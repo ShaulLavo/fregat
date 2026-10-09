@@ -3,8 +3,8 @@ import { GitStoreProvider } from '@/features/git/providers/store-provider'
 import { useDisplayedShell } from '@/features/workspace/hooks/use-displayed-shell'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import { KeepAliveProvider } from '@/lib/keep-alive/providers/keep-alive-provider'
-import { ThemeStudioSlot } from '@/components/theme-studio-slot'
-import { SessionDialogs } from '@/components/session-dialogs'
+import { DeferredThemeStudioSlot } from '@/components/deferred-theme-studio-slot'
+import { DeferredSessionDialogs } from '@/components/deferred-session-dialogs'
 import { ShellBody } from '@/features/workspace/components/shell-body'
 
 type WorkspaceViewProps = {
@@ -24,8 +24,8 @@ export function WorkspaceView({ rootFolder }: WorkspaceViewProps) {
       </KeepAliveProvider>
       {/* Outside the shell switch: the row or header that asked is often the first
           thing to unmount once the answer is yes. */}
-      <SessionDialogs />
-      <ThemeStudioSlot />
+      <DeferredSessionDialogs />
+      <DeferredThemeStudioSlot />
     </GitStoreProvider>
   )
 }

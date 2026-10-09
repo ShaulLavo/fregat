@@ -6,6 +6,7 @@ import { ShortcutsTab } from '@/features/dev/components/shortcuts-tab'
 import { HandlesTab } from '@/features/dev/components/handles-tab'
 import { IconsTab } from '@/features/dev/components/icons-tab'
 import { UpdatesTab } from '@/features/dev/components/updates-tab'
+import { OnboardingTab } from '@/features/dev/components/onboarding-tab'
 import { DEV_TABS, devTabForPath, devTabHref } from '@/features/dev/utils/tabs'
 
 /** The gallery at /dev. Tabs are plain links: one page load per tab is fine here. */
@@ -37,6 +38,7 @@ export function DevPage() {
         {active === 'handles' && <HandlesTab />}
         {active === 'icons' && <IconsTab />}
         {active === 'updates' && <UpdatesTab />}
+        {active === 'onboarding' && <OnboardingTab />}
       </main>
     </div>
   )

@@ -1,4 +1,6 @@
 import { resetSettingsIntentStore } from '@workspace/client-core/settings/intent-store'
+import { resetBootAppearance } from '@/lib/settings-boot-mirror'
+import { removeHtmlBootstrap } from '../factories/html-bootstrap'
 import { healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { activeServerOrigin } from '@/lib/client'
@@ -61,6 +63,8 @@ const TOAST_REMOVAL_MS = 200
 let toastsBefore = new Set<string | number>()
 
 beforeEach(() => {
+  resetBootAppearance()
+  removeHtmlBootstrap()
   toastsBefore = new Set(toast.getHistory().map((shown) => shown.id))
 })
 
@@ -79,6 +83,8 @@ afterEach(async () => {
   cleanup()
   // Optimistic UI can finish a test while a settings write still owns diagnostic timers.
   resetSettingsIntentStore()
+  resetBootAppearance()
+  removeHtmlBootstrap()
   // Unmounted diff views hand their parse to the shared service; the next test starts empty.
   await disposeHighlightingService()
   if (showedToast) await new Promise((resolve) => setTimeout(resolve, TOAST_REMOVAL_MS + 20))

@@ -52,7 +52,7 @@ import type { PlatformCommandBus } from '@/keymap/providers/command-context'
 import { FocusService } from '@/lib/focus/state/service'
 import type { TreeEntry, TreeResult } from '@/lib/file-system-types'
 import { treeModel, type TreeModel } from '@/lib/tree-model'
-import { AppProviders, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, seedHtmlTheme } from '../../../../test/render'
 
 const ROOT_PATH = 'repo'
 const PREPARED_ROOT_PATH = 'repo'
@@ -479,7 +479,7 @@ async function mountTreePane(
     readonly treeMounted?: boolean
   } = {},
 ) {
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   const fixture = await createBrowserWorkspace(options.rootPath ?? ROOT_PATH)
   if (options.density) setWorkbenchDensity(fixture.queryClient, options.density)
   const host = document.createElement('main')

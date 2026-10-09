@@ -1,0 +1,201 @@
+{
+  "classification": "experiment; no browser layout or public performance claim",
+  "date": "2026-10-09",
+  "machine": {
+    "cpu": "Intel Core i7-14700K",
+    "os": "Linux 7.2.8-arch1-2",
+    "bun": "1.4.2"
+  },
+  "method": {
+    "runs": 3,
+    "width": 40,
+    "includes": [
+      "fresh parser",
+      "piece table",
+      "replacement specs",
+      "inline map",
+      "projection row count"
+    ],
+    "excludes": ["browser layout", "paint", "fonts", "workers", "network"],
+    "baselineCommit": "106999614",
+    "baselineCode": "editor/packages/markdown/src/linkRender.ts",
+    "candidateSourceSha256": "458cc92aab24be6d4ab2b8141b2ca3aecc229a24dcfb652cfab9999ff34264a5",
+    "command": "for size in 524288 1048576; do bun editor/packages/editor/bench/markdownConstruction.ts \"$size\"; done",
+    "baselineMechanism": [
+      "scan all links per link",
+      "filter all specs per label",
+      "filter and splice all retained specs per label",
+      "rebuild label strings per marker"
+    ],
+    "equivalenceCases": 144,
+    "counterRegression": {
+      "links": 128,
+      "baselineRangeVisits": 33024,
+      "allowedRangeVisits": 5120
+    },
+    "processIsolation": "Each version and size used a fresh Bun process, with three fresh parser instances in that process.",
+    "treeSitterMdRevision": "e2ae3f735f614b3b618b5de71fc41644a180b9e7"
+  },
+  "results": [
+    {
+      "units": 524308,
+      "links": 6394,
+      "baseline": [
+        {
+          "run": 0,
+          "parseMs": 26.879496000000003,
+          "replacementsMs": 1595.655416,
+          "inlineMapMs": 30.708934,
+          "projectionMs": 33.43316099999993,
+          "totalMs": 1686.677007,
+          "replacements": 19182,
+          "rows": 12789
+        },
+        {
+          "run": 1,
+          "parseMs": 18.754192999999987,
+          "replacementsMs": 1577.213113,
+          "inlineMapMs": 26.712797000000137,
+          "projectionMs": 28.414804000000004,
+          "totalMs": 1651.0949070000001,
+          "replacements": 19182,
+          "rows": 12789
+        },
+        {
+          "run": 2,
+          "parseMs": 18.395946000000095,
+          "replacementsMs": 1408.9283569999998,
+          "inlineMapMs": 20.412286000000677,
+          "projectionMs": 16.911627999999837,
+          "totalMs": 1464.6482170000004,
+          "replacements": 19182,
+          "rows": 12789
+        }
+      ],
+      "candidate": [
+        {
+          "run": 0,
+          "parseMs": 26.822815,
+          "replacementsMs": 31.181923999999995,
+          "inlineMapMs": 25.680219000000008,
+          "projectionMs": 31.352858000000012,
+          "totalMs": 115.03781600000002,
+          "replacements": 19182,
+          "rows": 12789
+        },
+        {
+          "run": 1,
+          "parseMs": 17.802726000000007,
+          "replacementsMs": 17.798196999999988,
+          "inlineMapMs": 25.18413000000001,
+          "projectionMs": 21.316081999999994,
+          "totalMs": 82.101135,
+          "replacements": 19182,
+          "rows": 12789
+        },
+        {
+          "run": 2,
+          "parseMs": 18.322362999999996,
+          "replacementsMs": 16.08997500000001,
+          "inlineMapMs": 25.227336999999977,
+          "projectionMs": 21.590052000000014,
+          "totalMs": 81.229727,
+          "replacements": 19182,
+          "rows": 12789
+        }
+      ],
+      "median": {
+        "baseline": {
+          "replacementsMs": 1577.213113,
+          "projectionMs": 28.414804000000004,
+          "totalMs": 1651.0949070000001
+        },
+        "candidate": {
+          "replacementsMs": 17.798196999999988,
+          "projectionMs": 21.590052000000014,
+          "totalMs": 82.101135
+        }
+      }
+    },
+    {
+      "units": 1048616,
+      "links": 12788,
+      "baseline": [
+        {
+          "run": 0,
+          "parseMs": 61.676899000000006,
+          "replacementsMs": 7121.6917889999995,
+          "inlineMapMs": 51.715462000000116,
+          "projectionMs": 52.828191999999945,
+          "totalMs": 7287.912342,
+          "replacements": 38364,
+          "rows": 25577
+        },
+        {
+          "run": 1,
+          "parseMs": 39.60464900000079,
+          "replacementsMs": 9349.511261,
+          "inlineMapMs": 51.38035800000216,
+          "projectionMs": 59.12693799999761,
+          "totalMs": 9499.623206,
+          "replacements": 38364,
+          "rows": 25577
+        },
+        {
+          "run": 2,
+          "parseMs": 39.592398000000685,
+          "replacementsMs": 9007.320308999999,
+          "inlineMapMs": 45.62257800000225,
+          "projectionMs": 45.51292999999714,
+          "totalMs": 9138.048214999999,
+          "replacements": 38364,
+          "rows": 25577
+        }
+      ],
+      "candidate": [
+        {
+          "run": 0,
+          "parseMs": 62.160098000000005,
+          "replacementsMs": 56.86949100000001,
+          "inlineMapMs": 55.65957,
+          "projectionMs": 53.268654999999995,
+          "totalMs": 227.957814,
+          "replacements": 38364,
+          "rows": 25577
+        },
+        {
+          "run": 1,
+          "parseMs": 38.772918000000004,
+          "replacementsMs": 41.62675899999999,
+          "inlineMapMs": 54.27656999999999,
+          "projectionMs": 43.398256,
+          "totalMs": 178.074503,
+          "replacements": 38364,
+          "rows": 25577
+        },
+        {
+          "run": 2,
+          "parseMs": 37.80034699999999,
+          "replacementsMs": 34.38717400000007,
+          "inlineMapMs": 53.516389000000004,
+          "projectionMs": 62.61021999999991,
+          "totalMs": 188.31412999999998,
+          "replacements": 38364,
+          "rows": 25577
+        }
+      ],
+      "median": {
+        "baseline": {
+          "replacementsMs": 9007.320308999999,
+          "projectionMs": 52.828191999999945,
+          "totalMs": 9138.048214999999
+        },
+        "candidate": {
+          "replacementsMs": 41.62675899999999,
+          "projectionMs": 53.268654999999995,
+          "totalMs": 188.31412999999998
+        }
+      }
+    }
+  ]
+}

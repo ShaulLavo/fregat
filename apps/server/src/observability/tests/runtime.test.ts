@@ -614,7 +614,7 @@ describe('observability runtime', () => {
     await rm(stalePath, { recursive: true })
 
     const response = await app.handle(
-      new Request('http://local/fs/recents?limit=40&mode=file&showHidden=true', {
+      new Request('http://local/fs/recents?limit=40&showHidden=true', {
         headers: trustedOriginHeaders(),
       }),
     )

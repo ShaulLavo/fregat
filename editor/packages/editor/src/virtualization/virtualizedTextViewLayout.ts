@@ -13,7 +13,7 @@ import type { SelectionAffinity } from '../selections'
 import type { TextEdit } from '../tokens'
 import type { TextEditBatch } from '../textEditBatch'
 import type { DisplayProjectionTransition, WrapAdvance } from './displayProjectionTypes'
-import { PROPORTIONAL_WRAP_MARGIN_PX } from './glyphAdvances'
+import { glyphAdvancesFor, PROPORTIONAL_WRAP_MARGIN_PX } from './glyphAdvances'
 import { clamp } from '../style-utils'
 import {
   foldMapMatchesText,
@@ -198,9 +198,16 @@ function proportionalWrapAdvance(
   view: VirtualizedTextViewInternal,
   viewportWidth: number,
 ): WrapAdvance | null {
-  const glyphs = view.glyphs
-  if (!view.wrapEnabled || !glyphs || viewportWidth <= 0) return null
-  const width = Math.max(1, viewportWidth - view.currentGutterWidth - PROPORTIONAL_WRAP_MARGIN_PX)
+  if (!view.wrapEnabled || viewportWidth <= 0) return null
+  const glyphs = view.glyphs ?? glyphAdvancesFor(view.scrollElement)
+  if (!glyphs) return null
+  const width = Math.max(
+    1,
+    viewportWidth -
+      view.currentGutterWidth -
+      view.metrics.characterWidth -
+      PROPORTIONAL_WRAP_MARGIN_PX,
+  )
   const current = view.wrapAdvance
   if (current && current.width === width && current.glyphs === glyphs) return current
 

@@ -1,6 +1,6 @@
 import type { TerminalColor, TerminalTheme } from 'ghostty-webgpu'
 import type { Rgb } from '@workspace/contracts'
-import type { TerminalColors } from '@workspace/client-core/themes/palette'
+import type { TerminalColors } from '@workspace/contracts/themes/palette-rendering'
 
 /** The ghostty theme for a resolved palette, over the session's current one. */
 export function terminalThemeFor(colors: TerminalColors, current: TerminalTheme): TerminalTheme {

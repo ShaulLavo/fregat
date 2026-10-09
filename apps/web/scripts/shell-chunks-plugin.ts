@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { Plugin, ResolvedConfig, Rolldown } from 'vite'
+import type { HtmlTagDescriptor, Plugin, ResolvedConfig, Rolldown } from 'vite'
 import { createScriptError } from '../../../scripts/structured-errors.ts'
 
 /** Each lazy shell's root module, by the kind the boot script picks (src/lib/shell/utils/kind.ts). */
@@ -13,7 +13,13 @@ export const PHONE_BOOT_SCREENS = [
   'src/features/phone/components/session-screen.tsx',
 ] as const
 
-const PLACEHOLDER = '<!-- shell-chunks -->'
+/** Overlays loaded on demand (`src/components/deferred-overlay.tsx`), grouped apart from the workbench. */
+export const PHONE_OVERLAYS = [
+  'src/components/session-dialogs.tsx',
+  'src/components/theme-studio-slot.tsx',
+  'src/features/environments/components/picker-dialog.tsx',
+  'src/features/chat/components/provider-sign-in-dialog.tsx',
+] as const
 
 /**
  * Names every chunk and stylesheet each shell needs beyond the entry, in a JSON script the
@@ -29,17 +35,21 @@ export function shellChunksPlugin(webRoot: string): Plugin {
     },
     transformIndexHtml: {
       order: 'post',
-      handler(html, context) {
-        if (!html.includes(PLACEHOLDER)) return html
+      handler(_html, context): HtmlTagDescriptor[] {
+        if (path.basename(context.filename) !== 'index.html') return []
         const manifest =
           context.bundle && context.chunk
             ? shellManifest(webRoot, config.base, context.bundle, context.chunk)
             : {}
         const json = JSON.stringify(manifest).replaceAll('<', '\\u003c')
-        return html.replace(
-          PLACEHOLDER,
-          () => `<script type="application/json" id="shell-chunks">${json}</script>`,
-        )
+        return [
+          {
+            tag: 'script',
+            attrs: { type: 'application/json', id: 'shell-chunks' },
+            children: json,
+            injectTo: 'head-prepend',
+          },
+        ]
       },
     },
   }

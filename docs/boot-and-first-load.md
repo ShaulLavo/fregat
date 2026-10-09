@@ -4,6 +4,12 @@ What must be on screen at first frame, how first-load JavaScript is gated, and h
 a deploy keeps loading its lazy chunks. Written by Plan 109 (retired 2026-09-25; its measurements are
 in git history).
 
+## Initial appearance
+
+[HTML bootstrap](html-bootstrap.md) supplies current appearance and native image preloads in the
+first document. Its named producer/renderer/reader contract replaces appearance storage reads;
+normal settings projections own changes after startup.
+
 ## What boot is
 
 **Boot is the first usable frame of the last layout the user left.** On screen: the titlebar, the

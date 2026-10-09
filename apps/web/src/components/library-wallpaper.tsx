@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { AssetId } from '@workspace/contracts'
 import { cn } from '@workspace/ui/lib/utils'
 import { libraryImageUrl } from '@/lib/wallpapers/state/queries'
+import { wallpaperImageDecoded } from '@/lib/html-bootstrap'
 
 export function LibraryWallpaper({
   asset,
@@ -10,7 +11,9 @@ export function LibraryWallpaper({
   readonly asset: AssetId
   readonly className?: string
 }) {
-  const [readyAsset, setReadyAsset] = useState<AssetId | null>(null)
+  const [readyAsset, setReadyAsset] = useState<AssetId | null>(() =>
+    wallpaperImageDecoded(libraryImageUrl(asset, 'display')) ? asset : null,
+  )
   const [attempt, setAttempt] = useState({ asset, thumbnailFailed: false, fullFailed: false })
   if (attempt.asset !== asset) {
     setAttempt({ asset, thumbnailFailed: false, fullFailed: false })
@@ -23,7 +26,7 @@ export function LibraryWallpaper({
   )
   return (
     <>
-      {readyAsset === null && !attempt.thumbnailFailed ? (
+      {(readyAsset === null || attempt.fullFailed) && !attempt.thumbnailFailed ? (
         <img
           crossOrigin='anonymous'
           alt=''
@@ -48,7 +51,7 @@ export function LibraryWallpaper({
             data-workbench-wallpaper={ready ? '' : undefined}
             data-workbench-wallpaper-layer={ready ? 'still' : 'pending-still'}
             src={libraryImageUrl(imageAsset, 'display')}
-            decoding='async'
+            decoding={ready ? 'sync' : 'async'}
             onError={() =>
               setAttempt((current) => {
                 if (current.asset !== imageAsset) return current

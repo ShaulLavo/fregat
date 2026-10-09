@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
-import { buildNative } from './build-native'
+import { buildNative, copyNativeHost } from './build-native'
 import desktopPackage from '../package.json'
 import { checkApp } from './check-app'
 import {
@@ -58,7 +58,7 @@ export async function buildApp(arch: 'arm64' | 'x64' = process.arch === 'arm64' 
     ])
     const native = buildNative(desktop, arch)
     if (!native) throw createScriptError('The macOS native host was not built.')
-    copyFileSync(native, path.join(macos, 'platform-webview'))
+    copyNativeHost(native, path.join(macos, 'platform-webview'))
     const checkout = await readCheckout(root)
     const release: Release = {
       name: `app-${checkout.commit.slice(0, 8)}`,
@@ -70,7 +70,7 @@ export async function buildApp(arch: 'arm64' | 'x64' = process.arch === 'arm64' 
     await buildWeb(release, '/')
     await buildServer(release, 'installed', arch)
     mkdirSync(path.join(release.server, 'native'), { recursive: true })
-    copyFileSync(
+    copyNativeHost(
       path.join(macos, 'platform-webview'),
       path.join(release.server, 'native/platform-webview'),
     )

@@ -128,7 +128,7 @@ async function install(options: InstallOptions, control: InstallControl) {
     })
   if (options.from) {
     cpSync(path.join(path.resolve(options.from), 'web'), release.web, { recursive: true })
-    stampWebRelease(release.web, release.name)
+    await stampWebRelease(release.web, release.name)
   } else await buildWeb(release, webBase)
 
   if (release.previous) {

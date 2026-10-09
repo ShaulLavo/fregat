@@ -598,6 +598,18 @@ composing keyboard such as Gboard may type the letter), through the mesh.
 
 ## Follow-up items
 
+- **Phone first load grew back (found 2026-10-09).** The split above took the phone's first-load
+  script to 1,071,142 bytes gzip on 2026-09-26. By 2026-10-09 the gated phone conversation load
+  was 1,499,663 bytes on main `91001cdd8`, with 2.1 KB left under its limit. #1159 moves four
+  startup-closed dialogs out (−31.5 KB) and re-pins. The largest remaining cost a phone's first
+  screen does not need is the editor core, about 240 KB of the gzipped startup chunk. It enters
+  the first load through `apps/web/src/state/application-runtime.ts` →
+  `features/editor/state/runtime.ts`, the language-server connection pool and the workspace
+  document service. Next step: create the editor runtime on first use (a document, a file screen,
+  the composer when it needs it), measure with `bun run bundle:gate` and `agent:browser trace
+phone-startup-timing` before and after, and re-pin. Also find what else grew between 09-26 and
+  10-09 (`git log -p scripts/bundle-gate*` pins and the gate report's owners).
+
 Carried in from other plans. They wait for the phone shell and join its split plans.
 
 - **Phone haptics (from Plan 154 Phase 7).** Only if this plan keeps the phone web layout.

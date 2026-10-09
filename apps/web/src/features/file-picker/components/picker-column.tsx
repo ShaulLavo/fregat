@@ -9,8 +9,7 @@ import { isDirectoryEntry } from '@/lib/file-system-types'
 import { ColumnLoading } from '@/features/file-picker/components/column-loading'
 import { ColumnRow } from '@/features/file-picker/components/column-row'
 import { directoryQueryOptions } from '@/features/file-picker/utils/directory-query'
-import type { FilePickerMode } from '@/features/file-picker/utils/model'
-import { filterPickerEntries } from '@/features/file-picker/utils/type-filter'
+import { folderEntries } from '@/features/file-picker/utils/model'
 import { sortFilePickerEntries } from '@/features/file-picker/utils/sort-entries'
 import { folderLabel } from '@/features/file-picker/utils/columns'
 import { WidthHandle } from '@workspace/ui/patterns/width-handle'
@@ -29,11 +28,9 @@ const BY_NAME = { direction: 'ascending', key: 'name' } as const
  * and ← back out; only the column holding focus is a tab stop.
  */
 export function PickerColumn({
-  accept,
   active,
   column,
   isBusy,
-  mode,
   path,
   selectFirst,
   selectedPath,
@@ -47,11 +44,9 @@ export function PickerColumn({
   onOpen,
   onSelect,
 }: {
-  accept?: readonly string[]
   active: boolean
   column: number
   isBusy: boolean
-  mode: FilePickerMode
   path: string
   /** Entered with →: select the first entry once the folder has loaded. */
   selectFirst: boolean
@@ -68,13 +63,10 @@ export function PickerColumn({
   onSelect: (column: number, entry: FsEntry) => void
 }) {
   const query = useQuery({
-    ...directoryQueryOptions({ mode, path, query: '', showHidden }),
+    ...directoryQueryOptions({ path, query: '', showHidden }),
     placeholderData: (previous) => (previous?.currentEntry?.path === path ? previous : undefined),
   })
-  const entries = sortFilePickerEntries(
-    filterPickerEntries(query.data?.entries ?? [], mode, accept),
-    BY_NAME,
-  )
+  const entries = sortFilePickerEntries(folderEntries(query.data?.entries ?? []), BY_NAME)
   const containerRef = useRef<HTMLDivElement>(null)
   const [columnRef, measuredWidth] = useElementWidth<HTMLDivElement>()
   const { resizeColumn } = useFilePickerSessionActions()
@@ -162,10 +154,8 @@ export function PickerColumn({
         items={entries}
         renderRow={(entry) => (
           <ColumnRow
-            accept={accept}
             entry={entry}
             isBusy={isBusy}
-            mode={mode}
             rowProps={list.rowProps(entry.path)}
             selected={entry.path === selectedPath}
             onDirectoryIntent={onDirectoryIntent}
