@@ -4,7 +4,7 @@
 
 - Status: Approved.
 - Owner request: 2026-10-09. Document the mechanism before implementing it. Put wallpaper preloads in HTML and give the app current startup appearance without passing through localStorage.
-- Delivery now: this execution plan, its index entry, and roadmap placement. Product implementation remains paused until the owner starts it.
+- Execution authorized: 2026-10-09. Implementation is in progress; verification and delivery receipts follow below.
 - Scheduling: a bounded web/server startup change, independent of the large structural programs. Coordinate with Plan 337 on document admission and pairing, Plan 114 on native backdrop information, and Plan 320 on generated palette data.
 - Supersedes the implementation approach in [draft PR #1144](https://github.com/ShaulLavo/fregat/pull/1144), which waits for the settings query before mounting wallpaper. That approach must not ship. Its reproduction is useful evidence; its product changes are excluded.
 

@@ -33,9 +33,11 @@ root.setAttribute('data-density', appearance.density)
 root.setAttribute('data-feel', appearance.feel)
 if (!appearance.wallpaper.enabled) root.setAttribute('data-wallpaper-hidden', '')
 prepareWallpaperImage()
-startFont(appearance.uiFont)
-startFont(appearance.codeFont)
-if (parseFontRef(appearance.codeFont)?.source !== 'nerd') startFont(NERD_SYMBOLS_FONT)
+if (bootstrap?.kind === 'app') {
+  startFont(appearance.uiFont)
+  startFont(appearance.codeFont)
+  if (parseFontRef(appearance.codeFont)?.source !== 'nerd') startFont(NERD_SYMBOLS_FONT)
+}
 // The shell is chosen before the first paint, so its chunks download beside the entry script.
 const shell = initialShellKind((query) => window.matchMedia(query).matches)
 root.setAttribute('data-shell', shell)

@@ -11,7 +11,7 @@ export const webErrors = defineErrorCatalog('web', {
     status: 500,
     message: 'The app document is incomplete',
     why: 'The installed document is missing a required startup element or contains duplicates.',
-    fix: 'Build and install the web and server release together.',
+    fix: 'Restore the required startup elements and rebuild the release.',
   },
   BOOTSTRAP_ORIGIN_INVALID: {
     status: 403,
