@@ -6,7 +6,6 @@ import { WebGlTerminalRenderer } from '../../render/webgl/renderer.js'
 import { CanvasTerminalRenderer } from '../../render/canvas/renderer.js'
 import type { RendererTextFrameSnapshot } from '../../render/renderer.js'
 import { WebGpuTerminalRenderer } from '../../render/renderer.js'
-import type { TerminalSubmittedText } from '../submitted-frame.js'
 import type { RenderSchedulerClock } from '../../render/scheduler.js'
 import { TerminalSession } from '../../term/session.js'
 import { createTerminalElements } from '../elements.js'
@@ -84,14 +83,12 @@ async function fixture(
     autoFit: false,
     elements: createTerminalElements(host),
     rendererFactory: async (options) => {
-      const onTextFrame = options.onTextFrame
       const capturedOptions = {
         ...options,
         schedulerClock: clock,
-        onTextFrame: (snapshot: RendererTextFrameSnapshot) => {
-          publicFrames?.push(snapshot)
-          onTextFrame?.(snapshot)
-        },
+        onTextFrame: publicFrames
+          ? (snapshot: RendererTextFrameSnapshot) => publicFrames.push(snapshot)
+          : undefined,
       }
       renderer = await {
         webgl: WebGlTerminalRenderer,
@@ -219,16 +216,20 @@ describe('review failure boundaries', () => {
     terminal.write('\rnew')
     clock.flush()
     expect(held.rows.map((row) => row.text)).toEqual(text)
+    terminal.dispose()
+    expect(held.rows.map((row) => row.text)).toEqual(text)
   })
 
   it('keeps public renderer text snapshots cloneable without public native tokens', async () => {
     const frames: RendererTextFrameSnapshot[] = []
-    const { terminal, clock } = await fixture('webgl', false, false, frames)
+    const { terminal, session, clock } = await fixture('webgl', false, false, frames)
     terminal.write('held')
     clock.flush()
     const frame = frames.at(-1)!
     expect(() => structuredClone(frame)).not.toThrow()
     expect(frame).not.toHaveProperty('nativeFrame')
+    expect(frame).not.toHaveProperty('previousTextRows')
+    expect(session.renderState).not.toHaveProperty('retainDisplayedFrame')
   })
 })
 

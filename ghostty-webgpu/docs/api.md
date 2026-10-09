@@ -167,6 +167,15 @@ changes and native full damage refresh the complete viewport. Retention advances
 required row has been captured successfully. Pending writes and failed submissions preserve
 text from the last accepted frame; previously returned owned rows remain valid.
 
+Native retention owns at most three cell-array slots after a completed capture, plus frame and
+row metadata, separately allocated grapheme data, and reader scratch storage. A grid-size
+replacement can briefly own four frames because allocation precedes freeing the mismatched
+spare. The three retained slots can have different historical grid sizes.
+
+Public renderer `onTextFrame` snapshots contain owned rows, with no native identities or
+reader functions, and remain readable after later captures and disposal. The terminal's private
+GPU publication channel keeps the no-demand path lazy.
+
 Accessibility defaults to off. Pass `accessibility: {}` or configure its label and live-region
 limits to enable the mirror. `setAccessibilityEnabled(true)` enables it after opening. The
 mirror subscribes through `onText` and starts from the current displayed viewport. Disabling
@@ -185,7 +194,8 @@ only changed byte ranges. GPU sources provide `createFrameBuilder`.
 Atlas recovery is bounded to three registration sweeps. If a frame still cannot be built, the
 renderer reports a `frame_builder` error, retains the last submitted frame, and keeps damage and
 refresh requests pending. The next write, resize, font change, explicit refresh or cursor activity
-requests a full native rebuild. Recovery adds no failure-specific retry loop. Canvas resizing and
+requests a full native rebuild. Coordinated submission or capture failures request one recovery frame; a repeated failure
+waits for another render action. Canvas resizing and
 context replacement still invalidate prior pixels.
 
 Canvas 2D, DOM, accessibility, selection/copy and frame callbacks retain their shared row readers.

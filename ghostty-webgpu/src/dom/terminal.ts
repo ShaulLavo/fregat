@@ -18,6 +18,7 @@ import type {
 import type { RendererFrameSnapshot, RendererTextFrameSnapshot } from '../render/renderer.js'
 import { createCompatibleTerminalRenderer } from '../render/selector.js'
 import type { InactiveCursorStyle } from '../render/cursor.js'
+import { observeDisplayedFrame } from '../render/displayed-frame.js'
 import { EventEmitter } from '../term/events.js'
 import type { LinkProvider, LinkProviderRegistration } from '../term/links.js'
 import type { TerminalSession } from '../term/session.js'
@@ -625,7 +626,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.ensureActive()
     const after = this.execution.submittedFrame?.frame ?? 0
     return this.textSubscribers.subscribe((publication) => {
-      if (publication.text.frame > after) listener(publication)
+      if (publication.text.frame > after) return listener(publication)
     })
   }
 
@@ -1030,7 +1031,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
         font,
         onError: (cause) => this.reportError(cause, 'renderer.restore'),
         onCleanUpdate: () => this.handleCleanUpdate(),
-        onTextFrame: (snapshot) => this.handleFrame(snapshot),
+        [observeDisplayedFrame]: (snapshot) => this.handleFrame(snapshot),
         retainDisplayedText: true,
         needsFrameRows: () => Boolean(this.links?.needsFrame || this.textSubscribers.hasListeners),
         onRowsChanged: (rows) => {
