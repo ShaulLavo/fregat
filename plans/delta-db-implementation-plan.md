@@ -240,13 +240,22 @@ accepted edits to disk continuously, on save only, or per agent turn.
 
 **D4 — how a teammate reaches someone's Fregat server.** Before phase 4. The model is a remote
 server everyone opens, as in Google Docs: one machine holds the project and the others edit it
-through its server. Fregat does not sync two copies of a project between machines. Options: the
-existing browser connection when the server is reachable (same tailnet, a machine shared with
-another tailnet, a tunnel); WebRTC with the server
-as a peer, which needs a native data-channel library in Bun; or server-to-server QUIC with NAT
-traversal and relays (iroh-style) when both sides run Fregat. Criterion: works across home NATs
-without setup, and no company server can read the text. WebRTC stays the only option between two
-browsers with no server (Singapore on its own).
+through its server. Fregat does not sync two copies of a project between machines.
+
+Owner direction (2026-10-09): Tailscale first.
+
+- A teammate with Tailscale: share the machine with their tailnet; they open the server like
+  any of the owner's devices. Revoking the share ends access.
+- A guest without Tailscale: Tailscale Funnel publishes the server at a public HTTPS address, and
+  Fregat hands out an invite link that expires or is revoked when the session ends. Funnel makes
+  the server reachable from the internet, so Fregat's own sign-in and invite checks must hold on
+  their own.
+
+Later options, if people without Tailscale need direct connections: WebRTC with the server as a
+peer (needs a native data-channel library in Bun), or an embedded peer-to-peer library such as
+Iroh, which connects app instances by key with relays and needs no install or account. Criterion:
+works across home routers without setup, and no company server can read the text. WebRTC stays
+the only option between two browsers with no server (Singapore on its own).
 
 Presence already carries up to 32 selections per window, so each person can have several
 cursors. One person with two windows or devices shows up twice; group presence by person before
