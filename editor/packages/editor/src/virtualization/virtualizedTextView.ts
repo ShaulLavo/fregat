@@ -365,9 +365,10 @@ export class VirtualizedTextView {
       longLineChunkSize,
     )
     const tabSize = normalizeTabSize(options.tabSize)
-    const virtualizer = new FixedRowVirtualizer(
-      createVirtualizerOptions(rowHeight, overscan, rowGap, scrollMode, options.scrollPastEnd),
-    )
+    const virtualizer = new FixedRowVirtualizer({
+      ...createVirtualizerOptions(rowHeight, overscan, rowGap, scrollMode, options.scrollPastEnd),
+      maxScrollHeight: scrollMode === 'virtualized' ? viewport.maxScrollHeight : undefined,
+    })
     const initialTextSnapshot = createStringTextSnapshot('')
     const initialInjectedTextRows = options.injectedTextRows ?? []
     const initialModel = createVirtualizedTextViewModel({
