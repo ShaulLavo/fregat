@@ -12,8 +12,6 @@ import type { AbiLayout } from './abi.js'
 import { assertGhosttyResult, createGhosttyError } from './error.js'
 import { readTerminalLines } from './grid-text.js'
 import { requireLayout } from './memory.js'
-import { decodeSafeUint64 } from './safe-uint64.js'
-import { ScrollSnapshotReader } from './scroll-snapshot.js'
 import { readNativeBuffer } from './native-buffer.js'
 import { readSelectionText } from './native-text.js'
 import type { GhosttyRuntime } from './runtime.js'
@@ -29,7 +27,6 @@ import type {
   TerminalOptions,
   TerminalPoint,
   TerminalScrollbar,
-  TerminalScrollSnapshot,
   TerminalSelectionFormatOptions,
   TerminalSize,
 } from './types.js'
@@ -115,6 +112,15 @@ function fieldOffset(layout: AbiLayout, field: string): number {
   throw createGhosttyError('ghostty_type_json', `Required ABI field is missing: ${field}`)
 }
 
+function decodeSafeUint64(view: DataView, pointer: number, name: string): number {
+  const value = view.getBigUint64(pointer, true)
+  if (value <= BigInt(Number.MAX_SAFE_INTEGER)) return Number(value)
+  throw createGhosttyError(
+    'ghostty_terminal_get(SCROLLBAR)',
+    `${name} exceeds Number.MAX_SAFE_INTEGER`,
+  )
+}
+
 function nativeCursorStyle(style: TerminalCursorStyle): NativeTerminalCursorStyle {
   if (style === 'bar') return NativeTerminalCursorStyle.Bar
   if (style === 'block') return NativeTerminalCursorStyle.Block
@@ -140,7 +146,6 @@ export class GhosttyTerminal {
   private defaultCursorBlinkValue = false
   private defaultCursorStyleValue: TerminalCursorStyle = 'block'
   private disposed = false
-  private scrollReader?: ScrollSnapshotReader
   private handleValue: number
   private sizeValue: TerminalSize
 
@@ -219,12 +224,6 @@ export class GhosttyTerminal {
     return this.readBoolean(TerminalData.MouseTracking, 'MOUSE_TRACKING')
   }
 
-  get scrollSnapshot(): TerminalScrollSnapshot {
-    this.ensureActive()
-    this.scrollReader ??= new ScrollSnapshotReader(this.runtime)
-    return this.scrollReader.read(this.handleValue)
-  }
-
   get scrollbar(): TerminalScrollbar {
     const layout = requireLayout(this.runtime.layouts, 'GhosttyTerminalScrollbar')
     return this.readRequiredData(TerminalData.Scrollbar, layout.size, 'SCROLLBAR', (pointer) => ({
@@ -232,19 +231,16 @@ export class GhosttyTerminal {
         this.runtime.memory.view,
         pointer + fieldOffset(layout, 'len'),
         'scrollbar length',
-        'ghostty_terminal_get(SCROLLBAR)',
       ),
       offset: decodeSafeUint64(
         this.runtime.memory.view,
         pointer + fieldOffset(layout, 'offset'),
         'scrollbar offset',
-        'ghostty_terminal_get(SCROLLBAR)',
       ),
       total: decodeSafeUint64(
         this.runtime.memory.view,
         pointer + fieldOffset(layout, 'total'),
         'scrollbar total',
-        'ghostty_terminal_get(SCROLLBAR)',
       ),
     }))
   }
@@ -633,8 +629,6 @@ export class GhosttyTerminal {
 
   dispose(): void {
     if (this.disposed) return
-    this.scrollReader?.dispose()
-    this.scrollReader = undefined
     this.runtime.bridge.unregisterTerminal(this.handleValue)
     this.runtime.exports.ghostty_terminal_free(this.handleValue)
     this.runtime.releaseTerminal(this)

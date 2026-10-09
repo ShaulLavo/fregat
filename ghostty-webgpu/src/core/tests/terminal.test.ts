@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { GhosttyResult, TerminalData, TerminalMode, TerminalScreen } from '../abi.js'
+import { afterEach, describe, expect, it } from 'vitest'
+import { GhosttyResult, TerminalMode, TerminalScreen } from '../abi.js'
 import type { AbiLayouts } from '../abi.js'
 import { GhosttyRuntime } from '../runtime.js'
 import { GhosttyTerminal } from '../terminal.js'
@@ -9,7 +9,6 @@ let runtime: GhosttyRuntime | undefined
 afterEach(() => {
   runtime?.dispose()
   runtime = undefined
-  vi.restoreAllMocks()
 })
 
 function createScrollbarTerminal(values: {
@@ -219,65 +218,4 @@ describe('scrollbar uint64 decoding', () => {
 
     expect(() => terminal.scrollbar).toThrow('scrollbar total exceeds Number.MAX_SAFE_INTEGER')
   })
-})
-
-it('reads live scroll snapshots without scalar allocation after warming the descriptor', async () => {
-  runtime = await GhosttyRuntime.create()
-  const terminal = runtime.createTerminal({ columns: 8, rows: 3 })
-  terminal.write('0\r\n1\r\n2\r\n3\r\n4\r\n5')
-  const before = terminal.scrollSnapshot
-  expect(before).toEqual({
-    scrollbackLength: 3,
-    scrollbar: { length: 3, offset: 3, total: 6 },
-    viewportActive: true,
-  })
-  terminal.scrollToTop()
-  runtime.exports.memory.grow(1)
-  const allocate = vi.spyOn(runtime.memory, 'allocate')
-  const free = vi.spyOn(runtime.memory, 'free')
-  expect(terminal.scrollSnapshot).toEqual({
-    scrollbackLength: 3,
-    scrollbar: { length: 3, offset: 0, total: 6 },
-    viewportActive: false,
-  })
-  expect(allocate).not.toHaveBeenCalled()
-  expect(free).not.toHaveBeenCalled()
-  for (const action of [
-    () => terminal.resize({ columns: 12, rows: 4 }),
-    () => terminal.write('\x1b[?1049hA界'),
-    () => terminal.write('\x1b[?1049l'),
-  ]) {
-    action()
-    const expected = {
-      scrollbackLength: terminal.scrollbackLength,
-      scrollbar: terminal.scrollbar,
-      viewportActive: terminal.viewportActive,
-    }
-    allocate.mockClear()
-    free.mockClear()
-    expect(terminal.scrollSnapshot).toEqual(expected)
-    expect(allocate).not.toHaveBeenCalled()
-    expect(free).not.toHaveBeenCalled()
-  }
-  expect(before).toEqual({
-    scrollbackLength: 3,
-    scrollbar: { length: 3, offset: 3, total: 6 },
-    viewportActive: true,
-  })
-  free.mockClear()
-  terminal.dispose()
-  expect(free).toHaveBeenCalledTimes(1)
-  terminal.dispose()
-  expect(free).toHaveBeenCalledTimes(1)
-})
-
-it('rejects partially failing live scroll queries without returning stale fields', async () => {
-  runtime = await GhosttyRuntime.create()
-  const terminal = runtime.createTerminal({ columns: 8, rows: 3 })
-  const before = terminal.scrollSnapshot
-  const pointer = (terminal as unknown as { scrollReader: { buffer: number } }).scrollReader.buffer
-  runtime.memory.view.setInt32(pointer + 4, -1, true)
-  expect(() => terminal.scrollSnapshot).toThrow('ghostty_terminal_get_multi')
-  runtime.memory.view.setInt32(pointer + 4, TerminalData.Scrollbar, true)
-  expect(terminal.scrollSnapshot).toEqual(before)
 })
