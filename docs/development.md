@@ -6,7 +6,7 @@ how the repo is put together. the [readme](../README.md) covers what fregat is a
 
 - `apps/web`, the editor shell, workspace tree, git views, file picker, client state
 - `apps/server`, elysia rpc for filesystem, git, file watching, auth, provider adapters, and the typescript lsp websockets
-- `apps/desktop`, the Bun launcher, installed Chromium app integration, and native C/Objective-C system-webview hosts
+- `apps/desktop`, the Bun launcher, installed Chromium app integration, and native Zig/Swift system-webview hosts
 - `apps/mac`, the native swift client
 - `apps/tui`, the terminal client
 - `packages/contracts`, shared dtos, runtime schemas, the settings registry
@@ -33,6 +33,16 @@ Use Git 2.31 or newer. Run `bun run hooks:install` in each checkout that should 
 Relative selection follows a moved checkout. The installer preserves existing custom `core.hooksPath` settings and stops before writes when one applies. A custom hook manager can invoke `bun run hooks:pre-commit` explicitly. The first opt-in enables `extensions.worktreeConfig`. An ordinary common `core.bare=false` value moves into the main worktree's config. Bare repositories, `core.worktree` overrides, and unrelated dormant worktree configuration require separate Git setup. Existing common hooks remain in place.
 
 ## workspace libraries
+
+The Linux desktop host requires Zig 0.17.x, `pkg-config`, and WebKitGTK 4.1 development headers.
+The macOS host requires Swift 6 and the macOS SDK from the Xcode command-line tools.
+`bun run --cwd apps/desktop build:native` builds the host for the current platform. Linux uses
+`zig translate-c` to generate library declarations, then compiles the Zig host with safety checks.
+The macOS build compiles the Swift host with AppKit and WebKit, targeting macOS 11 and later.
+With a graphical session available, `bun run --cwd apps/desktop verify:native --evidence <directory>`
+exercises the real host's startup scripts, launcher messages, picker cancellation, persistent
+cookies and storage, state-home isolation, and shutdown. It opens temporary verification windows
+and writes protocol receipts to the evidence directory.
 
 Editor packages live in `editor/packages/`, and the terminal library lives in `ghostty-webgpu/`. Bun installs their workspace links from the root `bun.lock`. Run `bun install --frozen-lockfile` at the root, then `bun run build:workspaces` to prepare the exports used by production builds and typechecking.
 
