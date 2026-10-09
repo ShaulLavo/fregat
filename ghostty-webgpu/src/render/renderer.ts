@@ -97,7 +97,7 @@ type TerminalRendererMode = 'auto' | 'canvas2d-fill-text' | 'canvas2d-pixels'
 export type CanvasPaintMode = 'fill-text' | 'pixels'
 
 export interface WebGpuTerminalRendererOptions {
-  /** Eligibility for built-in device acquisition; custom device factories own their policy. */
+  /** Eligibility for initial built-in acquisition; custom device factories own their policy. */
   adapterPolicy?: 'hardware' | 'any'
   canvas: HTMLCanvasElement | OffscreenCanvas
   columns: number
@@ -248,7 +248,7 @@ export class WebGpuTerminalRenderer {
   private device: GPUDevice
   private focused = false
   private inactiveCursorStyle?: InactiveCursorStyle
-  private readonly deviceOwner: DeviceOwner
+  private readonly replacementDeviceOwner: DeviceOwner
   private deviceLease: DeviceLease
   private readonly coordinator?: FrameCoordinator
   private deviceGeneration = 1
@@ -290,7 +290,7 @@ export class WebGpuTerminalRenderer {
   private constructor(
     options: WebGpuTerminalRendererOptions,
     lease: DeviceLease,
-    deviceOwner: DeviceOwner,
+    replacementDeviceOwner: DeviceOwner,
     prepared: PreparedRenderer,
   ) {
     this.canvas = options.canvas
@@ -298,7 +298,7 @@ export class WebGpuTerminalRenderer {
     const device = lease.device
     this.device = device
     this.deviceLease = lease
-    this.deviceOwner = deviceOwner
+    this.replacementDeviceOwner = replacementDeviceOwner
     if (!options.deviceFactory && !options.schedulerClock)
       this.coordinator = sharedFrameCoordinator()
     this.renderState = options.renderState
@@ -342,12 +342,13 @@ export class WebGpuTerminalRenderer {
     const validated = validateRenderer(options)
     let owner = options.adapterPolicy === 'hardware' ? hardwareDeviceOwner : defaultDeviceOwner
     if (options.deviceFactory) owner = new DeviceOwner(options.deviceFactory)
+    const replacementOwner = options.deviceFactory ? owner : defaultDeviceOwner
     const lease = await owner.acquire()
     let prepared: PreparedRenderer | undefined
     try {
       textPassGlyphCapacity(lease.device, validated.grid.columns * validated.grid.rows)
       prepared = prepareRenderer(options, validated)
-      return new WebGpuTerminalRenderer(options, lease, owner, prepared)
+      return new WebGpuTerminalRenderer(options, lease, replacementOwner, prepared)
     } catch (cause) {
       try {
         prepared?.context.unconfigure()
@@ -921,7 +922,7 @@ export class WebGpuTerminalRenderer {
   private async requestReplacement(): Promise<DeviceLease | undefined> {
     try {
       this.deviceLease.retire()
-      return await this.deviceOwner.acquire()
+      return await this.replacementDeviceOwner.acquire()
     } catch (cause) {
       this.reportFrameFailure(cause)
       return undefined
