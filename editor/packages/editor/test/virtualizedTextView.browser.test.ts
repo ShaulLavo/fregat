@@ -579,7 +579,10 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
       view.scrollElement.dispatchEvent(new Event('scroll'))
       await browserFrames(3)
       const state = view.getState()
-      const firstRow = state.mountedRows.find((row) => row.index === state.visibleRange.start)!
+      const viewport = view.scrollElement.getBoundingClientRect()
+      const firstRow = state.mountedRows.find(
+        (row) => row.element.getBoundingClientRect().top >= viewport.top,
+      )!
       const offset = firstRow.startOffset
       view.focusInput()
       view.setSelection(offset, offset)
