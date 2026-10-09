@@ -2,11 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { descriptorFor } from '../settings/keys'
 import * as v from 'valibot'
 
-import {
-  nativePickerRequestSchema,
-  nativePickerResultSchema,
-  type NativePickerRequest,
-} from '../native-picker'
+import { nativePickerRequestSchema, nativePickerResultSchema } from '../native-picker'
 import { serverCapabilitiesSchema, serverIdentitySchema } from '../server-identity'
 
 const identity = {
@@ -51,51 +47,33 @@ describe('server identity', () => {
 })
 
 describe('native picker', () => {
-  it('accepts extensions and MIME types', () => {
-    const request = {
-      mode: 'file',
-      accept: ['.ts', 'image/png'],
-      startingPath: '/tmp',
-      multiple: true,
-    }
-    expect(v.safeParse(nativePickerRequestSchema, request).success).toBe(true)
+  it('accepts a request without a starting folder', () => {
+    expect(v.safeParse(nativePickerRequestSchema, {}).success).toBe(true)
   })
 
   it.each(['/tmp', 'C:\\Users\\person', 'D:/work', '\\\\server\\share\\folder'])(
     'accepts the absolute starting path %s',
     (startingPath) => {
-      expect(v.safeParse(nativePickerRequestSchema, { mode: 'folder', startingPath }).success).toBe(
-        true,
-      )
+      expect(v.safeParse(nativePickerRequestSchema, { startingPath }).success).toBe(true)
     },
   )
 
   it.each(['tmp', 'C:Users', '\\\\server', '/tmp/a\0b'])(
     'refuses the starting path %j',
     (startingPath) => {
-      expect(v.safeParse(nativePickerRequestSchema, { mode: 'folder', startingPath }).success).toBe(
-        false,
-      )
+      expect(v.safeParse(nativePickerRequestSchema, { startingPath }).success).toBe(false)
     },
   )
 
-  it('accepts a media range', () => {
-    expect(
-      v.safeParse(nativePickerRequestSchema, { mode: 'file', accept: ['image/*'] }).success,
-    ).toBe(true)
-  })
-
   it.each([
-    ['a relative starting path', { mode: 'folder', startingPath: 'tmp' }],
-    ['a glob in accept', { mode: 'file', accept: ['*.ts'] }],
-    ['a malformed wildcard MIME type', { mode: 'file', accept: ['image/p*ng'] }],
-    ['a wildcard type', { mode: 'file', accept: ['*/*'] }],
-    ['an unknown mode', { mode: 'save' }],
+    ['a file mode', { mode: 'file' }],
+    ['file types', { accept: ['.ts'] }],
+    ['multiple selection', { multiple: true }],
   ])('refuses %s', (_, request) => {
     expect(v.safeParse(nativePickerRequestSchema, request).success).toBe(false)
   })
 
-  it('keeps cancellation empty and a selection non-empty', () => {
+  it('keeps cancellation empty and a selection to one folder', () => {
     expect(v.safeParse(nativePickerResultSchema, { outcome: 'cancelled', paths: [] }).success).toBe(
       true,
     )
@@ -108,14 +86,9 @@ describe('native picker', () => {
     expect(
       v.safeParse(nativePickerResultSchema, { outcome: 'selected', paths: ['/a'] }).success,
     ).toBe(true)
-  })
-})
-
-describe('native picker request type', () => {
-  it('takes a readonly accept list', () => {
-    const accept: readonly string[] = ['.ts']
-    const request: NativePickerRequest = { mode: 'file', accept }
-    expect(request.accept).toBe(accept)
+    expect(
+      v.safeParse(nativePickerResultSchema, { outcome: 'selected', paths: ['/a', '/b'] }).success,
+    ).toBe(false)
   })
 })
 

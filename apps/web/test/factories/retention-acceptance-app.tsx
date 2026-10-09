@@ -25,7 +25,7 @@ import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { createBrowserWorkspace } from './browser-workspace'
 import { TestEditorStateProvider } from './editor-state-provider'
-import { AppProviders, seedBootMirrorTheme } from '../render'
+import { AppProviders, seedHtmlTheme } from '../render'
 import { RetentionAcceptanceIntent } from './retention-acceptance-intent'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { EditorTabActionsProvider } from '@/features/editor/providers/tab-actions-provider'
@@ -48,7 +48,7 @@ export async function mountRetentionAcceptanceApp(
   layout: 'groups' | 'surfaces' = 'groups',
   surface?: ReactNode,
 ) {
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   resetEditorColorThemeStore()
   syncEditorThemeSelection('dark', 'dark-plus')
   const rootPath = filesystemPath('repo')

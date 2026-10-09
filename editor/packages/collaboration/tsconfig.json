@@ -21,6 +21,8 @@
     "vitest.browser.config.ts",
     "vitest.server.config.ts",
     "vitest.editor.config.ts",
-    "../../global.d.ts"
+    "../../global.d.ts",
+    "bench/**/*.ts",
+    "vitest.cost.config.ts"
   ]
 }

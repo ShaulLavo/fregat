@@ -68,19 +68,34 @@ export class Effects {
   }
 
   set(command: EditId, effects: readonly Effect[]): void {
+    if (effects.some((effect) => effect.op.actor !== command.actor))
+      throw new CollabFailure('foreign-effect')
+    const targets = this.targets(effects)
+    if (targets.size === 0) throw new CollabFailure('empty-effects')
+    for (const [key, active] of targets) this.states.set(key, active)
+    this.commands.add(editKey(command))
+  }
+
+  project(effects: readonly Effect[]): EffectsSnapshot {
+    const targets = this.targets(effects)
+    const snapshot = this.snapshot()
+    return {
+      ...snapshot,
+      states: snapshot.states.map(([key, active]) => [key, targets.get(key) ?? active]),
+    }
+  }
+
+  private targets(effects: readonly Effect[]): ReadonlyMap<string, boolean> {
     const targets = new Map<string, boolean>()
     for (const effect of effects) {
       const key = editKey(effect.op)
-      if (effect.op.actor !== command.actor) throw new CollabFailure('foreign-effect')
       if (!this.states.has(key)) throw new CollabFailure('unknown-effect')
       if (typeof effect.active !== 'boolean') throw new CollabFailure('invalid-effect-state')
       if (targets.has(key) && targets.get(key) !== effect.active)
         throw new CollabFailure('conflicting-effects')
       targets.set(key, effect.active)
     }
-    if (targets.size === 0) throw new CollabFailure('empty-effects')
-    for (const [key, active] of targets) this.states.set(key, active)
-    this.commands.add(editKey(command))
+    return targets
   }
 
   snapshot(): EffectsSnapshot {

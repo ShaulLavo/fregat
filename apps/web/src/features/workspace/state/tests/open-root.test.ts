@@ -53,7 +53,7 @@ test('an abandoned open hands the active project back and records no recent', as
     expect(useActiveProjectStore.getState().workspaceRoot).toBe('previous')
     expect(switched).toEqual([])
     const recents = await client.fs.recents.get({
-      query: { limit: 30, mode: 'folder', showHidden: false },
+      query: { limit: 30, showHidden: false },
     })
     expect(recents.data?.entries.map((entry) => entry.path)).not.toContain('next')
   } finally {

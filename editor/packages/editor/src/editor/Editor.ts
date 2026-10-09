@@ -897,7 +897,10 @@ export class Editor {
   }
 
   setPresentationReady(ready: boolean): void {
+    if (this.disposed) return
+    const revealed = ready && !this.presentationReady
     this.presentationReady = ready
+    if (revealed) this.view.restorePresentationHighlights()
     if (ready) this.commitSnapshotIfReady()
   }
 

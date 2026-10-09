@@ -18,12 +18,11 @@ test('prefetch and load reuse the exact base-directory cache entry', async ({ cl
       useDirectoryTransition({
         currentPath: 'current',
         enabled: true,
-        mode: 'file',
         showHidden: false,
       }),
     { wrapper: queryClientWrapper(queryClient) },
   )
-  const queryKey = filePickerKeys.directory('target', '', 'file', false)
+  const queryKey = filePickerKeys.directory('target', '', false)
   const prefetch = result.current.preloadDirectory('target')
 
   expect(prefetch).toBeInstanceOf(Promise)
@@ -57,7 +56,6 @@ test('an optional missing-directory warmup resolves void and leaves the error in
       useDirectoryTransition({
         currentPath: 'current',
         enabled: true,
-        mode: 'file',
         showHidden: false,
       }),
     { wrapper: queryClientWrapper(queryClient) },
@@ -65,9 +63,9 @@ test('an optional missing-directory warmup resolves void and leaves the error in
   await act(async () => {
     await expect(result.current.preloadDirectory('missing')).resolves.toBeUndefined()
   })
-  expect(
-    queryClient.getQueryState(filePickerKeys.directory('missing', '', 'file', false))?.status,
-  ).toBe('error')
+  expect(queryClient.getQueryState(filePickerKeys.directory('missing', '', false))?.status).toBe(
+    'error',
+  )
   queryClient.clear()
 })
 
@@ -124,7 +122,6 @@ test('allows only the latest overlapping load to succeed', async ({ client }) =>
       useDirectoryTransition({
         currentPath: 'current',
         enabled: true,
-        mode: 'folder',
         showHidden: false,
       }),
     { wrapper: queryClientWrapper(queryClient) },
@@ -153,7 +150,6 @@ test('rejects an older intent that reaches loading after a newer navigation', as
       useDirectoryTransition({
         currentPath: 'current',
         enabled: true,
-        mode: 'folder',
         showHidden: false,
       }),
     { wrapper: queryClientWrapper(queryClient) },
@@ -168,9 +164,7 @@ test('rejects an older intent that reaches loading after a newer navigation', as
   })
 
   expect(outcomes).toEqual([false, true])
-  expect(
-    queryClient.getQueryState(filePickerKeys.directory('older', '', 'folder', false)),
-  ).toBeUndefined()
+  expect(queryClient.getQueryState(filePickerKeys.directory('older', '', false))).toBeUndefined()
   queryClient.clear()
 })
 
@@ -179,7 +173,6 @@ function useGatedDirectoryPath(initialPath: string) {
   const transition = useDirectoryTransition({
     currentPath,
     enabled: true,
-    mode: 'folder',
     showHidden: false,
   })
 

@@ -6,7 +6,7 @@ import {
   toHex,
   type Palette,
 } from '@workspace/contracts'
-import { flattenedAppColors } from '@workspace/client-core/themes/palette'
+import { flattenedAppColors } from '@workspace/contracts/themes/palette-rendering'
 
 import type { TerminalColorMode } from '@/host/utils/capabilities'
 import { colorForTerminal } from '@/theme/utils/colors'

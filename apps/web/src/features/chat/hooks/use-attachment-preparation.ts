@@ -4,6 +4,7 @@ import { errorMessage } from '@/lib/error-message'
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { stageChatInputFiles, uploadStagedAttachment } from '../state/prepare-attachments'
+import { stageMachineFiles } from '../state/machine-attachments'
 import { cancelAttachmentUpload, removeDraftAttachment } from '../state/attachment-uploads'
 import {
   chatInputAttachmentsPreparing,
@@ -28,7 +29,11 @@ export function useAttachmentPreparation(target: ChatInputDraftTarget) {
     mutationKey: chatMutationKeys.attachments(target.environmentId, target.draftKey),
     scope: { id: `attachments:${target.environmentId}:${target.draftKey}` },
     mutationFn: async (
-      input: { files: readonly File[] } | { retry: string } | { remove: ChatInputAttachment },
+      input:
+        | { files: readonly File[] }
+        | { paths: readonly string[] }
+        | { retry: string }
+        | { remove: ChatInputAttachment },
     ) => {
       const drafts = useChatInputDraftStore.getState()
       const updateAttachment = (
@@ -42,6 +47,14 @@ export function useAttachmentPreparation(target: ChatInputDraftTarget) {
           draftTarget: target,
           existingCount: drafts.getDraft(target).attachments.length,
           files: input.files,
+          onError: setError,
+        })
+      if ('paths' in input)
+        return stageMachineFiles({
+          addAttachments: drafts.addAttachments,
+          draftTarget: target,
+          existingCount: drafts.getDraft(target).attachments.length,
+          paths: input.paths,
           onError: setError,
         })
       const attachment =
@@ -97,6 +110,11 @@ export function useAttachmentPreparation(target: ChatInputDraftTarget) {
     prepare: (files: readonly File[]) => {
       if (!files.length) return Promise.resolve(false)
       return start({ files })
+    },
+    /** Files on the draft's own machine, named by their paths there. */
+    attachFromMachine: (paths: readonly string[]) => {
+      if (!paths.length) return Promise.resolve(false)
+      return start({ paths })
     },
     retry: (id: string) => start({ retry: id }),
     remove: (id: string) => {

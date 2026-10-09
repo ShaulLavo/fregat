@@ -89,6 +89,7 @@ export function mountDocsEditor(host: HTMLElement, options: DocsEditorOptions) {
     for (const listener of listeners) listener()
   }
   const editor: Editor = new Editor(element, {
+    presentationReady: false,
     plugins,
     keymap: { packs: [...defaultEditorPacks, markdownPack] },
     fontFamily: options.fontFamily,

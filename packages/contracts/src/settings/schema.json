@@ -860,13 +860,13 @@
     },
     "files.picker.view": {
       "default": "auto",
-      "description": "How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file.",
+      "description": "How the folder picker shows a folder: columns, a list, or icons. Auto uses columns.",
       "enum": ["auto", "columns", "icons", "list"],
       "type": "string"
     },
     "files.previewKilobytes": {
       "default": 64,
-      "description": "Kilobytes of a text file the file picker and quick open read for their preview. A longer file shows its first part and says how much of it that is.",
+      "description": "Kilobytes of a text file quick open reads for its preview. A longer file shows its first part and says how much of it that is.",
       "maximum": 1024,
       "minimum": 4,
       "type": "integer"
@@ -1713,7 +1713,7 @@
     },
     "window.nativeDialogTimeoutSeconds": {
       "default": 300,
-      "description": "Seconds a desktop file chooser or startup message stays open before its helper closes.",
+      "description": "Seconds a desktop folder chooser or startup message stays open before its helper closes.",
       "maximum": 3600,
       "minimum": 1,
       "type": "integer"

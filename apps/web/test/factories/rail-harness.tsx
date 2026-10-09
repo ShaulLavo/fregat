@@ -3,7 +3,7 @@ import type { KeybindingPreset } from '@workspace/client-core/commands/metadata'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { Toaster } from '@workspace/ui/components/sonner'
 import { toast } from 'sonner'
-import { SessionDialogs } from '@/components/session-dialogs'
+import { DeferredSessionDialogs } from '@/components/deferred-session-dialogs'
 import { ChatPanelHeader } from '@/features/chat/components/chat-panel-header'
 import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-manager-store'
 import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
@@ -252,7 +252,7 @@ export function renderRailHarness(
           <SessionRail />
         </Profiler>
       )}
-      <SessionDialogs />
+      <DeferredSessionDialogs />
       <Toaster />
       <ProjectDeleteDialog />
       <ProjectRenameDialog />
@@ -290,7 +290,7 @@ export function renderSessionHeaders(harness: RailHarness) {
           onSelectSession={() => {}}
         />
       </section>
-      <SessionDialogs />
+      <DeferredSessionDialogs />
       <Toaster />
     </>,
   )

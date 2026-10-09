@@ -3,6 +3,8 @@ import { init, MarkdownDocument } from 'tree-sitter-md'
 import { createInlineMap, inlineRowForBufferRow } from '@singapore-editor/core/rendering'
 import { createPieceTableSnapshot, createStringTextSnapshot } from '@singapore-editor/core/document'
 import { markdownInlineReplacements } from '../src/replacements'
+import { renderMarkdownLinks, type MarkdownLink } from '../src/linkRender'
+import type { InlineReplacementSpec } from '@singapore-editor/core/rendering'
 
 beforeAll(() => init())
 
@@ -176,4 +178,170 @@ it('hides multiline link targets while preserving source lines and whole-link re
   expect(
     specs.every((spec) => spec.revealRange?.start === 0 && spec.revealRange.end === source.length),
   ).toBe(true)
+})
+
+it('visits link and marker ranges a bounded number of times as the document grows', () => {
+  for (const count of [128, 1024]) {
+    const unit = '[label](url)\n'
+    let visits = 0
+    const specs: InlineReplacementSpec[] = []
+    const links: MarkdownLink[] = []
+    for (let index = 0; index < count; index++) {
+      const start = index * unit.length
+      specs.push({
+        id: `marker:${index}`,
+        get startIndex() {
+          visits++
+          return start
+        },
+        endIndex: start + 1,
+        text: '',
+      })
+      links.push({
+        get span() {
+          visits++
+          return { start, end: start + unit.length - 1 }
+        },
+        label: { start: start + 1, end: start + 6 },
+        href: 'url',
+      })
+    }
+    specs.reverse()
+    links.reverse()
+    renderMarkdownLinks(specs, createStringTextSnapshot(unit.repeat(count)), links, {})
+    expect(visits).toBeLessThan(count * 40)
+    expect(specs.slice(0, count).map((spec) => spec.id)).toEqual(
+      Array.from({ length: count }, (_, index) => `marker:${count - index - 1}`),
+    )
+    expect(specs.slice(count).map((spec) => spec.startIndex)).toEqual(
+      links.map((link) => link.label.start),
+    )
+    expect(specs.length).toBe(count * 2)
+    expect(
+      specs.filter((spec) => spec.kind === 'link').every((spec) => spec.text === 'label'),
+    ).toBe(true)
+  }
+})
+
+it('keeps marker order and link fragment boundaries with formatted multiline labels', () => {
+  const text = 'before **plain** [**bold** and\n`code` ![alt](image)](target) after [second](url)'
+  const specs = markdownInlineReplacements(createStringTextSnapshot(text), parseMarkdown(text))
+  expect(
+    specs.map(({ kind, startIndex, endIndex, text, wrap, revealRange }) => ({
+      kind,
+      startIndex,
+      endIndex,
+      text,
+      wrap,
+      revealRange,
+    })),
+  ).toMatchInlineSnapshot(`
+    [
+      {
+        "endIndex": 9,
+        "kind": "marker",
+        "revealRange": undefined,
+        "startIndex": 7,
+        "text": "",
+        "wrap": undefined,
+      },
+      {
+        "endIndex": 16,
+        "kind": "marker",
+        "revealRange": undefined,
+        "startIndex": 14,
+        "text": "",
+        "wrap": undefined,
+      },
+      {
+        "endIndex": 18,
+        "kind": "link-marker",
+        "revealRange": {
+          "end": 60,
+          "kind": 16,
+          "start": 17,
+        },
+        "startIndex": 17,
+        "text": "",
+        "wrap": undefined,
+      },
+      {
+        "endIndex": 60,
+        "kind": "link-target",
+        "revealRange": {
+          "end": 60,
+          "kind": 16,
+          "start": 17,
+        },
+        "startIndex": 51,
+        "text": "",
+        "wrap": undefined,
+      },
+      {
+        "endIndex": 68,
+        "kind": "link-marker",
+        "revealRange": {
+          "end": 80,
+          "kind": 16,
+          "start": 67,
+        },
+        "startIndex": 67,
+        "text": "",
+        "wrap": undefined,
+      },
+      {
+        "endIndex": 80,
+        "kind": "link-target",
+        "revealRange": {
+          "end": 80,
+          "kind": 16,
+          "start": 67,
+        },
+        "startIndex": 74,
+        "text": "",
+        "wrap": undefined,
+      },
+      {
+        "endIndex": 30,
+        "kind": "link",
+        "revealRange": {
+          "end": 60,
+          "kind": 16,
+          "start": 17,
+        },
+        "startIndex": 18,
+        "text": "bold and",
+        "wrap": "text",
+      },
+      {
+        "endIndex": 51,
+        "kind": "link",
+        "revealRange": {
+          "end": 60,
+          "kind": 16,
+          "start": 17,
+        },
+        "startIndex": 31,
+        "text": "code alt",
+        "wrap": "text",
+      },
+      {
+        "endIndex": 74,
+        "kind": "link",
+        "revealRange": {
+          "end": 80,
+          "kind": 16,
+          "start": 67,
+        },
+        "startIndex": 68,
+        "text": "second",
+        "wrap": "text",
+      },
+    ]
+  `)
+})
+
+it('orders nested formatting markers beyond the first 16 bits of source offsets', () => {
+  const prefix = `${'a'.repeat(70_000)} `
+  expect(preview(`${prefix}[***both*** and **bold**](url)`)).toBe(`${prefix}both and bold`)
 })

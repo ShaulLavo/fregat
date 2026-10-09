@@ -164,6 +164,7 @@ function renderActions({ existingSession = false } = {}) {
               disabled={false}
               draftTarget={draftTarget}
               interactionMode='default'
+              machineFiles={{ limit: 8, startPath: null, onAttach: () => {} }}
               runtimeMode='full-access'
               sendDisabled={false}
               statusLabel='Working'

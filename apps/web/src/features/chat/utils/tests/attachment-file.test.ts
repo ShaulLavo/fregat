@@ -1,3 +1,5 @@
+// Cold server module transforms can exceed the test budget on a contended worker.
+import '../../../../../test/server'
 import { http, HttpResponse } from 'msw'
 import { server as transport } from '../../../../../test/msw/server'
 import { gzipSync, brotliCompressSync } from 'node:zlib'

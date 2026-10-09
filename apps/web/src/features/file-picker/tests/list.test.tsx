@@ -16,7 +16,7 @@ const actions = {
 
 test('keeps the listbox focused while loading and when a folder is empty', () => {
   const view = renderList([], { status: 'loading' })
-  const listbox = screen.getByRole('listbox', { name: 'Folders and files' })
+  const listbox = screen.getByRole('listbox', { name: 'Folders' })
 
   listbox.focus()
   expect(document.activeElement).toBe(listbox)
@@ -41,7 +41,7 @@ test.each(['ArrowLeft', 'Backspace'])('leaves an empty folder with %s', (key) =>
       },
     ),
   )
-  const listbox = screen.getByRole('listbox', { name: 'Folders and files' })
+  const listbox = screen.getByRole('listbox', { name: 'Folders' })
   listbox.focus()
   fireEvent.keyDown(listbox, { key })
   expect(parentRequests).toBe(1)
@@ -68,7 +68,6 @@ function pickerList(
         isSearching={false}
         loadState={loadState}
         listRef={options.listRef}
-        mode='folder'
         onDirectoryIntent={() => undefined}
         onEntryDoubleClick={() => undefined}
         onCommitEntry={() => undefined}
