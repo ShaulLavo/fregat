@@ -799,3 +799,35 @@ it('restores wrapped physical rows after context loss and a grid resize', async 
   }
   expect(gl.getError()).toBe(gl.NO_ERROR)
 })
+
+it('fully repairs wrapped resident rows after a failed GPU upload', async () => {
+  const source = await runtimeFixture(8, 3)
+  source.terminal.write('\x1b[?25lA\r\nB\r\nC')
+  const onError = vi.fn()
+  const { canvas, clock, renderer } = await rendererFixture(source, { onError })
+  clock.flushFrame()
+  source.terminal.write('\x1b[3;1H\r\nD')
+  renderer.notifyWrite()
+  clock.flushFrame()
+  const frames = renderer.metrics.submittedFrames
+  const injected = createGhosttyError('frame_builder', 'Injected GPU upload failure')
+  vi.spyOn(canvas.getContext('webgl2')!, 'bufferSubData').mockImplementationOnce(() => {
+    throw injected
+  })
+  source.terminal.write('\x1b[3;1H\r\nE')
+  renderer.notifyWrite()
+  clock.flushFrame()
+  expect(onError).toHaveBeenCalledExactlyOnceWith(injected)
+  expect(renderer.metrics.submittedFrames).toBe(frames)
+  expect(source.state.dirty).not.toBe(RenderStateDirty.False)
+  renderer.schedule()
+  clock.flushFrame()
+  expect(renderer.metrics.submittedFrames).toBe(frames + 1)
+  expect(source.state.dirty).toBe(RenderStateDirty.False)
+  const oracleSource = await runtimeFixture(8, 3)
+  oracleSource.terminal.write('\x1b[?25lC\r\nD\r\nE')
+  const oracle = await rendererFixture(oracleSource)
+  oracle.clock.flushFrame()
+  expect(await renderer.capturePixels()).toEqual(await oracle.renderer.capturePixels())
+  expect(clock.frames.size).toBe(0)
+})
