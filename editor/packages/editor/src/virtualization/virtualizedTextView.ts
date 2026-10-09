@@ -1,4 +1,4 @@
-import { isTextareaElement } from '../dom'
+import { isElementNode, isTextareaElement } from '../dom'
 import {
   acquireRowPresentation,
   invalidateRowPresentations,
@@ -2610,8 +2610,7 @@ function rowOffsetFromCaretHit(
 }
 
 function auxiliaryCaretHitElement(node: Node): HTMLElement | null {
-  const element =
-    node instanceof node.ownerDocument!.defaultView!.Element ? node : node.parentElement
+  const element = isElementNode(node) ? node : node.parentElement
   return element?.closest<HTMLElement>(AUXILIARY_CARET_HIT_SELECTOR) ?? null
 }
 

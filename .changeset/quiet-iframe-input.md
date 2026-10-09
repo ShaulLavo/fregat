@@ -2,4 +2,4 @@
 '@singapore-editor/core': patch
 ---
 
-Fixed editors mounted in same-origin iframes so `setText()` and `dispose()` work with the textarea input route. Input synchronization, composition, embedded control checks, and row boundary checks now use the element's own browser realm.
+Fixed editors mounted in same-origin iframes so `setText()`, native selection reconciliation, and textarea input work in the editor's own document. Row boundary checks, caret hit testing, embedded control checks, and `dispose()` also work after the iframe is removed.
