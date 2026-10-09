@@ -238,7 +238,7 @@
     "@singapore-editor/collab#test": {
       "dependsOn": ["^build", "@singapore-editor/collaboration#build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/packages/collaboration/src/**"],
-      "env": ["COLLAB_STRESS", "COLLABORATION_LONG_RUN"],
+      "env": ["COLLAB_STRESS", "COLLAB_STRESS_SHARD", "COLLABORATION_LONG_RUN"],
       "outputs": []
     },
     "@singapore-editor/collab#typecheck": {

@@ -39,6 +39,7 @@ export class SessionDocument implements DocumentEngine<Envelope> {
   readonly engine = createEngine()
   readonly participant: Participant
   private readonly base = this.engine.snapshot()
+  private batching = false
   private host = this.createHost()
   private history: Confirmation<Envelope>[] = []
   private records = new Map<string, Confirmation<Envelope>>()
@@ -80,12 +81,30 @@ export class SessionDocument implements DocumentEngine<Envelope> {
     this.history.push(record)
     this.records.set(editKey(record.id), record)
     this.confirmations.push(hostMessage(record))
-    if (!this.batch) this.settleProjection()
+    if (!this.batch && !this.batching) this.settleProjection()
   }
   settleProjection() {
     if (!this.confirmations.length) return
     this.participant.receive(this.confirmations)
     this.confirmations = []
+  }
+  sequenceBatch(edits: readonly { readonly edit: Envelope; readonly rejection?: string }[]) {
+    this.batching = true
+    try {
+      return edits.map(({ edit, rejection }) => this.sequence(edit, rejection))
+    } finally {
+      this.batching = false
+      if (!this.batch) this.settleProjection()
+    }
+  }
+  applyBatch(records: readonly Confirmation<Envelope>[]): boolean {
+    this.batching = true
+    try {
+      return records.every((record) => this.apply(record))
+    } finally {
+      this.batching = false
+      if (!this.batch) this.settleProjection()
+    }
   }
   private valid(record: Confirmation<Envelope>, tip: Checkpoint) {
     const { hash: digest, ...body } = record
@@ -145,6 +164,7 @@ export function sessionNetwork(documents: readonly DocumentEngine<Envelope>[], b
   const queue: { from: number; to: number; message: Message<Envelope> }[] = []
   const topology = new Set<string>()
   const replay: Envelope[] = []
+  const confirmationSizes: number[] = []
   let commits = 0
   let now = 0
   const sessions = documents.map(
@@ -163,6 +183,7 @@ export function sessionNetwork(documents: readonly DocumentEngine<Envelope>[], b
         send: (to, message) => {
           const target = Number(to.slice(5))
           if (!topology.has(`${index}:${target}`)) return
+          if (message.type === 'CONFIRM') confirmationSizes.push(message.payload.records.length)
           if (message.type === 'RECONCILE_COMMIT') {
             replay.push(...message.payload.replay)
             commits++
@@ -207,5 +228,5 @@ export function sessionNetwork(documents: readonly DocumentEngine<Envelope>[], b
     }
     advance()
   }
-  return { sessions, replay, flush, advance, partition, commits: () => commits }
+  return { sessions, replay, confirmationSizes, flush, advance, partition, commits: () => commits }
 }

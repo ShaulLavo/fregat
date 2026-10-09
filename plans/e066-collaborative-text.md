@@ -171,23 +171,33 @@ Types' and Fugue's test suites. The research settles the rest:
   wins; the test documents that accepted-envelope counterexample separately.
 - **Retained metadata grows** with edit history while tombstones stay exact. Measure piece and
   identity-run growth over long sessions before deciding on identity compaction.
-- **Replay cost** grows with the pending queue; a long offline queue is the main latency risk.
-  Replay may run in slices if it exceeds the frame budget.
-  - Approved follow-up, 2026-10-09: measure and reduce repeated pending replay during rejoin.
-    Reproduce with `COLLABORATION_LONG_RUN=1 bun run --cwd editor/packages/collab test
-test/offline-order.test.ts --project textbuffer -t 'effects=false, adapter=document'
---reporter verbose`, through the host's job runner. Two groups author 2,000 edits each;
-    the production document emitted `4001 total; 2000 unchanged losing-branch envelopes
-replayed; four peers; zero rejected/blocked/pending`, then exceeded the original
-    120-second test timeout at 241 seconds in a shared-machine run. The long-run timeout is
-    now 600 seconds; default cases remain small. Ordering and edit loss were ruled out by
-    text, retained-ID, visible-ID, acceptance and replay-envelope assertions.
-    Start at `editor/packages/collaboration/src/document.ts:159` and
-    `editor/packages/collab/src/participant.ts:161,242`: single-record confirmations restore
-    confirmed state and replay the remaining queue. Count replayed operations at 1, 10, 100,
-    1,000 and 2,000 pending edits before changing batching or reconciliation; preserve the
-    existing correctness assertions. The engine fixture batches projection in stress mode,
-    while the production document still confirms each record normally.
+- **Replay cost.** The approved rejoin follow-up is implemented in PR #1112 (2026-10-09).
+  The original single-record confirmation path restored confirmed state and replayed the
+  remaining queue after every acknowledgement. A 2,000-edit losing branch replayed
+  2,001,000 pending envelopes. `Participant` now retains one confirmed snapshot, an
+  acknowledged-envelope prefix, and an insertion-ordered pending map. Exact unchanged
+  head acknowledgements advance that prefix with zero engine applies or restores. Foreign
+  edits and rejections materialize the prefix and reconcile once per received batch.
+  Snapshot-copying engines retain no per-pending-edit snapshots.
+  - Session submission and confirmation carry arrays bounded by the replay window and
+    transport message size. The production document publishes one exact editor reconcile
+    per batch, including a valid prefix before an invalid confirmation suffix.
+  - A/B/B/A production-document experiment, shared machine, with 2,000 edits per branch
+    and a real editor snapshot buffer: original 58.704 s / 68.149 s; changed 403.875 ms /
+    526.624 ms. Pending replay fell to 2,000 envelopes in one pass; engine applies fell
+    from 2,005,001 to 4,001; editor publications fell from 2,001 to two. These are runtime
+    document measurements, not browser frame or isolated-machine headline claims.
+  - Reproduce the counted bounds and existing ordering assertions with
+    `COLLABORATION_LONG_RUN=1 bun run --cwd editor/packages/collab test
+test/offline-order.test.ts test/order-independence.test.ts test/replay-work.test.ts
+test/document-replay.test.ts --maxWorkers=1`. Both engines passed all 44 tests in
+    171.84 s. The counted 2,000/2,000 case bounds envelope applies by three times the
+    branch length and one restore; the production batch bounds them by twice the branch
+    length and two exact publications. Typing at 0, 1, 10 and 100 pending edits retains
+    one engine apply, zero restores and one snapshot per authored edit.
+  - Remaining foreign edits can still require pending replay. Measure that distinct
+    workload before adding scheduling or slicing; this change preserves placement,
+    identity, acceptance, rejection and undo assertions without deferring work.
 - **Host-rejected edits** that later pending edits depend on need a defined outcome: pending
   dependants are rejected with them and surfaced, never re-placed by offset.
 - **Unicode contract.** Code-unit IDs with whole-pair edits follow Loro's contract. Yjs's

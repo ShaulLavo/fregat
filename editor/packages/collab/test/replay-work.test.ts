@@ -16,7 +16,7 @@ function accepted(host: Host, envelope: Envelope): HostMessage {
   return message
 }
 
-test('unchanged own-head acknowledgements promote saved snapshots without applying or restoring', () => {
+test('unchanged own-head acknowledgements advance the confirmed prefix without applying or restoring', () => {
   const { engine, participant, host } = setup()
   const pending = participant.localBatch(
     Array.from({ length: 20 }, (_, offset) => ({ offset, deleteCount: 0, text: 'a' })),
@@ -59,12 +59,12 @@ test('a mixed host batch restores once and replays only remaining pending edits'
   participant.subscribe(({ edits }) => publications.push(edits))
   participant.receive(messages)
   expect(restore).toHaveBeenCalledTimes(1)
-  expect(apply).toHaveBeenCalledTimes(3)
+  expect(apply).toHaveBeenCalledTimes(4)
   expect(publications).toEqual([engine.changesBetween(before)])
   expect(participant.state().pending.map((edit) => edit.id)).toEqual([pending[2]!.id])
   participant.receive([accepted(host, pending[2]!)])
   expect(restore).toHaveBeenCalledTimes(1)
-  expect(apply).toHaveBeenCalledTimes(3)
+  expect(apply).toHaveBeenCalledTimes(4)
   expect(participant.text()).toBe(host.text())
 })
 
@@ -99,4 +99,22 @@ test('installing a long split and confirming its losing branch has linear envelo
   expect(restore).toHaveBeenCalledTimes(1)
   expect(participant.state().pending).toEqual([])
   expect(participant.text()).toBe(host.text())
-})
+}, 120_000)
+
+test.each([0, 1, 10, 100])(
+  'typing with %i pending edits applies one envelope and takes one snapshot',
+  (count) => {
+    const { engine, participant } = setup()
+    if (count)
+      participant.localBatch(
+        Array.from({ length: count }, (_, offset) => ({ offset, deleteCount: 0, text: 'a' })),
+      )
+    const apply = vi.spyOn(engine, 'apply')
+    const restore = vi.spyOn(engine, 'restore')
+    const snapshot = vi.spyOn(engine, 'snapshot')
+    participant.local({ offset: count, deleteCount: 0, text: 'b' })
+    expect(apply).toHaveBeenCalledTimes(1)
+    expect(restore).toHaveBeenCalledTimes(0)
+    expect(snapshot).toHaveBeenCalledTimes(1)
+  },
+)

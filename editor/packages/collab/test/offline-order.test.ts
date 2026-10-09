@@ -93,6 +93,7 @@ for (const effects of [false, true]) {
         .slice(1)
         .map((record) => record.edit)
       const losingOrigins = new Map(losing.map((edit) => [editKey(edit.id), JSON.stringify(edit)]))
+      net.confirmationSizes.length = 0
       net.partition([[0, 1, 2, 3]])
       for (
         let retry = 0;
@@ -102,6 +103,8 @@ for (const effects of [false, true]) {
         net.advance()
       expect(net.sessions.filter((session) => session.isHost)).toHaveLength(1)
       expect(net.commits()).toBeGreaterThan(0)
+      expect(net.confirmationSizes.some((size) => size > 1)).toBe(true)
+      expect(net.confirmationSizes.length).toBeLessThanOrEqual(12)
       const replayed = new Map(net.replay.map((edit) => [editKey(edit.id), JSON.stringify(edit)]))
       for (const [key, envelope] of losingOrigins) expect(replayed.get(key)).toBe(envelope)
       const directMerge = direct(causalOrder(edits, 20261009))
