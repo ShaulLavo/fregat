@@ -1,7 +1,7 @@
 import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
 import { errorMessage } from '@/lib/error-message'
 import type { FsEntry, PickedFsEntry } from '@/lib/file-system-types'
-import { isDirectoryEntry } from '@/lib/file-system-types'
+import { isDirectoryEntry, isFileEntry } from '@/lib/file-system-types'
 import {
   ArrowClockwiseIcon,
   ArrowLeftIcon,
@@ -68,14 +68,17 @@ import {
 import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { ListHeader } from '@/features/file-picker/components/list-header'
 import {
+  FILES_PICKER_COPY,
   PICKER_COPY,
   ROOT_PATH,
+  attachLabel,
   displayPath,
   entryByOffset,
   folderEntries,
   loadStateEntries,
   pickerParentPath,
   toPickedEntry,
+  toggleChosen,
   type EntriesLoadState,
 } from '@/features/file-picker/utils/model'
 import { NewFolderPopover } from '@/features/file-picker/components/new-folder-popover'
@@ -94,6 +97,7 @@ import {
 import { sidebarSectionsFor } from '@/features/file-picker/utils/sidebar-locations'
 import { PreviewPane } from '@/features/file-picker/components/preview'
 import { SelectedSummary } from '@/features/file-picker/components/selected-summary'
+import { ChosenSummary } from '@/features/file-picker/components/chosen-summary'
 import {
   FilePickerSessionActionsContext,
   type FilePickerSessionActions,
@@ -114,20 +118,36 @@ import { usePickerBackGesture } from '@/features/file-picker/hooks/use-back-gest
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 
+/** Choosing files: folders list so the person can walk into them, and files can be chosen. */
+export type FilePickerFilesChoice = {
+  /** The folder to open in; null opens at the machine's default folder. */
+  readonly startPath: string | null
+  /** How many files may be chosen. */
+  readonly limit: number
+  readonly onPick: (entries: readonly FsEntry[]) => void
+}
+
 type FilePickerDialogProps = {
   open: boolean
-  value: PickedFsEntry | null
   onOpenChange: (open: boolean) => void
-  onPick: (entry: PickedFsEntry) => void
-}
+} & (
+  | { files?: undefined; value: PickedFsEntry | null; onPick: (entry: PickedFsEntry) => void }
+  | { files: FilePickerFilesChoice; value?: undefined; onPick?: undefined }
+)
 
 const INITIAL_SORT: FileListSort = { direction: 'ascending', key: 'name' }
 
-export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePickerDialogProps) {
+export function FilePickerDialog(props: FilePickerDialogProps) {
+  const { open, onOpenChange } = props
+  const files = props.files ?? null
+  const copy = files ? FILES_PICKER_COPY : PICKER_COPY
   const showHidden = useSettingValue('files.showHidden')
   const settings = useSettingsProjection()
   const settingsActions = useSettingsActions()
-  const session = useFilePickerSession(value)
+  const session = useFilePickerSession(props.value ?? null, files?.startPath ?? null)
+  // Chosen files stay chosen while the person walks to other folders for more.
+  const [chosen, setChosen] = useState<readonly FsEntry[]>([])
+  const chosenPaths = new Set(chosen.map((entry) => entry.path))
   const searchInputRef = useRef<HTMLInputElement>(null)
   const wide = useMediaQuery(WIDE_QUERY, true)
   const compact = useMediaQuery(COMPACT_QUERY, false)
@@ -212,10 +232,15 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
     () => (effectiveSort ? sortFilePickerEntries(loadedEntries, effectiveSort) : loadedEntries),
     [effectiveSort, loadedEntries],
   )
-  const entries = folderEntries(sortedEntries)
+  const entries = files ? sortedEntries : folderEntries(sortedEntries)
   // A phone leads the folder it opened in with recent folders; the Places sheet has them anywhere.
+  // Choosing files opens in the project, whose own files come first.
   const leadsWithRecents =
-    compact && session.isInitialized && !isSearching && session.currentPath === session.openedPath
+    compact &&
+    !files &&
+    session.isInitialized &&
+    !isSearching &&
+    session.currentPath === session.openedPath
   // Recents and the folder appear together, so no row moves under a finger once shown.
   const lead = leadingListState(loadState, recentState, leadsWithRecents)
   const leadPending = lead.pending
@@ -231,7 +256,8 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
   const chosenView = pickerView(viewSetting)
   const [middleRef, middleWidth] = useElementWidth<HTMLDivElement>()
   // A phone has room for one column of names, and no hover or double click to drive the others.
-  const view = compact ? 'list' : shownPickerView(chosenView, isSearching, middleWidth)
+  // Choosing files uses the list alone, whose rows carry each file's choice mark.
+  const view = compact || files ? 'list' : shownPickerView(chosenView, isSearching, middleWidth)
   const [trailState, setTrailState] = useState<{ path: string; trail: ColumnTrail } | null>(null)
   const heldTrail =
     trailState?.path === session.currentPath
@@ -244,7 +270,8 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
   const isSearchPending = session.query.trim() !== session.effectiveQuery.trim()
   const isSearchLoading = isSearching && isDirectoryFetching
   const listInteractionPending = isSearchPending || isSearchLoading
-  const previewEntry = focusedEntry ?? currentEntry
+  // The preview shows folders; a focused file leaves the folder it sits in on show.
+  const previewEntry = focusedEntry && isDirectoryEntry(focusedEntry) ? focusedEntry : currentEntry
   const focusedPickable = view === 'columns' ? deepestPickable(trail) : toPickedEntry(focusedEntry)
   const selectedPickable = focusedPickable ?? currentEntry
   // The phone's Open always takes the folder its header names.
@@ -345,9 +372,34 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
 
     commitStartedRef.current = true
     backGesture.leave(() => {
-      onPick(entry)
+      props.onPick?.(entry)
       onOpenChange(false)
     })
+  }
+
+  function commitFiles(picked: readonly FsEntry[]) {
+    if (!files || picked.length === 0 || commitStartedRef.current) return
+
+    commitStartedRef.current = true
+    backGesture.leave(() => {
+      files.onPick(picked)
+      onOpenChange(false)
+    })
+  }
+
+  function toggleFile(entry: FsEntry) {
+    if (!files) return
+    setChosen((current) => toggleChosen(current, entry, files.limit))
+  }
+
+  // Enter on a folder opens it. Enter or a double click on a file attaches the chosen files with it.
+  function commitFileEntry(entry: FsEntry) {
+    if (!files) return
+    if (isDirectoryEntry(entry)) return navigateTo(entry.path)
+    const withEntry = chosen.some((item) => item.path === entry.path)
+      ? chosen
+      : toggleChosen(chosen, entry, files.limit)
+    commitFiles(withEntry)
   }
 
   function close() {
@@ -381,6 +433,11 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
     }
 
     const candidate = focusedEntry ?? shownEntries[0] ?? null
+    if (files) {
+      if (!candidate) return
+      event.preventDefault()
+      return commitFileEntry(candidate)
+    }
     // In columns the footer names the deepest pickable entry, so Enter picks that one.
     const candidatePickable =
       candidate && !(view === 'columns' && focusedEntry)
@@ -408,7 +465,9 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
   }
 
   function handleEntryDoubleClick(entry: FsEntry) {
-    if (listInteractionPending || !isDirectoryEntry(entry)) return
+    if (listInteractionPending) return
+    if (files && isFileEntry(entry)) return commitFileEntry(entry)
+    if (!isDirectoryEntry(entry)) return
     navigateTo(entry.path)
   }
 
@@ -456,6 +515,7 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
   }
 
   function commitEntry(entry: FsEntry) {
+    if (files) return commitFileEntry(entry)
     const pickable = toPickedEntry(entry)
     if (pickable) commitPick(pickable)
   }
@@ -559,7 +619,7 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
       </InputGroupAddon>
       <InputGroupInput
         ref={searchInputRef}
-        aria-label={PICKER_COPY.searchLabel}
+        aria-label={copy.searchLabel}
         autoCapitalize='off'
         autoComplete='off'
         autoCorrect='off'
@@ -568,7 +628,7 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
         className='h-full text-xs'
         onChange={handleSearchChange}
         onKeyDown={handleSearchKeyDown}
-        placeholder={searchPlaceholder(PICKER_COPY.searchPlaceholder, machineLabel, compact)}
+        placeholder={searchPlaceholder(copy.searchPlaceholder, machineLabel, compact)}
         spellCheck={false}
         value={session.query}
       />
@@ -659,6 +719,8 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
             />
           )}
           <FileList
+            choice={files ? { chosen: chosenPaths, toggle: toggleFile } : null}
+            copy={copy}
             entries={listEntries}
             isBusy={listInteractionPending}
             isSearching={isSearching}
@@ -698,7 +760,7 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
               the breadcrumb says where you are and the commit button says what
               will happen, so a title bar repeating both is chrome for nothing. */}
             <DialogHeader className='sr-only'>
-              <DialogTitle>{PICKER_COPY.title}</DialogTitle>
+              <DialogTitle>{copy.title}</DialogTitle>
               <DialogDescription>
                 {machineLabel
                   ? `Browsing ${displayPath(session.currentPath)} on ${machineLabel}.`
@@ -834,37 +896,39 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
                   />
                 )}
                 {searchField}
-                <Tabs value={chosenView} onValueChange={(next: PickerView) => chooseView(next)}>
-                  <TabsList aria-label='View' variant='segmented'>
-                    <IconTooltip label='Columns'>
-                      <TabsTab
-                        aria-label='Columns'
-                        className='w-(--density-control-height-sm) px-0'
-                        value='columns'
-                      >
-                        <ColumnsIcon />
-                      </TabsTab>
-                    </IconTooltip>
-                    <IconTooltip label='List'>
-                      <TabsTab
-                        aria-label='List'
-                        className='w-(--density-control-height-sm) px-0'
-                        value='list'
-                      >
-                        <ListIcon />
-                      </TabsTab>
-                    </IconTooltip>
-                    <IconTooltip label='Icons'>
-                      <TabsTab
-                        aria-label='Icons'
-                        className='w-(--density-control-height-sm) px-0'
-                        value='icons'
-                      >
-                        <GridFourIcon />
-                      </TabsTab>
-                    </IconTooltip>
-                  </TabsList>
-                </Tabs>
+                {files ? null : (
+                  <Tabs value={chosenView} onValueChange={(next: PickerView) => chooseView(next)}>
+                    <TabsList aria-label='View' variant='segmented'>
+                      <IconTooltip label='Columns'>
+                        <TabsTab
+                          aria-label='Columns'
+                          className='w-(--density-control-height-sm) px-0'
+                          value='columns'
+                        >
+                          <ColumnsIcon />
+                        </TabsTab>
+                      </IconTooltip>
+                      <IconTooltip label='List'>
+                        <TabsTab
+                          aria-label='List'
+                          className='w-(--density-control-height-sm) px-0'
+                          value='list'
+                        >
+                          <ListIcon />
+                        </TabsTab>
+                      </IconTooltip>
+                      <IconTooltip label='Icons'>
+                        <TabsTab
+                          aria-label='Icons'
+                          className='w-(--density-control-height-sm) px-0'
+                          value='icons'
+                        >
+                          <GridFourIcon />
+                        </TabsTab>
+                      </IconTooltip>
+                    </TabsList>
+                  </Tabs>
+                )}
                 <Separator className='h-4' orientation='vertical' />
                 {folderActions}
               </PaneBar>
@@ -923,22 +987,38 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
                 >
                   Cancel
                 </Button>
-                <Button
-                  className='min-w-0 flex-1'
-                  size='lg'
-                  disabled={!phoneTarget}
-                  onClick={() => {
-                    if (phoneTarget) commitPick(phoneTarget)
-                  }}
-                  title={phoneTarget ? displayPath(phoneTarget.path) : undefined}
-                  type='button'
-                >
-                  {PICKER_COPY.chooseLabel}
-                </Button>
+                {files ? (
+                  <Button
+                    className='min-w-0 flex-1'
+                    size='lg'
+                    disabled={chosen.length === 0}
+                    onClick={() => commitFiles(chosen)}
+                    type='button'
+                  >
+                    {attachLabel(chosen.length)}
+                  </Button>
+                ) : (
+                  <Button
+                    className='min-w-0 flex-1'
+                    size='lg'
+                    disabled={!phoneTarget}
+                    onClick={() => {
+                      if (phoneTarget) commitPick(phoneTarget)
+                    }}
+                    title={phoneTarget ? displayPath(phoneTarget.path) : undefined}
+                    type='button'
+                  >
+                    {PICKER_COPY.chooseLabel}
+                  </Button>
+                )}
               </DialogFooter>
             ) : (
               <DialogFooter className='flex h-(--bar-height) shrink-0 flex-row items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) sm:justify-between'>
-                <SelectedSummary entry={selectedPickable} />
+                {files ? (
+                  <ChosenSummary chosen={chosen} limit={files.limit} />
+                ) : (
+                  <SelectedSummary entry={selectedPickable} />
+                )}
                 <span
                   className='text-muted-foreground text-2xs ml-auto shrink-0 font-mono tabular-nums'
                   role='status'
@@ -951,14 +1031,25 @@ export function FilePickerDialog({ open, value, onOpenChange, onPick }: FilePick
                   <Button onClick={close} size='sm' type='button' variant='ghost'>
                     Cancel
                   </Button>
-                  <Button
-                    disabled={!selectedPickable}
-                    onClick={chooseSelected}
-                    size='sm'
-                    type='button'
-                  >
-                    {PICKER_COPY.chooseLabel}
-                  </Button>
+                  {files ? (
+                    <Button
+                      disabled={chosen.length === 0}
+                      onClick={() => commitFiles(chosen)}
+                      size='sm'
+                      type='button'
+                    >
+                      {attachLabel(chosen.length)}
+                    </Button>
+                  ) : (
+                    <Button
+                      disabled={!selectedPickable}
+                      onClick={chooseSelected}
+                      size='sm'
+                      type='button'
+                    >
+                      {PICKER_COPY.chooseLabel}
+                    </Button>
+                  )}
                 </div>
               </DialogFooter>
             )}
