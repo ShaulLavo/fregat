@@ -45,10 +45,11 @@
       "scripts/build-wasm.ts": "91442f6b080a347aed96e61a7c592576102e9a82851d93013aba30f050847302",
       "scripts/bridge.zig": "a300002927c87c63ba79022ecb9cddcbd87234ae3e4a3260eb02f32c291812f7",
       "scripts/snapshot.zig": "77787a136a22d03509b75fae45c92623fae792a412e4da61877a15a30dd7c1ee",
+      "scripts/retained-frame.zig": "e54ab480f5c294e83beee3a59be5dc93fa13d63595acba9bb3268fb6bee5ebdf",
       "scripts/glyph-index.zig": "f34cf29a9cb11923b35d027b2f93fac017485d6abd43352cc27ef0fc89d524b3",
       "scripts/unknown-osc.zig": "99b6aa177a66bb6df934a8c16d17ebcb5488f15946600e1df52bf6d10a77b5d7",
       "scripts/ghostty-source.ts": "f87852c521a48c96171508845928504ecb8532eb07befe41a3770b26d054de56",
-      "scripts/wasm-provenance.ts": "13519101ee21dfcdcc596b525c8541c0e2ee94f816094f3a08965f9f51a74569",
+      "scripts/wasm-provenance.ts": "d80276ceba1f05b74fbc1099041163278635b97fabfcae93b96b9e8b019ef14f",
       "src/core/version.ts": "a9f9166ef443f4fa2b0b2d43385802bad9efe4825d996cad0b7efa5db107d6fb"
     }
   },
