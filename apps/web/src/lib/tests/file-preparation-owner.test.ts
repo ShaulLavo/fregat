@@ -14,9 +14,13 @@ import { expect, test } from '../../../test/fixtures'
 import { createGatedMutationClient } from '../../../test/factories/gated-mutation-client'
 import {
   filePreparationOwner,
+  gatedStagePreparer,
   preparationEnvironment,
+  preparationFile,
   preparationRuntime,
 } from '../../../test/factories/file-preparation'
+import { MountedEditorRegistry } from '@/features/editor/state/mounted-editor-registry'
+import { vi } from 'vitest'
 
 test.for(['late-release', 'admission-release'] as const)(
   '$0 observes a rejected shared read while the local queue advances',
@@ -198,4 +202,126 @@ test('preparation identity rotates only after actual producer transitions settle
   expect(owner.service.getPreparationIdentity()).not.toBe(disconnected)
   expect(observed).toHaveLength(5)
   stop()
+})
+
+function joinedPreparationFixture(onTestFinished: (cleanup: () => void) => void) {
+  const queryClient = new QueryClient()
+  const clock = preparationRuntime()
+  const gated = gatedStagePreparer()
+  const mountedEditors = new MountedEditorRegistry()
+  const fixture = filePreparationOwner({
+    mountedEditors,
+    preparer: gated.preparer,
+    queryClient,
+    runtime: clock.runtime,
+  })
+  const path = filesystemPath('/repo/a.ts')
+  queryClient.setQueryData(fileSnapshotQueryOptions(path).queryKey, preparationFile(path))
+  fixture.owner.setRoot(filesystemPath('/repo'))
+  fixture.owner.connect()
+  const drain = async () => {
+    while (clock.queued() > 0) clock.startNext()
+    await clock.settled()
+  }
+  onTestFinished(() => {
+    gated.settle()
+    fixture.dispose()
+  })
+  return {
+    ...fixture,
+    clock,
+    drain,
+    gated,
+    mountedEditors,
+    path,
+    /** Hover until the stage start is scheduled, then join it into a view as activation does. */
+    async joinIntoView(id = tabId('a')) {
+      const hover = fixture.owner.service.prepare({ path, source: 'tab' })
+      clock.startNext()
+      await vi.waitFor(() => expect(clock.queued()).toBe(1))
+      const joined = fixture.owner.service.join(path)!
+      fixture.documents.ensureViewForDocument(id, joined.documentKey, joined.prepared)
+      return hover
+    },
+  }
+}
+
+test('a stage a view joined still starts after the service clears before it runs', async ({
+  onTestFinished,
+}) => {
+  const f = joinedPreparationFixture(onTestFinished)
+  await f.joinIntoView()
+
+  f.owner.setRoot(null)
+  f.gated.settle()
+  await f.drain()
+
+  expect(f.gated.start).toHaveBeenCalledOnce()
+  expect(f.gated.signal().aborted).toBe(false)
+  expect(f.gated.preparedDocument().dispose).not.toHaveBeenCalled()
+  f.documents.removeView(tabId('a'))
+  expect(f.gated.signal().aborted).toBe(true)
+  expect(f.gated.preparedDocument().dispose).toHaveBeenCalledOnce()
+})
+
+test('a mounted view keeps its joined preparation through a root clear and hover expiry', async ({
+  onTestFinished,
+}) => {
+  const f = joinedPreparationFixture(onTestFinished)
+  await f.joinIntoView()
+  f.clock.startNext()
+  await vi.waitFor(() => expect(f.gated.start).toHaveBeenCalledOnce())
+
+  f.mountedEditors.register(f.path)
+  f.clock.advance(60_000)
+  f.owner.setRoot(null)
+
+  expect(f.gated.signal().aborted).toBe(false)
+  expect(f.gated.preparedDocument().dispose).not.toHaveBeenCalled()
+})
+
+test('the last holder reclaims shared preparation once and later releases are inert', async ({
+  onTestFinished,
+}) => {
+  const f = joinedPreparationFixture(onTestFinished)
+  await f.joinIntoView()
+  const second = f.owner.service.join(f.path)!
+  f.documents.ensureViewForDocument(tabId('b'), second.documentKey, second.prepared)
+
+  f.owner.disposeNow()
+  expect(f.gated.preparedDocument().dispose).not.toHaveBeenCalled()
+  f.documents.dispose()
+  second.prepared?.release()
+
+  expect(f.gated.signal().aborted).toBe(true)
+  expect(f.gated.preparedDocument().dispose).toHaveBeenCalledOnce()
+})
+
+test('closing an unmounted joined tab returns its preparation to idle expiry', async ({
+  onTestFinished,
+}) => {
+  const f = joinedPreparationFixture(onTestFinished)
+  const hover = await f.joinIntoView()
+  hover.release()
+  f.documents.removeView(tabId('a'))
+  f.clock.advance(30_000)
+
+  expect(f.gated.signal().aborted).toBe(true)
+  expect(f.gated.preparedDocument().dispose).toHaveBeenCalledOnce()
+})
+
+test('quarantine counts a running joined preparation as used work', async ({ onTestFinished }) => {
+  const f = joinedPreparationFixture(onTestFinished)
+  const sample = f.owner.beginBenchmarkSample({ path: f.path, rootPath: filesystemPath('/repo') })
+  await f.joinIntoView()
+  f.clock.startNext()
+  await vi.waitFor(() => expect(f.gated.start).toHaveBeenCalledOnce())
+
+  sample.quarantine()
+  f.gated.settle()
+  await f.drain()
+  const result = await sample.quiesce()
+  sample.release()
+
+  expect(result).toMatchObject({ preparedJoins: 1, wastedIntents: 0 })
 })

@@ -269,10 +269,17 @@ type PreparedSource = {
   release(): void
 } & ({ readonly fileVersion: string; readonly kind: 'clean' } | { readonly kind: 'live' })
 
+/**
+ * One preparation. Its lifetime belongs to its holders (the service's record entry and every
+ * view that joined it), not to the record map: work keeps running while any holder remains and
+ * the source and configuration are still current, and the last release cancels and reclaims it.
+ */
 type PreparedOpenRecord = {
   readonly abortController: AbortController
   readonly documentKey: DocumentKey
   documentConfigurationTag: readonly EditorPreparedTagValue[]
+  driving: boolean
+  environment: FileOpenIntentEnvironmentIdentity
   readonly estimatedBytes: number
   readonly holders: PreparedDocumentHolders
   lastActivityAt: number
@@ -283,11 +290,11 @@ type PreparedOpenRecord = {
   structuralRange: FileOpenIntentStructuralRange
 }
 
-/** Counts the record and the views sharing one prepared document; the last release disposes it. */
+/** Counts the record and the views sharing one preparation; the last release reclaims it. */
 class PreparedDocumentHolders {
   private count = 0
 
-  constructor(readonly document: EditorPreparedDocument) {}
+  constructor(private readonly reclaim: () => void) {}
 
   /** True while a view holds the document beside the record that prepares it. */
   get joined(): boolean {
@@ -301,7 +308,7 @@ class PreparedDocumentHolders {
       if (released) return
       released = true
       this.count -= 1
-      if (this.count === 0) this.document.dispose()
+      if (this.count === 0) this.reclaim()
       onRelease?.()
     }
   }
@@ -697,7 +704,9 @@ class FileOpenIntentServiceState {
 
     scope.quarantined = true
     const unjoined = Array.from(this.records.values()).filter((record) => !record.holders.joined)
-    scope.wastedIntents = unjoined.length + this.queuedPaths.length + (this.running ? 1 : 0)
+    const activeJoined = this.activePath ? this.records.get(this.activePath)?.holders.joined : false
+    const wastedRun = this.running && !activeJoined ? 1 : 0
+    scope.wastedIntents = unjoined.length + this.queuedPaths.length + wastedRun
     this.clear()
   }
 
@@ -963,7 +972,7 @@ class FileOpenIntentServiceState {
   invalidatePath(path: FilesystemPath): void {
     const canonical = canonicalPath(path)
     const queued = this.removeQueuedPath(canonical)
-    if (this.activePath === canonical) this.abortActivePreparation()
+    if (this.activePath === canonical) this.activeAbortController?.abort()
     const record = this.records.get(canonical)
     if (!record) {
       if (queued || this.activePath === canonical)
@@ -1006,7 +1015,7 @@ class FileOpenIntentServiceState {
   clear(reason = 'service-cleared'): void {
     this.lifecycleGeneration += 1
     this.callerInterests.clear()
-    this.abortActivePreparation()
+    this.activeAbortController?.abort()
     this.activeAbortController = null
     this.queuedPaths.length = 0
     this.queuedPathSet.clear()
@@ -1022,13 +1031,6 @@ class FileOpenIntentServiceState {
     }
   }
 
-  // Work a view joined belongs to that view now; only its own release ends it.
-  private abortActivePreparation(): void {
-    const record = this.activePath ? this.records.get(this.activePath) : undefined
-    if (record?.holders.joined) return
-    this.activeAbortController?.abort()
-  }
-
   private runNext(): void {
     if (this.running) return
 
@@ -1040,13 +1042,14 @@ class FileOpenIntentServiceState {
     this.activePath = path
     const lifecycleGeneration = this.lifecycleGeneration
     const existingRecord = this.records.get(path)
-    const abortController = existingRecord?.abortController ?? new AbortController()
+    // Cancels this queue turn only; a stored preparation is cancelled by its last holder.
+    const abortController = new AbortController()
     this.activeAbortController = abortController
     const intentOperation = this.intentOperations.get(path)
     const operation = this.runtime
       .schedule(() =>
         existingRecord
-          ? this.runExistingPreparation(path, existingRecord, lifecycleGeneration)
+          ? this.runExistingPreparation(path, existingRecord)
           : this.preparePath(path, lifecycleGeneration, abortController, intentOperation),
       )
       .finally(() => {
@@ -1062,10 +1065,9 @@ class FileOpenIntentServiceState {
   private async runExistingPreparation(
     path: FilesystemPath,
     record: PreparedOpenRecord,
-    lifecycleGeneration: number,
   ): Promise<void> {
     try {
-      await this.runPreparationStages(path, record, lifecycleGeneration)
+      await this.runPreparationStages(path, record)
       this.markPrepared(path, 'ready')
     } catch (error) {
       this.intentOperations.get(path)?.event.error(error)
@@ -1104,7 +1106,7 @@ class FileOpenIntentServiceState {
           lifecycleGeneration,
           abortController,
         )
-        if (record) await this.runPreparationStages(path, record, lifecycleGeneration)
+        if (record) await this.runPreparationStages(path, record)
         if (record) {
           this.markPrepared(path, 'ready-live')
           return
@@ -1153,7 +1155,7 @@ class FileOpenIntentServiceState {
           abortController,
         )
         if (record) {
-          await this.runPreparationStages(path, record, lifecycleGeneration)
+          await this.runPreparationStages(path, record)
         }
         if (record) {
           this.markPrepared(path, 'ready-live')
@@ -1182,7 +1184,7 @@ class FileOpenIntentServiceState {
         this.finishIntent(path, 'superseded', { reason: 'source-changed' })
         return
       }
-      await this.runPreparationStages(path, record, lifecycleGeneration)
+      await this.runPreparationStages(path, record)
       this.markPrepared(path, 'ready-clean')
     } catch (error) {
       if (this.intentOperations.get(path) !== operation) return
@@ -1254,11 +1256,12 @@ class FileOpenIntentServiceState {
     const snapshot = document.buffer.getSnapshot()
     const structuralRange = this.structuralRange(path, document.buffer)
     const startedAt = this.runtime.now()
+    const preparationController = new AbortController()
     const prepared = this.preparer.prepare(
       document.buffer,
       document.key,
       path,
-      abortSignal,
+      preparationController.signal,
       structuralRange,
       document.analysis,
     )
@@ -1283,27 +1286,28 @@ class FileOpenIntentServiceState {
       !this.generationIsCurrent(lifecycleGeneration) ||
       !this.sourceIsCurrent(preparedSource)
     ) {
+      preparationController.abort()
       prepared.preparedDocument.dispose()
       return null
     }
-    return this.store(path, preparedSource, prepared, structuralRange, abortController)
+    return this.store(path, preparedSource, prepared, structuralRange, preparationController)
   }
 
   // Highlighter and structural stages run on different workers, so they run side by side.
-  private async runPreparationStages(
-    path: FilesystemPath,
-    record: PreparedOpenRecord,
-    lifecycleGeneration: number,
-  ): Promise<void> {
-    while (this.recordCanRun(path, record, lifecycleGeneration)) {
-      const queued = queuedStages(record)
-      if (queued.length === 0) return
+  private async runPreparationStages(path: FilesystemPath, record: PreparedOpenRecord) {
+    if (record.driving) return
+    record.driving = true
+    try {
+      while (this.recordCanRun(record)) {
+        const queued = queuedStages(record)
+        if (queued.length === 0) return
 
-      await Promise.all(
-        queued.map((stageRecord) =>
-          this.runPreparationStage(path, record, stageRecord, lifecycleGeneration),
-        ),
-      )
+        await Promise.all(
+          queued.map((stageRecord) => this.runPreparationStage(path, record, stageRecord)),
+        )
+      }
+    } finally {
+      record.driving = false
     }
   }
 
@@ -1311,12 +1315,11 @@ class FileOpenIntentServiceState {
     path: FilesystemPath,
     record: PreparedOpenRecord,
     stageRecord: PreparedStageRecord,
-    lifecycleGeneration: number,
   ): Promise<void> {
     stageRecord.progress = 'started'
     this.touchRecord(path, record)
     const startedAt = this.runtime.now()
-    this.intentOperations.get(path)?.event.set({
+    this.recordEvent(path, record)?.set({
       preparation: {
         providerConfiguration: {
           [stageRecord.stage.family]: {
@@ -1328,18 +1331,18 @@ class FileOpenIntentServiceState {
       },
     })
     await this.runtime.schedule(async () => {
-      if (!this.recordCanRun(path, record, lifecycleGeneration)) return
+      if (!this.recordCanRun(record)) return
 
       const outcome = stageRecord.stage.start()
       this.noteBenchmarkRuntimeSessionIds(record.preparedDocument)
       await awaitPreparationInterest(Promise.resolve(outcome), record.abortController.signal)
     })
-    if (!this.recordCanRun(path, record, lifecycleGeneration)) return
+    if (!this.recordCanRun(record)) return
     if (record.stages.get(stageRecord.stage.family) !== stageRecord) return
 
     stageRecord.progress = 'settled'
     const durationMs = this.runtime.now() - startedAt
-    const event = this.intentOperations.get(path)?.event
+    const event = this.recordEvent(path, record)
     event?.increment('workerMs', durationMs)
     event?.set({
       preparation: { estimatedBytes: record.estimatedBytes },
@@ -1357,14 +1360,17 @@ class FileOpenIntentServiceState {
     })
   }
 
-  private recordCanRun(
-    path: FilesystemPath,
-    record: PreparedOpenRecord,
-    lifecycleGeneration: number,
-  ): boolean {
+  // Validity, not membership: a preparation a view joined outlives its record entry.
+  private recordCanRun(record: PreparedOpenRecord): boolean {
     if (record.abortController.signal.aborted) return false
-    if (!this.generationIsCurrent(lifecycleGeneration)) return false
-    return this.records.get(path) === record
+    if (!sameEnvironment(record.environment, this.environment)) return false
+    return this.liveAuthorityMatches(record.source)
+  }
+
+  /** The intent event this record reports to, while it is still the path's record. */
+  private recordEvent(path: FilesystemPath, record: PreparedOpenRecord) {
+    if (this.records.get(path) !== record) return undefined
+    return this.intentOperations.get(path)?.event
   }
 
   private store(
@@ -1377,11 +1383,17 @@ class FileOpenIntentServiceState {
     const previous = this.records.get(path)
     if (previous) this.disposeRecord(path, previous)
     const preparedDocument = preparation.preparedDocument
-    const holders = new PreparedDocumentHolders(preparedDocument)
+    const holders = new PreparedDocumentHolders(() => {
+      abortController.abort()
+      preparedDocument.dispose()
+      source.release()
+    })
     const record: PreparedOpenRecord = {
       abortController,
       documentConfigurationTag: preparation.documentConfigurationTag,
       documentKey: source.documentKey,
+      driving: false,
+      environment: this.environment,
       get estimatedBytes() {
         return preparedDocument.estimatedBytes
       },
@@ -1462,6 +1474,7 @@ class FileOpenIntentServiceState {
       }
     }
     record.documentConfigurationTag = configuration.documentConfigurationTag
+    record.environment = preparer.environment
     record.stages = nextStages
     record.structuralRange = structuralRange
     const structural = nextStages.get('structural')
@@ -1523,9 +1536,10 @@ class FileOpenIntentServiceState {
   private disposeRecord(path: FilesystemPath, record: PreparedOpenRecord): void {
     if (this.records.get(path) === record) this.records.delete(path)
     this.noteBenchmarkRuntimeSessionIds(record.preparedDocument)
-    if (!record.holders.joined) record.abortController.abort()
+    const joined = record.holders.joined
     record.releaseHold()
-    record.source.release()
+    if (!joined || record.driving || queuedStages(record).length === 0) return
+    void this.runPreparationStages(path, record).catch(() => undefined)
   }
 
   private sourceIsCurrent(source: PreparedSource): boolean {
