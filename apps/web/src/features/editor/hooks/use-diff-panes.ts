@@ -31,6 +31,10 @@ export function useDiffPanes(): DiffPanesController {
   // The pane being mirrored reports its move from inside our `setScrollPosition` call, before it
   // returns, so that report is recognised by who is moving rather than guessed from its position.
   const mirroring = useRef<DiffGutterSide | null>(null)
+  // Split rows are paired, so the panes share one vertical offset. A refresh resolves each pane's
+  // own source anchor, and inside a replaced block those land on different rows; the pane the
+  // reader last scrolled or focused keeps its place and the other follows it.
+  const leader = useRef<DiffSplitSide>('new')
 
   const registerEditor = (side: DiffGutterSide, editor: Editor | null) => {
     if (editor) {
@@ -47,17 +51,19 @@ export function useDiffPanes(): DiffPanesController {
     from: DiffScrollPosition,
     kind: 'restoration' | 'scroll',
   ) => {
-    if (kind === 'restoration') {
+    if (mirroring.current === side) {
       lastSeen.current.set(side, from)
       return
     }
-    if (mirroring.current === side) {
+    if (kind === 'restoration') {
       lastSeen.current.set(side, from)
+      alignToLeader(side)
       return
     }
 
     const target = otherSide(side)
     if (!target) return
+    leader.current = target === 'new' ? 'old' : 'new'
 
     const mirror = editors.current.get(target)
     if (!mirror) return
@@ -85,9 +91,25 @@ export function useDiffPanes(): DiffPanesController {
     lastSeen.current.set(target, mirror.getScrollPosition())
   }
 
+  const alignToLeader = (side: DiffGutterSide) => {
+    if (!otherSide(side)) return
+    const follower = otherSide(leader.current)!
+    const lead = editors.current.get(leader.current)
+    const mirror = editors.current.get(follower)
+    if (!lead || !mirror) return
+    const top = lead.getScrollPosition().top
+    if (mirror.getScrollPosition().top === top) return
+
+    mirroring.current = follower
+    mirror.setScrollPosition({ top })
+    mirroring.current = null
+    lastSeen.current.set(follower, mirror.getScrollPosition())
+  }
+
   const handleFocus = (side: DiffGutterSide) => {
     const target = otherSide(side)
     if (!target) return
+    leader.current = target === 'new' ? 'old' : 'new'
 
     // `reveal: false`, or collapsing the idle pane's selection scrolls it to the top and takes the
     // pane the reader is looking at with it on the next sync.

@@ -1,4 +1,4 @@
-import { CaretLeftIcon } from '@phosphor-icons/react'
+import { ArrowBendLeftUpIcon, XIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import type { ReactNode } from 'react'
@@ -8,14 +8,16 @@ import { folderLabel } from '@/features/file-picker/utils/columns'
 import { displayPath, pickerParentPath } from '@/features/file-picker/utils/model'
 
 /**
- * The phone picker's bar, shaped like the phone shell's: Up, the folder over where it lives, then
- * actions. Tapping the name edits the path, which `editor` replaces the name with.
+ * The phone picker's bar: Close, the folder over where it lives, then Up and actions. The leading
+ * slot closes because phones read a leading control as leaving the screen. Tapping the name edits
+ * the path, which `editor` replaces the name with.
  */
 export function CompactHeader({
   actions,
   canGoUp,
   currentPath,
   editor,
+  onClose,
   onEditPath,
   onUp,
 }: {
@@ -23,6 +25,7 @@ export function CompactHeader({
   canGoUp: boolean
   currentPath: string
   editor: ReactNode
+  onClose: () => void
   onEditPath: () => void
   onUp: () => void
 }) {
@@ -30,17 +33,9 @@ export function CompactHeader({
 
   return (
     <PaneBar className='gap-(--density-gap-tight)'>
-      <IconTooltip label='Up one folder'>
-        <Button
-          aria-label='Up one folder'
-          disabled={!canGoUp}
-          focusableWhenDisabled
-          onClick={onUp}
-          size='icon'
-          type='button'
-          variant='ghost'
-        >
-          <CaretLeftIcon className='size-(--icon-size)' />
+      <IconTooltip label='Close'>
+        <Button aria-label='Close' onClick={onClose} size='icon' type='button' variant='ghost'>
+          <XIcon className='size-(--icon-size)' />
         </Button>
       </IconTooltip>
       {editor ?? (
@@ -62,7 +57,22 @@ export function CompactHeader({
           ) : null}
         </Button>
       )}
-      <div className='flex shrink-0 items-center gap-(--density-gap-tight)'>{actions}</div>
+      <div className='flex shrink-0 items-center gap-(--density-gap-tight)'>
+        <IconTooltip label='Up one folder'>
+          <Button
+            aria-label='Up one folder'
+            disabled={!canGoUp}
+            focusableWhenDisabled
+            onClick={onUp}
+            size='icon'
+            type='button'
+            variant='ghost'
+          >
+            <ArrowBendLeftUpIcon className='size-(--icon-size)' />
+          </Button>
+        </IconTooltip>
+        {actions}
+      </div>
     </PaneBar>
   )
 }

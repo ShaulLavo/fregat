@@ -575,3 +575,39 @@ test('entries created by disposal appear in truthful final counts and keep the p
   })
   expect(scheduled.after.inactiveEntryCount).toBe(0)
 })
+
+test('lease reconciliation leaves packed token backing inspection to explicit diagnostics', async ({
+  onTestFinished,
+}) => {
+  const buffer = createEditorTextBuffer('token')
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'lease-census' })
+  onTestFinished(() => analysis.dispose())
+  const tokens = EditorTokenStore.fromTokens([{ start: 0, end: 5, style: { color: 'red' } }])
+  let tokenReads = 0
+  const provider: EditorHighlighterProvider = {
+    operation: createEditorHighlighterOperation(() => ({
+      analyze: async () => ({
+        get tokens() {
+          tokenReads++
+          return tokens
+        },
+      }),
+      dispose: () => undefined,
+    })),
+  }
+  const lease = analysis.borrowHighlighter({ provider, languageId: 'typescript' })!
+  await lease.refresh(buffer.getTextSnapshot())
+  lease.dispose()
+  tokenReads = 0
+  expect(analysis.inspectRetention().tokenStoreBackingBytes).toBe(12)
+  expect(tokenReads).toBeGreaterThan(0)
+  tokenReads = 0
+  expect(
+    reconcileInactiveAnalysis({
+      enumerate: () => [analysis],
+      classify: () => 'warm',
+      limit: 1,
+    }).after,
+  ).toMatchObject({ inactiveEntryCount: 1, protectedEntryCount: 0 })
+  expect(tokenReads).toBe(0)
+})

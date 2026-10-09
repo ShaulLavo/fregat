@@ -108,7 +108,7 @@ Plan 099 is marked Delivered. Its common runtime routes document consumers throu
 Evidence:
 
 - `plans/099-document-contributions.md:1-14`
-- `plans/198-document-owned-editor-analysis.md:89-110`
+- [`plans/198-document-owned-editor-analysis.md:89-110`](https://github.com/ShaulLavo/fregat/blob/c01c490faa37ab9a100613389c9c2a6175c7b5a3/plans/198-document-owned-editor-analysis.md#L89-L110)
 - `docs/document-contributions/ownership-boundaries.md:3-14`
 
 The implementation publishes monotonic document revisions and an edit chain, then exposes captured reads and changes between revisions. This is the correct consumer-facing seam for collaborative reconciliation.
