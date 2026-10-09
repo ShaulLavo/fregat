@@ -1,8 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { comparisonBuildArguments, runtimeSource, sha256 } from './comparison-build.ts'
 
@@ -29,6 +30,47 @@ test('runtime build arguments preserve positional output and require one explici
     ['--runtime-ref', 'HEAD', '--runtime-ref', 'HEAD'],
   ])
     assert.throws(() => comparisonBuildArguments(args, output))
+})
+
+test('changing only the Canvas composer changes the runtime inventory and dirty state', async (context) => {
+  try {
+    execFileSync('git', ['--version'], { stdio: 'pipe' })
+  } catch {
+    context.skip('Runtime inventories require a Git checkout and Git executable')
+    return
+  }
+  const repository = await mkdtemp(join(tmpdir(), 'ghostty-composer-inventory-'))
+  const runtimeRoot = join(repository, 'runtime')
+  const git = (args) => execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim()
+  try {
+    await mkdir(join(runtimeRoot, 'src'), { recursive: true })
+    await writeFile(join(runtimeRoot, 'src/runtime.ts'), 'export const value = 1\n')
+    await writeFile(join(runtimeRoot, 'package.json'), '{"version":"0.1.1"}\n')
+    for (const path of ['ghostty-vt.wasm', 'bridge.wasm', 'canvas-compose.wasm'])
+      await copyFile(join(root, path), join(runtimeRoot, path))
+    git(['init', '--quiet'])
+    git(['add', '.'])
+    git([
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '--quiet',
+      '-m',
+      'runtime',
+    ])
+    const baseline = await runtimeSource(runtimeRoot)
+    await writeFile(join(runtimeRoot, 'canvas-compose.wasm'), 'changed-composer\0')
+    const changed = await runtimeSource(runtimeRoot)
+    assert.notEqual(changed.inventory.sha256, baseline.inventory.sha256)
+    assert.equal(changed.inventory.files['canvas-compose.wasm'], sha256('changed-composer\0'))
+    assert.match(changed.dirty, /canvas-compose\.wasm/)
+  } finally {
+    await rm(repository, { recursive: true, force: true })
+  }
 })
 
 test('explicit Git ref extracts and hashes the actual runtime while redirecting only runtime imports', async (context) => {

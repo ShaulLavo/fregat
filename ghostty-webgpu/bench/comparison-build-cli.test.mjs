@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { sha256 } from './comparison-build.ts'
+import { verifyHash } from '../scripts/comparison-guards.mjs'
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url))
 
@@ -44,9 +45,13 @@ async function fixture(context, run) {
       "import { value } from '../src/runtime.js'; console.log(value)\n",
     )
     const writeRuntime = async (value) => {
-      await writeFile(join(root, 'src/runtime.ts'), `export const value = '${value}'\n`)
+      await writeFile(
+        join(root, 'src/runtime.ts'),
+        `export const value = '${value}'; console.log(new URL('../canvas-compose.wasm', import.meta.url))\n`,
+      )
       await writeFile(join(root, 'bridge.wasm'), `${value}-bridge\0`)
       await writeFile(join(root, 'ghostty-vt.wasm'), `${value}-native\0`)
+      await writeFile(join(root, 'canvas-compose.wasm'), `${value}-composer\0`)
       await writeFile(join(root, 'package.json'), JSON.stringify({ version: value }))
     }
     git(['init', '--quiet'])
@@ -98,6 +103,7 @@ test('runtime-ref CLI bundles source, WASM and package version from one commit',
     const manifest = await assertBundle(output, '0.1.1', {
       'native.wasm': blob('ghostty-vt.wasm'),
       'bridge.wasm': blob('bridge.wasm'),
+      'canvas-compose.wasm': blob('canvas-compose.wasm'),
     })
     assert.equal(manifest.runtime.commit, baseline)
     assert.equal(manifest.runtime.mode, 'git-ref')
@@ -116,16 +122,55 @@ test('runtime-ref CLI bundles source, WASM and package version from one commit',
 
 test('checkout CLI bundles current dirty source, WASM and version', async (context) => {
   await fixture(context, async ({ repository, root, build }) => {
-    await writeFile(join(root, 'bridge.wasm'), 'dirty-bridge\0')
+    await writeFile(join(root, 'canvas-compose.wasm'), 'dirty-composer\0')
     const output = join(repository, '.artifacts/checkout')
     const result = build(output)
     assert.equal(result.status, 0, result.stderr)
     const manifest = await assertBundle(output, '0.1.2', {
       'native.wasm': await readFile(join(root, 'ghostty-vt.wasm')),
       'bridge.wasm': await readFile(join(root, 'bridge.wasm')),
+      'canvas-compose.wasm': await readFile(join(root, 'canvas-compose.wasm')),
     })
     assert.equal(manifest.runtime.mode, 'checkout')
-    assert.match(manifest.runtime.dirty, /bridge\.wasm/)
+    assert.match(manifest.runtime.dirty, /canvas-compose\.wasm/)
+  })
+})
+
+test('packet inventory rejects a composer copied from a different runtime source', async (context) => {
+  await fixture(context, async ({ repository, root, baseline, build }) => {
+    const output = join(repository, '.artifacts/mismatched-composer')
+    const result = build(output, ['--runtime-ref', baseline])
+    assert.equal(result.status, 0, result.stderr)
+    await cp(join(root, 'canvas-compose.wasm'), join(output, 'canvas-compose.wasm'))
+    const manifest = JSON.parse(await readFile(join(output, 'manifest.json'), 'utf8'))
+    await assert.rejects(async () => {
+      for (const [name, hash] of Object.entries(manifest.assets))
+        verifyHash(await readFile(join(output, name)), hash, name)
+    }, /hash mismatch: canvas-compose\.wasm/)
+  })
+})
+
+test('new runtime WASM assets enter checkout and Git-ref packet seals automatically', async (context) => {
+  await fixture(context, async ({ repository, root, git, build }) => {
+    const name = 'wasm/auxiliary.wasm'
+    const bytes = Buffer.from('auxiliary-wasm\0')
+    await mkdir(dirname(join(root, name)), { recursive: true })
+    await writeFile(join(root, name), bytes)
+    await writeFile(
+      join(root, 'src/runtime.ts'),
+      `export const value = '0.1.2'; console.log(new URL('../${name}', import.meta.url))\n`,
+    )
+    const output = join(repository, '.artifacts/auxiliary')
+    const result = build(output)
+    assert.equal(result.status, 0, result.stderr)
+    await assertBundle(output, '0.1.2', { [name]: bytes })
+    git(['add', '.'])
+    git(['commit', '--quiet', '-m', 'add auxiliary WASM'])
+    await rm(join(root, name))
+    const pinnedOutput = join(repository, '.artifacts/auxiliary-ref')
+    const pinnedResult = build(pinnedOutput, ['--runtime-ref', 'HEAD'])
+    assert.equal(pinnedResult.status, 0, pinnedResult.stderr)
+    await assertBundle(pinnedOutput, '0.1.2', { [name]: bytes })
   })
 })
 

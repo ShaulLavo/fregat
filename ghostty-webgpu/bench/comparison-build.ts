@@ -54,8 +54,8 @@ function runtimePlugin(root: string, extractedRoot: string): BunPlugin {
   }
 }
 
-const runtimeAssets = { 'native.wasm': 'ghostty-vt.wasm', 'bridge.wasm': 'bridge.wasm' }
-export const runtimePatterns = ['src', ...Object.values(runtimeAssets), 'package.json']
+// Capture auxiliary WASM too, including assets added by the selected runtime ref.
+export const runtimePatterns = ['src', '*.wasm', 'package.json']
 
 async function runtimeInputs(root: string, paths: readonly string[]) {
   const metadata: { version?: unknown } = JSON.parse(
@@ -65,10 +65,16 @@ async function runtimeInputs(root: string, paths: readonly string[]) {
     typeof metadata.version === 'string' && metadata.version.length > 0,
     'Runtime package metadata must contain a version',
   )
+  assert(
+    paths.includes('ghostty-vt.wasm') && paths.includes('bridge.wasm'),
+    'Runtime inputs must contain native and bridge WASM',
+  )
   return {
     version: metadata.version,
     assets: Object.fromEntries(
-      Object.entries(runtimeAssets).map(([name, path]) => [name, join(root, path)]),
+      paths
+        .filter((path) => path.endsWith('.wasm'))
+        .map((path) => [path === 'ghostty-vt.wasm' ? 'native.wasm' : path, join(root, path)]),
     ),
     inventory: await sourceInventory(root, paths),
   }
@@ -91,12 +97,19 @@ export async function runtimeSource(root: string, ref?: string) {
   assert(!ref.startsWith('-'), 'Runtime ref must name a Git revision')
   const commit = git(['rev-parse', '--verify', `${ref}^{commit}`])
   const prefix = git(['rev-parse', '--show-prefix'])
-  const inputPaths = runtimePatterns.map((path) => `${prefix}${path}`)
   const repository = git(['rev-parse', '--show-toplevel'])
-  const paths = git(['ls-tree', '-r', '--name-only', commit, '--', ...inputPaths], repository)
+  const inputPaths = git(
+    ['ls-tree', '-r', '--name-only', commit, '--', ...(prefix ? [prefix] : [])],
+    repository,
+  )
     .split('\n')
-    .filter(Boolean)
-    .map((path) => path.slice(prefix.length))
+    .filter(
+      (path) =>
+        path.startsWith(`${prefix}src/`) ||
+        path.endsWith('.wasm') ||
+        path === `${prefix}package.json`,
+    )
+  const paths = inputPaths.map((path) => path.slice(prefix.length))
   assert(
     paths.some((path) => path.startsWith('src/')),
     'Runtime ref must contain runtime src',

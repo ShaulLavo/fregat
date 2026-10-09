@@ -70,6 +70,7 @@ try {
   }
   const hashes: Record<string, string> = {}
   for (const [name, path] of Object.entries(assets)) {
+    await mkdir(dirname(join(output, name)), { recursive: true })
     await copyFile(path, join(output, name))
     hashes[name] = hash(await readFile(path))
   }
