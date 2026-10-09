@@ -1,4 +1,5 @@
-import { createEditorStructuralOperation } from '@singapore-editor/core/editor'
+import { createEditorBufferSession } from '@singapore-editor/core/document'
+import { Editor, createEditorStructuralOperation } from '@singapore-editor/core/editor'
 import { afterAll, afterEach, expect, inject, test } from 'vitest'
 import { commands } from 'vitest/browser'
 import '@singapore-editor/core/style.css'
@@ -48,7 +49,7 @@ async function record(sample: unknown) {
 const discoveryRun = {
   sourceHead: 'vitest-discovery-pilot',
   protocol: RETENTION_COUNT_PROTOCOL,
-  cycles: 2,
+  cycles: 20,
   fixtures: [
     { id: 'tree-ts-pilot', provider: 'tree-sitter', language: 'typescript', sourceUnits: 4096 },
   ],
@@ -117,6 +118,77 @@ for (const fixture of collectedRun.fixtures) {
     await flight
   }, 600_000)
 }
+
+test(
+  'twenty actual view open/close cycles keep entries, worker sessions and packed bytes flat',
+  { timeout: 120_000 },
+  async (context) => {
+    const host = await retentionCountHost(discoveryRun.fixtures[0]!)
+    context.onTestFinished(() => host.dispose())
+    const container = document.createElement('div')
+    container.style.cssText = 'height: 240px; width: 600px;'
+    document.body.append(container)
+    context.onTestFinished(() => container.remove())
+    const samples: {
+      entries: number
+      structuralSessions: number
+      highlighterSessions: number
+      tokenStoreBackingBytes: number
+    }[] = []
+    for (let cycle = 1; cycle <= 20; cycle++) {
+      const editor = new Editor(container, {
+        plugins: [
+          {
+            activate: (view) => [
+              view.registerSyntaxProvider(host.structuralProvider),
+              view.registerHighlighter(host.highlighterProvider),
+            ],
+          },
+        ],
+      })
+      try {
+        editor.attachSession(createEditorBufferSession(host.a.buffer), {
+          analysis: host.a.analysis,
+          documentId: host.a.analysis.documentId,
+          languageId: 'typescript',
+          structuralConfigurationTag: ['cycle'],
+          highlighterConfigurationTag: ['cycle'],
+        })
+        await host.settle()
+        expect(editor.getState().initialHighlightStatus).toBe('painted')
+        expect(editor.materializeFullText()).toBe(`dirty ${host.expectedSource}`)
+      } finally {
+        editor.dispose()
+      }
+      const sample = await host.sample('actual-open-close-cycle', cycle)
+      expect(sample.point.consistent).toBe(true)
+      expect(sample.bound.passes).toBe(true)
+      const resources = {
+        entries: sample.entryCount,
+        structuralSessions: sample.treeWorker?.documentCount ?? 0,
+        highlighterSessions: sample.shikiWorker?.documentCount ?? 0,
+        tokenStoreBackingBytes: sample.inspections.reduce(
+          (sum, inspection) => sum + inspection.tokenStoreBackingBytes,
+          0,
+        ),
+      }
+      expect(resources.entries).toBeGreaterThan(0)
+      expect(resources.structuralSessions).toBeGreaterThan(0)
+      expect(resources.highlighterSessions).toBeGreaterThan(0)
+      expect(resources.tokenStoreBackingBytes).toBeGreaterThan(0)
+      samples.push(resources)
+      expect(resources).toEqual(samples[0])
+    }
+    await context.annotate(
+      JSON.stringify({ cycles: samples.length, samples }),
+      'actual-open-close-retention-plateau',
+    )
+    expect(samples).toHaveLength(20)
+    await host.dispose()
+    expect(await host.tree.inspectRetention()).toBeNull()
+    expect(await host.shiki.inspectRetention()).toBeNull()
+  },
+)
 
 async function runCase(fixture: RetentionRun['fixtures'][number], ownHost: (host: Host) => void) {
   try {
