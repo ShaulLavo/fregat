@@ -278,12 +278,14 @@ them).
    types through native editor inputs, then clicks each resolution. It checks convergence,
    local dismissal, dot bounds outside text and hover contrast. Revision coverage checks settled
    resolution retirement, reopened hovers, both peers, a unit at a pane edge and a real cross-unit
-   manual action. Every offered action must be hit-testable inside the hover before any click;
-   Playwright auto-scrolling cannot make a clipped action pass. Twelve screenshots cover these
-   states; the mark, both peers’ hovers, all resolutions, pane-edge hover, manual hover and separate
+   manual action. The manual fixture orders peer identities to retain Alice's insertion in the
+   first declaration; the other cases retain random identities. Every offered action must be
+   hit-testable inside the hover before any click; Playwright auto-scrolling cannot make a clipped
+   action pass. Three consecutive native runs passed. Twelve screenshots cover these states;
+   the mark, both peers’ hovers, all resolutions, pane-edge hover, manual hover and separate
    `look` capture were read back. Revision evidence is
-   `20261009T183916Z-scenario-collaboration-merge-review-R64bce`
-   and `20261009T183922Z-look-collaboration-html-1440x1000-3ItKbl`. Example theme type is
+   `20261009T185446Z-scenario-collaboration-merge-review-N7qcLB`
+   and `20261009T185341Z-look-collaboration-html-1440x1000-qzmSYf`. Example theme type is
    explicit so its dark page and shared hover use the same palette. Detector cost and the
    dedicated projected query remain step 3 work.
 

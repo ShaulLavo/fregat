@@ -274,6 +274,16 @@ export const collaborationMergeReview: Scenario = {
     await assertHover(page, 0)
     await step('pane-edge-hover')
 
+    await page.addInitScript(() => {
+      const randomUUID = crypto.randomUUID.bind(crypto)
+      let calls = 0
+      crypto.randomUUID = () => {
+        calls++
+        if (calls === 1) return randomUUID()
+        // Ordered fixture identities retain Alice's insertion in the first declaration.
+        return `${calls.toString(16).padStart(8, '0')}-0000-4000-8000-000000000000`
+      }
+    })
     await page.goto(new URL('/collaboration.html', page.url()).href)
     await connect(page)
     const source = 'const first = "base";\nconst second = 0;\n'
