@@ -3,7 +3,6 @@ import {
   DEFAULT_CODE_FONT,
   DEFAULT_COLOR_THEME,
   DEFAULT_PALETTE_ID,
-  DEFAULT_WALLPAPER_SELECTION,
   DEFAULT_UI_FONT,
   DEFAULT_WORKBENCH_DENSITY,
   DEFAULT_WORKBENCH_FEEL,
@@ -41,7 +40,7 @@ type BootAppearance = {
   density: SettingsValues['workbench.density']
   feel: SettingsValues['workbench.feel']
   palette: string
-  wallpaper: WallpaperSelection
+  wallpaper: WallpaperSelection | null
   uiFont: string
   codeFont: string
 }
@@ -51,8 +50,8 @@ const root = document.documentElement
 root.classList.add(appearance.mode)
 root.setAttribute('data-density', appearance.density)
 root.setAttribute('data-feel', appearance.feel)
-if (!appearance.wallpaper.enabled) root.setAttribute('data-wallpaper-hidden', '')
-if (appearance.wallpaper.enabled && appearance.wallpaper.source.kind === 'desktop') {
+if (!appearance.wallpaper?.enabled) root.setAttribute('data-wallpaper-hidden', '')
+if (appearance.wallpaper?.enabled && appearance.wallpaper.source.kind === 'desktop') {
   preloadDesktopWallpaper()
 }
 startFont(appearance.uiFont)
@@ -85,7 +84,7 @@ function readBootAppearance(): BootAppearance {
     density: isWorkbenchDensity(density) ? density : DEFAULT_WORKBENCH_DENSITY,
     feel: isWorkbenchFeel(feel) ? feel : DEFAULT_WORKBENCH_FEEL,
     palette: typeof storedPalette === 'string' ? storedPalette : DEFAULT_PALETTE_ID,
-    wallpaper: DEFAULT_WALLPAPER_SELECTION,
+    wallpaper: null,
     uiFont: typeof uiFont === 'string' ? uiFont : DEFAULT_UI_FONT,
     codeFont: typeof codeFont === 'string' ? codeFont : DEFAULT_CODE_FONT,
   }

@@ -129,6 +129,7 @@ export const transientAlertSelector =
   '[role="alert"], [data-sonner-toast], [role="status"].text-warning'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperImageSelector = 'img[data-workbench-wallpaper-layer]'
+export const wallpaperMediaSelector = '[data-workbench-wallpaper-layer]'
 export const diffPaneSelector = '.editor-diff-pane'
 /** A diff pane whose syntax tokens for its current rows have landed. */
 export const diffPaneSyntaxReadySelector = '.editor-diff-pane[data-syntax="ready"]'
@@ -970,7 +971,7 @@ export const selectors = {
   menuItem: (page: Page, name: string) => page.getByRole('menuitem', { name, exact: true }),
   wallpaperLibraryOption: (page: Page) =>
     page.locator('[cmdk-item][data-value^="wallpaper:"]').filter({ has: page.locator('img') }),
-  wallpaperMedia: (page: Page) => page.locator('[data-workbench-wallpaper-layer]'),
+  wallpaperMedia: (page: Page) => page.locator(wallpaperMediaSelector),
   wallpaperStill: (page: Page) => page.locator(wallpaperStillSelector),
   commandOption: (page: Page, name: string) => page.getByRole('option', { name, exact: false }),
   renameInput: (page: Page) => page.getByRole('textbox', { name: 'New name', exact: true }),
