@@ -1,6 +1,6 @@
 ---
 '@singapore-editor/tree-sitter': patch
-'@singapore-editor/editor': patch
+'@singapore-editor/core': patch
 '@singapore-editor/markdown': patch
 ---
 
