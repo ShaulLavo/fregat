@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import type { GhosttyRenderState } from '../../core/render-state.js'
 import type { GhosttyTerminal } from '../../core/terminal.js'
@@ -69,6 +69,32 @@ it('projects owned packed rows identically without materializing cells across st
     ]
     for (const [index, input] of cases.entries())
       expectPackedScreen({ terminal, state, input, index, theme })
+  } finally {
+    runtime.dispose()
+  }
+})
+
+it('decodes one packed cell per appearance run and keeps cursor boundaries isolated', async () => {
+  const runtime = await GhosttyRuntime.create()
+  try {
+    const terminal = runtime.createTerminal({ columns: 40, rows: 1 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('\x1b[?25l\x1b[31medit 00001\x1b[0m')
+    state.update()
+    const row = state.readRows({ packed: true })[0]!
+    const materialized = state.readRows()[0]!
+    const theme = canonicalRendererTheme(mergeRendererTheme({}))
+    const read = vi.spyOn(row.packed!, 'read')
+    expect(renderRowRuns(row, undefined, probeFont, theme)).toEqual(
+      renderRowRuns(materialized, undefined, probeFont, theme),
+    )
+    expect(read).toHaveBeenCalledTimes(2)
+    read.mockClear()
+    const cursor = { style: 'bar' as const, visible: true, x: 3, y: 0 }
+    expect(renderRowRuns(row, cursor, probeFont, theme)).toEqual(
+      renderRowRuns(materialized, cursor, probeFont, theme),
+    )
+    expect(read).toHaveBeenCalledTimes(4)
   } finally {
     runtime.dispose()
   }

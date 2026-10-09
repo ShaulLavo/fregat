@@ -65,6 +65,29 @@ export class PackedCells {
     return span
   }
 
+  // The caller has decoded a single-width head and excludes any cursor cell from this run.
+  extendTextRun(index: number, limit: number, target: RenderCell): number {
+    const offset = index * PACKED_CELL_WORDS
+    const foreground = this.words[offset + 1]!
+    const background = this.words[offset + 2]!
+    const flags = this.words[offset + 3]!
+    let text = target.text || ' '
+    let end = index + 1
+    for (; end < limit; end += 1) {
+      const next = end * PACKED_CELL_WORDS
+      if (
+        this.words[next + 3] !== flags ||
+        (this.words[next + 3]! & 3) !== 0 ||
+        this.words[next + 1] !== foreground ||
+        this.words[next + 2] !== background
+      )
+        break
+      text += this.textAt(next) || ' '
+    }
+    target.text = text
+    return end
+  }
+
   materialize(): readonly RenderCell[] {
     return Array.from({ length: this.length }, (_, index) => this.read(index, emptyRenderCell()))
   }

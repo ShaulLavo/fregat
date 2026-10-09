@@ -180,6 +180,14 @@ export function renderRowRuns(
     while (!packed && row.cells[index + width]?.continuation) width += 1
     const paintedCursor =
       cursor?.visible && cursor.y === row.y && cursor.x === cell.x ? cursor : undefined
+    let end = index + 1
+    if (packed && width === 1 && !paintedCursor) {
+      const limit =
+        cursor?.visible && cursor.y === row.y && cursor.x > index
+          ? Math.min(cursor.x, length)
+          : length
+      end = packed.extendTextRun(index, limit, cell)
+    }
     // Cursor and wide-cell paint stays isolated; font, theme and contrast are fixed for this row.
     const reusable = width === 1 && !paintedCursor
     const style =
@@ -191,7 +199,8 @@ export function renderRowRuns(
     currentStyle = style
     currentCursor = paintedCursor?.style
     currentText += cell.text || ' '
-    currentWidth += width
+    currentWidth += width + end - index - 1
+    index = end - 1
     // Wide glyphs occupy two cells but one character; their following run must start at its own cell.
     if (width > 1 || paintedCursor) flush()
   }
