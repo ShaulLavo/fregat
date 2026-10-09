@@ -9,6 +9,8 @@ type DisplayedTextOptions = Pick<ReadTextRowsOptions, 'rows'>
 
 export interface NativeDisplayedFrame {
   readonly token: number
+  accept(): void
+  discard(): void
   readRows(options?: DisplayedRowsOptions): readonly RenderRow[]
   readTextRows(options?: DisplayedTextOptions): readonly RenderTextRow[]
   readPreviousTextRows(): readonly RenderTextRow[]
@@ -30,6 +32,9 @@ export class DisplayedFrameStore {
   private spare?: NativeSlot
   private disposed = false
   private token = 0
+  private currentToken = 0
+  private pending?: NativeSlot
+  private pendingToken = 0
   private readonly rowReader: RowReader
   private readonly textReader: TextRowReader
   private readonly previousReader: TextRowReader
@@ -52,6 +57,8 @@ export class DisplayedFrameStore {
     full = false,
   ): NativeDisplayedFrame {
     if (this.disposed) throw createGhosttyError('retain_frame', 'Displayed-frame store is disposed')
+    if (this.pending)
+      throw createGhosttyError('retain_frame', 'A displayed-frame capture is awaiting acceptance')
     const descriptor = this.runtime.layouts.GhosttyCell as unknown as PackedDescriptor
     const tag = descriptor.bits.content_tag
     const style = descriptor.bits.style_id
@@ -85,20 +92,35 @@ export class DisplayedFrameStore {
     }
     if (this.spare && next !== this.spare)
       this.runtime.bridge.destroyRetainedFrame(this.spare.handle)
-    this.spare = this.previous
-    this.previous = this.current
-    this.current = next
+    this.spare = next
+    this.pending = next
     const token = ++this.token
+    this.pendingToken = token
     const current = next
-    const previous = this.previous
+    const previous = this.current
     let rows: readonly RenderTextRow[] | undefined
     let previousRows: readonly RenderTextRow[] | undefined
+    const pending = () => this.pending === current && this.pendingToken === token
     const active = () => {
-      if (token !== this.token || this.current !== current)
+      if (
+        this.disposed ||
+        (!pending() && (this.current !== current || this.currentToken !== token))
+      )
         throw createGhosttyError('read_displayed_frame', 'Displayed-frame token has retired')
     }
     return Object.freeze({
       token,
+      accept: () => {
+        if (!pending()) return
+        this.pending = undefined
+        this.spare = this.previous
+        this.previous = this.current
+        this.current = current
+        this.currentToken = token
+      },
+      discard: () => {
+        if (pending()) this.pending = undefined
+      },
       readRows: (options: DisplayedRowsOptions = {}) => {
         active()
         return this.rowReader.read(current.handle, 0, 0, current, options)
@@ -123,6 +145,7 @@ export class DisplayedFrameStore {
     if (this.current) this.runtime.bridge.destroyRetainedFrame(this.current.handle)
     if (this.previous) this.runtime.bridge.destroyRetainedFrame(this.previous.handle)
     if (this.spare) this.runtime.bridge.destroyRetainedFrame(this.spare.handle)
+    this.pending = undefined
     this.spare = undefined
     this.current = undefined
     this.previous = undefined
