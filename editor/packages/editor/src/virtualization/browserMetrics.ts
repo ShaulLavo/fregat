@@ -1,6 +1,5 @@
 import { EditorDisposableStore, MutableEditorDisposable } from '../editor/disposables'
 import type { EditorDisposable } from '../editor/disposables'
-import { scheduleFrame, type ScheduledFrame } from '../editor/scheduleFrame'
 import { clearGlyphAdvancesCache } from './glyphAdvances'
 
 export type BrowserTextMetrics = {
@@ -277,7 +276,7 @@ function createInvalidationSource(view: Window): BrowserTextMetricsInvalidationS
   }
 
   registrations.add(observeDevicePixelRatio(view, invalidate))
-  const faces = createFaceObserver(view)
+  const faces = createFaceObserver()
   const source = {
     listeners,
     faces,
@@ -296,34 +295,19 @@ function createInvalidationSource(view: Window): BrowserTextMetricsInvalidationS
  * change the font through any stylesheet or variable, and nothing announces a system face. One
  * observer serves the window, so a change several editors share clears the cache once.
  */
-function createFaceObserver(view: Window): FaceObserver | null {
+function createFaceObserver(): FaceObserver | null {
   if (typeof ResizeObserver === 'undefined') return null
 
   const watched = new Map<Element, WatchedFace>()
-  const pending = new Map<Element, WatchedFace>()
-  let notification: ScheduledFrame | null = null
-  const cancelNotification = () => {
-    notification?.cancel()
-    notification = null
-  }
-  const notify = () => {
-    notification = null
-    const stale = Array.from(pending)
-    pending.clear()
+  const observer = new ResizeObserver((entries) => {
+    const stale = entries.flatMap((entry) => staleFace(watched.get(entry.target), entry))
+    if (stale.length === 0) return
+
     clearBrowserTextMetricsCache()
     // Checked again at the call: a listener can dispose another editor before its turn comes.
     for (const [probe, face] of stale) {
       if (watched.get(probe) === face) face.onChange()
     }
-  }
-  const observer = new ResizeObserver((entries) => {
-    const stale = entries.flatMap((entry) => staleFace(watched.get(entry.target), entry))
-    for (const [probe, face] of stale) pending.set(probe, face)
-    if (pending.size === 0 || notification) return
-
-    // Re-measuring can resize an observed ancestor through its overlay reservation. Run outside
-    // ResizeObserver delivery so the ancestor's new content box reaches its own observer.
-    notification = scheduleFrame(notify, view)
   })
   return {
     watch: (element, onChange) => {
@@ -334,17 +318,11 @@ function createFaceObserver(view: Window): FaceObserver | null {
         dispose: () => {
           observer.unobserve(probe)
           watched.delete(probe)
-          pending.delete(probe)
-          if (pending.size === 0) cancelNotification()
           host.remove()
         },
       }
     },
-    dispose: () => {
-      observer.disconnect()
-      pending.clear()
-      cancelNotification()
-    },
+    dispose: () => observer.disconnect(),
   }
 }
 

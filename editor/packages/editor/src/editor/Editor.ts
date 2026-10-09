@@ -44,6 +44,7 @@ import {
 import { LineStartsView } from '../virtualization/lineStartIndex'
 import { EditorSecondaryWorkScheduler } from './secondaryWorkScheduler'
 import { appendTiming, nowMs } from './timing'
+import { scheduleFrame, type ScheduledFrame } from './scheduleFrame'
 import { projectTokensThroughEdit, projectTokensThroughEdits } from './tokenProjection'
 import { createTextEditBatch, type TextEditBatch } from '../textEditBatch'
 import { projectRowDecorationMapThroughEdits } from '../virtualization/rowDecorationProjection'
@@ -347,6 +348,9 @@ type EditorLifecycleSummary = {
 
 export class Editor {
   private readonly container: HTMLElement
+  private remeasuringFace = false
+  private readonly pendingOverlayWidths = new Map<EditorOverlaySide, number>()
+  private overlayReservationFrame: ScheduledFrame | null = null
   private readonly view: VirtualizedTextView
   private readonly foldState: EditorFoldState
   private readonly fallbackFolds: EditorFallbackFoldController
@@ -2313,7 +2317,13 @@ export class Editor {
   }
 
   private remeasureTextMetrics(): void {
-    this.announceFontMetrics(this.view.remeasureMetrics(), 'face_changed')
+    const remeasuring = this.remeasuringFace
+    this.remeasuringFace = true
+    try {
+      this.announceFontMetrics(this.view.remeasureMetrics(), 'face_changed')
+    } finally {
+      this.remeasuringFace = remeasuring
+    }
   }
 
   private announceFontMetrics(
@@ -2528,6 +2538,9 @@ export class Editor {
     if (this.disposed) return
 
     this.disposed = true
+    this.overlayReservationFrame?.cancel()
+    this.overlayReservationFrame = null
+    this.pendingOverlayWidths.clear()
     this.transactionListeners.clear()
     this.releaseTransactionAttachment()
     this.pendingTransactions.length = 0
@@ -4404,9 +4417,34 @@ export class Editor {
   }
 
   private reserveOverlayWidth(side: EditorOverlaySide, width: number): void {
+    if (this.disposed) return
+    if (this.remeasuringFace) {
+      // Font metrics must reach rows before paint. Only the padding that resizes the observed
+      // ancestor waits until its descendant font probe's ResizeObserver delivery has finished.
+      this.pendingOverlayWidths.set(side, width)
+      this.overlayReservationFrame ??= scheduleFrame(
+        this.applyOverlayReservations,
+        this.el.ownerDocument.defaultView ?? undefined,
+      )
+      return
+    }
+
+    this.pendingOverlayWidths.delete(side)
+    if (this.pendingOverlayWidths.size === 0) {
+      this.overlayReservationFrame?.cancel()
+      this.overlayReservationFrame = null
+    }
     if (!this.view.reserveOverlayWidth(side, width)) return
 
     this.notifyViewContributions('layout', null)
+  }
+
+  private readonly applyOverlayReservations = (): void => {
+    this.overlayReservationFrame = null
+    for (const [side, width] of Array.from(this.pendingOverlayWidths)) {
+      if (!Object.is(this.pendingOverlayWidths.get(side), width)) continue
+      this.reserveOverlayWidth(side, width)
+    }
   }
 
   rowAtPoint(clientX: number, clientY: number): EditorPointHit | null {
