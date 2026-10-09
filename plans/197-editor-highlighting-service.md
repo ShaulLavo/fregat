@@ -32,6 +32,51 @@ offset, theme, and scheduling requirements before any adoption decision. Keep
 computation owned by this service and record local measurements for any proposed
 performance change.
 
+## Approved follow-up: retire hover tokens across theme changes
+
+Recorded 2026-10-09 at `657faea169e3d691ec01949d62a64fc406cad860`, while investigating
+[PR #1190](https://github.com/ShaulLavo/fregat/pull/1190)'s shared-work ownership failures.
+Status: Approved repair; implementation remains pending. Effort: S. Fix risk: low.
+
+`editor/packages/plugin-ui/src/hoverController.ts:298` calls the tokenizer's `clear()`
+when the theme changes. `src/codeTokens.ts:81–84` clears completed tokens and held keys,
+but preserves `inFlight`. A new request joins the old promise at lines 49–50, and the
+old completion repopulates the cache at lines 57–58. The snippet feature captures its
+highlighter providers before awaiting work in
+`editor/packages/editor/src/editor/snippetTokensFeature.ts:57–76`.
+
+The actual exported `createTooltipCodeTokenizer` reproduced this with a controlled
+token-producing feature. Ordinary coalescing, completion, and cache clearing passed first.
+Starting another snippet, clearing, requesting the same snippet, and then completing the
+old work returned the same promise and cached `old-theme` tokens. There were two feature
+calls total: one baseline call and one old-theme call. The new theme started no work.
+This proves the tokenizer race; live browser theme-switch behavior was not exercised.
+
+Execution:
+
+1. Reconcile changes since the recorded commit in `codeTokens.ts`, `hoverController.ts`,
+   and `snippetTokensFeature.ts`. Keep the existing simple editor path and snippet feature.
+2. Add a gated regression in `editor/packages/plugin-ui/test/codeTokens.test.ts`, using
+   the real tokenizer and a controlled external token feature. Prove normal coalescing
+   first. Start A, clear, start B for the same block, finish A, and require a second feature
+   call, no A tokens in the current cache, and B remaining discoverable. Finish B and
+   require its tokens. Repeat with B completing before A and with repeated clearing.
+3. Retire pending work on invalidation and fence both publication and cleanup by the
+   captured request or owner identity. Replacing a theme-bound owner is also valid.
+   Clearing the promise map alone leaves late publication and deletion unsafe.
+4. From `editor/packages/plugin-ui`, run
+   `bun run test -- --project dom test/codeTokens.test.ts test/hoverController.test.ts`.
+   The new theme regression must fail before the repair and pass afterwards. Add a controller
+   integration regression that delivers a theme update while snippet work is pending.
+5. Add a patch changeset for `@singapore-editor/plugin-ui`. Build affected workspaces before
+   checking consumers. Verify a pending hover through a theme change on the real editor
+   surface, review the screenshot, and record the verification evidence directory.
+
+Exit: the current theme starts and retains its own token work; late old-theme completion
+cannot publish tokens or remove the newer task. Preserve cache capacity, hover hold timing,
+and ordinary same-theme sharing. Shared lifecycle extraction belongs to
+[329](329-async-lifecycle-and-transport.md)'s ownership qualification.
+
 ## Delivered follow-ups, 2026-10-01
 
 - [PR #213](https://github.com/ShaulLavo/fregat/pull/213) delivered bounded owning-worker

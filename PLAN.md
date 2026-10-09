@@ -115,7 +115,7 @@ The October 3 plans retain the existing structural-cutover limit. Mesh and appli
 work can proceed independently where their files and contracts do not overlap.
 
 1. Address Mesh control authorization in [290](plans/290-mesh-device-authorization.md).
-   Public app removal and pill extraction [291](plans/291-mesh-private-services.md) is separate.
+   Public hosting retirement and dormant pill source [291](plans/291-mesh-private-services.md) shipped in Mesh v0.1.232.
    Update recovery [296](plans/296-mesh-update-recovery.md), installer guidance
    [297](plans/297-mesh-installer-path.md), DNS recovery
    [298](plans/298-mesh-download-dns-recovery.md), and session removal
