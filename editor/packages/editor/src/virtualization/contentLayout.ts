@@ -32,13 +32,39 @@ export function revealContentRow(row: HTMLElement, requested: RevealBlock): void
 
 function contentRowIsVisible(row: HTMLElement): boolean {
   const bounds = row.getBoundingClientRect()
-  const window = row.ownerDocument.defaultView
-  if (!window || bounds.top < 0 || bounds.bottom > window.innerHeight) return false
-  for (let ancestor = row.parentElement; ancestor; ancestor = ancestor.parentElement) {
-    const overflow = window.getComputedStyle(ancestor).overflowY
-    if (overflow !== 'auto' && overflow !== 'scroll' && overflow !== 'hidden') continue
+  const reading = contentReadingBounds(row)
+  return bounds.top >= reading.top && bounds.bottom <= reading.bottom
+}
+
+export function contentReadingBounds(element: HTMLElement): {
+  readonly left: number
+  readonly right: number
+  readonly top: number
+  readonly bottom: number
+} {
+  const window = element.ownerDocument.defaultView!
+  let left = 0
+  let right = window.innerWidth
+  let top = 0
+  let bottom = window.innerHeight
+  for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+    const style = window.getComputedStyle(ancestor)
     const box = ancestor.getBoundingClientRect()
-    if (bounds.top < box.top || bounds.bottom > box.bottom) return false
+    const scale = ancestor.offsetWidth > 0 ? box.width / ancestor.offsetWidth : 1
+    if (clipsOverflow(style.overflowX)) {
+      left = Math.max(left, box.left + ancestor.clientLeft * scale)
+      right = Math.min(right, box.left + (ancestor.clientLeft + ancestor.clientWidth) * scale)
+    }
+    if (clipsOverflow(style.overflowY)) {
+      top = Math.max(top, box.top + ancestor.clientTop * scale)
+      bottom = Math.min(bottom, box.top + (ancestor.clientTop + ancestor.clientHeight) * scale)
+    }
   }
-  return true
+  return { left, right, top, bottom }
+}
+
+function clipsOverflow(overflow: string): boolean {
+  return (
+    overflow === 'auto' || overflow === 'scroll' || overflow === 'hidden' || overflow === 'clip'
+  )
 }

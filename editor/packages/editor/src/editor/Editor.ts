@@ -7,6 +7,7 @@ import { decodePaintSnapshot, encodePaintSnapshot } from './paintSnapshot'
 import { detectPlatform } from '@fregat/hotkeys'
 import {
   documentSessionChangeTextSnapshot,
+  registerDocumentSnapshotConstraint,
   getDocumentMutationLeaseState,
   subscribeDocumentMutationLeaseState,
   subscribeDocumentTransactions,
@@ -413,6 +414,7 @@ export class Editor {
   private readonly viewContributions: EditorViewContributionController
   private readonly secondaryWork = new EditorSecondaryWorkScheduler()
   private readonly detachedEditChain = new DocumentEditChain(0, 0)
+  private unregisterContentConstraint: (() => void) | null = null
   private unsubscribeBufferChanges: (() => void) | null = null
   private transactionAttachment: TransactionAttachment | null = null
   private unsubscribeLeaseChanges: (() => void) | null = null
@@ -2336,6 +2338,7 @@ export class Editor {
 
   setScrollMode(scrollMode: EditorOptions['scrollMode']): void {
     if (!this.view.setScrollMode(scrollMode)) return
+    this.syncContentConstraint()
 
     this.notifyViewContributions('layout', null)
     this.log({
@@ -2408,6 +2411,7 @@ export class Editor {
   }
 
   attachSession(session: DocumentSession, options: EditorSessionOptions = {}): void {
+    this.view.assertContentSnapshot(session.getTextSnapshot(), true)
     const analysis = options.analysis ?? options.preparedDocument?.analysis
     if (analysis && analysis.buffer !== editorBufferSession(session)?.buffer)
       throw new TypeError('Document analysis must reference the attached buffer')
@@ -2571,6 +2575,7 @@ export class Editor {
     options: ResetOwnedDocumentOptions,
     transactionBefore?: ReplacementTransactionBefore,
   ): number {
+    this.view.assertContentSnapshot(document.text, true)
     this.preparingDocument = true
     const savedScroll = this.pendingDocumentScroll ?? this.view.provisionalScrollPosition
     if (!options.scrollPosition && savedScroll)
@@ -3898,6 +3903,7 @@ export class Editor {
     const bufferSession = editorBufferSession(session)
     if (!bufferSession) return
 
+    this.syncContentConstraint()
     this.syncTransactionSubscription()
     this.unsubscribeBufferChanges = bufferSession.buffer.subscribe((event) =>
       this.handleBufferChange(bufferSession, event),
@@ -3944,7 +3950,19 @@ export class Editor {
     }
   }
 
+  private syncContentConstraint(): void {
+    this.unregisterContentConstraint?.()
+    this.unregisterContentConstraint = null
+    const buffer = this.session && editorBufferSession(this.session)?.buffer
+    if (!buffer || this.view.scrollMode !== 'content') return
+    this.unregisterContentConstraint = registerDocumentSnapshotConstraint(buffer, (snapshot) =>
+      this.view.assertContentSnapshot(snapshot),
+    )
+  }
+
   private disposeBufferSubscriptions(): void {
+    this.unregisterContentConstraint?.()
+    this.unregisterContentConstraint = null
     this.releaseTransactionAttachment()
     this.bufferPublication = null
     this.unsubscribeBufferChanges?.()

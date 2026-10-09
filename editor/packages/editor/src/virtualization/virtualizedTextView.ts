@@ -1,4 +1,4 @@
-import { assertContentLayout, revealContentRow } from './contentLayout'
+import { assertContentLayout, contentReadingBounds, revealContentRow } from './contentLayout'
 import {
   acquireRowPresentation,
   invalidateRowPresentations,
@@ -116,6 +116,7 @@ import {
   sourceEditPatch,
   setTextLayoutState,
   setWrapEnabledLayout,
+  assertContentSnapshot,
   updateVirtualizerRows,
   visualColumnForOffset,
 } from './virtualizedTextViewLayout'
@@ -756,6 +757,16 @@ export class VirtualizedTextView {
     return this.atomicRenderDepth > 0 || this.flushingAtomicRender
   }
 
+  get scrollMode(): VirtualizedTextViewScrollMode {
+    return this.view.scrollMode
+  }
+
+  public assertContentSnapshot(text: string | TextSnapshot, replacement = false): void {
+    if (this.view.scrollMode !== 'content') return
+    const snapshot = typeof text === 'string' ? createStringTextSnapshot(text) : text
+    assertContentSnapshot(this.view, snapshot, replacement)
+  }
+
   public setText(
     text: string | TextSnapshot,
     preparedLineStarts?: readonly number[],
@@ -763,8 +774,7 @@ export class VirtualizedTextView {
   ): void {
     const textSnapshot = typeof text === 'string' ? createStringTextSnapshot(text) : text
     const view = this.view
-    if (view.scrollMode === 'content')
-      assertContentLayout(textSnapshot.length, textSnapshot.lineCount, 0)
+    assertContentSnapshot(view, textSnapshot)
     this.pendingReveal = null
     view.sameLineTokenEdit = null
     view.tokenProjectionDirtyStartRow = null
@@ -1032,6 +1042,7 @@ export class VirtualizedTextView {
     const view = this.view
     const textSnapshot =
       typeof nextText === 'string' ? createStringTextSnapshot(nextText) : nextText
+    assertContentSnapshot(view, textSnapshot)
     this.applyingEdit = true
     try {
       const sameLinePatch = sameLineEditPatch(view, edit)
@@ -1055,6 +1066,7 @@ export class VirtualizedTextView {
 
   public applyEditBatch(batch: TextEditBatch): void {
     const view = this.view
+    assertContentSnapshot(view, batch.after)
     const previousLineCount = view.model.lineCount
     applyTextLayoutTransition(view, batch)
     projectFoldMarkersThroughBatch(view, batch)
@@ -1949,12 +1961,14 @@ function locatePoint(
 ) {
   if (view.provisional) return null
   const bounds = pointViewport(view.scrollElement)
+  const readingBounds =
+    view.scrollMode === 'content' ? contentReadingBounds(view.scrollElement) : bounds
   if (
     !clamp &&
-    (clientX < bounds.left ||
-      clientX >= bounds.right ||
-      clientY < bounds.top ||
-      clientY >= bounds.bottom)
+    (clientX < readingBounds.left ||
+      clientX >= readingBounds.right ||
+      clientY < Math.max(bounds.top, readingBounds.top) ||
+      clientY >= Math.min(bounds.bottom, readingBounds.bottom))
   )
     return null
   const metrics = viewportPointMetrics(view, clientX, clientY)

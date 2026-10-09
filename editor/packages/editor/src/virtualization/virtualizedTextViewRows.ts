@@ -1,3 +1,4 @@
+import { contentReadingBounds } from './contentLayout'
 import { completeRowPresentation, invalidateRowPresentations } from '../rowPresentation'
 import { createError } from '../logging/errors'
 import { pointViewport } from './pointViewport'
@@ -3299,7 +3300,7 @@ function viewportTextX(
   right: number,
   scrollLeft: number,
 ): number {
-  const viewportX = clamp(clientX, left, right) - left
+  const viewportX = (view.scrollMode === 'content' ? clientX : clamp(clientX, left, right)) - left
   const scrolledX = viewportX + scrollLeft
   return Math.max(0, scrolledX - gutterWidth(view))
 }
@@ -3353,7 +3354,12 @@ function caretPositionAtX(
 }
 
 export function pageRowDelta(view: VirtualizedTextViewInternal): number {
-  const { viewportHeight } = view.virtualizer.getSnapshot()
+  let viewportHeight = view.virtualizer.getSnapshot().viewportHeight
+  if (view.scrollMode === 'content') {
+    const bounds = contentReadingBounds(view.scrollElement)
+    viewportHeight =
+      Math.max(0, bounds.bottom - bounds.top) / pointViewport(view.scrollElement).scale
+  }
   return Math.max(1, Math.floor(viewportHeight / rowStride(view)) - 1)
 }
 
