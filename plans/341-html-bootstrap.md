@@ -4,7 +4,7 @@
 
 - Status: Approved.
 - Owner request: 2026-10-09. Document the mechanism before implementing it. Put wallpaper preloads in HTML and give the app current startup appearance without passing through localStorage.
-- Execution authorized: 2026-10-09. Implementation is in progress; verification and delivery receipts follow below.
+- Execution authorized: 2026-10-09. Implementation is delivered; verification and delivery receipts follow below.
 - Scheduling: a bounded web/server startup change, independent of the large structural programs. Coordinate with Plan 337 on document admission and pairing, Plan 114 on native backdrop information, and Plan 320 on generated palette data.
 - Supersedes the implementation approach in [draft PR #1144](https://github.com/ShaulLavo/fregat/pull/1144), which waits for the settings query before mounting wallpaper. That approach must not ship. Its reproduction is useful evidence; its product changes are excluded.
 
@@ -125,7 +125,7 @@ Add a Vite adapter that produces the same elements and payload through the share
 3. [x] Add `readHtmlBootstrap()` and migrate all appearance startup consumers together. Remove superseded appearance storage/preload logic while preserving live queries, decoded-image transitions, and non-appearance storage consumers.
 4. [x] Wire the Vite and isolated-server adapters. Replace storage-seeded wallpaper bootstrap scenarios with real document production. Add stable selectors to the verification selector module.
 5. [x] Qualify built production HTML in Chromium and WebKit at phone and desktop sizes. Compare matched cold-load traces and image transfers. Add a concise architecture explanation and correct obsolete palette comments.
-6. [ ] Deliver the implementation through normal review, CI, and authorized installation. Server and web changes ship together. Confirm the served release and perform the read-only live check.
+6. [x] Deliver the implementation through normal review, CI, and authorized installation. Server and web changes ship together. Confirm the served release and perform the read-only live check.
 
 ## Verification and acceptance
 
@@ -151,11 +151,11 @@ Do not claim saved milliseconds from source inspection. Compare time to initial 
 
 ## Delivery boundaries
 
-The initial plan-only PR did not enable the mechanism. Runtime delivery is recorded below. The rejected wallpaper-delay PR stays draft and unmerged. The later implementation must update the server and web release together because the web client depends on a new document contract. Public contract-package behavior changes require the usual patch changeset; this plan-only change does not.
+The initial plan-only PR did not enable the mechanism. Runtime delivery is recorded below. The rejected wallpaper-delay PR is closed without merging. The later implementation must update the server and web release together because the web client depends on a new document contract. Public contract-package behavior changes require the usual patch changeset; this plan-only change does not.
 
 ## Implementation qualification, 2026-10-09
 
-The source now implements the shared appearance schema, Bun document producer/renderer, client handoff, decoded-image adoption, release stamping, and Vite/fixture adapters. The native hints were ported into the current Zig and Swift hosts after the native rewrite landed. Product delivery is still pending review/CI and installation.
+The source now implements the shared appearance schema, Bun document producer/renderer, client handoff, decoded-image adoption, release stamping, and Vite/fixture adapters. The native hints were ported into the current Zig and Swift hosts after the native rewrite landed. Product delivery is recorded below.
 
 - Focused qualification: 26 server transformation/admission checks, 28 client appearance/wallpaper checks, 69 release/adapter checks, repository gates and full repository typechecks passed. The Zig host builds. The complete Swift host compiles with the repository's Swift 6/warnings-as-errors flags; an offscreen Swift WebKit proof sent four real requests and verified app/transparent hints on initial loads and reloads. This does not claim full native-window material or Linux GUI qualification.
 - Chromium and WebKit startup scenarios confirm off creates no wallpaper requests, and the enabled library image is visible with the later settings response held. The HTML link, decoder and rendered image consume one transfer. Known-good images and screenshots were inspected. WebKit retained its existing unsupported viewport-hint diagnostic and cancelled requests during reload.
@@ -167,3 +167,20 @@ Local evidence is retained in the task's reported evidence directories. The exec
 ### Shared palette dependency correction
 
 CI exercised real release copies and the workspace build graph, exposing a server/client-core SDK dependency cycle. Palette rendering now lives in the browser-free contracts theme module; all callers were moved and the old client-core export was removed. The renderer produces identical CSS. The 57 launcher/update regressions pass without symlink recursion, with 18 contracts palette/renderer checks and 9 remaining client-core palette checks passing.
+
+## Delivery receipt, 2026-10-09
+
+[PR #1168](https://github.com/ShaulLavo/fregat/pull/1168) merged with every CI check passing, including all Chromium and WebKit mobile shards. The installed server and web both report clean commit `5672ddf7a48b5dcb5795676d24122a9556388daa`, release `20261009T171310Z-5672ddf7-main-4664f692`. The release endpoint reports `serving`, no pending release, and a passed live check.
+
+The combined latest-main tree also built in Zig and compiled in Swift with the repository flags. The overlapping folder-chooser changes preserved the backdrop hint. The full native-window rendering limits above still apply.
+
+The first deployment probe falsely required exactly one wallpaper preload and read the removed wallpaper global. [PR #1172](https://github.com/ShaulLavo/fregat/pull/1172) updates the probe to inspect the consumed HTML bootstrap and applicable media condition. Eighteen narrow checks pass, including real Chromium light/dark selection. The corrected probe passed against the installed release, and the read-only Chromium browser doctor reported ready, healthy, and no problems. A 390×844 WebKit check rendered the phone screen with no server warning or error; its existing unsupported `interactive-widget` viewport diagnostic remains. Draft #1144 was closed without merging.
+
+Local delivery evidence:
+
+- `/work/tmp/html-bootstrap-341/deploy.log` and `served-release.json`.
+- `/work/tmp/html-bootstrap-341/merged-native/qualification.md` and native build logs.
+- `/work/tmp/html-bootstrap-341/live-check-corrected/` and `live-check-publish.log`.
+- `/work/tmp/fregat-evidence/20261009T171408Z-look-1440x1000-epolJV/` and `/work/tmp/fregat-evidence/20261009T172241Z-look-390x844-m9I6VE/`; both screenshots were inspected.
+
+The live probe retained a preexisting provider-usage authorization warning census as diagnostics. Its follow-up is recorded in Plan 147; the fresh browser check produced no warning or error.
