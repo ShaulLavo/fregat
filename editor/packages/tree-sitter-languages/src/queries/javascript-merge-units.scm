@@ -17,11 +17,9 @@
 (class_declaration name: (_) @merge.signature) @merge.unit
 (method_definition name: (_) @merge.signature) @merge.unit
 (pair key: (_) @merge.signature) @merge.unit
-(import_specifier name: (_) @merge.signature) @merge.unit
+(import_specifier !alias name: (_) @merge.signature) @merge.unit
+(import_specifier alias: (_) @merge.signature) @merge.unit
 (named_imports) @merge.commutative
 (arguments (_) @merge.unit)
 (array (_) @merge.unit)
 (formal_parameters (_) @merge.unit)
-; Initializers, computed keys and spreads can make declaration order observable.
-(class_body (method_definition name: [(property_identifier) (private_property_identifier) (string) (number)])+ @_merge.member) @merge.commutative
-(object (pair key: [(property_identifier) (string) (number)] value: [(number) (string) (true) (false) (null)])+ @_merge.member) @merge.commutative

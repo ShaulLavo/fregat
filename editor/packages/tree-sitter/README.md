@@ -46,13 +46,22 @@ and commutativity flag. A retired or unavailable snapshot returns `status: 'stal
 
 Language contributions supply `mergeUnitQuerySource`. Queries capture `@merge.unit`,
 `@merge.signature` and `@merge.commutative`. An optional repeated `@_merge.member` capture
-limits commutativity to parents whose named children all match that pattern. The worker
-compiles this query only when requested. Languages without a query, unmatched ranges and
-units with syntax errors use the enclosing complete lines with `source: 'line'`.
+limits commutativity to parents whose named semantic children all match that pattern. Comments
+leave eligibility unchanged. The worker compiles this query only when requested. Languages
+without a query, unmatched ranges and units with syntax errors use the enclosing complete
+lines with `source: 'line'`. Fallback includes requested line separators and keeps CRLF together.
+
+Named JavaScript imports use the local alias as their signature when present. Go field names
+are individual units whose parent range identifies the owning declaration, including grouped
+fields. Ordered parents expose source-name hints; duplicate-signature comparisons apply to
+commutative parents. JavaScript class bodies and objects, Go and Rust field lists, and
+TypeScript interfaces containing methods or call signatures stay ordered. Property-only
+TypeScript interfaces and JSON objects allow unordered children.
 
 Generic languages reuse their retained parse. Markdown creates a structural block tree on
 its first merge-unit request because its native renderer keeps its tree private. Injected
-code uses the enclosing language's query when its grammar is registered.
+code uses the deepest containing registered language's query. Successful results retain
+that selected language ID, including line fallback.
 
 ## In the Singapore family
 

@@ -76,16 +76,16 @@ const fixtures = [
     needle: 'amber',
     type: 'field_declaration',
     signature: 'amber',
-    commutative: true,
+    commutative: false,
   },
   {
     id: 'go',
     wasm: 'tree-sitter-go/tree-sitter-go.wasm',
     text: 'package paint\ntype Palette struct { Amber int; Violet int }\n',
     needle: 'Amber',
-    type: 'field_declaration',
+    type: 'field_identifier',
     signature: 'Amber',
-    commutative: true,
+    commutative: false,
   },
   {
     id: 'javascript',
@@ -94,7 +94,7 @@ const fixtures = [
     needle: 'amber',
     type: 'method_definition',
     signature: 'amber',
-    commutative: true,
+    commutative: false,
   },
   {
     id: 'javascript',
@@ -112,7 +112,7 @@ const fixtures = [
     needle: '2',
     type: 'pair',
     signature: 'amber',
-    commutative: true,
+    commutative: false,
   },
   {
     id: 'javascript',

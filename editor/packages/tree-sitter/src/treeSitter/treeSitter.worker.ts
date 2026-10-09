@@ -2912,9 +2912,7 @@ const queryMergeUnit = async (
     Math.min(Math.max(request.range.startIndex, request.range.endIndex), cached.size),
   )
   const range = { startIndex, endIndex }
-  const layer = cached.markdown
-    ? (cached.layers.find((candidate) => layerContainsSelection(candidate, range)) ?? null)
-    : layerForSelection(cached, range)
+  const layer = deepestLayerForSelection(cached, range)
   const languageId = layer?.languageId ?? cached.languageId
   const runtime = await ensureRuntime(languageId)
   assertRuntimeSessionActive(request.runtimeSessionId)
@@ -2928,7 +2926,12 @@ const queryMergeUnit = async (
     return { ...identity, status: 'stale', unit: null }
   const source = runtime.descriptor.mergeUnitQuerySource
   if (!source?.trim())
-    return { ...identity, status: 'ok', unit: lineMergeUnit(cached.source.read.text, range) }
+    return {
+      ...identity,
+      languageId,
+      status: 'ok',
+      unit: lineMergeUnit(cached.source.read.text, range),
+    }
   const query = (runtime.mergeUnitQuery ??= new Query(runtime.language, source))
   // The native Markdown renderer does not expose its block tree.
   const tree =
@@ -3030,11 +3033,16 @@ const clampSelectionIndex = (root: Node, index: number): number => {
 const layerForSelection = (
   document: ParsedDocument,
   range: TreeSitterSelectionRange,
-): ParsedLayer => {
-  let best = rootLayerForDocument(document)
+): ParsedLayer => deepestLayerForSelection(document, range) ?? rootLayerForDocument(document)
+
+const deepestLayerForSelection = (
+  document: ParsedDocument,
+  range: TreeSitterSelectionRange,
+): ParsedLayer | null => {
+  let best: ParsedLayer | null = null
   for (const layer of document.layers) {
     if (!layerContainsSelection(layer, range)) continue
-    if (layer.depth < best.depth) continue
+    if (best && layer.depth < best.depth) continue
     best = layer
   }
 

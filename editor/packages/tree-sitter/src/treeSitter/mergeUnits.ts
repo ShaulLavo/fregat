@@ -66,7 +66,7 @@ function commutativeParent(parent: Node, matches: readonly QueryMatch[]): boolea
   }
   // Repeated query patterns can skip siblings, so require coverage of the entire parent.
   return [...membersByPattern.values()].some((ids) =>
-    parent.namedChildren.every((child) => ids.has(child.id)),
+    parent.namedChildren.every((child) => child.isExtra || ids.has(child.id)),
   )
 }
 
@@ -80,11 +80,18 @@ export function lineMergeUnit(
 ): TreeSitterMergeUnit {
   const first = text.lineAt(range.startIndex)
   const last = text.lineAt(Math.max(range.startIndex, range.endIndex - 1))
+  const lastLine = text.lineRange(last)
+  let endIndex = lastLine.end
+  if (last + 1 < text.lineCount) {
+    // Line ranges exclude LF but include CR; keep CRLF together at unit boundaries.
+    if (endIndex > lastLine.start && text.readRange(endIndex - 1, endIndex) === '\r') endIndex--
+    if (range.endIndex > endIndex) endIndex = text.lineStart(last + 1)
+  }
   return {
     source: 'line',
     type: 'line',
     startIndex: text.lineRange(first).start,
-    endIndex: text.lineRange(last).end,
+    endIndex,
     signature: null,
     parent: null,
   }

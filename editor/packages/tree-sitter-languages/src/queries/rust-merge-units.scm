@@ -13,7 +13,6 @@
 (type_item name: (_) @merge.signature) @merge.unit
 (field_declaration name: (_) @merge.signature) @merge.unit
 (field_initializer field: (_) @merge.signature) @merge.unit
-(field_declaration_list) @merge.commutative
 (arguments (_) @merge.unit)
 (parameters (_) @merge.unit)
 (array_expression (_) @merge.unit)

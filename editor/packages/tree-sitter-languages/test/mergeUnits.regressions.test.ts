@@ -121,7 +121,7 @@ const fixtures = [
   {
     name: 'Go fields used in positional composite literals stay ordered',
     id: 'go',
-    text: 'package paint\ntype Palette struct { Amber int; Violet int }\nvar color = Palette{1, 2}\n',
+    text: 'package brush\ntype Palette struct { Amber int; Violet int }\nvar color = Palette{1, 2}\n',
     needles: ['int', 'int'],
     signatures: [null, null],
     type: 'field_declaration',

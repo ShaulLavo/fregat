@@ -4,4 +4,5 @@
 (property_signature name: (_) @merge.signature) @merge.unit
 (method_signature name: (_) @merge.signature) @merge.unit
 (public_field_definition name: (_) @merge.signature) @merge.unit
-(interface_body) @merge.commutative
+; Overload resolution depends on method and call-signature order.
+(interface_body (property_signature)+ @_merge.member) @merge.commutative

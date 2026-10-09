@@ -85,7 +85,7 @@
         },
         {
           "file": "./queries/javascript-merge-units.scm",
-          "sha256": "c49ffd6da2d0482c707d81ce7d75de55f81c44f9ae2480b18141dcea0b06a782"
+          "sha256": "eac8c9a8e0c41a51b3c49d36dd1253a9c08fb64fa2fbec03ff54bd51cdd2020d"
         },
         {
           "file": "./queries/javascript-fields-merge-units.scm",
@@ -107,7 +107,7 @@
         },
         {
           "kind": "merge-units",
-          "sha256": "781b9a34d42f0f3cc6fac3c22efc088d7216135400ce2f2070c0553bc41f5ad3"
+          "sha256": "db540875b24a5de2a50789d6a4edd13fbb6cbe4297fc1ff203d2485ec4b67fa0"
         }
       ]
     },
@@ -242,11 +242,11 @@
         },
         {
           "file": "./queries/javascript-merge-units.scm",
-          "sha256": "c49ffd6da2d0482c707d81ce7d75de55f81c44f9ae2480b18141dcea0b06a782"
+          "sha256": "eac8c9a8e0c41a51b3c49d36dd1253a9c08fb64fa2fbec03ff54bd51cdd2020d"
         },
         {
           "file": "./queries/typescript-merge-units.scm",
-          "sha256": "38de4c75cd1f7f7669b6ac1bf72e9696383843384201e0b1062b092aa85d2c24"
+          "sha256": "f50242e136e4d7210b46f7abb3160e95fb4b008be635eb061156e0d713917227"
         }
       ],
       "queries": [
@@ -264,7 +264,7 @@
         },
         {
           "kind": "merge-units",
-          "sha256": "19a3d5248d17dc7bdd3e0d57a0fbc3a9c877d49a214d59ecb431b9754cdc5f34"
+          "sha256": "75edb5202803c8972658e2fdd8c333aeaa363c4d54ab9398f64d4d63862b88ce"
         }
       ]
     },
@@ -407,11 +407,11 @@
         },
         {
           "file": "./queries/javascript-merge-units.scm",
-          "sha256": "c49ffd6da2d0482c707d81ce7d75de55f81c44f9ae2480b18141dcea0b06a782"
+          "sha256": "eac8c9a8e0c41a51b3c49d36dd1253a9c08fb64fa2fbec03ff54bd51cdd2020d"
         },
         {
           "file": "./queries/typescript-merge-units.scm",
-          "sha256": "38de4c75cd1f7f7669b6ac1bf72e9696383843384201e0b1062b092aa85d2c24"
+          "sha256": "f50242e136e4d7210b46f7abb3160e95fb4b008be635eb061156e0d713917227"
         },
         {
           "file": "./queries/tsx-merge-units.scm",
@@ -433,7 +433,7 @@
         },
         {
           "kind": "merge-units",
-          "sha256": "34fa30c7327ec880dfb30194c23b481875d6491ae4aa40491f474855971e4d02"
+          "sha256": "58c1eba85a5361a378e2276aeb377ce4efdafb5d873b7215f69bbd8339c79a86"
         }
       ]
     },
@@ -1066,7 +1066,7 @@
         },
         {
           "file": "./queries/rust-merge-units.scm",
-          "sha256": "4403e188ce049c2e465c2180a8093699be3348e676969947aa6353abbcbe6c67"
+          "sha256": "a29f03b778b6d37fdfcb9763db7dbc4d10d08a2488719e8c35ca82f017af8c4c"
         }
       ],
       "queries": [
@@ -1084,7 +1084,7 @@
         },
         {
           "kind": "merge-units",
-          "sha256": "4403e188ce049c2e465c2180a8093699be3348e676969947aa6353abbcbe6c67"
+          "sha256": "a29f03b778b6d37fdfcb9763db7dbc4d10d08a2488719e8c35ca82f017af8c4c"
         }
       ]
     },
@@ -1151,7 +1151,7 @@
         },
         {
           "file": "./queries/go-merge-units.scm",
-          "sha256": "49b803100f0e0c94f97561be54fe28e746b3052314bd87181e6bfde418982739"
+          "sha256": "e1adbe9bfb5ce4a06f5aa96b2d9ef975ff080179f20e87d80f2a33429d8e18ab"
         }
       ],
       "queries": [
@@ -1169,7 +1169,7 @@
         },
         {
           "kind": "merge-units",
-          "sha256": "49b803100f0e0c94f97561be54fe28e746b3052314bd87181e6bfde418982739"
+          "sha256": "e1adbe9bfb5ce4a06f5aa96b2d9ef975ff080179f20e87d80f2a33429d8e18ab"
         }
       ]
     },
