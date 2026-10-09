@@ -7,7 +7,6 @@ import '../src/style.css'
 declare module 'vitest/browser' {
   interface BrowserCommands {
     proofKeyPress: (key: string) => Promise<void>
-    proofInputDelivery: (details: string) => Promise<void>
   }
 }
 
@@ -59,10 +58,6 @@ test.each(['flex', 'grid'] as const)('fills a sized %s host after resizing', asy
 test.each([
   ['10 MiB', 10 * 1024 * 1024],
   ['1,000 character', 1000],
-  ...Array.from(
-    { length: 11 },
-    (_, trial) => [`10 MiB trial ${trial + 2}`, 10 * 1024 * 1024] as const,
-  ),
 ] as const)('keeps a %s document windowed while typing in a block host', async (size, bytes) => {
   const host = document.createElement('div')
   host.style.cssText = 'display:block;width:600px;height:120px'
@@ -87,62 +82,34 @@ test.each([
   expect(rows()).toBeLessThan(100)
 
   const input = editor.getInputElement()
-  const events = { keydown: 0, beforeinput: 0, input: 0, keyup: 0 }
-  for (const type of ['keydown', 'beforeinput', 'input', 'keyup'] as const)
-    input.addEventListener(type, () => events[type]++)
+  let beforeinputCount = 0
+  input.addEventListener('beforeinput', () => beforeinputCount++)
   for (const where of ['end', 'middle'] as const) {
     const offset = where === 'end' ? editor.getState().length : Math.floor(bytes / 2)
     editor.setSelection(offset, offset, { reveal: true })
     editor.focus()
-    const focusBefore = {
-      focused: document.activeElement === input,
-      documentFocused: document.hasFocus(),
-    }
     const initialLength = editor.getState().length
+    const initialBeforeinputCount = beforeinputCount
     const letter = where === 'end' ? 'q' : 'z'
-    const deliveries: unknown[] = []
-    for (let key = 0; key < 20; key++) {
-      await commands.proofKeyPress(letter)
-      deliveries.push({
-        key,
-        expectedLength: initialLength + key + 1,
-        length: editor.getState().length,
-        focused: document.activeElement === input,
-        documentFocused: document.hasFocus(),
-        events: { ...events },
-      })
-    }
-    const submitted = {
+    for (let key = 0; key < 20; key++) await commands.proofKeyPress(letter)
+    const diagnostic = JSON.stringify({
       size,
-      bytes,
       where,
       inputKind: input.tagName,
-      focusBefore,
+      focused: document.activeElement === input,
+      documentFocused: document.hasFocus(),
+      beforeinputCount: beforeinputCount - initialBeforeinputCount,
       expectedLength: initialLength + 20,
-      length: editor.getState().length,
+      applicationLength: editor.getState().length,
       snapshotLength: editor.getTextSnapshot().length,
-      events: { ...events },
-      deliveries,
-    }
-    await commands.proofInputDelivery(JSON.stringify({ stage: 'submitted', ...submitted }))
+    })
     await expect
-      .poll(() => editor.getState().length, { message: JSON.stringify(submitted) })
+      .poll(() => editor.getState().length, { message: diagnostic })
       .toBe(initialLength + 20)
-    await commands.proofInputDelivery(
-      JSON.stringify({
-        stage: 'settled',
-        size,
-        bytes,
-        where,
-        length: editor.getState().length,
-        snapshotLength: editor.getTextSnapshot().length,
-        focused: document.activeElement === input,
-        documentFocused: document.hasFocus(),
-        events: { ...events },
-      }),
+    expect(editor.getTextSnapshot().length, diagnostic).toBe(initialLength + 20)
+    expect(editor.getTextSnapshot().readRange(offset, offset + 20), diagnostic).toBe(
+      letter.repeat(20),
     )
-    expect(editor.getTextSnapshot().length).toBe(initialLength + 20)
-    expect(editor.getTextSnapshot().readRange(offset, offset + 20)).toBe(letter.repeat(20))
     await expect
       .poll(() =>
         host.querySelector('.editor-virtualized-content')?.textContent?.includes(letter.repeat(20)),
