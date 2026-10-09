@@ -13,9 +13,8 @@ declare module 'vitest/browser' {
   }
 }
 
-const fontUrl = new URL('../../../site/src/fonts/jetbrains-mono.woff2', import.meta.url).href
-const fallbackFontUrl = new URL('../../../site/src/fonts/source-serif-4.woff2', import.meta.url)
-  .href
+const fontUrl = new URL('./fixtures/fonts/jetbrains-mono.woff2', import.meta.url).href
+const fallbackFontUrl = new URL('./fixtures/fonts/source-serif-4.woff2', import.meta.url).href
 
 const mounted: { editor: Editor; host: HTMLElement; parent: HTMLElement }[] = []
 
