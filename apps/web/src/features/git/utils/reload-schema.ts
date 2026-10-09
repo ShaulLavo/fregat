@@ -6,23 +6,37 @@ import {
   type GitInputRevision,
 } from '@workspace/contracts'
 
-const scroll = v.nullable(v.object({ top: v.number(), left: v.number() }))
+const sourceAnchor = v.object({
+  kind: v.literal('source'),
+  side: v.picklist(['old', 'new']),
+  line: v.number(),
+  character: v.number(),
+})
+const displayAnchor = v.object({
+  kind: v.literal('display'),
+  region: v.nullable(v.string()),
+  hunk: v.nullable(v.number()),
+  row: v.number(),
+  character: v.number(),
+})
+const anchor = v.variant('kind', [sourceAnchor, displayAnchor])
 const selection = v.object({
-  anchorOffset: v.number(),
-  headOffset: v.number(),
-  startOffset: v.number(),
-  endOffset: v.number(),
+  anchor,
+  head: anchor,
   affinity: v.picklist(['before', 'after']),
 })
-const selections = v.optional(v.pipe(v.array(selection), v.maxLength(100)))
+const paneAnchors = v.nullable(
+  v.object({
+    selections: v.pipe(v.array(selection), v.maxLength(100), v.readonly()),
+    viewport: v.nullable(v.object({ anchor, withinRow: v.number() })),
+    left: v.number(),
+  }),
+)
 const diffViewSchema = v.object({
-  expanded: v.array(v.string()),
-  old: scroll,
-  new: scroll,
-  stacked: scroll,
-  oldSelections: selections,
-  newSelections: selections,
-  stackedSelections: selections,
+  expanded: v.pipe(v.array(v.string()), v.readonly()),
+  old: paneAnchors,
+  new: paneAnchors,
+  stacked: paneAnchors,
   layout: v.optional(v.record(v.string(), v.number())),
 })
 const identitySchema = v.variant('kind', [
