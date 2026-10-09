@@ -6,10 +6,8 @@ export default defineConfig({
     include: [
       'scripts/**/*.test.{ts,mjs}',
       '.github/actions/setup/action.test.ts',
-      'apps/web/scripts/bundle-gate.test.ts',
-      'apps/web/scripts/bundle-owners.test.ts',
       'apps/web/scripts/dev-source-alias.test.ts',
-      'apps/web/scripts/first-load-files.test.ts',
+      'apps/web/scripts/license-notices-plugin.test.ts',
       'apps/web/scripts/phosphor-import-plugin.test.ts',
       'apps/web/scripts/phosphor-weight-plugin.test.ts',
       'apps/web/scripts/shard-durations.test.ts',

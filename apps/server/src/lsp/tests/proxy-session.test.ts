@@ -2164,6 +2164,150 @@ describe('LspSessionPool semantic token delta', () => {
     })
   })
 
+  it('cancels only the requested waiter on a shared connection', async () => {
+    const fixture = await deltaFixture()
+    await fixture.first.handleClientMessage(json(tokensRequest(10)))
+    const ask = lastServerRequest(fixture)
+    await fixture.first.handleClientMessage(json(tokensRequest(11)))
+    expect(lastServerRequest(fixture)?.id).toBe(ask?.id)
+
+    const cancel = json({ jsonrpc: '2.0', method: '$/cancelRequest', params: { id: 10 } })
+    await fixture.first.handleClientMessage(cancel)
+    await fixture.first.handleClientMessage(cancel)
+    expect(
+      fixture.serverMessages.filter((message) => message.method === '$/cancelRequest'),
+    ).toHaveLength(0)
+
+    fixture.respond({
+      id: ask?.id,
+      jsonrpc: '2.0',
+      result: { data: [0, 0, 4, 0, 0], resultId: 'r1' },
+    })
+    expect(fixture.firstSocket.sent.at(-1)).toMatchObject({
+      id: 11,
+      result: { data: [0, 0, 4, 0, 0] },
+    })
+    expect(fixture.firstSocket.sent.some((message) => message.id === 10)).toBe(false)
+  })
+
+  it('cancels backend work once the final request on a shared connection leaves', async () => {
+    const fixture = await deltaFixture()
+    await fixture.first.handleClientMessage(json(tokensRequest(10)))
+    const ask = lastServerRequest(fixture)
+    await fixture.first.handleClientMessage(json(tokensRequest(11)))
+
+    await fixture.first.handleClientMessage(
+      json({ jsonrpc: '2.0', method: '$/cancelRequest', params: { id: 10 } }),
+    )
+    expect(
+      fixture.serverMessages.filter((message) => message.method === '$/cancelRequest'),
+    ).toHaveLength(0)
+    const cancel = json({ jsonrpc: '2.0', method: '$/cancelRequest', params: { id: 11 } })
+    await fixture.first.handleClientMessage(cancel)
+    await fixture.first.handleClientMessage(cancel)
+    expect(
+      fixture.serverMessages.filter((message) => message.method === '$/cancelRequest'),
+    ).toEqual([{ jsonrpc: '2.0', method: '$/cancelRequest', params: { id: ask?.id } }])
+
+    fixture.respond({
+      id: ask?.id,
+      jsonrpc: '2.0',
+      result: { data: [0, 0, 4, 0, 0], resultId: 'abandoned' },
+    })
+    expect(fixture.firstSocket.sent.some((message) => message.id === 11)).toBe(false)
+    await fixture.first.handleClientMessage(json(tokensRequest(12)))
+    expect(lastServerRequest(fixture)?.method).toBe('textDocument/semanticTokens/full')
+  })
+
+  it('drops every waiter on a disconnected connection while preserving the other connection', async () => {
+    const fixture = await deltaFixture()
+    await fixture.first.handleClientMessage(json(tokensRequest(10)))
+    const ask = lastServerRequest(fixture)
+    await fixture.first.handleClientMessage(json(tokensRequest(11)))
+    await fixture.second.handleClientMessage(json(tokensRequest(20)))
+
+    fixture.first.dispose()
+    expect(
+      fixture.serverMessages.filter((message) => message.method === '$/cancelRequest'),
+    ).toHaveLength(0)
+    await fixture.second.handleClientMessage(
+      json({ jsonrpc: '2.0', method: '$/cancelRequest', params: { id: 20 } }),
+    )
+    expect(
+      fixture.serverMessages.filter((message) => message.method === '$/cancelRequest'),
+    ).toEqual([{ jsonrpc: '2.0', method: '$/cancelRequest', params: { id: ask?.id } }])
+  })
+
+  it('keeps the newer request discoverable when an older request is cancelled', async () => {
+    const fixture = await deltaFixture()
+    await fixture.first.handleClientMessage(json(tokensRequest(10)))
+    const older = lastServerRequest(fixture)
+    await fixture.first.handleClientMessage(
+      json(didChange(URI, 2, [{ text: `${DOCUMENT_TEXT}\nconst added = 1` }])),
+    )
+    await fixture.second.handleClientMessage(json(tokensRequest(20)))
+    const newer = lastServerRequest(fixture)
+    expect(newer?.id).not.toBe(older?.id)
+
+    await fixture.first.handleClientMessage(
+      json({ jsonrpc: '2.0', method: '$/cancelRequest', params: { id: 10 } }),
+    )
+    await fixture.second.handleClientMessage(json(tokensRequest(21)))
+    expect(
+      fixture.serverMessages.filter((message) =>
+        String(message.method).startsWith('textDocument/semanticTokens'),
+      ),
+    ).toHaveLength(2)
+
+    fixture.respond({
+      id: newer?.id,
+      jsonrpc: '2.0',
+      result: { data: [0, 0, 4, 0, 0], resultId: 'r2' },
+    })
+    expect(fixture.secondSocket.sent.slice(-2)).toMatchObject([
+      { id: 20, result: { data: [0, 0, 4, 0, 0] } },
+      { id: 21, result: { data: [0, 0, 4, 0, 0] } },
+    ])
+    fixture.respond({
+      id: older?.id,
+      jsonrpc: '2.0',
+      result: { data: [0, 0, 1, 0, 0], resultId: 'abandoned' },
+    })
+    expect(fixture.firstSocket.sent.some((message) => message.id === 10)).toBe(false)
+  })
+
+  it('retires the newer request on last-owner close after an older request is cancelled', async () => {
+    const fixture = await deltaFixture()
+    await fixture.first.handleClientMessage(json(tokensRequest(10)))
+    const older = lastServerRequest(fixture)
+    await fixture.first.handleClientMessage(
+      json(didChange(URI, 2, [{ text: `${DOCUMENT_TEXT}\nconst added = 1` }])),
+    )
+    await fixture.second.handleClientMessage(json(tokensRequest(20)))
+    const newer = lastServerRequest(fixture)
+    await fixture.first.handleClientMessage(
+      json({ jsonrpc: '2.0', method: '$/cancelRequest', params: { id: 10 } }),
+    )
+
+    await fixture.first.handleClientMessage(json(didClose(URI)))
+    await fixture.second.handleClientMessage(json(didClose(URI)))
+    expect(
+      fixture.serverMessages.filter((message) => message.method === '$/cancelRequest'),
+    ).toEqual([
+      { jsonrpc: '2.0', method: '$/cancelRequest', params: { id: older?.id } },
+      { jsonrpc: '2.0', method: '$/cancelRequest', params: { id: newer?.id } },
+    ])
+    fixture.respond({
+      id: newer?.id,
+      jsonrpc: '2.0',
+      result: { data: [0, 0, 4, 0, 0], resultId: 'closed' },
+    })
+    expect(fixture.secondSocket.sent.some((message) => message.id === 20)).toBe(false)
+    await fixture.first.handleClientMessage(json(didOpen(URI, DOCUMENT_TEXT)))
+    await fixture.first.handleClientMessage(json(tokensRequest(12)))
+    expect(lastServerRequest(fixture)?.method).toBe('textDocument/semanticTokens/full')
+  })
+
   it('starts a fresh request rather than coalescing across an edit', async () => {
     const fixture = await deltaFixture()
     const before = fixture.serverMessages.length

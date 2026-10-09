@@ -11,6 +11,9 @@ const workflow = () => read('.github/workflows/ci.yml')
 function fixture() {
   const outputs: Record<string, string> = {
     code: 'true',
+    shared: 'true',
+    tooling: 'true',
+    tree: 'true',
     packages: '["web"]',
     exhaustive: 'true',
     web: 'true',
@@ -104,6 +107,38 @@ test('actual required graph accepts completed successful jobs and its docs skip'
   expect(fixture().run()).toEqual({ passed: true, issues: [] })
 })
 
+test('terminal-only validation accepts its two verification jobs and rejects missing coverage', () => {
+  const value = fixture()
+  for (const key of [
+    'shared',
+    'tooling',
+    'tree',
+    'web',
+    'server',
+    'tui',
+    'site',
+    'editor',
+    'hotkeys',
+    'exhaustive',
+  ])
+    value.changes.outputs[key] = 'false'
+  value.changes.outputs.docs = 'true'
+  value.changes.outputs.packages = '["ghostty-webgpu"]'
+  for (const id of Object.keys(value.needs))
+    value.needs[id] = {
+      result: ['changes', 'docs', 'libraries'].includes(id) ? 'success' : 'skipped',
+    }
+  value.needs.changes = value.changes
+  const names = ['Changes', 'Docs format', 'Libraries / Ghostty tests']
+  const jobs = value.jobs
+    .filter((job) => names.includes(job.name))
+    .map((job) => ({ ...job, conclusion: 'success', runner_id: 1 }))
+  expect(value.evaluate(jobs)).toEqual({ passed: true, issues: [] })
+  expect(
+    value.evaluate(jobs.filter((job) => job.name !== 'Libraries / Ghostty tests')).passed,
+  ).toBe(false)
+})
+
 test('scheduled full validation uses the same strict verdict', () => {
   const value = fixture()
   expect(value.evaluate(value.jobs, 'schedule')).toEqual({ passed: true, issues: [] })
@@ -112,6 +147,8 @@ test('scheduled full validation uses the same strict verdict', () => {
 test('ordinary site changes require both smoke engines and no exhaustive mobile shards', () => {
   const value = fixture()
   value.changes.outputs.exhaustive = 'false'
+  const standalone = value.jobs.find((job) => job.name === 'Libraries / Standalone packages')
+  if (standalone) standalone.conclusion = 'skipped'
   value.changes.outputs.mobile_shards = '["chromium-0","webkit-0"]'
   const jobs = value.jobs.filter(
     (job) => !['Mobile layout (chromium-1)', 'Mobile layout (webkit-1)'].includes(job.name),

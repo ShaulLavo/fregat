@@ -130,7 +130,7 @@ Each flag gives what it is, where it ships, why that matters, and the options.
   copy of the licence and "prominent notices" on files we changed. This duty exists today
   whatever licence we choose for our own code.
 - **Options:** generate `THIRD_PARTY_NOTICES` at build time from the same inputs this audit used
-  (`bundle-stats.json`, the server path comments, the runtime lock), and serve it at
+  (emitted web chunk module ids, the server path comments, the runtime lock), and serve it at
   `/licenses/`. Add `packages/tree/LICENSE-pierre` plus a header line on the forked files, and
   `OFL.txt` for the fonts.
 
