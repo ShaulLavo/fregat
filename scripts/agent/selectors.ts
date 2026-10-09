@@ -486,6 +486,15 @@ export const selectors = {
   machineFormCancel: (dialog: Locator) =>
     dialog.getByRole('button', { name: 'Cancel', exact: true }),
   machineDialogError: (dialog: Locator) => dialog.getByRole('alert'),
+  firstWorkspaceChat: (page: Page) => page.locator('[data-first-workspace]'),
+  firstWorkspaceDialog: (page: Page) => page.locator('[data-first-workspace-dialog]'),
+  firstWorkspaceRemote: (page: Page) => page.locator('[data-first-workspace-remote]'),
+  firstWorkspaceChatLocal: (page: Page) =>
+    page.locator('[data-first-workspace]').getByRole('button', { name: /^Folder on / }),
+  firstWorkspaceChatRemote: (page: Page) =>
+    page
+      .locator('[data-first-workspace]')
+      .getByRole('button', { name: 'Remote machine', exact: true }),
   serverOutOfDate: (scope: Page | Locator) => scope.getByText('Protocol mismatch', { exact: true }),
   sshHostList: (page: Page) =>
     page.getByRole('listbox', { name: 'SSH hosts', exact: true }).first(),

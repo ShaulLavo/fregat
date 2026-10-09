@@ -140,8 +140,8 @@ work can proceed independently where their files and contracts do not overlap.
    for manual use before scheduler integration. Durable storage
    [293](plans/293-mesh-durable-job-state.md) precedes coordinated dispatch
    [294](plans/294-mesh-job-coordination.md). Schedule recurring collector execution after those guarantees pass; its usable manual command comes first.
-5. Automatic placement [311](plans/311-automatic-machine-placement.md), design-first onboarding
-   [315](plans/315-local-remote-onboarding.md), device pairing [337](plans/337-device-pairing.md), and session attention
+5. Automatic placement [311](plans/311-automatic-machine-placement.md), first-run onboarding
+   [315](plans/315-local-remote-onboarding.md) (web and phone shipped; installed macOS proof pending), device pairing [337](plans/337-device-pairing.md), and session attention
    [316](plans/316-session-attention.md) follow their owning product and verification gates.
    Grammar re-pinning and held-out corpus [317](plans/317-tree-sitter-phase-two-prerequisites.md)
    remain Approved and deferred to Phase 2 preparation. They do not start the stopped parser wave.

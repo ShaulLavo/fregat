@@ -6,6 +6,8 @@ import { commands } from 'vitest/browser'
 
 import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
 import { filePickerDialogQueryOptions } from '@/features/file-picker/utils/dialog-query'
+import { activeServerOrigin } from '@/lib/client'
+import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { holdDeferredDialog, loadDeferredDialogs, renderWithProviders } from '../../../test/render'
 
 declare module 'vitest/browser' {
@@ -38,7 +40,10 @@ test('a picker opened before its module loads hands focus on and returns it to t
   await dialog()
   release()
 
-  await expect.poll(() => document.activeElement?.getAttribute('placeholder')).toBe('Search files')
+  // The search names the machine it searches, once that server has reported its host.
+  await expect
+    .poll(() => document.activeElement?.getAttribute('placeholder'))
+    .toBe(searchPlaceholder())
   await commands.proofKeyPress({ key: 'Escape' })
 
   await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull()
@@ -66,4 +71,9 @@ function PickerOpener() {
 async function dialog() {
   await expect.poll(() => document.querySelector('[role="dialog"]')).toBeTruthy()
   return document.querySelector<HTMLElement>('[role="dialog"]')!
+}
+
+function searchPlaceholder() {
+  const label = useEnvironmentsStore.getState().entries[activeServerOrigin()]?.label
+  return label ? `Search files on ${label}` : 'Search files'
 }
