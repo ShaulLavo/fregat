@@ -160,7 +160,7 @@ try {
   )
   if (!ref)
     assert.equal(
-      (await sourceInventory(root, runtimeCheckoutFiles(root))).sha256,
+      (await sourceInventory(root, await runtimeCheckoutFiles(root))).sha256,
       runtime.inventory.sha256,
       'Runtime inputs changed during the build; rebuild from stable inputs',
     )

@@ -32,7 +32,7 @@ test('runtime build arguments preserve positional output and require one explici
     assert.throws(() => comparisonBuildArguments(args, output))
 })
 
-test('changing only the Canvas composer changes the runtime inventory and dirty state', async (context) => {
+test('changing Canvas composer bytes or declarations changes the checkout inventory', async (context) => {
   try {
     execFileSync('git', ['--version'], { stdio: 'pipe' })
   } catch {
@@ -43,7 +43,10 @@ test('changing only the Canvas composer changes the runtime inventory and dirty 
   const runtimeRoot = join(repository, 'runtime')
   const git = (args) => execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim()
   try {
-    await mkdir(join(runtimeRoot, 'src'), { recursive: true })
+    await mkdir(join(runtimeRoot, 'src/core'), { recursive: true })
+    const declarations = join(runtimeRoot, 'src/core/assets.ts')
+    const manifest = await readFile(join(root, 'src/core/assets.ts'), 'utf8')
+    await writeFile(declarations, manifest)
     await writeFile(join(runtimeRoot, 'src/runtime.ts'), 'export const value = 1\n')
     await writeFile(join(runtimeRoot, 'package.json'), '{"version":"0.1.1"}\n')
     for (const path of ['ghostty-vt.wasm', 'bridge.wasm', 'canvas-compose.wasm'])
@@ -68,6 +71,16 @@ test('changing only the Canvas composer changes the runtime inventory and dirty 
     assert.notEqual(changed.inventory.sha256, baseline.inventory.sha256)
     assert.equal(changed.inventory.files['canvas-compose.wasm'], sha256('changed-composer\0'))
     assert.match(changed.dirty, /canvas-compose\.wasm/)
+    const path = 'wasm/compose-current.wasm'
+    await mkdir(join(runtimeRoot, 'wasm'))
+    await writeFile(join(runtimeRoot, path), 'relocated-composer\0')
+    await writeFile(declarations, manifest.replace('../../canvas-compose.wasm', `../../${path}`))
+    const relocated = await runtimeSource(runtimeRoot)
+    assert.equal(relocated.assets[path], join(runtimeRoot, path))
+    assert.equal(relocated.assets['canvas-compose.wasm'], undefined)
+    assert.equal(relocated.inventory.files[path], sha256('relocated-composer\0'))
+    assert.equal(relocated.inventory.files['canvas-compose.wasm'], undefined)
+    assert.notEqual(relocated.inventory.sha256, changed.inventory.sha256)
   } finally {
     await rm(repository, { recursive: true, force: true })
   }
