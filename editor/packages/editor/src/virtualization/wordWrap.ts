@@ -169,9 +169,9 @@ function appendCompleteWrapText(
   for (let index = 0; index < to;) {
     let end = segments ? (segments[++cluster]?.index ?? text.length) : index + 1
     const code = text.charCodeAt(index)
-    // Hanging spaces cannot open a row; measure their whole run once.
-    if (measure && words && code === 32 && !segments && runs.length === 0) {
-      while (end < to && text.charCodeAt(end) === 32) end += 1
+    // Hanging whitespace cannot open a row; measure its whole run once.
+    if (measure && words && spaceCode(code) && !segments && runs.length === 0) {
+      while (end < to && spaceCode(text.charCodeAt(end))) end += 1
     }
     const space = code === 32 || code === 9
     const cjk = code >= 0x2e80 && isCjkCodeUnit(code)
@@ -188,7 +188,7 @@ function appendCompleteWrapText(
 
     const unit = measure ? text.slice(index, end) : ''
     let cells = measure
-      ? shapedWidth(segmentText + unit, tabStop, measure) - segmentVisual
+      ? appendedShapedWidth(segmentText, unit, segmentVisual, tabStop, measure) - segmentVisual
       : clusterCells(text, index, end, segmentVisual, tabStop, advance)
     const overflows = cells > 0 && segmentVisual > 0 && segmentVisual + cells > width
     if (overflows && !(words && space)) {
@@ -204,7 +204,7 @@ function appendCompleteWrapText(
         segmentText = ''
       }
       cells = measure
-        ? shapedWidth(segmentText + unit, tabStop, measure) - segmentVisual
+        ? appendedShapedWidth(segmentText, unit, segmentVisual, tabStop, measure) - segmentVisual
         : clusterCells(text, index, end, segmentVisual, tabStop, advance)
       if (!interior && segmentVisual > 0 && segmentVisual + cells > width) {
         line.ends.push(length)
@@ -212,7 +212,7 @@ function appendCompleteWrapText(
         segmentVisual = 0
         segmentText = ''
         cells = measure
-          ? shapedWidth(segmentText + unit, tabStop, measure) - segmentVisual
+          ? appendedShapedWidth(segmentText, unit, segmentVisual, tabStop, measure) - segmentVisual
           : clusterCells(text, index, end, segmentVisual, tabStop, advance)
       }
     }
@@ -239,17 +239,36 @@ function appendCompleteWrapText(
   line.previousCjk = previousCjk
 }
 
+function spaceCode(code: number): boolean {
+  return code === 32 || code === 9
+}
+
+/** Earlier tab-separated runs are settled; only the current shaping run can change. */
+function appendedShapedWidth(
+  text: string,
+  unit: string,
+  width: number,
+  tabStop: number,
+  measure: (text: string) => number,
+): number {
+  const tab = text.lastIndexOf('\t')
+  if (tab < 0) return shapedWidth(text + unit, tabStop, measure)
+  const tail = text.slice(tab + 1)
+  const settled = tail.length > 0 ? width - measure(tail) : width
+  return settled + shapedWidth(tail + unit, tabStop, measure)
+}
+
 /** Tabs end shaping runs and reach the next stop from the wrapped row's origin. */
 function shapedWidth(text: string, tabStop: number, measure: (text: string) => number): number {
   let width = 0
   let start = 0
   for (let index = 0; index < text.length; index += 1) {
     if (text.charCodeAt(index) !== 9) continue
-    width += measure(text.slice(start, index))
+    if (index > start) width += measure(text.slice(start, index))
     width += tabStop - (width % tabStop)
     start = index + 1
   }
-  return width + measure(text.slice(start))
+  return start < text.length ? width + measure(text.slice(start)) : width
 }
 
 /** Advances belong to complete graphemes, so a row never starts inside a glyph. */

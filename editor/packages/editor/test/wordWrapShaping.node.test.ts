@@ -46,3 +46,21 @@ test('measures hanging spaces as a run', () => {
   expect(line.ends).toEqual([20_001])
   expect(shaped.mock.calls.length).toBeLessThan(10)
 })
+
+test.each([1, 257, 4096])('settles hanging tab runs across %i-unit input chunks', (chunkSize) => {
+  for (const count of [1000, 2000, 4000]) {
+    const shaped = vi.fn(measure)
+    const rules = { width: 4, words: true, tabSize: 4, advance: () => 1, measure: shaped }
+    const line = createWordWrapLine()
+    const text = 'i' + '\t'.repeat(count) + 'i'
+    for (let start = 0; start < text.length; start += chunkSize) {
+      appendWordWrapText(line, text, start, Math.min(text.length, start + chunkSize), rules)
+    }
+    finishWordWrapLine(line, rules)
+    expect(line.ends).toEqual([count + 1])
+    expect(shaped.mock.calls.length).toBeLessThan(text.length * 4)
+    expect(shaped.mock.calls.reduce((total, [run]) => total + run.length, 0)).toBeLessThan(
+      text.length * 4,
+    )
+  }
+})
