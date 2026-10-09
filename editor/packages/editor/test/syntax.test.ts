@@ -1044,7 +1044,7 @@ describe('highlight refresh retry', () => {
     view.dispose()
   })
 
-  it('keeps the terminal plain fallback after edits until the provider changes', async () => {
+  it('starts a fresh ladder when an edit fails after the retries ran out', async () => {
     let refreshes = 0
     const view = mountRetryEditor((context) => ({
       analyze: (read) =>
@@ -1060,16 +1060,13 @@ describe('highlight refresh retry', () => {
     expect(view.actions('editor.syntax.highlight_retries_exhausted')).toHaveLength(1)
 
     view.editor.edit({ from: 0, to: 0, text: 'x' })
-    expect(view.editor.getState().initialHighlightStatus).toBe('error')
-    expect(view.editor['syntax'].tokens.length).toBe(0)
-    await vi.advanceTimersByTimeAsync(50)
-    expect(view.editor.getState().initialHighlightStatus).toBe('error')
     await vi.advanceTimersByTimeAsync(RETRY_WINDOW_MS)
 
-    expect(refreshes).toBe(3)
-    expect(view.sessionsCreated()).toBe(2)
+    // The edit reloads once; its refresh runs the full ladder, which reloads once more.
+    expect(refreshes).toBe(6)
+    expect(view.sessionsCreated()).toBe(4)
     const terminal = view.actions('editor.syntax.highlight_retries_exhausted')
-    expect(terminal.map((event) => (event.syntax as { attempts: number }).attempts)).toEqual([3])
+    expect(terminal.map((event) => (event.syntax as { attempts: number }).attempts)).toEqual([3, 3])
     expect(view.editor.getState().initialHighlightStatus).toBe('error')
     view.dispose()
   })

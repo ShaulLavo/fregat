@@ -1400,8 +1400,6 @@ export class EditorSyntaxController {
     const session = this.options.getSession()
     if (!this.highlighterSession || !session) return
 
-    // Edits keep the terminal plain fallback; provider changes start a new retry ladder.
-    if (change && this.initialHighlightState === 'error') return
     if (change) this.initialHighlightState = 'loading'
     const configurationGeneration = this.initialHighlightConfigurationGeneration
     const delayMs = options.delayMs ?? syntaxRefreshDelay(change)

@@ -420,17 +420,6 @@ export class AnalysisEntry<T> {
     this.enqueue(read)
   }
 
-  protected retainFailure(read: DocumentRead): boolean {
-    if (this.scheduling === 'pinned') return false
-    if (this.state.kind !== 'failed' || !this.isConfigurationCurrent()) return false
-    if (this.queuedPoint === read.revision.point) return true
-    this.queuedPoint = read.revision.point
-    this.queuedRead = read
-    this.state = { ...this.state, revision: read.revision.point.revision }
-    if (this.active) this.retention.changed()
-    return true
-  }
-
   synchronize(): void {
     const read = this.delivery.current()
     if (!read || (read.revision.point === this.queuedPoint && this.isConfigurationCurrent())) return
@@ -1262,11 +1251,7 @@ export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
       ? { ...state, providerTheme: this.highlighter.themeOutcome() }
       : state
   }
-  override changed(read: DocumentRead): void {
-    // Failed providers retry through explicit refreshes or configuration changes.
-    if (this.retainFailure(read)) return
-    super.changed(read)
-  }
+
   override refresh(): void {
     this.highlighter.invalidateTheme()
     super.refresh()

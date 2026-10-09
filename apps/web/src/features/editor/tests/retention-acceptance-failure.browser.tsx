@@ -19,10 +19,13 @@ import {
 const readyPath = filesystemPath('repo/src/editor-tab-a.ts')
 const failedPath = filesystemPath('repo/src/editor-tab-b.ts')
 
-test(
-  'an unavailable real highlighter settles into an interactive live plain fallback',
+test.for([
+  { undoTiming: 'during', text: 'x' },
+  { undoTiming: 'after', text: 'abcdefgh' },
+] as const)(
+  'an unavailable real highlighter keeps plain text interactive with Undo $undoTiming retry',
   { timeout: 30_000 },
-  async (context) => {
+  async ({ undoTiming, text }, context) => {
     const app = await mountRetentionAcceptanceApp()
     await ensureFileSnapshotQuery(app.queryClient, readyPath)
     expect(await app.read().commands.openFileSurface(readyPath)).toMatchObject({
@@ -57,6 +60,7 @@ test(
       },
     )
     context.onTestFinished(() => {
+      vi.useRealTimers()
       vi.unstubAllGlobals()
     })
     await ensureFileSnapshotQuery(app.queryClient, failedPath)
@@ -87,26 +91,82 @@ test(
         .inspectRetention()
         .entries.some((entry) => entry.family === 'highlighter' && entry.status === 'failed'),
     ).toBe(true)
+    // The edit debounce is 75 ms; the retry ladder delays are 100 and 400 ms.
+    // Freeze only timer scheduling so real keyboard events and Worker failures still run.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const workerAttempts = unavailable.length
     controller.commands.setSelection(0)
     controller.commands.focus()
-    await commands.proofKeyPress({ key: 'x' })
-    expect(document.buffer.materializeFullText()).toBe('x' + before)
-    await assertTerminalFallback('x' + before)
+    if (undoTiming === 'during') await commands.proofKeyPress({ key: text })
+    // Deliver the multi-key burst in one turn, before worker delivery can divide it.
+    if (undoTiming === 'after') {
+      const input = window.document.activeElement!
+      for (const character of text) {
+        input.dispatchEvent(
+          new InputEvent('beforeinput', {
+            bubbles: true,
+            cancelable: true,
+            data: character,
+            inputType: 'insertText',
+          }),
+        )
+      }
+    }
+    const edited = text + before
+    expect(document.buffer.materializeFullText()).toBe(edited)
+    expect(controller.getSnapshot()?.initialHighlightStatus).toBe('loading')
+    await nextFrame()
+    assertPlainFallback(edited)
+    // The entire burst shares the failed edit request and its bounded recovery ladder.
+    expect(unavailable.length - workerAttempts).toBeLessThanOrEqual(4)
+    if (undoTiming === 'after') await assertBoundedRecovery(edited, workerAttempts)
+
+    const attemptsBeforeUndo = unavailable.length
     expect(controller.commands.dispatchCommand('undo')).toBe(true)
     expect(document.buffer.materializeFullText()).toBe(before)
-    await assertTerminalFallback(before)
+    expect(controller.getSnapshot()?.initialHighlightStatus).toBe('loading')
+    await nextFrame()
+    assertPlainFallback(before)
+    await assertBoundedRecovery(before, attemptsBeforeUndo)
+    vi.useRealTimers()
+    await awaitEditorSyntaxWorkerIdleFences()
+    assertPlainFallback(before)
 
-    async function assertTerminalFallback(source: string) {
-      await awaitEditorSyntaxWorkerIdleFences()
+    function nextFrame() {
+      return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    }
+
+    async function assertBoundedRecovery(source: string, attemptsBeforeBurst: number) {
+      // 2 seconds covers the 75 ms debounce and the 100/400 ms backoff, with delivery slack.
+      for (let elapsed = 0; elapsed < 2_000; elapsed += 50) {
+        await vi.advanceTimersByTimeAsync(50)
+        await nextFrame()
+        assertPlainFallback(source)
+        if (controller.getSnapshot()?.initialHighlightStatus === 'error') break
+      }
+      expect(controller.getSnapshot()?.initialHighlightStatus).toBe('error')
+      await vi.advanceTimersByTimeAsync(2_000)
+      await nextFrame()
+      expect(controller.getSnapshot()?.initialHighlightStatus).toBe('error')
+      assertPlainFallback(source)
+      // One failed edit request and three refresh attempts form one recovery ladder.
+      const attempts = unavailable.length - attemptsBeforeBurst
+      expect(attempts).toBeGreaterThan(0)
+      expect(attempts).toBeLessThanOrEqual(4)
+    }
+
+    function assertPlainFallback(source: string) {
       const current = captureRetentionAcceptancePaint(app, failedPath, failed.id)
-      expect(unavailable).toHaveLength(workerAttempts)
-      expect(current.installed.initialHighlightStatus).toBe('error')
       expect(current.source).toBe(source)
+      expect(current.installed.source).toBe(source)
       expect(current.frame.rows.length).toBeGreaterThan(0)
       expect(current.frame.rows.every((row) => row.presentation === 'live')).toBe(true)
+      expect(current.frame.rows.every((row) => row.mapping === 'source')).toBe(true)
       expect(current.frame.runs).toEqual([])
     }
-    await context.annotate(JSON.stringify({ unavailable, sample }), 'highlighter-failure-fallback')
+    await context.annotate(
+      JSON.stringify({ unavailable, undoTiming, sample }),
+      'highlighter-failure-fallback',
+    )
   },
 )
