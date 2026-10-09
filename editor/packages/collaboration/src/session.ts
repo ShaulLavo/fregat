@@ -21,6 +21,7 @@ import {
   type Round,
 } from './protocol'
 import { ReplayWindow } from './replay-window'
+import { MESSAGE_LIMIT } from './framing'
 
 export interface SessionOptions<E extends EditEnvelope> {
   readonly peer: string
@@ -278,7 +279,7 @@ export class Session<E extends EditEnvelope> {
         break
       case 'SUBMIT':
         if (this.isHost && sameAuthority(this.authority, message.payload.authority))
-          this.submit(message.payload.edit)
+          for (const edit of message.payload.edits) this.submit(edit)
         break
       case 'CONFIRM':
         this.confirm(message.sender, message.payload)
@@ -667,13 +668,12 @@ export class Session<E extends EditEnvelope> {
       this.negotiate()
       return
     }
-    for (const record of history.slice(own.length)) {
-      if (!engine.apply(record)) {
-        this.negotiate()
-        return
-      }
-      this.pending.delete(editKey(record.id))
+    const records = history.slice(own.length)
+    if (!engine.applyBatch(records)) {
+      this.negotiate()
+      return
     }
+    for (const record of records) this.pending.delete(editKey(record.id))
     this.rememberLocal()
   }
 
@@ -684,59 +684,101 @@ export class Session<E extends EditEnvelope> {
       !sameAuthority(payload.authority, this.authority)
     )
       return
-    const { record } = payload
     const tip = this.options.engine.checkpoint()
-    if (record.depth <= tip.depth) {
-      const own = this.options.engine.exportHistory(this.options.genesis)!
-      if (own[record.depth - 1]?.hash !== record.hash) this.negotiate()
-      return
+    const own = this.options.engine.exportHistory(this.options.genesis)!
+    const records: Confirmation<E>[] = []
+    let depth = tip.depth
+    for (const record of payload.records) {
+      if (record.depth <= tip.depth) {
+        if (own[record.depth - 1]?.hash !== record.hash) {
+          this.negotiate()
+          return
+        }
+        continue
+      }
+      if (record.depth !== depth + 1) {
+        const last = payload.records.at(-1)!
+        this.request(peer, { depth: last.depth, hash: last.hash }, this.authority.epoch)
+        return
+      }
+      records.push(record)
+      depth = record.depth
     }
-    if (record.depth > tip.depth + 1) {
-      this.request(peer, { depth: record.depth, hash: record.hash }, this.authority.epoch)
-      return
-    }
-    if (!this.options.engine.apply(record)) {
+    if (!records.length) return
+    if (!this.options.engine.applyBatch(records)) {
       this.negotiate()
       return
     }
-    this.pending.delete(editKey(record.id))
+    for (const record of records) this.pending.delete(editKey(record.id))
     this.rememberLocal()
     this.send(peer, 'HAVE', { tip: this.branch.tip, epoch: this.authority.epoch })
   }
 
   private flushPending(): void {
     if (this.phase.kind !== 'stable' || !this.compatibleMembership()) return
+    const count = Math.min(
+      this.pending.size,
+      Math.max(1, Math.floor(this.replayWindowSize / this.members.size)),
+    )
     if (!this.isHost) {
-      const count = Math.min(
-        this.pending.size,
-        Math.max(1, Math.floor(this.replayWindowSize / this.members.size)),
-      )
+      const edits: E[] = []
       for (let index = 0; index < count && this.pending.size; index++) {
         const [key, edit] = this.pending.entries().next().value!
         this.pending.delete(key)
         this.pending.set(key, edit)
-        this.send(this.authority.host, 'SUBMIT', { authority: this.authority, edit })
+        edits.push(edit)
       }
+      for (const batch of this.batches(edits))
+        this.send(this.authority.host, 'SUBMIT', { authority: this.authority, edits: batch })
       return
     }
     const ready = [...this.pending.values()].sort(
       (a, b) => a.lamport - b.lamport || compareIds(editKey(a.id), editKey(b.id)),
     )
+    const sequenced = new Set<string>()
+    const commands: { edit: E; rejection?: string }[] = []
     for (const edit of ready) {
+      if (commands.length === count) break
       const key = editKey(edit.id)
-      const missing = edit.deps.some((id) => !this.options.engine.outcome(id))
+      const missing = edit.deps.some(
+        (id) => !this.options.engine.outcome(id) && !sequenced.has(editKey(id)),
+      )
       const since = this.blockedSince.get(key) ?? this.now
       if (missing) this.blockedSince.set(key, since)
       if (missing && this.now - since < this.options.dependencyTimeout) continue
-      const record = this.options.engine.sequence(
-        edit,
-        missing ? 'Dependency unavailable' : undefined,
-      )
+      commands.push({ edit, rejection: missing ? 'Dependency unavailable' : undefined })
+      sequenced.add(key)
+    }
+    if (!commands.length) return
+    const records = this.options.engine.sequenceBatch(commands)
+    for (const record of records) {
+      const key = editKey(record.id)
       this.pending.delete(key)
       this.blockedSince.delete(key)
-      this.rememberLocal()
-      this.broadcast('CONFIRM', { authority: this.authority, record })
     }
+    this.rememberLocal()
+    for (const batch of this.batches(records))
+      this.broadcast('CONFIRM', { authority: this.authority, records: batch })
+  }
+
+  private batches<T>(values: readonly T[]): readonly (readonly T[])[] {
+    const batches: T[][] = []
+    const encoder = new TextEncoder()
+    let batch: T[] = []
+    let bytes = 0
+    for (const value of values) {
+      const size = encoder.encode(JSON.stringify(value)).byteLength
+      // Reserve space for session headers and transport wrappers around the opaque records.
+      if (batch.length && bytes + size > MESSAGE_LIMIT / 2) {
+        batches.push(batch)
+        batch = []
+        bytes = 0
+      }
+      batch.push(value)
+      bytes += size + 1
+    }
+    if (batch.length) batches.push(batch)
+    return batches
   }
 
   private retryPhase(): void {

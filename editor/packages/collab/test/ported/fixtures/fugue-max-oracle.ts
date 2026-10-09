@@ -4,6 +4,9 @@
 // Transport/serialization are removed; tree placement and traversal are retained.
 // Copyright (c) 2023 Matthew Weidner and Martin Kleppmann. MIT;
 // see ../../../THIRD_PARTY_TEST_NOTICES.md.
+import { charKey, editKey, insertionOf } from '../../../src/types'
+import type { CharId, Envelope } from '../../../src/types'
+
 interface ID {
   sender: string
   counter: number
@@ -223,6 +226,20 @@ class Tree<T> {
     return null
   }
 
+  *retained(): IterableIterator<Node<T>> {
+    const stack = [{ node: this.root, emit: false }]
+    while (stack.length) {
+      const entry = stack.pop()!
+      if (entry.emit) {
+        if (entry.node !== this.root) yield entry.node
+        continue
+      }
+      for (const node of [...entry.node.rightChildren].reverse()) stack.push({ node, emit: false })
+      stack.push({ node: entry.node, emit: true })
+      for (const node of [...entry.node.leftChildren].reverse()) stack.push({ node, emit: false })
+    }
+  }
+
   *traverse(node: Node<T>): IterableIterator<T> {
     let current = node
 
@@ -295,5 +312,124 @@ export function fugueMaxAuthor(actor: string) {
       }
       receive(message)
     },
+  }
+}
+
+type Value = {
+  readonly id: CharId
+  readonly text: string
+  readonly insert: string
+  readonly deletes: Set<string>
+}
+export type OracleEdit = {
+  readonly envelope: Envelope
+  readonly inserts: readonly InsertMessage<Value>[]
+}
+
+/** Parent/side messages are generated on the author's tree, never on the receiving tree. */
+export function fugueMaxReplica() {
+  const tree = new Tree<Value>()
+  const active = new Map<string, boolean>()
+  const seen = new Set<string>()
+  const idOf = (id: CharId): ID => ({ sender: id.bunch, counter: id.counter })
+  const visible = (value: Value) =>
+    active.get(value.insert) === true && [...value.deletes].every((key) => !active.get(key))
+  function settle() {
+    for (const node of tree.retained()) {
+      const deleted = !visible(node.value!)
+      if (node.isDeleted === deleted) continue
+      node.isDeleted = deleted
+      tree.updateSize(node, deleted ? -1 : 1)
+    }
+  }
+  function apply(edit: OracleEdit) {
+    const { envelope, inserts } = edit
+    const key = editKey(envelope.id)
+    if (seen.has(key)) return
+    const change = envelope.change
+    if (change.kind === 'setEffects') {
+      for (const effect of change.effects) active.set(editKey(effect.op), effect.active)
+    } else {
+      active.set(key, true)
+      for (const message of inserts)
+        tree.addNode(
+          message.id,
+          { ...message.value, deletes: new Set() },
+          tree.getByID(message.parent),
+          message.side,
+          message.rightOrigin,
+        )
+      if (change.kind !== 'insert') {
+        for (const span of change.spans) {
+          for (let unit = 0; unit < span.count; unit++)
+            tree
+              .getByID({ sender: span.start.bunch, counter: span.start.counter + unit })
+              .value!.deletes.add(key)
+        }
+      }
+    }
+    seen.add(key)
+    settle()
+  }
+  function author(envelope: Envelope, offset: number): OracleEdit {
+    const insertion = insertionOf(envelope.change)
+    const inserts: InsertMessage<Value>[] = []
+    if (!insertion) {
+      const edit = { envelope, inserts }
+      apply(edit)
+      return edit
+    }
+    active.set(editKey(envelope.id), true)
+    for (let unit = 0; unit < insertion.text.length; unit++) {
+      const index = offset + unit
+      const left = index === 0 ? tree.root : tree.getByIndex(tree.root, index - 1)
+      const right =
+        left.rightChildren.length === 0
+          ? tree.nextNonDescendant(left)
+          : tree.leftmostDescendant(left.rightChildren[0]!)
+      if (unit === 0) {
+        const leftId = left === tree.root ? 'start' : left.value!.id
+        const rightId = right === null ? 'end' : right.value!.id
+        if (JSON.stringify(leftId) !== JSON.stringify(insertion.originLeft))
+          throw new TypeError('Author left origin differs from upstream FugueMax')
+        if (JSON.stringify(rightId) !== JSON.stringify(insertion.originRight))
+          throw new TypeError(
+            `Author tombstone right origin differs from upstream FugueMax: ${JSON.stringify({ id: envelope.id, offset, expected: rightId, actual: insertion.originRight })}`,
+          )
+      }
+      const id = { bunch: insertion.start.bunch, counter: insertion.start.counter + unit }
+      const message: InsertMessage<Value> = {
+        type: 'insert',
+        id: idOf(id),
+        value: {
+          id,
+          text: insertion.text[unit]!,
+          insert: editKey(envelope.id),
+          deletes: new Set(),
+        },
+        parent: left.rightChildren.length === 0 ? left.id : right!.id,
+        side: left.rightChildren.length === 0 ? 'R' : 'L',
+        ...(left.rightChildren.length === 0 ? { rightOrigin: right?.id ?? null } : {}),
+      }
+      tree.addNode(
+        message.id,
+        message.value,
+        tree.getByID(message.parent),
+        message.side,
+        message.rightOrigin,
+      )
+      inserts.push(message)
+    }
+    // Insert messages already affected the author's tree. Apply only deletion/effect bookkeeping.
+    const edit = { envelope, inserts }
+    apply({ envelope, inserts: [] })
+    return edit
+  }
+  return {
+    author,
+    apply,
+    text: () => [...tree.traverse(tree.root)].map((value) => value.text).join(''),
+    ids: () => [...tree.retained()].map((node) => charKey(node.value!.id)),
+    visibleIds: () => [...tree.traverse(tree.root)].map((value) => charKey(value.id)),
   }
 }
