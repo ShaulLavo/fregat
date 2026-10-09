@@ -49,7 +49,7 @@ function observedWords(words: Uint32Array, onRead: () => void): Uint32Array {
 }
 
 function countedWordViews(
-  length: number,
+  length: number | (() => number),
   onAllocation: () => void,
   onRead: () => void,
 ): Uint32ArrayConstructor {
@@ -57,7 +57,8 @@ function countedWordViews(
     construct(target, args, newTarget) {
       if (typeof args[0] === 'number') onAllocation()
       const words = Reflect.construct(target, args, newTarget)
-      return args[2] === length ? observedWords(words, onRead) : words
+      const observedLength = typeof length === 'function' ? length() : length
+      return args[2] === observedLength ? observedWords(words, onRead) : words
     },
   })
 }
@@ -191,7 +192,6 @@ describe('text-only render rows', () => {
   ])('allocates ASCII storage only for ASCII packets ($text)', async ({ text, allocations }) => {
     runtime = await GhosttyRuntime.create()
     const grid = { columns: 80, rows: 3 }
-    const cellCount = grid.columns * grid.rows
     const terminal = runtime.createTerminal(grid)
     const state = runtime.createRenderState(terminal)
     terminal.write('é界')
@@ -211,25 +211,30 @@ describe('text-only render rows', () => {
     vi.stubGlobal(
       'Uint32Array',
       countedWordViews(
-        cellCount * 3,
+        () => runtime!.memory.view.getUint32(extract.mock.lastCall![6] + 20, true) * 3,
         () => (bitmapAllocations += 1),
         () => (wordReads += 1),
       ),
     )
     let rows: readonly RenderTextRow[]
+    let codepointMask: number
+    let copiedCells: number
     try {
       rows = state.readTextRows()
+      const snapshot = extract.mock.calls[0]![6]
+      codepointMask = runtime.memory.view.getUint32(snapshot + 36, true)
+      copiedCells = runtime.memory.view.getUint32(snapshot + 20, true)
+      expect(runtime.memory.view.getUint32(snapshot + 32, true)).toBe(0)
       state.readTextRows()
+      expect(runtime.memory.view.getUint32(snapshot + 20, true)).toBe(0)
     } finally {
       vi.unstubAllGlobals()
     }
-    expect(runtime.memory.view.getUint32(extract.mock.calls[0]![6] + 32, true)).toBe(0)
     expect({ scratchAllocations, bitmapAllocations }).toEqual({
       scratchAllocations: allocations,
-      bitmapAllocations: allocations * 2,
+      bitmapAllocations: allocations,
     })
-    expect(wordReads).toBe(allocations * cellCount * 2)
-    const codepointMask = runtime.memory.view.getUint32(extract.mock.calls[0]![6] + 36, true)
+    expect(wordReads).toBe(allocations * copiedCells)
     expect((codepointMask & ~0x7f) === 0).toBe(allocations === 1)
     expect(materialize(rows)).toEqual(expected)
     terminal.write('\x1b[H\x1b[2Jchanged')
@@ -353,7 +358,7 @@ describe('text-only render rows', () => {
     const rows = state.readTextRows()
     expect(calls).toBe(2)
     expect(full).not.toHaveBeenCalled()
-    expect(rowStride).toBe(12)
+    expect(rowStride).toBe(16)
     expect(cellBytes).toBe(10 * 3 * 12)
     expect(rows[0]!.cells[0]).toBe('e' + '́'.repeat(60))
     calls = 0

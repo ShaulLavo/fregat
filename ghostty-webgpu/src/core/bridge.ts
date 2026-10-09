@@ -185,6 +185,7 @@ export class CallbackBridge {
     maskLength: number,
     dirtyOnly: number,
     snapshot: number,
+    cache: number,
   ): number {
     return this.bridgeExports!.bridge_read_text_rows(
       state,
@@ -194,7 +195,19 @@ export class CallbackBridge {
       maskLength,
       dirtyOnly,
       snapshot,
+      cache,
     )
+  }
+
+  createTextCache(columns: number, rows: number): number {
+    const cache = this.bridgeExports!.bridge_create_text_cache(columns, rows)
+    if (cache === 0)
+      throw createGhosttyError('bridge_create_text_cache', 'Text cache allocation failed')
+    return cache
+  }
+
+  destroyTextCache(cache: number): void {
+    this.bridgeExports!.bridge_destroy_text_cache(cache)
   }
 
   buildFrame(

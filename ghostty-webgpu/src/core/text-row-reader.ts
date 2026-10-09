@@ -2,7 +2,7 @@ import { SnapshotReader } from './snapshot-reader.js'
 import type { GhosttyRuntime } from './runtime.js'
 import type { ReadTextRowsOptions, RenderTextRow, TerminalSize } from './types.js'
 
-const rowWords = 3
+const rowWords = 4
 const cellWords = 3
 const continuationFlag = 0x80000000
 
@@ -67,6 +67,7 @@ function copiedAsciiRows(
   const packet = decoder.decode(bytes.subarray(0, length))
   const rows: RenderTextRow[] = []
   for (let offset = 0; offset < metadata.length; offset += rowWords) {
+    if (metadata[offset + 3] !== 0) continue
     const y = metadata[offset]!
     const start = metadata[offset + 1]!
     const length = metadata[offset + 2]!
@@ -104,17 +105,37 @@ function copiedTextRow(y: number, words: Uint32Array, graphemes: Uint32Array): R
   })
 }
 
+function movedRow(y: number, payload: RenderTextRow, previous: RenderTextRow): RenderTextRow {
+  if (previous.y === y) return previous
+  if (payload.y === y) return payload
+  return Object.freeze({
+    y,
+    text: payload.text,
+    get cells() {
+      return payload.cells
+    },
+    get continuations() {
+      return payload.continuations
+    },
+  })
+}
+
 export class TextRowReader {
   private readonly snapshots: SnapshotReader
   private readonly decoder = new TextDecoder()
   private asciiBytes: Uint8Array = new Uint8Array(0)
+  private cache = 0
+  private columns = 0
+  private rows = 0
+  private previous: readonly RenderTextRow[] = []
+  private payloads: readonly RenderTextRow[] = []
 
-  constructor(runtime: GhosttyRuntime) {
+  constructor(private readonly runtime: GhosttyRuntime) {
     this.snapshots = new SnapshotReader(runtime, {
       rowWords,
       cellWords,
       operation: 'bridge_read_text_rows',
-      extract: (...args) => runtime.bridge.readTextRows(...args),
+      extract: (...args) => runtime.bridge.readTextRows(...args, this.cache),
     })
   }
 
@@ -126,7 +147,60 @@ export class TextRowReader {
     options: ReadTextRowsOptions,
   ): readonly RenderTextRow[] {
     if (grid.rows === 0) return Object.freeze([])
+    this.reserve(grid)
     const snapshot = this.snapshots.read(state, iterator, cells, grid, options)
+    const fresh = this.copyRows(snapshot)
+    if (fresh.length === snapshot.rows.length / rowWords) {
+      this.previous = Object.freeze(fresh)
+      this.payloads = this.previous
+      return this.previous
+    }
+    let index = 0
+    const next: RenderTextRow[] = []
+    const payloads: RenderTextRow[] = []
+    for (let offset = 0; offset < snapshot.rows.length; offset += rowWords) {
+      const y = snapshot.rows[offset]!
+      const source = snapshot.rows[offset + 3]!
+      if (source !== 0) {
+        const payload = this.payloads[source - 1]!
+        next.push(movedRow(y, payload, this.previous[source - 1]!))
+        payloads.push(payload)
+        continue
+      }
+      const row = fresh[index++]!
+      next.push(row)
+      payloads.push(row)
+    }
+    this.previous = Object.freeze(next)
+    this.payloads = payloads
+    return this.previous
+  }
+
+  dispose(): void {
+    this.snapshots.dispose()
+    if (this.cache !== 0) this.runtime.bridge.destroyTextCache(this.cache)
+    this.cache = 0
+    this.previous = []
+    this.payloads = []
+  }
+
+  private reserve(grid: Pick<TerminalSize, 'columns' | 'rows'>): void {
+    if (this.cache !== 0 && this.columns === grid.columns && this.rows === grid.rows) return
+    const cache = this.runtime.bridge.createTextCache(grid.columns, grid.rows)
+    if (this.cache !== 0) this.runtime.bridge.destroyTextCache(this.cache)
+    this.cache = cache
+    this.columns = grid.columns
+    this.rows = grid.rows
+    this.previous = []
+    this.payloads = []
+  }
+
+  private copyRows(snapshot: {
+    rows: Uint32Array
+    cells: Uint32Array
+    graphemes: Uint32Array
+  }): readonly RenderTextRow[] {
+    if (snapshot.cells.length === 0) return []
     if (snapshot.graphemes.length === 0 && (this.snapshots.codepointMask & ~0x7f) === 0) {
       const length = snapshot.cells.length / cellWords
       if (this.asciiBytes.length < length) this.asciiBytes = new Uint8Array(length)
@@ -136,15 +210,12 @@ export class TextRowReader {
     const graphemes = snapshot.graphemes.slice()
     const rows: RenderTextRow[] = []
     for (let offset = 0; offset < snapshot.rows.length; offset += rowWords) {
+      if (snapshot.rows[offset + 3] !== 0) continue
       const y = snapshot.rows[offset]!
       const start = snapshot.rows[offset + 1]! * cellWords
       const end = start + snapshot.rows[offset + 2]! * cellWords
       rows.push(copiedTextRow(y, records.subarray(start, end), graphemes))
     }
-    return Object.freeze(rows)
-  }
-
-  dispose(): void {
-    this.snapshots.dispose()
+    return rows
   }
 }

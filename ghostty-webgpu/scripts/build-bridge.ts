@@ -44,6 +44,8 @@ async function validateWasm(path: string): Promise<void> {
   for (const name of [
     'bridge_read_rows',
     'bridge_read_text_rows',
+    'bridge_create_text_cache',
+    'bridge_destroy_text_cache',
     'bridge_build_frame',
     'bridge_register_glyph',
     'bridge_create_glyph_index',
