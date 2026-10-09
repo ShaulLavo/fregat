@@ -266,3 +266,18 @@ test('touches preserve exact UTF-16 spans for insert, delete and replace', () =>
     },
   ])
 })
+
+test('causal successors cover every dependency and exclude concurrent or evicted identities', () => {
+  const history = confirmedHistory(23)
+  const window = new ConfirmedWindow(history)
+  const ancestors = new Map<string, Set<string>>()
+  for (const edit of history) {
+    const seen = new Set(edit.deps.flatMap((id) => [editKey(id), ...ancestors.get(editKey(id))!]))
+    ancestors.set(editKey(edit.id), seen)
+    for (const previous of history) {
+      expect(window.isAfter(edit.id, [previous.id])).toBe(seen.has(editKey(previous.id)))
+    }
+  }
+  const suffix = new ConfirmedWindow(history, 2)
+  expect(suffix.isAfter(history.at(-1)!.id, [history[0]!.id])).toBe(false)
+})

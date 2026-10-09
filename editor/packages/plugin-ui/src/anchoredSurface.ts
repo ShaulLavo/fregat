@@ -49,7 +49,8 @@ export type AnchoredSurfaceOptions = {
   /** Class for the anchor element, and the stem of the anchor name the surface follows. */
   readonly anchorClassName: string
   readonly preferredPlacement: AnchoredSurfacePlacement
-  readonly alignment?: AnchoredSurfaceAlignment
+  readonly alignment?: AnchoredSurfaceAlignment | (() => AnchoredSurfaceAlignment)
+  readonly horizontalBounds?: () => DOMRect | undefined
   /** Clear space kept between the anchor and the surface. */
   readonly gapPx?: number
   /** Clear space kept between the surface and the edge of the viewport. */
@@ -89,7 +90,8 @@ export function createAnchoredSurface(options: AnchoredSurfaceOptions): Anchored
   const document = element.ownerDocument
   const gapPx = options.gapPx ?? DEFAULT_GAP_PX
   const viewportMarginPx = options.viewportMarginPx ?? DEFAULT_VIEWPORT_MARGIN_PX
-  const alignment = options.alignment ?? 'center'
+  const alignment = () =>
+    typeof options.alignment === 'function' ? options.alignment() : (options.alignment ?? 'center')
 
   nextAnchorId += 1
   const anchorName = `--${options.anchorClassName}-${nextAnchorId}`
@@ -110,8 +112,7 @@ export function createAnchoredSurface(options: AnchoredSurfaceOptions): Anchored
   element.style.setProperty('inset', 'auto')
   // A surface that starts at the anchor runs off the far edge of a narrow window; the side is ours
   // and stays ours, so only the axis we did not decide is handed back to the browser.
-  if (alignment === 'start') element.style.setProperty('position-try-fallbacks', 'flip-inline')
-  applyPlacement(element, options.preferredPlacement, alignment, gapPx)
+  applyPlacement(element, options.preferredPlacement, alignment(), gapPx)
 
   let disposed = false
 
@@ -131,7 +132,15 @@ export function createAnchoredSurface(options: AnchoredSurfaceOptions): Anchored
       gapPx,
       viewportMarginPx,
     )
-    applyPlacement(element, placement, alignment, gapPx)
+    element.style.translate = '0px'
+    applyPlacement(element, placement, alignment(), gapPx)
+    const bounds = options.horizontalBounds?.()
+    const left = Math.max(viewportMarginPx, (bounds?.left ?? 0) + viewportMarginPx)
+    const right =
+      Math.min(document.defaultView?.innerWidth ?? 0, bounds?.right ?? Infinity) - viewportMarginPx
+    const surface = element.getBoundingClientRect()
+    const shifted = Math.max(left, Math.min(surface.left, right - surface.width))
+    element.style.translate = `${shifted - surface.left}px`
     if (configuredMaxHeight === undefined) return
 
     const room = roomBeside(rect, placement, viewportHeight, gapPx, viewportMarginPx)
@@ -197,6 +206,10 @@ function applyPlacement(
   alignment: AnchoredSurfaceAlignment,
   gapPx: number,
 ): void {
+  element.style.setProperty(
+    'position-try-fallbacks',
+    alignment === 'start' ? 'flip-inline' : 'none',
+  )
   const across = alignment === 'start' ? 'span-right' : 'center'
   element.style.setProperty('position-area', `${placement} ${across}`)
   // The gap is a margin rather than an offset because the position area owns the insets, and a
