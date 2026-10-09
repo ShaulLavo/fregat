@@ -1447,6 +1447,54 @@ it('copies paint-row text without visiting styles for text-only frame consumers'
   }
 })
 
+it('captures reused native text synchronously before callback delivery', async () => {
+  const runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 16, rows: 3 })
+  const state = runtime.createRenderState(terminal)
+  const canvas = createCanvas()
+  const frames: { rows: readonly { y: number; text: string }[] }[] = []
+  const changed = [0, 1, 2]
+  const observer = new FrameObserver({
+    canvas,
+    columns: 16,
+    rows: 3,
+    font: fittedFont(),
+    renderState: state,
+    onTextFrame: (frame) => frames.push(frame),
+  })
+  try {
+    terminal.write('first\r\nsecond\r\nthird\r\n')
+    state.update()
+    observer.emit(state, state.readCursor(), undefined, changed)
+    state.acknowledge()
+    terminal.write('fourth\r\n')
+    state.update()
+    const deliver = observer.capture(state, state.readCursor(), undefined, changed)
+    expect(frames).toHaveLength(1)
+    terminal.write('\x1b[1;1Hlater\x1b[K')
+    state.update()
+    deliver()
+    expect(frames).toHaveLength(2)
+    expect(frames[1]!.rows.map(({ text }) => text.trimEnd())).toEqual(['third', 'fourth', ''])
+    const superseded = observer.capture(state, state.readCursor(), undefined, changed)
+    terminal.write('\x1b[2;1Hlatest\x1b[K')
+    state.update()
+    const latest = observer.capture(state, state.readCursor(), undefined, changed)
+    superseded()
+    expect(frames).toHaveLength(2)
+    latest()
+    expect(frames).toHaveLength(3)
+    expect(frames[2]!.rows.map(({ text }) => text.trimEnd())).toEqual(['later', 'latest', ''])
+    runtime.exports.memory.grow(1)
+    expect(frames[1]!.rows.map(({ text }) => text.trimEnd())).toEqual(['third', 'fourth', ''])
+  } finally {
+    state.dispose()
+    terminal.dispose()
+    runtime.dispose()
+    canvas.remove()
+  }
+})
+
 it('restores the whole resized viewport after cursor-only callback demand', async () => {
   const runtime = await GhosttyRuntime.create()
   const terminal = runtime.createTerminal({ columns: 12, rows: 3 })

@@ -756,7 +756,10 @@ export interface BridgeWasmExports extends WebAssembly.Exports {
     maskLength: number,
     dirtyOnly: number,
     snapshot: number,
+    cache: number,
   ): number
+  bridge_create_text_cache(columns: number, rows: number): number
+  bridge_destroy_text_cache(cache: number): void
   bridge_build_frame(
     state: number,
     iterator: number,
