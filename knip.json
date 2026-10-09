@@ -138,6 +138,7 @@
     },
     "apps/tui": {
       "entry": [
+        "scripts/compiler-preload.ts",
         "src/search/tests/replacement.test-d.ts",
         "test/processes/job-control-launcher.ts",
         "test/processes/job-control-session.ts",

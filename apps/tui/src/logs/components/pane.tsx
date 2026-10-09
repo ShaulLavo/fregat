@@ -46,10 +46,7 @@ export function LogsPane({
     description: event.errorMessage ?? '',
     value: event.id,
   }))
-  const selected = Math.max(
-    0,
-    options.findIndex((option) => option.value === selectedId),
-  )
+  const selected = selectionIndex(options, selectedId)
   function setSelected(index: number) {
     latestSelectedId.current = options[index]?.value ?? null
     setSelectedId(latestSelectedId.current)
@@ -161,5 +158,12 @@ export function LogsPane({
         </Dialog>
       )}
     </box>
+  )
+}
+
+function selectionIndex(options: readonly { value: string }[], selectedId: string | null) {
+  return Math.max(
+    0,
+    options.findIndex((option) => option.value === selectedId),
   )
 }

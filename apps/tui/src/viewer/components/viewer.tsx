@@ -14,6 +14,7 @@ import { Spinner } from '@/components/spinner'
 import type { SettingsSession } from '@/connection/state/session'
 import { connectionFailure } from '@/connection/utils/failure'
 import type { Theme } from '@/theme/utils/theme'
+import { onRenderableResize } from '@/utils/renderable-events'
 import { ViewerLine } from '@/viewer/components/line'
 import { useViewerDocument } from '@/viewer/hooks/use-document'
 import { useViewerLanguage } from '@/viewer/hooks/use-language'
@@ -278,10 +279,10 @@ export function FileViewer({
         flexGrow={1}
         scrollY={false}
         scrollX
-        onSizeChange={function () {
-          setPageSize(Math.max(1, this.height))
-          setViewportWidth(this.width)
-        }}
+        onSizeChange={onRenderableResize((view) => {
+          setPageSize(Math.max(1, view.height))
+          setViewportWidth(view.width)
+        })}
         onMouseScroll={(event) => {
           if (event.scroll?.direction === 'left' || event.scroll?.direction === 'right') return
           const delta = event.scroll?.direction === 'up' ? -3 : 3
