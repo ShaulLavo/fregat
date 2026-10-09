@@ -147,6 +147,38 @@ describe('retained native displayed frame', () => {
     }
   })
 
+  it('shares prototype readers between captures while keeping immutable generation identities', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 12, rows: 2 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('first')
+    state.update()
+    const first = state[retainDisplayedFrame]()
+    first.accept()
+    terminal.write('second')
+    state.update()
+    const second = state[retainDisplayedFrame]()
+    for (const method of [
+      'accept',
+      'discard',
+      'readRows',
+      'readTextRows',
+      'readPreviousTextRows',
+    ] as const) {
+      expect(second[method]).toBe(first[method])
+      expect(Object.hasOwn(second, method)).toBe(false)
+    }
+    expect(Object.isFrozen(first)).toBe(true)
+    expect(Object.isFrozen(second)).toBe(true)
+    expect(second.token).toBeGreaterThan(first.token)
+    const owned = first.readTextRows()
+    second.accept()
+    expect(() => first.readTextRows()).toThrow('token has retired')
+    expect(owned[0]?.text).not.toContain('second')
+    expect(second.readTextRows()[0]?.text).toContain('second')
+    expect(second.readTextRows()).toBe(second.readTextRows())
+  })
+
   it('preserves both displayed generations when a native retention capture fails and disposes twice', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 12, rows: 2 })
