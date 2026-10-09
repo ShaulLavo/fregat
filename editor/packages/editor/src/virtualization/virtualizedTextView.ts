@@ -989,7 +989,10 @@ export class VirtualizedTextView {
     view.scrollMode = nextScrollMode
     setScrollModeAttribute(view.scrollElement, nextScrollMode)
     view.lastRenderedRowsKey = ''
-    view.virtualizer.updateOptions({ scrollMode: nextScrollMode })
+    view.virtualizer.updateOptions({
+      scrollMode: nextScrollMode,
+      maxScrollHeight: nextScrollMode === 'virtualized' ? view.viewport.maxScrollHeight : undefined,
+    })
     return true
   }
 
