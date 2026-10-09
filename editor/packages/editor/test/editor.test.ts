@@ -226,7 +226,7 @@ function createTestLanguagePlugin(): EditorPlugin {
 }
 
 function withTestLanguagePlugins(...plugins: readonly EditorPlugin[]): readonly EditorPlugin[] {
-  return [createTestLanguagePlugin(), createEditorFindPlugin(), ...plugins]
+  return [createTestLanguagePlugin(), createEditorFindPlugin()].concat(plugins)
 }
 
 function withTestGutterPlugins(...plugins: readonly EditorPlugin[]): readonly EditorPlugin[] {
@@ -333,9 +333,10 @@ function editorRoot(): HTMLElement {
 }
 
 function hiddenCharacterKinds(): string[] {
-  return [
-    ...document.querySelectorAll<HTMLElement>('.editor-virtualized-hidden-character-marker'),
-  ].map((marker) => marker.dataset.editorHiddenCharacter!)
+  return Array.from(
+    document.querySelectorAll<HTMLElement>('.editor-virtualized-hidden-character-marker'),
+    (marker) => marker.dataset.editorHiddenCharacter!,
+  )
 }
 
 function resizeObserverEntry(target: Element, width: number, height: number): ResizeObserverEntry {
@@ -1532,9 +1533,10 @@ describe('Editor', () => {
       ])
 
       const entry = [...highlightsMap].find(([name]) => name.includes('search-result-match'))
-      const styleText = [...document.head.querySelectorAll('style')]
-        .map((style) => style.textContent ?? '')
-        .join('\n')
+      const styleText = Array.from(
+        document.head.querySelectorAll('style'),
+        (style) => style.textContent ?? '',
+      ).join('\n')
 
       expect(entry?.[1].size).toBe(1)
       expect(styleText).toContain('background-color: yellow')
@@ -1595,9 +1597,10 @@ describe('Editor', () => {
         },
       ])
       const fourthEntry = [...highlightsMap].find(([name]) => name.includes('search-result-match'))
-      const styleText = [...document.head.querySelectorAll('style')]
-        .map((style) => style.textContent ?? '')
-        .join('\n')
+      const styleText = Array.from(
+        document.head.querySelectorAll('style'),
+        (style) => style.textContent ?? '',
+      ).join('\n')
 
       expect(fourthEntry?.[1]).toBe(thirdEntry?.[1])
       expect(styleText).toContain('background-color: orange')
@@ -1785,9 +1788,10 @@ describe('Editor', () => {
       })
       editor.setText(['<<<<<<< HEAD', 'ours', '=======', 'theirs', '>>>>>>> branch'].join('\n'))
 
-      const labels = [
-        ...container.querySelectorAll<HTMLButtonElement>('.editor-merge-conflict-lens-action'),
-      ].map((action) => action.textContent)
+      const labels = Array.from(
+        container.querySelectorAll<HTMLButtonElement>('.editor-merge-conflict-lens-action'),
+        (action) => action.textContent,
+      )
       expect(labels).toEqual([
         'Accept Current Change',
         'Accept Incoming Change',
@@ -6367,7 +6371,7 @@ describe('Editor', () => {
       editor.addPlugin(syntaxPlugin12)
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: [syntaxPlugin12, ...withTestLanguagePlugins(plugin)],
+        plugins: [syntaxPlugin12].concat(withTestLanguagePlugins(plugin)),
       })
       const text = Array.from(
         { length: 60000 },
@@ -8283,7 +8287,9 @@ describe('Editor', () => {
       editor.addPlugin(syntaxPlugin48)
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: [syntaxPlugin48, ...[createEditorLoggingPlugin((event) => events.push(event))]],
+        plugins: [syntaxPlugin48].concat([
+          createEditorLoggingPlugin((event) => events.push(event)),
+        ]),
       })
 
       editor.openDocument({

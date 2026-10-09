@@ -748,10 +748,10 @@ describe('provider runtime ingestion', () => {
   }) => {
     const projection = createProjectionFixture()
     onTestFinished(projection.close)
-    let model = applyIncrementally(projection, [
-      ...sessionBootstrapEvents(),
-      sessionCreatedEvent(sessionId),
-    ])
+    let model = applyIncrementally(
+      projection,
+      sessionBootstrapEvents().concat([sessionCreatedEvent(sessionId)]),
+    )
     const ingestion = new ProviderRuntimeIngestion(
       async (command) => {
         if (command.type !== 'session.activity.append') return

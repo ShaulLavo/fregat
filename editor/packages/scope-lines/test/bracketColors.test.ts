@@ -220,9 +220,10 @@ function paintedRanges(testContext: TestContext) {
 }
 
 function generatedColorRules(): string {
-  return [...document.head.querySelectorAll('style')]
-    .map((element) => element.textContent ?? '')
-    .join('\n')
+  return Array.from(
+    document.head.querySelectorAll('style'),
+    (element) => element.textContent ?? '',
+  ).join('\n')
 }
 
 /** The value declared for every `brackets.levelN` id there is, ordered by N. */
@@ -233,7 +234,7 @@ function levelColorDefaults(): string[] {
     ),
   ]
   return declarations
-    .toSorted((left, right) => Number(left[1]) - Number(right[1]))
+    .sort((left, right) => Number(left[1]) - Number(right[1]))
     .map((declaration) => declaration[2] ?? '')
 }
 

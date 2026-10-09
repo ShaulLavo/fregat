@@ -143,7 +143,7 @@ posixTest(
       await assertConverged(box.pidFile)
     } finally {
       await writeFile(box.pidFile + '.release', 'go')
-      await Promise.allSettled([first, ...(second ? [second] : [])])
+      await Promise.allSettled([first].concat(second ? [second] : []))
       await box.cleanup()
     }
   },
@@ -234,13 +234,12 @@ posixTest(
       for (const subject of ['one', 'two', 'three']) {
         const url = `http://localhost:123/?subject=${subject}`
         const shortcut = Bun.spawn(
-          [
-            box.candidate.executable,
-            ...chromiumArguments(box.candidate, box.profile, {
+          [box.candidate.executable].concat(
+            chromiumArguments(box.candidate, box.profile, {
               ...installedIdentity(url),
               url,
             }),
-          ],
+          ),
           { stdio: ['ignore', 'ignore', 'ignore'] },
         )
         expect(await shortcut.exited).toBe(0)
@@ -286,10 +285,9 @@ posixTest(
       for (const subject of ['one', 'two', 'three']) {
         const url = `http://localhost:123/?subject=${subject}`
         const shortcut = Bun.spawn(
-          [
-            box.candidate.executable,
-            ...chromiumArguments(box.candidate, box.profile, { ...installedIdentity(url), url }),
-          ],
+          [box.candidate.executable].concat(
+            chromiumArguments(box.candidate, box.profile, { ...installedIdentity(url), url }),
+          ),
           { stdio: ['ignore', 'ignore', 'ignore'] },
         )
         expect(await shortcut.exited).toBe(0)
@@ -336,10 +334,9 @@ posixTest(
       await until(box.pidFile + '.spawned')
       const url = 'http://localhost:123/?subject=os-wins'
       owner = Bun.spawn(
-        [
-          box.candidate.executable,
-          ...chromiumArguments(box.candidate, box.profile, { ...installedIdentity(url), url }),
-        ],
+        [box.candidate.executable].concat(
+          chromiumArguments(box.candidate, box.profile, { ...installedIdentity(url), url }),
+        ),
         { stdio: ['ignore', 'ignore', 'ignore'] },
       )
       await until(box.pidFile + '.app')
@@ -457,10 +454,9 @@ posixTest('a nested controller target replays with the installed base app identi
   try {
     await until(box.pidFile + '.installing')
     const shortcut = Bun.spawn(
-      [
-        box.candidate.executable,
-        ...chromiumArguments(box.candidate, box.profile, { ...identity, url: nested }),
-      ],
+      [box.candidate.executable].concat(
+        chromiumArguments(box.candidate, box.profile, { ...identity, url: nested }),
+      ),
       { stdio: ['ignore', 'ignore', 'ignore'] },
     )
     expect(await shortcut.exited).toBe(0)

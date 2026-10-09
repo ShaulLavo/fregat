@@ -50,9 +50,7 @@ describe('history serialization', () => {
       buffer.checkoutHistoryState(node.id)
       return buffer.materializeFullText()
     })
-    expect(texts.toSorted()).toEqual(
-      ['start', 'start one', 'start one three', 'start one two'].toSorted(),
-    )
+    expect(texts.sort()).toEqual(['start', 'start one', 'start one three', 'start one two'].sort())
   })
 
   it('reports the inverse edits on undo so a view can patch instead of resync', () => {

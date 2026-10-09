@@ -5884,6 +5884,12 @@
         },
         {
           "kind": "unknown",
+          "name": "createEditorSnapshotBuffer",
+          "source": "packages/editor/src/documentSession.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "defineDocumentOperation",
           "source": "packages/editor/src/editor/operationDefinitions.ts",
           "via": "packages/editor/src/document/workerReader.ts"
@@ -5898,6 +5904,12 @@
           "kind": "unknown",
           "name": "defineStructuralOperation",
           "source": "packages/editor/src/editor/operationDefinitions.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "DocumentDelivery",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
           "via": "packages/editor/src/document/workerReader.ts"
         },
         {

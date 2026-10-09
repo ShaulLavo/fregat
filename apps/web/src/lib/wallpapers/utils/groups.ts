@@ -90,7 +90,7 @@ export function wallpaperSections(
   }
   return {
     uploads,
-    themes: [...themes].map(([id, grouped]) => ({
+    themes: Array.from(themes, ([id, grouped]) => ({
       id,
       heading: titleCase(id),
       assets: grouped,

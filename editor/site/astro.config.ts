@@ -63,18 +63,16 @@ export default defineConfig({
       ],
       sidebar: SECTIONS.map((section) => ({
         label: section.label,
-        items: [
-          ...section.pages.map(([slug, label]) =>
+        items: section.pages
+          .map(([slug, label]: readonly [string, string]) =>
             manualPage(slug) ? { label, link: `/docs/${slug}/` } : { label, slug: `docs/${slug}` },
-          ),
-          ...(section.label === 'Reference' ? references.map((entry) => entry.sidebar) : []),
-        ],
+          )
+          .concat(section.label === 'Reference' ? references.map((entry) => entry.sidebar) : []),
       })),
-      plugins: [
-        ...references.map((entry) => entry.plugin),
-        // Editor pages are outside Starlight; scripts/links.ts checks every rendered link.
-        linksValidator({ exclude: ['/docs/{start-here,guides,concepts}/**'] }),
-      ],
+      // Editor pages are outside Starlight; scripts/links.ts checks every rendered link.
+      plugins: references
+        .map((entry) => entry.plugin)
+        .concat([linksValidator({ exclude: ['/docs/{start-here,guides,concepts}/**'] })]),
     }),
   ],
 })

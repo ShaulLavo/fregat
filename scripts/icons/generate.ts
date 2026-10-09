@@ -51,15 +51,18 @@ const catppuccin = JSON.parse(
 
 const packGlyphNames = readdirSync(path.join(pack, 'svgs'))
   .filter((file) => file.endsWith('.svg'))
-  .toSorted(compareNames)
+  .sort(compareNames)
   .map((file) => file.slice(0, -'.svg'.length))
-const glyphs = new Map([
-  ...packGlyphNames.map((name) => [name, readGlyph(name)] as const),
-  ...Object.values(CATPPUCCIN_RULES)
-    .map((rule) => rule.icon)
-    .toSorted(compareNames)
-    .map((icon) => [`${CATPPUCCIN_PREFIX}${icon}`, catppuccinGlyph(icon)] as const),
-])
+const glyphs = new Map(
+  packGlyphNames
+    .map((name) => [name, readGlyph(name)] as const)
+    .concat(
+      Object.values(CATPPUCCIN_RULES)
+        .map((rule) => rule.icon)
+        .sort(compareNames)
+        .map((icon) => [`${CATPPUCCIN_PREFIX}${icon}`, catppuccinGlyph(icon)] as const),
+    ),
+)
 const glyphNames = [...glyphs.keys()]
 
 const rules = resolvedRules()
@@ -121,7 +124,7 @@ function readGlyph(name: string) {
 
 /** Ids are document-global once a glyph is inlined or in a sprite, so each carries its glyph. */
 function namespacedIds(inner: string, name: string) {
-  const ids = [...inner.matchAll(/\bid="([^"]+)"/gu)].map((match) => match[1]!)
+  const ids = Array.from(inner.matchAll(/\bid="([^"]+)"/gu), (match) => match[1]!)
   let result = inner
   for (const id of ids) {
     const next = `${GRADIENT_PREFIX}${name}-${id}`
@@ -196,7 +199,7 @@ function ruleMaps(resolved: typeof rules) {
     const normalized = key.trim().toLocaleLowerCase()
     if (!map.has(normalized)) map.set(normalized, rule)
   }
-  for (const [name, rule] of [...Object.entries(RULES), ...Object.entries(CATPPUCCIN_RULES)]) {
+  for (const [name, rule] of Object.entries(RULES).concat(Object.entries(CATPPUCCIN_RULES))) {
     for (const fileName of rule.fileNames ?? []) claim(fileNames, fileName, name)
     for (const extension of rule.extensions ?? []) claim(extensions, extension, name)
   }
@@ -213,7 +216,7 @@ function ruleMaps(resolved: typeof rules) {
 }
 
 function sortedMap(map: Map<string, string>) {
-  return new Map([...map].toSorted(([left], [right]) => compareNames(left, right)))
+  return new Map([...map].sort(([left], [right]) => compareNames(left, right)))
 }
 
 function hueClass(rule: IconRule) {
@@ -247,13 +250,13 @@ export type FileIconGlyph = keyof typeof VSCODE_ICON_GLYPHS
 
 function rulesFile() {
   const ruleLines = Object.entries(rules)
-    .toSorted(([left], [right]) => compareNames(left, right))
+    .sort(([left], [right]) => compareNames(left, right))
     .map(
       ([name, rule]) =>
         `  ${key(name)}: { glyph: '${rule.glyph}', hue: '${rule.hue}', className: '${hueClass(rule)}' },`,
     )
   const mapLines = (map: Map<string, string>) =>
-    [...map].map(([name, rule]) => `  ${key(name)}: '${rule}',`).join('\n')
+    Array.from(map, ([name, rule]) => `  ${key(name)}: '${rule}',`).join('\n')
   return `// ${HEADER}
 import type { FileIconGlyph } from '@/lib/vscode-icon-glyphs'
 

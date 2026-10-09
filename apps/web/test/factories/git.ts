@@ -9,7 +9,7 @@ export function runGit(
   options: GitRunOptions = {},
 ): GitRunResult {
   const inside = options.cwdMode === 'option'
-  const result = spawnSync('git', inside ? args : ['-C', root, ...args], {
+  const result = spawnSync('git', inside ? args : ['-C', root].concat(args), {
     cwd: inside ? root : undefined,
     encoding: 'utf8',
   })

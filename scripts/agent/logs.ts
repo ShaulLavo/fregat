@@ -61,7 +61,7 @@ export function formatLogEvent(event: LogEvent): string {
     .filter(([key]) => !['service', 'environment', 'pipeline'].includes(key))
     .slice(0, 8)
     .map(([key, value]) => `${key}=${compact(value)}`)
-  return [...head, ...tail, ...extra].join(' ')
+  return head.concat(tail, extra).join(' ')
 }
 
 export function parseSince(value: string): Date {

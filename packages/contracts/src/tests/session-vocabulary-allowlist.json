@@ -7,12 +7,14 @@
     "thread": 7,
     "threadId": 5
   },
-  "apps/server/src/orchestration/tests/title-context.test.ts": {
+  "apps/server/src/orchestration/tests/title-context.t3code.test.ts": {
     "formatThreadTitleContext": 1,
-    "thread/message": 1,
     "ThreadTitleContext": 1
   },
-  "apps/server/src/orchestration/tests/title-links.test.ts": {
+  "apps/server/src/orchestration/tests/title-context.test.ts": {
+    "thread/message": 1
+  },
+  "apps/server/src/orchestration/tests/title-links.t3code.test.ts": {
     "ThreadTitleLinks": 2
   },
   "apps/server/src/orchestration/tests/title-normalization.test.ts": {

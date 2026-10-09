@@ -10,7 +10,7 @@ export async function admitHistoricalAddress(
   address: Address,
 ) {
   const selected = editorDocumentToken(address)
-  const tokens = [...new Set([...(address.tabs ?? []), ...(selected ? [selected] : [])])]
+  const tokens = [...new Set((address.tabs ?? []).concat(selected ? [selected] : []))]
   const admitted = await Promise.all(
     tokens.map(async (token) => {
       const parsed = contentForDocumentToken(rootPath, token)

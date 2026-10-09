@@ -385,39 +385,43 @@ export const quickOpenPreview: Scenario = {
     } catch (error) {
       primary = { error }
     } finally {
+      const failureStages: Parameters<typeof finishPreviewScenario>[1] = primary
+        ? [
+            {
+              name: 'failed-request-evidence',
+              run: () =>
+                evidence.json('failed-native-request-facts.json', { phase, counts, requests }),
+            },
+            {
+              name: 'failure-capture',
+              run: () => captureScenarioFailure(page, evidence, 'before-cleanup'),
+            },
+          ]
+        : []
       await finishPreviewScenario(
         primary,
-        [
-          ...(primary
-            ? [
-                {
-                  name: 'failed-request-evidence',
-                  run: () =>
-                    evidence.json('failed-native-request-facts.json', { phase, counts, requests }),
-                },
-                {
-                  name: 'failure-capture',
-                  run: () => captureScenarioFailure(page, evidence, 'before-cleanup'),
-                },
-              ]
-            : []),
-          { name: 'release-head', run: () => releaseHead() },
-          { name: 'request-listener', run: () => page.off('request', request) },
-          { name: 'head-route', run: () => page.unroute('**/fs/head?*') },
-          { name: 'read-route', run: () => page.unroute('**/fs/read?*') },
-          ...handles.map((handle, index) => ({
+        failureStages.concat(
+          [
+            { name: 'release-head', run: () => releaseHead() },
+            { name: 'request-listener', run: () => page.off('request', request) },
+            { name: 'head-route', run: () => page.unroute('**/fs/head?*') },
+            { name: 'read-route', run: () => page.unroute('**/fs/read?*') },
+          ],
+          handles.map((handle, index) => ({
             name: `handle-${index}`,
             run: () => handle.dispose(),
           })),
-          { name: 'navigate-blank', run: () => page.goto('about:blank') },
-          {
-            name: 'release-fixture',
-            run: async () => {
-              await releaseFixture(fixture)
-              fixtureReleased = true
+          [
+            { name: 'navigate-blank', run: () => page.goto('about:blank') },
+            {
+              name: 'release-fixture',
+              run: async () => {
+                await releaseFixture(fixture)
+                fixtureReleased = true
+              },
             },
-          },
-        ],
+          ],
+        ),
         (failures) =>
           evidence.json('fixture-cleanup.json', { released: fixtureReleased, fixture, failures }),
       )

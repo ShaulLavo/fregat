@@ -26,16 +26,18 @@ export function createTestKeymap(
     keymap: editorKeymapBindings({}, 'linux'),
   })
   const handlers: Record<string, CommandHandler<KeyboardEvent>> = {}
-  for (const command of new Set([...EDITOR_COMMANDS.map((entry) => entry.id), ...commands.keys()]))
+  for (const command of new Set(
+    EDITOR_COMMANDS.map<EditorAnyCommandId>((entry) => entry.id).concat(
+      Array.from(commands.keys()),
+    ),
+  ))
     handlers[command] = ({ source }) =>
       commands.get(command)?.(source ? { event: source } : {}) ?? false
   const node = dispatcher.createNode({
     readContext: () => ({
-      identifiers: [
-        'Editor',
-        'writable',
-        ...[...keys].filter(([, read]) => read()).map(([key]) => key),
-      ],
+      identifiers: ['Editor', 'writable'].concat(
+        [...keys].filter(([, read]) => read()).map(([key]) => key),
+      ),
       values: { mode: 'full' },
     }),
     commands: handlers,

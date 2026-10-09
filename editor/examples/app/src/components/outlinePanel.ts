@@ -126,7 +126,7 @@ class OutlinePanelController implements OutlinePanel {
   }
 
   private rows(symbol: OutlineSymbol, depth: number): HTMLElement[] {
-    const row = el('div', { role: 'treeitem', 'aria-level': String(depth + 1) })
+    const row: HTMLElement = el('div', { role: 'treeitem', 'aria-level': String(depth + 1) })
     row.style.paddingLeft = `${10 + depth * 14}px`
     const kind = el('span', { class: 'outline-kind' })
     kind.textContent = KIND_LABELS.get(symbol.kind) ?? 'symbol'
@@ -134,7 +134,7 @@ class OutlinePanelController implements OutlinePanel {
     name.textContent = symbol.name
     row.append(kind, name)
     row.onclick = () => this.reveal(symbol)
-    return [row, ...(symbol.children ?? []).flatMap((child) => this.rows(child, depth + 1))]
+    return [row].concat((symbol.children ?? []).flatMap((child) => this.rows(child, depth + 1)))
   }
 
   private reveal(symbol: OutlineSymbol): void {

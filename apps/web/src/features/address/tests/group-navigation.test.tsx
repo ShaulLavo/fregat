@@ -62,7 +62,7 @@ test('opening a file and switching workspaces preserve each group tab order', as
 
   expect(await commands.openFileSurface(filesystemPath('repo/c.ts'))).toEqual({ status: 'applied' })
   const opened = activeEditorTab(groups())!
-  const expectedOrder = [initialOrder[0], [...initialOrder[1]!, opened.id]]
+  const expectedOrder = [initialOrder[0], initialOrder[1]!.concat([opened.id])]
   expect(order()).toEqual(expectedOrder)
 })
 

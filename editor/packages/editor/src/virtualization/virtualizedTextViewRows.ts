@@ -3055,7 +3055,7 @@ function applyTotalHeight(
 export function getMountedRows(
   view: VirtualizedTextViewInternal,
 ): readonly MountedVirtualizedTextRow[] {
-  return Array.from(view.rowElements.values()).toSorted((a, b) => a.index - b.index)
+  return Array.from(view.rowElements.values()).sort((a, b) => a.index - b.index)
 }
 
 export function textOffsetFromDomBoundary(

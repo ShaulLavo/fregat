@@ -23,9 +23,10 @@ import {
 afterEach(unmountParityTree)
 
 function expandedPaths() {
-  return [...treeScope().querySelectorAll<HTMLElement>('[role="treeitem"][aria-expanded="true"]')]
-    .map((element) => element.dataset.itemPath)
-    .toSorted()
+  return Array.from(
+    treeScope().querySelectorAll<HTMLElement>('[role="treeitem"][aria-expanded="true"]'),
+    (element) => element.dataset.itemPath,
+  ).sort()
 }
 
 describe('filter', () => {

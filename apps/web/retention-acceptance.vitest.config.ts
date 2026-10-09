@@ -49,11 +49,10 @@ export default defineConfig(({ mode }) =>
         ...base,
         root: import.meta.dirname,
         test: undefined,
-        plugins: [
-          ...(base.plugins ?? []),
-          retentionEntryReceiptPlugin(),
-          ...retentionColdServer(process.env.CI === 'true'),
-        ],
+        plugins: (base.plugins ?? []).concat(
+          [retentionEntryReceiptPlugin()],
+          retentionColdServer(process.env.CI === 'true'),
+        ),
       }
     : {
         ...base,
@@ -350,7 +349,10 @@ async function performRetentionAcceptanceReload(
         frames.push({
           at: performance.now(),
           editor: Boolean(document.querySelector('.editor-virtualized')),
-          rows: [...document.querySelectorAll<HTMLElement>('.editor-virtualized-row')].map(readRow),
+          rows: Array.from(
+            document.querySelectorAll<HTMLElement>('.editor-virtualized-row'),
+            readRow,
+          ),
           fonts: {
             status: document.fonts.status,
             codeLoaded: document.fonts.check('13px "JetBrains Mono Variable"'),
@@ -469,7 +471,7 @@ async function performRetentionAcceptanceReload(
             arm,
             timings,
             phase,
-            pending: [...pending.values()],
+            pending: Array.from(pending.values()),
             consoleMessages,
             setup,
             responses,
@@ -833,6 +835,7 @@ function observeRetentionEntryOptimizer(server: ViteDevServer, note: (event: obj
       if (typeof payload === 'object' && payload.type === 'full-reload')
         note({ kind: 'full-reload' })
     })
-    return Reflect.apply(send, this, [payload, ...rest])
+    const arguments_: unknown[] = [payload]
+    return Reflect.apply(send, this, arguments_.concat(rest))
   }
 }

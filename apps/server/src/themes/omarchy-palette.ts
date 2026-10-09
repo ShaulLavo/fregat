@@ -106,7 +106,7 @@ function omarchyColor(
   key: string,
   fallbacks: readonly string[],
 ) {
-  for (const candidate of [key, ...fallbacks]) {
+  for (const candidate of [key].concat(fallbacks)) {
     const value = table[candidate]
     if (typeof value !== 'string' || !parseColor(value)) continue
     if (candidate !== key) report.push(`${key} ← ${candidate} (fallback)`)

@@ -22,7 +22,7 @@ export type BaseRefCandidateInput = {
 export function baseRefCandidates(input: BaseRefCandidateInput): string[] {
   const candidates: string[] = []
 
-  for (const candidate of [input.defaultBranch, ...DEFAULT_BASE_BRANCH_CANDIDATES]) {
+  for (const candidate of [input.defaultBranch].concat(DEFAULT_BASE_BRANCH_CANDIDATES)) {
     const normalized = stripRemotePrefix(candidate, input.remoteNames)
     if (!normalized) continue
     // A branch is never its own base, and repeating a candidate only repeats

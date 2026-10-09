@@ -6,10 +6,9 @@ export function LargeFileNotice({
   readonly minimapAllowed: boolean
 }) {
   if (analysisAllowed && minimapAllowed) return null
-  const paused = [
-    ...(analysisAllowed ? [] : ['syntax colours', 'language services', 'folding']),
-    ...(minimapAllowed ? [] : ['the minimap']),
-  ]
+  const paused = (analysisAllowed ? [] : ['syntax colours', 'language services', 'folding']).concat(
+    minimapAllowed ? [] : ['the minimap'],
+  )
   const list =
     paused.length === 1 ? paused[0] : `${paused.slice(0, -1).join(', ')} and ${paused.at(-1)}`
   return (

@@ -244,7 +244,7 @@ export class OrchestrationSnapshotQuery {
       worktrees,
       snapshotSequence: this.currentSequence(),
       sessions,
-      updatedAt: latestShellSnapshotUpdatedAt([...projects, ...worktrees], sessions),
+      updatedAt: latestShellSnapshotUpdatedAt(projects, worktrees, sessions),
     })
   }
 
@@ -427,7 +427,7 @@ export class OrchestrationSnapshotQuery {
     const retained = requests.filter(
       (row) => pendingIds.has(row.activityId) && !recentIds.has(row.activityId),
     )
-    return [...retained, ...recent]
+    return retained.concat(recent)
   }
 
   private sessionApprovalRequests(sessionId: string): ApprovalRequests {
@@ -655,7 +655,7 @@ function olderThan(
 function takeBackwardsPage<Row>(rows: Row[], limit: number) {
   return {
     hasEarlier: rows.length > limit,
-    rows: rows.slice(0, limit).toReversed(),
+    rows: rows.slice(0, limit).reverse(),
   }
 }
 
@@ -665,13 +665,17 @@ type ShellSnapshotTimestampSource = {
 }
 
 function latestShellSnapshotUpdatedAt(
-  projects: ShellSnapshotTimestampSource[],
-  sessions: ShellSnapshotTimestampSource[],
+  projects: readonly ShellSnapshotTimestampSource[],
+  worktrees: readonly ShellSnapshotTimestampSource[],
+  sessions: readonly ShellSnapshotTimestampSource[],
 ) {
   let updatedAt = new Date(0).toISOString()
 
   for (const project of projects) {
     updatedAt = latestTimestamp(updatedAt, project.updatedAt)
+  }
+  for (const worktree of worktrees) {
+    updatedAt = latestTimestamp(updatedAt, worktree.updatedAt)
   }
   for (const session of sessions) {
     updatedAt = latestTimestamp(updatedAt, session.updatedAt)

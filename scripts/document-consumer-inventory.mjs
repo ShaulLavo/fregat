@@ -21,7 +21,7 @@ const sources = readSources()
 function readSources() {
   const files = execFileSync(
     'git',
-    ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', ...roots],
+    ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--'].concat(roots),
     {
       cwd: root,
       encoding: 'utf8',
@@ -31,7 +31,7 @@ function readSources() {
     .filter(isSource)
     .filter((file) => existsSync(resolve(root, file)))
     .sort(sourceOrder)
-  return [...new Set(files)].map((file) => ({
+  return Array.from(new Set(files), (file) => ({
     file,
     lines: readFileSync(resolve(root, file), 'utf8').split('\n'),
   }))
@@ -195,7 +195,8 @@ function row(category, line) {
 }
 
 const rows = Object.entries(patterns).flatMap(([category, pattern]) => scan(category, pattern))
-const inventory = ['repo\tcategory\towner\tfile\tline\ttext\tunit\tnote', ...rows].join('\n') + '\n'
+const inventory =
+  ['repo\tcategory\towner\tfile\tline\ttext\tunit\tnote'].concat(rows).join('\n') + '\n'
 const mode = process.argv[2]
 if (mode === '--write') writeFileSync(output, inventory)
 else if (mode === '--check') {

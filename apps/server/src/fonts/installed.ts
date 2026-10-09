@@ -144,7 +144,7 @@ async function listWithFontconfig() {
 export function parseFontconfigList(output: string): InstalledFont[] {
   const families = new Map<string, { monospace: boolean; faces: InstalledFace[] }>()
   // A variable file's range line first, so its named instances fold into it.
-  const lines = output.split('\n').toSorted((left, right) => rangeRank(left) - rangeRank(right))
+  const lines = output.split('\n').sort((left, right) => rangeRank(left) - rangeRank(right))
   for (const line of lines) {
     const record = fontconfigRecord(line)
     if (!record) continue

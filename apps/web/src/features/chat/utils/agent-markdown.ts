@@ -7,7 +7,7 @@ type LanguageRepair = {
   readonly codeStart: RegExp
 }
 
-const CODE_FENCE_LANGUAGE_REPAIRS: readonly LanguageRepair[] = [
+const SORTED_LANGUAGE_REPAIRS = [
   {
     aliases: ['typescript', 'javascript', 'tsx', 'jsx', 'ts', 'js'],
     codeStart:
@@ -45,12 +45,11 @@ const CODE_FENCE_LANGUAGE_REPAIRS: readonly LanguageRepair[] = [
     aliases: ['go'],
     codeStart: /^(?:package|import|func|type|var|const)\b/u,
   },
-]
+] satisfies readonly LanguageRepair[]
 
-const SORTED_LANGUAGE_REPAIRS = CODE_FENCE_LANGUAGE_REPAIRS.map((repair) => ({
-  ...repair,
-  aliases: repair.aliases.toSorted((first, second) => second.length - first.length),
-}))
+for (const repair of SORTED_LANGUAGE_REPAIRS) {
+  repair.aliases.sort((first, second) => second.length - first.length)
+}
 
 export function normalizeAgentMarkdown(markdown: string) {
   return codexFileCitationsMarkdown(markdown)

@@ -937,7 +937,7 @@ export class WorkspaceEditService {
   }
 
   private clearHistory(): void {
-    const groups = [...this.undoStack.splice(0), ...this.redoStack.splice(0)]
+    const groups = this.undoStack.splice(0).concat(this.redoStack.splice(0))
     this.publish({})
     void Promise.all(groups.map((group) => this.releaseGroup(group))).then(() =>
       this.flushPendingWorkspaceMutationCleanup(),
@@ -3153,7 +3153,7 @@ function reverseLocalCommit(
   }
   options.documentStore.getState().runWorkspaceDocumentBatch(() => {
     const cursors = beginLocalReverseCursors(local, locks)
-    for (const leg of [...local.legs].reverse()) {
+    for (const leg of local.legs.reverse()) {
       const reversed = reverseLocalLeg(options, locks, local, cursors, leg)
       if (!reversed) restored = false
     }
@@ -3483,7 +3483,7 @@ function reverseGroupLocal(
   let succeeded = true
   options.documentStore.getState().runWorkspaceDocumentBatch(() => {
     const cursors = beginGroupReverseCursors(group, locks)
-    const legs = direction === 'undo' ? [...group.legs].reverse() : group.legs
+    const legs = direction === 'undo' ? group.legs.toReversed() : group.legs
     for (const leg of legs) {
       if (!reverseGroupLeg(options, group, locks, receipts, cursors, leg, direction)) {
         succeeded = false
@@ -3686,10 +3686,9 @@ function changedFileDocumentPaths(
   current: EditorDocumentStore,
 ): FilesystemPath[] {
   const paths = new Set<FilesystemPath>()
-  const documents = [
-    ...Object.values(previous.liveDocumentsByKey),
-    ...Object.values(current.liveDocumentsByKey),
-  ]
+  const documents = Object.values(previous.liveDocumentsByKey).concat(
+    Object.values(current.liveDocumentsByKey),
+  )
   for (const document of documents) {
     if (document.target.kind !== 'file') continue
     if (

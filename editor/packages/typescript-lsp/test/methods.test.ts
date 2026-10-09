@@ -594,7 +594,7 @@ function applyEdits(text: string, edits: readonly lsp.TextEdit[]): string {
     newText: edit.newText,
   }))
   let result = text
-  for (const edit of offsets.toSorted((left, right) => right.start - left.start)) {
+  for (const edit of offsets.sort((left, right) => right.start - left.start)) {
     result = `${result.slice(0, edit.start)}${edit.newText}${result.slice(edit.end)}`
   }
   return result

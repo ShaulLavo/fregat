@@ -31,7 +31,7 @@ export function draftWorktreeChoices(
         worktree.kind === 'linked' &&
         worktree.lifecycle.state === 'ready',
     )
-    .toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
 }
 
 /** What the workspace trigger says: where the session will run. */

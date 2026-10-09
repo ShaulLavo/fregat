@@ -27,6 +27,7 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+          exclude: ['**/*.t3code.test.ts'],
           setupFiles: ['./test/env/msw.ts'],
         },
       },

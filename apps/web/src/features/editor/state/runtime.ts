@@ -118,7 +118,7 @@ export function createEditorRuntime({
   const snapshotComparisonOwner = createSnapshotComparisonOwner(documentStore, queryClient)
   const syncSnapshotComparisons = () => {
     const state = workspaceStore.getState()
-    const workspaces = [...state.parkedWorkspaces].map(([rootPath, slice]) => ({
+    const workspaces = Array.from(state.parkedWorkspaces, ([rootPath, slice]) => ({
       rootPath: filesystemPath(rootPath),
       panels: slice.workbenchPanels,
     }))

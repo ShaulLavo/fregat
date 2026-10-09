@@ -220,15 +220,16 @@ test.for([false, true])(
             source: await operation.readText(filesystemPath('first.ts')),
             edits: [{ from: 0, to: dirtyText.length, text: 'after' }],
           },
-          ...(persisted
+        ].concat(
+          persisted
             ? [
                 {
                   source: await operation.readText(filesystemPath('disk.ts')),
                   edits: [{ from: 0, to: 6, text: 'after' }],
                 },
               ]
-            : []),
-        ],
+            : [],
+        ),
       }),
     })
     service.confirmPreview(await textChangePreview(service))

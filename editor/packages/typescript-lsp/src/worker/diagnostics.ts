@@ -1,3 +1,4 @@
+import type { Diagnostic } from 'typescript-api'
 import type * as lsp from 'vscode-languageserver-protocol'
 import { tsDiagnosticToLspDiagnostic } from '../tsDiagnostics'
 import type { DocumentContext } from './context'
@@ -6,11 +7,10 @@ import { stringParam } from './protocol'
 
 export function collectDiagnostics(env: ProjectService, fileName: string): lsp.Diagnostic[] {
   const service = env.languageService
-  return [
-    ...service.getSyntacticDiagnostics(fileName),
-    ...service.getSemanticDiagnostics(fileName),
-    ...service.getSuggestionDiagnostics(fileName),
-  ].map((diagnostic) => tsDiagnosticToLspDiagnostic(diagnostic))
+  const syntactic: readonly Diagnostic[] = service.getSyntacticDiagnostics(fileName)
+  return syntactic
+    .concat(service.getSemanticDiagnostics(fileName), service.getSuggestionDiagnostics(fileName))
+    .map((diagnostic) => tsDiagnosticToLspDiagnostic(diagnostic))
 }
 
 /**

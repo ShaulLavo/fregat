@@ -15,6 +15,6 @@ export function writtenFont(variables: unknown, key: string): string | null {
 
 /** Newest first, the saved value leading, each font once. */
 export function recentFonts(saved: string, written: readonly (string | null)[]): string[] {
-  const newestFirst = written.filter((value) => value !== null).toReversed()
-  return [...new Set([saved, ...newestFirst])].slice(0, RECENT_LIMIT)
+  const newestFirst = written.filter((value) => value !== null).reverse()
+  return [...new Set([saved].concat(newestFirst))].slice(0, RECENT_LIMIT)
 }

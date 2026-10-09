@@ -145,7 +145,7 @@ describe('claudeCatalog', () => {
 
   it('lists a legacy model the CLI lists again once, as current', () => {
     const [retired] = legacy(catalog.models)
-    const relisted = claudeCatalog([...claudeModelRows(), row(retired ?? '')])
+    const relisted = claudeCatalog(claudeModelRows().concat([row(retired ?? '')]))
 
     expect(current(relisted.models)).toContain(retired)
     expect(legacy(relisted.models)).not.toContain(retired)
@@ -159,10 +159,9 @@ describe('claudeCatalog', () => {
 
 describe('claudeCatalog default', () => {
   it('keeps the product default first when the CLI lists it', () => {
-    const catalog = claudeCatalog([
-      ...claudeModelRows(),
-      row(`${DEFAULT_CLAUDE_MODEL}[1m]`, DEFAULT_CLAUDE_MODEL),
-    ])
+    const catalog = claudeCatalog(
+      claudeModelRows().concat([row(`${DEFAULT_CLAUDE_MODEL}[1m]`, DEFAULT_CLAUDE_MODEL)]),
+    )
 
     expect(catalog.defaultModel).toBe(DEFAULT_CLAUDE_MODEL)
     expect(catalog.defaultFallback).toBe(false)

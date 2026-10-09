@@ -20,7 +20,8 @@ const releaseFiles = [
   'web/index.html',
   'server/index.js',
   'server/claude-discovery-worker.ts',
-  ...[
+].concat(
+  [
     RUNTIME_MANIFEST,
     RUNTIME_LOCK,
     REMOTE_SUPPORT,
@@ -30,7 +31,7 @@ const releaseFiles = [
     IMAGE_WORKER,
     THIRD_PARTY_NOTICES,
   ].map((file) => `server/${file}`),
-]
+)
 
 function requireEntry(root: string, name: string, kind: 'file' | 'directory', executable = false) {
   const entry = statSync(path.join(root, name))

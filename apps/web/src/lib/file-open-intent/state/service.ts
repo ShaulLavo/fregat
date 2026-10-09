@@ -731,13 +731,13 @@ class FileOpenIntentServiceState {
 
     return {
       evictions: scope.evictions,
-      joinedHighlighterRuntimeSessionIds: [...scope.joinedHighlighterRuntimeSessionIds],
-      joinedStructuralRuntimeSessionIds: [...scope.joinedStructuralRuntimeSessionIds],
+      joinedHighlighterRuntimeSessionIds: Array.from(scope.joinedHighlighterRuntimeSessionIds),
+      joinedStructuralRuntimeSessionIds: Array.from(scope.joinedStructuralRuntimeSessionIds),
       nonTargetIntents: scope.nonTargetIntents,
       preparedJoins: scope.preparedJoins,
       promotedBytes: scope.promotedBytes,
-      highlighterRuntimeSessionIds: [...scope.highlighterRuntimeSessionIds],
-      structuralRuntimeSessionIds: [...scope.structuralRuntimeSessionIds],
+      highlighterRuntimeSessionIds: Array.from(scope.highlighterRuntimeSessionIds),
+      structuralRuntimeSessionIds: Array.from(scope.structuralRuntimeSessionIds),
       targetIntents: scope.targetIntents,
       wastedIntents: scope.wastedIntents,
     }
@@ -1682,7 +1682,7 @@ class FileOpenIntentServiceState {
         await operation
         continue
       }
-      const related = [...this.relatedOperations]
+      const related = Array.from(this.relatedOperations)
       if (related.length > 0) {
         await Promise.allSettled(related)
         continue

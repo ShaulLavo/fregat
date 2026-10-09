@@ -208,9 +208,9 @@ async function resetEditorOpenSample({
   deleteCleanTargetDocument(request.path, documentStore)
   removeEditorVisibleSnapshotCacheForPath(storage, request)
   await Promise.all(
-    [...result.highlighterRuntimeSessionIds, ...result.structuralRuntimeSessionIds].map(
-      awaitEditorSyntaxRuntimeSessionIdle,
-    ),
+    result.highlighterRuntimeSessionIds
+      .concat(result.structuralRuntimeSessionIds)
+      .map(awaitEditorSyntaxRuntimeSessionIdle),
   )
   await awaitEditorSyntaxWorkerIdleFences()
   await nextTaskAndFrame()

@@ -56,7 +56,10 @@ describe('markdown preview plugin', () => {
 
   // Read the mounted DOM rather than editor state: what the user actually sees is the assertion.
   const rowTexts = (): readonly string[] =>
-    [...container.querySelectorAll('[data-editor-virtual-row]')].map((row) => row.textContent ?? '')
+    Array.from(
+      container.querySelectorAll('[data-editor-virtual-row]'),
+      (row) => row.textContent ?? '',
+    )
 
   const openMarkdown = async (languageId = 'markdown'): Promise<void> => {
     editor.openDocument({ documentId: 'notes.md', text: DOCUMENT, languageId })

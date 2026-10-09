@@ -87,7 +87,7 @@ export function createMarkdownSession(options: MarkdownSessionOptions = {}): Mar
     const tail: Tail = { fileValue: text, nodes: groups.at(-1)?.nodes ?? [], start: tailStart }
     const tailLine = (prefix?.endLine ?? 0) + countLines(text.slice(prefixEnd, tailStart))
 
-    return [...settled, tailBlock(heal ? healedTail(processor, tail, tailLine) : tail, heal)]
+    return settled.concat([tailBlock(heal ? healedTail(processor, tail, tailLine) : tail, heal)])
   }
 }
 

@@ -9,16 +9,15 @@ import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
 const FILLER = Array.from({ length: 12 }, (_, index) => `const filler${index} = ${index}`)
-const BEFORE = [...FILLER, 'const limit = 10', 'call(first, second) => void', 'tail()']
-const AFTER = [
-  ...FILLER,
+const BEFORE = FILLER.concat(['const limit = 10', 'call(first, second) => void', 'tail()'])
+const AFTER = FILLER.concat([
   'const limit = 20',
   'call(',
   '  first,',
   '  second,',
   ') => void',
   'tail()',
-]
+])
 
 export const gitDiffInlineTint: Scenario = {
   name: 'git-diff-inline-tint',

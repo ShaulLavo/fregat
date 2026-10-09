@@ -254,10 +254,11 @@ async function fetchInitialTree(
   savedDirectories: readonly string[] = [],
 ) {
   const directoryPaths = [
-    ...new Set([
-      ...selectedFileAncestorDirectoryPaths(rootPath, selectedFilePath),
-      ...savedDirectories.map((path) => `${rootPath}/${path}`),
-    ]),
+    ...new Set(
+      selectedFileAncestorDirectoryPaths(rootPath, selectedFilePath).concat(
+        savedDirectories.map((path) => `${rootPath}/${path}`),
+      ),
+    ),
   ]
   const root = fetchTree(filesystemPath(rootPath), signal, client)
   const directories = Promise.all(

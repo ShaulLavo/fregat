@@ -61,7 +61,7 @@ export function createHistory(initial: Location) {
     subscribe: (listener: () => void) => store.subscribe(() => listener()),
     visit(location: Location) {
       if (equal(entries[index], location)) return
-      entries = [...entries.slice(0, index + 1), location]
+      entries = entries.slice(0, index + 1).concat([location])
       index = entries.length - 1
       publish()
     },

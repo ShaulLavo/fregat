@@ -10,6 +10,8 @@ import { decodeDocumentTarget } from '../../../../test/factories/document-target
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 
+const invalidDocumentIds: readonly string[] = INVALID_DOCUMENT_IDS
+
 describe('typed file classification at the input boundary', () => {
   test.each(DOCUMENT_TARGET_CASES)(
     'classifies $kind without granting backing file ownership',
@@ -20,7 +22,7 @@ describe('typed file classification at the input boundary', () => {
     },
   )
 
-  test.each([...INVALID_DOCUMENT_IDS, ...INVALID_SETTINGS_SURFACE_IDS])(
+  test.each(invalidDocumentIds.concat(INVALID_SETTINGS_SURFACE_IDS))(
     'rejects malformed target %s',
     (path) => {
       expect(decodeDocumentTarget(path, filesystemPath('')).kind).toBe('invalid')

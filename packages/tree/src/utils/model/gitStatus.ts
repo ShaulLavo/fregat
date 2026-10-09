@@ -21,7 +21,7 @@ export function resolveFileTreeGitStatusState(
   entries: readonly GitStatusEntry[] | undefined,
   previous: FileTreeGitStatusState | null = null,
 ): FileTreeGitStatusState | null {
-  const signature = getGitStatusSignature(entries == null ? undefined : [...entries])
+  const signature = getGitStatusSignature(entries)
   if (signature === '0') {
     return null
   }

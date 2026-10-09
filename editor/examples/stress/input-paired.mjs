@@ -116,7 +116,7 @@ export function comparePairedInput(baseline, candidate, schedule, seed, draws) {
         !canStopInputPairs(pair, baseline.config.consumers ?? 'native', baseline.config.loadProfile)
       )
         fail(`Unjustified adaptive early stop for ${key}`)
-  const metrics = [...groups].map(([key, group], index) => {
+  const metrics = Array.from(groups, ([key, group], index) => {
     const budget = inputBudget(
       baseline.config.consumers ?? 'native',
       key,
@@ -211,7 +211,7 @@ export function inputMatrixConfigurations(options = {}) {
   if (options.full) return [...inputConsumerIds]
   const defaults =
     options.loadProfile === 'loaded' ? ['native', 'disabled'] : ['platform', 'native']
-  const configurations = [...new Set([...defaults, ...(options.declared ?? [])])]
+  const configurations = [...new Set(defaults.concat(options.declared ?? []))]
   return configurations.filter(
     (configuration) => options.loadProfile !== 'loaded' || !inputHasWorkerTreeSitter(configuration),
   )

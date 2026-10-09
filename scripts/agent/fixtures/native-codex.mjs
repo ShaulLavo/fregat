@@ -719,7 +719,7 @@ function scrollToolTurn(message, chunks) {
   const turn = startOwnTurn(message)
   const step = (index) => {
     if (index === 16) {
-      streamAnswer(turn, `${turn}-answer`, [...chunks, 'SCROLL_STREAM_DONE'], 45)
+      streamAnswer(turn, `${turn}-answer`, chunks.concat(['SCROLL_STREAM_DONE']), 45)
       return
     }
     const item = { id: `${turn}-step-${String(index).padStart(2, '0')}`, type: 'commandExecution' }
@@ -769,7 +769,7 @@ function chatScroll(message) {
     return scrollToolTurn(message, SCROLL_STREAM_CHUNKS.slice(0, 12))
   if (text.startsWith('TOOLS')) return scrollToolTurn(message, SCROLL_STREAM_CHUNKS)
   const turn = startOwnTurn(message)
-  streamAnswer(turn, `${turn}-answer`, [...SCROLL_STREAM_CHUNKS, 'SCROLL_STREAM_DONE'], 45)
+  streamAnswer(turn, `${turn}-answer`, SCROLL_STREAM_CHUNKS.concat(['SCROLL_STREAM_DONE']), 45)
 }
 
 function handle(message) {

@@ -37,7 +37,7 @@ export function useImportProjectScripts(rootPath: string | null) {
       action: 'chat.project.scripts.import',
       command: createProjectScriptsCommand({
         projectId: project.id,
-        scripts: [...project.scripts, ...imported],
+        scripts: project.scripts.concat(imported),
       }),
       dispatchCommand: transport.dispatchCommand,
       onAccepted: () =>

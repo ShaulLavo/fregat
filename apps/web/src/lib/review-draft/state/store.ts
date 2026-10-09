@@ -22,7 +22,7 @@ export const useReviewDraftStore = create<ReviewDraftStore>((set) => ({
       createdAt: new Date().toISOString(),
       id: crypto.randomUUID(),
     }
-    set((state) => ({ comments: [...state.comments, comment] }))
+    set((state) => ({ comments: state.comments.concat([comment]) }))
     return comment
   },
   removeAll: (ids) =>

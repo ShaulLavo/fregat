@@ -39,9 +39,10 @@ test.each([
   async (_name, chart) => {
     const svg = await render(chart)
     expect(svg.querySelector('.mermaid_user_hidden')).not.toBeNull()
-    const labels = [...svg.querySelectorAll('text, foreignObject')]
-      .map((node) => node.textContent)
-      .join(' ')
+    const labels = Array.from(
+      svg.querySelectorAll('text, foreignObject'),
+      (node) => node.textContent,
+    ).join(' ')
     expect(labels).toContain('classDef hidden')
     expect(labels).not.toContain('mermaid_user_')
     expect(svg.querySelector('.hidden')).toBeNull()
@@ -51,9 +52,10 @@ test.each([
 
 test('preserves kanban text with class decorations', async () => {
   const svg = await render('kanban\n column[Todo]\n  task[classDef hidden]\n  :::hidden')
-  const labels = [...svg.querySelectorAll('text, foreignObject')]
-    .map((node) => node.textContent)
-    .join(' ')
+  const labels = Array.from(
+    svg.querySelectorAll('text, foreignObject'),
+    (node) => node.textContent,
+  ).join(' ')
   expect(labels).toContain('classDef hidden')
   expect(labels).not.toContain('mermaid_user_')
   expect(svg.querySelector('.hidden')).toBeNull()
@@ -77,12 +79,16 @@ test('preserves class diagram node identities and applies custom/default styles'
   )
   expect(svg.querySelector('[id*="-classId-Animal-"]')).not.toBeNull()
   expect(svg.querySelector('[id*="-classId-mermaid_user_Animal-"]')).toBeNull()
-  const labels = [...svg.querySelectorAll('text, foreignObject')]
-    .map((node) => node.textContent)
-    .join(' ')
+  const labels = Array.from(
+    svg.querySelectorAll('text, foreignObject'),
+    (node) => node.textContent,
+  ).join(' ')
   expect(labels).toContain('Animal')
   expect(labels).toContain('+classDef hidden')
-  const fills = [...svg.querySelectorAll('rect, path')].map((shape) => getComputedStyle(shape).fill)
+  const fills = Array.from(
+    svg.querySelectorAll('rect, path'),
+    (shape) => getComputedStyle(shape).fill,
+  )
   expect(fills).toContain('rgb(171, 205, 239)')
   expect(fills).toContain('rgb(254, 220, 186)')
 }, 30_000)
@@ -97,7 +103,7 @@ test('retains comments, directives, multiline labels, node ids and URL reference
   )
   expect(svg.textContent).toContain('Class identity proof')
   expect(svg.querySelector('foreignObject')?.textContent).toContain('classDef hidden')
-  const ids = new Set([...svg.querySelectorAll('[id]')].map((node) => node.id))
+  const ids = new Set(Array.from(svg.querySelectorAll('[id]'), (node) => node.id))
   for (const node of svg.querySelectorAll('*')) {
     for (const attribute of node.attributes) {
       for (const match of attribute.value.matchAll(/url\(#([^)]+)\)/g))

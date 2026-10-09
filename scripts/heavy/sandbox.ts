@@ -137,7 +137,7 @@ export function start(
   if (options.jobClass) args.push('--class', options.jobClass)
   if (options.quiet) args.push('--quiet')
   if (options.server) args.push('--server')
-  const child = spawn('bun', [...args, label, '--', ...command], {
+  const child = spawn('bun', args.concat([label, '--'], command), {
     cwd: options.cwd ?? box.root,
     detached: options.detached ?? false,
     env: options.env ?? process.env,

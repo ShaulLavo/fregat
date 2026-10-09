@@ -330,10 +330,9 @@ async function portSkill(name: string) {
   for (const file of await walk(to)) {
     if (!file.endsWith('.md')) continue
     const original = await readFile(file, 'utf8')
-    const ported = [...rules, ...lineRules].reduce(
-      (text, [pattern, replacement]) => text.replace(pattern, replacement),
-      original,
-    )
+    const ported = rules
+      .concat(lineRules)
+      .reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), original)
     await writeFile(file, ported)
     for (const [index, line] of ported.split('\n').entries()) {
       if (leftover.test(line))

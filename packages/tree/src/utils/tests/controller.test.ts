@@ -6,6 +6,18 @@ import { renamePaths } from '../rename-paths'
 import type { FileTreeVisibleRow } from '../model/public-types'
 
 describe('FileTreeController', () => {
+  it('returns selected paths as an independently mutable snapshot', () => {
+    const controller = new FileTreeController({ paths: ['b.ts', 'a.ts'] })
+    controller.selectPath('b.ts')
+    controller.selectPath('a.ts')
+
+    const selected = controller.getSelectedPaths()
+    selected.sort()
+    expect(selected).toEqual(['a.ts', 'b.ts'])
+    selected.pop()
+    expect(controller.getSelectedPaths()).toEqual(['b.ts', 'a.ts'])
+  })
+
   it('tracks selection, search, drag/drop, and rename state', () => {
     const onDropComplete = vi.fn()
     const onRename = vi.fn()

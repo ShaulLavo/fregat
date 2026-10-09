@@ -36,8 +36,8 @@ describe('mutationKeys', () => {
       mutationKeys.stage('repo', 'a.ts'),
       mutationKeys.unstageMany('repo', ['a.ts']),
     ]) {
-      expect(key.slice(0, scope.length)).toEqual([...scope])
+      expect(key.slice(0, scope.length)).toEqual(scope)
     }
-    expect(mutationKeys.push('repo/.worktrees/one').slice(0, scope.length)).not.toEqual([...scope])
+    expect(mutationKeys.push('repo/.worktrees/one').slice(0, scope.length)).not.toEqual(scope)
   })
 })

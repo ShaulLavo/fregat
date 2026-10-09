@@ -534,7 +534,7 @@ export function createTypeScriptLanguageSession(
 
   function updateProjectFile(project: ProjectHost, fileName: string): void {
     const text = workspaceFiles.get(fileName)
-    for (const target of [fileName, ...mirrorPaths(workspacePackageList(), fileName)]) {
+    for (const target of [fileName].concat(mirrorPaths(workspacePackageList(), fileName))) {
       if (text === undefined) project.deleteFile(target)
       else project.setFile(target, text)
     }

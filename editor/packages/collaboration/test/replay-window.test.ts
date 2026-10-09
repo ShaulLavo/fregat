@@ -9,7 +9,7 @@ function* permutations(values: readonly number[]): Generator<readonly number[]> 
   }
   for (const value of values)
     for (const rest of permutations(values.filter((other) => other !== value)))
-      yield [value, ...rest]
+      yield [value].concat(rest)
 }
 
 test('every ordering inside the window accepts each ID once', () => {

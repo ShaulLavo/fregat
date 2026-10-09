@@ -13,29 +13,30 @@ export type CaseScope = {
 /** The argv that runs one bench case in its own memory-capped user scope. */
 export function caseScopeCommand(scope: CaseScope) {
   // NOT-PORTABLE: Linux benchmarks require systemd-run and a working user manager.
-  if (process.platform !== 'linux') return [...scope.command]
+  if (process.platform !== 'linux') return Array.from(scope.command)
   return [
     'systemd-run',
     '--user',
     '--scope',
-    '--quiet',
-    // systemd-run would expand $VAR in the case's arguments; they are paths and must stay as given.
+    '--quiet', // systemd-run would expand $VAR in the case's arguments; they are paths and must stay as given.
     '--expand-environment=no',
     `--unit=${scope.unit}`,
-    ...(scope.slice ? [`--slice=${scope.slice}`] : []),
-    '-p',
-    `MemoryMax=${scope.memoryMiB}M`,
-    '-p',
-    'MemorySwapMax=0',
-    // On OOM the kernel kills the offender alone; systemd's default reaction would stop the
-    // scope and, on a second OOM event, SIGKILL the shim before it writes the case's totals.
-    '-p',
-    'OOMPolicy=continue',
-    'bash',
-    SCOPE_SHIM,
-    scope.accountingFile,
-    ...scope.command,
-  ]
+  ].concat(
+    scope.slice ? [`--slice=${scope.slice}`] : [],
+    [
+      '-p',
+      `MemoryMax=${scope.memoryMiB}M`,
+      '-p',
+      'MemorySwapMax=0', // On OOM the kernel kills the offender alone; systemd's default reaction would stop the
+      // scope and, on a second OOM event, SIGKILL the shim before it writes the case's totals.
+      '-p',
+      'OOMPolicy=continue',
+      'bash',
+      SCOPE_SHIM,
+      scope.accountingFile,
+    ],
+    scope.command,
+  )
 }
 
 export type CaseRun = CaseScope & {

@@ -1,12 +1,15 @@
-import { compileKeymap, detectPlatform, type KeymapPlatform } from '@fregat/hotkeys'
+import {
+  compileKeymap,
+  detectPlatform,
+  type KeymapPlatform,
+  type KeymapEntry,
+} from '@fregat/hotkeys'
 import { baseEditorKeymap, defaultEditorPacks } from '../../src/keymap/presets'
 import { editorCommandDeclaration, isEditorCommandId } from '../../src/editor/commandCatalog'
 
 export function defaultKeyBindings(platform: KeymapPlatform = detectPlatform()) {
-  const entries = [
-    ...baseEditorKeymap[platform],
-    ...defaultEditorPacks.flatMap((pack) => pack[platform]),
-  ]
+  const base: readonly KeymapEntry[] = baseEditorKeymap[platform]
+  const entries = base.concat(defaultEditorPacks.flatMap((pack) => pack[platform]))
   return compileKeymap(entries, platform).bindings.map((binding) => ({
     ...binding.payload.entry,
     keys: binding.chord,

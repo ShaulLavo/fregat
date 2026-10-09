@@ -136,7 +136,7 @@ it('exits after its last client leaves when there are no live sessions', async (
 
 it('concurrent clients adopt one host for the same state root', async () => {
   const host = await testHost()
-  const clients = [host.client, ...Array.from({ length: 9 }, () => host.connect())]
+  const clients = [host.client].concat(Array.from({ length: 9 }, () => host.connect()))
   const greetings = await Promise.all(clients.map((client) => client.host()))
   const pid = greetings[0]!.pid
   expect(greetings.every((hello) => hello.pid === pid)).toBe(true)
@@ -239,7 +239,7 @@ it.each(['host', 'stalled child'] as const)(
       kind === 'host'
         ? [path.join(import.meta.dirname, '../main.ts'), `--state-root=${stateRoot}`]
         : ['-e', 'setInterval(() => {}, 1000)']
-    const child = Bun.spawn([process.execPath, ...command], {
+    const child = Bun.spawn([process.execPath].concat(command), {
       env,
       stdio: ['ignore', 'ignore', 'inherit'],
     })

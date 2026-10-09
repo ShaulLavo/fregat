@@ -26,12 +26,9 @@ const RUNTIME_FRAME = /\b(?:node|bun):[\w/.-]+:(\d+)(?::(\d+))?/g
 
 /** Every `path:line` frame in one line of tool output, in order, without overlaps. */
 export function stackFrames(line: string): StackFrame[] {
-  const frames = [
-    ...pathFrames(line, COLON_FRAME),
-    ...pathFrames(line, PAREN_FRAME),
-    ...pythonFrames(line),
-    ...runtimeFrames(line),
-  ].toSorted((left, right) => left.start - right.start)
+  const frames = pathFrames(line, COLON_FRAME)
+    .concat(pathFrames(line, PAREN_FRAME), pythonFrames(line), runtimeFrames(line))
+    .sort((left, right) => left.start - right.start)
 
   const kept: StackFrame[] = []
   for (const frame of frames) {
@@ -76,7 +73,7 @@ function pathFrames(line: string, pattern: RegExp): StackFrame[] {
 }
 
 function pythonFrames(line: string): StackFrame[] {
-  return [...line.matchAll(PYTHON_FRAME)].map((match) => {
+  return Array.from(line.matchAll(PYTHON_FRAME), (match) => {
     const path = match[1] ?? ''
     const start = match.index + match[0].indexOf('"') + 1
 
@@ -92,7 +89,7 @@ function pythonFrames(line: string): StackFrame[] {
 }
 
 function runtimeFrames(line: string): StackFrame[] {
-  return [...line.matchAll(RUNTIME_FRAME)].map((match) => ({
+  return Array.from(line.matchAll(RUNTIME_FRAME), (match) => ({
     column: match[2] ? Number(match[2]) : null,
     end: match.index + match[0].length,
     external: true,

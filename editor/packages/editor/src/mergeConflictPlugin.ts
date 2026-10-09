@@ -666,7 +666,7 @@ function conflictForNavigation(
   }
 
   const forwards = direction === 'next'
-  const ordered = forwards ? conflicts : [...conflicts].reverse()
+  const ordered = forwards ? conflicts : conflicts.toReversed()
   const candidate = ordered.find((conflict) => {
     if (conflictContainsOffset(conflict, offset)) return false
     return forwards ? offset < conflict.range.start : offset > conflict.range.start

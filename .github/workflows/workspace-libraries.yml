@@ -3,6 +3,12 @@ name: Workspace libraries
 on:
   workflow_call:
     inputs:
+      exhaustive:
+        type: boolean
+        default: false
+      packages:
+        type: string
+        default: all
       editor:
         type: boolean
         default: true
@@ -32,6 +38,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+        with:
+          build-packages: editor
       - name: Install Editor browsers
         timeout-minutes: 8
         uses: ./.github/actions/install-browsers
@@ -41,23 +49,26 @@ jobs:
       - name: Check full-document benchmark probes
         run: bun run --cwd editor/bench/compare test
       - name: Build full-document benchmark
+        if: ${{ github.event_name == 'workflow_dispatch' || inputs.exhaustive }}
         timeout-minutes: 3
         run: bun run --cwd editor/bench/compare build:full
       - name: Smoke complete syntax output
+        if: ${{ github.event_name == 'workflow_dispatch' || inputs.exhaustive }}
         timeout-minutes: 2
         run: bun run --cwd editor/bench/compare smoke:full --output "$RUNNER_TEMP/singapore-full-smoke"
       - name: Smoke dense syntax lifecycle
+        if: ${{ github.event_name == 'workflow_dispatch' || inputs.exhaustive }}
         timeout-minutes: 3
         run: bun run --cwd editor/bench/compare smoke:full --corpus dense-injected --lifecycle --timeout 150000 --output "$RUNNER_TEMP/singapore-dense-smoke"
       - name: Keep dense syntax lifecycle evidence
-        if: always()
+        if: ${{ always() && (github.event_name == 'workflow_dispatch' || inputs.exhaustive) }}
         uses: actions/upload-artifact@v4
         with:
           name: singapore-dense-smoke
           path: ${{ runner.temp }}/singapore-dense-smoke
           if-no-files-found: ignore
       - name: Keep full-document smoke evidence
-        if: always()
+        if: ${{ always() && (github.event_name == 'workflow_dispatch' || inputs.exhaustive) }}
         uses: actions/upload-artifact@v4
         with:
           name: singapore-full-smoke
@@ -70,11 +81,19 @@ jobs:
       - name: Check architecture health
         run: bun run --cwd editor health
       - name: Test Editor packages and examples
-        run: bun x turbo run test --filter='./editor/packages/*' --filter='./editor/examples/*' --concurrency=1
+        env:
+          CI_PACKAGES: ${{ inputs.packages || 'all' }}
+        run: bun scripts/ci/packages.mjs editor-tests "$CI_PACKAGES"
+      - name: Test collaboration signaling broker
+        run: bun run --cwd editor/packages/collaboration test:server
       - name: Test tree-sitter browser worker
         run: bun run --cwd editor/packages/tree-sitter test:browser
       - name: Test collaboration presence in Chromium
         run: bun x turbo run test:browser --filter=@singapore-editor/collaboration --concurrency=1 -- test/presence.browser.test.ts
+      - name: Test collaboration transports in Chromium
+        run: bun run --cwd editor/packages/collaboration test:browser -- test/transports.browser.test.ts
+      - name: Smoke concurrent editor input and author undo
+        run: bun run --cwd editor/packages/collaboration test:editor -- test/editor.browser.test.ts --testNamePattern '2 simple editors preserve concurrent forward runs and author undo'
 
   ghostty:
     name: Ghostty tests
@@ -84,6 +103,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+        with:
+          build-packages: '["ghostty-webgpu","ghostty-webgpu-line-editor"]'
       - name: Install Chromium
         timeout-minutes: 5
         uses: ./.github/actions/install-browsers
