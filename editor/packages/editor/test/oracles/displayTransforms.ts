@@ -582,12 +582,13 @@ const textSegments = (
   let visual = 0
 
   for (let column = 0; column < text.length; column += 1) {
-    const charWidth = visualWidthForChar(text[column]!, visual, tabSize)
+    let charWidth = visualWidthForChar(text[column]!, segmentVisual, tabSize)
     if (segmentVisual > 0 && segmentVisual + charWidth > width) {
       segments.push(segmentForColumns(segments.length, text, segmentStartColumn, column, tabSize))
       segmentStartColumn = column
       segmentStartVisual = visual
       segmentVisual = 0
+      charWidth = visualWidthForChar(text[column]!, 0, tabSize)
     }
 
     segmentVisual += charWidth
