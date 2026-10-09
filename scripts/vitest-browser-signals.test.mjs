@@ -16,7 +16,6 @@ test('Playwright providers share and release SIGTERM trace cleanup', () => {
       '-e',
       `
     import assert from 'node:assert/strict'
-    import { setTimeout } from 'node:timers/promises'
     import { PlaywrightBrowserProvider } from ${JSON.stringify(providerUrl)}
 
     const project = {
@@ -28,16 +27,21 @@ test('Playwright providers share and release SIGTERM trace cleanup', () => {
     assert.equal(process.listenerCount('SIGTERM'), initial + 1)
 
     const stopped = []
+    let markStopped
+    const tracesStopped = new Promise(resolve => { markStopped = resolve })
     for (const [index, provider] of providers.entries()) {
       provider.browser = { close: async () => {} }
       provider.contexts.set('session', {
-        tracing: { stopChunk: async ({ path }) => { stopped.push(path) } },
+        tracing: { stopChunk: async ({ path }) => {
+          stopped.push(path)
+          if (stopped.length === providers.length) markStopped()
+        } },
         close: async () => {},
       })
       provider.pendingTraces.set('trace-' + index, 'session')
     }
     process.kill(process.pid, 'SIGTERM')
-    await setTimeout(50)
+    await tracesStopped
     assert.deepEqual(stopped.sort(), providers.map((_, index) => 'trace-' + index).sort())
 
     await providers[0].close()
