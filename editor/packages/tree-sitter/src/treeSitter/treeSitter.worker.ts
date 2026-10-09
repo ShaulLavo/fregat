@@ -7,6 +7,8 @@ import {
   Query,
   heap,
   type Node,
+  type QueryCapture,
+  type QueryCaptureRange,
   type Range as TreeSitterRange,
   type Tree,
   type TreeCursor,
@@ -2183,14 +2185,14 @@ const collectCaptures = (
     return captures
   }
 
-  const matches = measurePhase(context, 'highlightQueryAndPredicates', () =>
-    query.matches(rootNode, queryOptions(context, range)),
+  const queryCaptures = measurePhase(context, 'highlightQueryAndPredicates', () =>
+    query.captureRanges(rootNode, queryOptions(context, range)),
   )
   assertNotCancelled(context)
+  incrementCount(context, 'rawCaptures', queryCaptures.length)
 
-  for (const match of matches) {
-    incrementCount(context, 'rawCaptures', match.captures.length)
-    collectMatchCaptures(match.captures, captures, seen, runtime.descriptor.id, range)
+  for (const capture of queryCaptures) {
+    collectCapture(capture, captures, seen, runtime.descriptor.id, range)
   }
 
   incrementCount(context, 'uniqueCaptures', captures.length)
@@ -2222,26 +2224,14 @@ const collectFolds = (
   return folds
 }
 
-const collectMatchCaptures = (
-  matchCaptures: ReturnType<Query['matches']>[number]['captures'],
-  captures: TreeSitterCapture[],
-  seen: Set<string>,
-  languageId: TreeSitterLanguageId,
-  range?: TreeSitterSyntaxRange,
-): void => {
-  for (const capture of matchCaptures) {
-    collectCapture(capture, captures, seen, languageId, range)
-  }
-}
-
 const collectCapture = (
-  capture: ReturnType<Query['captures']>[number],
+  capture: QueryCapture | QueryCaptureRange,
   captures: TreeSitterCapture[],
   seen: Set<string>,
   languageId: TreeSitterLanguageId,
   range?: TreeSitterSyntaxRange,
 ): void => {
-  const node = capture.node
+  const node = 'node' in capture ? capture.node : capture
   if (!node) return
 
   const startIndex = node.startIndex

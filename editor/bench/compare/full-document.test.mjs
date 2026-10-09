@@ -13,6 +13,10 @@ for (const file of [
     const source = await readFile(new URL(`../../packages/${file}`, import.meta.url), 'utf8')
     const transformed = fullDocumentTransform(source, `/packages/${file}`)
     assert.notEqual(transformed, source)
+    if (file.endsWith('treeSitter.worker.ts')) {
+      assert.ok(transformed.includes("['matches', 'captures', 'captureRanges']"))
+      assert.ok(transformed.includes("if (typeof original !== 'function') continue"))
+    }
     if (file.endsWith('session.ts')) {
       assert.ok(
         transformed.includes(

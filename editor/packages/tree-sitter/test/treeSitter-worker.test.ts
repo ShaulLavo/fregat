@@ -273,9 +273,31 @@ describe('tree-sitter worker internals', () => {
     ])
   })
 
+  it('normalizes full range captures in flattened match order with first-capture deduplication', () => {
+    const ranges = [
+      { name: 'variable', startIndex: 75, endIndex: 82, patternIndex: 0 },
+      { name: 'function', startIndex: 5, endIndex: 10, patternIndex: 1 },
+      { name: 'variable', startIndex: 75, endIndex: 82, patternIndex: 2 },
+      { name: 'function', startIndex: 75, endIndex: 82, patternIndex: 3 },
+      { name: 'empty', startIndex: 3, endIndex: 3, patternIndex: 4 },
+    ]
+    const query = { captureRanges: () => ranges } as unknown as Query
+    const context = { ...cancellationContext(), counts: new Map<string, number>() }
+    expect(
+      collectCaptures(fakeTree(node('program', 0, 100)), highlightedRuntime(query), context),
+    ).toEqual([
+      { startIndex: 75, endIndex: 82, captureName: 'variable', languageId: 'typescript' },
+      { startIndex: 5, endIndex: 10, captureName: 'function', languageId: 'typescript' },
+      { startIndex: 75, endIndex: 82, captureName: 'function', languageId: 'typescript' },
+    ])
+    expect(context.counts.get('rawCaptures')).toBe(5)
+    expect(context.counts.get('uniqueCaptures')).toBe(3)
+    expect(ranges.map((capture) => capture.patternIndex)).toEqual([0, 1, 2, 3, 4])
+  })
+
   it('skips highlights when tree-sitter provides null trees or capture nodes', () => {
     const query = {
-      matches: () => [{ captures: [{ name: 'variable', node: null }] }],
+      captureRanges: () => [],
       captures: () => [{ name: 'variable', node: null }],
     } as unknown as Query
     const runtime = highlightedRuntime(query)

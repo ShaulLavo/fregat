@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { $, Glob } from 'bun'
+import { $, Glob, semver } from 'bun'
 import { workspaceRoot } from './workspace-root'
 
 const root = resolve(import.meta.dir, '..')
@@ -20,11 +20,22 @@ const manifest = (await response.json()) as {
   peerDependencies?: Record<string, string>
   peerDependenciesMeta?: Record<string, { optional?: boolean }>
 }
-// Validate before writing: an independently published runtime can precede its matching Markdown peer.
-assert.equal(
-  manifest.peerDependencies?.['web-tree-sitter'],
-  runtime,
-  'The selected Markdown source must require the exact runtime artifact; wait for its matching peer update',
+const runtimeResponse = await fetch(
+  `https://raw.githubusercontent.com/ShaulLavo/tree-sitter-x/${runtimeRevision}/package.json`,
+)
+assert.ok(runtimeResponse.ok, 'The selected runtime artifact manifest must be available')
+const runtimeManifest = (await runtimeResponse.json()) as { version: string }
+assert.equal(typeof runtimeManifest.version, 'string')
+const peerRange = manifest.peerDependencies?.['web-tree-sitter']
+assert.match(
+  peerRange ?? '',
+  /^\^\d+\.\d+\.\d+$/,
+  'The Markdown peer must declare a compatible runtime line',
+)
+// Validate compatibility before writes; the host overrides select one exact runtime artifact.
+assert.ok(
+  peerRange && semver.satisfies(runtimeManifest.version, peerRange),
+  'The selected runtime artifact must satisfy the Markdown peer range',
 )
 assert.notEqual(manifest.peerDependenciesMeta?.['web-tree-sitter']?.optional, true)
 assert.equal(manifest.dependencies?.['web-tree-sitter'], undefined)

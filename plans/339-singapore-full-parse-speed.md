@@ -561,8 +561,27 @@ A prospective paired experiment used byte-identical root lockfiles after the sta
 | Highlight query and predicates |    1,169.0 ms |            986.8 ms |    1,158.2 ms |            975.1 ms |
 | Overlap resolution             |      138.5 ms |            161.9 ms |      214.7 ms |            223.2 ms |
 
-Retain this candidate for independent runtime review. M1 remains unpassed. Cold worker work exceeds 4,000 ms and both conditions exceed the frozen 25% diagnostic-work reduction ceilings. A qualified window is premature. Capture normalization remains the next bounded allocation experiment; compact ranges still construct a separate normalized capture and string deduplication key for each accepted range.
+Runtime PR [tree-sitter-x #25](https://github.com/ShaulLavo/tree-sitter-x/pull/25) passed independent review and merged. Consumer integration pins published artifact `0fb6e61c7396727c49b8c6e4d757f6bf8dcfd6ed` and compatible Markdown source `e2ae3f735f614b3b618b5de71fc41644a180b9e7`. Full highlights use `captureRanges`; range highlights retain `captures`, and injection discovery and folds retain `matches`. The updater validates the required Markdown caret peer against the artifact version before changing exact host pins. Compatible runtime updates can keep the Markdown source unchanged. M1 remains unpassed. Cold worker work exceeds 4,000 ms and both conditions exceed the frozen 25% diagnostic-work reduction ceilings. A qualified window is premature. Capture normalization remains the next bounded allocation experiment; compact ranges still construct a separate normalized capture and string deduplication key for each accepted range.
 
 [Complete evidence](https://github.com/ShaulLavo/fregat/tree/lane/plan-339-capture-profile/editor/docs/performance/singapore-full-parse-2026-10-08/materialization-ranges-experiment) preserves the interrupted initial attempt, the completed dependency-confounded attempt rejected by strict comparison, and the prospective aligned experiment. No raw metadata was edited. Both prior rejected allocation designs, their runtime source snapshots and their traces remain beside it. The aligned runtime JavaScript hash is `011f537e049147dd89e23d8d8335b7f0c46111a42fa1b728e728a54b4c7c413b`.
 
 The real native suite passed 167 tests across 17 files, including grouped and repeated capture predicates, properties, Unicode, range/containing/depth options, disabled captures, match-limit status, callback failure recovery and five grammar fixtures. ESLint, a forced TypeScript build and the ESM bundle build passed. The local immutable dependency cache provides Vitest 3.2.4 while the source manifest declares Vitest 5.0.3; actual CI remains required. The expanded fixture's first run failed an explicit expected-capture count while both APIs agreed. A repeated capture pattern corrected the fixture, and the complete rerun passed.
+
+The published consumer also passed a fresh 10 MiB full-document output smoke. Its 1,198,376 tokens, token/style/structural hashes, complete coverage, 42 query calls and unexceeded match limit match the frozen canonical output. The screenshot was read back. This is a correctness check with the real published artifact, not a paired performance claim or qualification. [Published consumer evidence](https://github.com/ShaulLavo/fregat/tree/lane/plan-339-capture-profile/editor/docs/performance/singapore-full-parse-2026-10-08/capture-consumer-published-smoke) retains the raw observation and trace.
+
+### Capture normalization experiment, 2026-10-09
+
+A separate prospective experiment kept compact ranges on both sides and changed only full-capture normalization. The candidate sorts its fresh capture array by span, then records the last span stamp for each capture name. This removes per-capture concatenated deduplication keys. The API's flattened match order is unchanged. This candidate is an experimental transform and is not included in the shipping compact-range consumer.
+
+Cold ran baseline then candidate; warm reversed that order. Strict comparison passed environment, lockfile, fixture and canonical-output checks for all four fresh-document samples. These are single observations per side and condition, not qualification.
+
+| Diagnostic experiment          | Cold string keys | Cold span stamps | Warm string keys | Warm span stamps |
+| ------------------------------ | ---------------: | ---------------: | ---------------: | ---------------: |
+| Complete highlighted frame     |       4,144.9 ms |       3,820.3 ms |       4,046.0 ms |       3,630.4 ms |
+| Worker parse plus query        |       3,956.2 ms |       3,646.2 ms |       3,894.6 ms |       3,503.6 ms |
+| Main-thread union work         |        23.959 ms |        15.675 ms |        10.267 ms |        10.140 ms |
+| Highlight query and predicates |         961.7 ms |         957.0 ms |         962.1 ms |         972.7 ms |
+
+Cold diagnostic work is 3,661.875 ms, above the frozen 3,539.053 ms ceiling. Warm diagnostic work is 3,513.740 ms in this one observation. M1 remains unpassed; no full qualification window was run. Span stamps need focused equal-span precedence, injection and deduplication tests before shipping. Continue bounded allocation experiments to close the cold diagnostic-work gap.
+
+[Raw observations, traces, source probes and host recipe](https://github.com/ShaulLavo/fregat/tree/lane/plan-339-capture-profile/editor/docs/performance/singapore-full-parse-2026-10-08/normalization-span-map-experiment) retain both sides separately from the earlier API-only experiment. Raw JSON and source snapshots are lossless gzip archives, with byte sizes and hashes in `artifacts.json`.

@@ -1,0 +1,22 @@
+[
+  {
+    "path": "classification.json.gz",
+    "bytes": 297,
+    "sha256": "9a9a0cc1066dbc2ab423befcb787f40a8b95ba18d704e71535fa5fc2f9e1063f"
+  },
+  {
+    "path": "experiment.json.gz",
+    "bytes": 15140,
+    "sha256": "eb73b25e4a3f9a7eef4f9fb6ba20b7f2124972d8d942ead0b806812177c20358"
+  },
+  {
+    "path": "singapore-10-0-open.trace.json.gz",
+    "bytes": 442055,
+    "sha256": "d45ddfae398372f4894c562b190d9c01130001920034882cbafe4304578b906c"
+  },
+  {
+    "path": "singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  }
+]

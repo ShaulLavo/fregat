@@ -56,13 +56,13 @@
     "solid-js": "1.9.13",
     "starlight-links-validator": "0.26.0",
     "starlight-typedoc": "0.23.1",
-    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#00b65ee848d7ea6a3f6123b0507b7a791d6a6769",
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#e2ae3f735f614b3b618b5de71fc41644a180b9e7",
     "typedoc": "0.28.20",
     "typedoc-plugin-markdown": "4.12.0",
     "typescript": "npm:typescript@6.0.3",
     "unified": "11.0.5",
     "unist-util-visit": "5.1.0",
     "vitest": "5.0.2",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#a052adf5c2c34ef78f97d1631c41ca83db9816d3"
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#0fb6e61c7396727c49b8c6e4d757f6bf8dcfd6ed"
   }
 }

@@ -80,6 +80,7 @@ async function withUpdater(
   peer: string,
   check: (fixture: { root: string; run: () => void; files: string[] }) => Promise<void>,
   layout: 'nested' | 'standalone' = 'nested',
+  runtimeVersion = '0.28.1',
 ) {
   const root = await mkdtemp(path.join(tmpdir(), 'editor-runtime-update-'))
   const family = layout === 'nested' ? 'editor' : 'singapore'
@@ -145,6 +146,7 @@ async function withUpdater(
       `globalThis.fetch = async (url) => {
         const { writeFileSync } = await import('node:fs');
         writeFileSync(${JSON.stringify(path.join(root, 'requested-url'))}, String(url));
+        if (String(url).includes('/tree-sitter-x/')) return Response.json(${JSON.stringify({ version: runtimeVersion })});
         return Response.json(${JSON.stringify({
           version: '0.1.2',
           peerDependencies: { 'web-tree-sitter': peer },
@@ -168,7 +170,7 @@ async function withUpdater(
 }
 
 test('an unchanged artifact preserves full SHAs and skips installation', async () => {
-  await withUpdater(runtime, markdown, runtimeSpec(runtime), async ({ root, run, files }) => {
+  await withUpdater(runtime, markdown, '^0.28.1', async ({ root, run, files }) => {
     const before = await Promise.all(files.map((file) => readFile(file, 'utf8')))
     run()
     expect(await Promise.all(files.map((file) => readFile(file, 'utf8')))).toEqual(before)
@@ -177,46 +179,41 @@ test('an unchanged artifact preserves full SHAs and skips installation', async (
 })
 
 test('a matching Markdown source advances full host, peer, catalog, and fixture pins together', async () => {
-  await withUpdater(
-    nextRuntime,
-    nextMarkdown,
-    runtimeSpec(nextRuntime),
-    async ({ root, run, files }) => {
-      run()
-      const contents = await Promise.all(files.map((file) => readFile(file, 'utf8')))
-      for (const text of contents) {
-        expect(text).not.toContain(runtime)
-        expect(text).not.toContain(markdown)
+  await withUpdater(nextRuntime, nextMarkdown, '^0.28.1', async ({ root, run, files }) => {
+    run()
+    const contents = await Promise.all(files.map((file) => readFile(file, 'utf8')))
+    for (const text of contents) {
+      expect(text).not.toContain(runtime)
+      expect(text).not.toContain(markdown)
+    }
+    const host = JSON.parse(contents[0]!)
+    expect(host.overrides['web-tree-sitter']).toBe(runtimeSpec(nextRuntime))
+    expect(
+      JSON.parse(await readFile(path.join(root, 'editor/package.json'), 'utf8')).overrides[
+        'web-tree-sitter'
+      ],
+    ).toBe(runtimeSpec(nextRuntime))
+    const fixture = JSON.parse(contents[1]!)
+    expect(fixture.packages[0].dependencies['web-tree-sitter']).toBe(runtimeSpec(nextRuntime))
+    expect(fixture.packages[1].dependencies['tree-sitter-md']).toBe(markdownSpec(nextMarkdown))
+    expect(JSON.parse(contents[2]!).sources['tree-sitter-md'].revision).toBe(nextMarkdown)
+    for (const text of contents.slice(3)) {
+      const dependencies = JSON.parse(text).dependencies
+      expect(dependencies['tree-sitter-md']).toBe(markdownSpec(nextMarkdown))
+      if (dependencies['web-tree-sitter']) {
+        expect(dependencies['web-tree-sitter']).toBe(runtimeSpec(nextRuntime))
       }
-      const host = JSON.parse(contents[0]!)
-      expect(host.overrides['web-tree-sitter']).toBe(runtimeSpec(nextRuntime))
-      expect(
-        JSON.parse(await readFile(path.join(root, 'editor/package.json'), 'utf8')).overrides[
-          'web-tree-sitter'
-        ],
-      ).toBe(runtimeSpec(nextRuntime))
-      const fixture = JSON.parse(contents[1]!)
-      expect(fixture.packages[0].dependencies['web-tree-sitter']).toBe(runtimeSpec(nextRuntime))
-      expect(fixture.packages[1].dependencies['tree-sitter-md']).toBe(markdownSpec(nextMarkdown))
-      expect(JSON.parse(contents[2]!).sources['tree-sitter-md'].revision).toBe(nextMarkdown)
-      for (const text of contents.slice(3)) {
-        const dependencies = JSON.parse(text).dependencies
-        expect(dependencies['tree-sitter-md']).toBe(markdownSpec(nextMarkdown))
-        if (dependencies['web-tree-sitter']) {
-          expect(dependencies['web-tree-sitter']).toBe(runtimeSpec(nextRuntime))
-        }
-      }
-      expect(await readFile(path.join(root, 'requested-url'), 'utf8')).toBe(
-        `https://raw.githubusercontent.com/ShaulLavo/tree-sitter-md/${nextMarkdown}/package.json`,
-      )
-      expect(await readFile(path.join(root, 'commands'), 'utf8')).toBe(
-        `${root}|install\n${path.join(root, 'editor')}|run --cwd packages/tree-sitter-languages languages:generate\n`,
-      )
-    },
-  )
+    }
+    expect(await readFile(path.join(root, 'requested-url'), 'utf8')).toBe(
+      `https://raw.githubusercontent.com/ShaulLavo/tree-sitter-x/${nextRuntime}/package.json`,
+    )
+    expect(await readFile(path.join(root, 'commands'), 'utf8')).toBe(
+      `${root}|install\n${path.join(root, 'editor')}|run --cwd packages/tree-sitter-languages languages:generate\n`,
+    )
+  })
 })
 
-test.each([runtimeSpec(runtime), runtimeSpec(nextRuntime.slice(0, 7)), '^0.28.0'])(
+test.each([runtimeSpec(runtime), runtimeSpec(nextRuntime.slice(0, 7)), '^0.29.0', '=0.28.0'])(
   'an incompatible Markdown peer %s stops before any writes or installation',
   async (peer) => {
     await withUpdater(nextRuntime, nextMarkdown, peer, async ({ root, run, files }) => {
@@ -228,8 +225,28 @@ test.each([runtimeSpec(runtime), runtimeSpec(nextRuntime.slice(0, 7)), '^0.28.0'
   },
 )
 
+test('a compatible runtime update preserves the Markdown source revision', async () => {
+  await withUpdater(
+    nextRuntime,
+    markdown,
+    '^0.28.1',
+    async ({ root, run, files }) => {
+      run()
+      expect(JSON.parse(await readFile(files[0]!, 'utf8')).overrides['web-tree-sitter']).toBe(
+        runtimeSpec(nextRuntime),
+      )
+      for (const text of await Promise.all(files.slice(3).map((file) => readFile(file, 'utf8')))) {
+        expect(JSON.parse(text).dependencies['tree-sitter-md']).toBe(markdownSpec(markdown))
+      }
+      expect(await readFile(path.join(root, 'commands'), 'utf8')).toContain('install')
+    },
+    'nested',
+    '0.28.2',
+  )
+})
+
 test('a Markdown-only update advances the merged source at an unchanged runtime', async () => {
-  await withUpdater(runtime, nextMarkdown, runtimeSpec(runtime), async ({ root, run, files }) => {
+  await withUpdater(runtime, nextMarkdown, '^0.28.1', async ({ root, run, files }) => {
     run()
     const contents = await Promise.all(files.map((file) => readFile(file, 'utf8')))
     expect(JSON.parse(contents[0]!).overrides['web-tree-sitter']).toBe(runtimeSpec(runtime))
@@ -242,7 +259,7 @@ test('standalone updates leave the parent graph whole and install inside the fam
   await withUpdater(
     nextRuntime,
     nextMarkdown,
-    runtimeSpec(nextRuntime),
+    '^0.28.1',
     async ({ root, run, files }) => {
       const before = await Promise.all(files.slice(0, 2).map((file) => readFile(file, 'utf8')))
       run()
@@ -265,7 +282,7 @@ test('standalone updates leave the parent graph whole and install inside the fam
 
 test('artifacts with a shared seven-character prefix still update the full pin', async () => {
   const revision = runtime.slice(0, 7) + 'c'.repeat(33)
-  await withUpdater(revision, nextMarkdown, runtimeSpec(revision), async ({ run, files }) => {
+  await withUpdater(revision, nextMarkdown, '^0.28.1', async ({ run, files }) => {
     run()
     expect(JSON.parse(await readFile(files[0]!, 'utf8')).overrides['web-tree-sitter']).toBe(
       runtimeSpec(revision),
@@ -295,7 +312,16 @@ test('authored host, Markdown, catalog, and release fixture pins agree with the 
   const require = createRequire(path.join(repository, 'editor/packages/tree-sitter/package.json'))
   const markdownName = Object.keys(host).find((name) => host[name] === markdownPin)
   const peer = JSON.parse(readFileSync(require.resolve(`${markdownName}/package.json`), 'utf8'))
-  expect(peer.peerDependencies['web-tree-sitter']).toBe(runtimePin)
+  const runtimeName = Object.keys(host).find((name) => host[name] === runtimePin)
+  expect(runtimeName).toBeDefined()
+  const runtimeEntry = require.resolve(`${runtimeName}`)
+  const runtimeManifest = JSON.parse(
+    readFileSync(path.join(path.dirname(runtimeEntry), 'package.json'), 'utf8'),
+  )
+  expect(peer.peerDependencies['web-tree-sitter']).toMatch(/^\^\d+\.\d+\.\d+$/)
+  expect(
+    Bun.semver.satisfies(runtimeManifest.version, peer.peerDependencies['web-tree-sitter']),
+  ).toBe(true)
   expect(peer.dependencies?.['web-tree-sitter']).toBeUndefined()
   const fixtures = read('scripts/release/editor-fixture.json').packages
   for (const name of ['editor', 'markdown', 'tree-sitter', 'tree-sitter-languages']) {
@@ -315,28 +341,23 @@ test('authored host, Markdown, catalog, and release fixture pins agree with the 
 test.each(['install', 'run'])(
   'a failed %s restores source pins and retries the same pair',
   async (step) => {
-    await withUpdater(
-      nextRuntime,
-      nextMarkdown,
-      runtimeSpec(nextRuntime),
-      async ({ root, run, files }) => {
-        const before = await Promise.all(files.map((file) => readFile(file, 'utf8')))
-        const failure = path.join(root, 'fail-step')
-        await writeFile(failure, step)
-        expect(run).toThrow()
-        expect(await Promise.all(files.map((file) => readFile(file, 'utf8')))).toEqual(before)
-        await rm(failure)
-        run()
-        expect(JSON.parse(await readFile(files[0]!, 'utf8')).overrides['web-tree-sitter']).toBe(
-          runtimeSpec(nextRuntime),
-        )
-        expect(
-          JSON.parse(await readFile(files[2]!, 'utf8')).sources['tree-sitter-md'].revision,
-        ).toBe(nextMarkdown)
-        expect(await readFile(path.join(root, 'commands'), 'utf8')).toContain(
-          `${root}|install\n${path.join(root, 'editor')}|run --cwd packages/tree-sitter-languages languages:generate\n`,
-        )
-      },
-    )
+    await withUpdater(nextRuntime, nextMarkdown, '^0.28.1', async ({ root, run, files }) => {
+      const before = await Promise.all(files.map((file) => readFile(file, 'utf8')))
+      const failure = path.join(root, 'fail-step')
+      await writeFile(failure, step)
+      expect(run).toThrow()
+      expect(await Promise.all(files.map((file) => readFile(file, 'utf8')))).toEqual(before)
+      await rm(failure)
+      run()
+      expect(JSON.parse(await readFile(files[0]!, 'utf8')).overrides['web-tree-sitter']).toBe(
+        runtimeSpec(nextRuntime),
+      )
+      expect(JSON.parse(await readFile(files[2]!, 'utf8')).sources['tree-sitter-md'].revision).toBe(
+        nextMarkdown,
+      )
+      expect(await readFile(path.join(root, 'commands'), 'utf8')).toContain(
+        `${root}|install\n${path.join(root, 'editor')}|run --cwd packages/tree-sitter-languages languages:generate\n`,
+      )
+    })
   },
 )
