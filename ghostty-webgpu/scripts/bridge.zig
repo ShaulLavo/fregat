@@ -300,7 +300,7 @@ fn sameRowId(a: c.GhosttyRenderStateRowId, b: c.GhosttyRenderStateRowId) bool {
 
 fn planFrameRows(frame: *Frame, state: c.GhosttyRenderState, iterator: c.GhosttyRenderStateRowIterator) c.GhosttyResult {
     const cache = frame.row_cache.?;
-    const previous_offset = frame.row_offset;
+    cache.previous_offset = frame.row_offset;
     if (frame.stable_allowed == 0) {
         frame.stable_rows = 0;
         frame.row_offset = 0;
@@ -347,10 +347,9 @@ fn planFrameRows(frame: *Frame, state: c.GhosttyRenderState, iterator: c.Ghostty
         if (sameRowId(cache.previous[source].id, cache.incoming[destination]) and source < destination) cache.streaming = false;
     }
     if (!cache.moved) return c.GHOSTTY_SUCCESS;
-    cache.previous_offset = previous_offset;
     if (frame.stable_allowed != 0) {
-        frame.stable_rows = 1;
         if (cache.row_starts == null) cache.row_starts = frameAllocate(u32, cache.rows) orelse return c.GHOSTTY_OUT_OF_MEMORY;
+        frame.stable_rows = 1;
         const shift = cache.sources[0];
         var rotation = true;
         for (0..cache.rows) |destination| {
@@ -761,8 +760,7 @@ fn buildRow(comptime stable: bool, frame: *Frame, iterator: c.GhosttyRenderState
     var glyph_first = frame.columns;
     var glyph_end: u32 = 0;
     const start = if (stable) frame.row_cache.?.row_starts.?[y] else y * frame.columns;
-    // Only movement changes the owner of an already-placed record.
-    const previous = if (stable) &frame.row_cache.?.previous[if (frame.row_cache.?.moved) previousLogicalRow(frame, y) else y] else undefined;
+    const previous = if (stable) &frame.row_cache.?.previous[previousLogicalRow(frame, y)] else undefined;
     for (0..raw.len) |x| {
         const selected = has_selection and x >= selection.start_x and x <= selection.end_x;
         const slot = start + @as(u32, @intCast(x));
@@ -812,6 +810,8 @@ export fn bridge_build_frame(state: c.GhosttyRenderState, iterator: c.GhosttyRen
     if (result != c.GHOSTTY_SUCCESS) return result;
     const cache = frame.row_cache.?;
     if (!retry) frame.row_changes = 0;
+    // Full rebuilds repair remaps that a failed frame never uploaded.
+    if (!dirty_only) frame.row_changes |= 4;
     frame.row_changes |= @as(u32, @intFromBool(cache.moved)) | (@as(u32, @intFromBool(previous_stable != frame.stable_rows)) << 1);
     // Glyph retries must retain both remap delivery and every coordinate-layout upload.
     const layout_changed = (frame.row_changes & 2) != 0;

@@ -33,6 +33,20 @@ export interface TextPassCopy {
   texture: GPUTexture
 }
 
+type FrameRows =
+  | {
+      readonly stableRows?: false
+      readonly columns?: number
+      readonly rowHeight?: number
+      readonly rowOffset?: number
+    }
+  | {
+      readonly stableRows: boolean
+      readonly columns: number
+      readonly rowHeight: number
+      readonly rowOffset: number
+    }
+
 interface PipelineResources {
   cellBindGroup: GPUBindGroup
   cellPipeline: GPURenderPipeline
@@ -162,14 +176,10 @@ export class WebGpuTextPass {
   }
 
   uploadFrame(
-    data: {
+    data: FrameRows & {
       readonly cellData: Float32Array
       readonly glyphData: Float32Array
-      readonly columns?: number
-      readonly rowHeight?: number
-      readonly rowOffset?: number
       readonly rowChanges?: number
-      readonly stableRows?: boolean
     },
     updates: readonly RowInstanceUpdate[],
   ): number {
@@ -244,17 +254,12 @@ export class WebGpuTextPass {
     for (const buffer of this.ownedBuffers) buffer.destroy()
   }
 
-  private uploadRows(data: {
-    readonly columns?: number
-    readonly rowHeight?: number
-    readonly rowOffset?: number
-    readonly stableRows?: boolean
-  }): number {
-    const columns = data.stableRows ? data.columns! : 0
-    const height = data.stableRows ? data.rowHeight! : 0
-    const offset = data.stableRows ? data.rowOffset! : 0
+  private uploadRows(data: FrameRows): void {
+    const columns = data.stableRows ? data.columns : 0
+    const height = data.stableRows ? data.rowHeight : 0
+    const offset = data.stableRows ? data.rowOffset : 0
     if (columns === this.rowColumns && height === this.rowHeight && offset === this.rowOffset)
-      return 0
+      return
     this.rowColumns = columns
     this.rowHeight = height
     this.rowOffset = offset
@@ -268,7 +273,6 @@ export class WebGpuTextPass {
     this.frameUploadedBytesValue += this.rowData.byteLength
     this.metrics.uploadedBytes += this.rowData.byteLength
     this.metrics.uploadOperations += 1
-    return 1
   }
 
   private createPipelines(format: GPUTextureFormat): PipelineResources {

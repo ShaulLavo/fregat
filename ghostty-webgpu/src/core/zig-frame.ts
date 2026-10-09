@@ -107,7 +107,7 @@ export class ZigFrameBuilder {
     )
   }
 
-  private physicalRows?: number[]
+  private physicalToLogicalRows?: number[]
 
   get rowChanges(): number {
     this.ensureActive()
@@ -199,11 +199,11 @@ export class ZigFrameBuilder {
     )
     if (this.rowChanges !== 0) {
       const offset = this.rowOffset
-      if (offset === 0) this.physicalRows = undefined
+      if (offset === 0) this.physicalToLogicalRows = undefined
       if (offset !== 0) {
-        this.physicalRows ??= new Array<number>(this.rows)
+        this.physicalToLogicalRows ??= new Array<number>(this.rows)
         for (let row = 0; row < this.rows; row += 1)
-          this.physicalRows[row] = (row + this.rows - offset) % this.rows
+          this.physicalToLogicalRows[row] = (row + this.rows - offset) % this.rows
       }
     }
     return this.runtime.memory.view.getUint32(this.frame + 44, true)
@@ -223,8 +223,8 @@ export class ZigFrameBuilder {
           byteOffset: view.getUint32(pointer + 8, true),
           byteLength: view.getUint32(pointer + 12, true),
         },
-        row: this.physicalRows
-          ? this.physicalRows[Math.floor(byteOffset / (this.columns * 64))]!
+        row: this.physicalToLogicalRows
+          ? this.physicalToLogicalRows[Math.floor(byteOffset / (this.columns * 64))]!
           : Math.floor(byteOffset / (this.columns * 64)),
       })
     }

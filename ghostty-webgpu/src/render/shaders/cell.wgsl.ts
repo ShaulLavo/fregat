@@ -1,3 +1,5 @@
+import { rowRemapShader } from './row-remap.wgsl.js'
+
 export const cellShader = /* wgsl */ `
 const FLAG_CURSOR: u32 = 1u;
 const FLAG_OVERLINE: u32 = 2u;
@@ -40,15 +42,7 @@ fn vertexMain(
     vec2f(0.0, 0.0), vec2f(1.0, 0.0), vec2f(0.0, 1.0),
     vec2f(0.0, 1.0), vec2f(1.0, 0.0), vec2f(1.0, 1.0),
   );
-  var physicalIndex = instanceIndex;
-  if (viewport.columns != 0u) {
-    physicalIndex = (instanceIndex + viewport.rowOffset * viewport.columns) % viewport.instanceCount;
-  }
-  let instance = instances[physicalIndex];
-  var origin = instance.rect.xy;
-  if (viewport.columns != 0u && instance.rect.w != 0.0) {
-    origin.y = f32(instanceIndex / viewport.columns) * viewport.rowHeight + origin.y;
-  }
+${rowRemapShader}
   let corner = corners[vertexIndex];
   let local = corner * instance.rect.zw;
   let pixel = origin + local;
