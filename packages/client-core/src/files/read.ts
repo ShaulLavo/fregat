@@ -56,7 +56,7 @@ export async function readEntry({ client, path, signal }: ReadOptions) {
 
 export async function readRecentEntries({ client, signal }: Omit<ReadOptions, 'path'>) {
   const { data, error } = await client.fs.recents.get({
-    query: { limit: 30, mode: 'folder', showHidden: false },
+    query: { limit: 30, showHidden: false },
     fetch: { signal },
   })
   if (error) throw createRpcError(error)

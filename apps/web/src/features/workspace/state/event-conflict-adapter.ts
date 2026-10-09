@@ -10,7 +10,8 @@ import {
 import type { SnapshotComparisonScope } from '@/lib/documents/utils/snapshot-comparison'
 import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { log } from '@/lib/client-logging'
-import { parentFilesystemPath } from '@/lib/path-formatters'
+import { displayPath, parentFilesystemPath } from '@/lib/path-formatters'
+import { clientErrors } from '@/lib/structured-errors'
 import { supportsTextFile } from '@/features/editor/state/workspace-document-service'
 import { FilesystemConflictToast } from '@/features/editor/components/filesystem-conflict-toast'
 import {
@@ -76,7 +77,7 @@ export function notifyChangedFilesystemConflict(
   remoteFile: FileResult,
   context: WorkspaceConflictContext,
 ) {
-  notifyFilesystemConflict(changedConflict(path, remoteFile, context), context)
+  notifyFilesystemConflict(changedConflict(path, remoteFile), context)
 }
 
 export function markDeletedFilesystemDocument(
@@ -92,9 +93,7 @@ export function markDeletedFilesystemDocument(
     {
       ...conflict,
       eventType: 'deleted',
-      localText: localConflictText(conflict.localPath, context),
       remoteFile: null,
-      remoteText: null,
     },
     context,
   )
@@ -115,10 +114,8 @@ export async function notifyRenamedFilesystemConflict(
       eventType: 'renamed',
       id: createConflictId(),
       localPath,
-      localText: localConflictText(localPath, context),
       remoteFile,
       remotePath,
-      remoteText: supportsTextFile(remoteFile) ? remoteFile.content : null,
     },
     capturedContext,
     local,
@@ -136,16 +133,13 @@ export function dismissFilesystemConflicts(conflictStore: EditorConflictStoreApi
 function changedConflict(
   path: FilesystemPath,
   remoteFile: FileResult,
-  context: WorkspaceConflictContext,
 ): Omit<FilesystemConflict, 'latest' | 'seed'> {
   return {
     eventType: 'changed',
     id: createConflictId(),
     localPath: path,
-    localText: localConflictText(path, context),
     remoteFile,
     remotePath: path,
-    remoteText: supportsTextFile(remoteFile) ? remoteFile.content : null,
   }
 }
 
@@ -257,7 +251,8 @@ function ensureConflictEditorDocument(
   if (context.getLiveEditorDocument(documentKey(target))) return
   const capture = conflict.latest.input.capture
   const content = createMergeConflictDocumentText({
-    ...conflict,
+    localPath: conflict.localPath,
+    remotePath: conflict.remotePath,
     localText: capture.local.kind === 'text' ? capture.local.snapshot.materializeFullText() : '',
     remoteText:
       capture.incoming.kind === 'text' ? capture.incoming.reader.materializeFullText() : null,
@@ -375,12 +370,13 @@ function captureLiveDocument(key: DocumentKey, context: WorkspaceConflictContext
 }
 
 async function applyLocalConflict(conflict: FilesystemConflict, context: WorkspaceConflictContext) {
+  const text = liveLocalText(conflict, context)
   if (conflict.eventType === 'deleted') {
-    await restoreDeletedLocalConflict(conflict, context.client)
+    await restoreDeletedLocalConflict(conflict.remotePath, text, context.client)
   } else {
     await writeFileContent(
       conflict.remotePath,
-      conflict.localText,
+      text,
       {
         baseVersion: conflict.remoteFile?.version ?? null,
         expectedMtimeMs: conflict.remoteFile?.mtimeMs ?? null,
@@ -393,9 +389,9 @@ async function applyLocalConflict(conflict: FilesystemConflict, context: Workspa
   return context.fetchFile(conflict.remotePath, new AbortController().signal)
 }
 
-async function restoreDeletedLocalConflict(conflict: FilesystemConflict, client: Client) {
-  await ensureFolderPath(parentFilesystemPath(conflict.remotePath, filesystemPath('')), client)
-  await createFileContent(conflict.remotePath, conflict.localText, client)
+async function restoreDeletedLocalConflict(path: FilesystemPath, text: string, client: Client) {
+  await ensureFolderPath(parentFilesystemPath(path, filesystemPath('')), client)
+  await createFileContent(path, text, client)
 }
 
 export function adoptFilesystemSnapshot(
@@ -455,8 +451,14 @@ function finishConflict(
   context.conflictStore.getState().removeConflict(conflict.id)
 }
 
-function localConflictText(path: FilesystemPath, context: WorkspaceConflictContext) {
-  return context.getLiveEditorDocument(fileDocumentKey(path))?.buffer.materializeFullText() ?? ''
+// Keeping my changes saves the live buffer as it is now; the event capture only feeds the comparison.
+function liveLocalText(conflict: FilesystemConflict, context: WorkspaceConflictContext) {
+  const document = context.getLiveEditorDocument(fileDocumentKey(conflict.localPath))
+  if (document) return document.buffer.materializeFullText()
+  throw clientErrors.CONFLICT_LOCAL_CLOSED({
+    path: displayPath(conflict.localPath),
+    internal: { conflictId: conflict.id, eventType: conflict.eventType },
+  })
 }
 
 function createConflictId() {

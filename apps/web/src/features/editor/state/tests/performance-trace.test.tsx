@@ -1,10 +1,15 @@
-import { afterEach, vi } from 'vitest'
-
+import { performanceRecordingMutationOptions } from '@/features/editor/utils/performance-recording-mutation'
+import { editorQueryKeys } from '@/features/editor/utils/query-keys'
+import { createResourceQueryClient } from '@/lib/resources/state/query-client'
+import { runMutation } from '@/lib/mutations/run'
 import {
-  installEditorPerformanceTraceFromUrl,
+  editorPerformanceRecordingRequested,
   registerEditorOpenBenchmarkControl,
   type EditorOpenSampleResetResult,
 } from '@/features/editor/state/performance-trace'
+import { afterEach, vi } from 'vitest'
+
+import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-recording'
 import { expect, test } from '../../../../../test/fixtures'
 
 type TraceHandle = {
@@ -117,14 +122,14 @@ test('trace-only bridge forwards opaque sample controls and unregisters ownershi
   const resetResult: EditorOpenSampleResetResult = {
     evictions: 0,
     nonTargetIntents: 0,
-    preparedClaims: 1,
+    preparedJoins: 1,
     promotedBytes: 20,
     highlighterRuntimeSessionIds: ['shiki:1'],
     quiescent: true,
     structuralRuntimeSessionIds: ['tree:1'],
     targetIntents: 1,
-    transferredHighlighterRuntimeSessionIds: ['shiki:1'],
-    transferredStructuralRuntimeSessionIds: ['tree:1'],
+    joinedHighlighterRuntimeSessionIds: ['shiki:1'],
+    joinedStructuralRuntimeSessionIds: ['tree:1'],
     wastedIntents: 0,
   }
   const reset = vi.fn(async () => resetResult)
@@ -167,3 +172,32 @@ function performanceEntry(startTime: number, duration: number, name: string): Pe
     toJSON: () => ({}),
   }
 }
+
+test('ordinary startup skips recording and explicit tracing requests it', () => {
+  vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
+  history.replaceState(null, '', '/')
+  expect(editorPerformanceRecordingRequested()).toBe(false)
+  history.replaceState(null, '', '/?editorPerfTrace=false')
+  expect(editorPerformanceRecordingRequested()).toBe(false)
+  history.replaceState(null, '', '/?editorPerfTrace=1')
+  expect(editorPerformanceRecordingRequested()).toBe(true)
+  vi.stubEnv('OBSERVABILITY_ENABLED', 'false')
+  expect(editorPerformanceRecordingRequested()).toBe(false)
+})
+
+test('on-demand recording installs the trace and settles its module cache', async () => {
+  vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
+  history.replaceState(null, '', '/?editorPerfTrace=1')
+  const queryClient = createResourceQueryClient()
+  try {
+    const recording = await runMutation(
+      queryClient,
+      performanceRecordingMutationOptions(queryClient),
+      undefined,
+    )
+    expect(traceHandle()).toBeDefined()
+    expect(queryClient.getQueryData(editorQueryKeys.performanceRecording)).toBe(recording)
+  } finally {
+    queryClient.clear()
+  }
+})

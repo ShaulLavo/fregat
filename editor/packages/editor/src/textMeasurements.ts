@@ -222,6 +222,12 @@ export class TextMeasurements {
     return findOffset(this.root(tabSize), target, bias, tabSize, mode)
   }
 
+  forEachTextChunk(visit: (text: string) => void): void {
+    for (const range of this.ranges) {
+      visit(range.source.text.slice(range.start, range.end))
+    }
+  }
+
   slice(start: number, end: number): TextMeasurements {
     const ranges: MeasuredTextRange[] = []
     let offset = 0

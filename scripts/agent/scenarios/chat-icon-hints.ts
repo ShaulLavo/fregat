@@ -2,6 +2,7 @@ import { strictEqual } from 'node:assert/strict'
 import type { Locator, Page } from 'playwright'
 import type { Scenario } from './index'
 import { selectors, settleAnimations } from '../selectors'
+import { isolatedNativeScenario } from './native-provider-verification'
 
 type Step = Parameters<Scenario['run']>[1]['step']
 const PROMPT = 'Verify the stashed prompt hint'
@@ -24,8 +25,6 @@ async function driveComposer(
   step: Step,
   image: { name: string; mimeType: string; buffer: Buffer },
 ) {
-  await selectors.workspaceMode(page, 'Chat').click()
-  await selectors.chatNewSession(page).click()
   const options = selectors.iconHintControl(page, 'Model options')
   await options.waitFor({ timeout: 20_000 })
   await captureHint(page, options, 'Model options:', step, 'model-options-hint')
@@ -36,7 +35,7 @@ async function driveComposer(
 
   const chooser = page.waitForEvent('filechooser')
   await selectors.iconHintControl(page, 'Attach').click()
-  await selectors.chatAttachMenuItem(page, 'Attach files…').click()
+  await selectors.chatAttachDeviceFiles(page).click()
   await (await chooser).setFiles(image)
   const attachment = selectors.iconHintControl(page, `Open ${image.name}`)
   await captureHint(page, attachment, `Open ${image.name}`, step, 'attachment-hint')
@@ -78,11 +77,13 @@ async function cleanupComposer(page: Page, imageName: string) {
   if (await message.isVisible()) await message.fill('')
 }
 
-export const chatIconHints: Scenario = {
+export const chatIconHints = isolatedNativeScenario({
   name: 'chat-icon-hints',
   description:
     'Hover composer controls, open an attached image, and exercise the stash. Removes its draft image and prompt without sending a message.',
-  async run(page, { step }) {
+  // Model options show only for a selected model, and the throwaway server runs fixture providers alone.
+  fixture: new URL('../fixtures/native-model-options.mjs', import.meta.url),
+  async drive(page, { step }) {
     const name = `icon-hints-${Date.now()}.png`
     const image = {
       name,
@@ -96,4 +97,4 @@ export const chatIconHints: Scenario = {
     }
     await step('draft-cleared')
   },
-}
+})

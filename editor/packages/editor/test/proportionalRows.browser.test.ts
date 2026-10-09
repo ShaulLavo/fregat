@@ -76,7 +76,9 @@ test('mounts the text a scroll offset reaches, under the spacer that stands for 
   for (const target of [30_000, 60_000, 90_000]) {
     scroller.scrollLeft = target
     await expect.poll(() => Number(row.dataset.editorVirtualWindowStart ?? '0')).toBeGreaterThan(0)
-    await new Promise((resolve) => requestAnimationFrame(resolve))
+    await expect
+      .poll(() => row.getBoundingClientRect().left + scroller.scrollLeft)
+      .toBeCloseTo(scroller.getBoundingClientRect().left + gutterWidth, 0)
     const x = scroller.getBoundingClientRect().left + gutterWidth + scroller.clientWidth / 2
     const expected = columnAtWidth(scroller.scrollLeft + scroller.clientWidth / 2)
     const nearby = new Set([LONG[expected - 1], LONG[expected], LONG[expected + 1]])

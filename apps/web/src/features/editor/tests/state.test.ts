@@ -340,7 +340,7 @@ describe('editor workspace state', () => {
         if (!testContentMatches(state.selectedTabContent, path)) return
         const activeTabId = selectedGroupTab(state.workbenchPanels.editorGroups)?.id ?? null
         preparedAtPublication = activeTabId
-          ? (documentStore.getState().getEditorView(testTabId(activeTabId))?.preparedDocument ??
+          ? (documentStore.getState().getEditorView(testTabId(activeTabId))?.prepared?.document ??
             null)
           : null
       })

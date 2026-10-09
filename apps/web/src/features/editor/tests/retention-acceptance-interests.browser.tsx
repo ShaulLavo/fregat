@@ -58,11 +58,11 @@ test(
     expect(tab).not.toBeNull()
     if (!tab) return
     const adopted = app.read().documents.getState().viewsByTabId[tab.id]
-    expect(adopted?.preparedDocument).not.toBeNull()
+    expect(adopted?.prepared).not.toBeNull()
     await context.annotate(
       JSON.stringify({
         point: 'remaining-prepared-stage-ids-after-activation',
-        remainingRuntimeSessionIds: adopted?.preparedDocument?.runtimeSessionIds(),
+        remainingRuntimeSessionIds: adopted?.prepared?.document.runtimeSessionIds(),
       }),
       'retention-acceptance-prepared-stage-receipt',
     )
@@ -81,8 +81,8 @@ test(
     if (typeof commands.retentionAcceptanceScreenshot === 'function')
       await commands.retentionAcceptanceScreenshot('caller-promoted')
     app.setPredictions([])
-    expect(app.read().documents.getState().viewsByTabId[tab.id]?.preparedDocument).toBe(
-      adopted?.preparedDocument,
+    expect(app.read().documents.getState().viewsByTabId[tab.id]?.prepared?.document).toBe(
+      adopted?.prepared?.document,
     )
     const reads = performance.getEntriesByType('resource').filter((entry) => {
       const url = new URL(entry.name)
@@ -139,13 +139,13 @@ test(
     transport.release()
     await shared
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-    const abandoned = app.read().interests.service.claimLive(path)
+    const abandoned = app.read().interests.service.join(path)
     await context.annotate(
       JSON.stringify({
         point: 'real-deadline-late-query',
         events,
         elapsedMs: Date.now() - began,
-        claim: abandoned ? 'unexpected' : 'absent',
+        join: abandoned ? 'unexpected' : 'absent',
         query: app.queryClient.getQueryState(fileSnapshotQueryOptions(path).queryKey),
       }),
       'retention-acceptance-interest-expiry',

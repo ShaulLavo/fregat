@@ -1,40 +1,33 @@
 import type { PlatformBridge, PlatformPickOptions } from '../shared/bridge'
 import { isRecord } from '@workspace/utils/objects'
 
-export function parsePickRequest(
-  body: unknown,
-  origin: string,
-): { id: number; documentId: string; options: PlatformPickOptions } | undefined {
+export type PickRequest =
+  | { id: number; documentId: string; options: PlatformPickOptions }
+  | { id: number; documentId: string; refused: 'options' }
+
+/**
+ * A pick request this page can be answered on. Requests without a usable id or
+ * document id have no caller to answer and return undefined; any other invalid
+ * shape is refused so the page's promise settles with an error.
+ */
+export function parsePickRequest(body: unknown, origin: string): PickRequest | undefined {
   if (
     !isRecord(body) ||
     body.origin !== origin ||
     body.method !== 'pickEntry' ||
     !Number.isSafeInteger(body.id) ||
     typeof body.documentId !== 'string' ||
-    !/^[a-f0-9-]{36}$/.test(body.documentId) ||
-    !isRecord(body.options)
+    !/^[a-f0-9-]{36}$/.test(body.documentId)
   )
     return
+  const caller = { id: body.id as number, documentId: body.documentId }
   const options = body.options
-  if (options.mode !== 'folder' && options.mode !== 'file') return
-  if (options.multiple !== undefined && typeof options.multiple !== 'boolean') return
-  if (options.startingPath !== undefined && typeof options.startingPath !== 'string') return
-  if (
-    options.accept !== undefined &&
-    (!Array.isArray(options.accept) ||
-      !options.accept.every((item: unknown) => typeof item === 'string'))
-  )
-    return
-  return {
-    id: body.id as number,
-    documentId: body.documentId,
-    options: {
-      mode: options.mode,
-      multiple: options.multiple,
-      startingPath: options.startingPath,
-      accept: options.accept,
-    },
-  }
+  if (!isRecord(options)) return { ...caller, refused: 'options' }
+  if (Object.keys(options).some((key) => key !== 'startingPath'))
+    return { ...caller, refused: 'options' }
+  if (options.startingPath !== undefined && typeof options.startingPath !== 'string')
+    return { ...caller, refused: 'options' }
+  return { ...caller, options: { startingPath: options.startingPath } }
 }
 export function shellBridge(
   url: string,
@@ -73,7 +66,7 @@ export function shellBridge(
       else request.resolve(response.paths);
     };
     bridge.pickEntry = options => new Promise((resolve, reject) => {
-      if (pending.size) { reject(new DOMException('A file chooser is already open.', 'InvalidStateError')); return; }
+      if (pending.size) { reject(new DOMException('A folder chooser is already open.', 'InvalidStateError')); return; }
       const id = ++next;
       pending.set(id, { resolve, reject });
       try { send({ id, documentId, method: 'pickEntry', options, origin: location.origin, token }); }

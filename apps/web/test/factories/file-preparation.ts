@@ -1,14 +1,19 @@
 import { QueryClient } from '@tanstack/react-query'
+import { vi } from 'vitest'
+import { createEditorPreparedDocument } from '@singapore-editor/core/editor'
 import { WorkspaceDocumentService } from '@/features/editor/state/workspace-document-service'
 import {
   createPlatformFileOpenPreparer,
   type EditorPreparedEnvironment,
 } from '@/features/editor/utils/prepared-document'
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
+import type { FileResult } from '@/lib/file-system-types'
 import {
   createFileOpenIntentServiceOwner,
   type FileOpenIntentPreparer,
   type FileOpenIntentRuntime,
+  type FileOpenIntentServiceOwnerDependencies,
 } from '@/lib/file-open-intent/state/service'
 
 export function preparationDocuments() {
@@ -28,10 +33,12 @@ export function filePreparationOwner({
   queryClient = new QueryClient(),
   runtime,
   preparer = createPlatformFileOpenPreparer(preparationEnvironment),
+  mountedEditors = { has: () => false, subscribe: () => () => undefined },
 }: {
   readonly queryClient?: QueryClient
   readonly runtime?: FileOpenIntentRuntime
   readonly preparer?: FileOpenIntentPreparer
+  readonly mountedEditors?: FileOpenIntentServiceOwnerDependencies['mountedEditors']
 } = {}) {
   const documents = preparationDocuments()
   const owner = createFileOpenIntentServiceOwner({
@@ -39,7 +46,7 @@ export function filePreparationOwner({
     getLiveDocument: (path) => documents.getLiveDocument(fileDocumentKey(path)),
     getRetainedScrollPosition: () => null,
     isActive: () => false,
-    mountedEditors: { has: () => false, subscribe: () => () => undefined },
+    mountedEditors,
     preparer,
     prefetchRelated: () => undefined,
     queryClient,
@@ -100,4 +107,55 @@ export function preparationRuntime() {
     queued: () => tasks.length,
     timerCount: () => timers.size,
   }
+}
+
+/**
+ * A real prepared document with one highlighter stage whose work stays pending until `settle`,
+ * so a test can order service events against the stage's scheduled start.
+ */
+export function gatedStagePreparer() {
+  let settle!: () => void
+  const pending = new Promise<void>((resolve) => {
+    settle = resolve
+  })
+  const start = vi.fn(() => pending)
+  const configuration = {
+    documentConfigurationTag: [],
+    stages: [{ configurationTag: [], family: 'highlighter' as const, provider: start, start }],
+  }
+  const observed: {
+    preparedDocument: ReturnType<typeof createEditorPreparedDocument> | null
+    signal: AbortSignal | null
+  } = { preparedDocument: null, signal: null }
+  const preparer: FileOpenIntentPreparer = {
+    environment: { configurationTag: [], highlighterProvider: null, structuralProvider: null },
+    prepare: (buffer, documentId, _path, abortSignal, _range, analysis) => {
+      const preparedDocument = createEditorPreparedDocument({
+        analysis,
+        buffer,
+        configuredTabSize: 4,
+        documentConfigurationTag: [],
+        documentId,
+        folding: false,
+        languageId: 'typescript',
+        tabSizePolicy: 'fixed',
+      })
+      vi.spyOn(preparedDocument, 'dispose')
+      observed.preparedDocument = preparedDocument
+      observed.signal = abortSignal
+      return { buffer, preparedDocument, ...configuration }
+    },
+    reconfigure: () => configuration,
+  }
+  return {
+    preparer,
+    settle,
+    start,
+    preparedDocument: () => observed.preparedDocument!,
+    signal: () => observed.signal!,
+  }
+}
+
+export function preparationFile(path: FilesystemPath, content = 'const a = 1\n'): FileResult {
+  return { content, mtimeMs: 1, path, size: content.length, version: 'v1' }
 }

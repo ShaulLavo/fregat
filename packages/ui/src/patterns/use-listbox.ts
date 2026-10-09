@@ -66,6 +66,9 @@ export function useListbox<Id extends string>({
   const cursorIndex = activeIndex < 0 ? enabledListboxIndex(items, 0, 1) : activeIndex
   const cursor = items[cursorIndex]
   const previousCursor = useRef({ index: cursorIndex, id: cursor?.id })
+  // A tap focuses the list before its click lands; revealing the first row then would scroll the
+  // tapped row away and the click would pick whatever moved under the finger.
+  const pointerFocus = useRef(false)
 
   function rowId(id: Id) {
     return `${prefix}-${id}`
@@ -161,14 +164,20 @@ export function useListbox<Id extends string>({
       const current = interactions.current
       const item = current.items.find((candidate) => candidate.id === id)
       if (item && !item.disabled) current.onActiveChange(id)
-      ref.current?.focus({ preventScroll: true })
+      focusFromPointer()
     },
     onMouseDown: (event: MouseEvent<HTMLElement>) => {
       if (isRowControl(event.target, event.currentTarget)) return
       event.preventDefault()
-      ref.current?.focus({ preventScroll: true })
+      focusFromPointer()
     },
   })
+
+  function focusFromPointer() {
+    pointerFocus.current = true
+    ref.current?.focus({ preventScroll: true })
+    pointerFocus.current = false
+  }
 
   const focus = () => ref.current?.focus({ preventScroll: true })
 
@@ -190,6 +199,7 @@ export function useListbox<Id extends string>({
       'aria-activedescendant': cursor ? rowId(cursor.id) : undefined,
       onKeyDown,
       onFocus: (event: FocusEvent<HTMLDivElement>) => {
+        if (pointerFocus.current) return
         if (!revealOnMount && event.target === event.currentTarget) revealCursor()
         if (activeIndex < 0 && cursor) onActiveChange(cursor.id)
       },

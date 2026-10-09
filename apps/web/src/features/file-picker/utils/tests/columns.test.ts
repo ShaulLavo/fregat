@@ -32,10 +32,8 @@ test('selecting in a column closes the columns after it', () => {
 })
 
 test('the deepest pickable entry skips a file past the folder the user drilled into', () => {
-  expect(deepestPickable([src, lib, app], 'folder')).toBe(lib)
-  expect(deepestPickable([src, lib, app], 'file')).toBe(app)
-  expect(deepestPickable([src, lib, app], 'file', ['.md'])).toBeNull()
-  expect(deepestPickable([], 'folder')).toBeNull()
+  expect(deepestPickable([src, lib, app])).toBe(lib)
+  expect(deepestPickable([])).toBeNull()
 })
 
 test('only a selection inside the current folder seeds the columns', () => {
@@ -44,10 +42,9 @@ test('only a selection inside the current folder seeds the columns', () => {
   expect(initialTrail('repo', null)).toEqual([])
 })
 
-test('auto picks columns for folders and a list for files; search and a narrow dialog use the list', () => {
-  expect(pickerView('auto', 'folder')).toBe('columns')
-  expect(pickerView('auto', 'file')).toBe('list')
-  expect(pickerView('list', 'folder')).toBe('list')
+test('auto picks columns; search and a narrow dialog use the list', () => {
+  expect(pickerView('auto')).toBe('columns')
+  expect(pickerView('list')).toBe('list')
   expect(shownPickerView('columns', true, 900)).toBe('list')
   expect(shownPickerView('columns', false, 260)).toBe('list')
   expect(shownPickerView('columns', false, 320)).toBe('columns')

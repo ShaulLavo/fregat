@@ -87,13 +87,24 @@ test('each shell’s first load gets a group, and the phone never shares the wor
     '/file-screen.tsx': { imports: ['/editor.tsx'] },
     '/editor.tsx': { imports: [] },
     '/sessions-screen.tsx': { imports: ['/session-hook.ts'] },
-    '/session-screen.tsx': { imports: ['/chat.tsx'] },
+    '/session-screen.tsx': { imports: ['/chat.tsx', '/menu.tsx'] },
     '/workbench.tsx': {
-      imports: ['/session-hook.ts', '/chat.tsx', '/tree.tsx', '/button.tsx', '/editor.tsx'],
+      imports: [
+        '/session-hook.ts',
+        '/chat.tsx',
+        '/tree.tsx',
+        '/button.tsx',
+        '/editor.tsx',
+        '/tabs.tsx',
+        '/menu.tsx',
+      ],
     },
     '/chat.tsx': { imports: [] },
     '/session-hook.ts': { imports: [] },
     '/tree.tsx': { imports: [] },
+    '/dialog.tsx': { imports: ['/tabs.tsx', '/menu.tsx'] },
+    '/menu.tsx': { imports: [] },
+    '/tabs.tsx': { imports: [] },
     '/dev-entry.tsx': { imports: ['/button.tsx', '/gallery.tsx'] },
   }
   const context = {
@@ -106,6 +117,7 @@ test('each shell’s first load gets a group, and the phone never shares the wor
     phone: '/phone.tsx',
     workbench: '/workbench.tsx',
     phoneScreens: ['/sessions-screen.tsx', '/session-screen.tsx'],
+    phoneOverlays: ['/dialog.tsx'],
   })
   const groupOf = (id: string) =>
     groups.map((group) => group.name(id, context)).find((name) => name !== null) ?? null
@@ -130,6 +142,9 @@ test('each shell’s first load gets a group, and the phone never shares the wor
     '/workbench.tsx': 'workbench',
   })
   expect(groupOf('/editor.tsx')).toBe('workbench-shared')
+  // An overlay's workbench modules stay apart from workbench-shared; one a boot screen shares is initial.
+  expect(groupOf('/tabs.tsx')).toBe('phone-overlays')
+  expect(groupOf('/menu.tsx')).toBe('initial')
   expect(groupOf('/gallery.tsx')).toBeNull()
   expect(groupOf('/session-screen.tsx')).toBeNull()
 })

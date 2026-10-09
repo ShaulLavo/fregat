@@ -185,22 +185,25 @@ async function settledSourceReference(
   source: string,
   document: string,
 ): Promise<TokenPaintReference> {
-  const coreUrl = `/@fs${path.resolve(import.meta.dirname, '../../../editor/packages/editor/dist/public/document.js')}`
+  // Resolved by Vite like the app's own imports, so the provider and analysis share one module graph.
+  const coreUrl = '/@id/@singapore-editor/core/document'
+  const editorUrl = '/@id/@singapore-editor/core/editor'
   const tokens = await page.evaluate<
     Parameters<typeof resolveTokenPaintRuns>[0]['tokens']
   >(`(async () => {
     const core = await import(${JSON.stringify(coreUrl)})
+    const editor = await import(${JSON.stringify(editorUrl)})
     const syntax = await import('/src/features/editor/state/syntax-highlighting.ts')
     const buffer = core.createEditorTextBuffer(${JSON.stringify(source)})
-    const snapshot = buffer.getSnapshot()
-    const textSnapshot = core.createDocumentTextSnapshot(snapshot)
-    const session = syntax.editorHighlighterProvider().createSession({ documentId: 'observer-reference', languageId: 'typescript', snapshot, textSnapshot })
+    const analysis = editor.createEditorDocumentAnalysis({ buffer, documentId: 'observer-reference' })
+    const session = analysis.borrowHighlighter({ provider: syntax.editorHighlighterProvider(), languageId: 'typescript' })
     if (!session) throw new RangeError('reference worker unavailable')
     try {
-      const result = await session.refresh(textSnapshot)
+      const result = await session.refresh(buffer.getTextSnapshot())
       return result.tokens.toTokens()
     } finally {
       session.dispose()
+      analysis.dispose()
     }
   })()`)
   const runs = await page.evaluate(resolveTokenPaintRuns, {

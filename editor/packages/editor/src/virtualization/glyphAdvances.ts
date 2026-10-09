@@ -1,7 +1,6 @@
 /**
- * Per-face glyph advances for a proportional font, read from a 2D canvas set to the face the text is
- * drawn with. Summing single glyphs ignores kerning and shaping, so callers leave a margin; the
- * monospace path never builds one.
+ * Per-face glyph advances from a 2D canvas. Wrapping measures monospace faces too, because CJK and
+ * fallback glyphs can exceed one cell. Summed advances omit shaping, so callers leave a margin.
  */
 export type GlyphAdvances = {
   /** The advance of one code point, in CSS pixels. */

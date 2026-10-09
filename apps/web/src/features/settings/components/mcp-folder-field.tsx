@@ -37,7 +37,6 @@ export function McpFolderField({
       {picking ? (
         <QueryClientProvider client={owner}>
           <FilePickerDialog
-            mode='folder'
             onOpenChange={setPicking}
             onPick={(entry) => {
               onChange(entry.path)

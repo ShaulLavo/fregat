@@ -5,18 +5,15 @@ import { errorMessage } from '@/lib/error-message'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useLayoutEffect, useRef } from 'react'
 
-import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import { toastError } from '@/lib/toast-error'
 
 export function useDirectoryTransition({
   currentPath,
   enabled,
-  mode,
   showHidden,
 }: {
   currentPath: string
   enabled: boolean
-  mode: FilePickerMode
   showHidden: boolean
 }) {
   const queryClient = useQueryClient()
@@ -24,7 +21,7 @@ export function useDirectoryTransition({
 
   useLayoutEffect(() => {
     requestIdRef.current += 1
-  }, [currentPath, enabled, mode, showHidden])
+  }, [currentPath, enabled, showHidden])
 
   useEffect(
     () => () => {
@@ -42,7 +39,7 @@ export function useDirectoryTransition({
     if (!enabled || path === currentPath) return
 
     return queryClient
-      .query(directoryQueryOptions({ mode, path, query: '', showHidden }))
+      .query(directoryQueryOptions({ path, query: '', showHidden }))
       .then(() => undefined)
       .catch(() => undefined)
   }
@@ -63,7 +60,7 @@ export function useDirectoryTransition({
     }
 
     try {
-      await queryClient.query(directoryQueryOptions({ mode, path, query: '', showHidden }))
+      await queryClient.query(directoryQueryOptions({ path, query: '', showHidden }))
     } catch (cause) {
       if (requestId !== requestIdRef.current) return false
 

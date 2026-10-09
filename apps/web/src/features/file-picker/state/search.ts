@@ -3,11 +3,7 @@ import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { WorkspaceSearchEvent, WorkspaceSearchQuery } from '@workspace/contracts'
 import type { FindMatch, FsEntry, SearchScope } from '@/lib/file-system-types'
 
-import {
-  ROOT_PATH,
-  compareSearchEntries,
-  type FilePickerMode,
-} from '@/features/file-picker/utils/model'
+import { ROOT_PATH, compareSearchEntries } from '@/features/file-picker/utils/model'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 
 const SEARCH_SCOPE_TIMEOUT_MS = 6000
@@ -30,7 +26,6 @@ const searchSignalCleanup = new WeakMap<AbortSignal, () => void>()
 export async function streamPickerSearchEntries(
   path: string,
   query: string,
-  mode: FilePickerMode,
   signal: AbortSignal,
   onEntries: (entries: FsEntry[]) => void,
   options: StreamPickerSearchOptions,
@@ -46,7 +41,6 @@ export async function streamPickerSearchEntries(
     search,
     path,
     query,
-    mode,
     showHidden,
     scope,
     matches,
@@ -67,7 +61,6 @@ async function streamSearchScope(
   search: WorkspaceSearchStream,
   path: string,
   query: string,
-  mode: FilePickerMode,
   showHidden: boolean,
   scope: SearchScope,
   matches: FindMatch[],
@@ -82,7 +75,7 @@ async function streamSearchScope(
     for await (const event of search(
       {
         caseSensitive: false,
-        entryType: searchEntryType(mode),
+        entryType: 'directory',
         excludeGlobs: showHidden ? undefined : PICKER_HIDDEN_SEARCH_EXCLUDE_GLOBS,
         includeContent: false,
         includeNames: true,
@@ -133,12 +126,6 @@ function fallbackEntry(match: FindMatch): FsEntry {
 
 export function fallbackEntries(matches: FindMatch[], query: string) {
   return matches.map(fallbackEntry).sort(compareSearchEntries(query))
-}
-
-export function searchEntryType(mode: FilePickerMode) {
-  if (mode === 'folder') return 'directory'
-
-  return undefined
 }
 
 function workspaceIndexEnabledForScope(scope: SearchScope) {

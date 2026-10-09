@@ -211,7 +211,7 @@ describe('native picker endpoint', () => {
   it('returns the paths a local request selected', async () => {
     const { file } = await helperScript(`echo '{"event":"picked","paths":["/srv/project"]}'`)
     const { base } = await listening({ helper: file })
-    const response = await pick(base, { mode: 'folder' })
+    const response = await pick(base, {})
     expect(response.status).toBe(200)
     expect(v.parse(nativePickerResultSchema, await response.json())).toEqual({
       outcome: 'selected',
@@ -224,7 +224,7 @@ describe('native picker endpoint', () => {
       `touch "$ROOT/started"\necho '{"event":"picked","paths":[]}'`,
     )
     const { base } = await listening({ helper: file })
-    const response = await pick(base, { mode: 'folder' }, { 'x-forwarded-for': '127.0.0.1' })
+    const response = await pick(base, {}, { 'x-forwarded-for': '127.0.0.1' })
     expect(response.status).toBe(403)
     expect(await code(response)).toBe('system.NATIVE_PICKER_NOT_LOCAL')
     await expect(stat(path.join(root, 'started'))).rejects.toThrow()
@@ -233,7 +233,7 @@ describe('native picker endpoint', () => {
   it('refuses a foreign origin before anything else', async () => {
     const { file } = await helperScript(`echo '{"event":"picked","paths":[]}'`)
     const { base } = await listening({ helper: file })
-    const response = await pick(base, { mode: 'folder' }, { origin: 'https://evil.example' })
+    const response = await pick(base, {}, { origin: 'https://evil.example' })
     expect(response.status).toBe(403)
     expect(await code(response)).toBe('FORBIDDEN_ORIGIN')
   })
@@ -241,7 +241,7 @@ describe('native picker endpoint', () => {
   it('refuses invalid options with the picker code', async () => {
     const { file } = await helperScript(`echo '{"event":"picked","paths":[]}'`)
     const { base } = await listening({ helper: file })
-    const response = await pick(base, { mode: 'save' })
+    const response = await pick(base, { accept: ['.ts'] })
     expect(response.status).toBe(400)
     expect(await code(response)).toBe('system.NATIVE_PICKER_INVALID_OPTIONS')
   })
@@ -250,7 +250,7 @@ describe('native picker endpoint', () => {
     const { file, root } = await helperScript(`echo $$ > "$ROOT/pid"\nexec sleep 30`)
     const { base } = await listening({ helper: file })
     const controller = new AbortController()
-    const pending = pick(base, { mode: 'folder' }, {}, controller.signal).catch(() => null)
+    const pending = pick(base, {}, {}, controller.signal).catch(() => null)
     const pid = await waitForPid(root)
     controller.abort()
     await pending
