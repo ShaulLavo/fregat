@@ -4,9 +4,8 @@ import { isRecord } from '@workspace/utils/objects'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { WebviewHost, runNativeDialog } from './webview-host'
-import { nativeBudget, nativeErrors, type NativeBudget, type HostSpawn } from './native-helper'
+import { nativeBudget, type NativeBudget, type HostSpawn } from './native-helper'
 import { shellBridge, parsePickRequest } from './shell-bridge'
-import type { PlatformPickOptions } from '../shared/bridge'
 import { launcherFailureFacts } from './failure'
 import type { StartupBudget } from './startup'
 import { appBundle } from './bundle'
@@ -80,7 +79,9 @@ export async function launchWebview(options: {
           host.drag()
           return
         }
-        answerPickRequest(event.body, new URL(options.url).origin, (pick) => host.pick(pick), reply)
+        const request = parsePickRequest(event.body, new URL(options.url).origin)
+        if (!request) return
+        void completePick(request.id, request.documentId, host.pick(request.options), reply)
       },
     })
     const reply = (response: unknown) =>
@@ -124,22 +125,6 @@ export async function showStartFailure(
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
-}
-
-/** Answers every pick request that names its caller, refusals included, so the page never waits on silence. */
-export function answerPickRequest(
-  body: unknown,
-  origin: string,
-  pick: (options: PlatformPickOptions) => Promise<string[]>,
-  reply: (response: unknown) => unknown,
-) {
-  const request = parsePickRequest(body, origin)
-  if (!request) return
-  const pending =
-    'refused' in request
-      ? Promise.reject(nativeErrors.PICKER_REFUSED({ internal: { refused: request.refused } }))
-      : pick(request.options)
-  void completePick(request.id, request.documentId, pending, reply)
 }
 
 async function completePick(

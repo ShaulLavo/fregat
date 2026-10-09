@@ -10,12 +10,6 @@ export const nativeErrors = defineErrorCatalog('desktop.webview', {
     why: 'The folder chooser did not receive a selection before the allowed interval ended.',
     fix: 'Open the folder chooser again and select a folder before it closes.',
   },
-  PICKER_REFUSED: {
-    status: 400,
-    message: 'The folder chooser request is not valid.',
-    why: 'This window and the desktop app are from different versions, so the app cannot read the request.',
-    fix: 'Restart Fregat so the window and the desktop app match, then open the folder again.',
-  },
   HOST_FAILED: {
     status: 500,
     message: 'The desktop native helper stopped.',

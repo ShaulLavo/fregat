@@ -47,12 +47,6 @@ export const clientErrors = defineErrorCatalog('client', {
     why: 'The file picker can only list the contents of a folder.',
     fix: 'Pick a folder that exists.',
   },
-  NATIVE_CHOOSER_NO_REPLY: {
-    status: 504,
-    message: 'The folder chooser did not answer.',
-    why: 'The desktop app sent no reply within the native dialog time limit. This happens when the window and the desktop app are from different versions.',
-    fix: 'Restart Fregat so the window and the desktop app match, then open the folder again.',
-  },
   CHAT_DRAFT_UNAVAILABLE: {
     status: 409,
     message: 'The chat draft could not be opened.',
