@@ -47,6 +47,7 @@ jobs:
           playwright: editor/packages/editor/node_modules/.bin/playwright
           browsers: chromium chromium-headless-shell firefox webkit
       - name: Check full-document benchmark probes
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"singapore-browser-compare"') }}
         run: bun run --cwd editor/bench/compare test
       - name: Build full-document benchmark
         if: ${{ github.event_name == 'workflow_dispatch' || inputs.exhaustive }}
@@ -75,24 +76,32 @@ jobs:
           path: ${{ runner.temp }}/singapore-full-smoke
           if-no-files-found: ignore
       - name: Check generated language catalog
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/tree-sitter-languages"') }}
         run: bun run --cwd editor/packages/tree-sitter-languages languages:generate -- --check
       - name: Check task inputs
+        if: ${{ github.event_name == 'workflow_dispatch' || inputs.exhaustive }}
         run: bun editor/scripts/check-turbo-inputs.mjs
       - name: Check architecture health
+        if: ${{ github.event_name == 'workflow_dispatch' || inputs.exhaustive }}
         run: bun run --cwd editor health
       - name: Test Editor packages and examples
         env:
           CI_PACKAGES: ${{ inputs.packages || 'all' }}
         run: bun scripts/ci/packages.mjs editor-tests "$CI_PACKAGES"
       - name: Test collaboration signaling broker
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/collaboration"') }}
         run: bun run --cwd editor/packages/collaboration test:server
       - name: Test tree-sitter browser worker
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/tree-sitter"') }}
         run: bun run --cwd editor/packages/tree-sitter test:browser
       - name: Test collaboration presence in Chromium
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/collaboration"') }}
         run: bun x turbo run test:browser --filter=@singapore-editor/collaboration --concurrency=1 -- test/presence.browser.test.ts
       - name: Test collaboration transports in Chromium
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/collaboration"') }}
         run: bun run --cwd editor/packages/collaboration test:browser -- test/transports.browser.test.ts
       - name: Smoke concurrent editor input and author undo
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/collaboration"') }}
         run: bun run --cwd editor/packages/collaboration test:editor -- test/editor.browser.test.ts --testNamePattern '2 simple editors preserve concurrent forward runs and author undo'
 
   ghostty:
@@ -112,15 +121,19 @@ jobs:
           playwright: ghostty-webgpu/node_modules/.bin/playwright
           browsers: chromium
       - name: Verify line editor package
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"ghostty-webgpu-line-editor"') }}
         run: bun run --cwd ghostty-webgpu-line-editor verify
       - name: Verify terminal library and browser package
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"ghostty-webgpu"') }}
         run: bun run --cwd ghostty-webgpu verify
       - name: Verify browser package with production npm settings
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"ghostty-webgpu"') }}
         env:
           NODE_ENV: production
           npm_config_omit: dev
         run: bun run --cwd ghostty-webgpu test:package
       - name: Classify native resolver state
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"ghostty-webgpu"') }}
         id: native-state
         working-directory: ghostty-webgpu
         run: |
