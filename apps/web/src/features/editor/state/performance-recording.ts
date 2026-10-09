@@ -1,5 +1,7 @@
 import {
   MAX_TRACE_EVENTS,
+  addDiagnosticSummary,
+  type DiagnosticSummary,
   type EditorPerformanceDiagnostic,
   type InitialDiagnostics,
 } from '@/features/editor/utils/diagnostic-buffer'
@@ -38,6 +40,8 @@ type EditorPerformanceTraceEvent =
 
 type EditorPerformanceTraceReport = {
   readonly durationMs: number
+  readonly droppedEvents: number
+  readonly truncated: boolean
   readonly disabledFeatures: readonly string[]
   readonly dom: Readonly<Record<string, number>>
   readonly events: Readonly<Record<string, number>>
@@ -108,7 +112,10 @@ function createEditorPerformanceTrace(initial?: InitialDiagnostics): {
   let frame = 0
   let lastFrameTime = performance.now()
   const traceEvents = createTraceBuffer<EditorPerformanceTraceEvent>(MAX_TRACE_EVENTS)
-  const diagnosticSummaries = new Map<string, { count: number; maxMs: number; totalMs: number }>()
+  const diagnosticSummaries = new Map<string, DiagnosticSummary>(
+    Array.from(initial?.summaries ?? [], ([name, summary]) => [name, { ...summary }]),
+  )
+  let initialDroppedEvents = initial?.droppedEvents ?? 0
   let frames = emptyFrameStats()
   let startedAt = initial?.startedAt ?? performance.now()
   const eventCounts = new Map<string, number>()
@@ -123,16 +130,7 @@ function createEditorPerformanceTrace(initial?: InitialDiagnostics): {
     record: (diagnostic) => {
       if (stopped) return
 
-      const durationMs = diagnostic.durationMs ?? 0
-      const summary = diagnosticSummaries.get(diagnostic.name) ?? {
-        count: 0,
-        maxMs: 0,
-        totalMs: 0,
-      }
-      summary.count += 1
-      summary.maxMs = Math.max(summary.maxMs, durationMs)
-      summary.totalMs += durationMs
-      diagnosticSummaries.set(diagnostic.name, summary)
+      addDiagnosticSummary(diagnosticSummaries, diagnostic)
       traceEvents.push({
         at: diagnostic.timestampMs ?? performance.now(),
         diagnostic,
@@ -141,8 +139,7 @@ function createEditorPerformanceTrace(initial?: InitialDiagnostics): {
     },
   }
 
-  for (const event of initial?.events ?? [])
-    sink.record({ ...event.diagnostic, timestampMs: event.at })
+  for (const event of initial?.events ?? []) traceEvents.push({ ...event, kind: 'diagnostic' })
 
   const recordInputEvent = (event: Event) => {
     if (stopped) return
@@ -203,6 +200,7 @@ function createEditorPerformanceTrace(initial?: InitialDiagnostics): {
       observer?.takeRecords()
       traceEvents.clear()
       diagnosticSummaries.clear()
+      initialDroppedEvents = 0
       frames = emptyFrameStats()
       eventCounts.clear()
       targetCounts.clear()
@@ -229,7 +227,10 @@ function createEditorPerformanceTrace(initial?: InitialDiagnostics): {
     const currentTraceEvents = traceEvents
       .values()
       .filter((event) => event.kind !== 'long-task' || event.at + event.durationMs >= startedAt)
+    const droppedEvents = initialDroppedEvents + traceEvents.droppedCount()
     return {
+      droppedEvents,
+      truncated: droppedEvents > 0,
       disabledFeatures: Array.from(editorPerformanceDisabledFeatures()),
       dom: editorPerformanceDomSnapshot(document),
       durationMs: performance.now() - startedAt,

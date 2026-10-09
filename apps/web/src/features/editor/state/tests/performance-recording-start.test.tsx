@@ -9,7 +9,10 @@ const host = globalThis as typeof globalThis & {
   __EDITOR_PERFORMANCE_DIAGNOSTICS__?: ReturnType<typeof createDiagnosticBuffer>['sink']
   __editorPerfTrace?: {
     stop(): void
+    reset(): void
     report(): {
+      droppedEvents: number
+      truncated: boolean
       durationMs: number
       traceEvents: readonly { at: number; diagnostic?: { name: string } }[]
       topDiagnostics: readonly { name: string; count: number; totalMs: number }[]
@@ -93,7 +96,65 @@ test('early diagnostics stay bounded during an indefinitely pending import', () 
     buffer.sink.record({ name: `event-${index}`, timestampMs: index })
   expect(buffer.snapshot().events).toHaveLength(MAX_TRACE_EVENTS)
   expect(buffer.snapshot().events[0]?.diagnostic.name).toBe('event-2')
+  const snapshot = buffer.snapshot()
+  expect(snapshot.droppedEvents).toBe(2)
+  expect(snapshot.summaries.get('event-0')).toEqual({ count: 1, maxMs: 0, totalMs: 0 })
+  buffer.sink.record({ name: 'event-0', durationMs: 5 })
+  expect(snapshot.summaries.get('event-0')?.count).toBe(1)
+  expect(buffer.snapshot().summaries.get('event-0')).toEqual({ count: 2, maxMs: 5, totalMs: 5 })
   buffer.stop()
   buffer.sink.record({ name: 'after-stop' })
   expect(buffer.snapshot().events).toHaveLength(0)
+  expect(buffer.snapshot().summaries.size).toBe(0)
+  expect(buffer.snapshot().droppedEvents).toBe(0)
+})
+
+test('overflow through replay preserves complete summaries and discloses raw event loss', async () => {
+  enableRecording()
+  const recording = await import('@/features/editor/state/performance-recording')
+  const load = Promise.withResolvers<typeof recording>()
+  const client = createResourceQueryClient()
+  const completed = startEditorPerformanceRecording(client, () => load.promise)
+  try {
+    for (let index = 0; index < MAX_TRACE_EVENTS + 2; index++)
+      host.__EDITOR_PERFORMANCE_DIAGNOSTICS__?.record({
+        name: 'early',
+        timestampMs: index,
+        durationMs: index < 2 ? 3 : 1,
+      })
+    load.resolve(recording)
+    await completed
+    const report = host.__editorPerfTrace?.report()
+    expect(report?.topDiagnostics).toContainEqual(
+      expect.objectContaining({
+        name: 'early',
+        count: 5002,
+        totalMs: 5006,
+        maxMs: 3,
+      }),
+    )
+    expect(report?.traceEvents).toHaveLength(MAX_TRACE_EVENTS)
+    expect(report?.traceEvents[0]?.at).toBe(2)
+    expect(report?.droppedEvents).toBe(2)
+    expect(report?.truncated).toBe(true)
+    host.__EDITOR_PERFORMANCE_DIAGNOSTICS__?.record({ name: 'early', durationMs: 4 })
+    expect(host.__editorPerfTrace?.report().topDiagnostics).toContainEqual(
+      expect.objectContaining({
+        name: 'early',
+        count: 5003,
+        totalMs: 5010,
+        maxMs: 4,
+      }),
+    )
+    expect(host.__editorPerfTrace?.report().droppedEvents).toBe(3)
+    host.__editorPerfTrace?.reset()
+    expect(host.__editorPerfTrace?.report().topDiagnostics).toEqual([])
+    expect(host.__editorPerfTrace?.report().traceEvents).toEqual([])
+    expect(host.__editorPerfTrace?.report().droppedEvents).toBe(0)
+    expect(host.__editorPerfTrace?.report().truncated).toBe(false)
+  } finally {
+    load.resolve(recording)
+    await completed
+    client.clear()
+  }
 })
