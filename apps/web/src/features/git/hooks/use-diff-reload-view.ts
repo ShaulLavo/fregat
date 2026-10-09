@@ -1,10 +1,10 @@
 import { useGitReloadOwner } from '@/features/git/hooks/use-reload-owner'
 import type { DiffReloadView, DiffReloadIdentity } from '@/features/git/utils/reload-schema'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { GitFileDiff } from '@workspace/contracts'
 import type { DiffAttachment } from '@/lib/diff-attachment'
-import { captureDiffView, savedDiffView } from '@/features/git/state/reload'
+import { captureDiffView, takeSavedDiffView } from '@/features/git/state/reload'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 
 type Presentation = {
@@ -23,18 +23,27 @@ export function useDiffReloadView(
   const [restoredIdentity, setRestoredIdentity] = useState<string | null>(null)
   const key = identity ? JSON.stringify(identity) : null
   if (attachment && identity && restoredIdentity !== key) {
-    const view = savedDiffView(owner, identity)
+    const view = takeSavedDiffView(owner, identity)
     if (view) presentation.restoreDiffView(attachment, view)
     setRestoredIdentity(key)
   }
+  // Cleanups run before this commit's effects, so a flush on leaving still sees the departing diff.
+  const shown = useRef({ identity, attachment })
   useEffect(() => {
-    if (!attachment || !diffs.length || !identity) return
-    const flush = () =>
-      captureDiffView(owner, generation, identity, presentation.diffViewRecord(attachment))
+    shown.current = { identity, attachment }
+  })
+  const active = key !== null && attachment !== null && diffs.length > 0
+  useEffect(() => {
+    if (!active) return
+    const flush = () => {
+      const { identity: current, attachment: displayed } = shown.current
+      if (current && displayed)
+        captureDiffView(owner, generation, current, presentation.diffViewRecord(displayed))
+    }
     const remove = addLifecycleFlush(flush)
     return () => {
       flush()
       remove()
     }
-  }, [owner, generation, identity, diffs, attachment, presentation])
+  }, [active, key, owner, generation, presentation])
 }

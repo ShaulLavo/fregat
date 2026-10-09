@@ -186,7 +186,9 @@ type ReadControl = { aborted: Promise<typeof ABORTED>; abort: () => void }
 
 const ABORTED = Symbol('git.read.aborted')
 
-async function readCapped(
+// Bun chooses the chunk size. Retain at most the budget plus one raw chunk,
+// and stop before decoding that chunk when it crosses the budget.
+export async function readCapped(
   stream: ReadableStream<Uint8Array>,
   maxBytes: number,
   control: ReadControl,
@@ -221,7 +223,7 @@ function abandonRead(
   return { bytes, text: '', truncated: bytes > maxBytes }
 }
 
-function createReadControl(): ReadControl {
+export function createReadControl(): ReadControl {
   let resolveAborted: (value: typeof ABORTED) => void = () => {}
   const aborted = new Promise<typeof ABORTED>((resolve) => {
     resolveAborted = resolve

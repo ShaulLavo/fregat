@@ -267,6 +267,8 @@ removing Lexical. Keep the original breakdown here for its implementation detail
 ## Draft ownership handoff from Plan 200
 
 Future work for this plan, after the composer runs on our editor. Plan 200 did not migrate Lexical.
+The ownership and source range contracts this builds on are in
+[document-backed content views](../docs/document-backed-content-views.md).
 
 - **Identity.** A draft becomes one more `UnsyncedDocumentRef` variant, keyed as drafts are today:
   environment, workspace root and draft key (`chatInputDraftStorageId`). The workspace document

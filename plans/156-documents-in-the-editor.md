@@ -82,9 +82,10 @@ ID not supplied), P1 live as `20261001T225237Z-87340481-w2-280`, and P2 live as
 This documentation track did not deploy or independently recheck the live mesh. Physical
 Mac/iPhone and real-account checks are unconfirmed; fixture/remote proofs do not certify them.
 
-Use existing file-document identity. Plan 200 owns shared content-source ownership, 198 owns
-retained analysis and attachment, and 099 owns buffer publication/consumer synchronization.
-Their full completion is not required for the binary guard or a view-only PDF tab. CSV keeps the
+Use existing file-document identity. Shared content-source ownership, retained analysis and
+attachment follow [document-backed content views](../docs/document-backed-content-views.md); 099 owns buffer
+publication/consumer synchronization. The binary guard and a view-only PDF tab do not depend
+on either. CSV keeps the
 existing live text buffer and must reuse whichever publication contract has landed. Do not create
 another retained-document registry or synchronization service while those plans proceed.
 
