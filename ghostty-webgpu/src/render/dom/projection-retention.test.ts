@@ -57,9 +57,49 @@ it('retains both ordinary run widths separated by the visible cursor', async () 
     state.update()
     const row = state.readRows({ packed: true })[0]!
     const actual = projection.project(row, cursor)
-    expect(widthReads).toBe(2)
+    expect(widthReads).toBe(0)
     expect(actual).toEqual(renderRowRuns(row, cursor, probeFont, theme))
   } finally {
+    runtime.dispose()
+  }
+})
+
+it('retains the single-cell cursor appearance across text and cursor-position edits', async () => {
+  const runtime = await GhosttyRuntime.create()
+  const foreground = vi.spyOn(CanvasColorCache.prototype, 'foreground')
+  try {
+    const terminal = runtime.createTerminal({ columns: 12, rows: 1 })
+    const state = runtime.createRenderState(terminal)
+    const theme = canonicalRendererTheme(mergeRendererTheme({}))
+    let widthReads = 0
+    const font = {
+      ...probeFont,
+      get cssCellWidth() {
+        widthReads += 1
+        return probeFont.cssCellWidth
+      },
+    }
+    const projection = new RowProjection(font, theme)
+    terminal.write('AAAAAAAAAAAA')
+    state.update()
+    projection.project(state.readRows({ packed: true })[0]!, {
+      style: 'outline',
+      visible: true,
+      x: 6,
+      y: 0,
+    })
+    foreground.mockClear()
+    widthReads = 0
+    terminal.write('\rBBBBBBBBBBBB')
+    state.update()
+    const row = state.readRows({ packed: true })[0]!
+    const cursor = { style: 'outline' as const, visible: true, x: 5, y: 0 }
+    const actual = projection.project(row, cursor)
+    expect(foreground).not.toHaveBeenCalled()
+    expect(widthReads).toBe(0)
+    expect(actual).toEqual(renderRowRuns(row, cursor, probeFont, theme))
+  } finally {
+    foreground.mockRestore()
     runtime.dispose()
   }
 })

@@ -147,6 +147,7 @@ export interface RowRun {
 
 interface CachedAppearance {
   readonly cell: RenderCell
+  readonly cursor: CursorState['style'] | undefined
   readonly style: string
   width: number
   runStyle: string
@@ -159,6 +160,7 @@ export class RowProjection {
   readonly scratchA = emptyRenderCell()
   readonly scratchB = emptyRenderCell()
   private readonly appearances: CachedAppearance[] = []
+  private cursorAppearance: CachedAppearance | undefined
 
   constructor(
     private readonly font: TerminalFittedFont,
@@ -171,11 +173,25 @@ export class RowProjection {
     return renderRowRuns(row, cursor, this.font, this.theme, this)
   }
 
-  appearance(cell: RenderCell): CachedAppearance {
+  appearance(cell: RenderCell, cursor: CursorState | undefined): CachedAppearance {
+    if (cursor) {
+      const cached = this.cursorAppearance
+      if (cached && cached.cursor === cursor.style && sameAppearance(cached.cell, cell))
+        return cached
+      this.cursorAppearance = this.createAppearance(cell, cursor)
+      return this.cursorAppearance
+    }
     for (const cached of this.appearances) {
       if (sameAppearance(cached.cell, cell)) return cached
     }
-    const cached: CachedAppearance = {
+    const cached = this.createAppearance(cell, undefined)
+    if (this.appearances.length === 2) this.appearances.shift()
+    this.appearances.push(cached)
+    return cached
+  }
+
+  private createAppearance(cell: RenderCell, cursor: CursorState | undefined): CachedAppearance {
+    return {
       // Packed reads mutate their scratch colors and styles on the next cell.
       cell: {
         ...emptyRenderCell(),
@@ -184,15 +200,13 @@ export class RowProjection {
         background: cell.background ? { ...cell.background } : undefined,
         style: cell.style ? { ...cell.style } : undefined,
       },
-      style: cellStyle(cell, undefined, this.font, this.theme, this.colors, 1),
+      cursor: cursor?.style,
+      style: cellStyle(cell, cursor, this.font, this.theme, this.colors, 1),
       width: 0,
       runStyle: '',
       alternateWidth: 0,
       alternateRunStyle: '',
     }
-    if (this.appearances.length === 2) this.appearances.shift()
-    this.appearances.push(cached)
-    return cached
   }
 }
 
@@ -245,11 +259,12 @@ export function renderRowRuns(
     while (!packed && row.cells[index + width]?.continuation) width += 1
     const paintedCursor =
       cursor?.visible && cursor.y === row.y && cursor.x === cell.x ? cursor : undefined
-    // Cursor and wide-cell paint stays isolated; font, theme and contrast are fixed for this row.
+    // Cursor spans stay isolated; wide glyphs bypass the appearance cache.
     const reusable = width === 1 && !paintedCursor
     const adjacent = reusable && previousCell && sameAppearance(previousCell, cell)
     let appearance = currentAppearance
-    if (!adjacent) appearance = reusable ? projection?.appearance(cell) : undefined
+    if (!adjacent)
+      appearance = width === 1 ? projection?.appearance(cell, paintedCursor) : undefined
     const style = adjacent
       ? currentStyle
       : (appearance?.style ?? cellStyle(cell, paintedCursor, font, theme, colors, width))
