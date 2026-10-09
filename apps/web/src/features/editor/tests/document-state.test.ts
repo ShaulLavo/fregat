@@ -1,4 +1,7 @@
-import { preparedDocumentLease } from '../../../../test/factories/prepared-document'
+import {
+  preparedDocumentLease,
+  preparedLeaseFor,
+} from '../../../../test/factories/prepared-document'
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { testDocumentKey, testScrollPositions } from '../../../../test/factories/document-targets'
 import { describe } from 'vitest'
@@ -12,7 +15,6 @@ import {
   acquireDocumentMutationLease,
   commitPreparedDocumentTransaction,
   createEditorBufferSession,
-  createEditorTextBuffer,
   getDocumentMutationLeaseState,
   type EditorTextBuffer,
   prepareDocumentTransaction,
@@ -20,10 +22,6 @@ import {
   reverseDocumentTransaction,
   subscribeDocumentMutationLeaseState,
 } from '@singapore-editor/core/document'
-import {
-  createEditorDocumentAnalysis,
-  createEditorPreparedDocument,
-} from '@singapore-editor/core/editor'
 
 describe('editor document store state identity', () => {
   it('rejects ASCII-only PDF registration before constructing a text buffer', () => {
@@ -177,34 +175,15 @@ describe('editor document store state identity', () => {
   it('records text committed inside an earlier logical publication', () => {
     const store = createEditorDocumentStore()
     const file = fileResult('/repo/nested.ts')
-    const buffer = createEditorTextBuffer(file.content)
+    const { buffer } = store.getState().ensureEditorView(tabId('nested'), file)
+    const deleted = store.getState().prepareWorkspaceDocumentDelete(file.path)!
+    expect(store.getState().commitWorkspaceDocumentProjection(deleted)).toBe(true)
     const session = createEditorBufferSession(buffer)
     buffer.subscribe((event) => {
       if (event.change.kind === 'synchronize') session.applyText('!')
     })
-    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'nested.ts' })
-    const preparedDocument = createEditorPreparedDocument({
-      buffer,
-      analysis,
-      configuredTabSize: 4,
-      tabSizePolicy: 'fixed',
-      folding: false,
-      documentConfigurationTag: [],
-      documentId: 'nested.ts',
-      languageId: null,
-    })
-    store.getState().ensureEditorView(tabId('nested'), file, {
-      kind: 'clean',
-      documentKey: testDocumentKey(file.path),
-      localRevision: buffer.getRevision(),
-      release: () => undefined,
-      buffer,
-      file,
-      fileVersion: file.version,
-      path: file.path,
-      preparedDocument,
-      snapshot: buffer.getSnapshot(),
-    })
+    // Rollback resubscribes the store after the listener above, so the listener runs first.
+    expect(store.getState().rollbackWorkspaceDocumentProjection(deleted)).toBe(true)
     const before = store.getState().dirtyContentRevision
     const result = commitPreparedDocumentTransaction(
       { buffer, sourceView: null },
@@ -447,55 +426,39 @@ describe('editor document store state identity', () => {
     expect(store.getState().viewsByTabId[tabId('tab-1')]).toBe(view)
   })
 
-  it('promotes an exact clean prepared buffer into the view', () => {
-    const store = createEditorDocumentStore()
-    const file = fileResult('/repo/a.ts')
-    const buffer = createEditorTextBuffer(file.content)
-    buffer.markClean()
-    const preparedDocument = preparedDocumentLease()
-
-    const view = store.getState().ensureEditorView(tabId('tab-1'), file, {
-      buffer,
-      file,
-      fileVersion: file.version,
-      kind: 'clean',
-      documentKey: testDocumentKey(file.path),
-      localRevision: buffer.getRevision(),
-      release: () => undefined,
-      path: file.path,
-      preparedDocument,
-      snapshot: buffer.getSnapshot(),
-    })
-
-    expect(view.buffer).toBe(buffer)
-    expect(view.preparedDocument).toBe(preparedDocument)
-    expect(view.contentRevision).toBe(`f:${file.version}`)
-  })
-
-  it('keeps dirty live content ahead of a stale clean prepared claim', () => {
+  it('installs a joined preparation once and keeps the view hold on a repeated join', () => {
     const store = createEditorDocumentStore()
     const file = fileResult('/repo/a.ts')
     const live = store.getState().ensureLiveEditorDocument(file)
-    createEditorBufferSession(live.buffer).applyText('!')
-    const preparedBuffer = createEditorTextBuffer(file.content)
-    const preparedDocument = preparedDocumentLease()
+    const joined = preparedLeaseFor(live, file.path, preparedDocumentLease(), file.version)
 
-    const view = store.getState().ensureEditorView(tabId('tab-1'), file, {
-      buffer: preparedBuffer,
-      file,
-      fileVersion: file.version,
-      kind: 'clean',
-      documentKey: testDocumentKey(file.path),
-      localRevision: preparedBuffer.getRevision(),
-      release: () => undefined,
-      path: file.path,
-      preparedDocument,
-      snapshot: preparedBuffer.getSnapshot(),
-    })
+    const view = store.getState().ensureEditorView(tabId('tab-1'), file, joined)
+    const repeated = preparedLeaseFor(live, file.path, joined.document, file.version)
+    const again = store.getState().ensureEditorView(tabId('tab-1'), file, repeated)
+
+    expect(view.buffer).toBe(live.buffer)
+    expect(view.preparedDocument).toBe(joined.document)
+    expect(again.preparedDocument).toBe(joined.document)
+    expect(store.getState().viewsByTabId[tabId('tab-1')]?.prepared).toBe(joined)
+    expect(joined.release).not.toHaveBeenCalled()
+    expect(repeated.release).toHaveBeenCalledOnce()
+    store.getState().removeEditorView(tabId('tab-1'))
+    expect(joined.release).toHaveBeenCalledOnce()
+  })
+
+  it('keeps dirty live content ahead of a stale clean joined preparation', () => {
+    const store = createEditorDocumentStore()
+    const file = fileResult('/repo/a.ts')
+    const live = store.getState().ensureLiveEditorDocument(file)
+    const stale = preparedLeaseFor(live, file.path, preparedDocumentLease(), file.version)
+    createEditorBufferSession(live.buffer).applyText('!')
+
+    const view = store.getState().ensureEditorView(tabId('tab-1'), file, stale)
 
     expect(view.buffer).toBe(live.buffer)
     expect(view.preparedDocument).toBeNull()
-    expect(preparedDocument.dispose).toHaveBeenCalledTimes(1)
+    expect(stale.release).toHaveBeenCalledOnce()
+    expect(stale.document.dispose).not.toHaveBeenCalled()
   })
 
   it('names clean file revisions from the opaque server version after an unraced save', () => {

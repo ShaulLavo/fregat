@@ -1,3 +1,4 @@
+import { preparedLeaseFor } from '../../../../test/factories/prepared-document'
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { materializeFileSnapshotText, type FileSnapshot } from '@/lib/file-snapshot'
 import { filesystemPath, settingsJsonDocument, tabId } from '@/lib/documents/utils/identity'
@@ -234,22 +235,20 @@ test('final disposal releases shared prepared interests before analysis and pres
       languageId: 'typescript',
       tabSizePolicy: 'fixed',
     })
-    const claim = {
-      buffer: document.buffer,
-      documentKey: document.key,
-      kind: 'live' as const,
-      release: () => undefined,
-      localRevision: document.localRevision,
-      path,
-      preparedDocument: prepared,
-      snapshot: document.buffer.getSnapshot(),
-    }
+    let holders = 2
+    const lease = () => ({
+      ...preparedLeaseFor(document, path, prepared),
+      release: () => {
+        holders -= 1
+        if (holders === 0) prepared.dispose()
+      },
+    })
     runtime.documentStore
       .getState()
-      .ensureEditorViewForDocument(tabId('first'), document.key, claim)
+      .ensureEditorViewForDocument(tabId('first'), document.key, lease())
     runtime.documentStore
       .getState()
-      .ensureEditorViewForDocument(tabId('second'), document.key, claim)
+      .ensureEditorViewForDocument(tabId('second'), document.key, lease())
     createEditorBufferSession(document.buffer).applyText(' edited')
     runtime.documentStore.getState().markWorkspaceDocumentRecoveryConflict([path], 'final')
     const settings = runtime.documentStore

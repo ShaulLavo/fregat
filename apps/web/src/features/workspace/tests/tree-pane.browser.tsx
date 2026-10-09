@@ -666,7 +666,7 @@ function observePreparedSelectionPublication(path: string) {
       const view = documentStore.getState().viewsByTabId[tab.id]
       publication = {
         documentId: view?.documentKey ?? null,
-        prepared: view?.preparedDocument !== null && view?.preparedDocument !== undefined,
+        prepared: view?.prepared !== null && view?.prepared !== undefined,
         selectedPath,
         tabId: tab.id,
       }

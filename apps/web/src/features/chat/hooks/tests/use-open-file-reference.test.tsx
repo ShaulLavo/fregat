@@ -115,7 +115,8 @@ test.for(['markdown', 'stack'] as const)(
         await new Promise((resolve) => setTimeout(resolve, 0))
       })
       expect(
-        editor.fileOpenIntentOwner.service.claimReadyClean(filesystemPath('repo/src/foo.ts')),
+        editor.fileOpenIntentOwner.service.join(filesystemPath('repo/src/foo.ts'))?.prepared ??
+          null,
       ).toBeNull()
       expect(editor.queryClient.getQueryData(options.queryKey)).toBe(snapshot)
       expect(reads).toBe(1)
@@ -154,17 +155,19 @@ test('two rendered links keep independent interests when one departs and the oth
     gate.resolve()
     const filePath = filesystemPath('repo/src/foo.ts')
     const snapshot = await editor.queryClient.query(fileSnapshotQueryOptions(filePath))
-    const result: { claim: ReturnType<typeof editor.fileOpenIntentOwner.service.claimReadyClean> } =
-      { claim: null }
+    const result: { joined: ReturnType<typeof editor.fileOpenIntentOwner.service.join> } = {
+      joined: null,
+    }
     await waitFor(() => {
-      result.claim = editor.fileOpenIntentOwner.service.claimReadyClean(filePath)
-      expect(result.claim).not.toBeNull()
+      result.joined?.prepared?.release()
+      result.joined = editor.fileOpenIntentOwner.service.join(filePath)
+      expect(result.joined?.prepared).not.toBeNull()
     })
     expect(reads).toBe(1)
     expect(editor.queryClient.getQueryData(fileSnapshotQueryOptions(filePath).queryKey)).toBe(
       snapshot,
     )
-    result.claim?.preparedDocument.dispose()
+    result.joined?.prepared?.release()
   } finally {
     gate.resolve()
     view.unmount()
