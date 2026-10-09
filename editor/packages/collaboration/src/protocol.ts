@@ -32,7 +32,12 @@ export interface DocumentEngine<E extends EditEnvelope> {
   outcome(id: EditId): Outcome | undefined
   // A session rejection records unresolved dependencies without applying the opaque change.
   sequence(edit: E, rejection?: string): Confirmation<E>
+  sequenceBatch(
+    edits: readonly { readonly edit: E; readonly rejection?: string }[],
+  ): readonly Confirmation<E>[]
   apply(record: Confirmation<E>): boolean
+  /** Applies the valid prefix and publishes its projection once, including on failure. */
+  applyBatch(records: readonly Confirmation<E>[]): boolean
   exportHistory(from: Checkpoint): readonly Confirmation<E>[] | undefined
   verify(history: readonly Confirmation<E>[], tip: Checkpoint): boolean
   install(history: readonly Confirmation<E>[], recovered?: readonly E[]): void
@@ -80,8 +85,8 @@ export interface Payloads<E extends EditEnvelope> {
   }
   ELECTION_OFFER: Offer
   HOST_CLAIM: Commit<E>
-  SUBMIT: { readonly authority: Authority; readonly edit: E }
-  CONFIRM: { readonly authority: Authority; readonly record: Confirmation<E> }
+  SUBMIT: { readonly authority: Authority; readonly edits: readonly E[] }
+  CONFIRM: { readonly authority: Authority; readonly records: readonly Confirmation<E>[] }
   HAVE: {
     readonly tip: Checkpoint
     readonly epoch: string

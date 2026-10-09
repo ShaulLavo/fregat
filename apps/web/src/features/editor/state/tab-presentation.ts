@@ -86,10 +86,7 @@ function claimsDiffInput(claim: DiffInputClaim, attachment: DiffAttachment): boo
   )
 }
 
-export function pendingDiffRestore(
-  presentation: DiffPanePresentation,
-  attachment: DiffAttachment,
-) {
+export function pendingDiffRestore(presentation: DiffPanePresentation, attachment: DiffAttachment) {
   const pending = presentation.pendingRestore
   return pending?.subject === diffAttachmentSubject(attachment).key &&
     claimsDiffInput(pending, attachment)

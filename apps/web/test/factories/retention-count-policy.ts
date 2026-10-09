@@ -264,7 +264,19 @@ function observeRetentionWork() {
     publication(documentId: string) {
       advance({ kind: 'publication', documentId })
     },
-    frame: () => new Promise<void>((resolve) => nativeFrame(() => resolve())),
+    frame: (signal: AbortSignal) =>
+      new Promise<void>((resolve, reject) => {
+        signal.throwIfAborted()
+        const abort = () => {
+          nativeCancel(id)
+          reject(signal.reason)
+        }
+        const id = nativeFrame(() => {
+          signal.removeEventListener('abort', abort)
+          resolve()
+        })
+        signal.addEventListener('abort', abort, { once: true })
+      }),
     verifierRead<T>(read: () => T) {
       const previous = provenance
       provenance = 'verifier-source-read'
@@ -322,7 +334,7 @@ function observeRetentionWork() {
   }
 }
 
-export async function retentionCountHost(fixture: RetentionFixture) {
+export async function retentionCountHost(fixture: RetentionFixture, signal: AbortSignal) {
   const [language, theme] = await Promise.all([
     fixture.language === 'typescript'
       ? import('shiki/langs/typescript.mjs')
@@ -814,7 +826,7 @@ export async function retentionCountHost(fixture: RetentionFixture) {
       .some((mutation) => mutation.state.status === 'pending')
   }
   async function settle() {
-    await observation.frame()
+    await observation.frame(signal)
     await Promise.resolve()
     await expect.poll(hasPendingRetentionMutation).toBe(false)
     await Promise.all([tree.awaitIdleFence(), shiki.awaitIdleFence()])
@@ -823,12 +835,15 @@ export async function retentionCountHost(fixture: RetentionFixture) {
       .toBe(0)
     await Promise.resolve()
     await expect.poll(hasPendingRetentionMutation).toBe(false)
-    await expect
-      .poll(() => {
-        const state = observation.snapshot()
-        return state.frames + state.scheduled.length
-      })
-      .toBe(0)
+    // Frame delivery and derived work share the test's deadline, not a wall-clock poll window.
+    let state = observation.snapshot()
+    while (state.frames + state.scheduled.length > 0) {
+      await observation.frame(signal)
+      await Promise.all([tree.awaitIdleFence(), shiki.awaitIdleFence()])
+      await expect.poll(hasPendingRetentionMutation).toBe(false)
+      state = observation.snapshot()
+    }
+    expect(state.frames + state.scheduled.length).toBe(0)
     await Promise.all([tree.awaitIdleFence(), shiki.awaitIdleFence()])
     await expect
       .poll(() => tree.inspect().pendingRequests + shiki.inspect().pendingRequests)
