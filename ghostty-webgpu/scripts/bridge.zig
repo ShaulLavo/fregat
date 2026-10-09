@@ -802,7 +802,8 @@ export fn bridge_build_frame(state: c.GhosttyRenderState, iterator: c.GhosttyRen
     }
     const rebuild_all = frame.glyph_index.rebuild_all != 0;
     // A missing-glyph retry must upload cell changes written before registration.
-    var force = !dirty_only or frame.status == 2 or rebuild_all;
+    const retry = frame.status == 2;
+    var force = !dirty_only or retry or rebuild_all;
     const previous_stable = frame.stable_rows;
     if (frame.row_cache == null) frame.row_cache = createFrameCache(frame.columns, frame.rows) orelse return c.GHOSTTY_OUT_OF_MEMORY;
     frame.rows_built = 0;
@@ -810,9 +811,11 @@ export fn bridge_build_frame(state: c.GhosttyRenderState, iterator: c.GhosttyRen
     var result = planFrameRows(frame, state, iterator);
     if (result != c.GHOSTTY_SUCCESS) return result;
     const cache = frame.row_cache.?;
-    const layout_changed = previous_stable != frame.stable_rows;
+    if (!retry) frame.row_changes = 0;
+    frame.row_changes |= @as(u32, @intFromBool(cache.moved)) | (@as(u32, @intFromBool(previous_stable != frame.stable_rows)) << 1);
+    // Glyph retries must retain both remap delivery and every coordinate-layout upload.
+    const layout_changed = (frame.row_changes & 2) != 0;
     force = force or layout_changed;
-    frame.row_changes = @as(u32, @intFromBool(cache.moved)) | (@as(u32, @intFromBool(layout_changed)) << 1);
     defer {
         if (result != c.GHOSTTY_SUCCESS) {
             for (0..cache.rows) |row| cache.previous[row].id = std.mem.zeroes(c.GhosttyRenderStateRowId);

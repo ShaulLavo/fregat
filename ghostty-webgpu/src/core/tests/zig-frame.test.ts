@@ -181,6 +181,31 @@ describe('WASM frame records', () => {
     }
   })
 
+  it('retains the complete layout transition through missing-glyph retries', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('a0\r\na1\r\na2\r\na3')
+    state.update()
+    builder = state.createFrameBuilder(24, 4)
+    readyFrame({ ...options, stableRows: true })
+    state.acknowledge()
+    terminal.write('\r\nB0')
+    state.update()
+    readyFrame({ ...options, stableRows: true, full: false })
+    expect(builder.rowChanges).toBe(3)
+    expect(builder.changedRanges().map((range) => range.row)).toEqual([0, 1, 2, 3])
+    for (const range of builder.changedRanges()) {
+      expect(range.cell.byteLength).toBe(24 * 64)
+      expect(range.glyph.byteLength).toBe(24 * 96)
+    }
+    state.acknowledge()
+    terminal.write('\x1b[2;1Ha')
+    state.update()
+    readyFrame({ ...options, stableRows: true, full: false })
+    expect(builder.rowChanges).toBe(0)
+  })
+
   it('reports every logical row moved by a physical instance ring', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
