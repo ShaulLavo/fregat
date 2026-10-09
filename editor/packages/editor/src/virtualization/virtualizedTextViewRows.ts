@@ -2100,6 +2100,7 @@ function horizontalChunkWindow(
   snapshot = view.virtualizer.getSnapshot(),
   widgets: readonly InlineWidgetRun[] = [],
 ): HorizontalChunkWindow {
+  if (view.scrollMode === 'content') return { start: 0, end: content.text.length }
   if (view.glyphs) {
     return proportionalChunkWindow(view, content, snapshot, view.glyphs, widgets)
   }
@@ -2951,6 +2952,7 @@ export function visibleGutterWidth(
 }
 
 export function spacerWidth(view: VirtualizedTextViewInternal, viewportWidth: number): number {
+  if (view.scrollMode === 'content') return viewportWidth
   return Math.max(viewportWidth, view.contentWidth + gutterWidth(view) + characterWidth(view))
 }
 

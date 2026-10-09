@@ -50,7 +50,7 @@ export type FixedRowVirtualizerOptions = {
   readonly scrollPastEnd?: boolean
 }
 
-type FixedRowScrollMode = 'virtualized' | 'static'
+type FixedRowScrollMode = 'virtualized' | 'static' | 'content'
 
 export type FixedRowScrollMetrics = {
   readonly scrollTop: number
@@ -207,6 +207,7 @@ export class FixedRowVirtualizer {
     this.updateCacheForFixedRows(next.rowHeight, next.rowGap)
     this.options = next
     this.scrollTop = nextScrollTop
+    if (next.scrollMode === 'content') this.scrollLeft = 0
     this.stableVirtualWindow = null
     this.syncAttachedScrollMode()
     this.emitChange()
@@ -236,12 +237,13 @@ export class FixedRowVirtualizer {
         this.logicalScrollProperties?.readNativeScrollHeight() ?? element.scrollHeight,
       lineHeight: () => this.options.rowHeight,
       isEnabled: () =>
+        this.options.scrollMode !== 'content' &&
         this.viewportMeasured &&
         this.options.enabled &&
         !this.provisionalScrollGeometry &&
         !this.isHidden() &&
         !this.nativeScrollNeedsRestore,
-      canScrollVertically: () => !this.isStaticMode(),
+      canScrollVertically: () => !this.isAllRowsMode(),
       onScrolled: () => this.scheduleScrollSync(),
     })
     this.attached = {
@@ -253,7 +255,7 @@ export class FixedRowVirtualizer {
     }
     this.syncAttachedScrollMode()
     resizeObserver?.observe(element)
-    if (options.readInitialScrollPosition !== false && !this.isStaticMode()) {
+    if (options.readInitialScrollPosition !== false && !this.isAllRowsMode()) {
       this.syncScrollPositionFromElement()
     }
   }
@@ -293,7 +295,10 @@ export class FixedRowVirtualizer {
     const nextViewportHeight = Math.max(0, normalizeNumber(metrics.viewportHeight))
     const restoreScrollPosition =
       nextViewportHeight > 0 && (this.isHidden() || this.nativeScrollNeedsRestore)
-    const nextScrollLeft = optionalNonNegative(metrics.scrollLeft, this.scrollLeft)
+    const nextScrollLeft =
+      this.options.scrollMode === 'content'
+        ? 0
+        : optionalNonNegative(metrics.scrollLeft, this.scrollLeft)
     const nextViewportWidth = optionalNonNegative(metrics.viewportWidth, this.viewportWidth)
     const nextBorderBoxWidth = optionalBorderBoxMetric(
       metrics.borderBoxWidth,
@@ -445,7 +450,7 @@ export class FixedRowVirtualizer {
 
   private getVisibleRange(): FixedRowVisibleRange {
     if (this.isHidden()) return { start: 0, end: 0 }
-    if (this.isStaticMode()) return staticVisibleRange(this.options)
+    if (this.isAllRowsMode()) return staticVisibleRange(this.options)
 
     if (this.options.rowHeightIndex) {
       return computeVariableRowVisibleRange({
@@ -659,7 +664,7 @@ export class FixedRowVirtualizer {
   }
 
   private logicalScrollTopFromNativeElement(viewportHeight = this.viewportHeight): number {
-    if (this.isStaticMode()) return 0
+    if (this.isAllRowsMode()) return 0
     if (
       this.isHidden() ||
       this.nativeScrollNeedsRestore ||
@@ -685,7 +690,7 @@ export class FixedRowVirtualizer {
       this.syncAttachedNativeScrollTop(true)
       return
     }
-    if (this.isStaticMode()) return
+    if (this.isAllRowsMode()) return
 
     const resizeMetrics = this.takePendingResizeMetrics()
     const viewportHeight = resizeMetrics?.viewportHeight ?? this.viewportHeight
@@ -703,7 +708,7 @@ export class FixedRowVirtualizer {
   }
 
   private syncAttachedNativeScrollTop(force = false): void {
-    if (this.isStaticMode() || this.isHidden()) return
+    if (this.isAllRowsMode() || this.isHidden()) return
 
     const properties = this.logicalScrollProperties
     if (!properties) return
@@ -719,7 +724,7 @@ export class FixedRowVirtualizer {
     const attached = this.attached
     if (!attached) return
 
-    if (this.isStaticMode()) {
+    if (this.isAllRowsMode()) {
       this.disableAttachedScrollElement(attached)
       return
     }
@@ -752,20 +757,20 @@ export class FixedRowVirtualizer {
   }
 
   private normalizeScrollTopForMetrics(scrollTop: number, viewportHeight: number): number {
-    if (this.isStaticMode()) return 0
+    if (this.isAllRowsMode()) return 0
 
     return normalizeScrollTopForMetrics(scrollTop, this.scrollGeometry(viewportHeight))
   }
 
   private snapshotViewportHeight(totalSize: number): number {
     if (this.isHidden()) return 0
-    if (this.isStaticMode()) return totalSize
+    if (this.isAllRowsMode()) return totalSize
 
     return this.viewportHeight
   }
 
   private snapshotScrollTop(): number {
-    if (this.isStaticMode()) return 0
+    if (this.isAllRowsMode()) return 0
 
     return this.scrollTop
   }
@@ -775,7 +780,7 @@ export class FixedRowVirtualizer {
    * very offsets the anchor is measured against.
    */
   private viewportAnchor(): ViewportAnchor | null {
-    if (this.isStaticMode() || this.scrollTop <= 0 || this.options.count === 0) return null
+    if (this.isAllRowsMode() || this.scrollTop <= 0 || this.options.count === 0) return null
 
     const index = this.options.rowHeightIndex
     const row = index
@@ -797,8 +802,8 @@ export class FixedRowVirtualizer {
     }
   }
 
-  private isStaticMode(): boolean {
-    return this.options.scrollMode === 'static'
+  private isAllRowsMode(): boolean {
+    return this.options.scrollMode !== 'virtualized'
   }
 
   private isHidden(): boolean {
@@ -827,7 +832,7 @@ function anchoredScrollTop(
   next: NormalizedFixedRowVirtualizerOptions,
   scrollTop: number,
 ): number {
-  if (!anchor || next.scrollMode === 'static') return scrollTop
+  if (!anchor || next.scrollMode !== 'virtualized') return scrollTop
 
   // A layout with no height index is one where every row is the base height, not
   // one that cannot be anchored: withdrawing the last variable row above the
@@ -1051,7 +1056,7 @@ function scrollGeometryForOptions(
   viewportHeight: number,
   totalSize = computeTotalSize(options),
 ): FixedRowScrollGeometry {
-  if (options.scrollMode === 'static') return staticScrollGeometry(totalSize)
+  if (options.scrollMode !== 'virtualized') return staticScrollGeometry(totalSize)
 
   const normalizedViewportHeight = Math.max(0, normalizeNumber(viewportHeight))
   const scrollHeight = totalSize + scrollPaddingEnd(options, normalizedViewportHeight)
@@ -1083,7 +1088,7 @@ function nextScrollTopForOptions(
   currentScrollTop: number,
   viewportHeight: number,
 ): number {
-  if (options.scrollMode === 'static') return 0
+  if (options.scrollMode !== 'virtualized') return 0
 
   return clampScrollTopForGeometry(
     currentScrollTop,
@@ -1289,7 +1294,7 @@ function normalizeMaxScrollHeight(value: number | undefined): number {
 }
 
 function normalizeScrollMode(value: FixedRowScrollMode | undefined): FixedRowScrollMode {
-  if (value === 'static') return 'static'
+  if (value === 'static' || value === 'content') return value
 
   return 'virtualized'
 }

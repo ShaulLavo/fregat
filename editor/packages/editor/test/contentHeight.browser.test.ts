@@ -1,10 +1,18 @@
 import { afterEach, expect, it } from 'vitest'
+import { commands } from 'vitest/browser'
 import { Editor } from '../src/editor/Editor'
 import { createDocumentSession, createPieceTableSnapshot } from '../src/public/document'
 import { createInlineMap } from '../src/inlineMap'
 import { createEditorFindPlugin } from '../../find/src/plugin'
-import fontUrl from '../../../site/src/fonts/jetbrains-mono.woff2?url'
 import '../src/style.css'
+
+declare module 'vitest/browser' {
+  interface BrowserCommands {
+    proofContentLayoutScreenshot: (width: number) => Promise<string>
+  }
+}
+
+const fontUrl = new URL('../../../site/src/fonts/jetbrains-mono.woff2', import.meta.url).href
 
 const mounted: { editor: Editor; host: HTMLElement; parent: HTMLElement }[] = []
 
@@ -17,6 +25,7 @@ afterEach(() => {
 
 function mount(width = 390) {
   const parent = document.createElement('div')
+  parent.id = 'content-height-proof'
   parent.style.cssText = 'height:240px;overflow:auto'
   const before = document.createElement('div')
   before.style.height = '360px'
@@ -46,26 +55,49 @@ const scroller = (host: HTMLElement) => host.querySelector<HTMLElement>('.editor
 const row = (host: HTMLElement, index: number) =>
   host.querySelector<HTMLElement>(`[data-editor-virtual-row="${index}"]`)!
 
-it.each([390, 752])('sizes the plain-text editor in normal flow at %s px and reveals outside it', async (width) => {
-  const { editor, host, parent } = mount(width)
-  const text = Array.from({ length: 80 }, (_, index) => `line ${index}`).join('\n')
-  editor.setText(text)
-  await frames()
-  expect(host.getBoundingClientRect().height).toBe(editor.getContentHeight())
-  expect(host.querySelectorAll('[data-editor-virtual-row]')).toHaveLength(80)
-  expect(getComputedStyle(scroller(host)).overflowY).toBe('visible')
-  expect(getComputedStyle(scroller(host)).overflowX).toBe('visible')
-  expect(scroller(host).scrollHeight).toBe(scroller(host).clientHeight)
-  editor.setSelection(text.length, text.length, { reveal: true })
-  await frames()
-  expect(parent.scrollTop).toBeGreaterThan(360)
-  expect(editor.getScrollPosition()).toEqual({ top: 0, left: 0 })
-  expect(row(host, 79).getBoundingClientRect().bottom).toBeLessThanOrEqual(parent.getBoundingClientRect().bottom + 1)
-  editor.setSelection(0, 0, { reveal: true, revealBlock: 'center' })
-  await frames()
-  expect(row(host, 0).getBoundingClientRect().top).toBeGreaterThanOrEqual(parent.getBoundingClientRect().top)
-  expect(parent.scrollTop).toBeLessThan(360)
-})
+it.each([390, 752])(
+  'sizes the plain-text editor in normal flow at %s px and reveals outside it',
+  async (width) => {
+    const { editor, host, parent } = mount(width)
+    const text = Array.from({ length: 80 }, (_, index) => `line ${index}`).join('\n')
+    editor.setText(text)
+    await frames()
+    expect(host.getBoundingClientRect().height).toBe(editor.getContentHeight())
+    expect(host.querySelectorAll('[data-editor-virtual-row]')).toHaveLength(80)
+    expect(getComputedStyle(scroller(host)).overflowY).toBe('visible')
+    expect(getComputedStyle(scroller(host)).overflowX).toBe('visible')
+    const readingScrollports = [...host.querySelectorAll<HTMLElement>('*')].filter((element) => {
+      if (element.matches('textarea, input')) return false
+      const style = getComputedStyle(element)
+      return (
+        ['auto', 'scroll'].includes(style.overflowX) || ['auto', 'scroll'].includes(style.overflowY)
+      )
+    })
+    expect(
+      readingScrollports.filter(
+        (element) =>
+          element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth,
+      ),
+    ).toEqual([])
+    expect(scroller(host).scrollHeight).toBe(scroller(host).clientHeight)
+    parent.scrollTop = 360
+    if ('proofContentLayoutScreenshot' in commands)
+      console.info('Content layout evidence', await commands.proofContentLayoutScreenshot(width))
+    editor.setSelection(text.length, text.length, { reveal: true })
+    await frames()
+    expect(parent.scrollTop).toBeGreaterThan(360)
+    expect(editor.getScrollPosition()).toEqual({ top: 0, left: 0 })
+    expect(row(host, 79).getBoundingClientRect().bottom).toBeLessThanOrEqual(
+      parent.getBoundingClientRect().bottom + 1,
+    )
+    editor.setSelection(0, 0, { reveal: true, revealBlock: 'center' })
+    await frames()
+    expect(row(host, 0).getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      parent.getBoundingClientRect().top,
+    )
+    expect(parent.scrollTop).toBeLessThanOrEqual(360)
+  },
+)
 
 it('publishes changed height after edits, width and font changes without a resize loop', async () => {
   const { editor, host } = mount()
@@ -116,7 +148,6 @@ it('uses the same content extent with a document session and switches scroll mod
   await frames()
   expect(host.getBoundingClientRect().height).toBe(840)
   editor.dispose()
-  session.dispose()
 })
 
 it('updates the content extent when a bundled font loads after mount', async () => {
@@ -141,10 +172,17 @@ it('publishes syntax replacement extent and restores the source extent', async (
   editor.setText(text)
   await frames()
   expect(editor.getContentHeight()).toBe(20)
-  editor.setInlineMap(createInlineMap(createPieceTableSnapshot(text), [{
-    id: 'syntax-preview', startIndex: 0, endIndex: text.length,
-    text: 'rendered preview words '.repeat(30), reveal: 'never',
-  }]))
+  editor.setInlineMap(
+    createInlineMap(createPieceTableSnapshot(text), [
+      {
+        id: 'syntax-preview',
+        startIndex: 0,
+        endIndex: text.length,
+        text: 'rendered preview words '.repeat(30),
+        reveal: 'never',
+      },
+    ]),
+  )
   await frames()
   expect(editor.getContentHeight()).toBeGreaterThan(20)
   expect(host.getBoundingClientRect().height).toBe(editor.getContentHeight())
@@ -159,7 +197,9 @@ it('find results and heading jumps reveal through the outside scroller', async (
   editor.setText(text)
   await frames()
   editor.openFind()
-  const input = host.querySelector<HTMLInputElement>('.editor-find-input:not(.editor-find-input-standalone)')!
+  const input = host.querySelector<HTMLInputElement>(
+    '.editor-find-input:not(.editor-find-input-standalone)',
+  )!
   input.value = 'needle'
   input.dispatchEvent(new Event('input', { bubbles: true }))
   editor.findNext()
@@ -169,6 +209,55 @@ it('find results and heading jumps reveal through the outside scroller', async (
   editor.closeFind()
   editor.jumpTo(0)
   await frames()
-  expect(row(host, 0).getBoundingClientRect().top).toBeGreaterThanOrEqual(parent.getBoundingClientRect().top)
-  expect(parent.scrollTop).toBeLessThan(360)
+  expect(row(host, 0).getBoundingClientRect().top).toBeGreaterThanOrEqual(
+    parent.getBoundingClientRect().top,
+  )
+  expect(parent.scrollTop).toBeLessThanOrEqual(360)
+})
+
+it('refuses oversized content paint while keeping virtualized mode available', async () => {
+  const { editor, host } = mount()
+  editor.setText('small')
+  expect(() => editor.setText('x'.repeat(1_048_577))).toThrow('content layout limit')
+  editor.setScrollMode('virtualized')
+  editor.setText('x\n'.repeat(10_001))
+  await frames()
+  expect(() => editor.setScrollMode('content')).toThrow('content layout limit')
+  expect(scroller(host).dataset.editorScrollMode).toBe('virtualized')
+  editor.setText('short')
+  editor.setScrollMode('content')
+  await frames()
+  expect(host.getBoundingClientRect().height).toBe(20)
+})
+
+it('reveals caret and heading offsets through document scrolling', async () => {
+  const { editor, host, parent } = mount()
+  parent.style.cssText = 'overflow:visible'
+  const text = 'heading\n' + 'body\n'.repeat(100)
+  editor.setText(text)
+  await frames()
+  editor.setSelection(text.length, text.length, { reveal: true })
+  await frames()
+  expect(window.scrollY).toBeGreaterThan(0)
+  expect(row(host, 101).getBoundingClientRect().bottom).toBeLessThanOrEqual(window.innerHeight + 1)
+  expect(editor.getScrollPosition()).toEqual({ top: 0, left: 0 })
+  editor.jumpTo(0)
+  await frames()
+  expect(row(host, 0).getBoundingClientRect().top).toBeGreaterThanOrEqual(0)
+  window.scrollTo(0, 0)
+})
+
+it('keeps unwrapped rows complete and reveals horizontally outside the editor', async () => {
+  const { editor, host, parent } = mount(180)
+  parent.style.width = '180px'
+  editor.setWordWrap(false)
+  const text = 'W'.repeat(200)
+  editor.setText(text)
+  await frames()
+  expect(row(host, 0).textContent).toBe(text)
+  expect(parent.scrollWidth).toBeGreaterThan(parent.clientWidth)
+  editor.setSelection(text.length, text.length, { reveal: true })
+  await frames()
+  expect(parent.scrollLeft).toBeGreaterThan(0)
+  expect(editor.getScrollPosition()).toEqual({ top: 0, left: 0 })
 })

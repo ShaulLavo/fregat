@@ -1,3 +1,4 @@
+import { assertContentLayout, revealContentRow } from './contentLayout'
 import {
   acquireRowPresentation,
   invalidateRowPresentations,
@@ -762,6 +763,8 @@ export class VirtualizedTextView {
   ): void {
     const textSnapshot = typeof text === 'string' ? createStringTextSnapshot(text) : text
     const view = this.view
+    if (view.scrollMode === 'content')
+      assertContentLayout(textSnapshot.length, textSnapshot.lineCount, 0)
     this.pendingReveal = null
     view.sameLineTokenEdit = null
     view.tokenProjectionDirtyStartRow = null
@@ -985,6 +988,10 @@ export class VirtualizedTextView {
     const nextScrollMode = normalizeScrollMode(scrollMode)
     if (view.scrollMode === nextScrollMode) return false
 
+    if (nextScrollMode === 'content') {
+      const snapshot = view.virtualizer.getSnapshot()
+      assertContentLayout(view.model.textLength, view.model.visibleLineCount, snapshot.totalSize)
+    }
     view.scrollMode = nextScrollMode
     setScrollModeAttribute(view.scrollElement, nextScrollMode)
     view.lastRenderedRowsKey = ''
@@ -1220,6 +1227,10 @@ export class VirtualizedTextView {
       this.pendingReveal = { offset, block: 'nearest' }
       return
     }
+    if (this.view.scrollMode === 'content') {
+      this.reveal(offset, 'nearest')
+      return
+    }
     scrollToRow(this.view, rowForOffset(this.view, offset))
   }
 
@@ -1245,6 +1256,18 @@ export class VirtualizedTextView {
     // Initial navigation can arrive before ResizeObserver measures the viewport.
     if (requested !== 'nearest' && view.virtualizer.getSnapshot().viewportHeight === 0) {
       this.pendingReveal = { offset, block: requested, affinity }
+      return
+    }
+
+    if (view.scrollMode === 'content') {
+      const index = affinity
+        ? rowForCaretPosition(view, offset, affinity)
+        : rowForOffset(view, offset)
+      const row = view.rowElements.get(index)?.element
+      flushDeferredCaret(view)
+      const target =
+        view.selections[0]?.head === offset && !view.caretElement.hidden ? view.caretElement : row
+      if (target) revealContentRow(target, requested)
       return
     }
 

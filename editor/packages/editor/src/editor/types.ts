@@ -141,6 +141,7 @@ export type EditorOptions = {
    * Defaults off on Windows and on elsewhere.
    */
   readonly rtlMoveVisually?: boolean
+  /** `content` paints every row at natural height; outside ancestors own scrolling. */
   readonly scrollMode?: EditorScrollMode
   readonly selectionSyncMode?: EditorSelectionSyncMode
   /** Confusable and invisible characters to point out; both families report unless turned off. */
