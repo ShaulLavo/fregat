@@ -62,6 +62,14 @@ for (const path of ['bytes', 'string']) {
         assert.equal(measured, false, 'rolling fixture preparation inside measured span')
         return fixtures.rollingFixture(...args)
       },
+      rollingInputs: (...args) => {
+        assert.equal(measured, false, 'rolling input conversion inside measured span')
+        return fixtures.rollingInputs(...args)
+      },
+      fixtureText: (...args) => {
+        assert.equal(measured, false, 'fixture text preparation inside measured span')
+        return fixtures.fixtureText(...args)
+      },
       corpus: (...args) => {
         assert.equal(measured, false, 'corpus preparation inside measured span')
         return fixtures.corpus(...args)
