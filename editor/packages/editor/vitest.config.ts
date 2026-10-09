@@ -4,7 +4,7 @@ import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 
 const crossEngineScrollTests = [
-  'test/{virtualizedTextView,virtualizedTextViewGeometry,wheelScrollTarget,gutterScroll,gutterLeadingInset,gutterPointerEvents,wrappedLineGutter,mouseSelectionAutoScroll,navigationReveal,initialViewport,firstPaint,longLineMeasurements,millionLinePaint,codeViewport,renderDisposal,rowPresentation,proportionalRows,proportionalWrap,wordWrap,defaultLargeDocument,metricProbeScrollExtent}.browser.test.ts',
+  'test/{virtualizedTextView,virtualizedTextViewGeometry,wheelScrollTarget,gutterScroll,gutterLeadingInset,gutterPointerEvents,wrappedLineGutter,mouseSelectionAutoScroll,navigationReveal,initialViewport,firstPaint,longLineMeasurements,millionLinePaint,codeViewport,renderDisposal,rowPresentation,proportionalRows,proportionalWrap,wordWrap,defaultLargeDocument,metricProbeScrollExtent,tailGeometry,typography}.browser.test.ts',
 ]
 
 export default defineConfig({
