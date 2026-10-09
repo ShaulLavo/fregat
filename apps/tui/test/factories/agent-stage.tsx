@@ -16,6 +16,8 @@ import { renderTui } from '../render'
 import type { TestServer } from '../server'
 import { queuePrompt } from '@/agent-stage/state/inbox'
 import type { TerminalContextSelection } from '@workspace/client-core/chat/terminal-context'
+import { setRendererCapabilities } from '@opentui/core/testing'
+import type { TerminalColorMode } from '@/host/utils/capabilities'
 
 export async function renderAgentStage(
   server: TestServer,
@@ -24,6 +26,8 @@ export async function renderAgentStage(
     readonly conversation?: boolean
     readonly width?: number
     readonly height?: number
+    readonly noColor?: boolean
+    readonly colorMode?: Exclude<TerminalColorMode, 'none'>
     readonly terminalContext?: TerminalContextSelection
   } = {},
 ) {
@@ -42,7 +46,7 @@ export async function renderAgentStage(
   const frame = await renderTui(
     <Application
       session={session}
-      noColor
+      noColor={options.noColor ?? true}
       onExit={() => {}}
       initialLocation={{
         kind: 'agent',
@@ -55,6 +59,13 @@ export async function renderAgentStage(
       height: options.height ?? 40,
       useThread: false,
       kittyKeyboard: true,
+    },
+    (renderer) => {
+      if (!options.colorMode) return
+      setRendererCapabilities(renderer, {
+        rgb: options.colorMode === 'truecolor',
+        ansi256: options.colorMode !== '16',
+      })
     },
   )
   return {
