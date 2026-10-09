@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GhosttyResult, TerminalMode, TerminalScreen } from '../abi.js'
 import type { AbiLayouts } from '../abi.js'
 import { GhosttyRuntime } from '../runtime.js'
@@ -9,7 +9,6 @@ let runtime: GhosttyRuntime | undefined
 afterEach(() => {
   runtime?.dispose()
   runtime = undefined
-  vi.restoreAllMocks()
 })
 
 function createScrollbarTerminal(values: {
@@ -43,7 +42,6 @@ function createScrollbarTerminal(values: {
     },
     layouts,
     memory: {
-      bytes: new Uint8Array(buffer),
       allocate: () => 8,
       free() {},
       view,
@@ -55,46 +53,12 @@ function createScrollbarTerminal(values: {
     disposed: false,
     effects: {},
     handleValue: 1,
-    readCapacity: 0,
-    readPointer: 0,
     runtime: fakeRuntime,
     sizeValue: { cellHeight: 16, cellWidth: 8, columns: 80, rows: 24 },
   }) as GhosttyTerminal
 }
 
 describe('terminal state', () => {
-  it('reuses owned scalar query scratch while returning live values after memory growth', async () => {
-    runtime = await GhosttyRuntime.create()
-    const terminal = runtime.createTerminal({ columns: 8, rows: 3 })
-    const { memory, exports } = runtime
-    const allocate = vi.spyOn(memory, 'allocate')
-    const free = vi.spyOn(memory, 'free')
-    expect(terminal.scrollbar.length).toBe(3)
-    const pointer = allocate.mock.results[0]!.value as number
-    allocate.mockClear()
-    free.mockClear()
-    expect(terminal.cursor).toEqual({ pendingWrap: false, visible: true, x: 0, y: 0 })
-    expect(terminal.size.columns).toBe(8)
-    expect(terminal.title).toBe('')
-    expect(terminal.scrollbackLimit).toBeUndefined()
-    expect(allocate).not.toHaveBeenCalled()
-    expect(free).not.toHaveBeenCalled()
-    terminal.write('AB\x1b]2;live title\x07')
-    exports.memory.grow(1)
-    allocate.mockClear()
-    free.mockClear()
-    expect(terminal.cursor.x).toBe(2)
-    expect(terminal.title).toBe('live title')
-    expect(terminal.scrollbar.length).toBe(3)
-    expect(allocate).not.toHaveBeenCalled()
-    expect(free).not.toHaveBeenCalled()
-    terminal.dispose()
-    expect(free.mock.calls).toEqual([[pointer, 24]])
-    free.mockClear()
-    terminal.dispose()
-    expect(free).not.toHaveBeenCalled()
-  })
-
   it('reads cursor, screen, and live terminal modes', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 8, rows: 3 })

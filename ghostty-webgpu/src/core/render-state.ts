@@ -1,11 +1,4 @@
-import {
-  RenderStateCursorVisualStyle,
-  RenderStateData,
-  RenderStateDirty,
-  RenderStateOption,
-  RenderStateRowData,
-  RenderStateRowOption,
-} from './abi.js'
+import { RenderStateCursorVisualStyle, RenderStateData, RenderStateDirty } from './abi.js'
 import { assertGhosttyResult, createGhosttyError } from './error.js'
 import { requireLayout } from './memory.js'
 import { ZigFrameBuilder } from './zig-frame.js'
@@ -161,8 +154,6 @@ export class GhosttyRenderState {
   private readonly scalarPointer: number
   private readonly state: OwnedHandle
   private readonly terminal: GhosttyTerminal
-  private readonly zeroBooleanPointer: number
-  private readonly zeroDirtyPointer: number
 
   constructor(runtime: GhosttyRuntime, terminal: GhosttyTerminal) {
     this.runtime = runtime
@@ -191,8 +182,6 @@ export class GhosttyRenderState {
     this.cursorReader = cursorReader
     this.scalarPointer = scalarPointer
     this.dirtyPointer = scalarPointer
-    this.zeroBooleanPointer = scalarPointer + 4
-    this.zeroDirtyPointer = scalarPointer + 8
   }
 
   /** Advances on damaged updates, independently of whether the renderer paints them. */
@@ -286,29 +275,11 @@ export class GhosttyRenderState {
 
   acknowledge(): number {
     this.ensureActive()
-    this.resetIterator()
-    let acknowledgedRows = 0
-    while (this.runtime.exports.ghostty_render_state_row_iterator_next(this.iterator.handle)) {
-      if (!this.readRowDirty()) continue
-      assertGhosttyResult(
-        'ghostty_render_state_row_set(DIRTY)',
-        this.runtime.exports.ghostty_render_state_row_set(
-          this.iterator.handle,
-          RenderStateRowOption.Dirty,
-          this.zeroBooleanPointer,
-        ),
-      )
-      acknowledgedRows += 1
-    }
     assertGhosttyResult(
-      'ghostty_render_state_set(DIRTY)',
-      this.runtime.exports.ghostty_render_state_set(
-        this.state.handle,
-        RenderStateOption.Dirty,
-        this.zeroDirtyPointer,
-      ),
+      'bridge_acknowledge',
+      this.runtime.bridge.acknowledge(this.state.handle, this.iterator.handle, this.scalarPointer),
     )
-    return acknowledgedRows
+    return this.runtime.memory.view.getUint32(this.scalarPointer, true)
   }
 
   dispose(): void {
@@ -380,30 +351,6 @@ export class GhosttyRenderState {
       ),
     )
     return { columns, rows: this.runtime.memory.view.getUint16(this.dirtyPointer, true) }
-  }
-
-  private resetIterator(): void {
-    assertGhosttyResult(
-      'ghostty_render_state_get(ROW_ITERATOR)',
-      this.runtime.exports.ghostty_render_state_get(
-        this.state.handle,
-        RenderStateData.RowIterator,
-        this.iterator.out,
-      ),
-    )
-    this.iterator.handle = this.runtime.memory.readHandle(this.iterator.out)
-  }
-
-  private readRowDirty(): boolean {
-    assertGhosttyResult(
-      'ghostty_render_state_row_get(DIRTY)',
-      this.runtime.exports.ghostty_render_state_row_get(
-        this.iterator.handle,
-        RenderStateRowData.Dirty,
-        this.dirtyPointer,
-      ),
-    )
-    return this.runtime.memory.view.getUint8(this.dirtyPointer) !== 0
   }
 
   private ensureActive(): void {

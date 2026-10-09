@@ -148,8 +148,6 @@ export class GhosttyTerminal {
   private disposed = false
   private handleValue: number
   private sizeValue: TerminalSize
-  private readPointer = 0
-  private readCapacity = 0
 
   constructor(runtime: GhosttyRuntime, options: TerminalOptions) {
     this.runtime = runtime
@@ -633,9 +631,6 @@ export class GhosttyTerminal {
     if (this.disposed) return
     this.runtime.bridge.unregisterTerminal(this.handleValue)
     this.runtime.exports.ghostty_terminal_free(this.handleValue)
-    if (this.readPointer) this.runtime.memory.free(this.readPointer, this.readCapacity)
-    this.readPointer = 0
-    this.readCapacity = 0
     this.runtime.releaseTerminal(this)
     this.disposed = true
     this.handleValue = 0
@@ -659,17 +654,6 @@ export class GhosttyTerminal {
     }
   }
 
-  private scalarReadPointer(size: number): number {
-    if (size > this.readCapacity) {
-      const pointer = this.runtime.memory.allocate(size)
-      if (this.readPointer) this.runtime.memory.free(this.readPointer, this.readCapacity)
-      this.readPointer = pointer
-      this.readCapacity = size
-    }
-    this.runtime.memory.bytes.fill(0, this.readPointer, this.readPointer + size)
-    return this.readPointer
-  }
-
   private readRequiredData<T>(
     data: TerminalData,
     size: number,
@@ -677,12 +661,16 @@ export class GhosttyTerminal {
     read: (pointer: number) => T,
   ): T {
     this.ensureActive()
-    const pointer = this.scalarReadPointer(size)
-    assertGhosttyResult(
-      `ghostty_terminal_get(${name})`,
-      this.runtime.exports.ghostty_terminal_get(this.handleValue, data, pointer),
-    )
-    return read(pointer)
+    const pointer = this.runtime.memory.allocate(size)
+    try {
+      assertGhosttyResult(
+        `ghostty_terminal_get(${name})`,
+        this.runtime.exports.ghostty_terminal_get(this.handleValue, data, pointer),
+      )
+      return read(pointer)
+    } finally {
+      this.runtime.memory.free(pointer, size)
+    }
   }
 
   private readOptionalData<T>(
@@ -692,11 +680,15 @@ export class GhosttyTerminal {
     read: (pointer: number) => T,
   ): T | undefined {
     this.ensureActive()
-    const pointer = this.scalarReadPointer(size)
-    const result = this.runtime.exports.ghostty_terminal_get(this.handleValue, data, pointer)
-    if (result === GhosttyResult.NoValue) return undefined
-    assertGhosttyResult(`ghostty_terminal_get(${name})`, result)
-    return read(pointer)
+    const pointer = this.runtime.memory.allocate(size)
+    try {
+      const result = this.runtime.exports.ghostty_terminal_get(this.handleValue, data, pointer)
+      if (result === GhosttyResult.NoValue) return undefined
+      assertGhosttyResult(`ghostty_terminal_get(${name})`, result)
+      return read(pointer)
+    } finally {
+      this.runtime.memory.free(pointer, size)
+    }
   }
 
   private readBoolean(data: TerminalData, name: string): boolean {
