@@ -10,11 +10,11 @@ import {
   writeRawSetting,
 } from './native-provider-verification'
 
-/** Plan 174 P3–P4: Settings › MCP servers lists an instance's config, adds through it and deletes. */
+/** Settings MCP configuration through an isolated provider fixture. */
 export const mcpSettings = isolatedNativeScenario({
   name: 'mcp-settings',
   description:
-    'Settings › MCP servers with a fixture Codex: picking the instance lists its user and project servers with status, facts and files; Add server writes an HTTP server through config/batchWrite with a masked header; Delete removes it again; a signed-out server signs in by pasting the address its page ended on, as from a phone.',
+    'Settings › MCP servers with a fixture Codex: picking the instance lists its user and project servers with status, facts and files; delayed provider and folder switches keep action ownership and reset open dialogs after readiness; Add server writes an HTTP server through config/batchWrite with a masked header; Delete removes it again; a signed-out server signs in by pasting the address its page ended on, as from a phone.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { root, step, orchestration, providerInstanceId }) {
     await selectors.sidebarSettingsButton(page, 'Chat').click()

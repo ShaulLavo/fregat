@@ -848,7 +848,12 @@ export function createApp(options: AppOptions) {
       ),
     )
     .use(sessionControlRoutes(providerService, mcpSignIns))
-    .use(mcpConfigRoutes(providerAdapterRegistry, mcpSignIns))
+    .use(
+      mcpConfigRoutes(providerAdapterRegistry, mcpSignIns, {
+        paths: fs.paths,
+        homePath: fs.homePath,
+      }),
+    )
     .use(agentReviewRoutes(agentReviews))
     .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch, checkpointHunks))
     .use(

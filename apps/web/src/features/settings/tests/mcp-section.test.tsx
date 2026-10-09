@@ -143,32 +143,7 @@ test.for(['remove', 'add', 'copy', 'sign-in'] as const)(
       await userEvent.click(screen.getByRole('tab', { name: 'Codex B' }))
       await held.entered
       expect(within(row).getByText(/mcp.linear.app/)).toBeVisible()
-      if (action === 'remove') {
-        await userEvent.click(within(row).getByRole('button', { name: 'Remove' }))
-        await userEvent.click(
-          within(await screen.findByRole('dialog')).getByRole('button', { name: /Delete/ }),
-        )
-        await waitFor(() => expect(first.writes).toHaveLength(1))
-      }
-      if (action === 'add') {
-        await userEvent.click(screen.getByRole('button', { name: 'Add server' }))
-        const dialog = await screen.findByRole('dialog')
-        await userEvent.type(within(dialog).getByLabelText('Name'), 'docs')
-        await userEvent.type(within(dialog).getByLabelText('Command'), 'fixture')
-        await userEvent.click(within(dialog).getByRole('button', { name: 'Add server' }))
-        await waitFor(() => expect(first.writes).toHaveLength(1))
-      }
-      if (action === 'copy') {
-        await userEvent.click(within(row).getByRole('button', { name: 'Also add linear to…' }))
-        await userEvent.click(await screen.findByRole('menuitem', { name: 'Also add to Codex B' }))
-        await waitFor(() => expect(first.reads).toHaveLength(1))
-        expect(second.writes[0]?.definition).toMatchObject({ command: 'claude' })
-      }
-      if (action === 'sign-in') {
-        await userEvent.click(within(row).getByRole('button', { name: 'Sign in' }))
-        await waitFor(() => expect(first.signIns).toHaveLength(1))
-        expect(second.signIns).toEqual([])
-      }
+      await exerciseMcpAction({ action, row, first, second })
       expect(screen.getByRole('tab', { name: 'Claude A', hidden: true })).toHaveAttribute(
         'aria-selected',
         'true',
@@ -238,7 +213,7 @@ test('keeps folder, scopes and removal with the displayed list until the selecte
   const server = await makeTestServer({ providerAdapter: adapter })
   const folder = path.join(server.root, 'second')
   await mkdir(folder)
-  adapter.folders.set('second', [{ ...adapter.servers[0]!, origin: 'https://second.example.test' }])
+  adapter.folders.set(folder, [{ ...adapter.servers[0]!, origin: 'https://second.example.test' }])
   const restore = installTestClient(createInProcessClient(server))
   const rendered = renderWithProviders(<McpSection />)
   let release = () => {}
@@ -259,6 +234,7 @@ test('keeps folder, scopes and removal with the displayed list until the selecte
     )
     await userEvent.click(within(picker).getByRole('button', { name: /^Open$/ }))
     await held.entered
+    expect(adapter.listFolders[1]).toBe(folder)
     await userEvent.click(within(row).getByRole('button', { name: 'Remove' }))
     const dialog = await screen.findByRole('dialog', { name: 'Delete linear?' })
     await userEvent.click(within(dialog).getByRole('button', { name: /Delete/ }))
@@ -271,7 +247,7 @@ test('keeps folder, scopes and removal with the displayed list until the selecte
     expect(screen.getByText('Home folder')).toBeVisible()
     held.release()
     expect(await screen.findByText(/second.example.test/)).toBeVisible()
-    expect(adapter.folders.get('second')).toHaveLength(1)
+    expect(adapter.folders.get(folder)).toHaveLength(1)
     expect(screen.getByText('second', { selector: '[data-mcp-folder]' })).toBeVisible()
   } finally {
     release()
@@ -280,3 +256,72 @@ test('keeps folder, scopes and removal with the displayed list until the selecte
     await server.cleanup()
   }
 })
+
+test('the picker root stays distinct from Home and reaches MCP sign-in as an absolute owner path', async () => {
+  const adapter = new McpConfigAdapter()
+  adapter.servers[0]!.status = 'needs-auth'
+  const server = await makeTestServer({ providerAdapter: adapter })
+  const restore = installTestClient(createInProcessClient(server))
+  const rendered = renderWithProviders(<McpSection />)
+  try {
+    await userEvent.click(await screen.findByRole('tab', { name: 'Claude' }))
+    await screen.findByText('linear')
+    expect(adapter.listFolders[0]).toBe(server.root)
+    await userEvent.click(screen.getByRole('button', { name: 'Choose folder…' }))
+    const picker = await screen.findByRole('dialog', { name: 'Choose folder' })
+    const open = within(picker).getByRole('button', { name: /^Open$/ })
+    await waitFor(() => expect(open).toBeEnabled())
+    await userEvent.click(open)
+    await screen.findByText('Root folder')
+    expect(screen.getByRole('button', { name: 'Home' })).toBeVisible()
+    await waitFor(() => expect(adapter.listed).toBe(2))
+    expect(adapter.listFolders[1]).toBe(server.root)
+    const row = screen.getByText('linear').closest('li')!
+    await userEvent.click(within(row).getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(adapter.signIns).toHaveLength(1))
+    expect(adapter.signIns[0]).toEqual({ folder: server.root, name: 'linear' })
+  } finally {
+    rendered.unmount()
+    restore()
+    await server.cleanup()
+  }
+})
+
+async function exerciseMcpAction({
+  action,
+  row,
+  first,
+  second,
+}: {
+  readonly action: 'remove' | 'add' | 'copy' | 'sign-in'
+  readonly row: HTMLElement
+  readonly first: McpConfigAdapter
+  readonly second: McpConfigAdapter
+}) {
+  if (action === 'remove') {
+    await userEvent.click(within(row).getByRole('button', { name: 'Remove' }))
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: /Delete/ }),
+    )
+    await waitFor(() => expect(first.writes).toHaveLength(1))
+  }
+  if (action === 'add') {
+    await userEvent.click(screen.getByRole('button', { name: 'Add server' }))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'docs')
+    await userEvent.type(within(dialog).getByLabelText('Command'), 'fixture')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add server' }))
+    await waitFor(() => expect(first.writes).toHaveLength(1))
+  }
+  if (action === 'copy') {
+    await userEvent.click(within(row).getByRole('button', { name: 'Also add linear to…' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Also add to Codex B' }))
+    await waitFor(() => expect(first.reads).toHaveLength(1))
+    expect(second.writes[0]?.definition).toMatchObject({ command: 'claude' })
+  }
+  if (action === 'sign-in') {
+    await userEvent.click(within(row).getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(first.signIns).toHaveLength(1))
+    expect(second.signIns).toEqual([])
+  }
+}
