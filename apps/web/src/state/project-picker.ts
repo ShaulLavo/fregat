@@ -6,16 +6,16 @@ import {
 } from '@/features/chat/state/chat-projection-store'
 import { createWorkspaceProjectCommand } from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
+import { settleShellSnapshot } from '@/features/chat-mode/state/settle-shell-snapshot'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import type { ConfirmedMachine } from '@/lib/environments/utils/machines'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import type { Navigation } from '@/state/navigation'
 
-const PROJECTION_WAIT_MS = 10_000
-
 /**
  * Registers the folder as a project on its machine, then opens it; throws when the machine
- * refuses. `project` is set once the chat projection holds its checkout, so a draft can open there.
+ * refuses. Resolves with the chat projection already holding the project, so a draft can open
+ * in `project` at once.
  */
 export async function openMachineProject(
   navigation: Navigation,
@@ -36,11 +36,12 @@ export async function openMachineProject(
     },
   })
   if (!outcome.ok) throw toClientError(outcome.error)
-  const registered = outcome.result.result
-  const projected =
-    registered !== null && (await projectedWorktree(machine.environmentId, registered.worktreeId))
+  const project = outcome.result.result
+  // The command answers before its event arrives; the machine's snapshot already holds the project.
+  if (project && !projected(machine.environmentId, project.worktreeId))
+    await settleShellSnapshot(machine.environmentId)
   const opened = await navigation.openWorkspace({ environmentId: machine.environmentId, path })
-  return { opened, project: projected ? registered : null }
+  return { opened, project }
 }
 
 export async function openPickedMachineProject(
@@ -55,24 +56,7 @@ export async function openPickedMachineProject(
   }
 }
 
-/** The command's answer can arrive before its event; waits for the event, and gives up after 10 s. */
-function projectedWorktree(environmentId: EnvironmentId, worktreeId: WorktreeId) {
-  const projected = () =>
-    Boolean(
-      selectChatProjectionSlice(useChatProjectionStore.getState(), environmentId).worktreeById[
-        worktreeId
-      ],
-    )
-  if (projected()) return Promise.resolve(true)
-  return new Promise<boolean>((resolve) => {
-    const settle = (value: boolean) => {
-      clearTimeout(timer)
-      unsubscribe()
-      resolve(value)
-    }
-    const timer = setTimeout(() => settle(false), PROJECTION_WAIT_MS)
-    const unsubscribe = useChatProjectionStore.subscribe(() => {
-      if (projected()) settle(true)
-    })
-  })
+function projected(environmentId: EnvironmentId, worktreeId: WorktreeId) {
+  const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), environmentId)
+  return Boolean(slice.worktreeById[worktreeId])
 }

@@ -14,6 +14,7 @@ import { MachineFolder } from '@/features/onboarding/components/machine-folder'
 import { ProgressDialog } from '@/features/onboarding/components/progress-dialog'
 import { RemoteDialog } from '@/features/onboarding/components/remote-dialog'
 import { useOpenProject } from '@/features/onboarding/hooks/use-open-project'
+import { machineName } from '@/features/onboarding/utils/machine-name'
 import { CHOOSE, CLOSED, LOCAL, REMOTE, leaving, type Step } from '@/features/onboarding/utils/step'
 
 /**
@@ -27,6 +28,11 @@ export function FirstWorkspace() {
   const [chosen, setStep] = useState<Step | null>(null)
   const open = useOpenProject()
   const step = chosen ?? (recents.data?.length === 0 ? CHOOSE : CLOSED)
+  // A new step starts clean: the last attempt's error and retry belong to the step it failed in.
+  const go = (next: Step) => {
+    if (!open.isPending) open.reset()
+    setStep(next)
+  }
   const pick = (machine: ConfirmedMachine, path: string) => {
     setStep(CLOSED)
     open.mutate({ machine, path }, { onError: () => setStep(CHOOSE) })
@@ -39,8 +45,8 @@ export function FirstWorkspace() {
     <>
       <EmptyChat
         machine={label}
-        onChooseLocal={() => setStep(primary ? LOCAL : CHOOSE)}
-        onChooseRemote={() => setStep(REMOTE)}
+        onChooseLocal={() => go(LOCAL)}
+        onChooseRemote={() => go(REMOTE)}
       />
       {open.isPending && request ? (
         <ProgressDialog
@@ -52,9 +58,9 @@ export function FirstWorkspace() {
         error={error}
         machine={label}
         open={step.kind === 'choose' && !open.isPending}
-        onLocal={() => setStep(LOCAL)}
-        onOpenChange={(next) => setStep(next ? CHOOSE : CLOSED)}
-        onRemote={() => setStep(REMOTE)}
+        onLocal={() => go(LOCAL)}
+        onOpenChange={(next) => go(next ? CHOOSE : CLOSED)}
+        onRemote={() => go(REMOTE)}
         onRetry={retry}
       />
       {step.kind === 'local' && primary ? (
@@ -64,10 +70,17 @@ export function FirstWorkspace() {
           onPick={pick}
         />
       ) : null}
+      {step.kind === 'local' && !primary ? (
+        <ProgressDialog
+          detail={`Fregat lists the folders on ${machineName(label)} once it confirms which machine answered.`}
+          title={`Connecting to ${machineName(label)}`}
+          onCancel={() => go(CHOOSE)}
+        />
+      ) : null}
       {step.kind === 'remote' ? (
         <RemoteDialog
-          onBack={() => setStep(CHOOSE)}
-          onMachine={(name) => setStep({ kind: 'machine', name })}
+          onBack={() => go(CHOOSE)}
+          onMachine={(name) => go({ kind: 'machine', name })}
         />
       ) : null}
       {step.kind === 'machine' ? (

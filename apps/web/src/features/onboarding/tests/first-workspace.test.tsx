@@ -9,6 +9,7 @@ import { FirstWorkspace } from '@/features/onboarding/components/first-workspace
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { createFederationHarness } from '../../../../test/factories/federation'
 import { expect, test } from '../../../../test/fixtures'
+import { createTestNavigation } from '../../../../test/factories/navigation'
 import { renderWithLoadedDialogs } from '../../../../test/render'
 
 async function renderFirstWorkspace(server: Parameters<typeof createFederationHarness>[0]) {
@@ -61,6 +62,39 @@ test('a fresh install opens the remote folder on its own machine, apart from the
   await waitFor(() => expect(rootPath(h)).toBe('same'))
   await waitFor(() => expect(projectCount(h.descriptorB.environmentId)).toBe(1))
   expect(projectCount(h.descriptorA.environmentId)).toBe(0)
+})
+
+test('the chosen folder opens its chat while the machine has not yet sent the project event', async ({
+  server,
+}) => {
+  const h = await renderFirstWorkspace(server)
+  await mkdir(join(h.serverB.root, 'held'))
+  const navigation = createTestNavigation({ application: h.application })
+  onTestFinished(() => navigation.dispose())
+  await renderWithLoadedDialogs(<FirstWorkspace />, {
+    application: h.application,
+    connections: h.connections,
+    navigation,
+    queryClient: queryClientFor(h.originA),
+  })
+
+  await userEvent.click(await screen.findByRole('button', { name: /^Connect a remote machine/ }))
+  await userEvent.click(await screen.findByRole('button', { name: /Remote fixture/ }))
+  await screen.findByRole('option', { name: /held/ })
+  h.holdEvents(h.originB)
+  onTestFinished(() => h.releaseEvents(h.originB))
+  await userEvent.click(screen.getByRole('button', { name: 'Go to folder' }))
+  const path = screen.getByRole('textbox', { name: 'Folder path' })
+  await userEvent.clear(path)
+  await userEvent.type(path, join(h.serverB.root, 'held'))
+  await userEvent.keyboard('{Enter}')
+  await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Folder path' })).toBeNull())
+  await userEvent.click(screen.getByRole('button', { name: 'Choose folder' }))
+
+  await waitFor(() => expect(navigation.currentAddress().document).toMatch(/^t\/draft-/))
+  expect(rootPath(h)).toBe('held')
+  expect(screen.queryByRole('alert')).toBeNull()
+  expect(projectCount(h.descriptorB.environmentId)).toBe(1)
 })
 
 test('cancelling the remote folder step opens nothing and keeps the machine', async ({

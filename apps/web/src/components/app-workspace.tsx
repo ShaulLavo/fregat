@@ -1,4 +1,4 @@
-import { FirstWorkspace } from '@/features/onboarding/components/first-workspace'
+import { DeferredFirstWorkspace } from '@/features/onboarding/components/deferred-first-workspace'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { ProjectPicker } from '@/features/environments/components/project-picker'
 import { useConnectedMachines } from '@/hooks/use-connected-machines'
@@ -57,7 +57,7 @@ export function AppWorkspace({ restoringWorkspace }: { readonly restoringWorkspa
         ) : (
           // The shell decides its own chrome before any workspace exists: a phone gets phone screens.
           <ShellBody query={query} rootPath={null}>
-            <FirstWorkspace />
+            <DeferredFirstWorkspace />
           </ShellBody>
         )}
       </div>

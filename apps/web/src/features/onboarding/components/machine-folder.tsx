@@ -1,4 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
+import { useState } from 'react'
 
 import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
 import { useConnectedMachines } from '@/hooks/use-connected-machines'
@@ -25,12 +26,16 @@ export function MachineFolder({
   const confirmed = useConnectedMachines()
   const record = machines.find((machine) => machine.name === name)
   const label = record?.config.label ?? name
-  const machine = confirmed.find(
+  const live = confirmed.find(
     (entry) =>
       entry.kind !== 'primary' &&
       entry.environmentId === record?.environmentId &&
       entry.phase === 'live',
   )
+  // Held once the picker opens, so a brief reconnect keeps the picker and its folder.
+  const [held, hold] = useState<ConfirmedMachine | null>(null)
+  if (live && !held) hold(live)
+  const machine = held ?? live
 
   if (!machine) {
     const error = connectionFailure(record, label)
