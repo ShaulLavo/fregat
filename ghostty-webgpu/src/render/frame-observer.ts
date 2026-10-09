@@ -1,3 +1,4 @@
+import type { NativeDisplayedFrame } from '../core/displayed-frame.js'
 import type { RenderCursorSnapshot, RenderRow } from '../core/types.js'
 import type { CursorState } from './instances/types.js'
 import { copiedFrameRow } from './frame-row.js'
@@ -85,13 +86,9 @@ export class FrameObserver {
       : undefined
     const ownedTextRows = this.rowsNeeded ? Object.freeze(this.textRows.filter(defined)) : undefined
     const nativeTextFrame = nativeFrame
-      ? Object.freeze({
-          ...snapshot,
-          nativeFrame,
-          get rows() {
-            return ownedTextRows ?? nativeFrame.readTextRows()
-          },
-        })
+      ? Object.freeze(
+          new NativeTextFrame(snapshot.cursor, snapshot.paintedCursor, nativeFrame, ownedTextRows),
+        )
       : undefined
     const textFrame = onTextFrame
       ? (nativeTextFrame ??
@@ -154,6 +151,23 @@ export class FrameObserver {
     if (state.readTextRows) return state.readTextRows(options)
     const source = this.current && rows ? rows : state.readRows(options)
     return source.map(copiedPaintTextRow)
+  }
+}
+
+class NativeTextFrame {
+  readonly #ownedRows: readonly RendererTextFrameRow[] | undefined
+
+  constructor(
+    readonly cursor: RenderCursorSnapshot,
+    readonly paintedCursor: Readonly<CursorState> | undefined,
+    readonly nativeFrame: NativeDisplayedFrame,
+    ownedRows: readonly RendererTextFrameRow[] | undefined,
+  ) {
+    this.#ownedRows = ownedRows
+  }
+
+  get rows(): readonly RendererTextFrameRow[] {
+    return this.#ownedRows ?? this.nativeFrame.readTextRows()
   }
 }
 

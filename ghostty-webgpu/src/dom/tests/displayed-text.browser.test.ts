@@ -465,6 +465,25 @@ describe('WebGPU retained displayed-text acceptance', () => {
 })
 
 describe('DOM retained displayed-text acceptance', () => {
+  it('shares the lazy native rows getter across immutable snapshots', async () => {
+    const { terminal, clock, snapshots } = await fixture('dom')
+    terminal.write('first accepted 界 é')
+    clock.flush()
+    const first = snapshots.at(-1)!
+    terminal.write('\rsecond accepted 🧑‍💻')
+    clock.flush()
+    const second = snapshots.at(-1)!
+    const firstGetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(first), 'rows')?.get
+    const secondGetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(second), 'rows')?.get
+    expect(firstGetter).toBeTypeOf('function')
+    expect(secondGetter).toBe(firstGetter)
+    expect(Object.hasOwn(first, 'rows')).toBe(false)
+    expect(Object.hasOwn(second, 'rows')).toBe(false)
+    expect(Object.isFrozen(first)).toBe(true)
+    expect(Object.isFrozen(second)).toBe(true)
+    expect(terminal.visibleLines()[0]).toContain('second accepted 🧑‍💻')
+  })
+
   it('accepts the already-owned native snapshot without a second lazy wrapper', async () => {
     const { terminal, clock, snapshots } = await fixture('dom')
     terminal.write('accepted native 界 é')
