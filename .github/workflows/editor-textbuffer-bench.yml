@@ -1,17 +1,8 @@
 name: Textbuffer benchmarks
 
 on:
-  pull_request:
-    paths:
-      - 'editor/packages/textbuffer/**'
-      - 'bun.lock'
-      - '.github/workflows/editor-textbuffer-bench.yml'
-  push:
-    branches: ['main']
-    paths:
-      - 'editor/packages/textbuffer/**'
-      - 'bun.lock'
-      - '.github/workflows/editor-textbuffer-bench.yml'
+  schedule:
+    - cron: '57 2 * * *'
   workflow_dispatch:
 
 permissions:
