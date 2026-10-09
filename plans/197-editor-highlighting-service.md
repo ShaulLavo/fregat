@@ -14,6 +14,24 @@ Planning checklist:
 - [x] Define ownership, semantics, implementation units, and checks.
 - [x] Check document formatting, index registration, and required repository gates/types.
 
+## TanStack Highlight reference, 2026-10-09
+
+[TanStack Highlight](https://tanstack.com/highlight/latest) is cloned at
+`references/tanstack-highlight`, inspected at
+[`0541f2fdc7f96fb6245c82c739f0d816afdb670a`](https://github.com/TanStack/highlight/tree/0541f2fdc7f96fb6245c82c739f0d816afdb670a).
+Study its [overview](https://github.com/TanStack/highlight/blob/0541f2fdc7f96fb6245c82c739f0d816afdb670a/docs/overview.md)
+for selective language registration, synchronous snippet tokenization, embedded
+language delegation, and stable token classes themed through CSS variables.
+Its [Markdown adapters](https://github.com/TanStack/highlight/blob/0541f2fdc7f96fb6245c82c739f0d816afdb670a/README.md#markdown-pipelines)
+show explicit highlighter injection and escaped token markup inside renderer-owned
+code containers. These are relevant to rendered fences and standalone code previews.
+
+Upstream targets documentation snippets and excludes incremental editor parsing
+and TextMate theme compatibility. Compare the snippet path against our language,
+offset, theme, and scheduling requirements before any adoption decision. Keep
+computation owned by this service and record local measurements for any proposed
+performance change.
+
 ## Delivered follow-ups, 2026-10-01
 
 - [PR #213](https://github.com/ShaulLavo/fregat/pull/213) delivered bounded owning-worker
