@@ -1,4 +1,5 @@
-import { createEditorStructuralOperation } from '@singapore-editor/core/editor'
+import { createEditorBufferSession } from '@singapore-editor/core/document'
+import { Editor, createEditorStructuralOperation } from '@singapore-editor/core/editor'
 import { afterAll, afterEach, expect, inject, test } from 'vitest'
 import { commands } from 'vitest/browser'
 import '@singapore-editor/core/style.css'
@@ -48,7 +49,7 @@ async function record(sample: unknown) {
 const discoveryRun = {
   sourceHead: 'vitest-discovery-pilot',
   protocol: RETENTION_COUNT_PROTOCOL,
-  cycles: 2,
+  cycles: 20,
   fixtures: [
     { id: 'tree-ts-pilot', provider: 'tree-sitter', language: 'typescript', sourceUnits: 4096 },
   ],
@@ -105,7 +106,7 @@ for (const fixture of collectedRun.fixtures) {
       caseOutcomes.push(outcome)
       await record({ kind: 'fixture-case-complete', cycle: collectedRun.cycles, ...outcome })
     })
-    const flight = runCase(fixture, (host) => {
+    const flight = runCase(fixture, context.signal, (host) => {
       ownedHost = host
       if (context.signal.aborted) abort()
     })
@@ -118,11 +119,138 @@ for (const fixture of collectedRun.fixtures) {
   }, 600_000)
 }
 
-async function runCase(fixture: RetentionRun['fixtures'][number], ownHost: (host: Host) => void) {
+test(
+  'twenty actual view open/close cycles keep entries, worker sessions and packed bytes flat',
+  { timeout: 120_000 },
+  async (context) => {
+    const host = await retentionCountHost(discoveryRun.fixtures[0]!, context.signal)
+    context.onTestFinished(() => host.dispose())
+    const container = document.createElement('div')
+    container.style.cssText = 'height: 240px; width: 600px;'
+    document.body.append(container)
+    context.onTestFinished(() => container.remove())
+    const samples: {
+      entries: number
+      activeEntries: number
+      leases: number
+      runtimeSessionIds: string[]
+      structuralSessions: number
+      highlighterSessions: number
+      tokenStoreBackingBytes: number
+    }[] = []
+    for (let cycle = 1; cycle <= 20; cycle++) {
+      const editor = new Editor(container, {
+        plugins: [
+          {
+            activate: (view) => [
+              view.registerSyntaxProvider(host.structuralProvider),
+              view.registerHighlighter(host.highlighterProvider),
+            ],
+          },
+        ],
+      })
+      try {
+        editor.attachSession(createEditorBufferSession(host.a.buffer), {
+          analysis: host.a.analysis,
+          documentId: host.a.analysis.documentId,
+          languageId: 'typescript',
+          structuralConfigurationTag: ['cycle'],
+          highlighterConfigurationTag: ['cycle'],
+        })
+        await host.settle()
+        expect(editor.getState().initialHighlightStatus).toBe('painted')
+        expect(editor.materializeFullText()).toBe(`dirty ${host.expectedSource}`)
+      } finally {
+        editor.dispose()
+      }
+      const sample = await host.sample('actual-open-close-cycle', cycle)
+      expect(sample.point.consistent).toBe(true)
+      expect(sample.bound.passes).toBe(true)
+      const resources = {
+        entries: sample.entryCount,
+        activeEntries: sample.activeEntries,
+        leases: sample.inspections
+          .flatMap((inspection) => inspection.entries)
+          .reduce((sum, entry) => sum + entry.leaseCount, 0),
+        runtimeSessionIds: sample.inspections
+          .flatMap((inspection) => inspection.entries)
+          .map((entry) => entry.runtimeSessionId)
+          .sort(),
+        structuralSessions: sample.treeWorker?.documentCount ?? 0,
+        highlighterSessions: sample.shikiWorker?.documentCount ?? 0,
+        tokenStoreBackingBytes: sample.inspections.reduce(
+          (sum, inspection) => sum + inspection.tokenStoreBackingBytes,
+          0,
+        ),
+      }
+      expect(resources.activeEntries).toBe(0)
+      expect(resources.leases).toBe(0)
+      expect(resources.runtimeSessionIds.length).toBe(resources.entries)
+      expect(resources.entries).toBeGreaterThan(0)
+      expect(resources.structuralSessions).toBeGreaterThan(0)
+      expect(resources.highlighterSessions).toBeGreaterThan(0)
+      expect(resources.tokenStoreBackingBytes).toBeGreaterThan(0)
+      samples.push(resources)
+      expect(resources).toEqual(samples[0])
+    }
+    await context.annotate(
+      JSON.stringify({ cycles: samples.length, samples }),
+      'actual-open-close-retention-plateau',
+    )
+    expect(samples).toHaveLength(20)
+    await host.dispose()
+    expect(await host.tree.inspectRetention()).toBeNull()
+    expect(await host.shiki.inspectRetention()).toBeNull()
+  },
+)
+
+test(
+  'retention settlement waits for delayed native frame delivery',
+  { timeout: 30_000 },
+  async (context) => {
+    const nativeFrame = globalThis.requestAnimationFrame.bind(globalThis)
+    const timers = new Set<ReturnType<typeof setTimeout>>()
+    const originalFrame = globalThis.requestAnimationFrame
+    globalThis.requestAnimationFrame = (callback) =>
+      nativeFrame((time) => {
+        const timer = setTimeout(() => {
+          timers.delete(timer)
+          callback(time)
+        }, 1_500)
+        timers.add(timer)
+      })
+    let host: Host | null = null
+    context.onTestFinished(async () => {
+      try {
+        await host?.dispose()
+      } finally {
+        globalThis.requestAnimationFrame = originalFrame
+        for (const timer of timers) clearTimeout(timer)
+      }
+    })
+    host = await retentionCountHost(discoveryRun.fixtures[0]!, context.signal)
+    // A frame can publish another frame after the first idle checkpoint.
+    requestAnimationFrame(() => requestAnimationFrame(() => undefined))
+    expect(host.observation.snapshot().frames).toBe(1)
+    await host.settle()
+    expect(host.observation.snapshot().frames).toBe(0)
+    expect(host.observation.snapshot().scheduled).toEqual([])
+    const stopped = new AbortController()
+    const waitingFrame = host.observation.frame(stopped.signal)
+    stopped.abort('verification-stop')
+    await expect(waitingFrame).rejects.toBe('verification-stop')
+  },
+)
+
+async function runCase(
+  fixture: RetentionRun['fixtures'][number],
+  signal: AbortSignal,
+  ownHost: (host: Host) => void,
+) {
   try {
     runRecord ??= recordRun()
     await runRecord
-    await verifyFixture(fixture, collectedRun.cycles, ownHost)
+    await verifyFixture(fixture, collectedRun.cycles, signal, ownHost)
   } catch (error) {
     await record({
       kind: 'failure',
@@ -161,9 +289,10 @@ afterAll(async () => {
 async function verifyFixture(
   fixture: RetentionRun['fixtures'][number],
   cycles: number,
+  signal: AbortSignal,
   ownHost: (host: Host) => void,
 ) {
-  const host = await retentionCountHost(fixture)
+  const host = await retentionCountHost(fixture, signal)
   ownHost(host)
   const b = host.borrow(host.b.analysis)
   let bView: ReturnType<Host['createView']> | null = null

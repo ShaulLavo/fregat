@@ -82,9 +82,10 @@ test('actual checkpoint reload keeps exact pair offsets and refuses changed refs
   const selection = editor.getSelections()
   expect(offset.top).toBeGreaterThan(0)
   await waitFor(() =>
-    expect(runtime.uiStore.getState().tabPresentation.get(id).diffPanes.stacked.scroll).toEqual(
-      offset,
-    ),
+    expect(
+      [...runtime.uiStore.getState().tabPresentation.get(id).diffPanes.stacked.views.values()][0]
+        ?.anchors.left,
+    ).toBe(offset.left),
   )
   const firstRead = runtime.documentStore.getState().snapshotComparisonTabs.get(id)!.read()
   if (firstRead.kind !== 'ready' || firstRead.input.kind !== 'checkpoint')
@@ -221,7 +222,7 @@ test('actual checkpoint reload keeps exact pair offsets and refuses changed refs
   }
 })
 
-test('an admitted reload is one shot, copied independently and withdrawn on semantic or file mismatch', async () => {
+test('a reloaded view restores on its own input in each tab copy and starts at the top on another input', async () => {
   stubEditorViewport({ height: 120, width: 300 })
   stubHighlightApi()
   const text = Array.from(
@@ -233,64 +234,56 @@ test('an admitted reload is one shot, copied independently and withdrawn on sema
     newFile: { path: 'source.ts', text },
   })
   const a = projectionControl(file, 'source-a', 'revision-a')
-  const b = projectionControl(file, 'source-b', 'revision-a')
+  const before = new TabPresentations().get(tabId('reload-first'))
+  const leaving = mountDiffProjectionControl(a, 'stacked', before.diffPanes.stacked)
+  await waitFor(() => expect(leaving.snapshot().viewport.clientHeight).toBe(120))
+  leaving.editor.setSelection(leaving.offset(30) + 8, leaving.offset(30) + 5, { reveal: false })
+  leaving.editor.setScrollPosition({ top: 240, left: 40 })
+  const position = leaving.editor.getScrollPosition()
+  const selections = leaving.editor.getSelections()
+  const record: DiffReloadView = JSON.parse(JSON.stringify(before.diffViewRecord(a)))
+  leaving.binding.detach()
+  expect(record.stacked?.viewport).not.toBeNull()
+
   const tabs = new TabPresentations()
   const original = tabs.get(tabId('reload-first'))
-  const state: DiffReloadView = {
-    expanded: [],
-    old: null,
-    new: null,
-    stacked: { top: 240, left: 40 },
-    stackedSelections: [
-      { anchorOffset: 8, headOffset: 5, startOffset: 5, endOffset: 8, affinity: 'after' },
-    ],
-  }
-  original.restoreDiffView(a, state)
+  original.restoreDiffView(a, record)
   tabs.copy(tabId('reload-first'), tabId('reload-copy'))
-  const copy = tabs.get(tabId('reload-copy'))
   const first = mountDiffProjectionControl(a, 'stacked', original.diffPanes.stacked)
   await waitFor(() => expect(first.snapshot().viewport.clientHeight).toBe(120))
-  expect(first.editor.getScrollPosition()).toEqual(state.stacked)
-  expect(first.editor.getSelections()).toEqual(state.stackedSelections)
-  expect(original.diffPanes.stacked.reload).toBeNull()
-  expect(copy.diffPanes.stacked.reload).not.toBeNull()
-  const second = mountDiffProjectionControl(a, 'stacked', copy.diffPanes.stacked)
+  expect(first.editor.getScrollPosition()).toEqual(position)
+  expect(first.editor.getSelections()).toEqual(selections)
+  const second = mountDiffProjectionControl(
+    a,
+    'stacked',
+    tabs.get(tabId('reload-copy')).diffPanes.stacked,
+  )
   await waitFor(() => expect(second.snapshot().viewport.clientHeight).toBe(120))
-  expect(second.editor.getScrollPosition()).toEqual(state.stacked)
-  expect(copy.diffPanes.stacked.reload).toBeNull()
-  original.restoreDiffView(a, { ...state, stacked: { top: 360, left: 20 } })
-  first.publish(a)
-  expect(first.editor.getScrollPosition()).toEqual({ top: 360, left: 20 })
+  expect(second.editor.getScrollPosition()).toEqual(position)
   first.editor.setScrollPosition({ top: 480, left: 30 })
   first.publish(a)
   expect(first.editor.getScrollPosition()).toEqual({ top: 480, left: 30 })
-  expect(second.editor.getScrollPosition()).toEqual(state.stacked)
-  original.restoreDiffView(a, state)
-  first.publish(b)
-  expect(first.editor.getScrollPosition()).toEqual({ top: 0, left: 0 })
-  expect(original.diffPanes.stacked.reload).toBeNull()
-  first.publish(a)
-  expect(first.editor.getScrollPosition()).toEqual({ top: 480, left: 30 })
-  original.restoreDiffView(a, state)
-  first.publish(projectionControl({ ...file }, 'source-a', 'revision-b'))
-  expect(first.editor.getScrollPosition()).not.toEqual(state.stacked)
-  expect(original.diffPanes.stacked.reload).toBeNull()
-  first.binding.detach()
-  first.editor.dispose()
-  original.restoreDiffView(a, state)
-  const marker = original.diffPanes.stacked.reload
-  const departing = mountDiffProjectionControl(b, 'stacked', original.diffPanes.stacked)
-  expect(departing.presentation.reload).toBeNull()
-  expect(marker).not.toBeNull()
-  const unmatched = tabs.get(tabId('reload-unmatched'))
-  unmatched.restoreDiffView(a, state)
-  const other = mountDiffProjectionControl(b, 'stacked', unmatched.diffPanes.stacked)
-  expect(other.editor.getScrollPosition()).toEqual({ top: 0, left: 0 })
-  other.publish(a)
-  expect(other.editor.getScrollPosition()).toEqual({ top: 0, left: 0 })
-  unmatched.restoreDiffView(a, state)
-  other.binding.detach()
-  expect(unmatched.diffPanes.stacked.reload).toBeNull()
+  expect(second.editor.getScrollPosition()).toEqual(position)
+
+  const revised = tabs.get(tabId('reload-revised'))
+  revised.restoreDiffView(a, record)
+  const changed = mountDiffProjectionControl(
+    projectionControl({ ...file }, 'source-a', 'revision-b'),
+    'stacked',
+    revised.diffPanes.stacked,
+  )
+  await waitFor(() => expect(changed.snapshot().viewport.clientHeight).toBe(120))
+  expect(changed.editor.getScrollPosition()).toEqual({ top: 0, left: 0 })
+
+  const other = tabs.get(tabId('reload-other'))
+  other.restoreDiffView(a, record)
+  const elsewhere = mountDiffProjectionControl(
+    projectionControl(file, 'source-b', 'revision-a'),
+    'stacked',
+    other.diffPanes.stacked,
+  )
+  await waitFor(() => expect(elsewhere.snapshot().viewport.clientHeight).toBe(120))
+  expect(elsewhere.editor.getScrollPosition()).toEqual({ top: 0, left: 0 })
 })
 
 test('an attached moving pair restores from its actual cache while dirty Undo survives and a new pair refuses offsets', async ({

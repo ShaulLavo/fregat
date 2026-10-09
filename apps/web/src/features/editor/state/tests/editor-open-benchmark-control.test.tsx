@@ -381,12 +381,12 @@ function benchmarkSampleResult() {
     evictions: 0,
     highlighterRuntimeSessionIds: [],
     nonTargetIntents: 0,
-    preparedClaims: 0,
+    preparedJoins: 0,
     promotedBytes: 0,
     structuralRuntimeSessionIds: [],
     targetIntents: 0,
-    transferredHighlighterRuntimeSessionIds: [],
-    transferredStructuralRuntimeSessionIds: [],
+    joinedHighlighterRuntimeSessionIds: [],
+    joinedStructuralRuntimeSessionIds: [],
     wastedIntents: 0,
   }
 }
@@ -408,10 +408,7 @@ function benchmarkSample(
 
 function benchmarkOwner(sample: FileOpenIntentBenchmarkSample): FileOpenIntentServiceOwner {
   return {
-    activation: {
-      claimLive: () => null,
-      claimReadyClean: () => null,
-    },
+    activation: { join: () => null },
     beginBenchmarkSample: vi.fn(() => sample),
     connect: () => undefined,
     disposeNow: () => undefined,
@@ -419,8 +416,7 @@ function benchmarkOwner(sample: FileOpenIntentBenchmarkSample): FileOpenIntentSe
     service: {
       getPreparationIdentity: () => sample,
       subscribePreparationIdentity: () => () => undefined,
-      claimLive: () => null,
-      claimReadyClean: () => null,
+      join: () => null,
       prepare: vi.fn(),
       recordInitialPaint: () => undefined,
     },

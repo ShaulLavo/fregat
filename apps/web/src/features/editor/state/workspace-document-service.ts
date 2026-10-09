@@ -34,10 +34,10 @@ import { createBinaryFileError, createClientInvariantError } from '@/lib/structu
 import { sameGitInputRevision } from '@/lib/documents/utils/comparisons'
 import { contentRevisionForText, fileContentRevision } from '@/features/editor/utils/text-snapshot'
 import { textSnapshotEqualsText } from '@/lib/text-snapshot-equality'
-import type { PreparedFileOpenClaim } from '@/lib/file-open-intent/types'
 import type {
   FileOpenIntentPreparationSource,
   FileOpenIntentPreparationSourceInput,
+  FileOpenIntentPreparedLease,
 } from '@/lib/file-open-intent/state/service'
 import { documentKey, fileDocument, fileDocumentKey } from '@/lib/documents/utils/identity'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
@@ -81,6 +81,7 @@ import {
   type EditorTextBufferChange,
   type EditorViewSession,
   type PieceTableSnapshot,
+  type DocumentSyncPoint,
   type DocumentTextSnapshot,
 } from '@singapore-editor/core/document'
 import {
@@ -136,7 +137,8 @@ export type LiveEditorDocument = {
 export type EditorDocumentView = {
   readonly reopenScrollPosition?: EditorScrollPosition
   readonly documentKey: DocumentKey
-  readonly preparedDocument: EditorPreparedDocument | null
+  /** This view's hold on the preparation it joined; released with the view. */
+  readonly prepared: FileOpenIntentPreparedLease | null
   readonly scrollPosition?: EditorScrollPosition
   readonly tabId: TabId
   readonly view: EditorViewSession
@@ -293,6 +295,12 @@ type SavedComparisonInterest = {
   stop: () => void
 }
 
+type CommittedLiveRevision = {
+  readonly revision: number
+  readonly syncPoint: DocumentSyncPoint
+  readonly snapshot: DocumentTextSnapshot
+}
+
 type PreviewInterest = {
   current: PreviewSourceRead
   readonly key: DocumentKey | null
@@ -409,6 +417,7 @@ export class WorkspaceDocumentService {
       key,
       buffer: document.buffer,
       revision: document.buffer.getRevision(),
+      syncPoint: document.buffer.getDocumentSyncPoint(),
       snapshot: document.buffer.getTextSnapshot(),
       ...boundedPreviewPrefix(document.buffer.getTextSnapshot(), maxBytes),
       maxBytes,
@@ -510,10 +519,7 @@ export class WorkspaceDocumentService {
     if (!this.sourceOwnerDisposed) this.onStateChange()
   }
 
-  private refreshPreviewSources(
-    key: DocumentKey,
-    committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
-  ): void {
+  private refreshPreviewSources(key: DocumentKey, committed?: CommittedLiveRevision): void {
     for (const [lease, entry] of Array.from(this.previewInterests)) {
       if (
         this.previewInterests.get(lease) !== entry ||
@@ -531,6 +537,7 @@ export class WorkspaceDocumentService {
       entry.current = {
         ...entry.current,
         revision: committed?.revision ?? document.buffer.getRevision(),
+        syncPoint: committed?.syncPoint ?? document.buffer.getDocumentSyncPoint(),
         snapshot,
         ...boundedPreviewPrefix(snapshot, entry.maxBytes),
         dirty: document.buffer.isDirty(),
@@ -744,12 +751,9 @@ export class WorkspaceDocumentService {
       this.releaseSnapshotComparison(lease, 'owner-disposed')
     for (const lease of this.comparisonInterests.keys())
       this.releaseSavedComparison(lease, 'owner-disposed')
-    const prepared = new Set<EditorPreparedDocument>()
-    for (const view of this.viewsByTabId.values()) {
-      if (view.preparedDocument) prepared.add(view.preparedDocument)
-    }
+    const views = Array.from(this.viewsByTabId.values())
     this.viewsByTabId.clear()
-    for (const document of prepared) document.dispose()
+    for (const view of views) view.prepared?.release()
     for (const key of this.liveDocumentsByKey.keys()) this.removeLiveDocument(key)
     this.viewScrollPositionSeeds.clear()
     this.scrollPositionSeeds.clear()
@@ -842,7 +846,7 @@ export class WorkspaceDocumentService {
     for (const tabId of this.viewsByTabId.keys()) {
       if (tabIds.has(tabId)) continue
 
-      this.viewsByTabId.get(tabId)?.preparedDocument?.dispose()
+      this.viewsByTabId.get(tabId)?.prepared?.release()
       this.viewsByTabId.delete(tabId)
       evictedTabIds.push(tabId)
     }
@@ -878,21 +882,17 @@ export class WorkspaceDocumentService {
     for (const [tabId, view] of this.viewsByTabId) {
       if (view.documentKey !== documentKey) continue
 
-      view.preparedDocument?.dispose()
+      view.prepared?.release()
       this.viewsByTabId.delete(tabId)
     }
 
     return { hadLiveDocument, wasDirty }
   }
 
-  ensureLiveDocument(
-    file: FileSnapshot,
-    claim: PreparedFileOpenClaim | null = null,
-  ): LiveEditorDocument {
+  ensureLiveDocument(file: FileSnapshot): LiveEditorDocument {
     assertTextFile(file)
     this.assertPathsAvailable([file.path])
     const existing = this.liveDocumentsByKey.get(fileDocumentKey(file.path))
-    const cleanClaim = cleanClaimForFile(claim, file)
     if (existing?.sync.kind === 'recovery-conflict') return existing
     if (existing?.sync.kind === 'file' && existing.sync.fileVersion === file.version) {
       if (existing.sync.mtimeMs === file.mtimeMs) return existing
@@ -908,8 +908,8 @@ export class WorkspaceDocumentService {
 
     // A touched file with the same bytes keeps its buffer, so the undo history survives.
     const record = existing
-      ? this.replacementDocument(file, existing, cleanClaim)
-      : this.createFileDocument(file, cleanClaim)
+      ? this.replacementDocument(file, existing)
+      : this.createFileDocument(file)
     this.installLiveDocument(record)
     if (record.buffer !== existing?.buffer) this.rebindViewsForDocument(record.key)
     return this.getRequiredLiveDocument(record.key)
@@ -957,16 +957,14 @@ export class WorkspaceDocumentService {
   ensureView(
     tabId: TabId,
     file: FileSnapshot,
-    claim: PreparedFileOpenClaim | null = null,
+    prepared: FileOpenIntentPreparedLease | null = null,
   ): LiveEditorViewDocument {
     try {
-      const document = this.ensureLiveDocument(file, claim)
-      return this.attachViewForDocument(tabId, document.key, claim)
+      const document = this.ensureLiveDocument(file)
+      return this.attachViewForDocument(tabId, document.key, prepared)
     } catch (error) {
-      claim?.preparedDocument?.dispose()
+      prepared?.release()
       throw error
-    } finally {
-      claim?.release()
     }
   }
 
@@ -1009,35 +1007,35 @@ export class WorkspaceDocumentService {
   ensureViewForDocument(
     tabId: TabId,
     documentKey: DocumentKey,
-    claim: PreparedFileOpenClaim | null = null,
+    prepared: FileOpenIntentPreparedLease | null = null,
   ): LiveEditorViewDocument {
     try {
-      return this.attachViewForDocument(tabId, documentKey, claim)
+      return this.attachViewForDocument(tabId, documentKey, prepared)
     } catch (error) {
-      claim?.preparedDocument?.dispose()
+      prepared?.release()
       throw error
-    } finally {
-      claim?.release()
     }
   }
 
   private attachViewForDocument(
     tabId: TabId,
     documentKey: DocumentKey,
-    claim: PreparedFileOpenClaim | null,
+    joined: FileOpenIntentPreparedLease | null,
   ): LiveEditorViewDocument {
     const document = this.getRequiredLiveDocument(documentKey)
     const resource = filesystemResource(document.target)
     if (resource) this.assertPathsAvailable([resource.path])
+    const prepared = preparedLeaseForDocument(document, joined)
     const existing = this.viewsByTabId.get(tabId)
     if (existing?.documentKey === document.key) {
-      const preparedDocument = preparedDocumentForClaim(document, claim)
-      if (preparedDocument) {
-        existing.preparedDocument?.dispose()
-        this.viewsByTabId.set(tabId, { ...existing, preparedDocument })
-        return this.viewDocumentProjection(this.viewsByTabId.get(tabId)!)
+      // A repeated join of the same preparation keeps the view's existing hold.
+      if (!prepared || prepared.document === existing.prepared?.document) {
+        prepared?.release()
+        return this.viewDocumentProjection(existing)
       }
-      return this.viewDocumentProjection(existing)
+      existing.prepared?.release()
+      this.viewsByTabId.set(tabId, { ...existing, prepared })
+      return this.viewDocumentProjection(this.viewsByTabId.get(tabId)!)
     }
 
     const scrollPosition =
@@ -1049,7 +1047,7 @@ export class WorkspaceDocumentService {
     const nextView: EditorDocumentView = {
       reopenScrollPosition: this.scrollPositionSeeds.get(document.key) ?? scrollPosition,
       documentKey: document.key,
-      preparedDocument: preparedDocumentForClaim(document, claim),
+      prepared,
       scrollPosition,
       tabId,
       view,
@@ -1065,7 +1063,7 @@ export class WorkspaceDocumentService {
     const view = this.viewsByTabId.get(tabId)
     if (!view) return false
 
-    view.preparedDocument?.dispose()
+    view.prepared?.release()
     this.viewsByTabId.delete(tabId)
     return true
   }
@@ -1663,8 +1661,8 @@ export class WorkspaceDocumentService {
     for (const [tabId, view] of this.viewsByTabId) {
       if (view.documentKey !== fromKey) continue
 
-      view.preparedDocument?.dispose()
-      this.viewsByTabId.set(tabId, { ...view, documentKey: toKey, preparedDocument: null })
+      view.prepared?.release()
+      this.viewsByTabId.set(tabId, { ...view, documentKey: toKey, prepared: null })
     }
 
     this.refreshLiveComparison(fromKey)
@@ -1786,19 +1784,14 @@ export class WorkspaceDocumentService {
     return next
   }
 
-  private createFileDocument(
-    file: FileSnapshot,
-    claim: Extract<PreparedFileOpenClaim, { readonly kind: 'clean' }> | null = null,
-  ): LiveEditorDocument {
-    if (!claim) markEditorOpenBenchmark('editor.file_open.buffer_built', file.path)
-    const buffer = claim?.buffer ?? createHistoryBuffer(materializeFileSnapshotDocumentText(file))
+  private createFileDocument(file: FileSnapshot): LiveEditorDocument {
+    markEditorOpenBenchmark('editor.file_open.buffer_built', file.path)
+    const buffer = createHistoryBuffer(materializeFileSnapshotDocumentText(file))
     const target = fileDocument({ path: file.path })
     buffer.markClean()
 
     return {
-      analysis:
-        claim?.preparedDocument.analysis ??
-        createEditorDocumentAnalysis({ buffer, documentId: documentKey(target) }),
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: documentKey(target) }),
       buffer,
       contentRevision: fileContentRevision(file.version),
       key: documentKey(target),
@@ -1832,13 +1825,12 @@ export class WorkspaceDocumentService {
   private replacementDocument(
     file: FileSnapshot,
     existing: LiveEditorDocument | undefined,
-    claim: Extract<PreparedFileOpenClaim, { readonly kind: 'clean' }> | null = null,
   ): LiveEditorDocument {
-    if (!existing) return this.createFileDocument(file, claim)
+    if (!existing) return this.createFileDocument(file)
     if (
       !textSnapshotEqualsText(existing.buffer.getTextSnapshot(), materializeFileSnapshotText(file))
     ) {
-      return this.createFileDocument(file, claim)
+      return this.createFileDocument(file)
     }
 
     existing.buffer.markClean()
@@ -1867,10 +1859,10 @@ export class WorkspaceDocumentService {
       nextView.setScrollPosition(view.scrollPosition)
       this.viewsByTabId.set(tabId, {
         ...view,
-        preparedDocument: null,
+        prepared: null,
         view: nextView,
       })
-      view.preparedDocument?.dispose()
+      view.prepared?.release()
     }
   }
 
@@ -1879,7 +1871,7 @@ export class WorkspaceDocumentService {
 
     return {
       ...document,
-      preparedDocument: view.preparedDocument,
+      preparedDocument: view.prepared?.document ?? null,
       scrollPosition: view.scrollPosition,
       tabId: view.tabId,
       view: view.view,
@@ -2001,7 +1993,7 @@ export class WorkspaceDocumentService {
       }),
     })
     for (const view of projection.views) {
-      this.viewsByTabId.set(view.tabId, { ...view, preparedDocument: null })
+      this.viewsByTabId.set(view.tabId, { ...view, prepared: null })
     }
     return true
   }
@@ -2067,6 +2059,7 @@ export class WorkspaceDocumentService {
       this.liveDocumentsByKey.set(documentKey, { ...document, localRevision })
       this.refreshLiveComparison(documentKey, {
         revision: event.revisionAfter,
+        syncPoint: event.syncPointAfter,
         snapshot: event.change.textSnapshot,
       })
       this.onStateChange()
@@ -2076,6 +2069,7 @@ export class WorkspaceDocumentService {
     this.acceptTextRevision(document, localRevision, event.change.isDirty)
     this.refreshLiveComparison(documentKey, {
       revision: event.revisionAfter,
+      syncPoint: event.syncPointAfter,
       snapshot: event.change.textSnapshot,
     })
     this.onStateChange()
@@ -2279,10 +2273,7 @@ export class WorkspaceDocumentService {
     if (input && input !== previous) this.publishSnapshotInput(group, input)
   }
 
-  private refreshLiveComparison(
-    key: DocumentKey,
-    committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
-  ): void {
+  private refreshLiveComparison(key: DocumentKey, committed?: CommittedLiveRevision): void {
     this.refreshPreviewSources(key, committed)
     this.refreshSettingsComparisons(key, committed)
     for (const [lease, entry] of this.comparisonInterests) {
@@ -2418,45 +2409,30 @@ function fileSyncVersion(document: LiveEditorDocument | undefined) {
   return document.sync.fileVersion
 }
 
-function cleanClaimForFile(
-  claim: PreparedFileOpenClaim | null,
-  file: FileSnapshot,
-): Extract<PreparedFileOpenClaim, { readonly kind: 'clean' }> | null {
-  if (claim?.kind !== 'clean') return null
-  if (claim.path !== file.path) return null
-  if (claim.fileVersion !== file.version) return null
-  if (claim.buffer.isDirty()) return null
-  if (claim.buffer.getSnapshot() !== claim.snapshot) return null
+function preparedLeaseForDocument(
+  document: LiveEditorDocument,
+  prepared: FileOpenIntentPreparedLease | null,
+): FileOpenIntentPreparedLease | null {
+  if (!prepared) return null
+  if (preparedLeaseMatchesDocument(document, prepared)) return prepared
 
-  return claim
+  prepared.release()
+  return null
 }
 
-function preparedDocumentForClaim(
+function preparedLeaseMatchesDocument(
   document: LiveEditorDocument,
-  claim: PreparedFileOpenClaim | null,
-): EditorPreparedDocument | null {
-  if (!claim?.preparedDocument) return null
-  if (!preparedClaimMatchesDocument(document, claim)) {
-    claim.preparedDocument.dispose()
-    return null
-  }
-
-  return claim.preparedDocument
-}
-
-function preparedClaimMatchesDocument(
-  document: LiveEditorDocument,
-  claim: PreparedFileOpenClaim,
+  prepared: FileOpenIntentPreparedLease,
 ): boolean {
-  if (filesystemResource(document.target)?.path !== claim.path) return false
-  if (document.buffer !== claim.buffer) return false
-  if (document.buffer.getSnapshot() !== claim.snapshot) return false
-  if (document.key !== claim.documentKey) return false
-  if (document.localRevision !== claim.localRevision) return false
-  if (claim.kind === 'live') return true
+  if (filesystemResource(document.target)?.path !== prepared.path) return false
+  if (document.buffer !== prepared.buffer) return false
+  if (document.buffer.getSnapshot() !== prepared.snapshot) return false
+  if (document.key !== prepared.documentKey) return false
+  if (document.localRevision !== prepared.localRevision) return false
+  if (prepared.fileVersion === null) return true
   if (document.sync.kind !== 'file') return false
 
-  return document.sync.fileVersion === claim.fileVersion
+  return document.sync.fileVersion === prepared.fileVersion
 }
 
 function omitKey(

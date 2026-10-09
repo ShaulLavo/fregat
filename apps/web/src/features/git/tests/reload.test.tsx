@@ -9,20 +9,22 @@ import {
   captureGitView,
   gitReloadGeneration,
   prepareGitReload,
-  savedDiffView,
+  takeSavedDiffView,
   savedGitView,
 } from '@/features/git/state/reload'
 import type { DiffReloadView, DiffReloadIdentity } from '@/features/git/utils/reload-schema'
 
 const checkpointIdentity: DiffReloadIdentity = { kind: 'checkpoint', identity: 'old:new' }
+const caret = { kind: 'source', side: 'old', line: 30, character: 5 } as const
 const diffView: DiffReloadView = {
   expanded: ['gap'],
-  old: { top: 620, left: 0 },
+  old: {
+    selections: [{ anchor: caret, head: caret, affinity: 'before' }],
+    viewport: { anchor: caret, withinRow: 2 },
+    left: 0,
+  },
   new: null,
   stacked: null,
-  oldSelections: [
-    { anchorOffset: 5, headOffset: 5, startOffset: 5, endOffset: 5, affinity: 'before' },
-  ],
 }
 
 test('Git view state survives a reload, and a different root does not claim it', () => {
@@ -35,9 +37,10 @@ test('Git view state survives a reload, and a different root does not claim it',
   const reloaded = new QueryClient()
   prepareGitReload(reloaded, storage, 'repo')
   expect(savedGitView(reloaded, 'repo')?.scrollTop).toBe(320)
-  expect(savedDiffView(reloaded, checkpointIdentity)?.expanded).toEqual(['gap'])
-  expect(savedDiffView(reloaded, checkpointIdentity)?.oldSelections?.[0]?.headOffset).toBe(5)
-  expect(savedDiffView(reloaded, { kind: 'checkpoint', identity: 'other' })).toBeUndefined()
+  expect(takeSavedDiffView(reloaded, { kind: 'checkpoint', identity: 'other' })).toBeUndefined()
+  const taken = takeSavedDiffView(reloaded, checkpointIdentity)
+  expect(taken?.expanded).toEqual(['gap'])
+  expect(taken?.old?.selections[0]?.head).toEqual(caret)
 
   prepareGitReload(reloaded, storage, 'other-repo')
   expect(savedGitView(reloaded, 'repo')).toBeUndefined()
@@ -55,8 +58,10 @@ test('a diff view captured against a superseded generation is dropped', () => {
     { kind: 'checkpoint', identity: 'superseded:identity' },
     diffView,
   )
+  const reloaded = new QueryClient()
+  prepareGitReload(reloaded, storage, 'repo')
   expect(
-    savedDiffView(owner, { kind: 'checkpoint', identity: 'superseded:identity' }),
+    takeSavedDiffView(reloaded, { kind: 'checkpoint', identity: 'superseded:identity' }),
   ).toBeUndefined()
 })
 
@@ -73,7 +78,24 @@ test('an old diff slot drops without losing the valid root and list record', () 
   const owner = new QueryClient()
   prepareGitReload(owner, storage, 'repo')
   expect(savedGitView(owner, 'repo')).toEqual({ activeId: 'worktree:a.ts', scrollTop: 320 })
-  expect(savedDiffView(owner, checkpointIdentity)).toBeUndefined()
+  expect(takeSavedDiffView(owner, checkpointIdentity)).toBeUndefined()
+})
+
+test('a diff slot saved as pixel offsets drops instead of migrating', () => {
+  const storage = environmentWindowStorage(testScopedStorage.environmentId)
+  storage.setItem(
+    'git.view.v1',
+    JSON.stringify({
+      root: 'repo',
+      diff: {
+        identity: checkpointIdentity,
+        view: { expanded: [], old: { top: 620, left: 0 }, new: null, stacked: null },
+      },
+    }),
+  )
+  const owner = new QueryClient()
+  prepareGitReload(owner, storage, 'repo')
+  expect(takeSavedDiffView(owner, checkpointIdentity)).toBeUndefined()
 })
 
 test('moving reload offsets restore only for the same semantic target and admitted pair', () => {
@@ -96,12 +118,33 @@ test('moving reload offsets restore only for the same semantic target and admitt
   captureDiffView(owner, gitReloadGeneration(owner), identity, diffView)
   const reloaded = new QueryClient()
   prepareGitReload(reloaded, storage, 'repo')
-  expect(savedDiffView(reloaded, identity)).toEqual(diffView)
   const changed = v.parse(gitInputRevisionSchema, {
     ...revision,
     new: { kind: 'blob', objectId: 'c'.repeat(40) },
   })
-  expect(savedDiffView(reloaded, { ...identity, revision: changed })).toBeUndefined()
+  expect(takeSavedDiffView(reloaded, { ...identity, revision: changed })).toBeUndefined()
   const staged = v.parse(gitSnapshotTargetSchema, { ...target, changeSource: 'staged' })
-  expect(savedDiffView(reloaded, { ...identity, target: staged })).toBeUndefined()
+  expect(takeSavedDiffView(reloaded, { ...identity, target: staged })).toBeUndefined()
+  expect(takeSavedDiffView(reloaded, identity)).toEqual(diffView)
+})
+
+test('a saved diff view is handed out once per page load, never refreshed by later captures', () => {
+  const storage = environmentWindowStorage(testScopedStorage.environmentId)
+  const owner = new QueryClient()
+  prepareGitReload(owner, storage, 'repo')
+  captureDiffView(owner, gitReloadGeneration(owner), checkpointIdentity, diffView)
+
+  const reloaded = new QueryClient()
+  prepareGitReload(reloaded, storage, 'repo')
+  expect(takeSavedDiffView(reloaded, checkpointIdentity)).toEqual(diffView)
+  expect(takeSavedDiffView(reloaded, checkpointIdentity)).toBeUndefined()
+  captureDiffView(reloaded, gitReloadGeneration(reloaded), checkpointIdentity, {
+    ...diffView,
+    expanded: ['later'],
+  })
+  expect(takeSavedDiffView(reloaded, checkpointIdentity)).toBeUndefined()
+
+  const next = new QueryClient()
+  prepareGitReload(next, storage, 'repo')
+  expect(takeSavedDiffView(next, checkpointIdentity)?.expanded).toEqual(['later'])
 })

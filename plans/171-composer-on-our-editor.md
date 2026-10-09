@@ -264,6 +264,26 @@ removing Lexical. Keep the original breakdown here for its implementation detail
 4. **Platform + Editor: rich text.** Markdown source with priority below chips, list continuation,
    then `composerRichTextEnabled`.
 
+## Draft ownership handoff from Plan 200
+
+Future work for this plan, after the composer runs on our editor. Plan 200 did not migrate Lexical.
+The ownership and source range contracts this builds on are in
+[document-backed content views](../docs/document-backed-content-views.md).
+
+- **Identity.** A draft becomes one more `UnsyncedDocumentRef` variant, keyed as drafts are today:
+  environment, workspace root and draft key (`chatInputDraftStorageId`). The workspace document
+  service for that environment and root owns its buffer, analysis and undo history.
+- **No save.** Drafts have no save destination, as with the other unsynced documents. Sending reads
+  the buffer; it never writes a file. The draft store keeps persisting the text for restore.
+- **Retention.** The composer holds an interest while it shows the draft, and `retain` keeps the
+  document while the draft store holds text. Sending, clearing or deleting the session releases it.
+  Switching sessions swaps the composer's document; it does not mount a hidden editor per session.
+- **One Markdown buffer.** Source, source-revealing and visual presentations and any draft preview
+  read the same buffer, as the Markdown file preview does. A preview borrows it through a live
+  lease (`acquireLivePreview` accepts file documents today and would accept drafts too), and
+  `captureSourceRange(read, range, text)` and `resolveSourceRange` give mention and command ranges
+  the same verification and invalidation rules as search results ([Plan 182](182-search-view-rendering.md#source-handoff-from-plan-200)).
+
 ## October 2026 issue follow-ups
 
 Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).

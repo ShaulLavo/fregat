@@ -57,7 +57,7 @@ export function EditorSurfaceTabBody({
     (state) => state.viewsByTabId[tabId]?.view ?? null,
   )
   const selectedPreparedDocument = useEditorDocumentState(
-    (state) => state.viewsByTabId[tabId]?.preparedDocument ?? null,
+    (state) => state.viewsByTabId[tabId]?.prepared?.document ?? null,
   )
   const selectedDocumentBuffer = useEditorDocumentState((state) =>
     selectedViewDocumentKey
@@ -139,8 +139,7 @@ export function EditorSurfaceTabBody({
   useLayoutEffect(() => {
     if (!selectedFile || selectedFile.seemsBinary || historyReversing) return
 
-    const claim = fileOpenIntent.claimReadyClean(selectedFile.path)
-    ensureEditorView(tabId, selectedFile, claim)
+    ensureEditorView(tabId, selectedFile, fileOpenIntent.join(selectedFile.path)?.prepared)
   }, [ensureEditorView, fileOpenIntent, historyReversing, selectedFile, tabId])
 
   useEffect(() => {

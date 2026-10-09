@@ -1,10 +1,6 @@
 import { expect, test } from '../../../../test/fixtures'
 import { createSavedComparisonFixture } from '../../../../test/factories/saved-comparison'
-import { createEditorBufferSession, createEditorTextBuffer } from '@singapore-editor/core/document'
-import {
-  createEditorDocumentAnalysis,
-  createEditorPreparedDocument,
-} from '@singapore-editor/core/editor'
+import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { fileDocumentKey, filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { materializeFileSnapshotText } from '@/lib/file-snapshot'
@@ -167,35 +163,16 @@ test('publishes captured snapshot and revision pairs through a reentrant earlier
 }) => {
   const fixture = await createSavedComparisonFixture(server.root, client)
   const initial = materializeFileSnapshotText(fixture.saved)
-  const buffer = createEditorTextBuffer(initial)
+  const store = createEditorDocumentStore({ environmentId: fixture.scope.environmentId })
+  const { buffer } = store.getState().ensureLiveEditorDocument(fixture.saved)
+  const deleted = store.getState().prepareWorkspaceDocumentDelete(fixture.path)!
+  expect(store.getState().commitWorkspaceDocumentProjection(deleted)).toBe(true)
   const session = createEditorBufferSession(buffer)
   const stopNested = buffer.subscribe((event) => {
     if (event.revisionAfter === 1) session.applyText('nested')
   })
-  const key = fileDocumentKey(fixture.path)
-  const analysis = createEditorDocumentAnalysis({ buffer, documentId: key })
-  const prepared = createEditorPreparedDocument({
-    analysis,
-    buffer,
-    documentId: key,
-    configuredTabSize: 4,
-    documentConfigurationTag: [],
-    languageId: 'typescript',
-    tabSizePolicy: 'fixed',
-  })
-  const store = createEditorDocumentStore({ environmentId: fixture.scope.environmentId })
-  store.getState().ensureLiveEditorDocument(fixture.saved, {
-    kind: 'clean',
-    documentKey: key,
-    localRevision: buffer.getRevision(),
-    release: () => undefined,
-    buffer,
-    file: fixture.saved,
-    fileVersion: fixture.saved.version,
-    path: fixture.path,
-    preparedDocument: prepared,
-    snapshot: buffer.getSnapshot(),
-  })
+  // Rollback resubscribes the store after the listener above, so the listener runs first.
+  expect(store.getState().rollbackWorkspaceDocumentProjection(deleted)).toBe(true)
   const lease = store.getState().acquireSavedComparison({
     scope: fixture.scope,
     saved: fixture.saved,
@@ -218,7 +195,6 @@ test('publishes captured snapshot and revision pairs through a reentrant earlier
   } finally {
     stop()
     stopNested()
-    prepared.dispose()
     store.getState().disposeEditorDocuments()
     fixture.service.dispose()
   }

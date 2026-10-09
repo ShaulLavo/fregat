@@ -191,7 +191,7 @@ describe('transport-neutral session', () => {
     for (let index = 0; index < 33; index++) network.author(sender)
     const submitted = network.messages.get('SUBMIT') ?? 0
     network.advance(3)
-    expect((network.messages.get('SUBMIT') ?? 0) - submitted).toBe(2)
+    expect((network.messages.get('SUBMIT') ?? 0) - submitted).toBe(1)
     network.links.set(key, link)
     network.stabilize()
   })
