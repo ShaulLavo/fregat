@@ -62,7 +62,8 @@ export function FileRow({
 
   function handleClick(event: MouseEvent<HTMLElement>) {
     rowProps.onClick(event)
-    if (chosen !== null && !isBusy) onToggle?.(entry)
+    // The second click of a double click belongs to the double click, which attaches the file.
+    if (chosen !== null && !isBusy && event.detail < 2) onToggle?.(entry)
   }
 
   function handleDoubleClick() {

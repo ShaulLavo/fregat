@@ -1,6 +1,15 @@
 import { createAttachmentTestOwnership } from '../../../test/factories/attachment-ownership'
 import { createTestMachineFiles } from '../../../test/factories/machine-files'
-import { mkdir, mkdtemp, rm, truncate, writeFile } from 'node:fs/promises'
+import {
+  appendFile,
+  mkdir,
+  mkdtemp,
+  open,
+  readFile,
+  rm,
+  truncate,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Elysia } from 'elysia'
@@ -8,6 +17,7 @@ import * as v from 'valibot'
 import { afterEach, expect, test } from 'vitest'
 import { MAX_CHAT_FILE_ATTACHMENT_BYTES, machineFileAttachmentSchema } from '@workspace/contracts'
 
+import { copyExactly } from '../machine-files'
 import { attachmentRoutes } from '../routes'
 import { validateAttachmentUpload } from '../uploads'
 
@@ -106,3 +116,51 @@ test('refuses empty, oversized, missing and folder paths without staging anythin
   )
   expect(leftovers).toEqual([])
 })
+
+test('a file that grows after its size was checked is refused, reading one byte past it', async () => {
+  const { root } = await setup()
+  const sourcePath = join(root, 'project', 'growing.log')
+  const copyPath = join(root, 'copy.part')
+  await writeFile(sourcePath, '0123456789')
+  const source = await open(sourcePath, 'r')
+  const writer = await open(copyPath, 'w')
+  try {
+    // The size was checked at 10 bytes; the file then grows well past it before the copy.
+    await appendFile(sourcePath, 'x'.repeat(1024 * 1024))
+    await expect(copyExactly(source, writer, 10)).rejects.toThrow(
+      'changed while it was being attached',
+    )
+  } finally {
+    await source.close()
+    await writer.close()
+  }
+  expect((await readFile(copyPath)).byteLength).toBe(0)
+})
+
+test('a file that shrinks after its size was checked is refused', async () => {
+  const { root } = await setup()
+  const sourcePath = join(root, 'project', 'shrinking.log')
+  await writeFile(sourcePath, '0123456789')
+  const source = await open(sourcePath, 'r')
+  const writer = await open(join(root, 'copy.part'), 'w')
+  try {
+    await truncate(sourcePath, 4)
+    await expect(copyExactly(source, writer, 10)).rejects.toThrow(
+      'changed while it was being attached',
+    )
+  } finally {
+    await source.close()
+    await writer.close()
+  }
+})
+
+// Windows has no mkfifo; the check needs a named pipe on disk.
+test.skipIf(Bun.which('mkfifo') === null)(
+  'a FIFO at the path is refused without waiting for a writer',
+  async () => {
+    const { attach, root } = await setup()
+    expect(Bun.spawnSync(['mkfifo', join(root, 'project', 'pipe')]).exitCode).toBe(0)
+    const response = await attach('project/pipe')
+    expect(response.status).toBeGreaterThanOrEqual(400)
+  },
+)

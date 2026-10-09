@@ -1,7 +1,7 @@
 import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
 import { errorMessage } from '@/lib/error-message'
 import type { FsEntry, PickedFsEntry } from '@/lib/file-system-types'
-import { isDirectoryEntry } from '@/lib/file-system-types'
+import { isDirectoryEntry, isFileEntry } from '@/lib/file-system-types'
 import {
   ArrowClockwiseIcon,
   ArrowLeftIcon,
@@ -392,11 +392,14 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
     setChosen((current) => toggleChosen(current, entry, files.limit))
   }
 
-  // Enter on a folder opens it. On a file it attaches what is chosen, or that file alone.
+  // Enter on a folder opens it. Enter or a double click on a file attaches the chosen files with it.
   function commitFileEntry(entry: FsEntry) {
     if (!files) return
     if (isDirectoryEntry(entry)) return navigateTo(entry.path)
-    commitFiles(chosen.length > 0 ? chosen : toggleChosen([], entry, files.limit))
+    const withEntry = chosen.some((item) => item.path === entry.path)
+      ? chosen
+      : toggleChosen(chosen, entry, files.limit)
+    commitFiles(withEntry)
   }
 
   function close() {
@@ -462,7 +465,9 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
   }
 
   function handleEntryDoubleClick(entry: FsEntry) {
-    if (listInteractionPending || !isDirectoryEntry(entry)) return
+    if (listInteractionPending) return
+    if (files && isFileEntry(entry)) return commitFileEntry(entry)
+    if (!isDirectoryEntry(entry)) return
     navigateTo(entry.path)
   }
 

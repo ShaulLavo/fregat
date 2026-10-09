@@ -1,4 +1,5 @@
-import { copyFile, rename, stat, unlink } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { open, rename, unlink, type FileHandle } from 'node:fs/promises'
 import { basename } from 'node:path'
 import {
   MAX_CHAT_ATTACHMENT_BYTES,
@@ -22,6 +23,7 @@ export type MachineFiles = {
 
 const MAX_FILE_NAME_LENGTH = 255
 const MAX_MIME_TYPE_LENGTH = 100
+const COPY_CHUNK_BYTES = 64 * 1024
 
 /**
  * Stages a file from this server's disk the way an upload is staged, copying it on disk so a
@@ -55,27 +57,45 @@ async function stageMachineFile({
   ownership: AttachmentOwnership
   path: string
 }): Promise<MachineFileAttachment> {
-  const source = await files.blob(path)
-  if (source.size <= 0) throw attachmentErrors.MACHINE_FILE_EMPTY({ internal: { sizeBytes: 0 } })
-  if (source.size > MAX_CHAT_FILE_ATTACHMENT_BYTES)
-    throw attachmentErrors.MACHINE_FILE_TOO_LARGE({
-      internal: { sizeBytes: source.size, limitBytes: MAX_CHAT_FILE_ATTACHMENT_BYTES },
-    })
-  const ticket = await createAttachmentUpload(
-    attachmentsDir,
-    uploadInput(source.absolutePath, source.size),
-    ownership,
+  const { absolutePath } = await files.blob(path)
+  // One handle from check to copy: the path cannot be swapped between them, and a non-blocking
+  // open keeps a FIFO put there from holding the request.
+  const source = await open(
+    absolutePath,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
   )
-  const id = ticket.attachment.id
   try {
-    await withAttachmentLane(attachmentsDir, id, () =>
-      copyInto(attachmentsDir, ticket.attachment, source.absolutePath),
+    const sizeBytes = await regularFileSize(source)
+    const ticket = await createAttachmentUpload(
+      attachmentsDir,
+      uploadInput(absolutePath, sizeBytes),
+      ownership,
     )
-  } catch (error) {
-    await deletePendingAttachmentUpload(attachmentsDir, id, ownership).catch(() => undefined)
-    throw error
+    const id = ticket.attachment.id
+    try {
+      await withAttachmentLane(attachmentsDir, id, () =>
+        copyInto(attachmentsDir, ticket.attachment, source),
+      )
+    } catch (error) {
+      await deletePendingAttachmentUpload(attachmentsDir, id, ownership).catch(() => undefined)
+      throw error
+    }
+    return { attachment: ticket.attachment, expiresAt: ticket.expiresAt }
+  } finally {
+    await source.close()
   }
-  return { attachment: ticket.attachment, expiresAt: ticket.expiresAt }
+}
+
+async function regularFileSize(source: FileHandle) {
+  const stats = await source.stat()
+  if (!stats.isFile())
+    throw attachmentErrors.MACHINE_FILE_CHANGED({ internal: { reason: 'not-regular-file' } })
+  if (stats.size <= 0) throw attachmentErrors.MACHINE_FILE_EMPTY({ internal: { sizeBytes: 0 } })
+  if (stats.size > MAX_CHAT_FILE_ATTACHMENT_BYTES)
+    throw attachmentErrors.MACHINE_FILE_TOO_LARGE({
+      internal: { sizeBytes: stats.size, limitBytes: MAX_CHAT_FILE_ATTACHMENT_BYTES },
+    })
+  return stats.size
 }
 
 /** Images the provider takes inline go as images; anything else, or larger, goes as a file. */
@@ -103,20 +123,39 @@ function inlineImageFits(mimeType: string, sizeBytes: number) {
 async function copyInto(
   attachmentsDir: string,
   attachment: MachineFileAttachment['attachment'],
-  sourcePath: string,
+  source: FileHandle,
 ) {
   const target = attachmentFilePath({ attachmentsDir, attachment })
   if (!target) throw attachmentErrors.MACHINE_FILE_CHANGED({ internal: { reason: 'no-target' } })
   const partPath = `${target}.${crypto.randomUUID()}.part`
+  const writer = await open(partPath, 'wx')
   try {
-    await copyFile(sourcePath, partPath)
-    const copied = await stat(partPath)
-    if (copied.size !== attachment.sizeBytes)
-      throw attachmentErrors.MACHINE_FILE_CHANGED({
-        internal: { expectedBytes: attachment.sizeBytes, copiedBytes: copied.size },
-      })
+    await copyExactly(source, writer, attachment.sizeBytes)
+    await writer.close()
     await rename(partPath, target)
   } finally {
+    await writer.close().catch(() => undefined)
     await unlink(partPath).catch(() => undefined)
   }
+}
+
+/**
+ * Copies the file the handle holds, reading at most one byte past `expectedBytes`, so a file
+ * that grew after its size was checked is refused before more than that is read.
+ */
+export async function copyExactly(source: FileHandle, writer: FileHandle, expectedBytes: number) {
+  const buffer = Buffer.allocUnsafe(COPY_CHUNK_BYTES)
+  let copied = 0
+  for (;;) {
+    const wanted = Math.min(buffer.byteLength, expectedBytes + 1 - copied)
+    const { bytesRead } = await source.read(buffer, 0, wanted, copied)
+    if (bytesRead === 0) break
+    copied += bytesRead
+    if (copied > expectedBytes) break
+    await writer.write(buffer, 0, bytesRead)
+  }
+  if (copied !== expectedBytes)
+    throw attachmentErrors.MACHINE_FILE_CHANGED({
+      internal: { expectedBytes, copiedBytes: copied },
+    })
 }

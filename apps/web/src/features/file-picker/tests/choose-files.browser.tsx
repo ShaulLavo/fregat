@@ -85,6 +85,31 @@ test('Space chooses the file under the cursor and Enter attaches the chosen file
   expect(picks[0]).toEqual(['picker/attach/plan.txt'])
 })
 
+test('a double click on a file attaches it with the files already chosen', async () => {
+  await page.viewport(1440, 1000)
+  const picks: Array<readonly string[]> = []
+  renderWithProviders(choose(8, picks))
+
+  await row('notes.md').click()
+  await row('plan.txt').dblClick()
+
+  await waitFor(() => expect(picks).toHaveLength(1))
+  expect(picks[0]).toEqual(['picker/attach/notes.md', 'picker/attach/plan.txt'])
+})
+
+test('a double click on a chosen file keeps it chosen and attaches it', async () => {
+  await page.viewport(1440, 1000)
+  const picks: Array<readonly string[]> = []
+  renderWithProviders(choose(8, picks))
+
+  await row('notes.md').click()
+  await expect.element(row('notes.md')).toHaveAttribute('aria-checked', 'true')
+  await row('notes.md').dblClick()
+
+  await waitFor(() => expect(picks).toHaveLength(1))
+  expect(picks[0]).toEqual(['picker/attach/notes.md'])
+})
+
 test('on a phone, a tap opens a folder, a tap chooses a file, and Back returns', async () => {
   await page.viewport(390, 844)
   renderWithProviders(choose(8, []))
