@@ -6,10 +6,11 @@
   "derivationProvenance": "The shared derivation helper retains a historical warm-counter correction note from the preceding error-free-walk experiment. It does not describe a failure in these three completed experiments. Original summaries and helper are preserved verbatim in the archive.",
   "setupFailure": "The first fused-cursor shell setup failed before making changes or measuring. The error log and corrected Python setup are preserved. No sample was rerun.",
   "archive": {
-    "file": "/work/reports/plan-339/qualification/next-candidates-20261009.tar.gz",
+    "file": "next-candidates-20261009.tar.gz",
     "bytes": 7185856,
     "sha256": "0a1d6e0a80e4aa9756fd084871d6cd2781edbaaef004777caaff967f8148c6d5",
-    "verifiedArtifacts": 77
+    "verifiedArtifacts": 77,
+    "availability": "Uncommitted historical full archive retained by the author; no machine-local address is published."
   },
   "experiments": [
     {
@@ -330,9 +331,38 @@
   ],
   "committedCoreArchive": {
     "file": "evidence.tar.gz",
-    "bytes": 364057,
-    "sha256": "a1917804b6c8568a5e798f0a15e7d8f3e8265b5a3d81fcddfd1e0cd92e2cdc3f",
+    "bytes": 365147,
+    "sha256": "fb7626daccdf5816ada8f4ba729eebf6ce9d54d4f9649af574cdb49af506a752",
     "verifiedArtifacts": 53,
-    "contents": "Raw observations, exact worker and transform sources, comparisons, classifications, derived summaries, host recipes and logs. Traces and screenshots stay in the complete local archive."
+    "contents": "Path-normalized archival copies of observations, sources, comparisons, classifications, summaries, recipes and logs. All measurement values are unchanged. Original traces and screenshots remain in the uncommitted full archive."
+  },
+  "archiveNormalization": {
+    "kind": "Path-normalized archival copies; measurement values unchanged.",
+    "originalCoreSha256": "a1917804b6c8568a5e798f0a15e7d8f3e8265b5a3d81fcddfd1e0cd92e2cdc3f",
+    "originals": "Unmodified historical core and full archives remain outside the repository.",
+    "changedMembers": [
+      "bracket-prefilter/cold/baseline/experiment.json",
+      "bracket-prefilter/cold/candidate/experiment.json",
+      "bracket-prefilter/warm/baseline/experiment.json",
+      "bracket-prefilter/warm/candidate/experiment.json",
+      "bracket-prefilter/experiment.sh",
+      "bracket-prefilter/experiment.log",
+      "bracket-prefilter/focused.log",
+      "mutable-capture-stamps/cold/baseline/experiment.json",
+      "mutable-capture-stamps/cold/candidate/experiment.json",
+      "mutable-capture-stamps/warm/baseline/experiment.json",
+      "mutable-capture-stamps/warm/candidate/experiment.json",
+      "mutable-capture-stamps/experiment.sh",
+      "mutable-capture-stamps/experiment.log",
+      "mutable-capture-stamps/focused.log",
+      "fused-cursor/cold/baseline/experiment.json",
+      "fused-cursor/cold/candidate/experiment.json",
+      "fused-cursor/warm/baseline/experiment.json",
+      "fused-cursor/warm/candidate/experiment.json",
+      "fused-cursor/experiment.sh",
+      "fused-cursor/experiment.log",
+      "provenance/prepare-fused-cursor.py"
+    ],
+    "recipes": "Setup accepts checkout, baseline-checkout and output-directory arguments. Measurement scripts require caller-supplied checkout/output paths, browser cache, canonical proof, scheduling wrappers and admission lock. No measurement was run."
   }
 }
