@@ -171,6 +171,8 @@ class NativeTextFrame {
   }
 }
 
+Object.freeze(NativeTextFrame.prototype)
+
 function copiedPaintTextRow(row: RenderRow): RendererTextFrameRow {
   if (row.packed) return copiedFrameRow(row)
   const texts = row.cells.map((cell) => cell.text)

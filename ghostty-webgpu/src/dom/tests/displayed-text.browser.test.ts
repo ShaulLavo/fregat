@@ -479,6 +479,7 @@ describe('DOM retained displayed-text acceptance', () => {
     expect(secondGetter).toBe(firstGetter)
     expect(Object.hasOwn(first, 'rows')).toBe(false)
     expect(Object.hasOwn(second, 'rows')).toBe(false)
+    expect(Object.isFrozen(Object.getPrototypeOf(first))).toBe(true)
     expect(Object.isFrozen(first)).toBe(true)
     expect(Object.isFrozen(second)).toBe(true)
     expect(terminal.visibleLines()[0]).toContain('second accepted 🧑‍💻')
@@ -499,6 +500,37 @@ describe('DOM retained displayed-text acceptance', () => {
     terminal.write('\rnext native')
     clock.flush()
     expect(owned[0]).toContain('accepted native')
+  })
+
+  it('keeps the accepted native reader when acknowledging a painted frame fails', async () => {
+    const retain = vi.spyOn(runtime.bridge, 'captureRetainedFrame')
+    cleanups.push(() => retain.mockRestore())
+    const { terminal, session, clock, host } = await fixture('dom')
+    terminal.write('accepted before failure 界 é')
+    clock.flush()
+    const owned = Array.from(host.querySelector('.ghostty-webgpu-frame')!.children, (row) =>
+      (row.textContent ?? '').trimEnd(),
+    )
+    const delivered: TerminalSubmittedText[] = []
+    terminal.onText((text) => delivered.push(text))
+    const publications = delivered.length
+    const captures = retain.mock.calls.length
+    const acknowledge = vi.spyOn(session.renderState, 'acknowledge').mockImplementation(() => {
+      throw new TypeError('injected DOM acknowledgement failure')
+    })
+    cleanups.push(() => acknowledge.mockRestore())
+    terminal.write('\rpending after failure 🧑‍💻')
+    expect(() => clock.flush()).toThrow('injected DOM acknowledgement failure')
+    expect(retain.mock.calls.length).toBeGreaterThan(captures)
+    expect(delivered).toHaveLength(publications)
+    expect(terminal.visibleLines()).toEqual(owned)
+    acknowledge.mockRestore()
+    terminal.refresh(0, 3)
+    clock.flushTimers()
+    clock.flush()
+    expect(terminal.visibleLines()[0]).toContain('pending after failure 🧑‍💻')
+    expect(delivered.at(-1)!.rows.map((row) => row.text)).toEqual(terminal.visibleLines())
+    expect(owned[0]).toContain('accepted before failure')
   })
 
   it('captures successful DOM paint before acknowledging damage and leaves failed paint unpublished', async () => {
