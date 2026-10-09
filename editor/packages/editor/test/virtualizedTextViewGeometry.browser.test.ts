@@ -110,9 +110,10 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
       const upToColumn = document.createRange()
       upToColumn.setStart(row.chunks[0]!.textNode, 0)
       upToColumn.setEnd(row.chunks[0]!.textNode, 10)
+      // WebKit rounds selected glyph boxes outward; a collapsed range reports the caret edge.
+      upToColumn.collapse(false)
       const drawn =
-        (upToColumn.getBoundingClientRect().right - row.element.getBoundingClientRect().left) /
-        SCALE
+        (upToColumn.getBoundingClientRect().left - row.element.getBoundingClientRect().left) / SCALE
 
       expect(drawn).toBeGreaterThan(0)
       expect(offsetToX(internals(view!), row, 10)).toBeCloseTo(drawn, 0)
@@ -240,8 +241,9 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
         const upTo = document.createRange()
         upTo.setStart(node, 0)
         upTo.setEnd(node, column)
+        upTo.collapse(false)
         expect(offsetToX(internal, row, row.startOffset + column)).toBeCloseTo(
-          upTo.getBoundingClientRect().right - rowLeft,
+          upTo.getBoundingClientRect().left - rowLeft,
           0,
         )
       }
