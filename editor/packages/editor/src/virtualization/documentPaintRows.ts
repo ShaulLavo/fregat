@@ -5,6 +5,10 @@ import {
   type DocumentPaintStyle,
   type SavedDocumentPaint,
 } from '../editor/documentPaint'
+import {
+  activateDocumentPaintHighlights,
+  canHighlightDocumentPaintRow,
+} from './documentPaintHighlights'
 import { glyphAdvancesFor, PROPORTIONAL_WRAP_MARGIN_PX } from './glyphAdvances'
 import { appendWordWrapText, createWordWrapLine, finishWordWrapLine } from './wordWrap'
 
@@ -67,8 +71,10 @@ export function mountDocumentPaint(
     measure: paint.monospace ? undefined : glyphs?.measure,
     minimumTabAdvance: paint.monospace ? undefined : glyphs?.minimumTabAdvance,
   }
-  for (const row of paint.rows) {
+  for (let index = 0; index < paint.rows.length; index++) {
+    const row = paint.rows[index]!
     const text = row.runs.map((run) => run.text).join('')
+    const highlight = canHighlightDocumentPaintRow(row)
     const line = createWordWrapLine()
     if (paint.wrap) {
       appendWordWrapText(line, text, 0, text.length, rules)
@@ -96,7 +102,11 @@ export function mountDocumentPaint(
         element.setAttribute('aria-label', row.heading.name)
         if (row.heading.id) element.id = row.heading.id
       }
-      appendRuns(element, row.runs, start, end, row.style)
+      element.dataset.editorDocumentPaintSourceRow = String(index)
+      element.dataset.editorDocumentPaintStart = String(start)
+      if (end > start && highlight) {
+        element.append(document.createTextNode(text.slice(start, end)))
+      } else appendRuns(element, row.runs, start, end, row.style)
       fragment.append(element)
       appendGutter(gutter, row, start === 0, top, paint.gutterWidth)
       top += row.height + paint.rowGap
@@ -106,11 +116,17 @@ export function mountDocumentPaint(
   const height = Math.max(0, top - paint.rowGap)
   root.style.height = `${height}px`
   root.append(fragment)
+  const highlights = activateDocumentPaintHighlights(root, paint)
+  if (!highlights) {
+    root.remove()
+    return null
+  }
   return {
     element: root,
     height,
     rowCount,
     dispose() {
+      highlights.dispose()
       root.remove()
     },
   }
@@ -245,6 +261,8 @@ const STYLE_KEYS = [
   'letterSpacing',
   'fontFeatureSettings',
   'fontVariationSettings',
+  'fontKerning',
+  'fontVariantLigatures',
   'visibility',
 ] as const
 

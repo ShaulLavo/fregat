@@ -2,7 +2,11 @@ import { afterEach, beforeAll, expect, it } from 'vitest'
 import { commands } from 'vitest/browser'
 import { init, MarkdownDocument } from 'tree-sitter-md'
 import { Editor } from '../src/editor/Editor'
-import { decodePaintSnapshot, mountPaintSnapshot } from '../src/paint'
+import {
+  activatePaintSnapshotHighlights,
+  decodePaintSnapshot,
+  mountPaintSnapshot,
+} from '../src/paint'
 import { createLineGutterPlugin } from '../../gutters/src/lineGutter'
 import { markdownInlineReplacements } from '../../markdown/src/replacements'
 import {
@@ -22,6 +26,36 @@ import manual from '../../../site/src/content/docs/docs/start-here/quick-start.m
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
+    proofDocumentPaintFirstFrame(
+      payload: string,
+      markup: string,
+      width: number,
+      javaScriptEnabled: boolean,
+      activationMode?: 'success' | 'refused' | 'throws' | 'missing' | 'missing-deferred',
+    ): Promise<{
+      image: string
+      text: string | null
+      height: number
+      rows: { text: string | null; x: number; y: number; width: number; height: number }[]
+      heading?: string | null
+      link?: string | null
+      visibility: string
+      gatePending: boolean
+      pending: { visibility: string; height: number; loading: boolean }
+      parsed: {
+        visibility: string
+        gatePending: boolean
+        deferredLoaded: boolean
+        readyState: string
+      } | null
+      frames: { visible: boolean; activated: boolean; highlights: number }[]
+      inputs: string[]
+      counts: number[]
+      sizes: {
+        activation: { bytes: number; gzipBytes: number }
+        paint: { bytes: number; gzipBytes: number }
+      }
+    }>
     proofDocumentPaintScreenshot(label: string): Promise<string>
     proofDocumentPaintResult(result: Record<string, unknown>, payload: string): Promise<void>
     proofDocumentPaintThrottle(rate: number): Promise<boolean>
@@ -281,9 +315,12 @@ it.each([
       restored.dispose()
       const inert = new DOMParser().parseFromString(markup, 'text/html').body.firstElementChild!
       overlay.append(inert)
+      const highlights = activatePaintSnapshotHighlights(inert as HTMLElement, paint)!
+      expect(highlights).not.toBeNull()
       const htmlPaint = await pixels(`markdown-${family}-${dark}-${width}-html`)
       expect(changedPixels(live, htmlPaint)).toBe(0)
       expect(inert.querySelector('script, iframe, style, img')).toBeNull()
+      highlights.dispose()
       overlay.remove()
       scroller.style.visibility = ''
       await benchmark(saved.paint, width, { fixture: 'manual', family, dark })
@@ -873,5 +910,305 @@ it('isolates token resolution from hostile descendant CSS', async () => {
     overlay.remove()
   } finally {
     stylesheet.remove()
+  }
+})
+
+it.each(['Snapshot Mono', 'Snapshot Serif'])(
+  'preserves shaping across token boundaries in %s',
+  async (family) => {
+    const text =
+      "AVATAR office affinity ffi fi fl To Wa\nconst first = createPieceTableSnapshot('hello')\ntext(first) // hello\nlast"
+    const { host, editor } = mount(text, false, family, false)
+    host.style.fontKerning = 'none'
+    host.style.fontVariantLigatures = 'none'
+    editor.setTokens([
+      { start: 1, end: 2, style: { color: '#cc3311' } },
+      { start: 9, end: 10, style: { color: '#cc3311' } },
+      { start: text.indexOf('create'), end: text.indexOf('('), style: { color: '#cc3311' } },
+    ])
+    await frames()
+    const saved = editor.captureSnapshot({ scope: 'document' })
+    expect(saved.status, JSON.stringify(saved)).toBe('ready')
+    if (saved.status !== 'ready') return
+    const paint = decodePaintSnapshot(saved.paint)!
+    for (const width of [320, 390, 1280]) {
+      host.style.width = `${width}px`
+      await frames()
+      const live = await pixels(`shaping-${family}-${width}-live`)
+      const overlay = document.createElement('div')
+      overlay.style.cssText =
+        'position:absolute;inset:0;font-kerning:auto;font-variant-ligatures:normal'
+      host.append(overlay)
+      const restored = mountPaintSnapshot(overlay, paint, { width })!
+      expect(restored.height).toBe(editor.getContentHeight())
+      host.querySelector<HTMLElement>('.editor-virtualized')!.style.visibility = 'hidden'
+      expect(changedPixels(live, await pixels(`shaping-${family}-${width}-static`))).toBe(0)
+      restored.dispose()
+      overlay.remove()
+      host.querySelector<HTMLElement>('.editor-virtualized')!.style.visibility = ''
+    }
+  },
+)
+
+it('activates emitted syntax synchronously at its first visible frame', async () => {
+  const text =
+    "AVATAR office affinity ffi fi fl To Wa\nconst first = createPieceTableSnapshot('hello')\nlast"
+  const { host, editor } = mount(text, false, 'Snapshot Serif', false)
+  host.style.fontKerning = 'none'
+  host.style.fontVariantLigatures = 'none'
+  editor.setTokens([
+    { start: 1, end: 2, style: { color: '#cc3311' } },
+    { start: 9, end: 10, style: { color: '#cc3311' } },
+  ])
+  await frames()
+  const saved = editor.captureSnapshot({ scope: 'document' })
+  expect(saved.status).toBe('ready')
+  if (saved.status !== 'ready') return
+  const paint = decodePaintSnapshot(saved.paint)!
+  for (const width of [320, 390, 1280]) {
+    host.style.width = `${width}px`
+    await frames()
+    const live = await pixels(`first-frame-${width}-live`)
+    const overlay = document.createElement('div')
+    host.append(overlay)
+    const restored = mountPaintSnapshot(overlay, paint, { width })!
+    restored.element.dataset.editorDocumentPaintReady = 'stale-document'
+    const markup = restored.element.outerHTML
+    restored.dispose()
+    overlay.remove()
+    const proof = await commands.proofDocumentPaintFirstFrame(saved.paint, markup, width, true)
+    expect(proof.frames.length).toBeGreaterThan(0)
+    expect(proof.pending).toEqual({
+      visibility: 'hidden',
+      height: editor.getContentHeight(),
+      loading: true,
+    })
+    expect(
+      proof.frames.every((frame) => !frame.visible || (frame.activated && frame.highlights > 0)),
+    ).toBe(true)
+    expect(proof.visibility).toBe('visible')
+    expect(proof.gatePending).toBe(false)
+    expect(changedPixels(live, await imagePixels(proof.image))).toBe(0)
+    expect(proof.height).toBe(editor.getContentHeight())
+    expect(proof.counts[0]).toBeGreaterThan(0)
+    const count = proof.counts[0]!
+    expect(proof.counts).toEqual([count, 2 * count, count, 2 * count, 2 * count])
+    expect(
+      proof.inputs.some((input) => /Editor\.ts|tree-sitter|\.wasm|[\\/]workers?[\\/]/.test(input)),
+    ).toBe(false)
+    expect(proof.sizes.paint.gzipBytes).toBeLessThan(16 * 1024)
+  }
+})
+
+it.each([false, true])(
+  'keeps emitted content readable with identical layout when JavaScript is disabled, Markdown=%s',
+  async (markdown) => {
+    const source = markdown
+      ? '# Heading\n\nRead [link](https://example.com).\n\nLast paragraph.'
+      : 'alpha beta\nlast'
+    const { host, editor } = mount(source, markdown, 'Snapshot Serif', false)
+    await frames()
+    const saved = editor.captureSnapshot({ scope: 'document' })
+    expect(saved.status).toBe('ready')
+    if (saved.status !== 'ready') return
+    const paint = decodePaintSnapshot(saved.paint)!
+    for (const width of [320, 390, 1280]) {
+      host.style.width = `${width}px`
+      await frames()
+      const overlay = document.createElement('div')
+      overlay.style.cssText = 'position:absolute;inset:0'
+      host.append(overlay)
+      const restored = mountPaintSnapshot(overlay, paint, { width })!
+      const root = restored.element
+      const bounds = root.getBoundingClientRect()
+      const rows = [...root.querySelectorAll<HTMLElement>('[data-editor-document-paint-row]')].map(
+        (row) => {
+          const rect = row.getBoundingClientRect()
+          return {
+            text: row.textContent,
+            x: rect.x - bounds.x,
+            y: rect.y - bounds.y,
+            width: rect.width,
+            height: rect.height,
+          }
+        },
+      )
+      const text = root.textContent
+      const markup = root.outerHTML
+      restored.dispose()
+      overlay.remove()
+      const proof = await commands.proofDocumentPaintFirstFrame(saved.paint, markup, width, false)
+      expect(proof.text).toBe(text)
+      expect(proof.height).toBe(editor.getContentHeight())
+      expect(proof.rows).toEqual(rows)
+      if (markdown) {
+        expect(proof.heading).toBe('Heading')
+        expect(proof.link).toBe('https://example.com')
+      }
+      if (!markdown) {
+        const live = await pixels(`javascript-off-code-${width}-live`)
+        expect(changedPixels(live, await imagePixels(proof.image))).toBeGreaterThan(0)
+      }
+      expect(proof.pending.visibility).toBe('visible')
+      expect(proof.pending.loading).toBe(true)
+      expect(proof.gatePending).toBe(false)
+      expect(proof.frames).toEqual([])
+      expect(proof.counts).toEqual([])
+    }
+  },
+)
+
+it('refuses mismatched emitted text and preserves foreign highlight registrations on disposal', async () => {
+  const { host, editor } = mount('alpha beta\nlast', false, 'Snapshot Mono', false)
+  await frames()
+  const saved = editor.captureSnapshot({ scope: 'document' })
+  expect(saved.status).toBe('ready')
+  if (saved.status !== 'ready') return
+  const paint = decodePaintSnapshot(saved.paint)!
+  const restored = mountPaintSnapshot(host, paint)!
+  const markup = restored.element.outerHTML
+  restored.dispose()
+  const root = new DOMParser().parseFromString(markup, 'text/html').body
+    .firstElementChild as HTMLElement
+  host.append(root)
+  const prior = new Set(CSS.highlights.keys())
+  const handle = activatePaintSnapshotHighlights(root, paint)!
+  expect(handle).not.toBeNull()
+  const names = [...CSS.highlights.keys()].filter((name) => !prior.has(name))
+  expect(names.length).toBeGreaterThan(0)
+  const foreign = new Highlight()
+  CSS.highlights.set(names[0]!, foreign)
+  handle.dispose()
+  handle.dispose()
+  expect(CSS.highlights.get(names[0]!)).toBe(foreign)
+  CSS.highlights.delete(names[0]!)
+  root.querySelector<HTMLElement>('[data-editor-document-paint-source-row]')!.textContent = 'wrong'
+  expect(activatePaintSnapshotHighlights(root, paint)).toBeNull()
+  expect([...CSS.highlights.keys()]).toEqual([...prior])
+  root.remove()
+})
+
+it.each(['refused', 'throws', 'missing', 'missing-deferred'] as const)(
+  'reveals streamed emitted content when activation is %s',
+  async (mode) => {
+    const { host, editor } = mount('alpha beta\nlast', false, 'Snapshot Serif', false)
+    await frames()
+    const saved = editor.captureSnapshot({ scope: 'document' })
+    expect(saved.status).toBe('ready')
+    if (saved.status !== 'ready') return
+    const paint = decodePaintSnapshot(saved.paint)!
+    const restored = mountPaintSnapshot(host, paint, { width: 320 })!
+    const markup = restored.element.outerHTML
+    restored.dispose()
+    const proof = await commands.proofDocumentPaintFirstFrame(saved.paint, markup, 320, true, mode)
+    expect(proof.pending.visibility).toBe('hidden')
+    expect(proof.pending.loading).toBe(true)
+    expect(proof.visibility).toBe('visible')
+    expect(proof.gatePending).toBe(false)
+    expect(proof.text).toBe(new DOMParser().parseFromString(markup, 'text/html').body.textContent)
+    expect(proof.height).toBe(editor.getContentHeight())
+    expect(proof.frames.some((frame) => frame.visible)).toBe(true)
+    if (mode === 'missing-deferred')
+      expect(proof.parsed).toEqual({
+        visibility: 'visible',
+        gatePending: false,
+        deferredLoaded: false,
+        readyState: 'interactive',
+      })
+  },
+)
+
+it.each([
+  'repeated',
+  'overlap',
+  'gap',
+  'missing',
+  'reordered',
+  'nested',
+  'oversized-text',
+] as const)('refuses malformed emitted slices: %s before allocating ranges', async (mode) => {
+  const { host, editor } = mount('alpha beta\nlast', false, 'Snapshot Mono', false)
+  await frames()
+  const saved = editor.captureSnapshot({ scope: 'document' })
+  expect(saved.status).toBe('ready')
+  if (saved.status !== 'ready') return
+  const paint = decodePaintSnapshot(saved.paint)!
+  const restored = mountPaintSnapshot(host, paint)!
+  const root = restored.element.cloneNode(true) as HTMLElement
+  restored.dispose()
+  host.append(root)
+  const rows = root.querySelectorAll<HTMLElement>('[data-editor-document-paint-source-row]')
+  const first = rows[0]!
+  if (mode === 'repeated') {
+    const duplicates = document.createDocumentFragment()
+    for (let index = 0; index < 10_001; index++) duplicates.append(first.cloneNode(true))
+    root.append(duplicates)
+  }
+  if (mode === 'overlap') root.append(first.cloneNode(true))
+  if (mode === 'gap') first.dataset.editorDocumentPaintStart = '1'
+  if (mode === 'missing') first.remove()
+  if (mode === 'reordered') root.insertBefore(rows[1]!, first)
+  if (mode === 'nested') first.append(document.createElement('span'))
+  if (mode === 'oversized-text') first.textContent = 'alpha beta'.repeat(10_001)
+  const prior = [...CSS.highlights.entries()]
+  const styles = document.head.querySelectorAll('style').length
+  const createRange = document.createRange.bind(document)
+  let allocations = 0
+  document.createRange = () => {
+    allocations++
+    return createRange()
+  }
+  try {
+    const handle = activatePaintSnapshotHighlights(root, paint)
+    handle?.dispose()
+    expect(handle).toBeNull()
+    expect(allocations).toBe(0)
+    expect([...CSS.highlights.entries()]).toEqual(prior)
+    expect(document.head.querySelectorAll('style').length).toBe(styles)
+  } finally {
+    document.createRange = createRange
+    root.remove()
+  }
+})
+
+it('checks shaping eligibility once per decoded run across wrapped slices', async () => {
+  const text = 'ab'.repeat(64) + '\nlast'
+  const { host, editor } = mount(text, false, 'Snapshot Mono', false)
+  editor.setTokens(
+    Array.from({ length: 128 }, (_, start) => ({
+      start,
+      end: start + 1,
+      style: { color: start % 2 ? '#cc3311' : '#1133cc' },
+    })),
+  )
+  await frames()
+  const saved = editor.captureSnapshot({ scope: 'document' })
+  expect(saved.status).toBe('ready')
+  if (saved.status !== 'ready') return
+  const paint = decodePaintSnapshot(saved.paint)!
+  if (paint.format !== 6) return
+  const restored = mountPaintSnapshot(host, paint, { width: 160 })!
+  expect(restored.rowCount).toBeGreaterThan(paint.rows.length)
+  const root = restored.element.cloneNode(true) as HTMLElement
+  restored.dispose()
+  host.append(root)
+  let reads = 0
+  const runs = paint.rows.flatMap((row) => row.runs)
+  for (const run of runs) {
+    const weight = run.style.fontWeight
+    Object.defineProperty(run.style, 'fontWeight', {
+      get() {
+        reads++
+        return weight
+      },
+    })
+  }
+  const handle = activatePaintSnapshotHighlights(root, paint)
+  try {
+    expect(handle).not.toBeNull()
+    expect(reads).toBe(runs.length)
+  } finally {
+    handle?.dispose()
+    root.remove()
   }
 })
