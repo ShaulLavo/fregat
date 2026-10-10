@@ -5,7 +5,20 @@ import editor from './vitest.editor.config.ts'
 
 export default defineConfig({
   ...editor,
-  optimizeDeps: { include: ['@singapore-editor/tree-sitter > tree-sitter-md', 'web-tree-sitter'] },
+  optimizeDeps: {
+    include: [
+      '@singapore-editor/tree-sitter > tree-sitter-md',
+      'web-tree-sitter',
+      '@noble/hashes/sha2.js',
+      '@noble/hashes/utils.js',
+      '@singapore-editor/core > @fregat/hotkeys > @tanstack/store',
+      '@singapore-editor/core > diff',
+      '@singapore-editor/plugin-ui > remark-gfm',
+      '@singapore-editor/plugin-ui > remark-parse',
+      '@singapore-editor/plugin-ui > remark-stringify',
+      '@singapore-editor/plugin-ui > unified',
+    ],
+  },
   test: {
     ...editor.test,
     include: ['bench/runtime.browser.test.ts'],

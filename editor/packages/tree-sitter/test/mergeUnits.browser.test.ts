@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { resolveTreeSitterLanguageContribution } from '../src'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '../../tree-sitter-languages/src/catalog.generated'
 import { TreeSitterWorkerClient } from '../src/treeSitter/workerClient'
+import type { TreeSitterReviewRead } from '../src/mergeReview'
 import {
   disposeTreeTransportDocuments,
   editTreeDocument,
@@ -22,6 +23,7 @@ beforeEach(async () => {
   await client.registerLanguages(descriptors)
 })
 afterEach(async () => {
+  vi.restoreAllMocks()
   disposeTreeTransportDocuments()
   await client.dispose()
 })
@@ -350,7 +352,7 @@ it('the live review reader admits snapshots and retires worker sources', async (
     backend: client,
   })
   const parse = vi.spyOn(client, 'parse')
-  const project = vi.spyOn(client, 'projectMergeUnits')
+  const project = vi.spyOn(client, 'reviewBatch')
   const base = createPieceTableSnapshot('const value = 0;\n')
   const projected = applyBatchToPieceTable(base, [{ from: 14, to: 15, text: '1' }])
   const ranges = [{ startIndex: 14, endIndex: 15 }]
@@ -359,8 +361,8 @@ it('the live review reader admits snapshots and retires worker sources', async (
     'lexical_declaration',
   )
   expect(parse).toHaveBeenCalledTimes(1)
-  expect(project).toHaveBeenCalledTimes(1)
-  expect(project.mock.calls[0]![0]).toMatchObject({
+  expect(project).toHaveBeenCalledTimes(2)
+  expect(project.mock.calls[1]![0].queries[0]).toMatchObject({
     baseSnapshotVersion: parse.mock.calls[0]![0].snapshotVersion,
     inputEdits: [
       {
@@ -381,7 +383,7 @@ it('the live review reader admits snapshots and retires worker sources', async (
     )
   }
   expect(parse).toHaveBeenCalledTimes(1)
-  expect(project).toHaveBeenCalledTimes(9)
+  expect(project).toHaveBeenCalledTimes(10)
   await syntax.release()
   const retired = await client.inspectRetention()
   expect(retired?.documentCount).toBe(0)
@@ -794,7 +796,7 @@ it('the live review reader preserves nested fence languages in projected units',
     { from: startIndex, to: startIndex + 1, text: '9' },
   ])
   const parse = vi.spyOn(client, 'parse')
-  const project = vi.spyOn(client, 'projectMergeUnits')
+  const project = vi.spyOn(client, 'reviewBatch')
   expect((await syntax(base, ranges, true))?.[0]?.[0]).toMatchObject({
     type: 'pair',
     languageId: 'json',
@@ -805,9 +807,11 @@ it('the live review reader preserves nested fence languages in projected units',
     hasErrors: false,
   })
   expect(parse).toHaveBeenCalledTimes(1)
-  expect(project).toHaveBeenCalledTimes(1)
-  const result = await project.mock.results[0]!.value
-  expect(result).toMatchObject({ languageId: 'markdown', units: [[{ languageId: 'json' }]] })
+  expect(project).toHaveBeenCalledTimes(2)
+  const result = await project.mock.results[1]!.value
+  expect(result).toMatchObject({
+    results: [{ languageId: 'markdown', units: [[{ languageId: 'json' }]] }],
+  })
   await syntax.dispose()
   expect((await client.inspectRetention())?.source.readCount).toBe(0)
 })
@@ -831,20 +835,23 @@ it.each(['stale', 'cancelled'] as const)(
     const ranges = [{ startIndex: 14, endIndex: 15 }]
     await syntax(base, ranges)
     const baseline = await client.inspectRetention()
-    const query = client.projectMergeUnits.bind(client)
+    const query = client.reviewBatch.bind(client)
     const cancellationBuffer = new SharedArrayBuffer(4)
     Atomics.store(new Int32Array(cancellationBuffer), 0, 1)
-    const project = vi
-      .spyOn(client, 'projectMergeUnits')
-      .mockImplementation((request) =>
-        query(
-          status === 'stale'
-            ? { ...request, baseSnapshotVersion: -1 }
-            : { ...request, cancellationBuffer },
+    const project = vi.spyOn(client, 'reviewBatch').mockImplementation((request) =>
+      query({
+        ...request,
+        queries: request.queries.map((item) =>
+          item.type === 'projectMergeUnits'
+            ? status === 'stale'
+              ? { ...item, baseSnapshotVersion: -1 }
+              : { ...item, cancellationBuffer }
+            : item,
         ),
-      )
+      }),
+    )
     expect(await syntax(projected, ranges, false, 'enclosing', base)).toBeNull()
-    expect(await project.mock.results[0]!.value).toMatchObject({ status, units: [] })
+    expect(await project.mock.results[0]!.value).toMatchObject({ results: [{ status, units: [] }] })
     expect((await client.inspectRetention())?.source).toEqual(baseline?.source)
     project.mockRestore()
     expect((await syntax(projected, ranges, false, 'enclosing', base))?.[0]?.[0]?.type).toBe(
@@ -854,3 +861,579 @@ it.each(['stale', 'cancelled'] as const)(
     expect((await client.inspectRetention())?.source.readCount).toBe(0)
   },
 )
+
+it('groups current ranges and independent projections without changing units or retaining sources', async () => {
+  const { createTreeSitterReviewSyntax } = await import('../src/mergeReview')
+  const { createPieceTableSnapshot, applyBatchToPieceTable } =
+    await import('@singapore-editor/core/document')
+  const descriptor = await resolveTreeSitterLanguageContribution(
+    TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+  )
+  const syntax = createTreeSitterReviewSyntax({
+    languageId: 'typescript',
+    languages: [descriptor],
+    backend: client,
+  })
+  const base = createPieceTableSnapshot('const value = 0;\n')
+  const ranges = Array.from({ length: 100 }, () => ({ startIndex: 14, endIndex: 15 }))
+  const current = await syntax(base, ranges)
+  const before = await client.inspectRetention()
+  const batch = vi.spyOn(client, 'reviewBatch')
+  const reads = [{ snapshot: base, ranges }].concat(
+    Array.from({ length: 10 }, (_, index) => ({
+      snapshot: applyBatchToPieceTable(base, [{ from: 14, to: 15, text: String(index) }]),
+      ranges,
+      baseSnapshot: base,
+    })),
+  )
+  const result = await syntax.batch(reads)
+  expect(batch).toHaveBeenCalledTimes(1)
+  expect(result).toHaveLength(11)
+  expect(result.every((units) => JSON.stringify(units) === JSON.stringify(current))).toBe(true)
+  expect((await client.inspectRetention())?.source).toEqual(before?.source)
+  await syntax.release()
+  const after = await client.inspectRetention()
+  expect(after?.documentCount).toBe(0)
+  expect(after?.source.readCount).toBe(0)
+  await syntax.dispose()
+})
+
+it('reports stale and cancelled batch entries independently in input order', async () => {
+  const text = 'const value = 0;\n'
+  await parseTreeDocument(client, {
+    ...document,
+    snapshotVersion: 1,
+    text,
+    resultMode: 'parseOnly',
+  })
+  const cancellationBuffer = new SharedArrayBuffer(4)
+  Atomics.store(new Int32Array(cancellationBuffer), 0, 1)
+  const query = {
+    ...document,
+    type: 'mergeUnits' as const,
+    snapshotVersion: 1,
+    ranges: [{ startIndex: 14, endIndex: 15 }],
+  }
+  const result = await client.reviewBatch({
+    runtimeSessionId: document.runtimeSessionId,
+    queries: [{ ...query, snapshotVersion: -1 }, { ...query, cancellationBuffer }, query],
+  })
+  expect(result?.results.map((entry) => entry.status)).toEqual(['stale', 'cancelled', 'ok'])
+  client.disposeDocument(document.runtimeSessionId)
+  await client.awaitRuntimeSessionIdle(document.runtimeSessionId)
+  expect(
+    (await client.reviewBatch({ runtimeSessionId: document.runtimeSessionId, queries: [query] }))
+      ?.results[0]?.status,
+  ).toBe('stale')
+})
+
+it('cancels a posted batch when its runtime is disposed and waits for cleanup', async () => {
+  const queued = new TreeSitterWorkerClient({
+    workerFactory() {
+      const worker = new Worker(
+        new URL('../src/treeSitter/treeSitter.worker.ts', import.meta.url),
+        { type: 'module' },
+      )
+      const send = worker.postMessage.bind(worker)
+      worker.postMessage = (message, options?: StructuredSerializeOptions | Transferable[]) => {
+        if (message.payload?.type === 'reviewBatch')
+          queued.disposeDocument(message.payload.runtimeSessionId)
+        if (Array.isArray(options)) send(message, options)
+        else send(message, options)
+      }
+      return worker
+    },
+  })
+  try {
+    const descriptor = await resolveTreeSitterLanguageContribution(
+      TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+    )
+    await queued.registerLanguages([descriptor])
+    const identity = { ...document, runtimeSessionId: 'dispose-review-batch', snapshotVersion: 1 }
+    await parseTreeDocument(queued, {
+      ...identity,
+      text: 'const value = 0;\n',
+      resultMode: 'parseOnly',
+    })
+    expect(
+      await queued.reviewBatch({
+        runtimeSessionId: identity.runtimeSessionId,
+        queries: [
+          {
+            ...identity,
+            type: 'mergeUnits',
+            ranges: [{ startIndex: 14, endIndex: 15 }],
+          },
+          {
+            ...identity,
+            type: 'mergeUnits',
+            cancellationBuffer: new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT),
+            ranges: [{ startIndex: 14, endIndex: 15 }],
+          },
+        ],
+      }),
+    ).toMatchObject({
+      results: [
+        { status: 'cancelled', units: [] },
+        { status: 'cancelled', units: [] },
+      ],
+    })
+    await queued.awaitRuntimeSessionIdle(identity.runtimeSessionId)
+    const retention = await queued.inspectRetention()
+    expect(retention?.documentCount).toBe(0)
+    expect(retention?.source.readCount).toBe(0)
+  } finally {
+    await queued.dispose()
+  }
+})
+
+it('retires every projected source when a loan release rejects', async () => {
+  const { createTreeSitterReviewSyntax } = await import('../src/mergeReview')
+  const { createPieceTableSnapshot, applyBatchToPieceTable } =
+    await import('@singapore-editor/core/document')
+  const descriptor = await resolveTreeSitterLanguageContribution(
+    TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+  )
+  const syntax = createTreeSitterReviewSyntax({
+    languageId: 'typescript',
+    languages: [descriptor],
+    backend: client,
+  })
+  const base = createPieceTableSnapshot('const value = 0;\n')
+  await syntax(base, [])
+  const connect = client.sourceEndpoint.connect.bind(client.sourceEndpoint)
+  let releases = 0
+  const spy = vi.spyOn(client.sourceEndpoint, 'connect').mockImplementation(async () => {
+    const connection = await connect()
+    if (!connection) return null
+    return {
+      ...connection,
+      send: (command, signal) => {
+        if (command.kind === 'unpin') {
+          releases++
+          return Promise.reject('loan release refused')
+        }
+        return connection.send(command, signal)
+      },
+    }
+  })
+  try {
+    await expect(
+      syntax.batch(
+        Array.from({ length: 2 }, (_, index) => ({
+          snapshot: applyBatchToPieceTable(base, [{ from: 14, to: 15, text: String(index + 1) }]),
+          ranges: [{ startIndex: 14, endIndex: 15 }],
+          baseSnapshot: base,
+        })),
+      ),
+    ).rejects.toBe('loan release refused')
+    expect(releases).toBe(2)
+    await syntax.release()
+    const retention = await client.inspectRetention()
+    expect(retention?.documentCount).toBe(0)
+    expect(retention?.source.readCount).toBe(0)
+  } finally {
+    spy.mockRestore()
+    await syntax.dispose()
+  }
+})
+
+it('bounded review requests let highlighting finish before a large review settles', async () => {
+  await parseTreeDocument(client, {
+    ...document,
+    snapshotVersion: 1,
+    text: 'const value = 0;\n',
+    resultMode: 'parseOnly',
+  })
+  const posted: number[] = []
+  const native = Worker.prototype.postMessage
+  vi.spyOn(Worker.prototype, 'postMessage').mockImplementation(function (
+    this: Worker,
+    message,
+    options,
+  ) {
+    if (message.payload?.type === 'reviewBatch')
+      posted.push(
+        message.payload.queries.reduce(
+          (sum: number, query: { ranges: unknown[] }) => sum + Math.max(1, query.ranges.length),
+          0,
+        ),
+      )
+    if (Array.isArray(options)) native.call(this, message, options)
+    else native.call(this, message, options)
+  })
+  let settled = false
+  const review = client
+    .reviewBatch({
+      runtimeSessionId: document.runtimeSessionId,
+      queries: [
+        {
+          ...document,
+          snapshotVersion: 1,
+          type: 'mergeUnits',
+          ranges: Array.from({ length: 20_000 }, () => ({ startIndex: 14, endIndex: 15 })),
+        },
+      ],
+    })
+    .then((result) => {
+      settled = true
+      return result
+    })
+  await vi.waitFor(() => expect(posted.length).toBeGreaterThan(0))
+  const highlighted = await client.queryRange({
+    ...document,
+    snapshotVersion: 1,
+    includeCaptures: true,
+    range: { startIndex: 0, endIndex: 16 },
+  })
+  expect(highlighted?.captures.length).toBeGreaterThan(0)
+  expect(settled).toBe(false)
+  const result = await review
+  expect(result?.results[0]?.units).toHaveLength(20_000)
+  expect(Math.max(...posted)).toBeLessThanOrEqual(256)
+  expect(posted).toHaveLength(Math.ceil(20_000 / 256))
+  vi.restoreAllMocks()
+}, 60_000)
+
+it.each(['current', 'projected'] as const)(
+  'whole-batch cancellation wins over a live %s entry flag',
+  async (kind) => {
+    await parseTreeDocument(client, {
+      ...document,
+      snapshotVersion: 1,
+      text: 'const value = 0;\n',
+      resultMode: 'parseOnly',
+    })
+    const prepared = await prepareTreeEdit(client, {
+      ...document,
+      previousSnapshotVersion: 1,
+      snapshotVersion: 2,
+      edits: [{ from: 14, to: 15, text: '1' }],
+      resultMode: 'parseOnly',
+    })
+    const outer = new SharedArrayBuffer(4)
+    Atomics.store(new Int32Array(outer), 0, 1)
+    const common = {
+      ...document,
+      cancellationBuffer: new SharedArrayBuffer(4),
+      ranges: [{ startIndex: 14, endIndex: 15 }],
+    }
+    const before = await client.inspectRetention()
+    try {
+      const query =
+        kind === 'current'
+          ? { ...common, type: 'mergeUnits' as const, snapshotVersion: 1 }
+          : {
+              ...common,
+              type: 'projectMergeUnits' as const,
+              baseSnapshotVersion: 1,
+              snapshotVersion: 2,
+              source: prepared!.payload.source,
+              inputEdits: prepared!.payload.inputEdits,
+            }
+      expect(
+        await client.reviewBatch({
+          runtimeSessionId: document.runtimeSessionId,
+          cancellationBuffer: outer,
+          queries: [query],
+        }),
+      ).toMatchObject({ results: [{ status: 'cancelled', units: [] }] })
+      expect((await client.inspectRetention())?.source).toEqual(before?.source)
+      expect((await client.inspectRetention())?.treeCount).toBe(before?.treeCount)
+    } finally {
+      await prepared!.prepared.dispose()
+    }
+  },
+  60_000,
+)
+
+it.each([0, 3_000_000])(
+  'batch retention matches sequential reads across current snapshots and projected bases with %i padding',
+  async (paddingSize) => {
+    const { createTreeSitterReviewSyntax } = await import('../src/mergeReview')
+    const { createPieceTableSnapshot, applyBatchToPieceTable } =
+      await import('@singapore-editor/core/document')
+    const descriptor = await resolveTreeSitterLanguageContribution(
+      TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+    )
+    const syntax = createTreeSitterReviewSyntax({
+      languageId: 'typescript',
+      languages: [descriptor],
+      backend: client,
+    })
+    const padding = paddingSize ? '/*' + 'x'.repeat(paddingSize) + '*/\n' : ''
+    const snapshots = Array.from({ length: paddingSize ? 3 : 7 }, (_, index) =>
+      createPieceTableSnapshot(padding + `const value = ${index};\n`),
+    )
+    const ranges = [{ startIndex: padding.length + 14, endIndex: padding.length + 15 }]
+    const reads: TreeSitterReviewRead[] = snapshots
+      .map((snapshot) => ({ snapshot, ranges }))
+      .concat(
+        snapshots.map((baseSnapshot) => ({
+          snapshot: applyBatchToPieceTable(baseSnapshot, [
+            { from: padding.length + 14, to: padding.length + 15, text: '9' },
+          ]),
+          baseSnapshot,
+          ranges,
+        })),
+      )
+    const expected = []
+    for (const read of reads)
+      expected.push(await syntax(read.snapshot, read.ranges, false, 'enclosing', read.baseSnapshot))
+    await syntax.release()
+    expect(await syntax.batch(reads)).toEqual(expected)
+    await syntax.dispose()
+    expect((await client.inspectRetention())?.source.readCount).toBe(0)
+    expect((await client.inspectRetention())?.documentCount).toBe(0)
+  },
+  60_000,
+)
+
+it.each(['cancel', 'supersede'] as const)(
+  'stops current and projected entries after work starts when the batch is %s',
+  async (action) => {
+    await parseTreeDocument(client, {
+      ...document,
+      snapshotVersion: 1,
+      text: 'const value = 0;\n',
+      resultMode: 'parseOnly',
+    })
+    const prepared = await prepareTreeEdit(client, {
+      ...document,
+      previousSnapshotVersion: 1,
+      snapshotVersion: 2,
+      edits: [{ from: 14, to: 15, text: '1' }],
+      resultMode: 'parseOnly',
+    })
+    const outer = new SharedArrayBuffer(4)
+    const local = new SharedArrayBuffer(4)
+    const ranges = Array.from({ length: 20_000 }, () => ({ startIndex: 14, endIndex: 15 }))
+    let posted = false
+    const native = Worker.prototype.postMessage
+    vi.spyOn(Worker.prototype, 'postMessage').mockImplementation(function (
+      this: Worker,
+      message,
+      options,
+    ) {
+      if (message.payload?.type === 'reviewBatch') posted = true
+      if (Array.isArray(options)) native.call(this, message, options)
+      else native.call(this, message, options)
+    })
+    try {
+      const pending = client.reviewBatch({
+        runtimeSessionId: document.runtimeSessionId,
+        cancellationBuffer: outer,
+        queries: [
+          {
+            ...document,
+            type: 'mergeUnits',
+            snapshotVersion: 1,
+            ranges,
+            cancellationBuffer: local,
+          },
+          {
+            ...document,
+            type: 'projectMergeUnits',
+            baseSnapshotVersion: 1,
+            snapshotVersion: 2,
+            ranges,
+            source: prepared!.payload.source,
+            inputEdits: prepared!.payload.inputEdits,
+            cancellationBuffer: local,
+          },
+        ],
+      })
+      await vi.waitFor(() => expect(posted).toBe(true))
+      await client.queryRange({
+        ...document,
+        snapshotVersion: 1,
+        range: { startIndex: 0, endIndex: 16 },
+      })
+      if (action === 'cancel') Atomics.store(new Int32Array(outer), 0, 1)
+      else
+        await parseTreeDocument(client, {
+          ...document,
+          snapshotVersion: 3,
+          text: 'const value = 3;\n',
+          resultMode: 'parseOnly',
+        })
+      expect((await pending)?.results.map((result) => result.status)).toEqual([
+        'cancelled',
+        'cancelled',
+      ])
+      expect(Atomics.load(new Int32Array(local), 0)).toBe(0)
+    } finally {
+      vi.restoreAllMocks()
+      await prepared!.prepared.dispose()
+      client.disposeDocument(document.runtimeSessionId)
+      await client.awaitRuntimeSessionIdle(document.runtimeSessionId)
+    }
+    expect((await client.inspectRetention())?.source.readCount).toBe(0)
+  },
+  60_000,
+)
+
+it('declares retained review snapshots immutable before parsing them', async () => {
+  const { createTreeSitterReviewSyntax } = await import('../src/mergeReview')
+  const { createPieceTableSnapshot } = await import('@singapore-editor/core/document')
+  const descriptor = await resolveTreeSitterLanguageContribution(
+    TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+  )
+  const syntax = createTreeSitterReviewSyntax({
+    languageId: 'typescript',
+    languages: [descriptor],
+    backend: client,
+  })
+  const parse = vi.spyOn(client, 'parse')
+  try {
+    expect(
+      await syntax(createPieceTableSnapshot('const value = 0;\n'), [
+        { startIndex: 14, endIndex: 15 },
+      ]),
+    ).not.toBeNull()
+    expect(parse).toHaveBeenCalledWith(
+      expect.objectContaining({ readOnly: true, resultMode: 'parseOnly' }),
+    )
+  } finally {
+    await syntax.dispose()
+  }
+})
+
+it.each([false, true])(
+  'immutable bases require fresh mutable parsing before edit, same-version promotion=%s',
+  async (promote) => {
+    const text = 'const value = 0;\nfunction read() { return value; }\n'
+    const editedText = text.replace('= 0', '= 2')
+    const oracle = { ...document, runtimeSessionId: 'mutable-oracle' }
+    try {
+      const full = await parseTreeDocument(client, {
+        ...oracle,
+        snapshotVersion: 1,
+        text: editedText,
+        includeCaptures: true,
+      })
+      expect(full?.timings.some((phase) => phase.name === 'treeSitter.parseRoot')).toBe(true)
+      expect(full?.tokensPacked?.starts.length).toBeGreaterThan(0)
+      await parseTreeDocument(client, {
+        ...document,
+        snapshotVersion: 1,
+        text,
+        readOnly: true,
+        resultMode: 'parseOnly',
+      })
+      let promotedRoot = false
+      if (promote) {
+        const promoted = await parseTreeDocument(client, {
+          ...document,
+          snapshotVersion: 1,
+          text,
+          includeCaptures: true,
+        })
+        promotedRoot =
+          promoted?.timings.some((phase) => phase.name === 'treeSitter.parseRoot') ?? false
+      }
+      const prepared = await prepareTreeEdit(client, {
+        ...document,
+        previousSnapshotVersion: 1,
+        snapshotVersion: 2,
+        edits: [{ from: 14, to: 15, text: '2' }],
+        includeCaptures: true,
+      })
+      const edited = await editTreeDocument(client, prepared!)
+      expect(edited?.captures).toEqual(full?.captures)
+      expect(edited?.tokensPacked).toEqual(full?.tokensPacked)
+      expect(edited?.errors).toEqual(full?.errors)
+      expect(edited?.snapshotVersion).toBe(2)
+      if (promote) {
+        expect(promotedRoot).toBe(true)
+        expect(edited?.timings.some((phase) => phase.name === 'treeSitter.edit')).toBe(true)
+      } else {
+        expect(edited?.timings.some((phase) => phase.name === 'treeSitter.edit')).toBe(false)
+        expect(edited?.timings.some((phase) => phase.name === 'treeSitter.parseRoot')).toBe(true)
+        expect((await client.inspectRetention())?.treeCount).toBe(2)
+      }
+    } finally {
+      for (const runtime of [document.runtimeSessionId, oracle.runtimeSessionId]) {
+        client.disposeDocument(runtime)
+        await client.awaitRuntimeSessionIdle(runtime)
+      }
+      const retained = await client.inspectRetention()
+      expect(retained?.treeCount).toBe(0)
+      expect(retained?.source.readCount).toBe(0)
+    }
+  },
+)
+
+it('read-only requests preserve a mutable base and its next incremental edit', async () => {
+  const text = 'const value = 0;\nfunction read() { return value; }\n'
+  const oracle = { ...document, runtimeSessionId: 'mutable-read-oracle' }
+  try {
+    const full = await parseTreeDocument(client, {
+      ...oracle,
+      snapshotVersion: 1,
+      text: text.replace('= 0', '= 2'),
+      includeCaptures: true,
+    })
+    expect(full?.timings.some((phase) => phase.name === 'treeSitter.parseRoot')).toBe(true)
+    expect(full?.tokensPacked?.starts.length).toBeGreaterThan(0)
+    await parseTreeDocument(client, {
+      ...oracle,
+      snapshotVersion: 2,
+      text,
+      includeCaptures: true,
+    })
+    const controlPrepared = await prepareTreeEdit(client, {
+      ...oracle,
+      previousSnapshotVersion: 2,
+      snapshotVersion: 3,
+      edits: [{ from: 14, to: 15, text: '2' }],
+      includeCaptures: true,
+    })
+    expect(controlPrepared).not.toBeNull()
+    const control = await editTreeDocument(client, controlPrepared!)
+    expect(control?.timings.some((phase) => phase.name === 'treeSitter.edit')).toBe(true)
+    expect(control?.timings.some((phase) => phase.name === 'treeSitter.parseRoot')).toBe(true)
+    await parseTreeDocument(client, {
+      ...document,
+      snapshotVersion: 1,
+      text,
+      includeCaptures: true,
+    })
+    const read = await parseTreeDocument(client, {
+      ...document,
+      snapshotVersion: 1,
+      text,
+      readOnly: true,
+      resultMode: 'parseOnly',
+    })
+    const prepared = await prepareTreeEdit(client, {
+      ...document,
+      previousSnapshotVersion: 1,
+      snapshotVersion: 2,
+      edits: [{ from: 14, to: 15, text: '2' }],
+      includeCaptures: true,
+    })
+    expect(prepared).not.toBeNull()
+    const edited = await editTreeDocument(client, prepared!)
+    expect(edited?.captures).toEqual(full?.captures)
+    expect(edited?.tokensPacked).toEqual(full?.tokensPacked)
+    expect(edited?.errors).toEqual(full?.errors)
+    expect(edited?.snapshotVersion).toBe(2)
+    expect(edited?.timings.some((phase) => phase.name === 'treeSitter.edit')).toBe(true)
+    expect(edited?.captures).toEqual(control?.captures)
+    expect(edited?.tokensPacked).toEqual(control?.tokensPacked)
+    expect(edited?.errors).toEqual(control?.errors)
+    expect(edited?.timings.map((phase) => phase.name)).toEqual(
+      control?.timings.map((phase) => phase.name),
+    )
+    expect(read?.timings.some((phase) => phase.name === 'treeSitter.parseRoot')).toBe(false)
+  } finally {
+    for (const runtime of [document.runtimeSessionId, oracle.runtimeSessionId]) {
+      client.disposeDocument(runtime)
+      await client.awaitRuntimeSessionIdle(runtime)
+    }
+    const retained = await client.inspectRetention()
+    expect(retained?.treeCount).toBe(0)
+    expect(retained?.source.readCount).toBe(0)
+  }
+})

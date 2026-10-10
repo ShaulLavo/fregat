@@ -141,6 +141,8 @@ it('refuses unsafe style values and malformed heading facts', () => {
   const paint = fixture()
   for (const replacement of [
     { color: 'url(https://example.com)' },
+    { color: 'var(--editor-syntax-keyword)' },
+    { backgroundColor: 'var(--editor-background)' },
     { backgroundColor: 'expression(alert(1))' },
     { fontSize: '1000000px' },
     { fontFamily: 'url(example.com)' },

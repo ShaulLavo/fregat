@@ -161,6 +161,23 @@ export type TreeSitterMergeUnitResult = {
   | { readonly status: 'stale' | 'cancelled'; readonly unit: null }
 )
 
+export type TreeSitterReviewBatchRequest = {
+  readonly type: 'reviewBatch'
+  readonly cancellationBuffer?: SharedArrayBuffer
+  readonly runtimeSessionId: string
+  readonly queries: readonly (
+    | (Omit<TreeSitterMergeUnitRequest, 'type' | 'range'> & {
+        readonly type: 'mergeUnits'
+        readonly ranges: readonly TreeSitterSyntaxRange[]
+      })
+    | TreeSitterProjectedMergeUnitsRequest
+  )[]
+}
+
+export type TreeSitterReviewBatchResult = {
+  readonly results: readonly TreeSitterProjectedMergeUnitsResult[]
+}
+
 export type TreeSitterProjectedMergeUnitsRequest = {
   readonly type: 'projectMergeUnits'
   readonly documentId: string
@@ -218,6 +235,8 @@ export type TreeSitterParseRequest = {
   readonly includeHighlights: boolean
   readonly includeCaptures?: boolean
   readonly resultMode?: 'full' | 'parseOnly' | 'bootstrap'
+  /** Immutable snapshots need no background warm-up for a later edit. */
+  readonly readOnly?: boolean
   readonly source: DocumentWorkerReadReference
   readonly generation: number
   readonly cancellationBuffer?: SharedArrayBuffer
@@ -308,6 +327,7 @@ export type TreeSitterWorkerRequestPayload =
   | TreeSitterSelectionRequest
   | TreeSitterMergeUnitRequest
   | TreeSitterProjectedMergeUnitsRequest
+  | TreeSitterReviewBatchRequest
   | TreeSitterDisposeDocumentRequest
   | TreeSitterRuntimeBarrierRequest
   | TreeSitterIdleFenceRequest
@@ -321,6 +341,7 @@ export type TreeSitterWorkerResult =
   | TreeSitterSelectionResult
   | TreeSitterMergeUnitResult
   | TreeSitterProjectedMergeUnitsResult
+  | TreeSitterReviewBatchResult
   | { readonly retention: TreeSitterWorkerRetentionSnapshot }
   | undefined
 

@@ -12,6 +12,7 @@ import { lineMergeUnit } from '../../tree-sitter/src/treeSitter/mergeUnits'
 import { createDocumentTextSnapshot } from '@singapore-editor/core/document'
 import { MergeReviewDetector } from '../src/merge-review'
 import { ReviewView } from '../src/review-view'
+import { hoverControllerFor } from '@singapore-editor/plugin-ui/hover-registry'
 import { EditorRoom } from '../test/editor-fixture'
 import { workload } from './workload'
 
@@ -35,6 +36,7 @@ test('measure real worker batches, dense conflicts, mark painting and hover open
       TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((entry) => entry.id === 'typescript')!,
     ),
   ]
+  let allRequests = 0
   const requests: {
     type: string
     start: number
@@ -51,7 +53,9 @@ test('measure real worker batches, dense conflicts, mark painting and hover open
       const pending = new Map<number, (typeof requests)[number]>()
       const send = worker.postMessage.bind(worker)
       worker.postMessage = (message, options?: StructuredSerializeOptions | Transferable[]) => {
+        allRequests++
         if (
+          message.payload?.type === 'reviewBatch' ||
           message.payload?.type === 'mergeUnit' ||
           message.payload?.type === 'projectMergeUnits'
         ) {
@@ -84,6 +88,7 @@ test('measure real worker batches, dense conflicts, mark painting and hover open
         const window = new ConfirmedWindow(prefix)
         window.append(batch)
         requests.length = 0
+        allRequests = 0
         const before = performance.now()
         const result = await detector.detect(
           window,
@@ -100,9 +105,40 @@ test('measure real worker batches, dense conflicts, mark painting and hover open
           requestJsonUtf8Bytes: bytes(request.request),
           resultJsonUtf8Bytes: bytes(request.result),
           roundTripMs: request.end! - request.start,
+          sentAtEpochMs: performance.timeOrigin + request.start,
+          receivedAtEpochMs: performance.timeOrigin + request.end!,
+          workerProfile:
+            (request.result as { result?: { profile?: unknown } } | undefined)?.result?.profile ??
+            null,
         }))
         expect(messages.every((message) => Number.isFinite(message.roundTripMs))).toBe(true)
-        if (pass >= 0) batches.push({ mode, elapsedMs, marks: result.marks.length, messages })
+        const workerRequests = allRequests
+        expect(messages).toHaveLength(1)
+        expect(workerRequests).toBe(1)
+        const serial = new MergeReviewDetector((...args) => syntax(...args))
+        expect(
+          await serial.detect(
+            window,
+            confirmed,
+            batch.map((edit) => edit.id),
+          ),
+        ).toEqual(result)
+        const markHash = Array.from(
+          new Uint8Array(
+            await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(result))),
+          ),
+          (byte) => byte.toString(16).padStart(2, '0'),
+        ).join('')
+        if (pass >= 0)
+          batches.push({
+            mode,
+            elapsedMs,
+            marks: result.marks.length,
+            messages,
+            workerRequests,
+            markHash,
+            exactMarkEquality: true,
+          })
         await syntax.release()
       }
     }
@@ -130,6 +166,14 @@ test('measure real worker batches, dense conflicts, mark painting and hover open
             ]),
         })
         try {
+          await expect
+            .poll(
+              () =>
+                Array.from(room.host.querySelectorAll<HTMLElement>('*')).filter(
+                  (element) => hoverControllerFor(element) !== null,
+                ).length,
+            )
+            .toBe(2)
           await frames()
           updates.length = 0
           editPeers(room, count, line.length)

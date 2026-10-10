@@ -1,4 +1,5 @@
 import type { TreeSitterLanguageDescriptor } from './registry'
+import { REVIEW_BATCH_RANGE_LIMIT } from './reviewBatch'
 import type {
   DocumentSourceConnection,
   DocumentSourceEndpoint,
@@ -18,6 +19,8 @@ import type {
   TreeSitterRangeResult,
   TreeSitterSelectionRequest,
   TreeSitterMergeUnitRequest,
+  TreeSitterReviewBatchRequest,
+  TreeSitterReviewBatchResult,
   TreeSitterMergeUnitResult,
   TreeSitterProjectedMergeUnitsRequest,
   TreeSitterProjectedMergeUnitsResult,
@@ -60,6 +63,8 @@ export type TreeSitterParsePayload = {
   readonly includeHighlights?: boolean
   readonly includeCaptures?: boolean
   readonly resultMode?: 'full'
+  /** Immutable snapshots need no background warm-up for a later edit. */
+  readonly readOnly?: boolean
   readonly source: DocumentWorkerReadReference
 }
 export type TreeSitterParseOnlyPayload = Omit<TreeSitterParsePayload, 'resultMode'> & {
@@ -139,6 +144,9 @@ export type TreeSitterBackend = {
     payload: TreeSitterRangePayload,
     signal?: AbortSignal,
   ): Promise<TreeSitterRangeResult | undefined>
+  reviewBatch?(
+    payload: Omit<TreeSitterReviewBatchRequest, 'type'>,
+  ): Promise<TreeSitterReviewBatchResult | undefined>
   projectMergeUnits?(
     payload: TreeSitterProjectedMergeUnitsPayload,
   ): Promise<TreeSitterProjectedMergeUnitsResult | undefined>
@@ -275,6 +283,7 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
       includeHighlights: payload.includeHighlights ?? true,
       includeCaptures: payload.includeCaptures,
       resultMode: payload.resultMode,
+      readOnly: payload.readOnly,
       source: payload.source,
     }
     const result = await this.postDocumentRequest(request, signal)
@@ -357,6 +366,81 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
       signal,
     )
     return isTreeSitterRangeResult(result) ? result : undefined
+  }
+
+  public reviewBatch(
+    payload: Omit<TreeSitterReviewBatchRequest, 'type'>,
+  ): Promise<TreeSitterReviewBatchResult | undefined> {
+    return this.trackRuntimeTask(payload.runtimeSessionId, this.finishReviewBatch(payload))
+  }
+
+  private async finishReviewBatch(
+    payload: Omit<TreeSitterReviewBatchRequest, 'type'>,
+  ): Promise<TreeSitterReviewBatchResult | undefined> {
+    if (!(await this.ensureWorkerReady())) return undefined
+    const cancellationBuffer =
+      payload.cancellationBuffer ??
+      (this.createCancellationFlag()?.buffer as SharedArrayBuffer | undefined)
+    const results: TreeSitterProjectedMergeUnitsResult[] = payload.queries.map((query) => ({
+      documentId: query.documentId,
+      snapshotVersion: query.snapshotVersion,
+      languageId: query.languageId,
+      status: 'ok',
+      units: [],
+    }))
+    const cancellationFlag = cancellationBuffer ? new Int32Array(cancellationBuffer) : null
+    const cancelRemaining = (first: number): void => {
+      for (let remaining = first; remaining < results.length; remaining++)
+        results[remaining] = { ...results[remaining]!, status: 'cancelled', units: [] }
+    }
+    let queries: TreeSitterReviewBatchRequest['queries'][number][] = []
+    let indices: number[] = []
+    let ranges = 0
+    let sent = false
+    const send = async (): Promise<boolean> => {
+      if (!queries.length) return true
+      const result = await this.postRequest({
+        type: 'reviewBatch',
+        runtimeSessionId: payload.runtimeSessionId,
+        cancellationBuffer,
+        queries,
+      })
+      if (!result || !('results' in result) || result.results.length !== indices.length)
+        return false
+      sent = true
+      for (let part = 0; part < indices.length; part++) {
+        const index = indices[part]!
+        const next = result.results[part]!
+        const previous = results[index]!
+        if (previous.status !== 'ok') continue
+        results[index] =
+          next.status === 'ok' ? { ...next, units: previous.units.concat(next.units) } : next
+      }
+      queries = []
+      indices = []
+      ranges = 0
+      return true
+    }
+    for (let index = 0; index < payload.queries.length; index++) {
+      const query = payload.queries[index]!
+      for (let start = 0; start < Math.max(1, query.ranges.length);) {
+        if (sent && cancellationFlag && Atomics.load(cancellationFlag, 0) === 1) {
+          cancelRemaining(Math.min(index, indices[0] ?? index))
+          return { results }
+        }
+        const count = Math.min(
+          REVIEW_BATCH_RANGE_LIMIT - ranges,
+          Math.max(1, query.ranges.length - start),
+        )
+        queries.push({ ...query, ranges: query.ranges.slice(start, start + count) })
+        indices.push(index)
+        ranges += count
+        start += count
+        if (ranges === REVIEW_BATCH_RANGE_LIMIT && !(await send())) return undefined
+      }
+    }
+    if (!(await send())) return undefined
+    return { results }
   }
 
   public mergeUnit(
@@ -749,6 +833,9 @@ export class TreeSitterWorkerOwner {
   }
   [backendBinding](): TreeSitterBackend {
     return this.#backend
+  }
+  reviewBatch(payload: Omit<TreeSitterReviewBatchRequest, 'type'>) {
+    return this.#backend.reviewBatch(payload)
   }
   projectMergeUnits(
     payload: TreeSitterProjectedMergeUnitsPayload,
