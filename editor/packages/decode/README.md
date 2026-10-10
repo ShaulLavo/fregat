@@ -2,7 +2,7 @@
 
 Text reveal animations for documents opened in the Singapore editor.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -38,13 +38,13 @@ editor.openDocument({
 - `mode` selects line, parallel, token, or diffusion reveals.
 - `maxDurationMs` caps the animation duration.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/decode/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/decode/overview/)
 
 ## In the Singapore family
 
 `@singapore-editor/core` owns the editor view. Add this plugin to animate newly opened documents.
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

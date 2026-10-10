@@ -9,7 +9,7 @@
   <a href="docs/development.md"><img src="https://img.shields.io/badge/install-source-blue" alt="Run from source" /></a>
 </p>
 <p align="center">
-  <a href="https://shaulavo.dev/fregat/">Website</a> ·
+  <a href="https://fregat.shaulavo.dev/">Website</a> ·
   <a href="docs/README.md">Documentation</a> ·
   <a href="PLAN.md">Roadmap</a> ·
   <a href="https://github.com/ShaulLavo/fregat/discussions">Discussions</a>
@@ -30,7 +30,7 @@ Fregat is early. Expect bugs and changing APIs. You can run it from source today
 "Isn't this just Cursor?" The familiar part is a code workspace with agents.
 The reason to try Fregat is how your work survives, and how much control you have over an agent's changes.
 
-- **Our own editor and terminal.** [Singapore](https://shaulavo.dev/singapore/) keeps readable versions of your text. [ghostty-webgpu](https://shaulavo.dev/ghostty-webgpu/) brings Ghostty's terminal core into the browser.
+- **Our own editor and terminal.** [Singapore](https://singapore.shaulavo.dev/) keeps readable versions of your text. [ghostty-webgpu](https://ghostty.shaulavo.dev/) brings Ghostty's terminal core into the browser.
 - **Work keeps going.** Browser and desktop windows share one machine server. On Linux, terminals survive server restarts and replay output. Updates wait for running agent turns, check the new release, and roll back a failed update. Read the [installed-app contracts](plans/114-installed-app.md).
 - **Review agents like pull requests.** Undo or reapply a hunk, collect line comments into a message, and fork a chat from a turn. Ask a second model to review, or send one prompt to several models in separate worktrees. See the [agent workbench](plans/139-acting-on-agent-diffs.md).
 - **Nothing is lost when you close a file.** The editor's undo graph survives closing its tab and restores when the saved content still matches. File-tree undo restores recent deleted folders with their tabs and unsaved edits. See [undo behavior](docs/research/packages-as-products/fregat-workbench.md#4-undo-that-goes-further-than-any-editor).

@@ -1,0 +1,18 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "product-sites-singapore",
+  "compatibility_date": "2026-10-10",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "singapore.shaulavo.dev",
+      "custom_domain": true,
+    },
+  ],
+  "assets": {
+    "directory": "./dist/singapore",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none",
+  },
+}

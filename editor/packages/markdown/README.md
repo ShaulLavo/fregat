@@ -2,7 +2,7 @@
 
 Markdown preview and editing commands for the Singapore editor.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -41,13 +41,13 @@ editor.openDocument({
 - `createMarkdownPreviewPlugin()` renders formatted Markdown over the source.
 - `createMarkdownAuthoringPlugin()` adds editing commands.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/markdown/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/markdown/overview/)
 
 ## In the Singapore family
 
 `@singapore-editor/core` owns the editor view. This optional package adds Markdown display and commands. Choose the other plugins your app needs.
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

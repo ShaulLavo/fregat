@@ -45,9 +45,9 @@ for (const directory of packageDirectories) {
     `${manifest.name}: repository provenance`,
   )
   let homepage = 'https://github.com/ShaulLavo/fregat/tree/main/hotkeys'
-  if (directory === 'ghostty-webgpu') homepage = 'https://shaulavo.dev/ghostty-webgpu/'
+  if (directory === 'ghostty-webgpu') homepage = 'https://ghostty.shaulavo.dev/'
   if (directory.startsWith('editor/')) {
-    homepage = `https://shaulavo.dev/singapore/docs/reference/api/${manifest.name.split('/')[1]}/overview/`
+    homepage = `https://singapore.shaulavo.dev/docs/reference/api/${manifest.name.split('/')[1]}/overview/`
   }
   assert.equal(manifest.homepage, homepage, `${manifest.name}: homepage`)
   links.add(homepage)

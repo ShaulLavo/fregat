@@ -10,7 +10,7 @@
     "tree-sitter",
     "typescript"
   ],
-  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/tree-sitter/overview/",
+  "homepage": "https://singapore.shaulavo.dev/docs/reference/api/tree-sitter/overview/",
   "bugs": {
     "url": "https://github.com/ShaulLavo/fregat/issues"
   },

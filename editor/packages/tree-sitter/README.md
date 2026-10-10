@@ -2,7 +2,7 @@
 
 Worker-based Tree-sitter parsing for Singapore syntax colors, folds, and brackets.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -34,7 +34,7 @@ editor.setText('const value = 1\n', { languageId: 'typescript' })
 - `createTreeSitterSyntaxProvider()` registers custom grammars.
 - `expandTreeSitterSelection()` selects a larger syntax node.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/tree-sitter/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/tree-sitter/overview/)
 
 ## Merge units
 
@@ -66,9 +66,9 @@ that selected language ID, including line fallback.
 ## In the Singapore family
 
 `@singapore-editor/core` owns the editor view. This optional package adds syntax parsing. Choose the other plugins your app needs.
-Use a bundler that serves the package worker and data assets. See the [hosting guide](https://shaulavo.dev/singapore/docs/guides/bundling/).
+Use a bundler that serves the package worker and data assets. See the [hosting guide](https://singapore.shaulavo.dev/docs/guides/bundling/).
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

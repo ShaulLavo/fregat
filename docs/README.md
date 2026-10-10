@@ -57,7 +57,8 @@ belong outside tracked documentation.
 
 ## Product site
 
-The [Fregat landing page](https://shaulavo.dev/fregat/) uses the Plates animated replica
+The [Fregat landing page](https://fregat.shaulavo.dev/) uses the Plates animated replica
 shipped in [PR #1012](https://github.com/ShaulLavo/fregat/pull/1012).
 [Plan 155](../plans/155-site-demo-replica.md) records the decision to delete the live-app demo.
-See [production product sites](../scripts/product-sites/README.md) for builds and publishing.
+The product sites run on Cloudflare Workers with Static Assets. Singapore includes its
+docs and the separate example at `/demo/`. See [production product sites](../scripts/product-sites/README.md) for builds and publishing.

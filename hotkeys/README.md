@@ -6,7 +6,7 @@
   <a href="https://github.com/ShaulLavo/fregat/tree/main/hotkeys"><img src="https://img.shields.io/badge/install-source%20%2F%20workspace-blue" alt="Install from source or workspace" /></a>
 </p>
 <p align="center">
-  <a href="https://shaulavo.dev/fregat/">Used in Fregat</a> ·
+  <a href="https://fregat.shaulavo.dev/">Used in Fregat</a> ·
   <a href="https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/README.md">API and examples</a> ·
   <a href="https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/keymaps.md">Keymap rules</a> ·
   <a href="https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/performance.md">Benchmarks</a>

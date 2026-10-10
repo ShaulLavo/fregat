@@ -42,7 +42,7 @@ const references = [
 })
 
 export default defineConfig({
-  base: '/ghostty-webgpu',
+  base: process.env.SITE_ORIGIN ? '/' : '/ghostty-webgpu',
   // Keep the authored markup verbatim so inline whitespace renders unchanged.
   compressHTML: false,
   site: process.env.SITE_ORIGIN ?? 'https://shaullavo.github.io',

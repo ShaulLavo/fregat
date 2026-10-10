@@ -1,6 +1,6 @@
 # Landing page and product assets
 
-The Astro site in `apps/site` publishes at https://shaulavo.dev/fregat/ through
+The Astro site in `apps/site` publishes at https://fregat.shaulavo.dev/ through
 `.github/workflows/product-sites.yml`. Its Plates design uses an animated replica shipped
 in PR #1012. The old live-app demo, mock backend and demo scenarios have been removed.
 
@@ -32,7 +32,7 @@ bun run agent:browser look --site --static-dir apps/site/dist --width 390 --heig
 Read desktop and mobile screenshots. Check `layout.json` for loaded images and a document
 width that matches the viewport. Inspect the replica and page navigation links.
 
-After publishing, run `bun run agent:browser look --site --url https://shaulavo.dev/fregat/`.
+After publishing, run `bun run agent:browser look --site --url https://fregat.shaulavo.dev/`.
 This checks document readiness and image loading on the live site.
 
 For product assets, use `--headed`. `browser-renderer.json` records the actual browser and GPU.
