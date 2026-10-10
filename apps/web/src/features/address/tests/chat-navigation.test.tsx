@@ -21,6 +21,40 @@ import {
 } from '../../../../test/factories/session-domain'
 import { pressBack, waitForNavigation } from '../../../../test/address'
 
+test.for(['workspace', 'chat'] as const)(
+  'opening the first project through %s replaces the no-project history entry',
+  async (destination) => {
+    const { domain, editor, environmentId, navigation, registration } =
+      await createChatNavigationFixture()
+    const history = navigation.router.history
+    const initialIndex = history.location.state.__TSR_index
+    const initialLength = history.length
+    expect(editor.workspaceStore.getState().rootFolder).toBeNull()
+
+    const project = { environmentId, projectId: registration.projectId }
+    const opened =
+      destination === 'workspace'
+        ? await navigation.openWorkspace({ environmentId, path: 'main' })
+        : await navigation.startDraft(project, registration.worktreeId)
+    expect(opened).toEqual({ status: 'applied' })
+    expect(history.length).toBe(initialLength)
+    expect(history.location.state.__TSR_index).toBe(initialIndex)
+
+    await navigation.startDraft(project, registration.worktreeId)
+    await pressBack(navigation)
+    expect(editor.workspaceStore.getState().rootFolder?.path).toBe('main')
+    expect(history.location.state.__TSR_index).toBe(initialIndex)
+    await pressBack(navigation)
+    expect(editor.workspaceStore.getState().rootFolder?.path).toBe('main')
+
+    mkdirSync(path.join(domain.server.root, 'other'))
+    await navigation.openWorkspace({ environmentId, path: 'other' })
+    expect(history.length).toBe(initialLength + 1)
+    await pressBack(navigation)
+    expect(editor.workspaceStore.getState().rootFolder?.path).toBe('main')
+  },
+)
+
 test('file history in chat mode reveals the editor while main chat history preserves its tools', async () => {
   const { domain, editor, environmentId, navigation, registration, refresh } =
     await createChatNavigationFixture()
