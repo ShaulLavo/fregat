@@ -97,29 +97,27 @@ export async function startReader(home: boolean) {
   const capture = async () => {
     if (!docs) return
     const text = docs.text()
-    // The unfocused preview is the reading paint. A caret on a mark reveals its source.
-    docs.editor.setSelection(text.length, text.length, { reveal: false })
-    await frame()
-    await document.fonts.ready
-    const saved = await docs.capturePaint()
     const chosen = palette()
     const other = chosen === 'light' ? 'dark' : 'light'
     const host = docs.element.parentElement!
-    host.style.position = 'absolute'
-    host.style.top = '0'
-    host.style.opacity = '0'
-    article.hidden = false
-    const decoded = decodePaintSnapshot(saved.paint)
-    const frozen = decoded && mountPaintSnapshot(article, decoded)
-    if (!frozen) {
-      article.hidden = true
-      host.style.position = 'relative'
-      host.style.opacity = '1'
-      throw new TypeError(`${current}: paint mount refused`)
-    }
-    mounted?.dispose()
-    mounted = frozen
     try {
+      // Theme controls can change the page while this queued capture is settling.
+      host.style.colorScheme = chosen
+      docs.refreshTheme()
+      // The unfocused preview is the reading paint. A caret on a mark reveals its source.
+      docs.editor.setSelection(text.length, text.length, { reveal: false })
+      await frame()
+      await document.fonts.ready
+      const saved = await docs.capturePaint()
+      host.style.position = 'absolute'
+      host.style.top = '0'
+      host.style.opacity = '0'
+      article.hidden = false
+      const decoded = decodePaintSnapshot(saved.paint)
+      const frozen = decoded && mountPaintSnapshot(article, decoded)
+      if (!frozen) throw new TypeError(`${current}: paint mount refused`)
+      mounted?.dispose()
+      mounted = frozen
       host.style.colorScheme = other
       docs.refreshTheme()
       await frame()
@@ -177,6 +175,9 @@ export async function startReader(home: boolean) {
       live.editor.setPresentationReady(true)
       setMode(true)
     } catch (error) {
+      docs = null
+      article.hidden = false
+      setMode(false)
       live?.dispose()
       host.remove()
       throw error

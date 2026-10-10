@@ -383,6 +383,38 @@ for (const engine of ['chromium', 'webkit'] as const) {
           await page.close()
         }
       })
+      test('a theme change during return to static keeps both palette captures accurate', async () => {
+        const page = await browser.newPage({ colorScheme: 'light' })
+        const options = {
+          style:
+            '.editor-virtualized-caret-layer, .mode button, .hero-mode button { visibility: hidden !important; }',
+        }
+        try {
+          await page.goto(`${preview.base}/?editor=off`)
+          await site.static(page).waitFor()
+          const light = await site.home(page).screenshot(options)
+          await site.goLive(page).click()
+          await site.live(page).waitFor()
+          expect((await site.home(page).screenshot(options)).equals(light)).toBe(true)
+          await page.evaluate(() => {
+            document.querySelector<HTMLButtonElement>('.hero-mode button')!.click()
+            document.querySelector<HTMLButtonElement>('.theme-toggle')!.click()
+          })
+          await site.static(page).waitFor()
+          await expect.poll(() => site.goLive(page).isEnabled()).toBe(true)
+          const dark = await site.home(page).screenshot(options)
+          await site.goLive(page).click()
+          await site.live(page).waitFor()
+          expect((await site.home(page).screenshot(options)).equals(dark)).toBe(true)
+          await site.goStatic(page).click()
+          await site.static(page).waitFor()
+          await page.locator('.theme-toggle').click()
+          await expect.poll(() => site.goLive(page).isEnabled()).toBe(true)
+          expect((await site.home(page).screenshot(options)).equals(light)).toBe(true)
+        } finally {
+          await page.close()
+        }
+      })
       test('failed live navigation keeps the captured page and its history together', async () => {
         const page = await browser.newPage()
         try {
