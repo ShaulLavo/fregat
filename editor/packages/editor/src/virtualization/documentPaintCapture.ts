@@ -6,6 +6,7 @@ import {
   type DocumentPaintRun,
   type DocumentPaintStyle,
 } from '../editor/documentPaint'
+import type { EditorTokenStyle } from '../tokens'
 import type { VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
 import type { MountedVirtualizedTextRow } from './virtualizedTextViewTypes'
 import { getMountedRows } from './virtualizedTextViewRows'
@@ -159,6 +160,7 @@ function captureRuns(
         styles.push({ start, end, style: group.style })
       }
     }
+    const resolvedStyles = new Map<EditorTokenStyle, EditorTokenStyle>()
     const boundaries = [...cuts].sort((a, b) => a - b)
     for (let index = 0; index + 1 < boundaries.length; index++) {
       const start = boundaries[index]!
@@ -167,17 +169,65 @@ function captureRuns(
       let style = base
       for (const token of styles) {
         if (token.start > start || token.end < end) continue
+        const resolved = resolvedStyles.get(token.style) ?? resolveTokenStyle(parent, token.style)
+        if (!resolved) return null
+        resolvedStyles.set(token.style, resolved)
         style = {
           ...style,
-          color: token.style.color ?? style.color,
-          backgroundColor: token.style.backgroundColor ?? style.backgroundColor,
-          textDecoration: token.style.textDecoration ?? style.textDecoration,
+          color: resolved.color ?? style.color,
+          backgroundColor: resolved.backgroundColor ?? style.backgroundColor,
+          textDecoration: resolved.textDecoration ?? style.textDecoration,
         }
       }
       runs.push({ text: node.data.slice(start, end), style, href })
     }
   }
   return mergeRuns(runs)
+}
+
+function resolveTokenStyle(parent: HTMLElement, token: EditorTokenStyle): EditorTokenStyle | null {
+  if (!token.color && !token.backgroundColor) return token
+  const document = parent.ownerDocument
+  const view = document.defaultView!
+  const context = view.getComputedStyle(parent)
+  const host = document.createElement('div')
+  host.style.setProperty('all', 'initial', 'important')
+  host.style.setProperty('display', 'none', 'important')
+  // Shadow isolation prevents page selectors from changing the token's paint context.
+  const probe = document.createElement('span')
+  host.attachShadow({ mode: 'closed' }).append(probe)
+  for (const property of context) {
+    if (!property.startsWith('--')) continue
+    probe.style.setProperty(property, context.getPropertyValue(property) || 'initial')
+  }
+  probe.style.color = context.color
+  probe.style.colorScheme = context.colorScheme
+  // Custom properties expose failed substitution before colour declarations fall back.
+  if (token.color) probe.style.setProperty('--document-paint-color', token.color)
+  if (token.backgroundColor)
+    probe.style.setProperty('--document-paint-background', token.backgroundColor)
+  document.documentElement.append(host)
+  try {
+    const substituted = view.getComputedStyle(probe)
+    const color = substituted.getPropertyValue('--document-paint-color').trim()
+    const background = substituted.getPropertyValue('--document-paint-background').trim()
+    if (token.color && (!color || !view.CSS.supports('color', color))) return null
+    if (
+      token.backgroundColor &&
+      (!background || !view.CSS.supports('background-color', background))
+    )
+      return null
+    if (token.color) probe.style.color = color
+    if (token.backgroundColor) probe.style.backgroundColor = background
+    const computed = view.getComputedStyle(probe)
+    return {
+      ...token,
+      color: token.color ? computed.color : undefined,
+      backgroundColor: token.backgroundColor ? computed.backgroundColor : undefined,
+    }
+  } finally {
+    host.remove()
+  }
 }
 
 const UNREPRESENTED_EFFECTS = [

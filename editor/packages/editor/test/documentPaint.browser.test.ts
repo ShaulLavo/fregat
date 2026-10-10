@@ -11,6 +11,8 @@ import {
   type MarkdownHeadings,
 } from '../../markdown/src/headings'
 import type { EditorPlugin } from '../src/plugins'
+import { createTreeSitterLanguagePlugin } from '../../tree-sitter/src/index'
+import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '../../tree-sitter-languages/src/index'
 import '../src/style.css'
 import '../../gutters/src/lineGutter.css'
 import '../../markdown/src/style.css'
@@ -722,4 +724,154 @@ it('refuses noncollapsed selection highlights without dropping their paint', asy
     status: 'unsupported',
     reason: 'unsafe-or-unsupported-fragment',
   })
+})
+
+it.each([false, true])(
+  'captures real TypeScript language-plugin colours with the default theme, dark=%s',
+  async (dark) => {
+    const text = 'export const answer: number = 42;\nconst message = "hello";\n// comment\nlast'
+    const { host, editor: initial, options, item } = mount(text, false, 'Snapshot Mono', dark)
+    initial.dispose()
+    const editor = new Editor(host, {
+      ...options,
+      theme: { type: dark ? 'dark' : 'light' },
+      plugins: [
+        createLineGutterPlugin(),
+        createTreeSitterLanguagePlugin(TREE_SITTER_LANGUAGE_CONTRIBUTIONS),
+      ],
+    })
+    item.editor = editor
+    editor.setText(text, { languageId: 'typescript' })
+    editor.setSelection(text.length)
+    await frames()
+    await expect.poll(() => editor.getState().syntaxStatus, { timeout: 20_000 }).toBe('ready')
+    const saved = editor.captureSnapshot({ scope: 'document' })
+    expect(saved.status, JSON.stringify(saved)).toBe('ready')
+    if (saved.status !== 'ready') return
+    const paint = decodePaintSnapshot(saved.paint)!
+    expect(paint.format).toBe(6)
+    if (paint.format !== 6) return
+    const runs = paint.rows.flatMap((row) => row.runs)
+    expect(runs.some((run) => run.style.color !== paint.style.color)).toBe(true)
+    for (const run of runs) {
+      expect(run.style.color).not.toContain('var(')
+      expect(run.style.backgroundColor).not.toContain('var(')
+    }
+    for (const width of [320, 390, 1280]) {
+      host.style.width = `${width}px`
+      await frames()
+      const live = await pixels(`typescript-theme-${dark}-${width}-live`)
+      const overlay = document.createElement('div')
+      overlay.style.cssText = 'position:absolute;inset:0'
+      host.append(overlay)
+      const restored = mountPaintSnapshot(overlay, paint, { width })!
+      expect(restored).not.toBeNull()
+      expect(restored.height).toBe(editor.getContentHeight())
+      host.querySelector<HTMLElement>('.editor-virtualized')!.style.visibility = 'hidden'
+      expect(changedPixels(live, await pixels(`typescript-theme-${dark}-${width}-static`))).toBe(0)
+      restored.dispose()
+      overlay.remove()
+      host.querySelector<HTMLElement>('.editor-virtualized')!.style.visibility = ''
+    }
+  },
+)
+
+it('resolves token foreground, background, fallbacks and currentColor in their CSS context', async () => {
+  const { host, editor } = mount('alpha beta gamma\nlast', false, 'Snapshot Mono', false)
+  host.style.setProperty('--snapshot-token', 'rgb(12, 34, 56)')
+  host.style.setProperty('--snapshot-background', 'rgb(78, 90, 12)')
+  editor.setTokens([
+    {
+      start: 0,
+      end: 5,
+      style: { color: 'var(--snapshot-token)', backgroundColor: 'var(--snapshot-background)' },
+    },
+    {
+      start: 6,
+      end: 10,
+      style: { color: 'var(--missing-token, rgb(23, 45, 67))', backgroundColor: 'currentColor' },
+    },
+  ])
+  await frames()
+  const saved = editor.captureSnapshot({ scope: 'document' })
+  expect(saved.status, JSON.stringify(saved)).toBe('ready')
+  if (saved.status !== 'ready') return
+  const paint = decodePaintSnapshot(saved.paint)!
+  if (paint.format !== 6) return
+  expect(paint.rows[0]!.runs[0]!.style).toMatchObject({
+    color: 'rgb(12, 34, 56)',
+    backgroundColor: 'rgb(78, 90, 12)',
+  })
+  expect(paint.rows[0]!.runs.find((run) => run.text === 'beta')!.style).toMatchObject({
+    color: 'rgb(23, 45, 67)',
+    backgroundColor: 'rgb(23, 45, 67)',
+  })
+})
+
+it.each([
+  'url(https://example.com)',
+  'expression(alert(1))',
+  'var(--missing-token)',
+  'var(--cycle-token)',
+  'var(--invalid-token)',
+])('refuses invalid or unresolved token colour %s', async (value) => {
+  const { host, editor } = mount('alpha beta\nlast', false, 'Snapshot Mono', false)
+  host.style.setProperty('--cycle-token', 'var(--cycle-token)')
+  host.style.setProperty('--invalid-token', 'url(https://example.com)')
+  for (const property of ['color', 'backgroundColor'] as const) {
+    editor.setTokens([{ start: 0, end: 5, style: { [property]: value } }])
+    await frames()
+    expect(editor.captureSnapshot({ scope: 'document' }).status).toBe('unsupported')
+  }
+})
+
+it.each(['light', 'dark'] as const)(
+  'resolves colours in the active %s colour scheme',
+  async (scheme) => {
+    const { host, editor } = mount('alpha beta\nlast', false, 'Snapshot Mono', false)
+    host.style.colorScheme = scheme
+    editor.setTokens([
+      { start: 0, end: 5, style: { color: 'light-dark(rgb(12, 34, 56), rgb(78, 90, 12))' } },
+    ])
+    await frames()
+    const saved = editor.captureSnapshot({ scope: 'document' })
+    expect(saved.status, JSON.stringify(saved)).toBe('ready')
+    if (saved.status !== 'ready') return
+    const paint = decodePaintSnapshot(saved.paint)!
+    expect(paint.format).toBe(6)
+    if (paint.format !== 6) return
+    expect(paint.rows[0]!.runs[0]!.style.color).toBe(
+      scheme === 'light' ? 'rgb(12, 34, 56)' : 'rgb(78, 90, 12)',
+    )
+  },
+)
+
+it('isolates token resolution from hostile descendant CSS', async () => {
+  const { host, editor } = mount('alpha beta\nlast', false, 'Snapshot Mono', false)
+  const stylesheet = document.createElement('style')
+  stylesheet.textContent =
+    '#document-paint-proof .editor-virtualized-row > span { color: rgb(0, 0, 255) !important; }'
+  document.head.append(stylesheet)
+  try {
+    editor.setTokens([{ start: 0, end: 5, style: { color: 'rgb(255, 0, 0)' } }])
+    await frames()
+    const live = await pixels('hostile-css-live')
+    const saved = editor.captureSnapshot({ scope: 'document' })
+    expect(saved.status, JSON.stringify(saved)).toBe('ready')
+    if (saved.status !== 'ready') return
+    const paint = decodePaintSnapshot(saved.paint)!
+    expect(paint.format).toBe(6)
+    if (paint.format !== 6) return
+    expect(paint.rows[0]!.runs[0]!.style.color).toBe('rgb(255, 0, 0)')
+    const overlay = document.createElement('div')
+    overlay.style.cssText = 'position:absolute;inset:0'
+    host.append(overlay)
+    const restored = mountPaintSnapshot(overlay, paint, { width: 1280 })!
+    host.querySelector<HTMLElement>('.editor-virtualized')!.style.visibility = 'hidden'
+    expect(changedPixels(live, await pixels('hostile-css-static'))).toBe(0)
+    restored.dispose()
+    overlay.remove()
+  } finally {
+    stylesheet.remove()
+  }
 })
