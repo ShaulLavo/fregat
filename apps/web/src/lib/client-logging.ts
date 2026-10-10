@@ -114,12 +114,17 @@ export async function observeClientOperation<T>(
     // network failure. The signal is ground truth.
     if (!isAbortError(error) && !signal?.aborted) {
       const internal = errorInternalContext(error)
-      log[failedOperationLevel(level)]({
+      const summary = errorSummary(error)
+      const severity =
+        baseEvent.area === 'fs' && summary.code === 'NOT_FOUND'
+          ? 'info'
+          : failedOperationLevel(level)
+      log[severity]({
         ...baseEvent,
         durationMs: elapsedMs(startedAt),
         // No limit here: `safeClientEvent` keeps the head 2000 characters of every string.
         error: {
-          ...errorSummary(error),
+          ...summary,
           ...(internal === undefined ? {} : { internal }),
         },
         outcome: classifyError?.(error) ?? 'error',
