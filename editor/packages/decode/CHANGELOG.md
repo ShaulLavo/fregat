@@ -1,5 +1,13 @@
 # @singapore-editor/decode
 
+## 0.2.9
+
+### Patch Changes
+
+- [#1257](https://github.com/ShaulLavo/fregat/pull/1257) [`e6f415a`](https://github.com/ShaulLavo/fregat/commit/e6f415ae7c29fdee8e7cf1e014efbcfa8bf55ed8) - Added `createMorphPlugin`, which animates text changes: text that survives an edit slides to its new place, removed text fades out, and new text streams in. Undo, redo and edits of at least `minEditChars` characters morph; `durationMs` and `bounce` shape the motion.
+- Updated dependencies []:
+  - @singapore-editor/core@0.2.9
+
 ## 0.2.8
 
 ### Patch Changes

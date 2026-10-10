@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/spellcheck",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Worker-based English spellchecking for the Singapore editor and standalone text.",
   "keywords": [
     "browser",

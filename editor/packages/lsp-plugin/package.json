@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/lsp-plugin",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Language server diagnostics, completion, hover, and navigation for the Singapore editor.",
   "keywords": [
     "browser",

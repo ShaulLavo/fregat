@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/tree-sitter",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Worker-based Tree-sitter parsing for Singapore syntax colors, folds, and brackets.",
   "keywords": [
     "browser",

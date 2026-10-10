@@ -1,5 +1,14 @@
 # @singapore-editor/lsp-plugin
 
+## 0.2.9
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @singapore-editor/core@0.2.9
+  - @singapore-editor/lsp@0.2.9
+  - @singapore-editor/plugin-ui@0.2.9
+
 ## 0.2.8
 
 ### Patch Changes
