@@ -170,6 +170,7 @@ export function refreshDisplayProjection(
     wrapColumn: view.wrapEnabled ? viewportColumns : null,
     wrapBreak: view.wrapBreak,
     wrapAdvance: view.wrapAdvance,
+    rowWrapAdvances: styledRowWrapAdvances(view),
     tabSize: view.tabSize,
   })
   view.model.wrapColumn = view.wrapEnabled ? viewportColumns : null
@@ -220,6 +221,58 @@ function proportionalWrapAdvance(
     measure: view.monospace ? undefined : glyphs.measure,
     minimumTabAdvance: view.monospace ? undefined : glyphs.minimumTabAdvance,
   }
+}
+
+/** Measure each presentation class under the same ancestor as mounted rows. */
+function styledRowWrapAdvances(
+  view: VirtualizedTextViewInternal,
+): ReadonlyMap<number, WrapAdvance> | undefined {
+  const base = view.wrapAdvance
+  if (!base) return undefined
+  const replacements = view.model.inlineMap?.rowReplacements
+  const rows = new Set(
+    Array.from(replacements?.keys() ?? []).concat(Array.from(view.rowDecorations.keys())),
+  )
+  if (!rows.size) return undefined
+  const probe = view.scrollElement.ownerDocument.createElement('div')
+  probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none'
+  probe.ariaHidden = 'true'
+  view.spacer.append(probe)
+  const byClass = new Map<string, WrapAdvance | null>()
+  const advances = new Map<number, WrapAdvance>()
+  try {
+    for (const row of rows) {
+      const kinds = new Set(
+        (replacements?.get(row) ?? [])
+          .map((replacement) => replacement.kind)
+          .filter((kind): kind is string => Boolean(kind && /^[a-z0-9-]+$/.test(kind))),
+      )
+      const classes = [...kinds]
+        .map((kind) => `editor-inline-${kind}`)
+        .concat(view.rowDecorations.get(row)?.className ?? '')
+        .join(' ')
+      let advance = byClass.get(classes)
+      if (advance === undefined) {
+        probe.className = `editor-virtualized-row ${classes}`
+        const glyphs = glyphAdvancesFor(probe)
+        advance =
+          glyphs && glyphs !== base.glyphs
+            ? {
+                width: base.width,
+                glyphs,
+                advance: (codePoint: number) => glyphs.advance(codePoint),
+                measure: glyphs.measure,
+                minimumTabAdvance: glyphs.minimumTabAdvance,
+              }
+            : null
+        byClass.set(classes, advance)
+      }
+      if (advance) advances.set(row, advance)
+    }
+  } finally {
+    probe.remove()
+  }
+  return advances
 }
 
 export function setWrapEnabledLayout(

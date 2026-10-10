@@ -10,6 +10,7 @@ import type { EditorTokenStyle } from '../tokens'
 import type { VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
 import type { MountedVirtualizedTextRow } from './virtualizedTextViewTypes'
 import { getMountedRows } from './virtualizedTextViewRows'
+import { glyphAdvancesFor } from './glyphAdvances'
 
 const MARKDOWN_KIND =
   /^editor-inline-(?:marker|heading-marker-[1-6]|fence-marker|task-marker|list-marker|quote-marker|link|link-marker|link-target)$/
@@ -57,6 +58,7 @@ export function captureDocumentPaint(
     const level = row.element.getAttribute('aria-level')
     rows.push({
       height: row.height,
+      characterWidth: glyphAdvancesFor(row.element)?.advance(48) ?? view.metrics.characterWidth,
       style: captureStyle(row.element),
       runs,
       heading:
@@ -67,7 +69,7 @@ export function captureDocumentPaint(
               id: row.element.id,
             }
           : null,
-      gutterBackgroundColor: getComputedStyle(row.gutterElement).backgroundColor,
+      gutterBackgroundColor: getComputedStyle(row.gutterElement).backgroundColor || 'transparent',
       gutterInsetBackgroundColor: row.gutterElement.classList.contains(
         'editor-virtualized-cursor-line-gutter-band',
       )
@@ -83,7 +85,7 @@ export function captureDocumentPaint(
     scope: 'document',
     appearance,
     style: captureStyle(view.scrollElement),
-    gutterBackgroundColor: getComputedStyle(view.gutterElement).backgroundColor,
+    gutterBackgroundColor: getComputedStyle(view.gutterElement).backgroundColor || 'transparent',
     characterWidth: view.metrics.characterWidth,
     monospace: view.monospace,
     gutterWidth: view.currentGutterWidth,

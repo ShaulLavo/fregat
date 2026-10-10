@@ -206,6 +206,16 @@ export default defineConfig({
             viewport: { width: 390, height: 844 },
             fileParallelism: false,
             provider: playwright({ contextOptions: devices['iPhone 13'] }),
+            commands: {
+              proofStyledWrapScreenshot: async ({ iframe, project }, width: number) => {
+                const directory = mkdtempSync(join(tmpdir(), 'singapore-styled-wrap-'))
+                const path = join(directory, `${project.name}-${width}.png`)
+                await iframe
+                  .locator('[data-styled-wrap-proof]')
+                  .screenshot({ path, animations: 'disabled' })
+                return path
+              },
+            },
             instances: [
               { browser: 'chromium', name: 'wrap-layout-chromium' },
               { browser: 'webkit', name: 'wrap-layout-iphone-webkit' },

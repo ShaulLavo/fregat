@@ -16,6 +16,8 @@ export type DisplayProjectionConfig = {
    * is on, and bounds how much of a line one uniform row may hold.
    */
   readonly wrapAdvance?: WrapAdvance | null
+  /** Effective fonts of presentation-styled source rows. */
+  readonly rowWrapAdvances?: ReadonlyMap<number, WrapAdvance>
   readonly tabSize: number
 }
 

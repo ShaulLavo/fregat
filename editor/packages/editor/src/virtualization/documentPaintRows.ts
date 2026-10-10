@@ -67,12 +67,26 @@ export function mountDocumentPaint(
     measure: paint.monospace ? undefined : glyphs?.measure,
     minimumTabAdvance: paint.monospace ? undefined : glyphs?.minimumTabAdvance,
   }
+  const probe = document.createElement('div')
+  probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none'
+  root.append(probe)
   for (const row of paint.rows) {
+    applyStyle(probe, row.style)
+    const rowGlyphs = glyphAdvancesFor(probe)
+    const rowRules =
+      rowGlyphs && rowGlyphs !== glyphs
+        ? {
+            ...rules,
+            advance: (codePoint: number) => rowGlyphs.advance(codePoint),
+            measure: rowGlyphs.measure,
+            minimumTabAdvance: rowGlyphs.minimumTabAdvance,
+          }
+        : rules
     const text = row.runs.map((run) => run.text).join('')
     const line = createWordWrapLine()
     if (paint.wrap) {
-      appendWordWrapText(line, text, 0, text.length, rules)
-      finishWordWrapLine(line, rules)
+      appendWordWrapText(line, text, 0, text.length, rowRules)
+      finishWordWrapLine(line, rowRules)
     }
     const ends = [...line.ends, text.length]
     let start = 0
@@ -103,6 +117,7 @@ export function mountDocumentPaint(
       start = end
     }
   }
+  probe.remove()
   const height = Math.max(0, top - paint.rowGap)
   root.style.height = `${height}px`
   root.append(fragment)

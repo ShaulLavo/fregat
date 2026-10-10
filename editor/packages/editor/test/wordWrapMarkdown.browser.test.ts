@@ -1,11 +1,22 @@
 import { beforeAll, expect, test } from 'vitest'
-import { page } from 'vitest/browser'
+import { commands, page } from 'vitest/browser'
+
 import { init, MarkdownDocument } from 'tree-sitter-md'
 import { markdownInlineReplacements } from '../../markdown/src/replacements'
 import { createStringTextSnapshot } from '../src/documentTextSnapshot'
 import { Editor } from '../src/editor/Editor'
+import { glyphAdvancesFor } from '../src/virtualization/glyphAdvances'
+import { decodePaintSnapshot, mountPaintSnapshot } from '../src/paint'
+import quickStart from '../../../site/src/content/docs/docs/start-here/quick-start.md?raw'
+import codeMirror from '../../../site/src/content/docs/docs/start-here/codemirror.md?raw'
 import '../src/style.css'
 import '../../markdown/src/style.css'
+
+declare module 'vitest/browser' {
+  interface BrowserCommands {
+    proofStyledWrapScreenshot(width: number): Promise<string>
+  }
+}
 
 beforeAll(() => init())
 
@@ -197,3 +208,109 @@ test('wraps padded Markdown table links without repeating the label', async () =
     container.remove()
   }
 })
+
+const HEADINGS =
+  '# Give the editor a container with enough room for every heading\n## 2. Give the editor a container\n### A longer heading with preview styling and wrapping enabled\nlast'
+
+test.each([320, 390])(
+  'wraps each heading font and replays identical rows at %i px',
+  async (width) => {
+    await checkStyledPreview(HEADINGS, width, true)
+  },
+)
+
+test.each([
+  ['Quick start', quickStart],
+  ['CodeMirror', codeMirror],
+])('contains the live %s manual at phone widths', async (_name, text) => {
+  for (const width of [312, 320, 390]) await checkStyledPreview(text, width, false)
+})
+
+async function checkStyledPreview(text: string, width: number, replay: boolean): Promise<void> {
+  const container = document.createElement('div')
+  container.style.cssText = `position:relative;width:${width}px`
+  document.body.append(container)
+  container.dataset.styledWrapProof = ''
+  const editor = new Editor(container, {
+    scrollMode: 'content',
+    wordWrap: true,
+    wordWrapBreak: 'word',
+    fontFamily: 'monospace',
+    fontSize: 14,
+    lineHeight: 26,
+  })
+  const parser = new MarkdownDocument()
+  let paintHost: HTMLElement | null = null
+  let disposePaint: (() => void) | undefined
+  try {
+    parser.setText(text)
+    editor.setText(text)
+    editor.setSelection(text.length)
+    editor.setInlineReplacementProvider(
+      () =>
+        markdownInlineReplacements(
+          createStringTextSnapshot(text),
+          parser.decorations(0, text.length),
+        ),
+      { trigger: 'edit' },
+    )
+    const scroller = container.querySelector<HTMLElement>('.editor-virtualized')!
+    await expect
+      .poll(() => container.querySelectorAll('.editor-inline-heading-marker-2').length)
+      .toBeGreaterThan(0)
+    await expect.poll(() => scroller.clientWidth).toBe(width)
+    await expect.poll(() => scroller.scrollWidth).toBe(width)
+    expectContained(container)
+    if (!replay) return
+    const saved = editor.captureSnapshot({ scope: 'document' })
+    expect(saved.status, JSON.stringify(saved)).toBe('ready')
+    if (saved.status !== 'ready') return
+    const decoded = decodePaintSnapshot(saved.paint)!
+    expect(decoded.format).toBe(6)
+    if (decoded.format !== 6) return
+    for (const [index, size] of [18.9, 16.8, 15.4].entries())
+      expect(Number.parseFloat(decoded.rows[index]!.style.fontSize)).toBeCloseTo(size, 4)
+    const rowElements = [...container.querySelectorAll<HTMLElement>('[data-editor-virtual-row]')]
+    for (const [index, row] of decoded.rows.entries()) {
+      const live = rowElements.find((element) =>
+        element.textContent?.startsWith(row.runs[0]?.text.slice(0, 8) ?? ''),
+      )
+      expect(live).toBeDefined()
+      expect(row.characterWidth).toBe(glyphAdvancesFor(live!)!.advance(48))
+      if (index < 3) expect(row.characterWidth).toBeGreaterThan(decoded.characterWidth)
+    }
+    const liveRows = [...container.querySelectorAll<HTMLElement>('[data-editor-virtual-row]')]
+      .sort((a, b) => Number(a.dataset.editorVirtualRow) - Number(b.dataset.editorVirtualRow))
+      .map((row) => row.textContent)
+    paintHost = document.createElement('div')
+    paintHost.style.width = `${width}px`
+    document.body.append(paintHost)
+    const paint = mountPaintSnapshot(paintHost, decoded, { width })!
+    expect(paint).not.toBeNull()
+    disposePaint = () => paint.dispose()
+    const staticRows = [...paintHost.querySelectorAll('[data-editor-document-paint-row]')]
+    expect(staticRows.map((row) => row.textContent)).toEqual(liveRows)
+    expect(paintHost.scrollWidth).toBe(paintHost.clientWidth)
+    console.info('Styled wrap evidence', await commands.proofStyledWrapScreenshot(width))
+    container.style.width = `${width === 320 ? 390 : 320}px`
+    await expect.poll(() => scroller.clientWidth).toBe(width === 320 ? 390 : 320)
+    await expect.poll(() => scroller.scrollWidth).toBe(scroller.clientWidth)
+    expectContained(container)
+    editor.setSelection(text.indexOf('2. Give') + 2)
+    await expect
+      .poll(() => container.querySelectorAll('.editor-inline-heading-marker-2').length)
+      .toBe(0)
+    expectContained(container)
+    editor.setSelection(text.length)
+    await expect
+      .poll(() => container.querySelectorAll('.editor-inline-heading-marker-2').length)
+      .toBeGreaterThan(0)
+    expectContained(container)
+  } finally {
+    disposePaint?.()
+    paintHost?.remove()
+    editor.dispose()
+    parser.dispose()
+    container.remove()
+  }
+}

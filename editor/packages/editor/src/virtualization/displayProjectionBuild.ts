@@ -30,7 +30,10 @@ export function buildContext(
       .map((range) => ({ start: range.startPoint.row + 1, end: range.endPoint.row + 1 }))
       .filter((range) => range.end > range.start) ?? []
   const rows = new Set(
-    Array.from(config.inlineMap?.rowReplacements.keys() ?? []).concat(Array.from(injected.keys())),
+    Array.from(config.inlineMap?.rowReplacements.keys() ?? []).concat(
+      Array.from(injected.keys()),
+      Array.from(config.rowWrapAdvances?.keys() ?? []),
+    ),
   )
   return {
     snapshot,
@@ -134,7 +137,9 @@ function buildLine(context: BuildContext, row: number): ProjectionNode {
   const { snapshot, config, counters } = context
   const { start, end } = snapshot.lineRange(row)
   const inline = inlineSummary(end - start, config.inlineMap?.rowReplacements.get(row) ?? [])
-  const wrap = summarizeDocumentWrap(snapshot, start, end, inline, config, counters)
+  const rowAdvance = config.rowWrapAdvances?.get(row)
+  const wrapConfig = rowAdvance ? { ...config, wrapAdvance: rowAdvance } : config
+  const wrap = summarizeDocumentWrap(snapshot, start, end, inline, wrapConfig, counters)
   const injections = context.injected.get(row) ?? []
   const before = injections
     .filter((input) => input.placement === 'before')

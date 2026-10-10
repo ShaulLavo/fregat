@@ -1288,9 +1288,10 @@ export class VirtualizedTextView {
   public setRowDecorations(decorations: ReadonlyMap<number, VirtualizedTextRowDecoration>): void {
     const view = this.view
     view.rowDecorations = decorations
+    refreshDisplayProjection(view, horizontalViewportColumns(view))
     clearRowGeometryCaches(view)
     view.lastRenderedRowsKey = ''
-    this.renderSnapshot(view.virtualizer.getSnapshot())
+    updateVirtualizerRows(view)
   }
 
   public setGutterContributions(contributions: readonly EditorGutterContribution[]): boolean {

@@ -471,6 +471,7 @@ function validConfig(
     wrapColumn: config.wrapColumn,
     wrapBreak: config.wrapBreak ?? 'character',
     wrapAdvance: config.wrapAdvance ?? null,
+    rowWrapAdvances: config.rowWrapAdvances,
     tabSize: config.tabSize,
     injectedTextRows: config.injectedTextRows,
     foldMap: config.foldMap?.snapshot.length === snapshot.length ? config.foldMap : null,
@@ -499,7 +500,8 @@ function changedSparseRanges(
     !transition &&
     before.config.foldMap === after.config.foldMap &&
     before.config.inlineMap === after.config.inlineMap &&
-    before.config.injectedTextRows === after.config.injectedTextRows
+    before.config.injectedTextRows === after.config.injectedTextRows &&
+    before.config.rowWrapAdvances === after.config.rowWrapAdvances
   )
     return []
   const ranges: SourceLineRange[] = []
@@ -534,7 +536,17 @@ function sameLineTransforms(
   const afterInline = after.config.inlineMap?.rowReplacements.get(afterRow) ?? []
   const beforeInjected = before.injected.get(beforeRow) ?? []
   const afterInjected = after.injected.get(afterRow) ?? []
-  return sameObjects(beforeInline, afterInline) && sameObjects(beforeInjected, afterInjected)
+  const beforeAdvance = before.config.rowWrapAdvances?.get(beforeRow)
+  const afterAdvance = after.config.rowWrapAdvances?.get(afterRow)
+  const sameAdvance =
+    beforeAdvance?.glyphs && afterAdvance?.glyphs
+      ? beforeAdvance.glyphs === afterAdvance.glyphs && beforeAdvance.width === afterAdvance.width
+      : beforeAdvance === afterAdvance
+  return (
+    sameAdvance &&
+    sameObjects(beforeInline, afterInline) &&
+    sameObjects(beforeInjected, afterInjected)
+  )
 }
 
 function sameObjects<T extends object>(before: readonly T[], after: readonly T[]): boolean {
