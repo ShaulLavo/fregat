@@ -1,6 +1,6 @@
 import { type EditorSyntaxLanguageId } from '@singapore-editor/core/syntax'
 import { createEditorLoggingPlugin, type EditorLogEvent } from '@singapore-editor/core/logging'
-import { type EditorDisposable, type EditorPlugin } from '@singapore-editor/core/extensions'
+import { type EditorPlugin } from '@singapore-editor/core/extensions'
 import {
   createBracketMatchPlugin,
   createDocumentLinkPlugin,
@@ -23,10 +23,9 @@ import {
   EDITOR_THEME_SOURCE,
 } from '@/features/editor/state/syntax-highlighting'
 import { highlightingService } from '@/lib/highlighting/state/service'
-import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { log } from '@/lib/client-logging'
 import { editorPerformanceFeatureDisabled } from '@/features/editor/state/performance-trace'
-import type { DecodeMode } from '@singapore-editor/decode'
+import { createDecodePlugin, createMorphPlugin, type DecodeMode } from '@singapore-editor/decode'
 import { editorIndentationGuidesSupported } from '@/features/editor/utils/indentation-guides'
 import { FOLD_CHEVRON_ICON } from '@/features/editor/utils/fold-icon'
 
@@ -105,84 +104,10 @@ export function createCriticalEditorCorePlugins(
   )
 }
 
-export function createDecodePluginLoader(mode: DecodeMode | null): EditorPlugin {
-  return {
-    name: 'platform.decode-loader',
-    activate: (context) => activateDecodePlugin(context, mode),
-  }
-}
-
-function activateDecodePlugin(
-  context: Parameters<EditorPlugin['activate']>[0],
-  mode: DecodeMode | null,
-) {
-  if (!mode) return
-  let disposed = false
-  let registration: EditorDisposable | null = null
-  const load = async () => {
-    const plugin = await loadPlugin('@singapore-editor/decode', () =>
-      import('@singapore-editor/decode').then((module) => module.createDecodePlugin({ mode })),
-    )
-    if (disposed || !plugin) return
-    registration = activateLoadedEditorPlugin(plugin, context)
-  }
-  scheduleNonCriticalPluginLoad(() => {
-    void load()
-  })
-  return {
-    dispose: () => {
-      disposed = true
-      registration?.dispose()
-    },
-  }
-}
-
-function scheduleNonCriticalPluginLoad(load: () => void) {
-  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-    window.requestIdleCallback(load)
-    return
-  }
-
-  queueMicrotask(load)
-}
-
-function activateLoadedEditorPlugin(
-  plugin: EditorPlugin,
-  context: Parameters<EditorPlugin['activate']>[0],
-): EditorDisposable | null {
-  try {
-    return disposableFromActivationResult(plugin.activate(context))
-  } catch (error) {
-    reportError(
-      toClientError({
-        code: 'OPERATION_FAILED',
-        name: plugin.name ?? 'editor-plugin',
-        error,
-      }),
-    )
-    return null
-  }
-}
-
-function disposableFromActivationResult(
-  result: ReturnType<EditorPlugin['activate']>,
-): EditorDisposable | null {
-  if (!result) return null
-  if (!isEditorDisposableArray(result)) return result
-
-  return {
-    dispose: () => disposeAll(result),
-  }
-}
-
-function isEditorDisposableArray(
-  result: ReturnType<EditorPlugin['activate']>,
-): result is readonly EditorDisposable[] {
-  return Array.isArray(result)
-}
-
-function disposeAll(disposables: readonly EditorDisposable[]) {
-  for (const disposable of disposables) disposable.dispose()
+/** The motion plugins: the file-open reveal when `mode` is set, and the edit morph. */
+export function createMotionPlugins(mode: DecodeMode | null, morph: boolean): EditorPlugin[] {
+  const reveal: EditorPlugin[] = mode ? [createDecodePlugin({ mode })] : []
+  return reveal.concat(morph ? [createMorphPlugin()] : [])
 }
 
 function createEditorSyntaxHighlightingPlugins(
@@ -200,18 +125,6 @@ function createEditorSyntaxHighlightingPlugins(
           : EDITOR_THEME_SOURCE,
     }),
   ]
-}
-
-async function loadPlugin(
-  name: string,
-  load: () => Promise<EditorPlugin>,
-): Promise<EditorPlugin | null> {
-  try {
-    return await load()
-  } catch (error) {
-    reportError(toClientError({ code: 'OPERATION_FAILED', name, error }))
-    return null
-  }
 }
 
 export function createPlatformEditorLoggingPlugin(): EditorPlugin {

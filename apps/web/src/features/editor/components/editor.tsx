@@ -29,7 +29,7 @@ import { EditorFrame } from '@/features/editor/components/frame'
 import { DiagnosticPeek } from '@/features/editor/components/diagnostic-peek'
 import {
   createCriticalEditorCorePlugins,
-  createDecodePluginLoader,
+  createMotionPlugins,
 } from '@/features/editor/utils/plugins'
 import { selectionForDefinition } from '@/features/editor/utils/position'
 import { languageIdForFilePath } from '@/lib/file-language'
@@ -203,6 +203,7 @@ export function Editor({
   const indentationGuidesEnabled = useSettingValue('editor.guides.indentation') && analysisAllowed
   const minimapEnabled = useSettingValue('editor.minimap.enabled') && minimapAllowed
   const decodeSetting = useSettingValue('editor.decode.mode')
+  const morphEnabled = useSettingValue('editor.morph.enabled') && analysisAllowed
   const inputRoute = useSettingValue('editor.inputRoute')
   const decodeMode = analysisAllowed
     ? effectiveDecodeMode(decodeSetting, typeof window === 'undefined' ? '' : location.search)
@@ -283,7 +284,10 @@ export function Editor({
       compareMergeConflict,
     ],
   )
-  const decodePlugin = useMemo(() => createDecodePluginLoader(decodeMode), [decodeMode])
+  const motionPlugins = useMemo(
+    () => createMotionPlugins(decodeMode, morphEnabled),
+    [decodeMode, morphEnabled],
+  )
   const unicodeHighlights = useUnicodeHighlights()
   const spellcheckPlugin = useSpellcheckPlugin()
   const textMenuRequest = useEditorUiState((state) =>
@@ -294,7 +298,9 @@ export function Editor({
     criticalEditorCorePlugins,
     [unicodeHighlights.plugin],
     analysisAllowed && spellcheckPlugin ? [spellcheckPlugin] : [],
-    [diagnosticPeek.plugin, languageServer, decodePlugin, scrollPersistencePlugin],
+    [diagnosticPeek.plugin, languageServer],
+    motionPlugins,
+    [scrollPersistencePlugin],
     additionalPlugins,
   )
   const document = liveDocument
