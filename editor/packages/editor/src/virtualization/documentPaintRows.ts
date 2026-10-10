@@ -77,6 +77,10 @@ export function mountDocumentPaint(
       rowGlyphs && rowGlyphs !== glyphs
         ? {
             ...rules,
+            width: Math.max(
+              1,
+              width - paint.gutterWidth - row.characterWidth - PROPORTIONAL_WRAP_MARGIN_PX,
+            ),
             advance: (codePoint: number) => rowGlyphs.advance(codePoint),
             measure: rowGlyphs.measure,
             minimumTabAdvance: rowGlyphs.minimumTabAdvance,
