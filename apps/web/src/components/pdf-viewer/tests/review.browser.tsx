@@ -1,5 +1,5 @@
 import '@workspace/ui/globals.css'
-import { test, expect, vi } from 'vitest'
+import { test, expect, vi, onTestFinished } from 'vitest'
 import { act, fireEvent } from '@testing-library/react'
 import { notifyManager, type MutationKey, type QueryClient } from '@tanstack/react-query'
 import { pdfMutationKeys } from '@/lib/pdf-viewer/mutation-keys'
@@ -19,6 +19,7 @@ async function waitForPdfMutation(queryClient: QueryClient, mutationKey: Mutatio
     if (mutation?.state.status === 'error') ready.reject(mutation.state.error)
   }
   const unsubscribe = cache.subscribe(notifyManager.batchCalls(settle))
+  onTestFinished(unsubscribe)
   try {
     notifyManager.schedule(settle)
     await ready.promise
@@ -73,6 +74,7 @@ test('a failed page render recovers when a valid replacement reuses page number 
     />,
     { command: false },
   )
+  onTestFinished(view.unmount)
   try {
     await expect.poll(() => view.container.textContent).toContain('This page could not be rendered')
     context.mockRestore()
@@ -105,6 +107,7 @@ test('Next visits two separated matches on one tall page inside its viewport', a
     </div>,
     { command: false },
   )
+  onTestFinished(view.unmount)
   try {
     await waitForPdfMutation(view.queryClient, pdfMutationKeys.open)
     expect(view.getByLabelText('Search PDF')).toBeVisible()
@@ -151,6 +154,7 @@ test('navigation waits for a distant page to render before revealing its selecte
     </div>,
     { command: false },
   )
+  onTestFinished(view.unmount)
   try {
     await waitForPdfMutation(view.queryClient, pdfMutationKeys.open)
     expect(view.getByLabelText('Search PDF')).toBeVisible()
@@ -229,6 +233,7 @@ test('navigation stays disabled until measured page placeholders exist', async (
     </div>,
     { command: false },
   )
+  onTestFinished(view.unmount)
   try {
     await waitForPdfMutation(view.queryClient, pdfMutationKeys.open)
     expect(view.getByLabelText('Search PDF')).toBeVisible()
