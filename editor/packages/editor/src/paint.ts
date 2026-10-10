@@ -7,6 +7,8 @@ export type {
 export type { MountedPaintSnapshot } from './virtualization/documentPaintRows'
 import type { PaintSnapshot } from './editor/documentPaint'
 import { mountDocumentPaint } from './virtualization/documentPaintRows'
+import { activateDocumentPaintHighlights } from './virtualization/documentPaintHighlights'
+export type { ActivatedPaintSnapshotHighlights } from './virtualization/documentPaintHighlights'
 
 export function mountPaintSnapshot(
   element: HTMLElement,
@@ -14,4 +16,9 @@ export function mountPaintSnapshot(
   options: { readonly width?: number } = {},
 ) {
   return paint.format === 6 ? mountDocumentPaint(element, paint, options) : null
+}
+
+/** Attach syntax paint to emitted snapshot HTML before its first visible frame. */
+export function activatePaintSnapshotHighlights(element: HTMLElement, paint: PaintSnapshot) {
+  return paint.format === 6 ? activateDocumentPaintHighlights(element, paint) : null
 }

@@ -1,0 +1,220 @@
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { gzipSync } from 'node:zlib'
+import type { Page } from '@playwright/test'
+import { build } from 'bun'
+
+export async function proveDocumentPaintFirstFrame(
+  page: Page,
+  project: string,
+  evidence: string,
+  payload: string,
+  markup: string,
+  width: number,
+  javaScriptEnabled: boolean,
+) {
+  const entry = join(evidence, 'activate-document-paint.ts')
+  const source = join(import.meta.dirname, '../../src/paint.ts')
+  writeFileSync(
+    entry,
+    `import { decodePaintSnapshot, activatePaintSnapshotHighlights } from ${JSON.stringify(source)}; window.__paintProof = { decodePaintSnapshot, activatePaintSnapshotHighlights };`,
+  )
+  const activation = await build({
+    entrypoints: [entry],
+    target: 'browser',
+    format: 'iife',
+    minify: true,
+    metafile: true,
+  })
+  const paintEntry = await build({
+    entrypoints: [source],
+    target: 'browser',
+    format: 'esm',
+    minify: true,
+    metafile: true,
+  })
+  if (!activation.success || !paintEntry.success) throw activation.logs.concat(paintEntry.logs)
+  const bundle = await activation.outputs[0]!.text()
+  const paintBundle = await paintEntry.outputs[0]!.text()
+  const sizes = {
+    activation: { bytes: Buffer.byteLength(bundle), gzipBytes: gzipSync(bundle).byteLength },
+    paint: { bytes: Buffer.byteLength(paintBundle), gzipBytes: gzipSync(paintBundle).byteLength },
+  }
+  writeFileSync(join(evidence, 'paint-entry-size.json'), JSON.stringify(sizes, null, 2))
+  writeFileSync(
+    join(evidence, 'activation-metafile.json'),
+    JSON.stringify(activation.metafile, null, 2),
+  )
+  writeFileSync(
+    join(evidence, 'paint-entry-metafile.json'),
+    JSON.stringify(paintEntry.metafile, null, 2),
+  )
+  const inputs = Object.keys(activation.metafile!.inputs)
+  const fonts = ['jetbrains-mono.woff2', 'source-serif-4.woff2']
+    .map((name, index) => {
+      const bytes = readFileSync(join(import.meta.dirname, '../fixtures/fonts', name)).toString(
+        'base64',
+      )
+      const family = index ? 'Snapshot Serif' : 'Snapshot Mono'
+      return `@font-face{font-family:"${family}";src:url(data:font/woff2;base64,${bytes})}`
+    })
+    .join('')
+  const context = await page
+    .context()
+    .browser()!
+    .newContext({
+      javaScriptEnabled,
+      deviceScaleFactor: await page.evaluate(() => devicePixelRatio),
+      viewport: { width: 1400, height: 900 },
+    })
+  const url = `${new URL(page.url()).origin}/document-paint-first-frame-proof`
+  const safePayload = payload.replaceAll('<', '\\u003c')
+  const html = `<!doctype html><html><head><style>body{margin:0}${fonts}</style></head><body><script>${bundle.replaceAll('</script', '<\\/script')}</script><script type="application/json" id="paint-payload">${safePayload}</script><div id="document-paint-proof" style="position:relative;width:${width}px">${markup}</div><script>window.__paintProofHandles=[window.__paintProof.activatePaintSnapshotHighlights(document.querySelector('[data-editor-document-paint]'),window.__paintProof.decodePaintSnapshot(document.querySelector('#paint-payload').textContent))];if(window.__paintProofHandles[0])document.querySelector('[data-editor-document-paint]').dataset.paintActivated='true';</script></body></html>`
+  await context.route(url, (route) => route.fulfill({ contentType: 'text/html', body: html }))
+  try {
+    const fresh = await context.newPage()
+    let firstImage: Buffer | undefined
+    let captureStarted = false
+    await fresh.exposeFunction('__capturePaintFrame', async () => {
+      if (captureStarted) return
+      captureStarted = true
+      firstImage = await fresh.locator('#document-paint-proof').screenshot({ animations: 'allow' })
+      await fresh.evaluate(() => {
+        ;(window as unknown as { __paintFirstFrameCaptured: boolean }).__paintFirstFrameCaptured =
+          true
+      })
+    })
+    await fresh.addInitScript({
+      content: `window.__paintFrames=[];let remaining=1200;function observe(){const root=document.querySelector('[data-editor-document-paint]');if(root){window.__paintFrames.push({activated:root.dataset.paintActivated==='true',highlights:CSS.highlights.size});if(document.fonts.status==='loaded')window.__capturePaintFrame();}if(--remaining>0&&!window.__stopPaintFrames)requestAnimationFrame(observe)}requestAnimationFrame(observe);`,
+    })
+    await fresh.goto(url)
+    await fresh.evaluate(() => document.fonts.ready)
+    if (javaScriptEnabled)
+      await fresh.waitForFunction(
+        () =>
+          (window as unknown as { __paintFirstFrameCaptured: boolean })
+            .__paintFirstFrameCaptured === true,
+      )
+    const settledImage = await fresh
+      .locator('#document-paint-proof')
+      .screenshot({ animations: 'allow' })
+    const firstFrame = javaScriptEnabled ? firstImage! : settledImage
+    const fixture = markup.includes('role="heading"') ? 'markdown' : 'code'
+    writeFileSync(
+      join(
+        evidence,
+        `${project}-${width}-${fixture}-${javaScriptEnabled ? 'first-frame' : 'javascript-off'}.png`,
+      ),
+      firstFrame,
+    )
+    const result = await fresh.evaluate(() => {
+      const root = document.querySelector<HTMLElement>('[data-editor-document-paint]')!
+      const bounds = root.getBoundingClientRect()
+      const state = window as unknown as {
+        __stopPaintFrames: boolean
+        __paintFrames?: { activated: boolean; highlights: number }[]
+      }
+      state.__stopPaintFrames = true
+      return {
+        text: root.textContent,
+        height: bounds.height,
+        rows: [...root.querySelectorAll<HTMLElement>('[data-editor-document-paint-row]')].map(
+          (row) => {
+            const rect = row.getBoundingClientRect()
+            return {
+              text: row.textContent,
+              x: rect.x - bounds.x,
+              y: rect.y - bounds.y,
+              width: rect.width,
+              height: rect.height,
+            }
+          },
+        ),
+        heading: root.querySelector('[role=heading]')?.getAttribute('aria-label'),
+        link: root.querySelector('a')?.getAttribute('href'),
+        frames: state.__paintFrames ?? [],
+      }
+    })
+    const counts: number[] = []
+    if (javaScriptEnabled) {
+      counts.push(await fresh.evaluate(() => CSS.highlights.size))
+      await fresh.addScriptTag({ content: bundle })
+      counts.push(
+        await fresh.evaluate((payload) => {
+          const state = window as unknown as {
+            __paintProof: {
+              decodePaintSnapshot(value: string): unknown
+              activatePaintSnapshotHighlights(
+                root: HTMLElement,
+                paint: unknown,
+              ): { dispose(): void }
+            }
+            __paintProofHandles: { dispose(): void }[]
+          }
+          const clone = document
+            .querySelector<HTMLElement>('[data-editor-document-paint]')!
+            .cloneNode(true) as HTMLElement
+          document.body.append(clone)
+          state.__paintProofHandles.push(
+            state.__paintProof.activatePaintSnapshotHighlights(
+              clone,
+              state.__paintProof.decodePaintSnapshot(payload),
+            ),
+          )
+          return CSS.highlights.size
+        }, payload),
+      )
+      counts.push(
+        await fresh.evaluate(() => {
+          const state = window as unknown as { __paintProofHandles: { dispose(): void }[] }
+          state.__paintProofHandles[0]!.dispose()
+          return CSS.highlights.size
+        }),
+      )
+      await fresh.addScriptTag({ content: bundle })
+      counts.push(
+        await fresh.evaluate((payload) => {
+          const state = window as unknown as {
+            __paintProof: {
+              decodePaintSnapshot(value: string): unknown
+              activatePaintSnapshotHighlights(
+                root: HTMLElement,
+                paint: unknown,
+              ): { dispose(): void }
+            }
+            __paintProofHandles: { dispose(): void }[]
+          }
+          const clone = document
+            .querySelector<HTMLElement>('[data-editor-document-paint]')!
+            .cloneNode(true) as HTMLElement
+          document.body.append(clone)
+          state.__paintProofHandles.push(
+            state.__paintProof.activatePaintSnapshotHighlights(
+              clone,
+              state.__paintProof.decodePaintSnapshot(payload),
+            ),
+          )
+          return CSS.highlights.size
+        }, payload),
+      )
+      counts.push(
+        await fresh.evaluate(() => {
+          const state = window as unknown as { __paintProofHandles: { dispose(): void }[] }
+          state.__paintProofHandles[0]!.dispose()
+          return CSS.highlights.size
+        }),
+      )
+    }
+    const proof = { ...result, sizes, inputs, counts }
+    writeFileSync(
+      join(
+        evidence,
+        `${project}-${width}-${fixture}-${javaScriptEnabled ? 'first-frame' : 'javascript-off'}.json`,
+      ),
+      JSON.stringify(proof, null, 2),
+    )
+    return { ...proof, image: firstFrame.toString('base64') }
+  } finally {
+    await context.close()
+  }
+}

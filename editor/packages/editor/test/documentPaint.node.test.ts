@@ -19,6 +19,8 @@ const style = {
   letterSpacing: 'normal',
   fontFeatureSettings: 'normal',
   fontVariationSettings: 'normal',
+  fontKerning: 'auto',
+  fontVariantLigatures: 'normal',
 } as const
 
 function fixture(count = 1): SavedDocumentPaint {
@@ -149,6 +151,9 @@ it('refuses unsafe style values and malformed heading facts', () => {
     { visibility: 'collapse' },
     { textDecoration: 'underline; background: red' },
     { fontWeight: '100000' },
+    { fontKerning: 'normal; color: red' },
+    { fontKerning: ['none'] },
+    { fontVariantLigatures: 'url(example.com)' },
   ])
     expect(
       decodeSnapshot(JSON.stringify({ ...paint, style: { ...style, ...replacement } })),

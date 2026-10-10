@@ -44,6 +44,13 @@ Each entry names its source and any work that owns changing it. "No lifting plan
 - Why. Copied paint contributions need bounds on rectangle counts and string payloads.
 - Ownership. No lifting plan identified.
 
+### Emitted document snapshot syntax paint
+
+- Requirement. Emitted document-snapshot HTML uses native CSS Custom Highlight ranges to preserve continuous text shaping across syntax-colour boundaries. Call `activatePaintSnapshotHighlights(root, paint)` from `@singapore-editor/core/paint` synchronously after inserting each root, before its first visible frame. A small inline activation bundle or blocking script can do this without loading the Editor, a parser or a worker. `mountPaintSnapshot` activates its own root automatically.
+- JavaScript off. Emitted text, links, headings, gutters and captured row layout remain readable. Syntax colours on continuous-text rows require activation; with JavaScript disabled those rows use their base text colour. Font files must still load for the captured font metrics to match.
+- Source. [documentPaintHighlights.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/virtualization/documentPaintHighlights.ts) and [paint.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/paint.ts). Dispose the returned handle when removing or replacing emitted roots. Independent bundles allocate names against the document's shared highlight registry.
+- Ownership. [Plan 340](https://github.com/ShaulLavo/fregat/blob/main/plans/340-singapore-site-embedding.md) owns emitted first-frame and live-takeover qualification.
+
 ## Document size and analysis
 
 ### Whole-document string boundary
