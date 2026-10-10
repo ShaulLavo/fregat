@@ -1,3 +1,5 @@
+import { DisplayProjection } from './displayProjection'
+import { assertContentLayout } from './contentLayout'
 import type { TextContent } from '../textContent'
 import type { MeasuredText } from '../textMeasurements'
 import type { FoldMap } from '../foldMap'
@@ -236,9 +238,36 @@ export function setInjectedTextRowsLayout(
   refreshDisplayProjection(view, viewportColumns)
 }
 
+export function assertContentSnapshot(
+  view: VirtualizedTextViewInternal,
+  textSnapshot: TextSnapshot,
+  replacement = false,
+): void {
+  if (view.scrollMode !== 'content') return
+  assertContentLayout(textSnapshot.length, 0, 0)
+  const projection = new DisplayProjection({
+    ...view.model.projection.config,
+    textSnapshot,
+    ...(replacement ? { foldMap: null, inlineMap: null, injectedTextRows: [] } : {}),
+  })
+  const count = projection.rowCount
+  assertContentLayout(
+    textSnapshot.length,
+    count,
+    count * getRowHeight(view) + Math.max(0, count - 1) * view.rowGap,
+  )
+}
+
 export function updateVirtualizerRows(view: VirtualizedTextViewInternal): void {
+  const count = visibleLineCount(view)
+  if (view.scrollMode === 'content')
+    assertContentLayout(
+      view.model.textLength,
+      count,
+      count * getRowHeight(view) + Math.max(0, count - 1) * view.rowGap,
+    )
   const changed = view.virtualizer.updateOptions({
-    count: visibleLineCount(view),
+    count,
     rowGap: view.rowGap,
     rowHeight: getRowHeight(view),
   })

@@ -48,6 +48,8 @@ export function glyphAdvancesFor(element: HTMLElement): GlyphAdvances | null {
 /** Dropped with the metrics cache: a late web font changes every advance without changing a style. */
 export function clearGlyphAdvancesCache(): void {
   advancesCache = new WeakMap()
+  // WebKit retains a canvas context's fallback face after the requested web font loads.
+  sharedContext = null
 }
 
 function createGlyphAdvances(

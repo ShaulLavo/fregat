@@ -24,6 +24,16 @@ editor.setText('const value = 1\n')
 // Call editor.dispose() when removing the view.
 ```
 
+## Content-height embedding
+
+Use content mode for a code sample or document that scrolls with its page. Give the host its width and leave its height automatic.
+
+Create the view with `new Editor(host, { scrollMode: 'content', wordWrap: true })`, then load the sample with `setText()`.
+
+Content mode paints every display row and grows after edits, font changes, preview replacements and resizing. Caret and search reveal scroll outside ancestors. `setScrollMode('content')` switches an existing view to this layout. `static` keeps its existing all-row layout with horizontal editor scrolling; `virtualized` keeps a bounded window of rows.
+
+Content mode supports up to 10,000 display rows, 1,048,576 UTF-16 source units and 1,000,000 CSS pixels of content height. Exceeding a limit throws an error with code `EDITOR_CONTENT_LAYOUT_LIMIT`. Refused replacements and edits preserve the attached document, selections and undo history. Use `virtualized` for larger documents.
+
 ## API highlights
 
 - `Editor.setText()` loads text into a view.
