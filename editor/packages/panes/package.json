@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/panes",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Resizable split panes for browser DOM elements.",
   "keywords": [
     "browser",

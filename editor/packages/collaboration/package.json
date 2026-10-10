@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/collaboration",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Session protocols, transports, and remote cursor presence for host-ordered collaboration.",
   "keywords": [
     "browser",
