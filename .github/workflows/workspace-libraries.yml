@@ -82,7 +82,6 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' || inputs.exhaustive }}
         run: bun editor/scripts/check-turbo-inputs.mjs
       - name: Check architecture health
-        if: ${{ github.event_name == 'workflow_dispatch' || inputs.exhaustive }}
         run: bun run --cwd editor health
       - name: Test Editor packages and examples
         env:
