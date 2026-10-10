@@ -46,8 +46,9 @@ export function buildFrame(
   for (const visible of snapshot.visibleRows) {
     if (visible.kind !== 'text') continue
     if (typeof visible.text !== 'string') return null
-    // Paint the overlay cannot redraw, such as plugin CSS, would vanish with the hidden row.
-    if (visible.mountedPaintSupport !== 'replayable') return null
+    // Paint the overlay cannot redraw, such as plugin CSS or control-character boxes, would vanish
+    // with the hidden row.
+    if (!drawsAsPlainText(visible)) return null
     if (visible.text.length === 0) continue
     appendRowPieces(pieces, {
       text: visible.text,
@@ -141,6 +142,15 @@ function tokenStyleLookup(
     if (start > offset) return { style: undefined, end: start }
     return { style: tokens.styleAt(cursor), end: tokens.endAt(cursor) }
   }
+}
+
+function drawsAsPlainText(row: EditorViewSnapshot['visibleRows'][number]): boolean {
+  if (row.mountedPaintSupport !== 'replayable') return false
+  return row.chunks.every(
+    (chunk) =>
+      chunk.mountedPaint.kind === 'replayable' &&
+      chunk.mountedPaint.parts.every((part) => part.kind === 'text'),
+  )
 }
 
 /** Fresh colours for a frame's pieces from a later token pass, by offset. */

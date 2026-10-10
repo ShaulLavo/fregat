@@ -557,6 +557,31 @@ describe('createMorphPlugin', () => {
     expect(rowAnimations()).toHaveLength(0)
   })
 
+  it('leaves rows alone when they draw control characters as boxes', () => {
+    const { context, contribution } = mountMorph()
+    const next = snapshot({ text: EDITED, textVersion: 2 })
+    const [first, ...rest] = next.visibleRows
+    const boxed = {
+      ...first!,
+      chunks: [
+        {
+          sourceStartOffset: first!.startOffset,
+          sourceEndOffset: first!.endOffset,
+          rowLocalStart: 0,
+          rowLocalEnd: first!.text.length,
+          text: first!.text,
+          mountedPaint: {
+            kind: 'replayable',
+            parts: [{ kind: 'control', text: '\u0007' }],
+          },
+        },
+      ],
+    } as unknown as (typeof rest)[number]
+    contribution.update({ ...next, visibleRows: [boxed].concat(rest) }, 'content', edit(12))
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+  })
+
   it('stays still under reduced motion', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
     const { context, contribution } = mountMorph()
