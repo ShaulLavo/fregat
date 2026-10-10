@@ -7,7 +7,13 @@ import { paletteTheme } from './theme'
 export type ExampleEditor = ReturnType<typeof mountExample>
 export function mountExample(
   host: HTMLElement,
-  options: { text: string; language: string; label: string; snapshot?: string },
+  options: {
+    text: string
+    language: string
+    label: string
+    snapshot?: string
+    fallbackFont?: boolean
+  },
 ) {
   const language = fenceLanguage(options.language)
   if (language === null) throw new TypeError(`No Singapore grammar for ${options.language}`)
@@ -19,7 +25,7 @@ export function mountExample(
     scrollMode: 'content',
     wordWrap: true,
     wordWrapBreak: 'word',
-    fontFamily: '"JetBrains Mono", monospace',
+    fontFamily: options.fallbackFont ? '"Singapore Mono Fallback", monospace' : '"JetBrains Mono"',
     fontSize: 14,
     lineHeight: 22,
     tabSize: 2,

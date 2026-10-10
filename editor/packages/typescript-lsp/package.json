@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/typescript-lsp",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "TypeScript and JavaScript language services in a browser worker for the Singapore editor.",
   "keywords": [
     "browser",

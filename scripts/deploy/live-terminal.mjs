@@ -252,14 +252,14 @@ export function terminalReleaseFailures(deployed, backend, protocolVersion) {
   const commit = deployed?.commit
   if (typeof commit !== 'string' || !/^[a-f0-9]{40}$/.test(commit))
     failures.push('terminal check: deployed client commit is missing')
+  // The isolated backend runs from the installed release; a web-only install keeps the running
+  // server on its older commit, so the deployed server's commit isn't compared.
   if (backend?.server?.commit !== commit)
     failures.push('terminal check: isolated backend commit differs from deployed client')
   for (const [name, release] of [
     ['deployed', deployed],
     ['isolated', backend],
   ]) {
-    if (release?.server?.commit !== commit)
-      failures.push(`terminal check: ${name} server commit differs from deployed client`)
     if (release?.dirtyFiles !== 0 || release?.server?.dirtyFiles !== 0)
       failures.push(`terminal check: ${name} backend artifacts have uncommitted changes`)
     const host = release?.terminalHostProbe

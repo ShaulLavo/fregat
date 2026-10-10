@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/markdown",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Markdown preview and editing commands for the Singapore editor.",
   "keywords": [
     "browser",

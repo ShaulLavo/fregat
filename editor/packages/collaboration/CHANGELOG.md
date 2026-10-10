@@ -1,5 +1,15 @@
 # @singapore-editor/collaboration
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @singapore-editor/core@0.2.9
+  - @singapore-editor/plugin-ui@0.2.9
+  - @singapore-editor/textbuffer@0.2.9
+  - @singapore-editor/collab@0.0.4
+
 ## 0.0.3
 
 ### Patch Changes

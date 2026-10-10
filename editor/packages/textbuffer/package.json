@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/textbuffer",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "A persistent piece-table text buffer with snapshots, stable anchors, and line mapping.",
   "keywords": [
     "browser",

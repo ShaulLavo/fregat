@@ -8,6 +8,7 @@ import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-wor
 import { measurePress, pressStampScript, type PressTiming } from '../press-timing'
 import {
   chords,
+  itemKeys,
   diffPaneSelector,
   editorRowSelector,
   editorViewportSelector,
@@ -229,10 +230,11 @@ export const prefetchFirstPaint: Scenario = {
       await step('quick-open')
 
       await selectors.editorTabs(page).first().waitFor()
+      const keys = await itemKeys(page)
       for (const round of [1, 2, 3]) {
         const target = await nextTabName(page)
         await measure(page, `next tab, keyboard only, ${round}: ${target}`, file(target), () =>
-          page.keyboard.press(chords.nextItem),
+          page.keyboard.press(keys.next),
         )
       }
       await step('tabs')

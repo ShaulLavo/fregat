@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/core",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "The browser editor at the core of Singapore, with text editing, selections, undo history, themes, and plugins.",
   "keywords": [
     "browser",

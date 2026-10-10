@@ -154,7 +154,7 @@ export const settingsNativeHostSelector = '.editor-virtualized'
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
 export const markdownEditorLinkSelector = '.editor-markdown-link'
 export const chatMessagesLogSelector = '[role="log"][aria-label="Messages"]'
-const chatComposerSelector = '[data-testid="chat-input-editor"]'
+export const chatComposerSelector = '[data-testid="chat-input-editor"]'
 const projectSwitcherSelector = '[aria-label="Switch project"]'
 export const mermaidSelectors = {
   diagram: '[data-markdown="mermaid-block"] [role="img"]',
@@ -176,8 +176,14 @@ export const editorTokenPaintSelectors = {
 /** The decode plugin's hidden-rows class, its diffusion overlay, and one overlay glyph. */
 export const decodeSelectors = {
   active: '.editor-decode-active',
-  glyphLayer: '.editor-decode-glyph-layer',
-  glyph: '.editor-decode-glyph',
+  layer: '.editor-decode-layer',
+  piece: '.editor-morph-piece',
+} as const
+export const morphSelectors = {
+  editor: (page: Page) => page.locator('[data-transitions-editor]'),
+  layer: '.editor-morph-layer',
+  revealLayer: '.editor-decode-layer',
+  piece: '.editor-morph-piece',
 } as const
 export const searchEditorSelector = '[aria-label="Search result editor"]'
 export const searchEditorFileRowSelector = '[role="treeitem"][aria-level="1"]'
@@ -1581,8 +1587,22 @@ export const chords = {
   commandPalette: 'ControlOrMeta+Shift+P',
   settings: 'ControlOrMeta+,',
   togglePanel: 'ControlOrMeta+J',
-  nextItem: 'ControlOrMeta+Alt+BracketRight',
   toggleSidebar: 'ControlOrMeta+B',
+}
+
+/**
+ * The default layout's tab and chat keys, which are Zed's: Alt+digit and Ctrl+PageUp/PageDown,
+ * or Ctrl+digit and Cmd+Alt+arrows on macOS.
+ */
+export async function itemKeys(page: Page) {
+  const mac = (await page.evaluate(detectPlatform)) === 'mac'
+  const modifier = mac ? 'Control' : 'Alt'
+  return {
+    modifier,
+    select: (position: number) => `${modifier}+${position}`,
+    next: mac ? 'Meta+Alt+ArrowRight' : 'Control+PageDown',
+    previous: mac ? 'Meta+Alt+ArrowLeft' : 'Control+PageUp',
+  }
 }
 
 export async function pressShortcut(page: Page, chord: string) {

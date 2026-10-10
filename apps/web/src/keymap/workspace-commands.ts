@@ -165,6 +165,52 @@ function runSessionCommand(
   return dispositionFor(result)
 }
 
+/**
+ * A keyboard chat switch leaves focus in the chat's composer, as a tab switch does in the editor.
+ * The request lapses once another chat is selected, so a later pointer switch keeps its focus.
+ */
+function switchSessionCommand(
+  context: WorkspaceCommandHandlerContext,
+  run: () => boolean | Promise<boolean>,
+): StartedCommand | ImmediateCommandDisposition {
+  if (context.snapshot.uiMode !== 'chat') return declined
+
+  const { runtime } = context
+  const before = selectedChatKey()
+  const leaving = runtime.focus.resolveTarget({
+    compatible: (target) => target.layout === 'chat' && target.id.kind === 'chat-composer',
+  })?.token
+  return {
+    completion: Promise.resolve(run()).then((accepted) => {
+      const rootPath = runtime.workspace.getState().rootFolder?.path
+      if (!accepted || !rootPath) return declined
+      const destination = selectedChatKey()
+      // The old chat's composer stays registered until the new one replaces it.
+      const switched = destination !== before
+      const id = { key: rootPath, kind: 'chat-composer' } as const
+      return transitionStart(
+        runtime.focus.request({
+          isValid: () =>
+            runtime.workspace.getState().uiMode === 'chat' && selectedChatKey() === destination,
+          kind: 'match',
+          matches: (target) =>
+            target.layout === 'chat' &&
+            focusTargetIdsEqual(target.id, id) &&
+            !(switched && target.token === leaving),
+        }),
+      ).completion
+    }),
+    status: 'started',
+  }
+}
+
+function selectedChatKey() {
+  const { selection } = useSessionSelectionStore.getState()
+  if (selection.kind === 'session') return `session:${selection.sessionId}`
+  if (selection.kind === 'draft') return `draft:${selection.draftId}`
+  return selection.kind
+}
+
 function exportSelectedSessionTranscript() {
   const { selection } = useSessionSelectionStore.getState()
   if (selection.kind !== 'session') return false
@@ -596,7 +642,7 @@ function selectItemCommands() {
       ...selectItemMetadata(position),
       run: (context) => {
         if (context.snapshot.uiMode === 'chat')
-          return runSessionCommand(context, () => jumpToSession(position))
+          return switchSessionCommand(context, () => jumpToSession(position))
         const group = activeEditorGroup(context.snapshot.workbenchPanels.editorGroups)
         return selectEditorTab(
           context.runtime,
@@ -611,7 +657,7 @@ function selectItemCommands() {
 function adjacentItemHandler(direction: SessionTraversalDirection) {
   return (context: WorkspaceCommandHandlerContext) => {
     if (context.snapshot.uiMode === 'chat')
-      return runSessionCommand(context, () => selectAdjacentSession(direction))
+      return switchSessionCommand(context, () => selectAdjacentSession(direction))
     const group = activeEditorGroup(context.snapshot.workbenchPanels.editorGroups)
     return selectEditorTab(context.runtime, group, adjacentTab(group, direction))
   }
