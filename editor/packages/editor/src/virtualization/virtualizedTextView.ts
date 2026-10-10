@@ -1,3 +1,4 @@
+import { scheduleFrame, type ScheduledFrame } from '../editor/scheduleFrame'
 import type { RevealBlock } from './revealBlock'
 import { assertContentLayout, contentReadingBounds, revealContentRow } from './contentLayout'
 import { isElementNode, isTextareaElement } from '../dom'
@@ -118,6 +119,7 @@ import {
   lineStartOffset,
   offsetForViewportColumn,
   refreshDisplayProjection,
+  releaseStyledRowFaces,
   refreshDisplayProjectionForWrapWidth,
   rowForCaretPosition,
   rowForOffset,
@@ -324,6 +326,7 @@ export class VirtualizedTextView {
   public readonly editContext: EditorEditContext | null
   private readonly view: VirtualizedTextViewInternal
   private measuredMaxScrollHeight: number | undefined
+  private styledFaceFrame: ScheduledFrame | null = null
   private readonly disposeForegroundHighlightRestore: () => void
   private cancelContentWidthMeasurement: (() => void) | null = null
   private provisionalPaint: { readonly paint: SavedPaint; readonly release: () => void } | null =
@@ -453,6 +456,8 @@ export class VirtualizedTextView {
       wrapEnabled: options.wrap ?? false,
       wrapBreak: options.wrapBreak ?? 'character',
       wrapAdvance: null,
+      styledRowFaces: new Map(),
+      onStyledFaceChange: () => this.scheduleStyledFaceRefresh(),
       glyphs: measuredFace.monospace ? null : glyphAdvancesFor(scrollElement),
       tabSize,
       tokenGroups: new Map(),
@@ -522,6 +527,9 @@ export class VirtualizedTextView {
     const view = this.view
     if (view.disposed) return
     view.disposed = true
+    this.styledFaceFrame?.cancel()
+    this.styledFaceFrame = null
+    releaseStyledRowFaces(view, new Set())
     this.atomicRenderPending = false
     const rows = new Set(view.rowElements.values())
     for (const row of view.rowPool) rows.add(row)
@@ -962,6 +970,15 @@ export class VirtualizedTextView {
     updateMountedFoldMarkers(view)
   }
 
+  private scheduleStyledFaceRefresh(): void {
+    if (this.view.disposed || this.styledFaceFrame) return
+    this.styledFaceFrame = scheduleFrame(() => {
+      this.styledFaceFrame = null
+      if (this.view.disposed || this.view.styledRowFaces.size === 0) return
+      this.remeasureMetrics()
+    }, this.scrollElement.ownerDocument.defaultView ?? globalThis)
+  }
+
   public refreshMetrics(): BrowserTextMetrics {
     const view = this.view
     invalidateScrollElementPadding(this.scrollElement)
@@ -986,7 +1003,7 @@ export class VirtualizedTextView {
       face.monospace === view.monospace
     if (unchanged) {
       // A late face can keep the average width and still move single glyphs.
-      if (glyphs !== view.glyphs) this.applyGlyphs(glyphs)
+      if (glyphs !== view.glyphs || view.styledRowFaces.size > 0) this.applyGlyphs(glyphs)
       return null
     }
 
@@ -1107,6 +1124,8 @@ export class VirtualizedTextView {
     clearRowGeometryCaches(view)
     resetContentWidthScan(view)
     view.lastRenderedRowsKey = ''
+    if (view.styledRowFaces.size > 0)
+      refreshDisplayProjection(view, horizontalViewportColumns(view))
     if (this.refreshWrapWidth()) return
     updateVirtualizerRows(view)
   }
@@ -1122,6 +1141,8 @@ export class VirtualizedTextView {
     updateGutterWidthIfNeeded(view)
     if (view.disposed) return
     view.lastRenderedRowsKey = ''
+    if (view.styledRowFaces.size > 0)
+      refreshDisplayProjection(view, horizontalViewportColumns(view))
     if (this.refreshWrapWidth()) return
     updateVirtualizerRows(view)
   }
@@ -1188,6 +1209,7 @@ export class VirtualizedTextView {
 
   public setTheme(theme: EditorTheme | null | undefined): void {
     applyEditorTheme(this.scrollElement, theme)
+    this.remeasureMetrics()
   }
 
   public setEditable(editable: boolean): void {
@@ -1288,9 +1310,10 @@ export class VirtualizedTextView {
   public setRowDecorations(decorations: ReadonlyMap<number, VirtualizedTextRowDecoration>): void {
     const view = this.view
     view.rowDecorations = decorations
+    refreshDisplayProjection(view, horizontalViewportColumns(view))
     clearRowGeometryCaches(view)
     view.lastRenderedRowsKey = ''
-    this.renderSnapshot(view.virtualizer.getSnapshot())
+    updateVirtualizerRows(view)
   }
 
   public setGutterContributions(contributions: readonly EditorGutterContribution[]): boolean {

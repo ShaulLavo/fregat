@@ -413,3 +413,21 @@ describe('indexed display projection', () => {
     }
   })
 })
+
+test('rewraps only a styled source row when its measured font changes', () => {
+  const base = { ...input('abcdefgh\nabcdefgh'), wrapColumn: 8 }
+  const glyphs = {}
+  const styled = { width: 8, advance: () => 2, glyphs }
+  const options = { ...base, rowWrapAdvances: new Map([[0, styled]]) }
+  const projection = new DisplayProjection(options)
+  const rows = () =>
+    Array.from({ length: projection.rowCount }, (_, index) => projection.getRow(index)!.text)
+  expect(rows()).toEqual(['abcd', 'efgh', 'abcdefgh'])
+  projection.reconfigure({
+    ...options,
+    rowWrapAdvances: new Map([[0, { width: 8, advance: () => 4, glyphs: {} }]]),
+  })
+  expect(rows()).toEqual(['ab', 'cd', 'ef', 'gh', 'abcdefgh'])
+  projection.reconfigure({ ...base, rowWrapAdvances: undefined })
+  expect(rows()).toEqual(['abcdefgh', 'abcdefgh'])
+})

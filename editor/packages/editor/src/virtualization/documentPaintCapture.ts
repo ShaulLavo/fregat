@@ -10,6 +10,7 @@ import type { EditorTokenStyle } from '../tokens'
 import type { VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
 import type { MountedVirtualizedTextRow } from './virtualizedTextViewTypes'
 import { getMountedRows } from './virtualizedTextViewRows'
+import { glyphAdvancesFor } from './glyphAdvances'
 
 const MARKDOWN_KIND =
   /^editor-inline-(?:marker|heading-marker-[1-6]|fence-marker|task-marker|list-marker|quote-marker|link|link-marker|link-target)$/
@@ -57,6 +58,7 @@ export function captureDocumentPaint(
     const level = row.element.getAttribute('aria-level')
     rows.push({
       height: row.height,
+      characterWidth: glyphAdvancesFor(row.element)?.advance(48) ?? view.metrics.characterWidth,
       style: captureStyle(row.element),
       runs,
       heading:

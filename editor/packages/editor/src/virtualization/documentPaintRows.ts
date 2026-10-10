@@ -71,14 +71,32 @@ export function mountDocumentPaint(
     measure: paint.monospace ? undefined : glyphs?.measure,
     minimumTabAdvance: paint.monospace ? undefined : glyphs?.minimumTabAdvance,
   }
+  const probe = document.createElement('div')
+  probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none'
+  root.append(probe)
   for (let index = 0; index < paint.rows.length; index++) {
     const row = paint.rows[index]!
+    applyStyle(probe, row.style)
+    const rowGlyphs = glyphAdvancesFor(probe)
+    const rowRules =
+      rowGlyphs && rowGlyphs !== glyphs
+        ? {
+            ...rules,
+            width: Math.max(
+              1,
+              width - paint.gutterWidth - row.characterWidth - PROPORTIONAL_WRAP_MARGIN_PX,
+            ),
+            advance: (codePoint: number) => rowGlyphs.advance(codePoint),
+            measure: rowGlyphs.measure,
+            minimumTabAdvance: rowGlyphs.minimumTabAdvance,
+          }
+        : rules
     const text = row.runs.map((run) => run.text).join('')
     const highlight = canHighlightDocumentPaintRow(row)
     const line = createWordWrapLine()
     if (paint.wrap) {
-      appendWordWrapText(line, text, 0, text.length, rules)
-      finishWordWrapLine(line, rules)
+      appendWordWrapText(line, text, 0, text.length, rowRules)
+      finishWordWrapLine(line, rowRules)
     }
     const ends = [...line.ends, text.length]
     let start = 0
@@ -113,6 +131,7 @@ export function mountDocumentPaint(
       start = end
     }
   }
+  probe.remove()
   const height = Math.max(0, top - paint.rowGap)
   root.style.height = `${height}px`
   root.append(fragment)

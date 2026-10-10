@@ -38,6 +38,7 @@ function fixture(count = 1): SavedDocumentPaint {
     wrap: 'word',
     rows: Array.from({ length: count }, () => ({
       height: 20,
+      characterWidth: 8,
       style,
       heading: null,
       gutterBackgroundColor: 'transparent',
@@ -200,3 +201,15 @@ it('refuses unsafe row, inset and cell gutter backgrounds', () => {
   ])
     expect(decodeSnapshot(JSON.stringify({ ...paint, rows: [changed] }))).toBeNull()
 })
+
+it.each([0, -1, 1025, Number.NaN, Number.POSITIVE_INFINITY])(
+  'refuses an invalid row font advance %s',
+  (characterWidth) => {
+    const paint = fixture()
+    expect(
+      decodeDocumentPaint(
+        JSON.stringify({ ...paint, rows: [{ ...paint.rows[0], characterWidth }] }),
+      ),
+    ).toBeNull()
+  },
+)

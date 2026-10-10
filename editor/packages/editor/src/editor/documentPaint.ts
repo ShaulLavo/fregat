@@ -32,6 +32,8 @@ export type DocumentPaintRun = {
 
 export type DocumentPaintRow = {
   readonly height: number
+  /** Effective font’s zero-glyph advance, in CSS pixels. */
+  readonly characterWidth: number
   readonly style: DocumentPaintStyle
   readonly runs: readonly DocumentPaintRun[]
   readonly heading: { readonly level: number; readonly name: string; readonly id: string } | null
@@ -213,6 +215,8 @@ function row(value: unknown): value is DocumentPaintRow {
     record(value) &&
     finite(value.height, 1024) &&
     value.height > 0 &&
+    finite(value.characterWidth, 1024) &&
+    value.characterWidth > 0 &&
     style(value.style) &&
     heading(value.heading) &&
     color(value.gutterBackgroundColor) &&
