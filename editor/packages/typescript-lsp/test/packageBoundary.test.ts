@@ -40,7 +40,7 @@ describe('@singapore-editor/typescript-lsp package boundary', () => {
   it('keeps generic LSP implementation files owned by @singapore-editor/lsp-plugin', () => {
     const files = sourceFiles()
 
-    expect([...files].sort()).toEqual([...TYPE_SCRIPT_SPECIALIZATION_FILES].sort())
+    expect([...files].sort()).toEqual(TYPE_SCRIPT_SPECIALIZATION_FILES.toSorted())
     for (const file of SHARED_LSP_PLUGIN_FILES) {
       expect(files.has(file), `${file} belongs in @singapore-editor/lsp-plugin`).toBe(false)
     }

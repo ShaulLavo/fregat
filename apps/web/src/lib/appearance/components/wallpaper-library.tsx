@@ -147,11 +147,11 @@ export function WallpaperLibrary({
   function handleDrop(event: DragEvent) {
     event.preventDefault()
     setDragging(false)
-    void uploadFiles([...event.dataTransfer.files])
+    void uploadFiles(Array.from(event.dataTransfer.files))
   }
 
   function handlePaste(event: ClipboardEvent) {
-    const files = [...event.clipboardData.files]
+    const files = Array.from(event.clipboardData.files)
     if (files.length === 0) return
     event.preventDefault()
     void uploadFiles(files)

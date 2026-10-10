@@ -68,7 +68,12 @@
     },
     "ghostty-webgpu-site#build": {
       "dependsOn": ["^build", "ghostty-webgpu#build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*",
+        "$TURBO_ROOT$/ghostty-webgpu/docs/correctness-results.json",
+        "$TURBO_ROOT$/ghostty-webgpu/docs/benchmarks/**"
+      ],
       "outputs": ["dist/**"]
     },
     "lint": {
@@ -254,6 +259,21 @@
     "@singapore-editor/collaboration#typecheck": {
       "dependsOn": ["^typecheck", "@singapore-editor/diff#build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/examples/app/src/**"]
+    },
+    "@workspace/ui#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["src/lib/generated/cn-tables.ts"],
+      "inputs": ["$TURBO_DEFAULT$", "!src/lib/generated/cn-tables.ts"]
+    },
+    "@workspace/contracts#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/server/src/orchestration/**",
+        "$TURBO_ROOT$/apps/server/src/provider/**",
+        "$TURBO_ROOT$/apps/web/src/features/{chat,chat-mode,address}/**",
+        "$TURBO_ROOT$/scripts/generate-settings-schema.ts"
+      ]
     }
   },
   "agentGuidance": false,

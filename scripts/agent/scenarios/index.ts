@@ -472,7 +472,10 @@ import { treeParityBehaviour } from './tree-parity-behaviour'
 
 import { devPackageUpdates } from './dev-package-updates'
 
+import { collaborationMergeReview } from './collaboration-merge-review'
+
 export const scenarios: readonly Scenario[] = [
+  collaborationMergeReview,
   overlayAlignment,
   unknownWorkspaceSettings,
   releaseInstallationSettings,
@@ -763,7 +766,7 @@ export const scenarios: readonly Scenario[] = [
   fileIcons,
   searchInputUndo,
   visualSearchPerformance,
-  ...visualSearchTiers,
+].concat(visualSearchTiers, [
   searchViewAllMatches,
   visualSearchHeaders,
   visualSearchScrollContent,
@@ -921,7 +924,7 @@ export const scenarios: readonly Scenario[] = [
   inlineRenameTree,
   filterFields,
   treeFileClicks,
-]
+])
 
 export function scenarioNamed(name: string): Scenario {
   const scenario = scenarios.find((entry) => entry.name === name)

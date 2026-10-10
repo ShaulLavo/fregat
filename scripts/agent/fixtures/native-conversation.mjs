@@ -96,11 +96,12 @@ function answerFor(thread, prompt) {
   const recall = marker(prompt, /\bend with ([A-Z0-9_]+)/)
   if (recall) {
     const earlier = thread.turns.filter((turn) => turn.kind === 'prompt').map((turn) => turn.prompt)
-    return [
-      'Earlier prompts in this conversation:',
-      ...earlier.map((text) => `- ${text}`),
-      recall,
-    ].join('\n')
+    return ['Earlier prompts in this conversation:']
+      .concat(
+        earlier.map((text) => `- ${text}`),
+        [recall],
+      )
+      .join('\n')
   }
   return (
     marker(prompt, /reply with exactly ([A-Za-z0-9_]+)/i) ??
@@ -307,7 +308,7 @@ function mcpServers() {
 function turnsList(message) {
   const thread = loadThread(message.params.threadId)
   const turns = (thread?.turns ?? []).map((turn) => ({ id: turn.id }))
-  const data = message.params.sortDirection === 'asc' ? turns : turns.toReversed()
+  const data = message.params.sortDirection === 'asc' ? turns : turns.reverse()
   return { data: data.slice(0, message.params.limit ?? data.length), nextCursor: null }
 }
 

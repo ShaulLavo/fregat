@@ -320,7 +320,7 @@ function apiUrl(login: { url: string }, context: ForgeContext, path: string) {
 }
 
 function tea(context: ForgeContext, args: readonly string[], input?: string) {
-  return forgeCommand(context, ['tea', ...args], input === undefined ? {} : { input })
+  return forgeCommand(context, ['tea'].concat(args), input === undefined ? {} : { input })
 }
 
 function hostOf(url: string) {

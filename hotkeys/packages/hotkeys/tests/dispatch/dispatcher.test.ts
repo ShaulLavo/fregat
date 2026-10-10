@@ -41,7 +41,7 @@ describe('focus nodes and resolution', () => {
   it('builds the context stack from the focus path', () => {
     const { dispatcher, editor } = workbench(keymap)
     editor.focus()
-    expect(dispatcher.contextStack().map((context) => [...context.identifiers])).toEqual([
+    expect(dispatcher.contextStack().map((context) => Array.from(context.identifiers))).toEqual([
       ['Workspace'],
       ['Pane'],
       ['Editor'],
@@ -82,10 +82,11 @@ describe('focus nodes and resolution', () => {
   })
 
   it('a user unbind returns the key to the shallower layer', () => {
-    const { dispatcher, editor, calls } = workbench([
-      ...keymap,
-      { keys: 'Control+B', unbind: 'markdown.bold', context: 'Editor', source: 'user' },
-    ])
+    const { dispatcher, editor, calls } = workbench(
+      keymap.concat([
+        { keys: 'Control+B', unbind: 'markdown.bold', context: 'Editor', source: 'user' },
+      ]),
+    )
     editor.handle('markdown.bold', () => void calls.push('bold'))
     editor.focus()
     dispatcher.handleKey(press('ctrl-b'), null)

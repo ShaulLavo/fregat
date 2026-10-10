@@ -44,7 +44,7 @@ describe('positions in a diff from the real git server', () => {
 
       const files = { new: opened(NEW).split('\n'), old: opened(OLD).split('\n') }
       const map = createDiffPositionMap(rows, file.newLines, file.oldLines)
-      const named = [...buffer.matchAll(/const (\w+)/g)].map((match) => {
+      const named = Array.from(buffer.matchAll(/const (\w+)/g), (match) => {
         const name = match[1]!
         const offset = match.index + 6
         const lookup = map.lookupAt(offset)

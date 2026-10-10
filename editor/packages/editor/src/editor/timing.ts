@@ -26,7 +26,10 @@ export function appendTiming(
   name: string,
   startMs: number,
 ): DocumentSessionChange {
-  return withDocumentSessionChangeTimings(change, [...change.timings, createTiming(name, startMs)])
+  return withDocumentSessionChangeTimings(
+    change,
+    change.timings.concat([createTiming(name, startMs)]),
+  )
 }
 
 export function mergeChangeTimings(

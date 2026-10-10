@@ -868,3 +868,15 @@ experiments measured before this probe-placement repair; they were not rerun for
 The complete editor suite after the hidden-probe repair passes 312 files and 4,261 tests,
 with one skipped file/test. Package typecheck, lint and formatting pass; its log is
 `native-budget/final/hidden-tab-final-suite.log`.
+
+The main integration after #1121 and #1107 retains content-mode viewport widths before applying
+proportional rounding to ordinary scroll extents. Main's strict unpaced typing burst remains
+unchanged. The native-oracle tests and licensed FreeSans cases retain their existing bounds,
+and main's content, wrap and other cross-engine projects remain registered.
+The merged complete editor suite passes 319 files and 4,404 tests, with one skipped file/test.
+The focused proportional, content, wrap and initial-viewport run passes 28 files and 534 tests;
+a temporary verification config also runs the wrap projects in Firefox, alongside their
+committed Chromium and WebKit projects. Logs and that config are retained under
+`/work/reports/freesans-geometry/merge-*`. Content-layout screenshots from Chromium, Firefox
+and WebKit are retained in `merge-content-look/` and were reviewed. The cost experiments above
+predate this main integration and were not rerun for it.

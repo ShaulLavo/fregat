@@ -128,12 +128,10 @@ function constArrayBlock(random, index) {
     (_, i) =>
       `{ key: 'entry_${index}_${i}', weight: ${Math.floor(random() * 1000)}, enabled: ${random() > 0.5} }`,
   )
-  const lines = [
-    `export const segmentEntries_${index} = [`,
-    ...values.map((value) => `  ${value},`),
-    '] as const',
-    '',
-  ]
+  const lines = [`export const segmentEntries_${index} = [`].concat(
+    values.map((value) => `  ${value},`),
+    ['] as const', ''],
+  )
   return { lines: lines.length, text: lines.join('\n') + '\n' }
 }
 

@@ -981,7 +981,7 @@ function pinnedRows(database: TestDatabase) {
     .from(projectionSessions)
     .all()
     .filter((row) => row.pinnedAt !== null)
-    .toSorted((left, right) => comparePinOrderKeys(left.pinOrderKey, right.pinOrderKey))
+    .sort((left, right) => comparePinOrderKeys(left.pinOrderKey, right.pinOrderKey))
 }
 
 function comparePinOrderKeys(left: string | null, right: string | null) {

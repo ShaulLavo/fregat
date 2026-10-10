@@ -33,7 +33,7 @@ function documentTokens(lines: number): PackedEditorTokens {
 }
 
 function median(samples: number[]): number {
-  return samples.toSorted((left, right) => left - right)[samples.length >> 1]!
+  return samples.sort((left, right) => left - right)[samples.length >> 1]!
 }
 
 function readRow(tokens: EditorTokenStore, line: number, grow: number): number {

@@ -954,7 +954,7 @@ describe('retained document analysis', () => {
     expect(lease).not.toBeNull()
     await lease!.refresh(buffer.getTextSnapshot())
     view.applyText('!')
-    await Promise.all([...reads, lease!.refresh(buffer.getTextSnapshot())])
+    await Promise.all(reads.concat([lease!.refresh(buffer.getTextSnapshot())]))
     expect(calls).toEqual(['analyze:alpha', 'analyze:alpha!?'])
     expect(lease!.read()).toMatchObject({ kind: 'ready', revision: 2 })
     analysis.dispose()

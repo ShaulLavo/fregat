@@ -196,7 +196,7 @@ function editorImplementationEntries(root) {
   const packageDirectories = readdirSync(resolve(root, 'packages'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
-    .toSorted()
+    .sort()
   for (const packageDirectory of packageDirectories) {
     entries.push(...editorPackageImplementationEntries(root, packageDirectory))
   }
@@ -213,7 +213,7 @@ function editorPackageImplementationEntries(root, packageDirectory) {
 function implementationManifest(root, entries) {
   const files = []
   for (const entry of entries) collectImplementationFiles(root, entry, files)
-  return files.toSorted()
+  return files.sort()
 }
 
 function collectImplementationFiles(root, relativePath, files) {
@@ -455,12 +455,11 @@ async function runBrowser(browserName, workspace, fixturePaths) {
     }
 
     const summary = summarize(browserName, samples, compatibilitySamples)
-    const runtimeSessionSamples = [
-      ...warmupSamples,
-      ...samples,
-      ...compatibilityCaptureResults,
-      ...compatibilitySamples,
-    ]
+    const runtimeSessionSamples = warmupSamples.concat(
+      samples,
+      compatibilityCaptureResults,
+      compatibilitySamples,
+    )
     console.log(
       `EDITOR_OPEN_BENCHMARK_CAPTURE ${JSON.stringify({
         schemaVersion: 1,
@@ -775,14 +774,14 @@ function readMeasuredPipeline(page, path, activationAt, detectedAt) {
       }
 
       function workerRuntimeSessionIds(family) {
-        return [
-          ...new Set(
+        return Array.from(
+          new Set(
             workers
               .filter((entry) => entry.detail?.family === family)
               .map((entry) => entry.detail?.runtimeSessionId)
               .filter((runtimeSessionId) => typeof runtimeSessionId === 'string'),
           ),
-        ]
+        )
       }
     },
     { activatedAt: activationAt, intentAt: detectedAt, targetPath: path },
@@ -1081,13 +1080,15 @@ function assertUniqueRuntimeSessionIdsAcrossFamilies(samples) {
   for (let index = 0; index < samples.length; index += 1) {
     const highlighter = highlighterSets[index]
     const structural = structuralSets[index]
-    if ([...highlighter].every((runtimeSessionId) => !structural.has(runtimeSessionId))) continue
+    if (Array.from(highlighter).every((runtimeSessionId) => !structural.has(runtimeSessionId)))
+      continue
 
     throw createBenchmarkError('editor-open benchmark reused a runtime id across syntax families')
   }
 
   const combinedSets = highlighterSets.map(
-    (highlighter, index) => new Set([...highlighter, ...structuralSets[index]]),
+    (highlighter, index) =>
+      new Set(Array.from(highlighter).concat(Array.from(structuralSets[index]))),
   )
   assertRuntimeSessionSetsAreDisjoint(
     combinedSets,
@@ -1153,7 +1154,7 @@ function distribution(samples, key) {
 function pairedNoiseFloor(samples) {
   const values = samples
     .map((sample) => sample.authoritativeHighlightMs)
-    .toSorted((left, right) => left - right)
+    .sort((left, right) => left - right)
   const median = percentile(values, 0.5)
   const deviations = values.map((value) => Math.abs(value - median))
   const robustStandardDeviation = percentile(deviations, 0.5) * 1.4826

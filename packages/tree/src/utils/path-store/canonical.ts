@@ -87,7 +87,7 @@ export function addPath(state: PathStoreState, path: string): PathStoreAddEvent 
   const nextProjectionSignature = getCollapsedProjectionSignature(state, directoryId)
   return createAddEvent({
     affectedAncestorIds: collectAncestorIds(state, addedNodeId),
-    affectedNodeIds: [...affectedNodeIds],
+    affectedNodeIds: Array.from(affectedNodeIds),
     path,
     projectionChanged: didProjectionChange(previousProjectionSignature, nextProjectionSignature),
   })
@@ -205,12 +205,13 @@ export function movePath(
   const nextTargetProjectionSignature = getCollapsedProjectionSignature(state, moveTarget.parentId)
 
   return createMoveEvent({
-    affectedAncestorIds: [
-      ...new Set([
-        ...collectAncestorIds(state, previousParentId),
-        ...collectAncestorIds(state, moveTarget.parentId),
-      ]),
-    ],
+    affectedAncestorIds: Array.from(
+      new Set(
+        collectAncestorIds(state, previousParentId).concat(
+          collectAncestorIds(state, moveTarget.parentId),
+        ),
+      ),
+    ),
     affectedNodeIds: [sourceNodeId],
     from: fromPath,
     projectionChanged: didAnyProjectionChange(

@@ -1,6 +1,6 @@
 # Boot and first load
 
-What must be on screen at first frame, how first-load JavaScript is gated, and how a page open across
+What must be on screen at first frame, how first-load JavaScript is measured, and how a page open across
 a deploy keeps loading its lazy chunks. Written by Plan 109 (retired 2026-09-25; its measurements are
 in git history).
 
@@ -55,19 +55,14 @@ retains a failed module URL may require Reload.
 `agent:browser scenario deferred-dialogs` delays both dialog modules and checks typing across
 palette load and closing/reopening the pending picker.
 
-## The first-load gate
+## Bundle size
 
-`bun run --cwd apps/web bundle:gate` (`apps/web/scripts/bundle-gate.ts`) builds through
-`bundle-report.ts` and compares first-load script gzip ([disk]) in total and per owner against
-`apps/web/scripts/first-load-pins.json`. The total may grow 1%. Each owner may grow by the larger of
-5% or 2 KB; an owner new to first load counts from zero. The failure names every owner that grew.
-`--write --reason=…` re-pins and appends the reason to the file's history. It runs in `verify` and
-in CI's typecheck job. First pin: 1,607,295 B gz, after Plan 129 Q2 and the evlog dedupe.
-
-Verified: a static import of `features/settings/components/page` in `main.tsx` fails the gate with
-`grew: apps/web/src/features/settings 12379 -> 57583` and `packages/contracts 32403 -> 37700`
-(total 1,676,329 against a limit of 1,623,368); restoring the file restores the pinned build. The
-gate has no `--dir`, so it never reads a stale `bundle-stats.json`.
+Bundle size is not gated; deal with it when it's a real problem (owner, 2026-10-09).
+PR #1202 removed the first-load size check from CI and `verify`. The remaining
+on-demand gate, pins and build-based report were then removed. Commit hooks also
+impose no first-load byte limits or per-owner budgets. Vite's production build
+log still reports output sizes. Investigate download size alongside measured startup
+behavior when users encounter a problem.
 
 ## Assets across deploys
 
@@ -75,39 +70,17 @@ gate has no `--dir`, so it never reads a stale `bundle-stats.json`.
 hashed assets it lacks, up to a week old, so a page loaded before a deploy keeps resolving its lazy
 chunks. A hash names one content, so a carried file never shadows a new one.
 
-## September 26 dialog split
+## Historical measurements
 
-The pin was last set at `ef0d170a0`. Rebuilding that commit with the current linked Editor
-`0f87310155df0720968e7bf8739d65cb18cd6249` gives 1,751,113 B gzip; its historical pin was
-1,743,278 B. Main at `9aaaeee87`, with the same linked Editor, gives 1,761,157 B. The dialog
-split gives **1,722,852 B**, removing 38,305 B and ending 20,426 B below the historical pin.
-The new total limit is 1,740,081 B; the 1% total and 5%/2 KB owner margins are unchanged.
+The September 26 dialog split reduced first-load JavaScript from 1,761,157 to
+1,722,852 gzip bytes in builds using the same linked Editor revision. Picker and
+palette content moved out of first load. Per-owner gzip estimates divided each
+chunk's gzip by rendered module share, so splitting a chunk could change attributed
+size without changing that owner's rendered bytes.
 
-Between the two rebuilt commits, chat adds 31,620 rendered bytes from goals, schedules and MCP
-approval, the picker adds 12,247 from places and drives, and contracts add 6,790. Client-core
-removes 25,514 rendered bytes when editor commands move to the Editor catalog. The historical
-Editor pin also predates the currently linked build. These are separate from this change's
-removal of picker and palette content from first load.
-
-Owner gzip estimates divide each chunk's gzip by rendered module share. Splitting chunks can
-increase an owner's estimate while reducing its rendered bytes. The pin history records a line
-for every owner whose estimate rises above the historical pin, including those redistributions.
-The picker falls from 24,536 to 81 B and the palette from 17,277 to 1,781 B attributed gzip.
-Shared component code falls from 28,888 to 21,588 B.
-
-## October 6 accepted measured reference
-
-Root preference 33 accepts the independently reviewed PR851 source
-`10d087ec19f5d3abe0d733a665f26f4cda3f9123` as the measured reference. The phone JavaScript baseline
-changes from 1449825 to 1470125 B gzip, with phone home 1203579 B and phone CSS 38667 B counted separately.
-The Editor baseline changes from 99601 to 105972 B, a canonical rounded approximate shared-chunk
-share. The reference retains admitted filesystem, settings, preview and attachment source meaning,
-held immutable byte and reader references, capture, admission, release and current write authority,
-including the useful PR851 optional-presentation split. Raw receipts are in
-`track200/pr808-placement-implementation/candidate`; independent proof and comment6009794865 are
-in `track200/pr808-placement-review`. Original phone and Editor gate failures remain preserved.
-Current assembly `81eb3c2b548cce327cd0729b657bda0ba8a47697` has changed verification inputs scanned by
-Tailwind, so its bytes remain unmeasured here and byte equivalence is not claimed. Exact-head full
-CI checks the current assembly against this reference with the existing 1% total and 5%/2 KiB owner
-margins. Reading, desktop 1772746 and every other owner baseline remain unchanged. Performance,
-functional, timeout and hardware qualification remain separate.
+The October 6 reviewed PR851 source `10d087ec19f5d3abe0d733a665f26f4cda3f9123`
+measured phone JavaScript at 1,470,125 gzip bytes. Phone home was 1,203,579 bytes
+and phone CSS was 38,667 bytes, counted separately. Its receipts are in
+`track200/pr808-placement-implementation/candidate`; independent proof is in
+`track200/pr808-placement-review`. These historical byte counts describe download
+size. They do not establish runtime performance or current build size.

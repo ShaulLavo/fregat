@@ -93,8 +93,8 @@ async function keystrokeTimes(text: string, mode: string) {
   return { total, controller, highlight, adoption }
 }
 
-function percentile(values: readonly number[], fraction: number): number {
-  const sorted = values.toSorted((a, b) => a - b)
+function percentile(values: number[], fraction: number): number {
+  const sorted = values.sort((a, b) => a - b)
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))] ?? 0
 }
 

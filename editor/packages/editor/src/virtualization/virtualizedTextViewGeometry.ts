@@ -2111,7 +2111,7 @@ function collapsedBoundaryPositionXs(
   for (const boundary of boundaries) {
     appendDistinctBoundaryPositions(positions, collapsedBoundaryXs(measurement, boundary))
   }
-  return positions.toSorted((left, right) => left - right)
+  return positions.sort((left, right) => left - right)
 }
 
 function appendDistinctBoundaryPositions(positions: number[], candidates: readonly number[]): void {
@@ -2156,7 +2156,7 @@ function recoveredBidiBoundaryPositionXs(
   if (recoveredEdgesShareSeam(preceding, following, positions)) {
     return recoveredSameDirectionSeamXs(positions, collapsedXs)
   }
-  return positions.toSorted((left, right) => left - right)
+  return positions.sort((left, right) => left - right)
 }
 
 function recoveredEdgesShareSeam(
@@ -2834,11 +2834,9 @@ function appendUnmeasuredRangeSegment(
 }
 
 function mergeGeometryRangeSegments(
-  segments: readonly GeometryRangeSegment[],
+  segments: GeometryRangeSegment[],
 ): readonly GeometryRangeSegment[] {
-  const sorted = segments.toSorted(
-    (left, right) => left.left - right.left || left.width - right.width,
-  )
+  const sorted = segments.sort((left, right) => left.left - right.left || left.width - right.width)
   const merged: GeometryRangeSegment[] = []
   for (const segment of sorted) appendMergedGeometrySegment(merged, segment)
   return merged

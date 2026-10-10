@@ -348,7 +348,7 @@ const normalizeInlineReplacements = (
         ? replacement.endColumn === replacement.startColumn
         : replacement.endColumn > replacement.startColumn,
     )
-    .toSorted((left, right) => {
+    .sort((left, right) => {
       return (
         left.startColumn - right.startColumn ||
         insertionOrder(left) - insertionOrder(right) ||
@@ -646,7 +646,7 @@ const normalizeInjectedTextRows = (rows: readonly InjectedTextRow[]): readonly I
   rows
     .filter((row) => row.id.length > 0)
     .filter((row) => row.anchorBufferRow >= 0)
-    .toSorted((left, right) => {
+    .sort((left, right) => {
       return (
         left.anchorBufferRow - right.anchorBufferRow ||
         placementOrder(left.placement) - placementOrder(right.placement) ||

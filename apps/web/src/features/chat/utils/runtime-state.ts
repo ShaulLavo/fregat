@@ -43,11 +43,12 @@ export function chatRuntimeAlerts({
   providerLoading?: boolean
   session: ChatSession
 }) {
-  return [
-    ...commandAlerts(commandFailure),
-    ...providerAlerts(provider, providerError, providerLoading, session),
-    ...(commandFailure ? [] : sessionErrorAlerts(session, provider)),
-  ].sort((left, right) => left.priority - right.priority)
+  return commandAlerts(commandFailure)
+    .concat(
+      providerAlerts(provider, providerError, providerLoading, session),
+      commandFailure ? [] : sessionErrorAlerts(session, provider),
+    )
+    .sort((left, right) => left.priority - right.priority)
 }
 
 function commandAlerts(commandFailure: string | null): ChatRuntimeAlert[] {

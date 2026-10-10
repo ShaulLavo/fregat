@@ -85,9 +85,10 @@ function editorRoot(): HTMLElement {
 
 /** Retired rows keep the text they last showed, so only the mounted ones say what is on screen. */
 function visibleText(): string {
-  return [...document.querySelectorAll('.editor-virtualized-row:not([hidden])')]
-    .map((row) => row.textContent ?? '')
-    .join('\n')
+  return Array.from(
+    document.querySelectorAll('.editor-virtualized-row:not([hidden])'),
+    (row) => row.textContent ?? '',
+  ).join('\n')
 }
 
 function foldToggles(): readonly HTMLButtonElement[] {

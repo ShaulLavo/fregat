@@ -302,7 +302,10 @@ describe('inline suggestions', () => {
     )
   }
   function rowTexts(): readonly (string | null)[] {
-    return [...container.querySelectorAll('.editor-virtualized-row')].map((row) => row.textContent)
+    return Array.from(
+      container.querySelectorAll('.editor-virtualized-row'),
+      (row) => row.textContent,
+    )
   }
   /** The text the last keystroke left selected. */
   function selectedText(): string {

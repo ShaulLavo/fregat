@@ -400,7 +400,7 @@ export const terminalIdleShells = isolatedNativeScenario({
         lastOwnerClosedIdle: !processExists(idlePid),
         busySurvived: processExists(busyPid),
         replayedIdleOutput: replay.output,
-        ownedTerminals: [...owners.values()].map((url) => ({
+        ownedTerminals: Array.from(owners.values(), (url) => ({
           worktreeId: url.searchParams.get('worktreeId'),
           terminalId: url.searchParams.get('terminalId'),
         })),
@@ -408,8 +408,8 @@ export const terminalIdleShells = isolatedNativeScenario({
     } finally {
       // A renderer failure must not prevent the capture-owned shells and session from closing.
       await page.goto('about:blank').catch(() => undefined)
-      await cleanupAll([
-        ...[...owners.values()].map((url) => async () => {
+      await cleanupAll(
+        Array.from(owners.values(), (url) => async () => {
           const base = `${url.protocol === 'wss:' ? 'https:' : 'http:'}//${url.host}${url.pathname}`
           const response = await api.request.post(`${base}/kill`, {
             headers: { Origin: new URL(api.url()).origin },
@@ -419,10 +419,11 @@ export const terminalIdleShells = isolatedNativeScenario({
             },
           })
           strictEqual(response.status(), 200, 'Owned shell cleanup succeeds')
-        }),
-        () => dispatch(api, orchestration, { type: 'session.runtime.stop', sessionId: otherId }),
-        () => dispatch(api, orchestration, { type: 'session.delete', sessionId: otherId }),
-      ])
+        }).concat([
+          () => dispatch(api, orchestration, { type: 'session.runtime.stop', sessionId: otherId }),
+          () => dispatch(api, orchestration, { type: 'session.delete', sessionId: otherId }),
+        ]),
+      )
     }
   },
 })

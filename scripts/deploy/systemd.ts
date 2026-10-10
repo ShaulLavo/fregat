@@ -213,7 +213,7 @@ function unitValues(): Record<string, string> {
 }
 
 async function systemctl(...args: string[]) {
-  const result = await run(['systemctl', '--user', ...args])
+  const result = await run(['systemctl', '--user'].concat(args))
   if (result.code === 0) return
 
   throw createScriptError(`systemctl --user ${args.join(' ')} failed with exit ${result.code}.`)

@@ -115,7 +115,7 @@ The October 3 plans retain the existing structural-cutover limit. Mesh and appli
 work can proceed independently where their files and contracts do not overlap.
 
 1. Address Mesh control authorization in [290](plans/290-mesh-device-authorization.md).
-   Public app removal and pill extraction [291](plans/291-mesh-private-services.md) is separate.
+   Public hosting retirement and dormant pill source [291](plans/291-mesh-private-services.md) shipped in Mesh v0.1.232.
    Update recovery [296](plans/296-mesh-update-recovery.md), installer guidance
    [297](plans/297-mesh-installer-path.md), DNS recovery
    [298](plans/298-mesh-download-dns-recovery.md), and session removal
@@ -173,6 +173,11 @@ that supplies current appearance and native wallpaper preloads before React. Thi
 an independent bounded web/server startup change. Implement it when the owner starts
 the work, after resolving document admission and native backdrop context with Plans
 337 and 114; preserve Plan 320's shared palette generator.
+
+[342](plans/342-app-reactivity-and-async-ownership.md) records the October 9 focused app
+audit and its Approved bounded repairs. MCP subject ownership and shared LSP cancellation
+can run independently; compiler-sensitive web repairs first establish actual compiled test
+coverage. Site playback and TUI theme lifetime repairs retain their existing domain gates.
 
 [335](plans/335-stroke-icons.md) retains the current stroke-icon migration, shared registry
 and selected morph sites. Its broad swap takes the structural window after the keymap

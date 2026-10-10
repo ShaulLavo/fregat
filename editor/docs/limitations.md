@@ -16,11 +16,11 @@ Each entry names its source and any work that owns changing it. "No lifting plan
 - Source. `BIDI_LINE_MEASUREMENT_CEILING`, `MAX_ROW_TEXT_NODE_LENGTH`, `bidiMeasurementRefusal`, `hasOversizedGrapheme` and `setUnmeasurableBidiRowText` in [virtualizedTextViewRows.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/virtualization/virtualizedTextViewRows.ts#L109).
 - What you see. The row becomes an endpoint-only placeholder. Its label reports the line or grapheme geometry ceiling. Interior text and interior caret geometry are unavailable in that row. The document text remains in the buffer.
 - Why. BiDi needs the browser's visual ordering. Splitting its text into independently positioned horizontal chunks would lose that ordering. The ceiling bounds native layout and geometry work; the 50-unit node bound also limits range measurement within a text node.
-- Ownership. No lifting plan identified. The proportional-text work below shares this ceiling but preserves a different behavior beyond it.
+- Ownership. No lifting plan identified. Proportional text below has an independent ceiling and remains editable beyond it.
 
 ### Proportional row measurement
 
-- Status. Implemented in draft [PR #1186](https://github.com/ShaulLavo/fregat/pull/1186), awaiting independent review and release.
+- Status. Implemented in [PR #1186](https://github.com/ShaulLavo/fregat/pull/1186), awaiting merge and release.
 - Limit. Native intact-row geometry applies strictly below **5,000 UTF-16 code units**. At **5,000 or more**, proportional rows use bounded shaped-run approximation. The independent `BIDI_LINE_MEASUREMENT_CEILING` remains **32,000**.
 - Source. `PROPORTIONAL_INTACT_NODE_CEILING = 5_000` in [nativeCarets.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/virtualization/nativeCarets.ts), `nativeRowCarets` in [virtualizedTextViewGeometry.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/virtualization/virtualizedTextViewGeometry.ts), and `shouldChunkLine` and `updateRowTextChunks` in [virtualizedTextViewRows.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/virtualization/virtualizedTextViewRows.ts).
 - DOM budget. A mounted plain left-to-right proportional row (printable ASCII and tabs) below the ceiling retains one intact text node. Its horizontal window starts at zero and includes the complete rendered row. Monospace and inline replacements retain their horizontal text windows. Native geometry is measured lazily on mounted rows; canvas shaping still owns document-wide projection and wrapping.

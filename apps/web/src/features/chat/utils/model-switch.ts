@@ -56,7 +56,7 @@ export function modelSwitches(
     previous = message.modelSelection
   }
 
-  return [...switches, ...reroutes(messages, activities)]
+  return switches.concat(reroutes(messages, activities))
 }
 
 function reroutes(

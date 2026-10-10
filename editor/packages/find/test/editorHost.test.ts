@@ -52,7 +52,7 @@ afterAll(() => {
 })
 
 afterEach(() => {
-  for (const dispose of openProbes.toReversed()) dispose()
+  for (const dispose of openProbes.reverse()) dispose()
   openProbes.length = 0
   paintedHighlights.clear()
   document.body.replaceChildren()
@@ -263,7 +263,7 @@ function editorProbe(text: string, plugins: readonly EditorPlugin[] = []): Edito
     ],
   }
 
-  const editor = new Editor(container, { defaultText: text, plugins: [...plugins, capture] })
+  const editor = new Editor(container, { defaultText: text, plugins: plugins.concat([capture]) })
   const view: unknown = Reflect.get(editor, 'view')
   // happy-dom has no layout, so deliver the first visible viewport measurement explicitly.
   if (view instanceof VirtualizedTextView) view.setScrollMetrics(0, 24)
@@ -342,9 +342,10 @@ function countedSnapshot(
 // What a screen reader would have been told, read off the live regions the editor publishes into.
 function announcements(container: HTMLElement): string[] {
   const host = container.closest('div')?.parentElement ?? document.body
-  return [...host.querySelectorAll('[role="status"]')]
-    .map((region) => region.textContent ?? '')
-    .filter((text) => text.length > 0)
+  return Array.from(
+    host.querySelectorAll('[role="status"]'),
+    (region) => region.textContent ?? '',
+  ).filter((text) => text.length > 0)
 }
 
 function mountedMatchCount(snapshot: EditorViewSnapshot): number {

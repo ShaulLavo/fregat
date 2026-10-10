@@ -58,18 +58,14 @@ function recentCommandsFirstGroups<Item extends PaletteRankItem>(
 ): readonly (readonly [string, readonly Item[]])[] {
   const recent = items
     .filter((item) => recency.has(item.id))
-    .toSorted(
-      (left, right) => commandRecencyRank(left, recency) - commandRecencyRank(right, recency),
-    )
+    .sort((left, right) => commandRecencyRank(left, recency) - commandRecencyRank(right, recency))
     .slice(0, RECENTLY_USED_COMMANDS_SHOWN)
   if (recent.length === 0) return groupedCommandItemsInOrder(items)
 
   const promoted = new Set(recent.map((item) => item.id))
 
-  return [
-    [RECENTLY_USED_COMMANDS_HEADING, recent] as const,
-    ...groupedCommandItemsInOrder(items.filter((item) => !promoted.has(item.id))),
-  ]
+  const leading: (readonly [string, readonly Item[]])[] = [[RECENTLY_USED_COMMANDS_HEADING, recent]]
+  return leading.concat(groupedCommandItemsInOrder(items.filter((item) => !promoted.has(item.id))))
 }
 
 function searchedCommandGroups<Item extends PaletteRankItem>(
@@ -78,9 +74,7 @@ function searchedCommandGroups<Item extends PaletteRankItem>(
 ): readonly (readonly [string, readonly Item[]])[] {
   const recent = ranked
     .filter((item) => recency.has(item.id))
-    .toSorted(
-      (left, right) => commandRecencyRank(left, recency) - commandRecencyRank(right, recency),
-    )
+    .sort((left, right) => commandRecencyRank(left, recency) - commandRecencyRank(right, recency))
   if (recent.length === 0) return [[ALL_COMMANDS_HEADING, ranked] as const]
 
   const rest = ranked.filter((item) => !recency.has(item.id))
@@ -122,7 +116,7 @@ function rankedCommandItems<Item extends PaletteRankItem>(items: readonly Item[]
 
   return ranked
     .filter((item) => !hasStrongMatch || item.strong)
-    .toSorted(compareRankedCommandItems)
+    .sort(compareRankedCommandItems)
     .map((item) => item.item)
 }
 

@@ -995,7 +995,7 @@ export class ProviderService {
       throw sessionIdentityErrors.SESSION_NOT_RUNNING({ internal: { sessionId: input.sessionId } })
     const current = binding.runtimePayload?.mcpOff ?? []
     const off = input.off
-      ? [...new Set([...current, input.name])].sort()
+      ? [...new Set(current.concat([input.name]))].sort()
       : current.filter((name) => name !== input.name)
     this.sessionDirectory.upsert({ ...bindingForUpsert(binding), runtimePayload: { mcpOff: off } })
     recordChatPipelineInfo('chat.pipeline.provider_service.mcp_session_off', {

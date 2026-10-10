@@ -562,19 +562,16 @@ describe('chat timeline items', () => {
     const running = chatTimelineItems({
       ...input,
       latestTurn: runningTurn(nextId, timestamp(5)),
-      messages: [
-        ...earlier,
+      messages: earlier.concat([
         message('prompt-2', sessionId, timestamp(5), 'user', { turnId: nextId }),
-      ],
+      ]),
       optimisticMessages: [],
     })
 
-    expect(sending.map((item) => item.id)).toEqual([...earlierIds, 'message:prompt-2'])
-    expect(running.slice(0, 5).map((item) => item.id)).toEqual([
-      ...earlierIds,
-      'message:prompt-2',
-      'working:turn-2',
-    ])
+    expect(sending.map((item) => item.id)).toEqual(earlierIds.concat(['message:prompt-2']))
+    expect(running.slice(0, 5).map((item) => item.id)).toEqual(
+      earlierIds.concat(['message:prompt-2', 'working:turn-2']),
+    )
     expect(running[1]).toMatchObject({ label: 'Worked for 3.0s' })
   })
 
@@ -900,9 +897,10 @@ function foldedActivityIds(item: ChatTimelineItem) {
 }
 
 function flattenTimelineItems(items: readonly ChatTimelineItem[]): ChatTimelineItem[] {
-  return items.flatMap((item) =>
-    item.type === 'turn-fold' ? [item, ...flattenTimelineItems(item.items)] : [item],
-  )
+  return items.flatMap((item): ChatTimelineItem[] => {
+    const rows: ChatTimelineItem[] = [item]
+    return item.type === 'turn-fold' ? rows.concat(flattenTimelineItems(item.items)) : rows
+  })
 }
 
 function foldedItemIds(item: ChatTimelineItem | undefined) {

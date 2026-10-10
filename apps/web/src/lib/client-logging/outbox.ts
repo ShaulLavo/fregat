@@ -149,7 +149,7 @@ export function createLogOutbox({
     const entries = read()
     const kept: StoredLog[] = []
     let bytes = 0
-    for (const entry of entries.toReversed()) {
+    for (const entry of entries.reverse()) {
       const size = new TextEncoder().encode(entry.serialized).byteLength
       const reason = discardReason(entry, size, cutoff, kept.length, bytes, limits)
       if (reason) {
@@ -160,7 +160,7 @@ export function createLogOutbox({
       kept.push(entry)
       bytes += size
     }
-    return kept.toReversed()
+    return kept.reverse()
   }
 
   return { persist, pending, remove, recordLoss }

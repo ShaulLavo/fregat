@@ -38,7 +38,7 @@ async function prune() {
   const pruned = [];
   const live = await protectedReleases();
   if (live === null) { process.stdout.write(JSON.stringify({ pruned }) + '\\n'); return; }
-  const keep = new Set([...live, ...${JSON.stringify([name, previous])}]);
+  const keep = new Set(Array.from(live).concat(${JSON.stringify([name, previous])}));
   for (const entry of await readdir('releases')) {
     if (keep.has(entry)) continue;
     await rm('releases/' + entry, { recursive: true, force: true });

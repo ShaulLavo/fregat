@@ -125,7 +125,7 @@ function select(session: DocumentSession, at: number, length: number): void {
   session.setSelections([{ anchor: at, head: at + length }])
 }
 
-function median(values: readonly number[]): number {
-  const sorted = values.toSorted((a, b) => a - b)
+function median(values: number[]): number {
+  const sorted = values.sort((a, b) => a - b)
   return sorted[Math.floor(sorted.length / 2)]!
 }

@@ -147,7 +147,7 @@ test.each([
   { ...frame, input: { ...frame.input, mounted: false } },
   { ...frame, rows: [{ ...emptyRow, text: 'stale source' }] },
   { ...frame, rows: [{ ...emptyRow, html: '<div data-editor-provisional-row></div>' }] },
-  { ...frame, rows: [...frame.rows, ...frame.rows] },
+  { ...frame, rows: frame.rows.concat(frame.rows) },
   { ...frame, observation: null },
   { ...frame, observation: { kind: 'mounted', views: [] } },
   { ...frame, observation: { kind: 'mounted', views: [view, view] } },

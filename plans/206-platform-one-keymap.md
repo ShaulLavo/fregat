@@ -188,6 +188,28 @@ The initial `ours` deviation keeps the approved document-navigation keys: Mod+[ 
 
 Chord cancellation retains Plan 203: an unbound nonprintable prefix waits for its next key; a bound prefix expires and executes after the continuation timeout. Focus, blur and pointer changes cancel the pending owner.
 
-## Open finding: Fregat-only commands have no keys under `ours`
+## Fregat's own commands in `ours`
 
-Found 2026-10-09 while repairing the `problems-panel-rows` scenario. Since #603 (`8d4694a20`), the 78 Fregat application rows in `apps/web/src/keymap/presets/vscode-app.json` load only under the `vscode` preset (`defaultPlatformKeyBindings` in `apps/web/src/keymap/default-bindings.ts`). Under the default `ours` preset, which copies Zed, commands with no Zed equivalent have no key: `workspace.fixDiagnostic` (Mod+. on a problem), `workspace.toggleCheckpointChange`, `workspace.toggleUiMode`, `workspace.newSession`, `workspace.toggleSessionRail` and others. The Problems row's Fix with AI button is out of the Tab order, so under `ours` the keyboard cannot reach it at all. Reproduce: on a default-settings throwaway server, focus the Problems tree on a diagnostic and press Ctrl+.; no draft opens and no command is logged. Under `keybindings.preset: vscode` the same press opens the draft. Which of these keys `ours` should adopt is an owner choice per this plan; each adopted key becomes a recorded row in `ours-patches.json`.
+Found 2026-10-09: since #603, the application rows in `apps/web/src/keymap/presets/vscode-app.json` loaded only under `vscode`, so under the default `ours` preset commands with no Zed action had no key. Fix problem with AI (Mod+. on a problem) was one of them, and its row button sits outside the Tab order, so the keyboard could not reach it. Reproduce on the old build: default settings, focus a diagnostic in Problems, press Ctrl+.; no draft opens.
+
+Owner decision 2026-10-09: `ours` gives every Fregat command a key, reusing the `vscode` key where Zed leaves it free and never shadowing a Zed default.
+
+- [x] `ours` loads every `vscode-app.json` row whose command no Zed row binds on that platform (`fregatBindings` in `apps/web/src/keymap/default-bindings.ts`); 24 rows per platform.
+- [x] Two Zed actions with exact Fregat equivalents are now translated in `zed.json`, so both Zed presets bind them: `pane::ActivateLastItem` is `workspace.selectItem9` (Alt+0 on Linux, Ctrl+0 on macOS) and `multi_workspace::ToggleWorkspaceSidebar` ("Toggle Threads Sidebar") is `workspace.toggleSessionRail` (Mod+Alt+J).
+- [x] Keys Zed uses in an overlapping context move, recorded with reasons in `apps/web/src/keymap/presets/ours-fregat.json`:
+
+| Command                                             | `vscode` key           | `ours` key                            | Zed binding it avoids                                                    |
+| --------------------------------------------------- | ---------------------- | ------------------------------------- | ------------------------------------------------------------------------ |
+| `workspace.toggleCheckpointChange` (Git)            | Mod+Backspace          | Mod+Shift+Backspace                   | Git changes list: Restore File                                           |
+| `workspace.historyBack` (Editor)                    | Mod+Alt+Z              | Mod+Alt+U                             | Editor: git Restore (macOS), Reject; Workspace: Rate Predictions (Linux) |
+| `workspace.historyForward` (Editor)                 | Mod+Alt+Shift+Z        | Mod+Alt+Shift+U                       | pairs with History: back, as Zed pairs Mod+U and Mod+Shift+U             |
+| `workspace.focusNextTerminal` (Terminal, Linux)     | Ctrl+PageDown          | Ctrl+Alt+PageDown                     | Pane: Activate Next Item                                                 |
+| `workspace.focusPreviousTerminal` (Terminal, Linux) | Ctrl+PageUp            | Ctrl+Alt+PageUp                       | Pane: Activate Previous Item                                             |
+| `workspace.toggleDiffViewMode`                      | Mod+Shift+D            | Mod+Alt+Shift+D                       | Workspace: debug panel                                                   |
+| `workspace.toggleUiMode`                            | Mod+Shift+M            | Mod+Alt+Shift+M                       | Workspace: Problems                                                      |
+| `workspace.newSession`                              | Mod+Alt+N in Workspace | Mod+Alt+N in `Workspace && !FileTree` | file tree: New Folder                                                    |
+| `workspace.toggleSessionRail`                       | Mod+Alt+B              | Mod+Alt+J (Zed's own row)             | Workspace: Toggle Right Dock                                             |
+| `workspace.selectItem9`                             | Alt+9 / Ctrl+9         | Alt+0 / Ctrl+0 (Zed's own row)        | Pane: Activate Item 9                                                    |
+
+- [x] `apps/web/src/keymap/tests/ours-fregat.test.ts` fails when an application command has no `ours` key on Linux, macOS or Windows, or when an added key matches a Zed key (mapped, unmapped or reserved) in an overlapping context.
+- [x] Fix with AI on a problem answers Mod+. under the default preset, the row's keyboard action; the button stays out of the Tab order so the Problems tree keeps one stop.

@@ -192,7 +192,7 @@ export function createHotkeyRegistry(
     const parsed = list.map((stroke) => parseRegisterableHotkey(stroke, platform))
     const target = registrationOptions.target ?? doc
     const hotkey = list.map((stroke) => normalizeRegisterableHotkey(stroke, platform)).join(' ')
-    const existing = [...entries.values()].find(
+    const existing = Array.from(entries.values()).find(
       (entry) =>
         entry.hotkey === hotkey &&
         entry.target === target &&

@@ -310,9 +310,8 @@ function inlineInset(view: VirtualizedTextView): string {
 }
 
 function bandRows(view: VirtualizedTextView): string[] {
-  return [
-    ...view.scrollElement.querySelectorAll<HTMLElement>(
-      '.editor-virtualized-cursor-line-gutter-band',
-    ),
-  ].map((row) => row.dataset.editorVirtualGutterRow ?? '')
+  return Array.from(
+    view.scrollElement.querySelectorAll<HTMLElement>('.editor-virtualized-cursor-line-gutter-band'),
+    (row) => row.dataset.editorVirtualGutterRow ?? '',
+  )
 }

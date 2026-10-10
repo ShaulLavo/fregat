@@ -592,7 +592,7 @@ async function attemptAdmission(
     if (drained && !drained.admit) return { reason: drained.reason }
     const decision = decide(
       waiting.entry.estimateBytes,
-      [...running.orphanCharges, ...ownerCharges(running.owners)],
+      running.orphanCharges.concat(ownerCharges(running.owners)),
       readReadings(options.procRoot),
       config.limits,
     )
@@ -661,12 +661,13 @@ async function reconcile(options: Options, graceSeconds: number, signal: AbortSi
     await settleDeadEntry(job, signal)
   }
   // A dead quiet entry remains until its slice is empty and the manager has stopped it.
-  const quietHolders = [
-    ...owners.filter((job) => job.quiet),
-    ...dead.flatMap((job) =>
-      job.attributable && job.entry.quiet && existsSync(job.file) ? [job.entry] : [],
-    ),
-  ]
+  const quietHolders = owners
+    .filter((job) => job.quiet)
+    .concat(
+      dead.flatMap((job) =>
+        job.attributable && job.entry.quiet && existsSync(job.file) ? [job.entry] : [],
+      ),
+    )
   clearQuietHolder(options.stateDir, (holder) => !quietHolders.some((job) => job.id === holder))
   return { orphanCharges, owners, quietHolders }
 }
@@ -891,7 +892,7 @@ function repositoryOf(cwd: string) {
 // launch sits in the try, so a bug here still surfaces.
 function gitOutput(args: readonly string[]) {
   const options = { stderr: 'ignore', stdout: 'pipe', timeout: GIT_TIMEOUT_MS } as const
-  const result = unlessLaunchFails(() => Bun.spawnSync(['git', ...args], options))
+  const result = unlessLaunchFails(() => Bun.spawnSync(['git'].concat(args), options))
   return result?.success ? result.stdout.toString() : null
 }
 

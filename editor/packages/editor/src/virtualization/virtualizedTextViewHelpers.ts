@@ -76,7 +76,7 @@ export function normalizeHorizontalOverscan(overscan: number | undefined): numbe
 export function normalizeScrollMode(
   scrollMode: VirtualizedTextViewScrollMode | undefined,
 ): VirtualizedTextViewScrollMode {
-  if (scrollMode === 'static') return 'static'
+  if (scrollMode === 'static' || scrollMode === 'content') return scrollMode
 
   return 'virtualized'
 }
@@ -93,7 +93,7 @@ export function normalizeFoldMarkers(
       startOffset: clamp(marker.startOffset, 0, textLength),
       endOffset: clamp(marker.endOffset, marker.startOffset, textLength),
     }))
-    .toSorted((left, right) => left.startRow - right.startRow || left.endRow - right.endRow)
+    .sort((left, right) => left.startRow - right.startRow || left.endRow - right.endRow)
 }
 
 export function indexFoldMarkersByStartRow(

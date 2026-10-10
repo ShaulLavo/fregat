@@ -14,19 +14,19 @@ import { selectItemMetadata, sidebarPanelMetadata, workspaceCommandMetadata } fr
 import type { CommandMetadata } from './metadata'
 
 export const commandMetadata = [
-  ...localCommandMetadata,
-  ...questionCommandMetadata,
-  terminalSendKeystrokeMetadata,
-  ...Object.values(workspaceCommandMetadata),
-  ...Object.values(editorCommandMetadata),
-  ...Object.values(environmentCommandMetadata),
-  ...ITEM_POSITIONS.map(selectItemMetadata),
-  ...ITEM_POSITIONS.map(sidebarPanelMetadata),
-  ...Object.values(foundationCommandMetadata),
-  ...Object.values(settingsCommandMetadata),
-  ...Object.values(workbenchCommandMetadata),
-  ...Object.values(chatCommandMetadata),
-]
+  localCommandMetadata,
+  questionCommandMetadata,
+  [terminalSendKeystrokeMetadata],
+  Object.values(workspaceCommandMetadata),
+  Object.values(editorCommandMetadata),
+  Object.values(environmentCommandMetadata),
+  ITEM_POSITIONS.map(selectItemMetadata),
+  ITEM_POSITIONS.map(sidebarPanelMetadata),
+  Object.values(foundationCommandMetadata),
+  Object.values(settingsCommandMetadata),
+  Object.values(workbenchCommandMetadata),
+  Object.values(chatCommandMetadata),
+].flat()
 
 export type CommandId = (typeof commandMetadata)[number]['id']
 const byId: ReadonlyMap<string, CommandMetadata<CommandId>> = new Map(

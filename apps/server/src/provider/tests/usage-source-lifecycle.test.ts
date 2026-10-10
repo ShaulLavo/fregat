@@ -57,18 +57,18 @@ test('clearing the proxy URL through settings stops collection while retaining m
       {
         ...mockDriver,
         driverKind: v.parse(providerDriverKindSchema, 'codex'),
-        environment: (config, id) => [
-          ...mockDriver.environment(config, id),
-          { name: 'CODEX_HOME', value: path.join(root, 'native-codex') },
-        ],
+        environment: (config, id) =>
+          mockDriver
+            .environment(config, id)
+            .concat([{ name: 'CODEX_HOME', value: path.join(root, 'native-codex') }]),
       },
       {
         ...mockDriver,
         driverKind: v.parse(providerDriverKindSchema, 'claude'),
-        environment: (config, id) => [
-          ...mockDriver.environment(config, id),
-          { name: 'CLAUDE_CONFIG_DIR', value: nativeHome },
-        ],
+        environment: (config, id) =>
+          mockDriver
+            .environment(config, id)
+            .concat([{ name: 'CLAUDE_CONFIG_DIR', value: nativeHome }]),
       },
     ],
   })

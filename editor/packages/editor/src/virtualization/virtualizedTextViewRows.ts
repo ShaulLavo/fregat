@@ -1,4 +1,5 @@
 import { recordEditorPerformanceDiagnostic } from '../editor/performanceDiagnostics'
+import { contentReadingBounds } from './contentLayout'
 import { completeRowPresentation, invalidateRowPresentations } from '../rowPresentation'
 import { createError } from '../logging/errors'
 import { pointViewport } from './pointViewport'
@@ -72,7 +73,8 @@ import type {
   VirtualizedCaretPosition,
   VirtualizedCaretPositions,
 } from './virtualizedTextViewTypes'
-import type { RevealBlock, VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
+import type { RevealBlock } from './revealBlock'
+import type { VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
 import {
   type RowInlineMapping,
   offsetForLocalIndex,
@@ -2183,6 +2185,7 @@ function horizontalChunkWindow(
   snapshot = view.virtualizer.getSnapshot(),
   widgets: readonly InlineWidgetRun[] = [],
 ): HorizontalChunkWindow {
+  if (view.scrollMode === 'content') return { start: 0, end: content.text.length }
   if (view.glyphs) {
     return proportionalChunkWindow(view, content, snapshot, view.glyphs, widgets)
   }
@@ -3056,6 +3059,7 @@ export function visibleGutterWidth(
 }
 
 export function spacerWidth(view: VirtualizedTextViewInternal, viewportWidth: number): number {
+  if (view.scrollMode === 'content') return viewportWidth
   const width = view.contentWidth + gutterWidth(view) + characterWidth(view)
   return Math.max(viewportWidth, view.monospace ? width : Math.ceil(width))
 }
@@ -3085,7 +3089,7 @@ function applyTotalHeight(
 export function getMountedRows(
   view: VirtualizedTextViewInternal,
 ): readonly MountedVirtualizedTextRow[] {
-  return Array.from(view.rowElements.values()).toSorted((a, b) => a.index - b.index)
+  return Array.from(view.rowElements.values()).sort((a, b) => a.index - b.index)
 }
 
 export function textOffsetFromDomBoundary(
@@ -3403,7 +3407,7 @@ function viewportTextX(
   right: number,
   scrollLeft: number,
 ): number {
-  const viewportX = clamp(clientX, left, right) - left
+  const viewportX = (view.scrollMode === 'content' ? clientX : clamp(clientX, left, right)) - left
   const scrolledX = viewportX + scrollLeft
   return Math.max(0, scrolledX - gutterWidth(view))
 }
@@ -3457,7 +3461,12 @@ function caretPositionAtX(
 }
 
 export function pageRowDelta(view: VirtualizedTextViewInternal): number {
-  const { viewportHeight } = view.virtualizer.getSnapshot()
+  let viewportHeight = view.virtualizer.getSnapshot().viewportHeight
+  if (view.scrollMode === 'content') {
+    const bounds = contentReadingBounds(view.scrollElement)
+    viewportHeight =
+      Math.max(0, bounds.bottom - bounds.top) / pointViewport(view.scrollElement).scale
+  }
   return Math.max(1, Math.floor(viewportHeight / rowStride(view)) - 1)
 }
 

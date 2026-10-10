@@ -183,7 +183,7 @@ export function ChatView({
 
   return (
     <ComposerRootsContext
-      value={[...outerRoots, session.worktree.path, session.worktree.canonicalPath]}
+      value={outerRoots.concat([session.worktree.path, session.worktree.canonicalPath])}
     >
       <section className='flex min-h-0 flex-1 flex-col'>
         <CheckpointRevertDialog

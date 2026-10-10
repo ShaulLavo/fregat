@@ -617,9 +617,10 @@ describe('VirtualizedTextView', () => {
       other.setText(createLines(100))
       view.setScrollMetrics(0, 100)
       other.setScrollMetrics(0, 100)
-      const ids = [...view.getState().mountedRows, ...other.getState().mountedRows].map(
-        (row) => row.element.id,
-      )
+      const ids = view
+        .getState()
+        .mountedRows.concat(other.getState().mountedRows)
+        .map((row) => row.element.id)
       expect(ids.every(Boolean)).toBe(true)
       expect(new Set(ids).size).toBe(ids.length)
     } finally {
@@ -633,7 +634,8 @@ describe('VirtualizedTextView', () => {
     view.setText(createLines(100))
     for (const top of [0, 20, 80, 400, 380, 60, 0]) {
       view.setScrollMetrics(top, 100)
-      const indexes = [...container.querySelectorAll<HTMLElement>('[data-editor-virtual-row]')].map(
+      const indexes = Array.from(
+        container.querySelectorAll<HTMLElement>('[data-editor-virtual-row]'),
         (row) => Number(row.dataset.editorVirtualRow),
       )
       const parent = view.getState().mountedRows[0]!.element.parentElement!
@@ -672,7 +674,7 @@ describe('VirtualizedTextView', () => {
       )
       const moved = observer
         .takeRecords()
-        .flatMap((record) => [...record.addedNodes, ...record.removedNodes])
+        .flatMap((record) => Array.from(record.addedNodes).concat(Array.from(record.removedNodes)))
       expect(moved.filter((node) => retained.has(node))).toEqual([])
     }
     observer.disconnect()
@@ -1102,7 +1104,7 @@ describe('VirtualizedTextView', () => {
   })
 
   it('keeps horizontal content width independent from recycled row text', () => {
-    view.setText([`${'x'.repeat(100)}`, ...Array.from({ length: 20 }, () => 'x')].join('\n'))
+    view.setText([`${'x'.repeat(100)}`].concat(Array.from({ length: 20 }, () => 'x')).join('\n'))
     view.setScrollMetrics(0, 40)
     const widthAfterLongLine = view.getState().contentWidth
 
@@ -1344,7 +1346,7 @@ describe('VirtualizedTextView', () => {
         text.slice(0, 3_000),
       )
       const highlight = highlightsMap.get(tokenHighlightNames()[0]!)!
-      expect([...highlight].map((range) => range.toString()).join('')).toBe(
+      expect(Array.from(highlight, (range) => range.toString()).join('')).toBe(
         text.slice(tokens.startAt(0), tokens.endAt(0)),
       )
     }
@@ -3238,7 +3240,8 @@ describe('VirtualizedTextView', () => {
     expect(rows.map((row) => row.bufferRow)).toEqual([0, 1, 3])
     expect(rows.map((row) => row.text)).toEqual(['a', 'b', 'd'])
     expect(
-      [...container.querySelectorAll<HTMLSpanElement>('.editor-virtualized-line-number')].map(
+      Array.from(
+        container.querySelectorAll<HTMLSpanElement>('.editor-virtualized-line-number'),
         (label) => label.style.counterSet,
       ),
     ).toEqual(['editor-line 1', 'editor-line 2', 'editor-line 4'])
@@ -3644,7 +3647,7 @@ function tokenHighlightNames(): string[] {
 }
 
 function styleElementTexts(): string[] {
-  return [...document.head.querySelectorAll('style')].map((element) => element.textContent ?? '')
+  return Array.from(document.head.querySelectorAll('style'), (element) => element.textContent ?? '')
 }
 
 function tokenHighlightRanges(): AbstractRange[] {

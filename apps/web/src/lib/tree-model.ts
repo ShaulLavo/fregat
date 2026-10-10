@@ -170,7 +170,7 @@ export function treePathForSelectedPath(rootPath: string, selectedFilePath: stri
 
 function addFlattenedTreeEntries(
   paths: string[],
-  entries: TreeEntry[],
+  entries: readonly TreeEntry[],
   rootPath: string,
   entriesByTreePath: Map<string, TreeEntry>,
 ) {
@@ -188,7 +188,7 @@ function addFlattenedTreeEntries(
   }
 }
 
-function addEntriesToModel(model: TreeModel, entries: TreeEntry[], rootPath: string) {
+function addEntriesToModel(model: TreeModel, entries: readonly TreeEntry[], rootPath: string) {
   for (const entry of entries) {
     const treePath = toTreePath(entry.path, rootPath)
     if (!treePath) continue

@@ -43,15 +43,16 @@ export class Effects {
     const spans = this.runs.get(span.start.bunch) ?? []
     this.runs.set(
       span.start.bunch,
-      [
-        ...spans,
-        {
-          start: span.start.counter,
-          count: span.count,
-          insert: key,
-          deletes: [],
-        },
-      ].sort((a, b) => a.start - b.start),
+      spans
+        .concat([
+          {
+            start: span.start.counter,
+            count: span.count,
+            insert: key,
+            deletes: [],
+          },
+        ])
+        .sort((a, b) => a.start - b.start),
     )
   }
 
@@ -100,7 +101,7 @@ export class Effects {
 
   snapshot(): EffectsSnapshot {
     return {
-      runs: [...this.runs].map(([bunch, spans]) => [
+      runs: Array.from(this.runs, ([bunch, spans]) => [
         bunch,
         spans.map((span) => ({ ...span, deletes: [...span.deletes] })),
       ]),
@@ -127,7 +128,7 @@ function deleteSpan(span: ProvenanceSpan, target: IdSpan, key: string): readonly
   if (start >= end || span.deletes.includes(key)) return [span]
   const result: ProvenanceSpan[] = []
   if (span.start < start) result.push({ ...span, count: start - span.start })
-  result.push({ ...span, start, count: end - start, deletes: [...span.deletes, key] })
+  result.push({ ...span, start, count: end - start, deletes: span.deletes.concat([key]) })
   if (end < span.start + span.count)
     result.push({ ...span, start: end, count: span.start + span.count - end })
   return result

@@ -60,7 +60,7 @@ function assertPaint(paint: Paint, tint: readonly string[]): void {
       `${paint.misaligned.length} of ${paint.consts} consts were not one whole coloured span: ${JSON.stringify(paint.misaligned)}`,
     )
   }
-  const sorted = [...tint].sort()
+  const sorted = tint.toSorted()
   if (JSON.stringify(sorted) !== JSON.stringify(['2', '9'])) {
     throw createScriptError(
       `The word tint covered ${JSON.stringify(sorted)}, not the changed digits`,

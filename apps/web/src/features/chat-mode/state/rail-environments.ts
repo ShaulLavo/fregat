@@ -32,7 +32,7 @@ export function railEnvironments(
       sessions: selectChatSessions(slice),
     })
   }
-  return [...byIdentity.values()]
+  return Array.from(byIdentity.values())
 }
 
 export function createRailEnvironmentsSelector(entries: EnvironmentsState['entries']) {

@@ -20,10 +20,9 @@ describe('mergeDenseDecorations', () => {
       stragglers.map((row) => rowBand(row, MATCH_COLOR)),
     )
 
-    expect(mergeDenseDecorations(bands, 600, 11_000).map(span)).toEqual([
-      [1, 1000],
-      ...stragglers.map((row) => [row, row]),
-    ])
+    expect(mergeDenseDecorations(bands, 600, 11_000).map(span)).toEqual(
+      [[1, 1000]].concat(stragglers.map((row) => [row, row])),
+    )
   })
 
   it('merges each appearance on its own', () => {

@@ -8,7 +8,7 @@ export function subscribeText<Snapshot>(
 ): () => void {
   let projection = participant.text()
   return participant.subscribe(({ edits }) => {
-    for (const edit of [...edits].reverse())
+    for (const edit of edits.toReversed())
       projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
     listener(projection)
   })

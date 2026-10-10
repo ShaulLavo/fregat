@@ -665,7 +665,7 @@ export class CodexProviderAdapter
     const interactionMode = input.interactionMode ?? DEFAULT_INTERACTION_MODE
     const modelOptions = codexModelOptions(input)
     const ephemeral = input.ephemeral ?? false
-    const mcpOff = [...(input.mcpOff ?? [])].sort()
+    const mcpOff = (input.mcpOff ?? []).toSorted()
     this.startInputs.set(input.sessionId, input)
     if (
       existing?.matches({
@@ -1078,10 +1078,9 @@ class CodexAppServerSession extends SessionContext {
     const response = await this.client.request('hooks/list', { cwds: [cwd] })
     const entries = response.data.filter((entry) => entry.cwd === cwd)
     return {
-      errors: entries.flatMap((entry) => [
-        ...entry.errors.map((error) => `${error.path}: ${error.message}`),
-        ...entry.warnings,
-      ]),
+      errors: entries.flatMap((entry) =>
+        entry.errors.map((error) => `${error.path}: ${error.message}`).concat(entry.warnings),
+      ),
       hooks: entries.flatMap((entry) => entry.hooks.map(codexConfiguredHook)),
     }
   }

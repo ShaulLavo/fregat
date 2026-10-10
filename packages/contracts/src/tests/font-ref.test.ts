@@ -25,7 +25,7 @@ describe('parseFontRef', () => {
   })
 
   it('accepts every curated font', () => {
-    const refs = [...CURATED_FONTS.ui, ...CURATED_FONTS.code].map((font) => font.ref)
+    const refs = CURATED_FONTS.ui.concat(CURATED_FONTS.code).map((font) => font.ref)
 
     expect(refs.filter((ref) => !parseFontRef(ref))).toEqual([])
   })

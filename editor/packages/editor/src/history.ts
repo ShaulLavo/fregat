@@ -127,7 +127,7 @@ export const restoreEditorHistory = <TSnapshot, TSelectionState, TTransaction = 
   for (const node of restored) {
     if (node.parentId === null) continue
     const parent = nodes.get(node.parentId)!
-    nodes.set(parent.id, { ...parent, childIds: [...parent.childIds, node.id] })
+    nodes.set(parent.id, { ...parent, childIds: parent.childIds.concat([node.id]) })
   }
 
   const history: HistoryState<TSnapshot, TSelectionState, TTransaction> = {
@@ -157,7 +157,7 @@ export const commitEditorHistory = <TSnapshot, TSelectionState, TTransaction = n
   state.clock += 1
   state.nodes.set(parent.id, {
     ...parent,
-    childIds: [...parent.childIds, id],
+    childIds: parent.childIds.concat([id]),
     preferredChildId: id,
     sealed: true,
   })

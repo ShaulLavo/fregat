@@ -834,10 +834,9 @@ function formatCounts(census) {
     hitsFor(census, measure).length,
   ])
   const width = Math.max(...rows.map(([title]) => title.length))
-  return [
-    'totals',
-    ...rows.map(([title, count]) => `  ${title.padEnd(width)}  ${String(count).padStart(6)}`),
-  ].join('\n')
+  return ['totals']
+    .concat(rows.map(([title, count]) => `  ${title.padEnd(width)}  ${String(count).padStart(6)}`))
+    .join('\n')
 }
 
 function formatRoots(roots) {
@@ -851,13 +850,15 @@ function formatReport(census, result, roots) {
     '',
     formatCounts(census),
     '',
-    ...MEASURES.filter((measure) => TARGETS[measure].histogram).map(
-      (measure) => `${formatHistogram(TARGETS[measure].title, census.hits[measure])}\n`,
-    ),
-    ...listed.map((measure) => `${formatList(TARGETS[measure].title, hitsFor(census, measure))}\n`),
-    formatGate(result),
-    '',
-  ].join('\n')
+  ]
+    .concat(
+      MEASURES.filter((measure) => TARGETS[measure].histogram).map(
+        (measure) => `${formatHistogram(TARGETS[measure].title, census.hits[measure])}\n`,
+      ),
+      listed.map((measure) => `${formatList(TARGETS[measure].title, hitsFor(census, measure))}\n`),
+      [formatGate(result), ''],
+    )
+    .join('\n')
 }
 
 function hitsFor(census, measure) {

@@ -392,7 +392,7 @@ export class LspSessionPool implements LspSessionSource {
       return null
     }
 
-    this.sessions.set(key, [...(this.sessions.get(key) ?? []), session])
+    this.sessions.set(key, (this.sessions.get(key) ?? []).concat([session]))
     return session
   }
 }
@@ -1185,19 +1185,18 @@ class PooledLspProxySession {
     message: JsonRpcNotification,
   ): void {
     const clientId = cancellationRequestId(message.params)
-    const backendId = clientId === null ? null : connection.backendRequestIdFor(clientId)
+    if (clientId === null) return
+    const backendId = connection.backendRequestIdFor(clientId)
     if (backendId === null) return
 
-    // A token request is shared, so one client's cancel is not the request's
-    // cancel. `dropSemanticTokenWaiter` already knows how to retire one waiter
-    // and only cancel when the last one leaves; the teardown path got that right
-    // and this path did not, which left the very hazard that function exists to
-    // prevent open on the route clients actually take — the browser cancels an
-    // in-flight token request on every keystroke.
     const pending = this.pendingRequests.get(backendId)
     if (pending?.semanticTokens) {
-      connection.untrackRequest(clientId as JsonRpcId)
-      this.dropSemanticTokenWaiter(backendId, pending.semanticTokens, connection)
+      connection.untrackRequest(clientId)
+      this.dropSemanticTokenWaiters(
+        backendId,
+        pending.semanticTokens,
+        (waiter) => waiter.connection === connection && waiter.clientId === clientId,
+      )
       return
     }
 
@@ -1695,7 +1694,11 @@ class PooledLspProxySession {
       // first. Cancelling on that name would let the first tab to close take the
       // answer away from every other tab still waiting for it.
       if (pending.semanticTokens) {
-        this.dropSemanticTokenWaiter(backendId, pending.semanticTokens, connection)
+        this.dropSemanticTokenWaiters(
+          backendId,
+          pending.semanticTokens,
+          (waiter) => waiter.connection === connection,
+        )
         continue
       }
       if (pending.connection !== connection) continue
@@ -1705,12 +1708,12 @@ class PooledLspProxySession {
     }
   }
 
-  private dropSemanticTokenWaiter(
+  private dropSemanticTokenWaiters(
     backendId: JsonRpcId,
     request: SemanticTokenRequest,
-    connection: LspProxyConnection,
+    shouldDrop: (waiter: SemanticTokenRequest['waiters'][number]) => boolean,
   ): void {
-    const remaining = request.waiters.filter((waiter) => waiter.connection !== connection)
+    const remaining = request.waiters.filter((waiter) => !shouldDrop(waiter))
     if (remaining.length === request.waiters.length) return
     if (remaining.length > 0) {
       request.waiters.splice(0, request.waiters.length, ...remaining)
@@ -1720,7 +1723,9 @@ class PooledLspProxySession {
     // Nobody is listening any more, so the backend can stop working on it — and
     // the baseline must not be updated by an answer nothing will read.
     this.pendingRequests.delete(backendId)
-    this.semanticTokenInFlight.delete(request.uri)
+    if (this.semanticTokenInFlight.get(request.uri) === backendId) {
+      this.semanticTokenInFlight.delete(request.uri)
+    }
     this.cancelBackendRequest(backendId)
   }
 
@@ -2288,7 +2293,7 @@ function applySemanticTokenEdits(baseline: readonly number[], edits: readonly un
     parsed.push({ data: data as number[], deleteCount, start })
   }
 
-  const ordered = parsed.toSorted((left, right) => right.start - left.start)
+  const ordered = parsed.sort((left, right) => right.start - left.start)
   for (let index = 1; index < ordered.length; index += 1) {
     const later = ordered[index - 1]
     const earlier = ordered[index]
@@ -2393,7 +2398,7 @@ function protocolRecordDifference(
   right: Readonly<Record<string, unknown>>,
   path: string,
 ): string | null {
-  for (const key of new Set([...Object.keys(left), ...Object.keys(right)])) {
+  for (const key of new Set(Object.keys(left).concat(Object.keys(right)))) {
     if (!Object.hasOwn(left, key) || !Object.hasOwn(right, key)) return `${path}.${key}`
     const difference = protocolValueDifference(left[key], right[key], `${path}.${key}`)
     if (difference !== null) return difference

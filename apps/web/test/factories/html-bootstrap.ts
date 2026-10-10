@@ -43,11 +43,9 @@ export function installHtmlBootstrap(values: Partial<SettingsValues> = {}) {
 }
 
 export function removeHtmlBootstrap() {
-  for (const id of [
-    HTML_BOOTSTRAP_ID,
-    HTML_BOOTSTRAP_PALETTE_ID,
-    ...Object.values(HTML_BOOTSTRAP_WALLPAPER_IDS),
-  ])
+  for (const id of [HTML_BOOTSTRAP_ID, HTML_BOOTSTRAP_PALETTE_ID].concat(
+    Object.values(HTML_BOOTSTRAP_WALLPAPER_IDS),
+  ))
     document.getElementById(id)?.remove()
   delete window.platformHtmlBootstrap
 }

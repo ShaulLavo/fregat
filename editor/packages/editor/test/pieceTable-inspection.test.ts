@@ -293,7 +293,7 @@ describe('piece tree inspection', () => {
     expect(validatePieceTreeInvariants(after).issues).toEqual([])
     expect(formatPieceTree(before, { maxRows: 10000 })).toBe(dump)
     // Editing may extend caches; inspection must leave the post-edit cache values intact.
-    const caches = [...(after.buffers.lineIndexes ?? [])].map(([key, value]) => [
+    const caches = Array.from(after.buffers.lineIndexes ?? [], ([key, value]) => [
       key,
       { ...value, offsets: value.offsets.slice() },
     ])

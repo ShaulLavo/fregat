@@ -128,6 +128,30 @@
   overflow-y: clip;
 }
 
+.editor-virtualized[data-editor-scroll-mode='content'] {
+  flex: none;
+  height: auto;
+  overflow: visible;
+  contain: style;
+}
+
+.editor-virtualized[data-editor-scroll-mode='content'] .editor-virtualized-spacer {
+  contain: style;
+}
+
+.editor-virtualized[data-editor-scroll-mode='content'] .editor-virtualized-viewport {
+  position: relative;
+  clip-path: none;
+}
+
+.editor-virtualized[data-editor-scroll-mode='content'] .editor-virtualized-text-clip {
+  clip-path: none;
+}
+
+.editor-virtualized[data-editor-scroll-mode='content'] .editor-virtualized-row {
+  contain: style size;
+}
+
 .editor-virtualized-viewport {
   clip-path: inset(0);
   left: 0;

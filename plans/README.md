@@ -162,7 +162,7 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [288](288-pr-preview-environments.md)                 | Preview environments for feature PRs                                                 |
 | [289](289-proxy-usage-feed.md)                        | Historical gateway feed, retired producer, and the Mesh TV panel                     |
 | [290](290-mesh-device-authorization.md)               | Approve devices before Mesh control                                                  |
-| [291](291-mesh-private-services.md)                   | Private temporary apps and reusable floating pill                                    |
+| [291](291-mesh-private-services.md)                   | Retire Mesh public hosting and preserve private apps                                 |
 | [292](292-mesh-zerotier.md)                           | ZeroTier adoption after authentication                                               |
 | [293](293-mesh-durable-job-state.md)                  | Durable job definitions and run records                                              |
 | [294](294-mesh-job-coordination.md)                   | Scheduled execution and failover                                                     |
@@ -208,6 +208,7 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [338](338-singapore-docs-load-speed.md)               | Measured startup and byte budgets for Singapore docs in the real editor              |
 | [340](340-singapore-site-embedding.md)                | Editor-produced first paint, page scrolling and matching static/live Singapore pages |
 | [341](341-html-bootstrap.md)                          | Named HTML bootstrap, current first-paint appearance and native wallpaper preloads   |
+| [342](342-app-reactivity-and-async-ownership.md)      | App compiler reactivity, MCP subject ownership, shared LSP cancellation and playback |
 
 ## Package and client plans
 

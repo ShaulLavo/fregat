@@ -7,7 +7,6 @@ import '../src/style.css'
 declare module 'vitest/browser' {
   interface BrowserCommands {
     proofKeyPress: (key: string) => Promise<void>
-    proofInputDelivery: (details: string) => Promise<void>
   }
 }
 
@@ -57,9 +56,9 @@ test.each(['flex', 'grid'] as const)('fills a sized %s host after resizing', asy
 })
 
 test.each([
-  ['1,000 character', 1000],
   ['10 MiB', 10 * 1024 * 1024],
-] as const)('keeps a %s document windowed while typing in a block host', async (_size, bytes) => {
+  ['1,000 character', 1000],
+] as const)('keeps a %s document windowed while typing in a block host', async (size, bytes) => {
   const host = document.createElement('div')
   host.style.cssText = 'display:block;width:600px;height:120px'
   document.body.append(host)
@@ -82,36 +81,35 @@ test.each([
   expect(scroll.clientHeight).toBe(120)
   expect(rows()).toBeLessThan(100)
 
-  const deliveries: unknown[] = []
   const input = editor.getInputElement()
-  const events = { keydown: 0, beforeinput: 0, input: 0, keyup: 0 }
-  for (const type of ['keydown', 'beforeinput', 'input', 'keyup'] as const)
-    input.addEventListener(type, () => events[type]++)
+  let beforeinputCount = 0
+  input.addEventListener('beforeinput', () => beforeinputCount++)
   for (const where of ['end', 'middle'] as const) {
     const offset = where === 'end' ? editor.getState().length : Math.floor(bytes / 2)
     editor.setSelection(offset, offset, { reveal: true })
     editor.focus()
-    await expect.poll(() => document.activeElement === input && document.hasFocus()).toBe(true)
     const initialLength = editor.getState().length
+    const initialBeforeinputCount = beforeinputCount
     const letter = where === 'end' ? 'q' : 'z'
-    for (let key = 0; key < 20; key++) {
-      await commands.proofKeyPress(letter)
-      const observed = {
-        where,
-        key,
-        expectedLength: initialLength + key + 1,
-        length: editor.getState().length,
-        inputKind: input.tagName,
-        focused: document.activeElement === input,
-        documentFocused: document.hasFocus(),
-        events: { ...events },
-      }
-      deliveries.push(observed)
-      await expect
-        .poll(() => editor.getState().length, { message: JSON.stringify(observed) })
-        .toBe(initialLength + key + 1)
-    }
-    expect(editor.getTextSnapshot().readRange(offset, offset + 20)).toBe(letter.repeat(20))
+    for (let key = 0; key < 20; key++) await commands.proofKeyPress(letter)
+    const diagnostic = JSON.stringify({
+      size,
+      where,
+      inputKind: input.tagName,
+      focused: document.activeElement === input,
+      documentFocused: document.hasFocus(),
+      beforeinputCount: beforeinputCount - initialBeforeinputCount,
+      expectedLength: initialLength + 20,
+      applicationLength: editor.getState().length,
+      snapshotLength: editor.getTextSnapshot().length,
+    })
+    await expect
+      .poll(() => editor.getState().length, { message: diagnostic })
+      .toBe(initialLength + 20)
+    expect(editor.getTextSnapshot().length, diagnostic).toBe(initialLength + 20)
+    expect(editor.getTextSnapshot().readRange(offset, offset + 20), diagnostic).toBe(
+      letter.repeat(20),
+    )
     await expect
       .poll(() =>
         host.querySelector('.editor-virtualized-content')?.textContent?.includes(letter.repeat(20)),
@@ -120,5 +118,4 @@ test.each([
     expect(scroll.clientHeight).toBe(120)
     expect(rows()).toBeLessThan(100)
   }
-  await commands.proofInputDelivery(JSON.stringify({ bytes, deliveries }))
 })

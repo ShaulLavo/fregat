@@ -45,9 +45,9 @@ export function comparisonReport(results: readonly unknown[]) {
     '',
     '| Host | Renderer | MiB | Theme engine | Result | Syntax | Open ms | Color ms | Key p95 ms | Save ms | Shiki MiB | Tree-sitter MiB |',
     '| --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |',
-    ...rows,
-    '',
-  ].join('\n')
+  ]
+    .concat(rows, [''])
+    .join('\n')
 }
 
 function hostCell(host: v.InferOutput<typeof resultSchema>['host']) {

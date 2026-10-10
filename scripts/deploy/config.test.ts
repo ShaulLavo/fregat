@@ -106,12 +106,12 @@ test('the production directory preserves its 4096-character bound', () => {
 })
 
 test.each(
-  [
-    ...[[], ['--server'], ['--restart'], ['--rollback']].map((args) => ({
+  [[], ['--server'], ['--restart'], ['--rollback']]
+    .map((args) => ({
       script: '../install-release.ts',
       args,
-    })),
-  ].flatMap((command) => [false, true].map((invalid) => ({ ...command, invalid }))),
+    }))
+    .flatMap((command) => [false, true].map((invalid) => ({ ...command, invalid }))),
 )(
   '$script $args stops before effects with an invalid target: $invalid',
   ({ script, args, invalid }) => {
@@ -127,7 +127,7 @@ test.each(
         writeFileSync(path.join(home, '.platform/settings.json'), settings)
       }
       const result = Bun.spawnSync(
-        [process.execPath, path.join(import.meta.dirname, script), ...args],
+        [process.execPath, path.join(import.meta.dirname, script)].concat(args),
         {
           env: {
             ...process.env,

@@ -46,9 +46,9 @@ test.skipIf(!userScopes)(
       root,
     ]
     const alloc = (mib: number) => ['bun', '-e', `Buffer.alloc(${mib} * 2 ** 20, 1)`]
-    await bun([path.join(HERE, 'run.ts'), ...dirs, 'small', '--', ...alloc(10)], root)
-    await bun([path.join(HERE, 'run.ts'), ...dirs, 'big', '--', ...alloc(150)], root)
-    await bun([path.join(HERE, 'run.ts'), ...dirs, 'big', '--', ...alloc(150)], root)
+    await bun([path.join(HERE, 'run.ts')].concat(dirs, ['small', '--'], alloc(10)), root)
+    await bun([path.join(HERE, 'run.ts')].concat(dirs, ['big', '--'], alloc(150)), root)
+    await bun([path.join(HERE, 'run.ts')].concat(dirs, ['big', '--'], alloc(150)), root)
 
     const byLabel = await bun(
       [
@@ -156,7 +156,7 @@ test('keeps the same command in different repositories apart, and lanes of one r
     ],
     'command',
   )
-  expect(rows.map((row) => [row.key, row.jobs]).toSorted()).toEqual([
+  expect(rows.map((row) => [row.key, row.jobs]).sort()).toEqual([
     ['/work/projects/mesh$ bun run test', 1],
     ['/work/projects/platform$ bun run test', 2],
   ])
@@ -167,7 +167,7 @@ test('keeps argv boundaries: one argument with a space is not two arguments', as
     [job({ command: ['printf', '%s', 'a b'] }), job({ command: ['printf', '%s', 'a', 'b'] })],
     'command',
   )
-  expect(rows.map((row) => row.key).toSorted()).toEqual([
+  expect(rows.map((row) => row.key).sort()).toEqual([
     "/work/projects/platform$ printf %s 'a b'",
     '/work/projects/platform$ printf %s a b',
   ])

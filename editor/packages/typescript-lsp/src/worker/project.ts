@@ -234,7 +234,7 @@ function projectConfigFileName(workspaceFiles: WorkspaceFiles): string | null {
   return (
     Array.from(workspaceFiles.keys())
       .filter((fileName) => fileName.endsWith('/tsconfig.json'))
-      .toSorted((left, right) => left.length - right.length || left.localeCompare(right))[0] ?? null
+      .sort((left, right) => left.length - right.length || left.localeCompare(right))[0] ?? null
   )
 }
 

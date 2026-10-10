@@ -7,6 +7,7 @@ import { decodePaintSnapshot, encodePaintSnapshot } from './paintSnapshot'
 import { detectPlatform } from '@fregat/hotkeys'
 import {
   documentSessionChangeTextSnapshot,
+  registerDocumentSnapshotConstraint,
   getDocumentMutationLeaseState,
   subscribeDocumentMutationLeaseState,
   subscribeDocumentTransactions,
@@ -417,6 +418,7 @@ export class Editor {
   private readonly viewContributions: EditorViewContributionController
   private readonly secondaryWork = new EditorSecondaryWorkScheduler()
   private readonly detachedEditChain = new DocumentEditChain(0, 0)
+  private unregisterContentConstraint: (() => void) | null = null
   private unsubscribeBufferChanges: (() => void) | null = null
   private transactionAttachment: TransactionAttachment | null = null
   private unsubscribeLeaseChanges: (() => void) | null = null
@@ -997,7 +999,7 @@ export class Editor {
       {
         ...json,
         rows: visible.map((index) => json.rows[index]!),
-        paintLayers: [...json.paintLayers, this.view.captureSelectionPaint()],
+        paintLayers: json.paintLayers.concat([this.view.captureSelectionPaint()]),
       },
       appearance,
       visible.map((index) => gutters[index]!),
@@ -1407,7 +1409,7 @@ export class Editor {
 
   private readHotkeysContext() {
     const booleans = this.getKeymapContext()
-    const identifiers = ['Editor', ...Object.keys(booleans).filter((key) => booleans[key])]
+    const identifiers = ['Editor'].concat(Object.keys(booleans).filter((key) => booleans[key]))
     const documentExtension = this.documentId?.match(/\.([^./]+)$/)?.[1]?.toLowerCase()
     const extension = this.options.keymapContext?.extension ?? documentExtension
     return {
@@ -1551,7 +1553,7 @@ export class Editor {
     // The suggestion joins the same map rather than one of its own: a document rendering itself
     // through replacements is still that document, and ghost text has to take its columns from what
     // is on screen rather than from text the reader cannot see.
-    const specs = [...carried, ...derived, ...this.inputSelection.inlineSuggestionSpecs()]
+    const specs = carried.concat(derived, this.inputSelection.inlineSuggestionSpecs())
     this.view.setInlineMap(specs.length === 0 ? null : createInlineMap(snapshot, specs))
   }
 
@@ -1586,7 +1588,7 @@ export class Editor {
     const registered = this.pluginHost.getInlineReplacementProviders()
     const direct = this.inlineReplacementProvider
     if (!direct) return registered
-    return [direct, ...registered]
+    return [direct].concat(registered)
   }
 
   setSyntaxFolds(folds: readonly FoldRange[]): void {
@@ -2349,6 +2351,7 @@ export class Editor {
 
   setScrollMode(scrollMode: EditorOptions['scrollMode']): void {
     if (!this.view.setScrollMode(scrollMode)) return
+    this.syncContentConstraint()
 
     this.notifyViewContributions('layout', null)
     this.log({
@@ -2391,7 +2394,11 @@ export class Editor {
     | EditorCommandDeclaration<EditorCommandId>
     | EditorContributedCommandDeclaration
   )[] {
-    return [...EDITOR_COMMANDS, ...this.pluginHost.getContributedCommands()]
+    const commands: readonly (
+      | EditorCommandDeclaration<EditorCommandId>
+      | EditorContributedCommandDeclaration
+    )[] = EDITOR_COMMANDS
+    return commands.concat(this.pluginHost.getContributedCommands())
   }
 
   private refusesMutation(command: string): boolean {
@@ -2421,6 +2428,7 @@ export class Editor {
   }
 
   attachSession(session: DocumentSession, options: EditorSessionOptions = {}): void {
+    this.view.assertContentSnapshot(session.getTextSnapshot(), true)
     const analysis = options.analysis ?? options.preparedDocument?.analysis
     if (analysis && analysis.buffer !== editorBufferSession(session)?.buffer)
       throw new TypeError('Document analysis must reference the attached buffer')
@@ -2587,6 +2595,7 @@ export class Editor {
     options: ResetOwnedDocumentOptions,
     transactionBefore?: ReplacementTransactionBefore,
   ): number {
+    this.view.assertContentSnapshot(document.text, true)
     this.preparingDocument = true
     const savedScroll = this.pendingDocumentScroll ?? this.view.provisionalScrollPosition
     if (!options.scrollPosition && savedScroll)
@@ -3109,7 +3118,7 @@ export class Editor {
         deactivatedCount:
           this.lifecycleSummary.plugin.deactivatedCount + disposingPluginNames.length,
         disposedCount: this.lifecycleSummary.plugin.disposedCount + disposingPluginNames.length,
-        names: [...this.lifecycleSummary.pluginNames].toSorted(),
+        names: Array.from(this.lifecycleSummary.pluginNames).sort(),
       },
       syntax: this.lifecycleSummary.syntax,
     })
@@ -3283,7 +3292,7 @@ export class Editor {
       layer: 0,
       priority: 0,
       disposal: NO_DISPLAY_PROJECTION_DISPOSAL,
-      value: [...acceptedFolds],
+      value: acceptedFolds,
     })
     return true
   }
@@ -3324,7 +3333,7 @@ export class Editor {
     const contributed = this.displayProjections.values('folds')
     if (this.manualFolds.length === 0) return contributed
 
-    const contributedFolds = contributed.flatMap((projection) => [...projection.value])
+    const contributedFolds = contributed.flatMap((projection) => projection.value)
     const compatibleManualFolds = this.manualFolds.filter(
       (fold) =>
         !index || nestableFoldRanges([fold], index.ranges(fold.startLine, fold.endLine)).length > 0,
@@ -3332,8 +3341,7 @@ export class Editor {
     const manualFolds = nestableFoldRanges(compatibleManualFolds, contributedFolds)
     if (manualFolds.length === 0) return contributed
 
-    return [
-      ...contributed,
+    return contributed.concat([
       {
         kind: 'folds',
         owner: MANUAL_FOLD_PROJECTION_OWNER,
@@ -3344,7 +3352,7 @@ export class Editor {
         disposal: NO_DISPLAY_PROJECTION_DISPOSAL,
         value: manualFolds,
       },
-    ]
+    ])
   }
 
   private syncFoldStateFromProjections(): void {
@@ -3914,6 +3922,7 @@ export class Editor {
     const bufferSession = editorBufferSession(session)
     if (!bufferSession) return
 
+    this.syncContentConstraint()
     this.syncTransactionSubscription()
     this.unsubscribeBufferChanges = bufferSession.buffer.subscribe((event) =>
       this.handleBufferChange(bufferSession, event),
@@ -3960,7 +3969,19 @@ export class Editor {
     }
   }
 
+  private syncContentConstraint(): void {
+    this.unregisterContentConstraint?.()
+    this.unregisterContentConstraint = null
+    const buffer = this.session && editorBufferSession(this.session)?.buffer
+    if (!buffer || this.view.scrollMode !== 'content') return
+    this.unregisterContentConstraint = registerDocumentSnapshotConstraint(buffer, (snapshot) =>
+      this.view.assertContentSnapshot(snapshot),
+    )
+  }
+
   private disposeBufferSubscriptions(): void {
+    this.unregisterContentConstraint?.()
+    this.unregisterContentConstraint = null
     this.releaseTransactionAttachment()
     this.bufferPublication = null
     this.unsubscribeBufferChanges?.()
@@ -5734,7 +5755,7 @@ class ContributionClaims {
 
   release(): readonly EditorDisposable[] {
     this.released = true
-    const claims = [...this.claims].toReversed()
+    const claims = Array.from(this.claims).reverse()
     this.claims.clear()
     return claims
   }
@@ -5768,7 +5789,7 @@ function withSortedKeys(value: unknown): unknown {
   if (value === null || typeof value !== 'object') return value
   return Object.fromEntries(
     Object.entries(value)
-      .toSorted(([left], [right]) => (left < right ? -1 : 1))
+      .sort(([left], [right]) => (left < right ? -1 : 1))
       .map(([key, entry]) => [key, withSortedKeys(entry)]),
   )
 }
@@ -5778,7 +5799,7 @@ function appearanceDifference(saved: string, live: string | null): readonly stri
   try {
     const before: Record<string, unknown> = JSON.parse(saved)
     const after: Record<string, unknown> = JSON.parse(live)
-    const keys = new Set([...Object.keys(before), ...Object.keys(after)])
+    const keys = new Set(Object.keys(before).concat(Object.keys(after)))
     return [...keys].filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
   } catch {
     return ['unreadable']

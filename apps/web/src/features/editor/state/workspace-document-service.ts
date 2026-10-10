@@ -2347,7 +2347,7 @@ function canonicalReservationRequests(
     if (existing && !sameReservationRequest(existing, request)) return null
     byPath.set(request.canonicalPath, request)
   }
-  return Array.from(byPath.values()).toSorted((left, right) =>
+  return Array.from(byPath.values()).sort((left, right) =>
     comparePaths(left.canonicalPath, right.canonicalPath),
   )
 }
@@ -2369,9 +2369,7 @@ function uniqueTargetStamps(
   for (const stamp of stamps) {
     if (!byBuffer.has(stamp.buffer)) byBuffer.set(stamp.buffer, stamp)
   }
-  return Array.from(byBuffer.values()).toSorted((left, right) =>
-    comparePaths(left.path, right.path),
-  )
+  return Array.from(byBuffer.values()).sort((left, right) => comparePaths(left.path, right.path))
 }
 
 function releaseMutationLeaseEntries(
@@ -2386,12 +2384,12 @@ function releaseMutationLeaseEntries(
 }
 
 function releaseRecoveryConflictEntries(
-  entries: readonly {
+  entries: {
     readonly document: LiveEditorDocument
     readonly entry: WorkspaceDocumentRecoveryConflictEntry
   }[],
 ): void {
-  for (const { document, entry } of entries.toReversed()) {
+  for (const { document, entry } of entries.reverse()) {
     releaseDocumentMutationLease(document.buffer, entry.lease)
   }
 }

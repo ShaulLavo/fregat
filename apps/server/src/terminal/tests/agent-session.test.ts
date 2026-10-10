@@ -260,12 +260,11 @@ test('CLI history appends once to the same conversation without replacing platfo
       text: 'Continue in the terminal',
       createdAt: '2026-09-07T13:00:00.000Z',
     }
-    fixture.adapter.history = [
-      ...fixture.adapter.history,
+    fixture.adapter.history = fixture.adapter.history.concat([
       cliMessage,
       cliMessage,
       { sourceId: 'cli-assistant', role: 'assistant', text: 'Terminal reply', createdAt: null },
-    ]
+    ])
     fixture.pty.ptys[0]?.exit(0)
     await expect.poll(() => socket.closes.length).toBe(1)
     const synchronized = await fixture.engine.sessionDetailSnapshot(fixture.sessionId)

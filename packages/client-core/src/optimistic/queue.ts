@@ -143,12 +143,11 @@ export function createIntentQueue<TPatch>(options: IntentQueueOptions = {}): Int
         .map((entry) => entry.intentId)
 
       store.setState((state) => ({
-        active: [
-          ...state.active.map((entry) =>
+        active: state.active
+          .map((entry) =>
             resourcesCollide(entry.resources, resources) ? { ...entry, overtaken: true } : entry,
-          ),
-          intent,
-        ],
+          )
+          .concat([intent]),
         failed: state.failed.map((entry) =>
           supersededIntentIds.includes(entry.intentId) ? { ...entry, superseded: true } : entry,
         ),
@@ -196,7 +195,7 @@ export function createIntentQueue<TPatch>(options: IntentQueueOptions = {}): Int
       }
       store.setState((state) => ({
         active: state.active.filter((candidate) => candidate.intentId !== intentId),
-        failed: [...state.failed, failed],
+        failed: state.failed.concat([failed]),
       }))
       entry.resolveSettlement('failed')
 
@@ -208,7 +207,7 @@ export function createIntentQueue<TPatch>(options: IntentQueueOptions = {}): Int
 
       const intent = enqueue(failed.patch, failed.resources, intentId)
       store.setState((state) => ({
-        active: [...state.active, intent],
+        active: state.active.concat([intent]),
         failed: state.failed.filter((entry) => entry.intentId !== intentId),
       }))
 
@@ -242,5 +241,5 @@ export function createIntentQueue<TPatch>(options: IntentQueueOptions = {}): Int
 export function pendingIntents<TPatch>(active: readonly Intent<TPatch>[]): Intent<TPatch>[] {
   return active
     .filter((intent) => intent.status === 'pending')
-    .toSorted((left, right) => left.sequence - right.sequence)
+    .sort((left, right) => left.sequence - right.sequence)
 }

@@ -125,9 +125,10 @@ test('keeps trailing-space markers on their source offsets after character rewra
   await expect.poll(() => container.getBoundingClientRect().width).toBe(80)
   await expect.poll(() => rows().length).toBe(3)
   const markerOffsets = () =>
-    [...container.querySelectorAll<HTMLElement>('.editor-virtualized-hidden-character-marker')]
-      .map((marker) => Number(marker.dataset.editorHiddenCharacterOffset))
-      .sort((left, right) => left - right)
+    Array.from(
+      container.querySelectorAll<HTMLElement>('.editor-virtualized-hidden-character-marker'),
+      (marker) => Number(marker.dataset.editorHiddenCharacterOffset),
+    ).sort((left, right) => left - right)
   await expect.poll(markerOffsets).toEqual([7, 8])
   const scroller = container.querySelector<HTMLElement>('.editor-virtualized')!
   expect(scroller.scrollWidth).toBe(scroller.clientWidth)

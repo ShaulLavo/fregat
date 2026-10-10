@@ -6,15 +6,18 @@ import { editorCommands } from './editor-commands'
 import type { PlatformCommandId } from './types'
 import { workspaceCommands } from './workspace-commands'
 
-export const platformCommands = [
-  ...workspaceCommands,
-  ...editorCommands,
-  ...environmentCommands,
-  ...nodeCommands,
-]
+export type CommandEntry =
+  | (typeof workspaceCommands)[number]
+  | (typeof editorCommands)[number]
+  | (typeof environmentCommands)[number]
+  | (typeof nodeCommands)[number]
+const workspaceEntries: readonly CommandEntry[] = workspaceCommands
 
-/** One row from the sole live command table. */
-export type CommandEntry = (typeof platformCommands)[number]
+export const platformCommands = workspaceEntries.concat(
+  editorCommands,
+  environmentCommands,
+  nodeCommands,
+)
 
 const byId = new Map<string, CommandEntry>(platformCommands.map((command) => [command.id, command]))
 

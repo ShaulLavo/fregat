@@ -363,7 +363,7 @@ async function installedToolchainRustAnalyzer(root: string) {
   // Sorted so a machine with several toolchains resolves the same binary on
   // every spawn; an arbitrary readdir order would make a pooled backend's
   // capabilities depend on the filesystem.
-  for (const entry of entries.toSorted()) {
+  for (const entry of entries.sort()) {
     const candidate = await runnableRustAnalyzer(
       path.join(toolchains, entry, 'bin', 'rust-analyzer'),
       root,

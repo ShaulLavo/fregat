@@ -112,7 +112,7 @@ export async function createFederationHarness(serverA: TestServer, remote?: Test
             if (!queue || !isSubscriptionFrame(message)) return deliver(message)
             queue.push(() => deliver(message))
           }
-          sockets.set(origin, [...(sockets.get(origin) ?? []), socket])
+          sockets.set(origin, (sockets.get(origin) ?? []).concat([socket]))
           if (unavailable.has(origin))
             setTimeout(() => socket.serverClose({ code: 1006, wasClean: false }), 0)
           return socket

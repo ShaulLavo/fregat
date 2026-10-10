@@ -339,7 +339,7 @@ export function installInputWorkerProof(negative = null) {
         ...message,
         payload: {
           ...payload,
-          source: { ...payload.source, chunks: [{ ...first, text }, ...rest] },
+          source: { ...payload.source, chunks: [{ ...first, text }].concat(rest) },
         },
       }
     }
@@ -463,7 +463,7 @@ export function replayShikiSource(log) {
       continue
     }
     if (text === null) return null
-    const ordered = [...payload.edits].sort(
+    const ordered = payload.edits.toSorted(
       (left, right) => right.from - left.from || right.to - left.to,
     )
     for (const edit of ordered) text = text.slice(0, edit.from) + edit.text + text.slice(edit.to)
@@ -620,7 +620,7 @@ export function createInputSourceIdentity(initialPoint) {
 }
 
 function applyCanonicalEdits(text, edits) {
-  const ordered = [...edits].sort((left, right) => right.from - left.from || right.to - left.to)
+  const ordered = edits.toSorted((left, right) => right.from - left.from || right.to - left.to)
   let boundary = text.length
   for (const edit of ordered) {
     if (

@@ -322,3 +322,47 @@ The abandoned `docwave/browser-doctor-diagnostics200` source head `bfa82f30f1971
 
 - [ ] On a bounded natural recurrence, retain that journal and identify the last completed child, pipe, browser or fixture-request phase before cleanup. Calibrate observability with the same healthy and deliberate 504 controls, and preserve the original job's exact source and command.
 - [ ] Repair a demonstrated cause with a failing-first test. Keep the original 5000 ms deadline, predicates, argv and owned cleanup. Do not replay the 15 healthy cases without a cause-directed reason or add a generic retry.
+
+## Package selection, 2026-10-10
+
+Status: Approved. The owner asked to run CI by changed app or package.
+
+- [x] Derive changed packages and consumers from workspace manifests and Turbo inputs, including local catalog-backed Hotkeys consumers. Check-only source readers add package checks without propagating their package as changed production code.
+- [x] Scope package formatting, linting, typechecking and shared-package tests. Keep shared structural, generated and script checks once, and retain full main and manual validation.
+- [x] Prepare each test runner's library prerequisites. The shared script suite still needs every library. Native host builds run when desktop is affected.
+- [x] Build product sites once and share their output with mobile shards. Each mobile shard installs its own engine. The overflow fixture runs once with both engines. Plans and root documentation select formatting.
+- [ ] Compare completed GitHub runs after merge using the verdict's queue and execution table. Keep the source head, event, selected package list and overlapping runs with each timing.
+
+The bounded baseline is [CI run 37993103466](https://github.com/ShaulLavo/fregat/actions/runs/37993103466), an Editor PR at `21a14d553137296fabb66240da5b2736b73d9193`. Run creation to final verdict was 3771 seconds. A web shard waited 2509 seconds for its runner; the longest mobile shard executed for 1218 seconds. These are one run's observations, not an expected speedup. Reducing selected work also reduces runner demand.
+
+At source `cb650473552ac4bf74bba4f5ed4ae5962c4f8961`, selection controls demonstrate that a chat source change selects `web` and the contracts source-reading tests; a highlighting change omits server, TUI and Ghostty suites; a Ghostty site-only change omits app and library suites; and a plan-only change selects formatting. Full-workspace typechecking passed. The new selector and package-runner controls, existing workflow/setup/verdict controls, and product-site shell tests verify the execution contract.
+
+### Cold fixture findings
+
+The optional full `bun run test:scripts` run naturally reproduced issue 833 in the healthy, nested-address and nested-root-address doctor cases. Each exceeded its unchanged 5000 ms deadline after the fixture served all three requests with HTTP 200 and complete responses. The healthy child had written 271 stdout bytes but had not exited or completed its pipe. Deployment's `web deployment builds false stale workspace exports before consumers` also reached 5001 ms, and the serial-policy Ghostty export case failed during the same run. Source was the commit above; no tested production code in those owners changed. The run was stopped after retaining these observations.
+
+A bounded isolated control used `bun --bun vitest run --config vitest.scripts.config.mjs scripts/agent/browser-doctor.test.ts scripts/deploy/release.test.ts scripts/heavy/worker-policy.test.ts --maxWorkers=1 --no-file-parallelism`: all 56 tests passed in 52.59 seconds at their original test deadlines. Concurrent host work is a hypothesis, not an established cause. Continue issue 833's existing phase-observation work above; do not add retries or raise its deadline.
+
+The build-graph fixture separately exceeded its 10000 ms hook while copying every tracked file in `scripts/build-graph.test.ts:20`. A same-volume temporary directory and an explicit 60000 ms hook bound allowed all eight graph controls to pass in 26.36 seconds. A later combined run hit the original 5000 ms deadline in `workspace catalog consumers build after local hotkeys declarations`, while the other seven graph cases and all 144 selection/workflow controls passed. No committed timeout was changed.
+
+- [ ] Measure the build-graph fixture's copy and dry-run phases separately with a known-good task hash. Check cross-volume file copying and repeated Turbo subprocess cost before changing its fixture structure. Preserve the cache invalidation assertions. Use the narrow `scripts/build-graph.test.ts` command, OS temporary directories and explicit one-off bounds while investigating; committed tests must remain portable.
+
+## Approved CI cuts, 2026-10-10
+
+Status: Approved. The owner requested these cuts and a direct push to main.
+
+- Fixed the metadata-documentation omission exposed by PR #1207. Its four Markdown files previously selected all 48 packages because `.agents/skills/react-development/SKILL.md` was treated as unknown code. The exact-file regression now selects zero application packages and documentation formatting.
+- Main pushes compare with the last successful main validation so replaced queued runs remain covered. Scheduled and manual runs retain full validation.
+- Normal site checks use six representative pages in both Chromium and WebKit. Full page crawls retain four disjoint browser shards during scheduled and manual validation.
+- Collaboration stress and textbuffer benchmark workflows are scheduled or manual. Full-document benchmark/lifecycle probes follow full-validation mode. Broker, presence, transport, and one concurrent editor input/undo regression remain in ordinary Editor CI.
+- Ghostty verification owns its formatting, lint and type checks; the generic package runner omits the duplicate executions.
+
+The failing-before executable check reported `Selected 48 packages for 4 Markdown files` and failed its expected-zero assertion. The updated selector reports zero. The initial adjacent run passed 149 controls; live CI and subsequent main validation supply the remaining delivery evidence.
+
+### Terminal-only CI, 2026-10-10
+
+Status: Approved. The owner requested terminal verification for PR #1208 without unrelated app suites. Its original run used the earlier broad workflow. The exact ten changed files now select Ghostty verification, its standalone packaging check and patch-note formatting. Shared repository checks and consumer app/site suites are omitted for terminal-only changes; mixed app changes and scheduled/manual full validation retain them. Markdown changesets are documentation metadata. The separate Ghostty documentation workflow triggers for site changes, shared build inputs, scheduled runs and manual runs rather than every terminal implementation edit.
+
+### Strict package ownership, 2026-10-10
+
+Status: Approved. The owner requested that each changed app or package run its own tests. Normal runs now use direct file ownership. Automatic consumer and cross-source-reader test expansion is removed; dependency builds remain preparation only. Root configuration and scripts select root tooling. Generic script tests, browser tooling checks and shared censuses run only for their owning tooling changes. Editor-specific browser checks are conditioned on the owning package. Standalone family exports remain full-validation checks. Sites build and smoke-test only their selected owners. Scheduled/manual full validation retains cross-package coverage.

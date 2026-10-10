@@ -18,23 +18,25 @@ export function settingsIssues(
   snapshot: Pick<SettingsDisplaySnapshot, 'layers' | 'diagnostics'>,
 ): readonly SettingsIssue[] {
   const malformed = snapshot.layers.filter((layer) => layer.file?.parseErrors.length)
-  return [
-    ...malformed.map((layer): SettingsIssue => ({
+  return malformed
+    .map((layer): SettingsIssue => ({
       key: layer.id,
       kind: 'syntax',
       title: `${layer.id} settings.json: syntax error`,
       detail: 'Using the last valid settings or defaults until this file is repaired.',
-    })),
-    ...snapshot.diagnostics
-      .filter((diagnostic) => !malformed.some((layer) => layer.id === diagnostic.layer))
-      .map((diagnostic): SettingsIssue => ({
-        key: `${diagnostic.layer}:${diagnostic.id}`,
-        kind: 'entry',
-        title: `${diagnostic.id} · ${diagnostic.layer}: ${settingsDiagnosticLabel(diagnostic.kind)} (not applied)`,
-        detail:
-          diagnostic.detail ?? 'The effective value comes from another valid layer or the default.',
-      })),
-  ]
+    }))
+    .concat(
+      snapshot.diagnostics
+        .filter((diagnostic) => !malformed.some((layer) => layer.id === diagnostic.layer))
+        .map((diagnostic): SettingsIssue => ({
+          key: `${diagnostic.layer}:${diagnostic.id}`,
+          kind: 'entry',
+          title: `${diagnostic.id} · ${diagnostic.layer}: ${settingsDiagnosticLabel(diagnostic.kind)} (not applied)`,
+          detail:
+            diagnostic.detail ??
+            'The effective value comes from another valid layer or the default.',
+        })),
+    )
 }
 
 export function settingLayerLabel(

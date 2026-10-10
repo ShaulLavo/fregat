@@ -30,7 +30,7 @@ test('boot preserves cached order and appends missing addressed tabs', async () 
   })
   expect((await waitForNavigation(navigation)).status).toBe('applied')
   expect(editorTabContents(harness.workspace)).toEqual(
-    testTabContents([...remembered, `${ROOT}/new.ts`]),
+    testTabContents(remembered.concat([`${ROOT}/new.ts`])),
   )
   expect(harness.workspace.getState().selectedTabContent).toEqual(
     testNullableTabContent(`${ROOT}/b.ts`),

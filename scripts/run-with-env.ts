@@ -56,9 +56,9 @@ function applyEnvAssignment(assignment: string) {
 function commandForArgs(args: readonly string[]) {
   const [command, ...rest] = args
   if (!command) throw createScriptError('Missing command.')
-  if (command.startsWith('-')) return [process.execPath, ...args]
+  if (command.startsWith('-')) return [process.execPath].concat(args)
 
-  return [resolveCommand(command), ...rest]
+  return [resolveCommand(command)].concat(rest)
 }
 
 function resolveCommand(command: string) {

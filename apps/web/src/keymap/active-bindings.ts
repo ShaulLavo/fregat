@@ -46,7 +46,7 @@ function configuredBindings(
   overrides: KeybindingOverrides,
   platform: PlatformName,
 ) {
-  const bindings = [...defaults]
+  const bindings = Array.from(defaults)
   const report: BindingResolutionEntry[] = []
   for (const [index, entry] of overrides.entries()) {
     const command = 'command' in entry ? entry.command : entry.unbind
@@ -108,7 +108,7 @@ export function keyBindingResolution(
     configured.bindings.map(({ entry }) => entry),
     platform,
   )
-  const report = [...configured.report]
+  const report = configured.report
   const paths = new Map(
     configured.bindings.flatMap((binding) =>
       reportContextPaths(binding.context).map((stack) => [contextPathLabel(stack), stack] as const),

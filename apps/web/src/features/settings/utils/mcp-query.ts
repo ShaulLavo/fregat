@@ -1,4 +1,4 @@
-import { queryOptions, type QueryClient } from '@tanstack/react-query'
+import { queryOptions, skipToken, type QueryClient } from '@tanstack/react-query'
 import type {
   ProviderInstanceId,
   ProviderInstanceMcp,
@@ -16,17 +16,22 @@ import { createRpcError } from '@/lib/structured-errors'
 const MCP_STALE_TIME_MS = 5 * 60_000
 
 export function instanceMcpQueryOptions(
-  providerInstanceId: ProviderInstanceId,
+  providerInstanceId: ProviderInstanceId | null,
   folder: string | null,
 ) {
   return queryOptions({
-    queryFn: async ({ client, signal }) => {
-      const response = await clientForQueryClient(client)
-        .providers({ providerInstanceId })
-        .mcp.get({ fetch: { signal }, query: folder ? { folder } : {} })
-      if (response.error) throw createRpcError(response.error)
-      return response.data as ProviderInstanceMcp
-    },
+    queryFn: providerInstanceId
+      ? async ({ client, signal }) => {
+          const response = await clientForQueryClient(client)
+            .providers({ providerInstanceId })
+            .mcp.get({ fetch: { signal }, query: folder ? { folder } : {} })
+          if (response.error) throw createRpcError(response.error)
+          return {
+            ...(response.data as ProviderInstanceMcp),
+            subject: { providerInstanceId, folder },
+          }
+        }
+      : skipToken,
     queryKey: settingsQueryKeys.mcpServers(providerInstanceId, folder),
     refetchOnWindowFocus: false,
     retry: false,

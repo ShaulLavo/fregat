@@ -62,7 +62,7 @@ export async function observeTerminalContinuity(page: Page) {
     },
     async dispose() {
       const results = await Promise.all(
-        [...terminals.values()].map((terminal) =>
+        Array.from(terminals.values(), (terminal) =>
           killCaptureTerminal(page.context().request, terminal),
         ),
       )

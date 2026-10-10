@@ -306,7 +306,7 @@ describe('painting', () => {
 
     const painted = [...test.groups.values()]
       .flatMap((group) => group.ranges)
-      .toSorted((left, right) => left.start - right.start)
+      .sort((left, right) => left.start - right.start)
     expect(painted).toEqual([
       { start: 0, end: 4 },
       { start: 4, end: 6 },
@@ -330,7 +330,7 @@ describe('painting', () => {
 
     const painted = [...test.groups.values()]
       .flatMap((group) => group.ranges)
-      .toSorted((left, right) => left.start - right.start)
+      .sort((left, right) => left.start - right.start)
     expect(painted).toEqual([
       { start: 0, end: 4 },
       { start: 4, end: 8 },

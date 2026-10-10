@@ -65,7 +65,7 @@ export function appendAttachment(
       `A prompt supports ${MAX_CHAT_ATTACHMENTS} images.`,
       'Remove an attachment before adding another.',
     )
-  return [...current, attachment]
+  return current.concat([attachment])
 }
 
 function imageMime(bytes: Buffer) {

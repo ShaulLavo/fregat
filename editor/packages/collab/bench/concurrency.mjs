@@ -63,7 +63,7 @@ function workload(authors, retained) {
     (_, author) => batch.filter((edit) => edit.id.actor === `author-${author}`).length,
   )
   const expectedPairs = (100 * 99 - counts.reduce((sum, count) => sum + count * (count - 1), 0)) / 2
-  return { history: [...prefix, ...batch], batch: batch.map((edit) => edit.id), expectedPairs }
+  return { history: prefix.concat(batch), batch: batch.map((edit) => edit.id), expectedPairs }
 }
 
 function measure(input) {

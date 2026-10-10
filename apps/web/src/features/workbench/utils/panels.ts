@@ -91,7 +91,7 @@ export function openTerminalTabInWorkbenchPanels(
     ...panels,
     activeTerminalTabId: tab.id,
     terminalTabSequence,
-    terminalTabs: [...panels.terminalTabs, tab],
+    terminalTabs: panels.terminalTabs.concat([tab]),
   }
 }
 
