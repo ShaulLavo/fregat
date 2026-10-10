@@ -226,6 +226,25 @@ for (const engine of ['chromium', 'webkit', 'firefox'] as const) {
         }
       },
     )
+    test('a stalled module script cannot keep examples hidden', async () => {
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
+      const page = await context.newPage()
+      await page.route(/\/_astro\/.*\.js(\?|$)/, () => {})
+      try {
+        await page.goto(`${preview.base}/docs/start-here/quick-start/`, { waitUntil: 'commit' })
+        await expect
+          .poll(() => page.locator('html').getAttribute('data-example-font'), { timeout: 2000 })
+          .toMatch(/^(mono|fallback)$/)
+        expect(
+          await page
+            .locator('[data-example] [data-editor-document-paint]')
+            .first()
+            .evaluate((node) => getComputedStyle(node).opacity),
+        ).toBe('1')
+      } finally {
+        await context.close()
+      }
+    })
     test('warm visits select Mono before paint for every example', async () => {
       const http = await startFontPreview(preview.base, 0)
       const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
