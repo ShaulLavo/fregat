@@ -5,6 +5,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, webkit } from 'playwright'
+import { migrationComparison } from '../src/examples/migration-comparison'
 
 const dist = fileURLToPath(new URL('../dist/', import.meta.url))
 const evidence = process.argv[2]
@@ -20,17 +21,24 @@ for (const [engine, launcher] of Object.entries({ chromium, webkit })) {
       })
       await page.route('http://migration.test/**', async (route) => {
         const path = new URL(route.request().url()).pathname.replace(/^\/ghostty-webgpu\//, '')
-        const file = join(dist, path || 'index.html')
+        const file = join(dist, path.endsWith('/') || !path ? `${path}index.html` : path)
         await route.fulfill({ path: file })
       })
       await page.goto('http://migration.test/ghostty-webgpu/')
       await page.evaluate(() => document.fonts.ready)
       const table = page.getByRole('table', { name: 'xterm.js to ghostty-webgpu' })
-      assert.equal(await table.locator('tbody tr').count(), 5)
-      assert.equal(await table.locator('pre code').count(), 8)
-      const prose = table.locator('td').filter({ hasText: /^built in/ })
-      assert.deepEqual(await prose.allTextContents(), ['built in', 'built in, plus WebGPU'])
-      assert.equal(await prose.locator('code, pre, span').count(), 0)
+      const expected = migrationComparison.flatMap(({ from, to }) =>
+        Array.of<string>(from).concat(to),
+      )
+      assert.equal(await table.locator('tbody tr').count(), migrationComparison.length)
+      assert.deepEqual(await table.locator('pre code').allTextContents(), expected)
+      assert.equal(
+        await table
+          .locator('td')
+          .filter({ hasText: /built in|terminal\.onData/ })
+          .count(),
+        0,
+      )
       const layout = await table.evaluate((element) => ({
         viewport: innerWidth,
         documentWidth: document.documentElement.scrollWidth,
@@ -78,8 +86,26 @@ for (const [engine, launcher] of Object.entries({ chromium, webkit })) {
           .locator('.callout')
           .screenshot({ path: join(evidence, `${engine}-${width}.png`) })
       }
+      await page.goto('http://migration.test/ghostty-webgpu/docs/start/xterm/')
+      await page.evaluate(() => document.fonts.ready)
+      const guideTable = page.getByRole('table', { name: 'xterm.js to ghostty-webgpu' })
+      assert.deepEqual(await guideTable.locator('pre code').allTextContents(), expected)
+      const guideLayout = await guideTable.evaluate((element) => ({
+        viewport: innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        tableWidth: element.getBoundingClientRect().width,
+        tableScrollWidth: element.scrollWidth,
+      }))
+      assert.ok(guideLayout.documentWidth <= width, `${engine} ${width}: guide page fits`)
+      assert.ok(
+        guideLayout.tableScrollWidth <= Math.ceil(guideLayout.tableWidth),
+        `${engine} ${width}: guide comparison fits`,
+      )
+      if (evidence) {
+        await guideTable.screenshot({ path: join(evidence, `${engine}-${width}-guide.png`) })
+      }
       console.log(
-        `${engine} ${width}: highlighted static code, prose cells and unbroken expressions pass`,
+        `${engine} ${width}: matching guide, highlighted static API snippets and unbroken landing expressions pass`,
       )
       await page.close()
     }

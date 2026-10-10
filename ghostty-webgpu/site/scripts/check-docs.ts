@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
+import { migrationComparison, migrationContext } from '../src/examples/migration-comparison'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const docs = join(root, 'src/content/docs')
@@ -43,6 +44,17 @@ try {
     )
     .join('\n')
   await writeFile(join(snippets, 'landing.ts'), code + '\nexport {}\n')
+  const migrationSamples = migrationComparison.flatMap((row, rowIndex) =>
+    row.to.map((snippet, snippetIndex) =>
+      'options' in row
+        ? `const options${rowIndex}_${snippetIndex} = ${snippet} satisfies GhosttyWebGpuTerminalOptions`
+        : snippet,
+    ),
+  )
+  await writeFile(
+    join(snippets, 'migration.ts'),
+    migrationContext + migrationSamples.join('\n') + '\nexport {}\n',
+  )
   const compiler = fileURLToPath(new URL('../../../node_modules/.bin/tsc', import.meta.url))
   const result = Bun.spawnSync([compiler, '--noEmit', '-p', join(root, 'tsconfig.examples.json')], {
     cwd: root,
@@ -51,7 +63,7 @@ try {
   })
   assert.equal(result.exitCode, 0, 'Docs and README example type-check failed')
   console.log(
-    `Docs samples checked. ${pages} authored pages; ${fences} README fences; 2 landing samples; examples compile against built declarations.`,
+    `Docs samples checked. ${pages} authored pages; ${fences} README fences; 2 landing samples; ${migrationSamples.length} migration snippets; examples compile against built declarations.`,
   )
 } finally {
   await rm(snippets, { recursive: true, force: true })

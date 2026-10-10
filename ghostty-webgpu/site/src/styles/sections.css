@@ -361,7 +361,7 @@
 
 .callout {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
   align-items: start;
   gap: 32px;
   margin-top: clamp(56px, 9vh, 96px);
