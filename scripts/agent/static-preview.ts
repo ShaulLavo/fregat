@@ -50,8 +50,8 @@ export async function openStaticPreview(page: Page, url = STATIC_PREVIEW_URL) {
             bounds.right > 0 &&
             bounds.top < innerHeight &&
             bounds.left < innerWidth
-          // Offscreen lazy images can leave decode pending while their source is deferred.
-          if (image.loading === 'lazy' && !image.currentSrc && !inViewport) return
+          // Offscreen lazy images can leave decode pending; currentSrc can already be selected.
+          if (image.loading === 'lazy' && !image.complete && !inViewport) return
           return image.decode()
         }),
       ),

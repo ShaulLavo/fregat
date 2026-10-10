@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { chromium, firefox, type Browser, type Page } from 'playwright'
+import { chromium, firefox, webkit, type Browser, type Page } from 'playwright'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 
 import { openStaticPreview, STATIC_PREVIEW_URL } from './static-preview'
@@ -7,7 +7,7 @@ import { openStaticPreview, STATIC_PREVIEW_URL } from './static-preview'
 const image =
   '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="blue"/></svg>'
 
-for (const engine of [chromium, firefox]) {
+for (const engine of [chromium, firefox, webkit]) {
   const unavailable = !existsSync(engine.executablePath())
   if (unavailable)
     console.info(`Static preview tests require installed Playwright ${engine.name()}.`)
@@ -54,10 +54,10 @@ for (const engine of [chromium, firefox]) {
       expect(requested).toBe(false)
       expect(
         await page.locator('img').evaluate((element: HTMLImageElement) => ({
-          source: element.currentSrc,
+          complete: element.complete,
           width: element.naturalWidth,
         })),
-      ).toEqual({ source: '', width: 0 })
+      ).toEqual({ complete: false, width: 0 })
     })
 
     test.each([
