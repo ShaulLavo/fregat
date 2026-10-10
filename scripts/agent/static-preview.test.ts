@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { chromium, firefox, webkit, type Browser, type Page } from 'playwright'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 
-import { openStaticPreview, STATIC_PREVIEW_URL } from './static-preview'
+import { captureStaticPreview, openStaticPreview, STATIC_PREVIEW_URL } from './static-preview'
 
 const image =
   '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="blue"/></svg>'
@@ -93,6 +93,45 @@ for (const engine of [chromium, firefox, webkit]) {
         release()
       }
     })
+
+    test.each(['selector scroll', 'viewport resize'])(
+      'awaits a lazy image after %s before capture',
+      async (change) => {
+        await documentWithImage('lazy', 10_000)
+        let release!: () => void
+        const held = new Promise<void>((resolve) => {
+          release = resolve
+        })
+        let requested = false
+        await page.route('**/image.svg', async (route) => {
+          requested = true
+          await held
+          await route.fulfill({ contentType: 'image/svg+xml', body: image })
+        })
+        try {
+          expect(await openStaticPreview(page)).toBe(true)
+          expect(requested).toBe(false)
+          await page.screenshot()
+          if (change === 'viewport resize')
+            await page.setViewportSize({ width: 390, height: 10_100 })
+          const target = change === 'selector scroll' ? page.locator('img') : page
+          let captured = false
+          const capture = captureStaticPreview(page, target).then(() => {
+            captured = true
+          })
+          await expect.poll(() => requested).toBe(true)
+          await page.waitForTimeout(250)
+          expect(captured).toBe(false)
+          release()
+          await capture
+          expect(
+            await page.locator('img').evaluate((element: HTMLImageElement) => element.naturalWidth),
+          ).toBe(40)
+        } finally {
+          release()
+        }
+      },
+    )
 
     test('a failed visible image keeps the preview unready', async () => {
       await documentWithImage('lazy', 20)
