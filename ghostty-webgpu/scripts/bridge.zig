@@ -725,7 +725,7 @@ fn reusableRenderedRow(cache: *const FrameCache, previous: *const CachedRow) boo
         !sameRowId(previous.id, std.mem.zeroes(c.GhosttyRenderStateRowId));
 }
 
-fn reuseRenderedCell(frame: *Frame, previous: *const CachedRow, slot: u32, raw: c.GhosttyCell, x: u32, y: u32, selected: bool) bool {
+inline fn reuseRenderedCell(frame: *Frame, previous: *const CachedRow, slot: u32, raw: c.GhosttyCell, x: u32, y: u32, selected: bool) bool {
     const cache = frame.row_cache.?;
     const old_selected = previous.selected and x >= previous.selection_start and x <= previous.selection_end;
     if (selected != old_selected) return false;
