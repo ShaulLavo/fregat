@@ -2,7 +2,7 @@ import type { ZigFrameBuilder } from '../../core/zig-frame.js'
 import type { AtlasKind, AtlasPageUpload, AtlasTextureLayout } from '../atlas/types.js'
 import { CELL_INSTANCE_BYTES, GLYPH_INSTANCE_BYTES } from '../instances/layout.js'
 import type { InstanceByteRange } from '../instances/types.js'
-import { planSparseUploadRanges, planUploadRanges } from '../instances/upload-ranges.js'
+import { planUploadRanges } from '../instances/upload-ranges.js'
 
 import {
   cellFragmentShader,
@@ -149,17 +149,13 @@ export class WebGlTextPass {
   }
 
   uploadFrame(
-    frame: FrameRows &
-      Pick<ZigFrameBuilder, 'cellData' | 'glyphData'> & { readonly rowChanges?: number },
+    frame: FrameRows & Pick<ZigFrameBuilder, 'cellData' | 'glyphData'>,
     updates: readonly { readonly cell: InstanceByteRange; readonly glyph: InstanceByteRange }[],
   ): number {
     this.ensureActive()
     this.frameUploadedBytesValue = 0
     this.rowMappingChangedValue = this.updateRows(frame)
-    const plan =
-      frame.stableRows && ((frame.rowChanges ?? 0) & 1) !== 0
-        ? planSparseUploadRanges(updates)
-        : planUploadRanges(updates)
+    const plan = planUploadRanges(updates)
     this.writeRanges(this.cells, frame.cellData, plan.cell, CELL_INSTANCE_BYTES)
     this.writeRanges(this.glyphs, frame.glyphData, plan.glyph, GLYPH_INSTANCE_BYTES)
     return plan.cell.length + plan.glyph.length
