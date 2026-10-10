@@ -1,3 +1,4 @@
+import { reactiveOwnerSnapshots } from './reactive-owner-snapshots'
 import { overlayAlignment } from './overlay-alignment'
 import { commandFoundation } from './command-foundation'
 import { clientLogDelivery } from './client-log-delivery'
@@ -475,6 +476,7 @@ import { devPackageUpdates } from './dev-package-updates'
 import { collaborationMergeReview } from './collaboration-merge-review'
 
 export const scenarios: readonly Scenario[] = [
+  reactiveOwnerSnapshots,
   collaborationMergeReview,
   overlayAlignment,
   unknownWorkspaceSettings,

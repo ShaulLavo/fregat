@@ -690,10 +690,10 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
         listeners.delete(listener)
       }
     },
-    permitsRecentRoot: () =>
+    permitsRecentRoot: (snapshot: NavigationStatus) =>
       initial.address.workspace === null &&
       initial.unavailable === null &&
-      status.status === 'applied',
+      snapshot.status === 'applied',
     attach(owner: ApplicationRuntime) {
       const retained = pendingHistory ?? detachedHistory
       const resumed =

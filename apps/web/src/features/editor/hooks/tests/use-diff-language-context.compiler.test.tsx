@@ -1,9 +1,12 @@
-import { filesystemPath } from '@/lib/documents/utils/identity'
-import { renderHook } from '@testing-library/react'
+import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
+import { act, renderHook } from '@testing-library/react'
+import { createEditorBufferSession } from '@singapore-editor/core/document'
+import { createTextDiff } from '@singapore-editor/diff'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { createElement, type ReactNode } from 'react'
 
 import { useDiffLanguageContext } from '@/features/editor/hooks/use-diff-language-context'
+import { diffLanguageDocuments } from '@/features/editor/utils/diff-documents'
 import {
   createEditorDocumentStore,
   EditorDocumentStateContext,
@@ -27,7 +30,7 @@ test('fails loudly when Platform document state is absent', () => {
 
 test('publishes live Platform text and explicit host capabilities', () => {
   const store = createEditorDocumentStore()
-  store.getState().ensureLiveEditorDocument({
+  const document = store.getState().ensureLiveEditorDocument({
     content: 'const value = 1\n',
     mtimeMs: 1,
     path: filesystemPath('/repo/a.ts'),
@@ -60,4 +63,21 @@ test('publishes live Platform text and explicit host capabilities', () => {
     ownedText: 'const value = 1\n',
     rootPath: '/repo',
   })
+
+  const file = createTextDiff({
+    oldFile: { path: '/repo/a.ts', text: 'const value = 0\n' },
+    newFile: { path: '/repo/a.ts', text: 'const value = 1\n' },
+  })
+  const snapshot = document.buffer.getTextSnapshot()
+  expect(diffLanguageDocuments({ ...result.current!, file })[0]?.sharesRealUri).toBe(true)
+  act(() => {
+    createEditorBufferSession(document.buffer).applyEdits([{ from: 14, to: 15, text: '2' }])
+  })
+  expect(document.buffer.materializeFullText()).toBe('const value = 2\n')
+  expect(
+    store.getState().liveDocumentsByKey[fileDocumentKey(filesystemPath('/repo/a.ts'))]?.buffer,
+  ).toBe(document.buffer)
+  expect(document.buffer.getTextSnapshot()).not.toBe(snapshot)
+  expect(result.current?.ownedText).toBe('const value = 2\n')
+  expect(diffLanguageDocuments({ ...result.current!, file })[0]?.sharesRealUri).toBe(false)
 })
