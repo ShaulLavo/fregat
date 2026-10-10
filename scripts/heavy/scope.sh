@@ -95,13 +95,16 @@ scan() {
   done
 }
 
-# Waits up to $1 tenths of a second for the job's other processes to exit.
+# Scheduler delays must consume the stop budget, or the wrapper kills this shim before accounting.
 settle() {
-  local tries=0
+  local now until
+  read -r now _ </proc/uptime
+  until=$((10#${now/./} + $1 * 10))
   scan ''
-  while [ "$found" -gt 0 ] && [ "$tries" -lt "$1" ]; do
+  while [ "$found" -gt 0 ]; do
+    read -r now _ </proc/uptime
+    [ "$((10#${now/./}))" -lt "$until" ] || break
     sleep 0.1
-    tries=$((tries + 1))
     scan ''
   done
 }
