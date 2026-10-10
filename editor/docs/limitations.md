@@ -50,7 +50,7 @@ Each entry names its source and any work that owns changing it. "No lifting plan
 - Admission. Emit the complete root produced by `mountPaintSnapshot`. Activation validates the ordered, contiguous source slices and full source coverage before allocating ranges. Repeated, overlapping, missing, reordered, oversized or nested malformed slices are refused; traversal and range work are bounded by the decoded document's text, rows and runs.
 - JavaScript off. Emitted text, links, headings, gutters and captured row layout remain readable. Syntax colours on continuous-text rows require activation; with JavaScript disabled those rows use their base text colour. Font files must still load for the captured font metrics to match.
 - Source. [documentPaintHighlights.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/virtualization/documentPaintHighlights.ts) and [paint.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/paint.ts). Dispose the returned handle when removing or replacing emitted roots. Independent bundles allocate names against the document's shared highlight registry.
-- Ownership. [Plan 340](https://github.com/ShaulLavo/fregat/blob/main/plans/340-singapore-site-embedding.md) owns emitted first-frame and live-takeover qualification.
+- Ownership. [Plan 340](https://github.com/ShaulLavo/fregat/blob/main/plans/340-singapore-site-embedding.md) owns emitted first-frame and inline-example activation qualification.
 
 ## Document size and analysis
 

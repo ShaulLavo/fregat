@@ -35,7 +35,6 @@ const slash = file.lastIndexOf('/') + 1
                 <li>
                   <a
                     href={entry.href}
-                    data-md={entry.md}
                     aria-current={entry.md === file ? 'page' : undefined}
                   >
                     {entry.label}
@@ -54,6 +53,6 @@ const slash = file.lastIndexOf('/') + 1
   <script>
     import '../../manual/live-examples'
     import { setUpSearch } from '../../manual/search'
-    setUpSearch(new Map())
+    setUpSearch()
   </script>
 </Manual>

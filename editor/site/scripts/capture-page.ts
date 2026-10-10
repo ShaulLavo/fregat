@@ -25,7 +25,7 @@ Object.assign(window, {
         const mounted = mountPaintSnapshot(host, paint)
         if (!mounted) throw new TypeError(`Example paint refused at ${width}`)
         await frame()
-        // Colour spans keep JS-off readable. Activation restores each original text node.
+        // Captured colour spans paint before scripts and avoid hidden-root Highlight invalidation.
         for (const row of mounted.element.querySelectorAll<HTMLElement>(
           '[data-editor-document-paint-row]',
         )) {

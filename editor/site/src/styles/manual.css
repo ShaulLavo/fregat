@@ -77,6 +77,13 @@ a {
 .menu[open] summary {
   color: var(--sg-title);
 }
+.top button[hidden] {
+  display: inline-block;
+  visibility: hidden;
+}
+.top .theme-toggle {
+  width: 3.5rem;
+}
 .theme-toggle[aria-pressed='true'] {
   color: var(--sg-title);
 }

@@ -783,7 +783,6 @@
         "@types/bun": "1.4.2",
         "@types/react": "19.2.17",
         "astro": "7.3.5",
-        "github-slugger": "2.0.0",
         "hast-util-from-html": "2.0.3",
         "oxfmt": "0.70.0",
         "oxlint": "1.85.0",
@@ -795,14 +794,13 @@
         "solid-js": "1.9.13",
         "starlight-links-validator": "0.26.0",
         "starlight-typedoc": "0.23.1",
-        "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#e2ae3f735f614b3b618b5de71fc41644a180b9e7",
         "typedoc": "0.28.20",
         "typedoc-plugin-markdown": "4.12.0",
         "typescript": "npm:typescript@6.0.3",
         "unified": "11.0.5",
         "unist-util-visit": "5.1.0",
+        "vite": "catalog:",
         "vitest": "5.0.2",
-        "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#121cf0d206a57a98e704dcee0c53e6804c619633",
       },
     },
     "ghostty-webgpu": {
@@ -4105,11 +4103,9 @@
 
     "@oxc-resolver/binding-wasm32-wasi/@emnapi/runtime": ["@emnapi/runtime@1.11.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-kyOl3X0DuTiT1h2ft8r2fYO8JYtU9a9Xis/zBSiGArNaagCOWx90N1k2wxp18czFDH+OgcWGb5ZP/XMt3dcyPA=="],
 
-    "@singapore-editor/markdown/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#e2ae3f7", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-e2ae3f7", "sha512-kjE9S2OATjgq6aWXpHClawh3cKtrxqMQtKvQ3F9gqEHYxKUBTt6HmCkifTHP99X76tiX/lp5y8F8UCsKUnQ3TQ=="],
+    "@singapore-editor/tree-sitter/web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#121cf0d", {}, "ShaulLavo-tree-sitter-x-121cf0d", "sha512-GpLDEvHVDP4AJkPgLUfw3cGw9AvuoAAUiGD8mA4fZ6NquyverZO2f3bi4ugjvhzYEeDiixDI2E9BYYa29T68Ww=="],
 
-    "@singapore-editor/tree-sitter/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#e2ae3f7", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-e2ae3f7", "sha512-kjE9S2OATjgq6aWXpHClawh3cKtrxqMQtKvQ3F9gqEHYxKUBTt6HmCkifTHP99X76tiX/lp5y8F8UCsKUnQ3TQ=="],
-
-    "@singapore-editor/tree-sitter-languages/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#e2ae3f7", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-e2ae3f7", "sha512-kjE9S2OATjgq6aWXpHClawh3cKtrxqMQtKvQ3F9gqEHYxKUBTt6HmCkifTHP99X76tiX/lp5y8F8UCsKUnQ3TQ=="],
+    "@singapore-editor/tree-sitter-languages/web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#121cf0d", {}, "ShaulLavo-tree-sitter-x-121cf0d", "sha512-GpLDEvHVDP4AJkPgLUfw3cGw9AvuoAAUiGD8mA4fZ6NquyverZO2f3bi4ugjvhzYEeDiixDI2E9BYYa29T68Ww=="],
 
     "@tailwindcss/node/lightningcss": ["lightningcss@1.32.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.32.0", "lightningcss-darwin-arm64": "1.32.0", "lightningcss-darwin-x64": "1.32.0", "lightningcss-freebsd-x64": "1.32.0", "lightningcss-linux-arm-gnueabihf": "1.32.0", "lightningcss-linux-arm64-gnu": "1.32.0", "lightningcss-linux-arm64-musl": "1.32.0", "lightningcss-linux-x64-gnu": "1.32.0", "lightningcss-linux-x64-musl": "1.32.0", "lightningcss-win32-arm64-msvc": "1.32.0", "lightningcss-win32-x64-msvc": "1.32.0" } }, "sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ=="],
 
@@ -4230,8 +4226,6 @@
     "singapore-editor-site/react": ["react@19.2.7", "", {}, "sha512-HNe9WslTbXmFK8o8cmwgAeJFSBvt1bPdHCVKtaaV+WlAN36mpT4hcRpwbf3fY56ar2oIXzsBpOAiIRHAdY0OlQ=="],
 
     "singapore-editor-site/solid-js": ["solid-js@1.9.13", "", { "dependencies": { "csstype": "^3.1.0", "seroval": "~1.5.0", "seroval-plugins": "~1.5.0" } }, "sha512-6hJeJMOcEX8ktqjpDoJZEmld3ijvcvWBDtiXBm7f4332SiFN66QeAQI1REQshvyUoISsSeJ4PHDauKYbwao9JQ=="],
-
-    "singapore-editor-site/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#e2ae3f7", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-e2ae3f7", "sha512-kjE9S2OATjgq6aWXpHClawh3cKtrxqMQtKvQ3F9gqEHYxKUBTt6HmCkifTHP99X76tiX/lp5y8F8UCsKUnQ3TQ=="],
 
     "singapore-editor-site/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 

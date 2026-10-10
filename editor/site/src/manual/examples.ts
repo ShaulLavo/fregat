@@ -6,13 +6,13 @@ export type HtmlRoot = ReturnType<typeof fromHtml>
 type Element = Extract<HtmlRoot['children'][number], { type: 'element' }>
 import { fenceLanguage } from './languages'
 
-export type ExamplePaint = { paint: string; html: Record<number, string> }
+type ExamplePaint = { paint: string; html: Record<number, string> }
 export type ExampleCapture = { light: ExamplePaint; dark: ExamplePaint }
-export const inlineJson = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u003c')
+const inlineJson = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u003c')
 const escape = (value: string) =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;')
 const cache = new Map<string, Promise<ExampleCapture>>()
-export async function captureExample(text: string, language: string): Promise<ExampleCapture> {
+async function captureExample(text: string, language: string): Promise<ExampleCapture> {
   const id = fenceLanguage(language) ?? 'text'
   const input = JSON.stringify({ text, language: id })
   let result = cache.get(input)
@@ -44,7 +44,7 @@ export async function renderExample(text: string, language: string): Promise<str
         )
           .map(
             (theme) =>
-              `<div data-example-theme="${theme}"${theme === 'dark' ? ' data-pagefind-ignore' : ''}>${capture[theme].html[width]}<script>SingaporeExamplePaint.activate(document.currentScript.previousElementSibling,JSON.parse(document.currentScript.closest('[data-example]').querySelector('[data-example-source]').textContent).${theme}.paint)</script></div>`,
+              `<div data-example-theme="${theme}"${theme === 'dark' ? ' data-pagefind-ignore' : ''}>${capture[theme].html[width]}</div>`,
           )
           .join('')}</div>`,
     )

@@ -15,8 +15,11 @@ export function onThemeChange(listener: () => void): void {
 }
 
 function changed() {
-  for (const button of document.querySelectorAll('.theme-toggle'))
+  for (const button of document.querySelectorAll('.theme-toggle')) {
+    button.textContent = isDark() ? 'Dark' : 'Light'
     button.setAttribute('aria-pressed', String(isDark()))
+    button.setAttribute('aria-label', isDark() ? 'Use light theme' : 'Use dark theme')
+  }
   for (const listener of listeners) listener()
 }
 

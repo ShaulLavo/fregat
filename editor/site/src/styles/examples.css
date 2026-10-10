@@ -97,7 +97,8 @@
 }
 [data-example] figcaption {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  min-height: 24px;
   gap: 12px;
   margin-top: 8px;
   font: 13px/1.5 var(--chrome, var(--sl-font));
@@ -135,6 +136,9 @@
 .sg-example-editor > .editor {
   border: 0;
   border-radius: 0;
+  --editor-cursor-line-row-background: transparent;
+  --editor-cursor-line-gutter-background: transparent;
+  --editor-gutter-active-foreground: var(--editor-gutter-foreground);
 }
 [data-example] [data-editor-document-paint] {
   background: var(--sg-code-bg, var(--sl-color-gray-6));

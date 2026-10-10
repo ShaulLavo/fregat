@@ -66,9 +66,13 @@ for (const [index, example] of examples.entries()) {
   )
   button.addEventListener('click', async () => {
     const status = example.querySelector<HTMLElement>('.example-status')!
-    button.disabled = true
+    if (button.getAttribute('aria-disabled') === 'true') return
+    button.setAttribute('aria-disabled', 'true')
     const alreadyReady = example.hasAttribute('data-example-ready')
-    if (!alreadyReady) status.textContent = 'Preparing editor…'
+    if (!alreadyReady) {
+      button.focus({ preventScroll: true })
+      status.textContent = 'Preparing editor…'
+    }
     try {
       const editor = await prepare(example).ready
       reveal(example, editor, true)
@@ -77,7 +81,7 @@ for (const [index, example] of examples.entries()) {
     } catch (error) {
       console.error('Example preparation failed', error)
       status.textContent = 'Editor could not load. Try again.'
-      button.disabled = false
+      button.removeAttribute('aria-disabled')
     }
   })
 }

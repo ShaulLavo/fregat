@@ -412,11 +412,16 @@ and stylesheets. Refreshing 4,600 mounted ranges caused a 122–180 ms synchrono
 Firefox pause in the reviewed implementation; the guarded path measured 0–1 ms.
 These were bounded, non-quiet experiment samples, not throughput measurements.
 
-The behavioral probe is `editor/site/tests/presentation.browser.ts`, run against a
-production build with the membership-refresh loop removed. It checks native syntax
-pixels after home/manual takeover, including light/dark themes, cold reloads,
-desktop WebKit, phone-width WebKit and the iPhone descriptor. Screenshot animations
-must remain enabled: disabling animations forces a WebKit repaint and hides the bug.
+The original behavioral probe used `editor/site/tests/presentation.browser.ts`
+against a production build with the membership-refresh loop removed. It checked
+native syntax pixels after home/manual takeover, including light/dark themes, cold
+reloads, desktop WebKit, phone-width WebKit and the iPhone descriptor. The ordinary
+HTML manual retired that takeover and probe. Its successor,
+`editor/site/tests/manual.browser.ts`, checks captured colour spans on every
+reload frame and static/live example pixels in Chromium and WebKit. Static
+examples keep their captured colours in HTML; explicit live examples still use
+native highlights. Screenshot animations must remain enabled: disabling them
+forces a WebKit repaint and hides the bug.
 The unchanged control failed with zero native live syntax pixels; the workaround
 passed all 32 production cases. See [the fix and verification](https://github.com/ShaulLavo/fregat/pull/1117).
 
