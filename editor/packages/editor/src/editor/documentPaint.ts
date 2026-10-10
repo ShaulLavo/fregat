@@ -20,6 +20,8 @@ export type DocumentPaintStyle = {
   readonly letterSpacing: string
   readonly fontFeatureSettings: string
   readonly fontVariationSettings: string
+  readonly fontKerning: string
+  readonly fontVariantLigatures: string
 }
 
 export type DocumentPaintRun = {
@@ -30,6 +32,8 @@ export type DocumentPaintRun = {
 
 export type DocumentPaintRow = {
   readonly height: number
+  /** Effective font’s zero-glyph advance, in CSS pixels. */
+  readonly characterWidth: number
   readonly style: DocumentPaintStyle
   readonly runs: readonly DocumentPaintRun[]
   readonly heading: { readonly level: number; readonly name: string; readonly id: string } | null
@@ -153,7 +157,19 @@ function style(value: unknown): value is DocumentPaintStyle {
     text(value.letterSpacing, 32) &&
     /^(?:normal|-?\d+(?:\.\d+)?px)$/.test(value.letterSpacing) &&
     fontSettings(value.fontFeatureSettings) &&
-    fontSettings(value.fontVariationSettings)
+    fontSettings(value.fontVariationSettings) &&
+    text(value.fontKerning, 6) &&
+    ['auto', 'normal', 'none'].includes(value.fontKerning) &&
+    ligatures(value.fontVariantLigatures)
+  )
+}
+
+function ligatures(value: unknown): value is string {
+  return (
+    text(value, 128) &&
+    /^(?:normal|none|(?:no-)?(?:common|discretionary|historical)-ligatures|(?:no-)?contextual)(?: (?:no-)?(?:common-ligatures|discretionary-ligatures|historical-ligatures|contextual))*$/.test(
+      value,
+    )
   )
 }
 
@@ -199,6 +215,8 @@ function row(value: unknown): value is DocumentPaintRow {
     record(value) &&
     finite(value.height, 1024) &&
     value.height > 0 &&
+    finite(value.characterWidth, 1024) &&
+    value.characterWidth > 0 &&
     style(value.style) &&
     heading(value.heading) &&
     color(value.gutterBackgroundColor) &&

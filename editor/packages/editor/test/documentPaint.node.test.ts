@@ -19,6 +19,8 @@ const style = {
   letterSpacing: 'normal',
   fontFeatureSettings: 'normal',
   fontVariationSettings: 'normal',
+  fontKerning: 'auto',
+  fontVariantLigatures: 'normal',
 } as const
 
 function fixture(count = 1): SavedDocumentPaint {
@@ -36,6 +38,7 @@ function fixture(count = 1): SavedDocumentPaint {
     wrap: 'word',
     rows: Array.from({ length: count }, () => ({
       height: 20,
+      characterWidth: 8,
       style,
       heading: null,
       gutterBackgroundColor: 'transparent',
@@ -149,6 +152,9 @@ it('refuses unsafe style values and malformed heading facts', () => {
     { visibility: 'collapse' },
     { textDecoration: 'underline; background: red' },
     { fontWeight: '100000' },
+    { fontKerning: 'normal; color: red' },
+    { fontKerning: ['none'] },
+    { fontVariantLigatures: 'url(example.com)' },
   ])
     expect(
       decodeSnapshot(JSON.stringify({ ...paint, style: { ...style, ...replacement } })),
@@ -195,3 +201,15 @@ it('refuses unsafe row, inset and cell gutter backgrounds', () => {
   ])
     expect(decodeSnapshot(JSON.stringify({ ...paint, rows: [changed] }))).toBeNull()
 })
+
+it.each([0, -1, 1025, Number.NaN, Number.POSITIVE_INFINITY])(
+  'refuses an invalid row font advance %s',
+  (characterWidth) => {
+    const paint = fixture()
+    expect(
+      decodeDocumentPaint(
+        JSON.stringify({ ...paint, rows: [{ ...paint.rows[0], characterWidth }] }),
+      ),
+    ).toBeNull()
+  },
+)

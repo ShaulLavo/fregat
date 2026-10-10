@@ -383,7 +383,7 @@ export function addTokenRangeToChunk(
 ): AbstractRange | null {
   const range =
     createStaticRangeForChunkRange(document, row, chunk, start, end) ??
-    createDomRangeForChunkRange(document, row, chunk, start, end)
+    createDomRangeForChunkRange(document, row, chunk, start, end, 'highlight')
   if (!range) return null
 
   highlight.add(range)

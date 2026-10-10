@@ -5,6 +5,10 @@ import {
   type DocumentPaintStyle,
   type SavedDocumentPaint,
 } from '../editor/documentPaint'
+import {
+  activateDocumentPaintHighlights,
+  canHighlightDocumentPaintRow,
+} from './documentPaintHighlights'
 import { glyphAdvancesFor, PROPORTIONAL_WRAP_MARGIN_PX } from './glyphAdvances'
 import { appendWordWrapText, createWordWrapLine, finishWordWrapLine } from './wordWrap'
 
@@ -67,12 +71,32 @@ export function mountDocumentPaint(
     measure: paint.monospace ? undefined : glyphs?.measure,
     minimumTabAdvance: paint.monospace ? undefined : glyphs?.minimumTabAdvance,
   }
-  for (const row of paint.rows) {
+  const probe = document.createElement('div')
+  probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none'
+  root.append(probe)
+  for (let index = 0; index < paint.rows.length; index++) {
+    const row = paint.rows[index]!
+    applyStyle(probe, row.style)
+    const rowGlyphs = glyphAdvancesFor(probe)
+    const rowRules =
+      rowGlyphs && rowGlyphs !== glyphs
+        ? {
+            ...rules,
+            width: Math.max(
+              1,
+              width - paint.gutterWidth - row.characterWidth - PROPORTIONAL_WRAP_MARGIN_PX,
+            ),
+            advance: (codePoint: number) => rowGlyphs.advance(codePoint),
+            measure: rowGlyphs.measure,
+            minimumTabAdvance: rowGlyphs.minimumTabAdvance,
+          }
+        : rules
     const text = row.runs.map((run) => run.text).join('')
+    const highlight = canHighlightDocumentPaintRow(row)
     const line = createWordWrapLine()
     if (paint.wrap) {
-      appendWordWrapText(line, text, 0, text.length, rules)
-      finishWordWrapLine(line, rules)
+      appendWordWrapText(line, text, 0, text.length, rowRules)
+      finishWordWrapLine(line, rowRules)
     }
     const ends = [...line.ends, text.length]
     let start = 0
@@ -96,21 +120,32 @@ export function mountDocumentPaint(
         element.setAttribute('aria-label', row.heading.name)
         if (row.heading.id) element.id = row.heading.id
       }
-      appendRuns(element, row.runs, start, end, row.style)
+      element.dataset.editorDocumentPaintSourceRow = String(index)
+      element.dataset.editorDocumentPaintStart = String(start)
+      if (end > start && highlight) {
+        element.append(document.createTextNode(text.slice(start, end)))
+      } else appendRuns(element, row.runs, start, end, row.style)
       fragment.append(element)
       appendGutter(gutter, row, start === 0, top, paint.gutterWidth)
       top += row.height + paint.rowGap
       start = end
     }
   }
+  probe.remove()
   const height = Math.max(0, top - paint.rowGap)
   root.style.height = `${height}px`
   root.append(fragment)
+  const highlights = activateDocumentPaintHighlights(root, paint)
+  if (!highlights) {
+    root.remove()
+    return null
+  }
   return {
     element: root,
     height,
     rowCount,
     dispose() {
+      highlights.dispose()
       root.remove()
     },
   }
@@ -161,7 +196,7 @@ function appendRuns(
         overflow: 'hidden',
         verticalAlign: 'top',
         whiteSpace: 'pre',
-        userSelect: 'none',
+        userSelect: 'text',
       })
       widget.append(span)
       element.append(widget)
@@ -245,6 +280,8 @@ const STYLE_KEYS = [
   'letterSpacing',
   'fontFeatureSettings',
   'fontVariationSettings',
+  'fontKerning',
+  'fontVariantLigatures',
   'visibility',
 ] as const
 

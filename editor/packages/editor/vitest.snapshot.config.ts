@@ -7,6 +7,7 @@ import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 import { browserTestResponses } from '../../scripts/browser-test-responses.ts'
 import { workspaceRoot } from '../../scripts/workspace-root.ts'
+import { proveDocumentPaintFirstFrame } from './test/env/document-paint-first-frame.ts'
 
 const evidence = mkdtempSync(join(tmpdir(), 'singapore-document-paint-'))
 const results: unknown[] = []
@@ -62,6 +63,29 @@ export default defineConfig({
       viewport: { width: 1400, height: 900 },
       provider: playwright(),
       commands: {
+        proofDocumentPaintFirstFrame: async (
+          { page, project },
+          payload: string,
+          markup: string,
+          width: number,
+          javaScriptEnabled: boolean,
+          activationMode:
+            | 'success'
+            | 'refused'
+            | 'throws'
+            | 'missing'
+            | 'missing-deferred' = 'success',
+        ) =>
+          proveDocumentPaintFirstFrame(
+            page,
+            project.name,
+            evidence,
+            payload,
+            markup,
+            width,
+            javaScriptEnabled,
+            activationMode,
+          ),
         proofDocumentPaintCold: async (
           { page, project },
           payload: string,
