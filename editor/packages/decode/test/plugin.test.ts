@@ -7,6 +7,7 @@ import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
+  EditorContributionChange,
   EditorRowPresentation,
   EditorPluginContext,
   EditorViewContribution,
@@ -14,7 +15,12 @@ import type {
   EditorViewContributionProvider,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
-import { createDecodePlugin, type DecodePluginOptions } from '../src/index'
+import {
+  createDecodePlugin,
+  createMorphPlugin,
+  type DecodePluginOptions,
+  type MorphPluginOptions,
+} from '../src/index'
 import { tokenizeLengths } from '../src/tokenize'
 import { collectRevealRows } from '../src/rows'
 import { RangeText } from '../../editor/dist/textContent'
@@ -458,6 +464,176 @@ it('animates only mounted long-line text at its horizontal position', () => {
   })
   expect(readRange).not.toHaveBeenCalled()
 })
+
+const EDITED = 'function f(a: number) {\n  if (x) {\n    y(a)\n  }\n}\n'
+
+describe('createMorphPlugin', () => {
+  it('morphs an edit: the real rows hide under an overlay of pieces', () => {
+    const { context, contribution } = mountMorph()
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(12))
+
+    const layer = context.contentElement.querySelector('.editor-morph-layer')
+    expect(layer?.querySelectorAll('.editor-morph-piece').length).toBeGreaterThan(0)
+    expect(context.scrollElement.classList.contains('editor-morph-active')).toBe(true)
+    expect(rowAnimations().length).toBeGreaterThan(0)
+    contribution.dispose()
+  })
+
+  it('morphs from the old text when the new text arrived first under viewport', () => {
+    const { context, contribution } = mountMorph()
+    const next = snapshot({ text: EDITED, textVersion: 2 })
+    contribution.update(next, 'viewport')
+    contribution.update(next, 'content', edit(12))
+
+    const pieces = Array.from(
+      context.contentElement.querySelectorAll('.editor-morph-piece'),
+      (piece) => piece.textContent,
+    )
+    // `number` is new, so it enters: the morph started from the text before the edit.
+    expect(pieces).toContain('number')
+    expect(enterAnimations().length).toBeGreaterThan(0)
+    contribution.dispose()
+  })
+
+  it('keeps typing instant', () => {
+    const { context, contribution } = mountMorph()
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(1))
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+    expect(rowAnimations()).toHaveLength(0)
+  })
+
+  it('morphs undo however small it is', () => {
+    const { context, contribution } = mountMorph()
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(1, 'undo'))
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).not.toBeNull()
+    contribution.dispose()
+  })
+
+  it('shows the real rows and drops the overlay when a document opens', () => {
+    const { context, contribution, presentations } = mountMorph()
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(12))
+    contribution.update(snapshot({ documentId: 'next', textVersion: 3 }), 'document')
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+    expect(context.scrollElement.classList.contains('editor-morph-active')).toBe(false)
+    expect(rowAnimations().every((entry) => entry.cancel.mock.calls.length > 0)).toBe(true)
+    expect(presentations.every((handle) => vi.mocked(handle.dispose).mock.calls.length > 0)).toBe(
+      true,
+    )
+  })
+
+  it('settles a running morph the moment the user types', () => {
+    const typing: { listener: ((text: string) => void) | null } = { listener: null }
+    const { context, contribution } = mountMorph({}, (listener) => (typing.listener = listener))
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(12))
+    expect(context.contentElement.querySelector('.editor-morph-layer')).not.toBeNull()
+
+    typing.listener?.('a')
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+    expect(rowAnimations().every((entry) => entry.cancel.mock.calls.length > 0)).toBe(true)
+  })
+
+  it('settles when layout changes under a running morph', () => {
+    const { context, contribution } = mountMorph()
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(12))
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'layout')
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+  })
+
+  it('leaves rows alone when their paint cannot be redrawn', () => {
+    const { context, contribution } = mountMorph()
+    const next = snapshot({ text: EDITED, textVersion: 2 })
+    const rows = next.visibleRows.map((row) => ({
+      ...row,
+      mountedPaintSupport: 'unreplayable-plugin-css' as const,
+    }))
+    contribution.update({ ...next, visibleRows: rows }, 'content', edit(12))
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+    expect(rowAnimations()).toHaveLength(0)
+  })
+
+  it('leaves rows alone when they draw control characters as boxes', () => {
+    const { context, contribution } = mountMorph()
+    const next = snapshot({ text: EDITED, textVersion: 2 })
+    const [first, ...rest] = next.visibleRows
+    const boxed = {
+      ...first!,
+      chunks: [
+        {
+          sourceStartOffset: first!.startOffset,
+          sourceEndOffset: first!.endOffset,
+          rowLocalStart: 0,
+          rowLocalEnd: first!.text.length,
+          text: first!.text,
+          mountedPaint: {
+            kind: 'replayable',
+            parts: [{ kind: 'control', text: '\u0007' }],
+          },
+        },
+      ],
+    } as unknown as (typeof rest)[number]
+    contribution.update({ ...next, visibleRows: [boxed].concat(rest) }, 'content', edit(12))
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+  })
+
+  it('stays still under reduced motion', () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
+    const { context, contribution } = mountMorph()
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(12))
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+  })
+})
+
+const enterAnimations = () =>
+  recorded.filter((entry) =>
+    entry.keyframes.some((frame) => String(frame.filter ?? '').startsWith('blur(3')),
+  )
+
+function edit(size: number, kind: EditorContributionChange['kind'] = 'edit') {
+  return {
+    kind,
+    edits: [{ from: 0, to: 0, text: 'x'.repeat(size) }],
+  } as unknown as EditorContributionChange
+}
+
+function mountMorph(
+  options: MorphPluginOptions = {},
+  onDidType?: (listener: (text: string) => void) => void,
+): {
+  context: EditorViewContributionContext
+  contribution: EditorViewContribution
+  presentations: EditorRowPresentation[]
+} {
+  let provider: EditorViewContributionProvider | undefined
+  createMorphPlugin(options).activate(
+    pluginContext((registered) => {
+      provider = registered
+      return { dispose: vi.fn() }
+    }),
+  )
+  const presentations: EditorRowPresentation[] = []
+  const base = viewContext(presentations)
+  const context: EditorViewContributionContext = onDidType
+    ? {
+        ...base,
+        onDidType: (listener) => {
+          onDidType(listener)
+          return { dispose: vi.fn() }
+        },
+      }
+    : base
+  populateRows(context.contentElement, snapshot())
+  const contribution = provider?.createContribution(context)
+  if (!contribution) throw new Error('morph contribution was not created')
+  return { context, contribution, presentations }
+}
 
 function mount(options: DecodePluginOptions = {}): {
   context: EditorViewContributionContext

@@ -82,6 +82,29 @@
   }
 }
 
+/* Morph overlay. Anchored at the content origin so it scrolls with the rows;
+   pieces sit at their final spot and WAAPI transforms carry them there. */
+.editor-morph-layer {
+  height: 0;
+  left: var(--editor-gutter-width, 0px);
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  z-index: 4;
+}
+
+.editor-morph-piece {
+  position: absolute;
+  transition: color 180ms linear;
+  white-space: pre;
+  will-change: transform, opacity;
+}
+
+/* The editor caret would sit at the settled text while the text is still moving. */
+.editor-morph-active .editor-virtualized-caret-layer {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   /* The plugin already no-ops under reduced motion; if the class is ever set,
      never hide anything. */
@@ -102,6 +125,10 @@
   }
 
   .editor-decode-glyph-layer {
+    display: none;
+  }
+
+  .editor-morph-layer {
     display: none;
   }
 }

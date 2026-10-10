@@ -17,6 +17,7 @@ import { runDiffusion } from './diffusion'
 import './style.css'
 
 export type { DecodeMode, DecodePluginOptions } from './options'
+export { createMorphPlugin, type MorphPluginOptions } from './morph'
 
 const INPUT_EVENTS = ['keydown', 'pointerdown', 'wheel'] as const
 

@@ -179,6 +179,11 @@ export const decodeSelectors = {
   glyphLayer: '.editor-decode-glyph-layer',
   glyph: '.editor-decode-glyph',
 } as const
+export const morphSelectors = {
+  editor: (page: Page) => page.locator('[data-transitions-editor]'),
+  layer: '.editor-morph-layer',
+  piece: '.editor-morph-piece',
+} as const
 export const searchEditorSelector = '[aria-label="Search result editor"]'
 export const searchEditorFileRowSelector = '[role="treeitem"][aria-level="1"]'
 export const editorTokenActivationSelectors = {
