@@ -1,1 +1,0 @@
-console=tty1 root=PARTUUID=27db7512-02 psi=0

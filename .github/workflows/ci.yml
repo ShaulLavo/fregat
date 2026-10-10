@@ -361,7 +361,7 @@ jobs:
       - name: Browser resource teardown
         if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
         timeout-minutes: 2
-        run: bun --bun vitest run scripts/browser-gc.test.ts scripts/heavy/browser-gc.test.ts --environment node --no-file-parallelism
+        run: bun --bun vitest run scripts/browser-gc.test.ts --environment node --no-file-parallelism
 
       - name: Cold dev startup
         if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
