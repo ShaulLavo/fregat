@@ -109,7 +109,10 @@ async function checkLiveTerminal(target: URL, out: string, releaseRoot: string) 
           webRoot,
           releaseRoot,
           handleSignals: false,
-          settings: { 'terminal.integrated.screenReader': true },
+          settings: {
+            'terminal.integrated.screenReader': true,
+            'terminal.integrated.cursorBlinking': false,
+          },
         })
         signal.throwIfAborted()
         report.isolatedRelease = await readRelease(new URL('/release', server.origin), signal)

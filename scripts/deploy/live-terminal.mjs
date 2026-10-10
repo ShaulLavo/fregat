@@ -53,16 +53,37 @@ function inspectTerminal({ prompt, index, suffix, text }) {
   return null
 }
 
-async function changedInputPixels({ before, after, first, second, characters }) {
-  if (first.row !== second.row || Math.abs(first.caret.y - second.caret.y) > 1) return false
-  if (Object.keys(first.bounds).some((key) => first.bounds[key] !== second.bounds[key]))
-    return false
-  const cellWidth = (second.caret.x - first.caret.x) / characters
+// Letter strokes occupy part of a cell; full-cell fills cannot prove glyph paint.
+const MIN_GLYPH_CHANGED_FRACTION = 0.03
+const MAX_GLYPH_CHANGED_FRACTION = 0.7
+const GLYPH_CHANNEL_DELTA = 16
+// Allow small capture noise while requiring each restored cell to return to its baseline.
+const RESTORE_CHANNEL_TOLERANCE = 8
+const MAX_RESTORE_CHANGED_FRACTION = 0.01
+
+async function changedInputPixels({
+  before,
+  after,
+  first,
+  second,
+  restored,
+  characters,
+  leadingCells,
+  thresholds,
+}) {
+  for (const current of [second, restored].filter(Boolean)) {
+    if (first.row !== current.row || Math.abs(first.caret.y - current.caret.y) > 1) return false
+    if (Object.keys(first.bounds).some((key) => first.bounds[key] !== current.bounds[key]))
+      return false
+  }
+  if (restored && Math.abs(first.caret.x - restored.caret.x) > 1) return false
+  const cellWidth = (second.caret.x - first.caret.x) / (characters + leadingCells)
   if (!(cellWidth > 0) || !(first.rowHeight > 0)) return false
   if (Math.abs(first.caret.y - first.bounds.y - first.row * first.rowHeight) > 1) return false
   const left = first.caret.x - first.clip.x
   const top = first.caret.y - first.clip.y
-  const right = left + cellWidth * (characters + 1)
+  const cells = characters + leadingCells + 1
+  const right = left + cellWidth * cells
   const bottom = top + first.rowHeight
   if (left < 0 || top < 0 || right > first.clip.width || bottom > first.clip.height) return false
   const decode = async (png) => {
@@ -78,11 +99,17 @@ async function changedInputPixels({ before, after, first, second, characters }) 
       pixels: context.getImageData(0, 0, canvas.width, canvas.height).data,
     }
   }
-  const [baseline, echoed] = await Promise.all([decode(before), decode(after)])
-  if (baseline.width !== echoed.width || baseline.height !== echoed.height) return false
+  const [baseline, compared] = await Promise.all([decode(before), decode(after)])
+  if (baseline.width !== compared.width || baseline.height !== compared.height) return false
   if (right > baseline.width || bottom > baseline.height) return false
-  for (let cell = 0; cell < characters; cell++) {
+  const firstCell = restored ? 0 : leadingCells
+  const lastCell = restored ? cells : leadingCells + characters
+  const channelDelta = restored
+    ? thresholds.restoreChannelTolerance + 1
+    : thresholds.glyphChannelDelta
+  for (let cell = firstCell; cell < lastCell; cell++) {
     let changed = 0
+    let area = 0
     const columns = new Set()
     for (let y = Math.floor(top); y < Math.ceil(bottom); y++) {
       for (
@@ -90,19 +117,30 @@ async function changedInputPixels({ before, after, first, second, characters }) 
         x < Math.ceil(left + (cell + 1) * cellWidth);
         x++
       ) {
+        area++
         const offset = (y * baseline.width + x) * 4
         const difference = Math.max(
-          Math.abs(baseline.pixels[offset] - echoed.pixels[offset]),
-          Math.abs(baseline.pixels[offset + 1] - echoed.pixels[offset + 1]),
-          Math.abs(baseline.pixels[offset + 2] - echoed.pixels[offset + 2]),
+          Math.abs(baseline.pixels[offset] - compared.pixels[offset]),
+          Math.abs(baseline.pixels[offset + 1] - compared.pixels[offset + 1]),
+          Math.abs(baseline.pixels[offset + 2] - compared.pixels[offset + 2]),
         )
-        if (difference < 16) continue
+        if (difference < channelDelta) continue
         changed++
         columns.add(x)
       }
     }
-    // Each typed character must change its cells; cursor movement alone cannot satisfy the proof.
-    if (changed < Math.max(6, cellWidth * first.rowHeight * 0.02) || columns.size < 2) return false
+    const fraction = changed / area
+    if (restored) {
+      if (fraction > thresholds.maxRestoreChangedFraction) return false
+      continue
+    }
+    if (
+      fraction < thresholds.minGlyphChangedFraction ||
+      fraction > thresholds.maxGlyphChangedFraction ||
+      changed < 6 ||
+      columns.size < 2
+    )
+      return false
   }
   return true
 }
@@ -117,7 +155,24 @@ async function eraseInput(page, input, options) {
     throw new DOMException('Timeout restoring the terminal input focus.', 'TimeoutError')
   await page.keyboard.press('Control+u')
   const cleared = await page.waitForFunction(inspectTerminal, options, { timeout: 5_000 })
-  await cleared.dispose()
+  try {
+    return await cleared.jsonValue()
+  } finally {
+    await cleared.dispose()
+  }
+}
+
+async function restoreInput(page, input, options, proof) {
+  const restored = await eraseInput(page, input, options)
+  const after = await page.screenshot({ clip: proof.first.clip, scale: 'css', timeout: 5_000 })
+  if (!proof.second) return
+  const matched = await page.evaluate(changedInputPixels, {
+    ...proof,
+    restored,
+    after: after.toString('base64'),
+  })
+  if (!matched)
+    throw new DOMException('Timeout restoring the terminal input pixels.', 'TimeoutError')
 }
 
 export async function waitForTerminalPrompt(page, prompt, timeoutMs = 30_000) {
@@ -141,27 +196,44 @@ export async function waitForTerminalPrompt(page, prompt, timeoutMs = 30_000) {
   // Clip a viewport capture without scrolling an offscreen terminal into view.
   const before = await page.screenshot({ clip: first.clip, scale: 'css', timeout: remaining() })
   const marker = 'xyz'
+  // The spacer keeps the original block cursor out of the three letter cells.
+  const typed = ` ${marker}`
+  const proof = {
+    before: before.toString('base64'),
+    first,
+    second: undefined,
+    characters: marker.length,
+    leadingCells: 1,
+    thresholds: {
+      minGlyphChangedFraction: MIN_GLYPH_CHANGED_FRACTION,
+      maxGlyphChangedFraction: MAX_GLYPH_CHANGED_FRACTION,
+      glyphChannelDelta: GLYPH_CHANNEL_DELTA,
+      restoreChannelTolerance: RESTORE_CHANNEL_TOLERANCE,
+      maxRestoreChangedFraction: MAX_RESTORE_CHANGED_FRACTION,
+    },
+  }
   try {
-    await page.keyboard.type(marker)
-    const options = { prompt, index: first.index, suffix: marker }
+    await page.keyboard.type(typed)
+    const options = { prompt, index: first.index, suffix: typed }
     await read(options)
     while (Date.now() < deadline) {
       const second = await page.evaluate(inspectTerminal, options)
       if (!second) break
       const after = await page.screenshot({ clip: first.clip, scale: 'css', timeout: remaining() })
       const painted = await page.evaluate(changedInputPixels, {
-        before: before.toString('base64'),
+        ...proof,
         after: after.toString('base64'),
-        first,
         second,
-        characters: marker.length,
       })
-      if (painted) return { count: first.count, promptRendered: true }
+      if (painted) {
+        proof.second = second
+        return { count: first.count, promptRendered: true }
+      }
       await page.waitForTimeout(Math.min(50, remaining()))
     }
     throw new DOMException('Timeout waiting for rendered terminal input pixels.', 'TimeoutError')
   } finally {
-    await eraseInput(page, input, { prompt, index: first.index, text: first.text })
+    await restoreInput(page, input, { prompt, index: first.index, text: first.text }, proof)
   }
 }
 

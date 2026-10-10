@@ -64,13 +64,26 @@ async function terminalFixture(page, options = {}) {
     paneStyle = '',
     paint = true,
     cursorOnly = false,
+    cursor = false,
     outsideChange = false,
+    animatedBackground = false,
+    inputBackground = false,
+    restoreChange = false,
   } = options
   await page.setContent(
-    `<body style="margin:0"><div data-slot="tool-pane" aria-label="Terminal" style="${paneStyle}"><div class="ghostty-webgpu" style="position:relative;width:600px;height:90px;background:${background};${hostStyle}"><canvas class="ghostty-webgpu-canvas" width="600" height="90" style="width:600px;height:90px;${backend === 'dom' ? 'opacity:0;' : ''}${canvasStyle}"></canvas>${backend === 'dom' ? `<div style="position:absolute;top:0;width:600px;white-space:pre;font:20px/30px monospace"><div data-row="0"><span style="${textStyle}">check$ </span></div></div>` : ''}<textarea aria-label="Terminal input" style="position:absolute;left:84px;top:0;width:1px;height:1px;opacity:0"></textarea><div aria-label="Terminal screen" style="position:absolute;left:-10000px"><div>check$</div><div> </div><div> </div></div></div></div></body>`,
+    `<style>@keyframes wall{0%,40%{background:white}50%,90%{background:black}100%{background:white}}.wall{position:absolute;inset:0;animation:wall 300ms linear infinite}</style><body style="margin:0"><div data-slot="tool-pane" aria-label="Terminal" style="${paneStyle}"><div class="ghostty-webgpu" style="position:relative;width:600px;height:90px;background:${background};${hostStyle}">${animatedBackground ? '<div class="wall" aria-hidden="true"></div>' : ''}<canvas class="ghostty-webgpu-canvas" width="600" height="90" style="width:600px;height:90px;${backend === 'dom' ? 'opacity:0;' : ''}${canvasStyle}"></canvas>${backend === 'dom' ? `<div style="position:absolute;top:0;width:600px;white-space:pre;font:20px/30px monospace"><div data-row="0"><span style="${textStyle}">check$ </span></div></div>` : ''}<textarea aria-label="Terminal input" style="position:absolute;left:84px;top:0;width:1px;height:1px;opacity:0"></textarea><div aria-label="Terminal screen" style="position:absolute;left:-10000px"><div>check$</div><div> </div><div> </div></div></div></div></body>`,
   )
   await page.evaluate(
-    ({ backend, paintEcho, paint: painted, cursorOnly, outsideChange }) => {
+    ({
+      backend,
+      paintEcho,
+      paint: painted,
+      cursorOnly,
+      cursor,
+      outsideChange,
+      inputBackground,
+      restoreChange,
+    }) => {
       const input = document.querySelector('textarea')
       const canvas = document.querySelector('canvas')
       const mirror = document.querySelector('[aria-label="Terminal screen"]')
@@ -84,6 +97,7 @@ async function terminalFixture(page, options = {}) {
       const paint = () => {
         mirror.firstElementChild.textContent = `check$ ${value}`.trimEnd()
         input.style.left = `${84 + value.length * 12}px`
+        if (inputBackground) canvas.parentElement.style.background = value ? 'black' : 'white'
         if (!painted || (!paintEcho && value && !cursorOnly)) return
         if (backend === 'dom') {
           span.textContent = `check$ ${value}`
@@ -93,7 +107,8 @@ async function terminalFixture(page, options = {}) {
         context.font = '20px monospace'
         context.fillStyle = 'black'
         context.fillText(`check$ ${paintEcho ? value : ''}`, 0, 22)
-        if (cursorOnly) context.fillRect(84 + value.length * 12, 0, 12, 30)
+        if (cursorOnly || cursor) context.fillRect(84 + value.length * 12, 0, 12, 30)
+        if (restoreChange && window.terminalInput.erased) context.fillRect(84, 0, 60, 30)
       }
       input.addEventListener('keydown', (event) => {
         if (event.ctrlKey && event.key === 'u') {
@@ -112,7 +127,16 @@ async function terminalFixture(page, options = {}) {
       })
       paint()
     },
-    { backend, paintEcho, paint, cursorOnly, outsideChange },
+    {
+      backend,
+      paintEcho,
+      paint,
+      cursorOnly,
+      cursor,
+      outsideChange,
+      inputBackground,
+      restoreChange,
+    },
   )
 }
 
@@ -174,7 +198,7 @@ test.skipIf(!browserAvailable)(
       })
       expect(await waiting).toEqual({ count: 1, promptRendered: true })
       expect(await page.evaluate(() => window.terminalInput)).toEqual({
-        typed: 'xyz',
+        typed: ' xyz',
         erased: 1,
         entered: 0,
       })
@@ -195,7 +219,7 @@ test.skipIf(!browserAvailable)(
         promptRendered: true,
       })
       expect(await page.evaluate(() => window.terminalInput)).toEqual({
-        typed: 'xyz',
+        typed: ' xyz',
         erased: 1,
         entered: 0,
       })
@@ -218,7 +242,7 @@ test
     await terminalFixture(page, { backend: 'dom', textStyle })
     await expect(waitForTerminalPrompt(page, 'check$', 500)).rejects.toThrow('Timeout')
     expect(await page.evaluate(() => window.terminalInput)).toEqual({
-      typed: 'xyz',
+      typed: ' xyz',
       erased: 1,
       entered: 0,
     })
@@ -238,7 +262,7 @@ test.skipIf(!browserAvailable).each(['canvas', 'dom'])(
         promptRendered: true,
       })
       expect(await page.evaluate(() => window.terminalInput)).toEqual({
-        typed: 'xyz',
+        typed: ' xyz',
         erased: 1,
         entered: 0,
       })
@@ -261,7 +285,7 @@ test.skipIf(!browserAvailable).each(['canvas', 'dom'])(
       })
       await expect(waitForTerminalPrompt(page, 'check$', 500)).rejects.toThrow('Timeout')
       expect(await page.evaluate(() => window.terminalInput)).toEqual({
-        typed: 'xyz',
+        typed: ' xyz',
         erased: 1,
         entered: 0,
       })
@@ -270,6 +294,61 @@ test.skipIf(!browserAvailable).each(['canvas', 'dom'])(
     }
   },
 )
+
+test.skipIf(!browserAvailable).each([
+  ['an animated background', { animatedBackground: true }],
+  ['a reversible full-cell background fill', { inputBackground: true }],
+])('rejects %s behind invisible glyphs', async (_name, options) => {
+  const page = await browser.newPage()
+  try {
+    await terminalFixture(page, {
+      ...options,
+      canvasStyle: 'opacity:0',
+      textStyle: 'color:transparent;-webkit-text-fill-color:transparent',
+    })
+    await expect(waitForTerminalPrompt(page, 'check$', 2_000)).rejects.toThrow('Timeout')
+    expect(await page.evaluate(() => window.terminalInput)).toEqual({
+      typed: ' xyz',
+      erased: 1,
+      entered: 0,
+    })
+  } finally {
+    await page.close()
+  }
+})
+
+test.skipIf(!browserAvailable)(
+  'rejects marker cells that remain changed after Ctrl-U',
+  async () => {
+    const page = await browser.newPage()
+    try {
+      await terminalFixture(page, { restoreChange: true })
+      await expect(waitForTerminalPrompt(page, 'check$', 2_000)).rejects.toThrow(
+        'Timeout restoring the terminal input pixels.',
+      )
+      expect(await page.evaluate(() => window.terminalInput)).toEqual({
+        typed: ' xyz',
+        erased: 1,
+        entered: 0,
+      })
+    } finally {
+      await page.close()
+    }
+  },
+)
+
+test.skipIf(!browserAvailable)('accepts restored glyphs with a stable block cursor', async () => {
+  const page = await browser.newPage()
+  try {
+    await terminalFixture(page, { cursor: true })
+    expect(await waitForTerminalPrompt(page, 'check$', 2_000)).toEqual({
+      count: 1,
+      promptRendered: true,
+    })
+  } finally {
+    await page.close()
+  }
+})
 
 test.skipIf(!browserAvailable).each([
   ['stalled glyphs', { paintEcho: false }],
@@ -281,7 +360,7 @@ test.skipIf(!browserAvailable).each([
     await terminalFixture(page, options)
     await expect(waitForTerminalPrompt(page, 'check$', 500)).rejects.toThrow('Timeout')
     expect(await page.evaluate(() => window.terminalInput)).toEqual({
-      typed: 'xyz',
+      typed: ' xyz',
       erased: 1,
       entered: 0,
     })
