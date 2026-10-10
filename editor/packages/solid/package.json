@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/solid",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "Solid bindings and reactive controls for the Singapore editor.",
   "keywords": [
     "browser",
