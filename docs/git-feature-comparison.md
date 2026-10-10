@@ -154,7 +154,7 @@ Important current limits:
 | Restore and move to next hunk          | Yes | Missing  | Zed has `RestoreAndNext`.                                                 |
 | Stage/unstage selected ranges          | Yes | Missing  | VS Code also has this.                                                    |
 | Hunk navigation                        | Yes | Missing  | The package's navigation API had no caller and went with `DiffView`.      |
-| Expand skipped unchanged context       | Yes | Yes      | `@singapore-editor/diff` supports expandable hunk separators.                     |
+| Expand skipped unchanged context       | Yes | Yes      | `@singapore-editor/diff` supports expandable hunk separators.             |
 | Word diff highlighting                 | Yes | Partial  | Platform annotates inline changes, but lacks global/language settings.    |
 | Collapse untracked diff                | Yes | Missing  | Zed has a panel setting for this.                                         |
 | Branch diff against default/merge base | Yes | Missing  | Zed has `BranchDiff` and `DiffType::MergeBase`.                           |
