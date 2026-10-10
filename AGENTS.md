@@ -31,7 +31,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 ## Reference Clones
 
 - Upstream clones (vscode, t3code, opencode, codex, …) belong in gitignored root `references/`. Check there before cloning. Tests and `scripts/parity` resolve `references/t3code` relatively; CI skips these checks because it does not fetch the clone.
-- Pull outdated clones before use. For pinned upstream commits (Plan 126), record the new head and changes in the plan.
+- Pull outdated clones before use. T3 Code architecture uses the published nightly pinned in `plans/343-t3code-nightly/reference-pin.json`; follow `docs/t3code-reference.md`. Plan 126 comparison records retain their historical pin. Record a reviewed nightly delta before changing the active pin.
 
 ## Code Organization
 
