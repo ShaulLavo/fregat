@@ -41,9 +41,13 @@ for (const engine of ['chromium', 'webkit'] as const) {
             await page.goto(`${preview.base}${path}`)
             await page.evaluate(() => document.fonts.ready)
             const example = page.locator('[data-example]').first()
+            const label = `${engine}-${path === '/' ? 'home' : 'playground'}`
             await expect
               .poll(() => example.getAttribute('data-example-ready'), { timeout: 20000 })
               .toBe('')
+            expect(
+              await example.locator('.example-prepared .editor-virtualized-metric-probe').count(),
+            ).toBeGreaterThan(0)
             await page.locator('site-search button, button.search-open').first().click()
             await page.locator('dialog[open]').waitFor()
             for (const viewport of [
@@ -52,14 +56,62 @@ for (const engine of ['chromium', 'webkit'] as const) {
               { width: 320, height: 390 },
             ]) {
               await page.setViewportSize(viewport)
-              await expect
-                .poll(() =>
-                  page.evaluate(() => ({
-                    width: innerWidth,
-                    document: document.scrollingElement!.scrollWidth,
-                  })),
-                )
-                .toEqual({ width: viewport.width, document: viewport.width })
+              await page.evaluate(() => document.fonts.ready)
+              const hiddenGeometry = await page.evaluate((width) => {
+                const frames = document.querySelectorAll<HTMLElement>('.example-stage')
+                const overflowing = Array.from(frames).flatMap((frame) => {
+                  const bounds = frame.getBoundingClientRect()
+                  const fits = (rect: DOMRect) =>
+                    rect.left >= Math.max(0, bounds.left) &&
+                    rect.right <= Math.min(width, bounds.right)
+                  return Array.from(frame.querySelectorAll('*'))
+                    .filter((element) => {
+                      const rect = element.getBoundingClientRect()
+                      return rect.width > 0 && rect.height > 0 && !fits(rect)
+                    })
+                    .filter((element) => {
+                      // Hidden editors and probes count; only an actual clip contains their bounds.
+                      for (
+                        let parent = element.parentElement;
+                        parent && parent !== frame.parentElement;
+                        parent = parent.parentElement
+                      ) {
+                        const overflow = getComputedStyle(parent).overflowX
+                        if (
+                          ['auto', 'scroll', 'hidden', 'clip'].includes(overflow) &&
+                          fits(parent.getBoundingClientRect())
+                        )
+                          return false
+                      }
+                      return true
+                    })
+                    .map((element) => ({
+                      class: element.className.toString(),
+                      left: element.getBoundingClientRect().left,
+                      right: element.getBoundingClientRect().right,
+                    }))
+                })
+                return {
+                  width: innerWidth,
+                  document: document.scrollingElement!.scrollWidth,
+                  overflowing,
+                }
+              }, viewport.width)
+              expect(await example.getAttribute('data-example-live')).toBeNull()
+              expect(
+                await example
+                  .locator('.example-prepared')
+                  .evaluate((element) => getComputedStyle(element).visibility),
+              ).toBe('hidden')
+              await writeFile(
+                join(evidence, `${label}-${viewport.width}x${viewport.height}-prepared.json`),
+                JSON.stringify(hiddenGeometry, null, 2),
+              )
+              expect(hiddenGeometry).toEqual({
+                width: viewport.width,
+                document: viewport.width,
+                overflowing: [],
+              })
             }
             await page.keyboard.press('Escape')
             const staticRows = await example
@@ -87,7 +139,6 @@ for (const engine of ['chromium', 'webkit'] as const) {
                 }),
               )
               .toEqual(staticRows)
-            const label = `${engine}-${path === '/' ? 'home' : 'playground'}`
             await page.screenshot({ path: join(evidence, `${label}.png`), fullPage: true })
             const geometry = await example.evaluate((element) => {
               const frame = element.querySelector<HTMLElement>('.example-stage')!
