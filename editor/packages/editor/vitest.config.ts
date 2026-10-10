@@ -209,6 +209,7 @@ export default defineConfig({
             provider: playwright({ contextOptions: devices['iPhone 13'] }),
             instances: [
               { browser: 'chromium', name: 'wrap-layout-chromium' },
+              { browser: 'firefox', name: 'wrap-layout-firefox', provider: playwright() },
               { browser: 'webkit', name: 'wrap-layout-iphone-webkit' },
             ],
           },

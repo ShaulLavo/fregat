@@ -1495,11 +1495,41 @@ function domBoundariesForChunkRange(
 
   const localStart = clampChunkLocal(chunk, rowLocalIndexForOffset(row, start, 'before'))
   const localEnd = clampChunkLocal(chunk, rowLocalIndexForOffset(row, end, 'after'))
-  const startBoundary = domBoundaryForChunkLocalOffset(chunk, localStart)
-  const endBoundary = domBoundaryForChunkLocalOffset(chunk, localEnd)
+  if (localEnd <= localStart) return null
+  const startBoundary = normalizedRangeBoundary(
+    domBoundaryForChunkLocalOffset(chunk, localStart),
+    'start',
+  )
+  const endBoundary = normalizedRangeBoundary(
+    domBoundaryForChunkLocalOffset(chunk, localEnd, 'before'),
+    'end',
+  )
   if (!startBoundary || !endBoundary) return null
 
   return { end: endBoundary, start: startBoundary }
+}
+
+// Keep native highlights and snapshot capture bounded by the text they cover.
+function normalizedRangeBoundary(
+  boundary: DomBoundary | null,
+  side: 'start' | 'end',
+): DomBoundary | null {
+  if (!boundary || boundary.node.nodeType === 3) return boundary
+  const child = boundary.node.childNodes[boundary.offset - (side === 'end' ? 1 : 0)]
+  if (!child) return boundary
+  if (child.nodeType === 3) {
+    const text = child as Text
+    return { node: text, offset: side === 'start' ? 0 : text.length }
+  }
+  const walker = child.ownerDocument!.createTreeWalker(child, 4)
+  let covered: Text | null = null
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!(node as Text).length) continue
+    covered = node as Text
+    if (side === 'start') break
+  }
+  if (!covered) return boundary
+  return { node: covered, offset: side === 'start' ? 0 : covered.length }
 }
 
 export function domBoundaryForOffset(
@@ -3338,7 +3368,12 @@ function chunkForLocalOffset(
 function domBoundaryForChunkLocalOffset(
   chunk: VirtualizedTextChunk,
   local: number,
+  bias: 'before' | 'after' = 'after',
 ): DomBoundary | null {
+  if (bias === 'before') {
+    const previous = chunk.parts.find((part) => part.localEnd === local && part.localStart < local)
+    if (previous) return boundaryAfterPart(previous)
+  }
   for (const part of chunk.parts) {
     if (part.localStart !== local) continue
     return boundaryBeforePart(part)

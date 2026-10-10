@@ -67,7 +67,9 @@ export function captureDocumentPaint(
               id: row.element.id,
             }
           : null,
-      gutterBackgroundColor: getComputedStyle(row.gutterElement).backgroundColor,
+      gutterBackgroundColor: view.currentGutterWidth
+        ? getComputedStyle(row.gutterElement).backgroundColor
+        : 'transparent',
       gutterInsetBackgroundColor: row.gutterElement.classList.contains(
         'editor-virtualized-cursor-line-gutter-band',
       )
@@ -83,7 +85,9 @@ export function captureDocumentPaint(
     scope: 'document',
     appearance,
     style: captureStyle(view.scrollElement),
-    gutterBackgroundColor: getComputedStyle(view.gutterElement).backgroundColor,
+    gutterBackgroundColor: view.currentGutterWidth
+      ? getComputedStyle(view.gutterElement).backgroundColor
+      : 'transparent',
     characterWidth: view.metrics.characterWidth,
     monospace: view.monospace,
     gutterWidth: view.currentGutterWidth,

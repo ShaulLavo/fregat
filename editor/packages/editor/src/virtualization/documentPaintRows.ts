@@ -161,7 +161,7 @@ function appendRuns(
         overflow: 'hidden',
         verticalAlign: 'top',
         whiteSpace: 'pre',
-        userSelect: 'none',
+        userSelect: 'text',
       })
       widget.append(span)
       element.append(widget)
