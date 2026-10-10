@@ -38,10 +38,12 @@ async function verifyZigVersion(zig: string): Promise<void> {
   const version = (await new Response(process.stdout).text()).trim()
   const exitCode = await process.exited
   if (exitCode !== 0) throw new ArtifactBuildError('Unable to read the Zig version')
-  // Ghostty's own build guard accepts only its pinned minor version.
   const [major, minor] = version.split('.').map(Number)
-  if (major === 0 && minor === 16) return
-  throw new ArtifactBuildError(`Ghostty ${sourceRevision} requires Zig 0.16.x, received ${version}`)
+  if (major === 0 && (minor ?? 0) >= 16) return
+  if ((major ?? 0) > 0) return
+  throw new ArtifactBuildError(
+    `Ghostty ${sourceRevision} requires Zig 0.16.0+, received ${version}`,
+  )
 }
 
 async function checkoutSource(workspace: string): Promise<string> {

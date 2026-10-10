@@ -396,7 +396,7 @@ greenfield-exit decision. [319](plans/319-agent-ui-mcp.md) stays
 far in the future. It consumes 087's MCP contracts; opening and placing content also waits
 for the still-unplanned layout system. Driving an already-open view has its separate boundary.
 
-[341](plans/341-zig-017-migration.md) is Approved and waits for Ghostty main to require
+[344](plans/344-zig-017-migration.md) is Approved and waits for Ghostty main to require
 Zig 0.17 and for a ZLS release that supports it. Until then all Zig builds stay on 0.16.x.
 It moves three Ghostty pins, replaces `@cImport` with `translate-c`, regenerates every
 compiler receipt and re-measures the terminal on Mac, Linux and Pi.

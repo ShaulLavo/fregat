@@ -1,4 +1,4 @@
-# Plan 341: Move our Zig code to Zig 0.17
+# Plan 344: Move our Zig code to Zig 0.17
 
 ## Status and ownership
 
@@ -16,7 +16,7 @@ Start when all of these hold:
 
 On 2026-10-09 Ghostty main (`b115e4567`) still requires 0.16. Its `requireZig` guard accepts only the same major and minor version, so no Ghostty revision builds with both 0.16 and 0.17. The migration branch fails `test-macos` and `build-macos-freetype`; zig-objc, libxev and zig-wayland migration PRs are open. Estimate: mid-October to late November 2026, low confidence. Ghostty took 45 days to adopt 0.15 and 100 days for 0.16.
 
-Until then we stay on exactly 0.16.x. `scripts/build-wasm.ts` now rejects other minor versions with a clear message instead of failing inside Ghostty's build.
+Until then we stay on exactly 0.16.x. Phase 0 tightens `scripts/build-wasm.ts` to reject other minor versions before invoking Ghostty's build.
 
 ## Outcome
 
@@ -113,7 +113,7 @@ Not adopting now:
 
 ## Phases
 
-- [ ] **0. Before the gate.** Wasm builds reject Zig minor versions other than 0.16 (done in this plan's PR). Add compiler provenance for `canvas-compose.wasm`, which is shipped but not covered by `ghostty-vt.provenance.json`. Its bytes reproduce exactly under 0.16.0, so the receipt can be recorded now.
+- [ ] **0. Before the gate.** Make wasm builds reject Zig minor versions other than 0.16. Rebuild the pinned 0.16 artifacts and regenerate `ghostty-vt.provenance.json`, because its build inputs include `scripts/build-wasm.ts`; the previous guard change failed `scripts/wasm-provenance.test.ts` on that file's SHA-256. Add compiler provenance for `canvas-compose.wasm`, which is shipped but not covered by `ghostty-vt.provenance.json`. Its bytes reproduce exactly under 0.16.0, so the receipt can be recorded now.
 - [ ] **1. Pins.** Move the three Ghostty pins to the target chosen under [Pin target](#pin-target): a tagged libghostty-vt release if one exists, otherwise the first main commit that requires 0.17 and passes CI. Rebuild `ghostty-vt.wasm` and confirm Ghostty's memset override is still linked.
 - [ ] **2. Owned source.** Bridge, snapshot, unknown-OSC and C-controls translate C through `translate-c`. Apply the array, builtin and path changes and the generated-producer change. Add `@divCeil`.
 - [ ] **3. Contracts and receipts.** Update the archive contracts, CI and schemas, then regenerate recipes, input manifests, bootstrap, native artifacts and wasm receipts with the builders.
