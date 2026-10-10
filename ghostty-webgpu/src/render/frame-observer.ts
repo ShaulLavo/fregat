@@ -22,6 +22,10 @@ export interface PreparedFrame {
   notify(): void
 }
 
+type FrameObserverOptions = Partial<WebGpuTerminalRendererOptions> &
+  Pick<WebGpuTerminalRendererOptions, 'rows'> &
+  DisplayedFrameOptions
+
 export class FrameObserver {
   private generation = 0
   private current = false
@@ -32,7 +36,7 @@ export class FrameObserver {
 
   private rowCount: number
 
-  constructor(private readonly options: WebGpuTerminalRendererOptions) {
+  constructor(private readonly options: FrameObserverOptions) {
     this.rowCount = options.rows
   }
 
@@ -82,14 +86,14 @@ export class FrameObserver {
     const generation = ++this.generation
     const { onFrame, onTextFrame, onRowsChanged, onRowsPainted } = this.options
     const changedRows = Object.freeze([...changed])
-    const onDisplayedFrame = (this.options as DisplayedFrameOptions)[observeDisplayedFrame]
+    const onDisplayedFrame = this.options[observeDisplayedFrame]
     const observesFrame = Boolean(onFrame || onTextFrame || onDisplayedFrame)
     const retain = (state as DisplayedFrameSource)[retainDisplayedFrame]
     const needsRows =
       observesFrame &&
       (this.rowsNeeded ||
         Boolean(onDisplayedFrame && (!this.options.retainDisplayedText || !retain)))
-    const previousTextRows = needsRows ? this.displayedFrame?.readTextRows() : undefined
+    const previousTextRows = needsRows ? this.previousTextRows() : undefined
     const preparedRows = needsRows ? this.updateRows(state, changed, rows) : undefined
     const nativeFrame =
       observesFrame && this.options.retainDisplayedText
@@ -160,6 +164,11 @@ export class FrameObserver {
     }
   }
 
+  private previousTextRows(): readonly RendererTextFrameRow[] | undefined {
+    if (this.current) return this.textRows.filter(defined)
+    return this.displayedFrame?.readTextRows()
+  }
+
   private updateRows(
     state: RenderStateSource,
     changed: readonly number[],
@@ -173,10 +182,7 @@ export class FrameObserver {
         rows && (this.current || rows.length === this.rowCount) ? rows : state.readRows(options)
       for (const row of source) fullRows[row.y] = copiedFrameRow(row)
     }
-    if (
-      this.options.onTextFrame ||
-      (this.options as DisplayedFrameOptions)[observeDisplayedFrame]
-    ) {
+    if (this.options.onTextFrame || this.options[observeDisplayedFrame]) {
       const source = this.readTextRows(state, options, rows, fullRows)
       for (const row of source) textRows[row.y] = row
     }

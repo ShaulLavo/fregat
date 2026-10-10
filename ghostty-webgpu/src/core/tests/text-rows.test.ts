@@ -159,7 +159,7 @@ describe('text-only render rows', () => {
     expect(materialize(state.readTextRows())).toEqual(equivalentTextRows(state.readRows()))
   })
 
-  it('batches ASCII row text while preserving lazy cells across later native updates', async () => {
+  it('owns ASCII row text while preserving lazy cells across later native updates', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 80, rows: 3 })
     const state = runtime.createRenderState(terminal)
@@ -174,7 +174,7 @@ describe('text-only render rows', () => {
     decode.mockRestore()
     batch.mockRestore()
     expect(calls).toBeLessThanOrEqual(rows.length)
-    expect(batches).toBeLessThanOrEqual(1)
+    expect(batches).toBe(rows.length)
     expect(rows.map((row) => row.text)).toEqual(expected.map((row) => row.text))
     terminal.write('\x1b[H\x1b[2Jchanged')
     state.update()
@@ -226,7 +226,7 @@ describe('text-only render rows', () => {
     expect(runtime.memory.view.getUint32(extract.mock.calls[0]![6] + 32, true)).toBe(0)
     expect({ scratchAllocations, bitmapAllocations }).toEqual({
       scratchAllocations: allocations,
-      bitmapAllocations: allocations * 2,
+      bitmapAllocations: allocations * grid.rows * 2,
     })
     expect(wordReads).toBe(allocations * cellCount * 2)
     const codepointMask = runtime.memory.view.getUint32(extract.mock.calls[0]![6] + 36, true)
@@ -265,6 +265,54 @@ describe('text-only render rows', () => {
     state.readTextRows()
     runtime.exports.memory.grow(1)
     expect(structuredClone(rows)).toEqual(expected)
+  })
+
+  it('copies Unicode records and graphemes in row-sized owned buffers', async () => {
+    runtime = await GhosttyRuntime.create()
+    const grid = { columns: 40, rows: 4 }
+    const terminal = runtime.createTerminal(grid)
+    const state = runtime.createRenderState(terminal)
+    terminal.write('界 é 🧑‍💻\r\nplain é\r\nx' + '́'.repeat(80) + '\r\nlast 界')
+    state.update()
+    const expected = equivalentTextRows(state.readRows())
+    const slice = vi.spyOn(Uint32Array.prototype, 'slice')
+    const rows = state.readTextRows()
+    const buffers = slice.mock.results.map((result) => result.value as Uint32Array)
+    slice.mockRestore()
+    expect(buffers.length).toBeGreaterThanOrEqual(grid.rows)
+    expect(buffers.every((words) => words.buffer.byteLength === words.byteLength)).toBe(true)
+    expect(buffers.every((words) => words.length <= grid.columns * 3)).toBe(true)
+    terminal.write('\x1b[2J\x1b[Hreplacement')
+    terminal.resize({ columns: 60, rows: 8 })
+    state.update()
+    state.readTextRows()
+    runtime.dispose()
+    runtime = undefined
+    expect(materialize(rows)).toEqual(expected)
+  })
+
+  it('gives each ASCII row its own blank-cell bitmap', async () => {
+    runtime = await GhosttyRuntime.create()
+    const grid = { columns: 65, rows: 4 }
+    const state = runtime.createRenderState(runtime.createTerminal(grid))
+    state.update()
+    state.readTextRows()
+    const lengths: number[] = []
+    vi.stubGlobal(
+      'Uint32Array',
+      new Proxy(Uint32Array, {
+        construct(target, args, newTarget) {
+          if (typeof args[0] === 'number') lengths.push(args[0])
+          return Reflect.construct(target, args, newTarget)
+        },
+      }),
+    )
+    try {
+      state.readTextRows()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    expect(lengths).toEqual(Array.from({ length: grid.rows }, () => Math.ceil(grid.columns / 32)))
   })
 
   it('filters requested and dirty rows without updating or acknowledging the state', async () => {

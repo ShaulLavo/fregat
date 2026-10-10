@@ -19,28 +19,22 @@ function cellText(words: Uint32Array, offset: number, graphemes: Uint32Array): s
   return text
 }
 
-function copiedAsciiCells(text: string, start: number, blanks: Uint32Array): readonly string[] {
+function copiedAsciiCells(text: string, blanks: Uint32Array): readonly string[] {
   return Object.freeze(
-    Array.from({ length: text.length }, (_, column) => {
-      const index = start + column
-      return (blanks[index >>> 5]! & (1 << (index & 31))) !== 0 ? '' : text[column]!
-    }),
+    Array.from({ length: text.length }, (_, column) =>
+      (blanks[column >>> 5]! & (1 << (column & 31))) !== 0 ? '' : text[column]!,
+    ),
   )
 }
 
-function copiedAsciiRow(
-  y: number,
-  text: string,
-  start: number,
-  blanks: Uint32Array,
-): RenderTextRow {
+function copiedAsciiRow(y: number, text: string, blanks: Uint32Array): RenderTextRow {
   let cells: readonly string[] | undefined
   let continuations: readonly boolean[] | undefined
   return Object.freeze({
     y,
     text,
     get cells() {
-      return (cells ??= copiedAsciiCells(text, start, blanks))
+      return (cells ??= copiedAsciiCells(text, blanks))
     },
     get continuations() {
       return (continuations ??= Object.freeze(Array.from({ length: text.length }, () => false)))
@@ -54,25 +48,39 @@ function copiedAsciiRows(
   bytes: Uint8Array,
   decoder: TextDecoder,
 ): readonly RenderTextRow[] {
-  const length = words.length / cellWords
-  const blanks = new Uint32Array(Math.ceil(length / 32))
-  let index = 0
-  for (let offset = 0; offset < words.length; offset += cellWords) {
-    const codepoint = words[offset]!
-    bytes[index] = codepoint || 0x20
-    if (codepoint === 0) blanks[index >>> 5]! |= 1 << (index & 31)
-    index += 1
-  }
-  // The owned string and private bitmap outlive native records and scratch reuse.
-  const packet = decoder.decode(bytes.subarray(0, length))
   const rows: RenderTextRow[] = []
   for (let offset = 0; offset < metadata.length; offset += rowWords) {
     const y = metadata[offset]!
     const start = metadata[offset + 1]!
     const length = metadata[offset + 2]!
-    rows.push(copiedAsciiRow(y, packet.slice(start, start + length), start, blanks))
+    const blanks = new Uint32Array(Math.ceil(length / 32))
+    for (let column = 0; column < length; column += 1) {
+      const codepoint = words[(start + column) * cellWords]!
+      bytes[column] = codepoint || 0x20
+      if (codepoint === 0) blanks[column >>> 5]! |= 1 << (column & 31)
+    }
+    // Each retained row owns its payload; a single row cannot keep the packet alive.
+    rows.push(copiedAsciiRow(y, decoder.decode(bytes.subarray(0, length)), blanks))
   }
   return Object.freeze(rows)
+}
+
+function copiedGraphemes(words: Uint32Array, graphemes: Uint32Array): Uint32Array {
+  let start = graphemes.length
+  let end = 0
+  for (let offset = 0; offset < words.length; offset += cellWords) {
+    const length = words[offset + 2]!
+    if (length === 0) continue
+    start = Math.min(start, words[offset + 1]!)
+    end = Math.max(end, words[offset + 1]! + length)
+  }
+  if (end === 0) return graphemes.slice(0, 0)
+  const owned = graphemes.slice(start, end)
+  for (let offset = 0; offset < words.length; offset += cellWords) {
+    if (words[offset + 2] === 0) continue
+    words[offset + 1]! -= start
+  }
+  return owned
 }
 
 function copiedTextRow(y: number, words: Uint32Array, graphemes: Uint32Array): RenderTextRow {
@@ -132,14 +140,13 @@ export class TextRowReader {
       if (this.asciiBytes.length < length) this.asciiBytes = new Uint8Array(length)
       return copiedAsciiRows(snapshot.rows, snapshot.cells, this.asciiBytes, this.decoder)
     }
-    const records = snapshot.cells.slice()
-    const graphemes = snapshot.graphemes.slice()
     const rows: RenderTextRow[] = []
     for (let offset = 0; offset < snapshot.rows.length; offset += rowWords) {
       const y = snapshot.rows[offset]!
       const start = snapshot.rows[offset + 1]! * cellWords
       const end = start + snapshot.rows[offset + 2]! * cellWords
-      rows.push(copiedTextRow(y, records.subarray(start, end), graphemes))
+      const records = snapshot.cells.slice(start, end)
+      rows.push(copiedTextRow(y, records, copiedGraphemes(records, snapshot.graphemes)))
     }
     return Object.freeze(rows)
   }
