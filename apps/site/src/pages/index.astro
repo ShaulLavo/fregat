@@ -23,6 +23,14 @@ const ogImage = new URL(`${base}og.jpg`, Astro.site)
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style is:inline>
+      @keyframes scroll-reveal { to { visibility: visible; } }
+      html[data-scroll-restoring] {
+        visibility: hidden;
+        animation: scroll-reveal 0s 1s forwards;
+      }
+    </style>
+    <noscript><style is:inline>html[data-scroll-restoring] { visibility: visible; animation: none; }</style></noscript>
     <script is:inline>
       (() => {
         const key = `fregat.site.scroll:${location.pathname}`
@@ -41,14 +49,18 @@ const ogImage = new URL(`${base}og.jpg`, Astro.site)
         }
         history.scrollRestoration = saved ? 'manual' : 'auto'
         // Streamed HTML must not paint at the top before its saved position is applied.
-        if (saved?.y > 0) document.documentElement.style.visibility = 'hidden'
+        if (saved?.y > 0) document.documentElement.setAttribute('data-scroll-restoring', '')
         document.addEventListener('fregat:parsed', () => {
-          const height = document.documentElement.scrollHeight
-          if (saved && height > saved.y) {
-            scrollTo(0, Math.min(saved.y, Math.max(0, height - innerHeight)))
+          try {
+            const height = document.documentElement.scrollHeight
+            if (saved && height > saved.y) {
+              scrollTo(0, Math.min(saved.y, Math.max(0, height - innerHeight)))
+            }
+          } finally {
+            history.scrollRestoration = 'auto'
+            document.documentElement.removeAttribute('data-scroll-restoring')
+            ready = true
           }
-          document.documentElement.style.removeProperty('visibility')
-          ready = true
         }, { once: true })
         function save() {
           if (!ready) return

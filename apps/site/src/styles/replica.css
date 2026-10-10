@@ -37,7 +37,8 @@
   text-align: left;
   -webkit-font-smoothing: antialiased;
   user-select: none;
-  zoom: calc(100cqw / 1280px);
+  /* Trigonometric ratios work in engines without typed CSS division. */
+  zoom: tan(atan2(100cqw, 1280px));
   box-shadow:
     0 40px 90px -30px rgb(0 0 0 / 0.55),
     0 0 0 1px color-mix(in oklch, var(--fg) 10%, transparent);
@@ -862,7 +863,7 @@ svg.i.sm {
 }
 .sect .rep {
   /* Section windows keep their readable size and crop inside narrow plates. */
-  zoom: max(calc(100cqw / 660px), 0.74);
+  zoom: max(tan(atan2(100cqw, 660px)), 0.74);
 }
 
 /* narrow: chat over the editor and terminal, no sidebar */
@@ -871,7 +872,7 @@ svg.i.sm {
     width: 440px;
     height: 968px;
     grid-template-rows: 36px minmax(0, 1fr);
-    zoom: calc(100cqw / 440px);
+    zoom: tan(atan2(100cqw, 440px));
   }
   .rep .rep-body {
     grid-template-columns: minmax(0, 1fr);

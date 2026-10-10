@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve, join, extname } from 'node:path'
 import { parseArgs } from 'node:util'
-import { chromium, webkit } from 'playwright'
+import { chromium, firefox, webkit } from 'playwright'
 
 const { values } = parseArgs({
   options: {
@@ -14,12 +14,14 @@ const { values } = parseArgs({
     evidence: { type: 'string' },
   },
 })
-assert.ok(values.engine === 'webkit' || values.engine === 'chromium')
+assert.ok(values.engine === 'webkit' || values.engine === 'chromium' || values.engine === 'firefox')
 const evidence = values.evidence
 if (evidence) await mkdir(evidence, { recursive: true })
-const browser = await (values.engine === 'webkit' ? webkit : chromium).launch({
+const engines = { chromium, firefox, webkit }
+const browser = await engines[values.engine].launch({
   headless: !values.headed,
 })
+console.log(`${values.engine}: ${browser.version()}`)
 const types: Record<string, string> = {
   '.html': 'text/html',
   '.css': 'text/css',
@@ -33,19 +35,34 @@ const failures: string[] = []
 try {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
-    isMobile: true,
+    isMobile: values.engine !== 'firefox',
     hasTouch: true,
     deviceScaleFactor: 3,
   })
   await context.route('http://site.test/**', async (route) => {
-    const path = new URL(route.request().url()).pathname.replace(/^\/fregat\/?/, '')
+    const url = new URL(route.request().url())
+    const path = url.pathname.replace(/^\/fregat\/?/, '')
     const file = Bun.file(join(values.dist!, path || 'index.html'))
     if (!(await file.exists())) return route.fulfill({ status: 404 })
     const extension = extname(file.name!)
     if (extension === '.woff2') await Bun.sleep(600)
     if (extension === '.js') await Bun.sleep(350)
+    let body = Buffer.from(await file.arrayBuffer())
+    const completion = url.searchParams.get('completion')
+    if (extension === '.html' && completion) {
+      const html = body.toString()
+      const script =
+        /<script[^>]*>\s*document\.dispatchEvent\(new Event\(['"]fregat:parsed['"]\)\);?\s*<\/script>/
+      assert.match(html, script, 'The failure probe targets the completion script')
+      body = Buffer.from(
+        html.replace(
+          script,
+          completion === 'missing' ? '' : "<script>throw 'Injected completion failure'</script>",
+        ),
+      )
+    }
     await route.fulfill({
-      body: Buffer.from(await file.arrayBuffer()),
+      body,
       contentType: types[extension],
     })
   })
@@ -188,20 +205,26 @@ try {
     }
   }
   // A saved reload position must not affect a fresh visit or a fragment destination.
-  await page.evaluate(() => scrollTo(0, 400))
+  await page.evaluate(() => scrollTo(0, 650))
   await page.waitForTimeout(300)
+  await page.reload()
+  assert.equal(
+    await page.evaluate(() => history.scrollRestoration),
+    'auto',
+    'Reload hands history restoration back to the browser',
+  )
   await page.goto('http://site.test/fregat/?fresh=1')
   assert.equal(await page.evaluate(() => scrollY), 0, 'Fresh navigation starts at the top')
   await page.goBack()
-  await page.waitForFunction(() => Math.abs(scrollY - 400) <= 1)
+  await page.waitForFunction(() => Math.abs(scrollY - 650) <= 1)
   const persisted = await page.evaluate(
     () =>
       (window as typeof window & { reloadEvidence: { persisted: boolean } }).reloadEvidence
         .persisted,
   )
-  console.log(`${values.engine}: back navigation preserved 400px; bfcache ${persisted}`)
+  console.log(`${values.engine}: back navigation preserved 650px; bfcache ${persisted}`)
   if (evidence)
-    await writeFile(join(evidence, 'back-navigation.json'), JSON.stringify({ persisted, y: 400 }))
+    await writeFile(join(evidence, 'back-navigation.json'), JSON.stringify({ persisted, y: 650 }))
   await page.goto('http://site.test/fregat/#review')
   for (const reload of [false, true]) {
     if (reload) await page.reload()
@@ -224,6 +247,93 @@ try {
     await page.evaluate(() => getComputedStyle(document.documentElement).visibility),
     'visible',
   )
+  // Both hero container layouts must fit in every engine.
+  for (const width of [390, 1000]) {
+    await page.setViewportSize({ width, height: 844 })
+    const geometry = await page.evaluate(() => {
+      const stage = document.querySelector('.hero-plate .stage')!.getBoundingClientRect()
+      const replica = document.querySelector('.hero-plate .rep')!.getBoundingClientRect()
+      const section = document.querySelector('.sect .rep')!
+      const sectionStage = section.closest('.stage')!.getBoundingClientRect().width
+      const sectionZoom = Number(getComputedStyle(section).zoom)
+      return {
+        stage: stage.width,
+        replica: replica.width,
+        sectionZoom,
+        expectedSectionZoom: Math.max(sectionStage / 660, 0.74),
+      }
+    })
+    assert.ok(Math.abs(geometry.stage - geometry.replica) <= 1, 'Hero replica fits its container')
+    assert.ok(
+      Math.abs(geometry.sectionZoom - geometry.expectedSectionZoom) < 0.001,
+      'Section replica uses its readable scale',
+    )
+    console.log(`${values.engine}: ${width}px hero fit ${JSON.stringify(geometry)}`)
+  }
+  await page.setViewportSize({ width: 390, height: 844 })
+  // A missing completion, a throwing completion, and a throwing restore all fail open.
+  for (const fault of ['missing', 'throw', 'restore']) {
+    const probe = await context.newPage()
+    await probe.addInitScript((fault) => {
+      sessionStorage.setItem(
+        `fregat.site.scroll:${location.pathname}`,
+        JSON.stringify({ y: 650, height: 10000 }),
+      )
+      if (fault === 'restore')
+        window.scrollTo = () => {
+          throw 'Injected restoration failure'
+        }
+    }, fault)
+    const url = `http://site.test/fregat/?${fault === 'restore' ? 'restore=throw' : `completion=${fault}`}`
+    await probe.goto(url)
+    await probe.reload()
+    await probe.waitForFunction(
+      () => getComputedStyle(document.documentElement).visibility === 'visible',
+      undefined,
+      { timeout: 3000 },
+    )
+    assert.equal(
+      await probe.locator('.hero h1').isVisible(),
+      true,
+      `${fault} leaves content visible`,
+    )
+    if (fault === 'restore')
+      assert.equal(await probe.evaluate(() => history.scrollRestoration), 'auto')
+    console.log(`${values.engine}: ${fault} restoration fails open`)
+    await probe.close()
+  }
+  const fallback = await context.newPage()
+  await fallback.route('**/*.woff2', (route) => route.abort())
+  await fallback.goto('http://site.test/fregat/?fallback=1')
+  const weights = await fallback.evaluate(async () => {
+    await document.fonts.load('400 100px "Inter Fallback"')
+    await document.fonts.load('700 100px "Inter Fallback"')
+    const canvas = document.createElement('canvas').getContext('2d')!
+    const sample = 'The complete IDE in your browser, with your agents inside.'
+    canvas.font = '400 100px "Inter Fallback"'
+    const regular = canvas.measureText(sample).width
+    canvas.font = '700 100px "Inter Fallback"'
+    const bold = canvas.measureText(sample).width
+    return {
+      regular,
+      bold,
+      faces: Array.from(document.fonts, (face) => ({
+        family: face.family.replaceAll('"', ''),
+        weight: face.weight,
+      }))
+        .filter((face) => face.family === 'Inter Fallback')
+        .map((face) => face.weight),
+    }
+  })
+  weights.faces.sort()
+  assert.deepEqual(
+    weights.faces,
+    ['400', '700'],
+    'Fallback faces declare their actual static weights',
+  )
+  assert.ok(weights.bold > weights.regular * 1.03, 'Fallback renders a distinct bold face')
+  console.log(`${values.engine}: fallback weight widths ${JSON.stringify(weights)}`)
+  await fallback.close()
   if (evidence) {
     await page.evaluate(() => scrollTo(0, 0))
     await page.screenshot({ path: join(evidence, `${values.engine}-mobile.png`) })

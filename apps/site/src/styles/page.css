@@ -18,8 +18,8 @@
 }
 @font-face {
   font-family: 'Inter Fallback';
-  src: local('Arial'), local('Liberation Sans');
-  font-weight: 450 900;
+  src: local('Arial Bold'), local('Liberation Sans Bold');
+  font-weight: 700;
   size-adjust: 107.4%;
   ascent-override: 90.2%;
   descent-override: 22.48%;
