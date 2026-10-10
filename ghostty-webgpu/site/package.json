@@ -8,6 +8,7 @@
     "preview": "astro preview",
     "typecheck": "../../node_modules/.bin/tsc --noEmit -p tsconfig.json && ../../node_modules/.bin/tsc --noEmit -p tsconfig.tests.json",
     "verify:sections": "bun scripts/verify-sections.ts",
+    "verify:migration": "bun scripts/verify-migration.ts",
     "docs:check": "bun scripts/check-docs.ts && bun test scripts/pty.test.ts"
   },
   "dependencies": {
