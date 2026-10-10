@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/collab",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Host-ordered text editing with persistent snapshots and character identities for collaboration engines.",
   "keywords": [
     "browser",

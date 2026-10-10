@@ -1,3 +1,30 @@
+/* A slow font stays on the metric-matched fallback for this visit, keeping text steady. */
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: optional;
+  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2');
+}
+/* Match Inter's fallback metrics so loading the web font preserves line breaks. */
+@font-face {
+  font-family: 'Inter Fallback';
+  src: local('Arial'), local('Liberation Sans');
+  font-weight: 400;
+  size-adjust: 106.24%;
+  ascent-override: 91.19%;
+  descent-override: 22.72%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Inter Fallback';
+  src: local('Arial Bold'), local('Liberation Sans Bold');
+  font-weight: 700;
+  size-adjust: 107.4%;
+  ascent-override: 90.2%;
+  descent-override: 22.48%;
+  line-gap-override: 0%;
+}
 /* Page chrome around the plates: a quiet warm near-black (paper in light mode); the plates carry the colour. */
 :root {
   --page: oklch(0.155 0.006 75);
@@ -5,7 +32,7 @@
   --soft: oklch(0.72 0.01 80);
   --faint: oklch(0.62 0.01 80);
   --well-2: oklch(0.2 0.007 75);
-  --sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --sans: 'Inter Variable', 'Inter Fallback', ui-sans-serif, system-ui, sans-serif;
   --mono: 'JetBrains Mono Variable', ui-monospace, monospace;
   color-scheme: dark;
 }
@@ -139,12 +166,18 @@ header nav a:hover {
   position: relative;
   overflow: hidden;
   border-radius: 6px;
-  background: var(--bg) center / cover no-repeat;
+  background: var(--bg) var(--wall) center / cover no-repeat;
 }
-.plate.lit {
-  background-image: var(--wall);
+.plate > .wallpaper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
 }
 .plate .stage {
+  position: relative;
   margin: 0 auto;
 }
 .plate.hero-plate {
@@ -323,6 +356,12 @@ footer a:hover {
   color: var(--ink);
 }
 
+@media (max-width: 480px) {
+  .hero .ctas {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
 @media (max-width: 900px) {
   header nav {
     display: none;

@@ -357,6 +357,7 @@
       ]
     },
     "editor/site": {
+      "entry": ["scripts/capture-page.ts", "src/examples/*.ts"],
       "ignoreDependencies": ["@singapore-editor/*", "satteri", "react", "@types/react", "solid-js"]
     }
   },

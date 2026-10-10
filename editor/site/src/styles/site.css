@@ -1,23 +1,11 @@
-/* Starlight pages (the playground, the package list and the generated API reference) in the
-   docs manual's look: the same warm paper, serif chrome and JetBrains Mono, light and dark. */
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: url(../fonts/jetbrains-mono.woff2) format('woff2');
-  font-weight: 400 800;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Source Serif 4';
-  src: url(../fonts/source-serif-4.woff2) format('woff2');
-  font-weight: 200 900;
-  font-display: swap;
-}
+@import './fonts.css';
+@import './palette.css';
 
 :root,
 ::backdrop {
-  --sl-font: 'Source Serif 4', Georgia, serif;
-  --sl-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --sl-font: 'Source Serif 4', 'Singapore Serif Fallback', Georgia, serif;
+  --sl-font-mono:
+    'JetBrains Mono', 'Singapore Mono Fallback', ui-monospace, 'SF Mono', Menlo, monospace;
   --sl-text-body: 1.0625rem;
   --sl-content-width: 46rem;
 

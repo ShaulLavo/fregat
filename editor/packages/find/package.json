@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/find",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Find and replace with regular expressions and case-preserving replacements for the Singapore editor.",
   "keywords": [
     "browser",
