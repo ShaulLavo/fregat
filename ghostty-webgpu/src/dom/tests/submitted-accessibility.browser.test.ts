@@ -4,7 +4,7 @@ import {
   type DisplayedTextFrame,
 } from '../../render/displayed-frame.js'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { page } from 'vitest/browser'
+import { cdp, page, server } from 'vitest/browser'
 import { Terminal as MainTerminal } from '../../../dist/index.js'
 import { Terminal as WorkerTerminal } from '../../../dist/worker/index.js'
 import type { TerminalApi } from '../../../dist/dom/terminal-api.js'
@@ -218,7 +218,109 @@ function assertDisplayed(
   )
 }
 
+interface AccessibleNode {
+  readonly nodeId: string
+  readonly ignored: boolean
+  readonly role?: { readonly value: string }
+  readonly name?: { readonly value: string }
+  readonly childIds?: readonly string[]
+  readonly properties?: readonly {
+    readonly name: string
+    readonly value: { readonly value: unknown }
+  }[]
+}
+
+interface BrowserFrameTree {
+  readonly frame: { readonly id: string; readonly url: string }
+  readonly childFrames?: readonly BrowserFrameTree[]
+}
+
+function browserFrames(tree: BrowserFrameTree): BrowserFrameTree['frame'][] {
+  return [tree.frame].concat((tree.childFrames ?? []).flatMap(browserFrames))
+}
+
+function accessibleText(nodes: readonly AccessibleNode[], node: AccessibleNode): string[] {
+  if (node.ignored) return []
+  if (node.role?.value === 'StaticText') return [node.name?.value ?? '']
+  return (node.childIds ?? []).flatMap((id) => {
+    const child = nodes.find((candidate) => candidate.nodeId === id)
+    return child ? accessibleText(nodes, child) : []
+  })
+}
+
+function screenText(nodes: readonly AccessibleNode[]): string[] {
+  const screen = nodes.find(
+    (node) =>
+      !node.ignored && node.role?.value === 'list' && node.name?.value === 'Terminal screen',
+  )
+  return screen ? accessibleText(nodes, screen) : []
+}
+
+function liveText(nodes: readonly AccessibleNode[]): string[] {
+  const live = nodes.find(
+    (node) =>
+      !node.ignored &&
+      node.properties?.some(
+        (property) => property.name === 'live' && property.value.value === 'polite',
+      ),
+  )
+  return live ? accessibleText(nodes, live) : []
+}
+
 describe('accessibility from real submitted native frames', () => {
+  it('keeps scrolled rows and fresh announcements in the Chrome accessibility tree', async ({
+    skip,
+  }) => {
+    if (server.browser !== 'chromium') skip('Chrome accessibility-tree verification uses CDP')
+    const { terminal, clock, elements, errors } = await fixture(false, true)
+    const accessibility = controller(terminal)
+    const session = cdp()
+    const { frameTree } = (await session.send('Page.getFrameTree')) as {
+      frameTree: BrowserFrameTree
+    }
+    const frame = browserFrames(frameTree).find((candidate) => candidate.url === location.href)
+    expect(frame).toBeDefined()
+    const tree = async (): Promise<readonly AccessibleNode[]> => {
+      const { nodes } = (await session.send('Accessibility.getFullAXTree', {
+        frameId: frame!.id,
+      })) as { nodes: AccessibleNode[] }
+      return nodes
+    }
+    const control = document.createElement('p')
+    control.textContent = 'Known readable AX control'
+    elements.root.append(control)
+    cleanups.push(() => control.remove())
+    await expect
+      .poll(async () =>
+        (await tree()).some(
+          (node) =>
+            !node.ignored &&
+            node.role?.value === 'StaticText' &&
+            node.name?.value === control.textContent,
+        ),
+      )
+      .toBe(true)
+
+    terminal.write('alpha\r\nbeta\r\ngamma\r\ndelta\r\nepsilon\r\nzeta')
+    clock.flush()
+    await expect.poll(async () => screenText(await tree())).toEqual(['delta', 'epsilon', 'zeta'])
+    expect(accessibility.mirror.isConnected).toBe(true)
+
+    terminal.scrollToTop()
+    clock.flush()
+    await expect.poll(async () => screenText(await tree())).toEqual(['alpha', 'beta', 'gamma'])
+    terminal.scrollToBottom()
+    clock.flush()
+    await expect.poll(async () => screenText(await tree())).toEqual(['delta', 'epsilon', 'zeta'])
+    accessibility.liveRegion.replaceChildren()
+    terminal.write('\r\nnew 界😀')
+    clock.flush()
+    await expect.poll(async () => screenText(await tree())).toEqual(['epsilon', 'zeta', 'new 界😀'])
+    await expect.poll(async () => liveText(await tree())).toContain('new 界😀')
+    expect(accessibility.liveRegion.isConnected).toBe(true)
+    expect(errors).toEqual([])
+  })
+
   it('hydrates the first display immediately and announces startup output', async () => {
     const { terminal, clock, errors } = await fixture(false, true, false)
     const accessibility = controller(terminal)
