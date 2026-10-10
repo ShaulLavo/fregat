@@ -91,10 +91,8 @@ test.each(['character', 'word'] as const)(
       if (bufferRow(editor, index + 1) !== bufferRow(editor, index)) continue
       checked += 1
       const nextUnit = wordWrapBreak === 'word' ? (nextText.match(/^\S+/)?.[0] ?? '') : nextText[0]!
-      // The character-width allowance keeps the caret inside the scrolling viewport.
-      expect(extent.right - trailing + glyphWidth(container, nextUnit)).toBeGreaterThan(
-        textEdge - 2,
-      )
+      // Preserve inter-word spaces and shaping when testing whether the next unit fits.
+      expect(extent.left + glyphWidth(container, text + nextUnit)).toBeGreaterThan(textEdge - 2)
     }
     expect(checked).toBeGreaterThan(3)
   },
