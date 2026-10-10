@@ -160,18 +160,20 @@ export class MergeReview {
     marks: readonly MergeReviewMark[],
     snapshot: TextbufferSnapshot,
   ): readonly MergeReviewMark[] {
+    if (!marks.length) return marks
     const engine = new TextbufferEngine()
     engine.restore(snapshot)
-    const edits = this.window.edits.filter((edit) => engine.effectActive(edit.envelope.id))
     return marks.flatMap((mark) => {
       // A causal follow-up in this unit replaces the old competing alternatives on every peer.
       const pairs = mark.pairs.filter(
         (pair) =>
-          !edits.some(
-            (edit) =>
-              this.window.isAfter(edit.envelope.id, pair) &&
-              touchesUnit(snapshot.buffer, edit, mark.unit),
-          ),
+          !this.window
+            .editsAfter(pair)
+            .some(
+              (edit) =>
+                engine.effectActive(edit.envelope.id) &&
+                touchesUnit(snapshot.buffer, edit, mark.unit),
+            ),
       )
       if (!pairs.length) return []
       const ids = new Map(pairs.flat().map((id) => [JSON.stringify(id), id]))
