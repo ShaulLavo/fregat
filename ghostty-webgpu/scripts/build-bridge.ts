@@ -86,7 +86,7 @@ async function main(): Promise<void> {
         '-I',
         join(source, 'include'),
         '-O',
-        'ReleaseFast',
+        'ReleaseSmall',
         `-femit-bin=${output}`,
       ],
       projectRoot,

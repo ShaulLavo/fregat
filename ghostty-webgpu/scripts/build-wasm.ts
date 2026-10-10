@@ -86,7 +86,7 @@ async function buildArtifacts(source: string, workspace: string, zig: string): P
       '-I',
       join(source, 'include'),
       '-O',
-      'ReleaseFast',
+      'ReleaseSmall',
       `-femit-bin=${bridgeOutput}`,
     ],
     projectRoot,

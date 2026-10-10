@@ -487,11 +487,12 @@ fn reuseFrameRow(comptime stable: bool, frame: *Frame, y: u32) c.GhosttyResult {
     var glyph_first = frame.columns;
     var glyph_end: u32 = 0;
     const top = if (stable) 0 else @as(f32, @floatFromInt(y)) * frame.cell_height;
-    const previous = &cache.previous[previousLogicalRow(frame, y)];
+    const previous = &cache.previous[if (stable) previousLogicalRow(frame, y) else y];
+    const reusable = reusableRenderedRow(cache, previous);
     for (0..frame.columns) |x| {
         const row = cache.next[y];
         const selected = row.selected and x >= row.selection_start and x <= row.selection_end;
-        if (reuseRenderedCell(stable, frame, previous, start + @as(u32, @intCast(x)), row.cells[x].raw, @intCast(x), y, selected)) continue;
+        if (reusable and reuseRenderedCell(frame, previous, start + @as(u32, @intCast(x)), row.cells[x].raw, @intCast(x), y, selected)) continue;
         rememberRenderedCell(cache, start + x, cache.next[y].cells[x]);
         var next_cell = source_cells[source_start + x];
         var next_glyph = source_glyphs[source_start + x];
@@ -719,12 +720,13 @@ fn rememberRenderedCell(cache: *FrameCache, slot: usize, input: CachedCell) void
     };
 }
 
-fn reuseRenderedCell(comptime stable: bool, frame: *Frame, owner: *const CachedRow, address: u32, raw: c.GhosttyCell, x: u32, y: u32, selected: bool) bool {
+fn reusableRenderedRow(cache: *const FrameCache, previous: *const CachedRow) bool {
+    return std.mem.eql(u32, &previous.appearance, &cache.appearance) and
+        !sameRowId(previous.id, std.mem.zeroes(c.GhosttyRenderStateRowId));
+}
+
+fn reuseRenderedCell(frame: *Frame, previous: *const CachedRow, slot: u32, raw: c.GhosttyCell, x: u32, y: u32, selected: bool) bool {
     const cache = frame.row_cache.?;
-    const previous = if (stable) owner else &cache.previous[y];
-    const slot = if (stable) address else y * frame.columns + x;
-    if (!std.mem.eql(u32, &previous.appearance, &cache.appearance)) return false;
-    if (sameRowId(previous.id, std.mem.zeroes(c.GhosttyRenderStateRowId))) return false;
     const old_selected = previous.selected and x >= previous.selection_start and x <= previous.selection_end;
     if (selected != old_selected) return false;
     const input = cache.rendered[slot];
@@ -769,11 +771,12 @@ fn buildRow(comptime stable: bool, frame: *Frame, iterator: c.GhosttyRenderState
     var glyph_first = frame.columns;
     var glyph_end: u32 = 0;
     const start = if (stable) frame.row_cache.?.row_starts.?[y] else y * frame.columns;
-    const previous = if (stable) &frame.row_cache.?.previous[previousLogicalRow(frame, y)] else undefined;
+    const previous = &frame.row_cache.?.previous[if (stable) previousLogicalRow(frame, y) else y];
+    const reusable = !force and reusableRenderedRow(frame.row_cache.?, previous);
     for (0..raw.len) |x| {
         const selected = has_selection and x >= selection.start_x and x <= selection.end_x;
         const slot = start + @as(u32, @intCast(x));
-        if (!force and reuseRenderedCell(stable, frame, previous, slot, raw.ptr[x], @intCast(x), y, selected)) continue;
+        if (reusable and reuseRenderedCell(frame, previous, slot, raw.ptr[x], @intCast(x), y, selected)) continue;
         const previous_cell = frame.cell_data[slot];
         const previous_glyph = frame.glyph_data[slot];
         result = buildCell(stable, frame, raw.ptr[0..raw.len], cells.*, slot, @intCast(x), y, selected);
