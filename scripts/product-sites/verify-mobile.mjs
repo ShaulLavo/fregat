@@ -238,6 +238,19 @@ async function checkLive(page, engine, url) {
   await page.locator('body[data-mode="editor"]').waitFor({ timeout: 20000 })
   for (const width of widths) {
     await record(page, engine, url, width, 'live')
+    // Resizing schedules caret placement after the rows; two frames can still read its old position.
+    await page.waitForFunction(
+      () => {
+        const element = document.querySelector('.editor-host .editor-virtualized')
+        return (
+          element &&
+          element.scrollWidth === element.clientWidth &&
+          element.scrollHeight === element.clientHeight
+        )
+      },
+      undefined,
+      { timeout: 5000 },
+    )
     const extents = await page.locator('.editor-host .editor-virtualized').evaluate((element) => ({
       x: element.scrollWidth - element.clientWidth,
       y: element.scrollHeight - element.clientHeight,
