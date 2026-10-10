@@ -669,6 +669,54 @@ it.each([rasterizer, overhangRasterizer])(
   },
 )
 
+it('writes pending row uniforms only when their pipeline draws', async () => {
+  const grids = await Promise.all(
+    [false, true].map((stableRows) =>
+      createGrid({
+        columns: 4,
+        rows: 4,
+        renderRows: ['A', 'B', 'C', 'D'].map((text, y) => row(y, [cell(0, { text })])),
+        stableRows,
+      }),
+    ),
+  )
+  const control = grids[0]!
+  const stable = grids[1]!
+  const programs = vi.spyOn(stable.gl, 'useProgram')
+  const layouts = vi.spyOn(stable.gl, 'uniform4f')
+  const frames = [
+    { write: '\x1b[4;1H\r\nE', draws: 1, uniforms: 1 },
+    { write: '\x1b[4;1H\r\nF', draws: 1, uniforms: 1 },
+    { write: '\x1b[2;1H\x1b[44mX\x1b[0m', draws: 2, uniforms: 1 },
+  ]
+  for (const frame of frames) {
+    for (const grid of grids) {
+      grid.native.state.acknowledge()
+      grid.native.terminal.write(frame.write)
+      grid.native.state.update()
+      expect(
+        buildZigFrame(grid.builder, grid.atlas, rasterizer, {
+          ...grid.frameOptions,
+          full: false,
+        }),
+      ).toBe(0)
+      grid.pass.syncAtlas(grid.atlas.consumeUploads())
+    }
+    control.pass.uploadFrame(control.builder, control.builder.changedRanges())
+    programs.mockClear()
+    layouts.mockClear()
+    stable.pass.uploadFrame(stable.builder, stable.builder.changedRanges())
+    expect(programs).toHaveBeenCalledTimes(0)
+    expect(layouts).toHaveBeenCalledTimes(0)
+    expect(stable.pass.submit()).toBe(frame.draws)
+    expect(programs).toHaveBeenCalledTimes(frame.draws)
+    expect(layouts).toHaveBeenCalledTimes(frame.uniforms)
+    expect(stable.builder.stableRows).toBe(true)
+    expect(stable.pass.capturePixels()).toEqual(control.pass.capturePixels())
+  }
+  expect(stable.gl.getError()).toBe(stable.gl.NO_ERROR)
+})
+
 it('returns to one glyph draw after the last resident row overhang scrolls away', async () => {
   const mixedRasterizer: GlyphRasterizer = {
     rasterize(input) {

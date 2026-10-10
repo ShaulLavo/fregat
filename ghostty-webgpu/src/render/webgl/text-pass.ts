@@ -30,6 +30,7 @@ interface Pipeline {
   readonly rowLayout: WebGLUniformLocation
   readonly instanceBaseUniform: WebGLUniformLocation
   instanceBase: number
+  rowLayoutDirty: boolean
   drawable: Uint8Array
   drawInstanceCount: number
   overhangCount: number
@@ -270,6 +271,7 @@ export class WebGlTextPass {
       rowLayout: this.uniform(program, 'rowLayout'),
       instanceBaseUniform: this.uniform(program, 'instanceBase'),
       instanceBase: 0,
+      rowLayoutDirty: false,
       drawable: new Uint8Array(this.instanceCount),
       drawInstanceCount: 0,
       overhangCount: 0,
@@ -308,11 +310,8 @@ export class WebGlTextPass {
     this.rowCount = rows
     this.rowOffset = offset
     this.rowHeight = height
-    const gl = this.context
-    for (const pipeline of [this.cells, this.glyphs]) {
-      gl.useProgram(pipeline.program)
-      gl.uniform4f(pipeline.rowLayout, columns, rows, offset, height)
-    }
+    this.cells.rowLayoutDirty = true
+    this.glyphs.rowLayoutDirty = true
     return true
   }
 
@@ -455,12 +454,22 @@ export class WebGlTextPass {
     const gl = this.context
     gl.useProgram(pipeline.program)
     gl.bindVertexArray(pipeline.vertexArray)
-    this.setInstanceBase(pipeline, 0)
+    this.setRowUniforms(pipeline, 0)
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, pipeline.drawInstanceCount)
     return 1
   }
 
-  private setInstanceBase(pipeline: Pipeline, first: number): void {
+  private setRowUniforms(pipeline: Pipeline, first: number): void {
+    if (pipeline.rowLayoutDirty) {
+      this.context.uniform4f(
+        pipeline.rowLayout,
+        this.rowColumns,
+        this.rowCount,
+        this.rowOffset,
+        this.rowHeight,
+      )
+      pipeline.rowLayoutDirty = false
+    }
     if (pipeline.instanceBase === first) return
     this.context.uniform1i(pipeline.instanceBaseUniform, first)
     pipeline.instanceBase = first
@@ -480,13 +489,13 @@ export class WebGlTextPass {
     if (highCount > 0) {
       gl.bindVertexArray(this.wrappedGlyphs)
       this.moveWrappedGlyphs(first)
-      this.setInstanceBase(this.glyphs, first)
+      this.setRowUniforms(this.glyphs, first)
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, highCount)
       draws += 1
     }
     if (lowCount > 0) {
       gl.bindVertexArray(this.glyphs.vertexArray)
-      this.setInstanceBase(this.glyphs, 0)
+      this.setRowUniforms(this.glyphs, 0)
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, lowCount)
       draws += 1
     }
