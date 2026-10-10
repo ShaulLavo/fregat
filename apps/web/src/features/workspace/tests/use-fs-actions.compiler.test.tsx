@@ -414,18 +414,33 @@ test('deleting an open file orphans its document here and undo brings it back', 
 test('saved rows cannot start mutations until the tree is confirmed', async ({ client }) => {
   await ensureFolderPath(filesystemPath('repo'), client)
   const harness = await renderFsActions('repo')
-  harness.queryClient.removeQueries({ queryKey: fileSystemKeys.tree('repo') })
-  harness.rerender()
-  expect(harness.result.current.actions.mutationsEnabled).toBe(false)
+  act(() => harness.queryClient.removeQueries({ queryKey: fileSystemKeys.tree('repo') }))
+  await waitFor(() => expect(harness.result.current.actions.mutationsEnabled).toBe(false))
   act(() => harness.result.current.actions.createEntry('', false))
   expect(harness.tree.getItem('untitled')).toBeNull()
-  harness.queryClient.setQueryData(fileSystemKeys.tree('repo'), harness.model)
-  harness.rerender()
-  expect(harness.result.current.actions.mutationsEnabled).toBe(true)
+  act(() => harness.queryClient.setQueryData(fileSystemKeys.tree('repo'), harness.model))
+  await waitFor(() => expect(harness.result.current.actions.mutationsEnabled).toBe(true))
   harness.cleanUp()
 })
 
-async function renderFsActions(rootPath: string) {
+test('confirmation arrival enables saved rows without fetching or a parent rerender', async ({
+  client,
+}) => {
+  await ensureFolderPath(filesystemPath('repo'), client)
+  const harness = await renderFsActions('repo', false)
+  expect(harness.result.current.actions.mutationsEnabled).toBe(false)
+  expect(harness.queryClient.getQueryData(fileSystemKeys.tree('repo'))).toBeUndefined()
+  expect(harness.queryClient.isFetching({ queryKey: fileSystemKeys.tree('repo') })).toBe(0)
+  act(() => harness.result.current.actions.createEntry('', false))
+  expect(harness.tree.getItem('untitled')).toBeNull()
+  act(() => harness.queryClient.setQueryData(fileSystemKeys.tree('repo'), harness.model))
+  await waitFor(() => expect(harness.result.current.actions.mutationsEnabled).toBe(true))
+  act(() => harness.result.current.actions.createEntry('', false))
+  expect(harness.tree.getItem('untitled')).not.toBeNull()
+  harness.cleanUp()
+})
+
+async function renderFsActions(rootPath: string, confirmed = true) {
   // The queue is global; an earlier test's unacknowledged intents must not leak in.
   resetTreeIntents()
   const model = treeModel(
@@ -434,7 +449,7 @@ async function renderFsActions(rootPath: string) {
   )
   const tree = new TreeViewModel({ paths: model.paths, renaming: true })
   const queryClient = createTestQueryClient()
-  queryClient.setQueryData(fileSystemKeys.tree(rootPath), model)
+  if (confirmed) queryClient.setQueryData(fileSystemKeys.tree(rootPath), model)
 
   function Wrapper({ children }: { readonly children: ReactNode }) {
     return (

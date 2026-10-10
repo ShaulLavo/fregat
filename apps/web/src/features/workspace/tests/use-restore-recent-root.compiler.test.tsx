@@ -15,6 +15,9 @@ import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
 import { createAddressTestRuntime } from '../../../../test/factories/address-runtime'
 import { createTestNavigation } from '../../../../test/factories/navigation'
+import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
+import { workspaceToken } from '@workspace/client-core/address/workspace'
+import { recentFolderKeys } from '@/lib/recent-folders-query'
 
 test('restores the most recent backend folder when browser workspace state is empty', async ({
   client,
@@ -25,6 +28,7 @@ test('restores the most recent backend folder when browser workspace state is em
   const { application } = await createAddressTestRuntime(client)
   const queryClient = application.getSnapshot().queryClient
   const navigation = createTestNavigation({ initialEntries: ['/'] })
+  expect(navigation.getSnapshot().status).toBe('pending')
   let editor: EditorRuntime | null = null
   const view = renderWithProviders(
     <EditorStateProvider>
@@ -42,6 +46,7 @@ test('restores the most recent backend folder when browser workspace state is em
   })
 
   expect(view.getByText('Restoring workspace')).toBeInTheDocument()
+  await waitFor(() => expect(navigation.getSnapshot().status).toBe('applied'))
   await waitFor(() =>
     expect(currentEditor(editor).workspaceStore.getState().rootFolder?.path).toBe('anubis'),
   )
@@ -49,6 +54,35 @@ test('restores the most recent backend folder when browser workspace state is em
   await waitFor(() =>
     expect(readWorkspaceCache(currentEditor(editor).storage).rootFolder?.path).toBe('anubis'),
   )
+})
+
+test('an explicit workspace address claims its folder before recents', async ({ client }) => {
+  await ensureFolderPath(filesystemPath('recent'), client)
+  await recordRecentEntry(filesystemPath('recent'), client)
+  await ensureFolderPath(filesystemPath('explicit'), client)
+  const workspace = await registerTestWorkspaceAddress(client, 'explicit')
+  const { application } = await createAddressTestRuntime(client)
+  const navigation = createTestNavigation({
+    initialEntries: [`/~${workspaceToken(workspace)}/workbench`],
+  })
+  let editor: EditorRuntime | null = null
+  const view = renderWithProviders(
+    <EditorStateProvider>
+      <RecentWorkspaceRecovery
+        expose={(next) => {
+          editor = next
+        }}
+      />
+    </EditorStateProvider>,
+    { application, navigation, queryClient: application.getSnapshot().queryClient },
+  )
+  onTestFinished(() => {
+    view.unmount()
+    navigation.dispose()
+  })
+  await waitFor(() => expect(navigation.getSnapshot().status).toBe('applied'))
+  expect(currentEditor(editor).workspaceStore.getState().rootFolder?.path).toBe('explicit')
+  expect(view.getByText('Ready')).toBeInTheDocument()
 })
 
 test('finishes restoring when the server has no recent folders', async ({ client }) => {
@@ -73,6 +107,9 @@ test('finishes restoring when the server has no recent folders', async ({ client
   expect(view.getByText('Restoring workspace')).toBeInTheDocument()
   await waitFor(() => expect(view.getByText('Ready')).toBeInTheDocument())
   expect(currentEditor(editor).workspaceStore.getState().rootFolder).toBeNull()
+  expect(
+    application.getSnapshot().queryClient.getQueriesData({ queryKey: recentFolderKeys.all }),
+  ).toContainEqual([recentFolderKeys.list(40), []])
 })
 
 function RecentWorkspaceRecovery({ expose }: { readonly expose: (editor: EditorRuntime) => void }) {

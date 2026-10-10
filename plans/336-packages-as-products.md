@@ -627,6 +627,12 @@ The original 200 MiB geometry failure remains a blocker for publishing a full co
 
 ## Approved follow-up: explicit FreeSans geometry
 
+- [x] Reproduce and fix the original eight explicit FreeSans failures, and keep the unchanged
+      native geometry assertions in CI with a licensed package-local font fixture.
+- [x] Implement the native-run geometry redesign identified by independent review of draft
+      [PR #1186](https://github.com/ShaulLavo/fregat/pull/1186). Mounted native insertion positions
+      must survive ligatures and storage chunks, without document-wide native measurement.
+
 An exploratory DPR-1 run on 2026-10-09 exposed additional proportional-font failures with
 Ubuntu `fonts-freefont-ttf_20211204+svn4273-2`, explicitly loaded as the test face. This is
 separate from the five CI-runner assertions: DejaVu Serif reproduces the Firefox runner's
@@ -649,10 +655,116 @@ owner-host archive is `/work/reports/virtualizer-cross-engine-2026-10-09/ci-font
 assertions, and `provenance.json` records the font packages and successful runner-font controls.
 Keep these machine-specific inputs out of committed tests.
 
-The likely boundary is summed single-glyph canvas advances in
-`editor/packages/editor/src/virtualization/glyphAdvances.ts` versus native shaped runs; this
-attribution remains unconfirmed. Investigate native caret reachability and shaping/hinting before
-choosing a fix. Preserve the existing bounds and add a portable failing-first font fixture.
+Confirmed on 2026-10-09. All eight failures share one cause: geometry sums isolated glyph
+advances while native layout shapes runs. In Firefox, ten `i` characters measure `27.9333` pixels
+as a run and `28.8333` as isolated glyphs; WebKit gives `27.9240` versus `28.8600`. Document and
+offscreen canvases agree with native element and Range widths, so font loading is not the cause.
+FreeSans also forms `ffi` ligatures in all three engines.
+
+Proportional row prefixes and viewport lookup now measure bounded runs, and wrapping measures
+complete row candidates across storage chunks and resets shaping at row breaks and tabs. The
+monospace path keeps its existing advance rules. The retained 96-case harness passes unchanged,
+and the package-local fixture reproduces the same eight failures before the product fix.
+Evidence is in `/work/reports/freesans-geometry/`, including native measurements, failing-first
+logs, the exact harness result, full browser checks and Node/DOM checks.
+
+A separate native tab-stop observation needs its own fix. With explicitly loaded FreeSans at
+13px and `tab-size:4`, Firefox's native element for `iiii\tAV\tffi` advances 13 pixels further
+than the current next-stop formula in `proportionalRows.ts` and `wordWrap.ts`. The shorter
+`iii\tAV\tffi` control agrees in all engines. Reproduce by extending
+`test/freeSansShaping.browser.test.ts` with the four-`i` case; its unchanged 0.05px bound fails
+only in Firefox. `/work/reports/freesans-geometry/shaping-regressions.log` retains the failure.
+Native attribution is confirmed. Firefox gives the zero glyph a `7.2333`-pixel advance; the
+four-`i` prefix is `11.2333` pixels wide, leaving `1.7667` pixels before the `13`-pixel stop.
+[CSS Text](https://www.w3.org/TR/css-text-3/) requires using the following stop when the gap is
+less than `0.5ch`, which is `3.6167` pixels here. Firefox advances the first tab to `26` pixels;
+the editor stops at `13`. This is an editor error, not a Firefox bug. WebKit reaches `13` in the
+same explicit `tab-size:4` native probe, so the eventual geometry must respect actual connected
+native layout. The draft now probes the font's native tab policy and applies the half-character minimum to shaped runs. The four-`i` regression passes in all three engines; monospace arithmetic is unchanged.
+
+Independent review found two additional correctness failures in the first shaped implementation:
+`'ffi'.repeat(10_000)` loses shaping across 512-unit blocks, and lookup inside `AV office ffi`
+uses detached-prefix widths instead of insertion positions in the intact run. Review fixtures,
+raw native measurements and a real 30-pixel scrolled-caret failure are retained under
+`/work/reports/virtualizer-cross-engine-review-2026-10-09/shaped-runs/`; reproduction inputs are
+in its `harness/`. The draft PR contains the pre-implementation design note. Native measurements
+must belong to mounted rows only, preserve connected shaping context, and invalidate one row
+on typing. The existing `displayProjectionWrap.ts` scans 256-line blocks before mounting, so
+putting DOM measurement in `GlyphAdvances.measure` would violate that contract. The unresolved
+bounded contracts are accurate horizontal window origins inside long unbroken runs and the
+indexing of native-wrapped mounted rows without walking unmounted content.
+
+The review's quadratic hanging-tab rescan is fixed in `9caa0e36860e619189492f14dfbacb14108d98bc`:
+settled tab-separated runs are reused, empty runs need no measurement, and tabs join hanging
+space batching. Tests cover 1,000, 2,000 and 4,000 tabs across 1-, 257- and 4,096-unit chunks,
+with linear bounds on measurement calls and measured code units. The full package check passes
+4,208 tests. Paired three-engine experiments and actual insertion controls are in
+`/work/reports/freesans-geometry/`; the draft PR records all methods, costs and cold-run variance.
+Caching and settled tabs do not resolve the remaining native-caret correctness failures.
+
+The initial native follow-up retained one intact text node for each mounted plain proportional row
+strictly below the initial 32,000-unit ceiling. That shared ceiling is superseded by the measured independent budget below. The approved DOM contract changes only ordinary
+proportional rows: the horizontal window starts at zero and keeps the complete rendered row.
+Monospace and inline replacements keep their strict text windows, including nonzero starts when
+scrolled. Every caret, paint and extent oracle remains unchanged. Rows at or above the ceiling
+remain editable with bounded approximate geometry and the structured state documented in
+[known limits](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/limitations.md#proportional-row-measurement).
+Existing oversized-BiDi refusal remains unchanged. Native lookup uses collapsed Ranges in the
+connected text node, caches unchanged mounted rows, and measures only the changed row on typing.
+Canvas shaping remains the document projection owner.
+
+- [ ] Complete independent review of the pushed native implementation and its long-row costs.
+- [x] Select an independent proportional intact-node budget from the approved 2k, 5k, 10k
+      and 15k cross-engine experiments. Retain editable bounded approximation above it and
+      the independent 32,000-unit BiDi ceiling.
+- [x] Verify the selected budget and its fallback costs in all three engines.
+- [ ] Obtain independent review of the selected budget and final checks. Keep #1186 draft
+      until the coordinator completes review.
+
+The 2026-10-09 paired long-row run is an **experiment**, not a published performance claim.
+A 500×200 viewport displays 100 rows of repeated `AV office ffi ` in the licensed FreeSans fixture,
+with wrapping off, 512-unit chunks and zero horizontal overscan. The baseline is the pushed
+pre-native implementation `a3b5a3f320ba03340e4681d8d38149b8c4472231`. Each case has three setup
+frames and 33 actions; medians omit the first three actions. The actions scroll horizontally in
+3,000-pixel steps, vertically in 220-pixel steps, or insert one character at offset 15,000.
+Timers cover synchronous action plus forced rect reads, not key-to-paint. Chromium tracing
+records layout and paint across all 33 action frames. Firefox and WebKit expose frame intervals
+and synchronous/forced-layout timing here; exclusive paint duration was not measured there.
+
+Final typing medians, baseline → intact-node implementation: Chromium 20k **3.8 → 3.9 ms** and
+30k **5.1 → 5.6 ms**; Firefox **6 → 8 ms** and **7 → 11 ms**; WebKit **4 → 10 ms** and
+**6 → 14 ms**. WebKit horizontal frame intervals rise from **16 → 28 ms** at 20k and
+**16 → 34 ms** at 30k; vertical intervals rise from **16 → 22 ms** and **16 → 26 ms**.
+These results miss the target in Firefox at 30k and WebKit at both lengths.
+
+Chromium mean layout/paint per action frame, baseline → intact node, in milliseconds:
+
+| Length | Action            | Layout        | Paint         |
+| ------ | ----------------- | ------------- | ------------- |
+| 20k    | Horizontal scroll | 0.879 → 0.000 | 0.749 → 0.222 |
+| 20k    | Vertical scroll   | 0.057 → 0.692 | 0.201 → 0.200 |
+| 20k    | Typing            | 0.141 → 1.517 | 0.569 → 3.050 |
+| 30k    | Horizontal scroll | 0.788 → 0.000 | 0.715 → 0.232 |
+| 30k    | Vertical scroll   | 0.056 → 1.503 | 0.215 → 0.330 |
+| 30k    | Typing            | 0.145 → 2.290 | 0.649 → 4.851 |
+
+The first intact-node experiment took 29–43 ms for Chromium/Firefox typing. Its CPU profile
+attributed roughly 1,014 ms of sampled work across 33 actions to tree-backed character reads
+from inactive whitespace and suspicious-character scans. The fix skips ASCII suspicious scans,
+skips unselected show-on-selection rows and reads hydrated chunk text for active whitespace.
+The counter regression proves typing does no source-tree `charAt` or `codePointAt` marker reads,
+while a real nonempty selection still paints whitespace. This removes that scanning bottleneck;
+it does not remove the measured browser layout/paint cost above.
+
+Evidence is retained in `/work/reports/freesans-geometry/native-cost/`: `results.json`,
+`chromium-trace.json`, `chromium-layout-paint.json`, pre-scan-fix evidence, the CPU profile,
+`run.mjs`, `profile.mjs` and `harness/`. Restore the retained `.native-before/` and
+`.native-cost.*` inputs into `editor/packages/editor/`, start Vite on an explicit free port,
+and set the retained `run.mjs` target to that port to reproduce this experiment. Do not edit
+source while the paired run is active: Vite reload invalidates the comparison. The experiment
+uses no model providers. Retired mounted rows release native caches; unchanged rows survive
+horizontal scrolling and one-row edits. The final static-target `agent:browser look --site`
+reports healthy with no browser problems, and its screenshot was read back.
 
 ## Kickoff prompt for an executing coordinator
 
@@ -664,3 +776,107 @@ choosing a fix. Preserve the existing bounds and add a portable failing-first fo
 > now on the VPS. Track N comes last:
 > ask the owner for npm setup only when everything else is done.
 > Send screenshots of every site and README at each milestone.
+
+### Approved measured proportional budget
+
+The coordinator approved selecting the largest tested intact-node size whose edits stay within
+8.3 ms in all three engines and whose WebKit horizontal/vertical scroll frames stay near 16 ms.
+The quiet 2026-10-10 experiment used the same 100-row FreeSans harness and engine versions as
+above, with lengths 2,000, 5,000, 10,000 and 15,000. Each edit now inserts at half the row length;
+scroll steps shrink when needed and use the actual clamped native offsets. This keeps smaller
+rows on a real scrolling path and edits within the first row. The native source stayed frozen
+at `1c8df51ee17c310257a0f5f609a8a5ee62d744a0` throughout the candidate matrix.
+
+| Units  | Chromium edit median / max ms | Firefox edit median / max ms | WebKit edit median / max ms | WebKit horizontal / vertical median frame ms |
+| ------ | ----------------------------- | ---------------------------- | --------------------------- | -------------------------------------------- |
+| 2,000  | 1.0 / 1.7                     | 1 / 2                        | 2 / 2                       | 16 / 16                                      |
+| 5,000  | 1.3 / 1.7                     | 3 / 5                        | 3 / 4                       | 16 / 16                                      |
+| 10,000 | 2.0 / 3.3                     | 4 / 7                        | 5 / 7                       | 26 / 20                                      |
+| 15,000 | 2.9 / 4.6                     | 5 / 10                       | 7 / 10                      | 31 / 22                                      |
+
+**5,000 is the largest passing candidate.** `PROPORTIONAL_INTACT_NODE_CEILING = 5_000`
+admits plain proportional native rows strictly below 5,000 UTF-16 units. At 5,000 or more,
+the existing bounded editable approximation and structured degraded state apply. The strict
+boundary leaves margin below the tested 5,000-unit row, which grew through 33 insertions.
+`BIDI_LINE_MEASUREMENT_CEILING = 32_000` is independent; RTL rows between these limits retain
+their existing geometry owner. The new BiDi control covers that separation. The 20k DOM test
+returns to bounded windows and nonzero starts; its caret, paint and extent oracles stay unchanged.
+Intact ligature controls still cross several former 512-unit boundaries below the new budget.
+
+Candidate evidence: `/work/reports/freesans-geometry/native-budget/` contains all 72 paired
+cases in `results.json`, Chromium tracing, engine problem lists and `run.mjs`. The selected-budget
+run is retained in `final/`, including the same paired method at 2k, 4,936, 5k, 10k, 15k, 20k and
+30k. The 4,936-unit row remains below the ceiling throughout all 33 insertions; each result
+records the mounted shaping path and ceiling to distinguish intact from approximate cases.
+These are synchronous edit/layout and frame-interval experiments, with no key-to-paint claim.
+
+Selected-budget verification retained all 126 paired cases without browser errors. At 4,936 units,
+the row remains native through every insertion; at 5,000 and above every measured row reports
+`approximate` with ceiling `5000`.
+
+| Units / path         | Chromium edit median / max ms | Firefox edit median / max ms | WebKit edit median / max ms | WebKit horizontal / vertical median frame ms |
+| -------------------- | ----------------------------- | ---------------------------- | --------------------------- | -------------------------------------------- |
+| 4,936 / native       | 1.2 / 2.5                     | 2 / 3                        | 3 / 3                       | 16 / 16                                      |
+| 5,000 / approximate  | 1.2 / 1.8                     | 2 / 4                        | 2 / 2                       | 16 / 16                                      |
+| 10,000 / approximate | 1.7 / 2.6                     | 3 / 6                        | 2 / 3                       | 16 / 16                                      |
+| 15,000 / approximate | 2.3 / 3                       | 3 / 6                        | 3 / 4                       | 16 / 16                                      |
+| 20,000 / approximate | 2.8 / 3.8                     | 4 / 10                       | 3 / 3                       | 16 / 16                                      |
+| 30,000 / approximate | 4 / 4.2                       | 5 / 11                       | 3 / 4                       | 16 / 16                                      |
+
+The admitted native case meets the measured edit/frame target in all engines. Approximate
+Firefox edits have 10 ms and 11 ms tails at 20k and 30k despite 4 ms and 5 ms medians:
+the fallback keeps its bounded shaping and editable contract, with no universal edit-latency
+promise. Chromium scroll-frame medians stay near 16.7 ms; Firefox stays near 17.05 ms.
+The final near-limit Chromium layout/paint per action frame, baseline → native, is
+0.610/0.571 → 0.000/0.173 ms horizontally, 0.051/0.138 → 0.195/0.110 ms vertically,
+and 0.103/0.513 → 0.368/0.824 ms during edits. Parsed totals are recorded in
+`final/chromium-layout-paint.json`, alongside the raw trace. The strict geometry tests need the initial ResizeObserver snapshot to settle before the
+first native scroll change; their setup now waits two animation frames. No geometry tolerance,
+timeout, skip or retry changed.
+
+The first full selected-budget suite exposed a delayed extent defect: WebKit settled a mounted
+2,048-unit window as the complete 20k row width (14,265 px versus the unchanged 139,180.21875 px
+native oracle). Approximate plain rows now keep their complete shaped-run width as the scroll
+extent owner. A direct measurement regression failed in Chromium and Firefox before the fix;
+the earlier full WebKit failure provides its on-surface evidence. The initial direct WebKit
+proof stopped without completing and was cancelled after 607 seconds; the repaired three-engine
+control finishes normally. The native path below the budget is unchanged.
+
+The same full run timed out the source import inventory at 5,906 ms. Its parser now skips files
+that contain neither the removed directory name nor a path escape. Escaped imports still receive
+full TypeScript parsing, with a regression for an escaped directory name. The timeout stays
+unchanged. These two findings are fixed in this lane; their logs are retained under
+`native-budget/final/`. Selected-budget costs before the extent fix are preserved in
+`native-budget/final-before-extent/`; the final table above comes from the completed rerun
+against the complete extent owner. All 126 cases completed with empty browser problem lists.
+Final source checks pass: 312 test files and 4,261 tests, with one skipped file/test; package
+typecheck, lint, format and root gates pass. The repaired focused run passes 7 files and 81 tests.
+
+The independent re-review of `04a462f0e` found a hidden-initialization tab-policy defect:
+Firefox cached zero when the probe lived under an editor ancestor with `display:none`.
+Revealing the editor and calling `refreshMetrics()` reused that cached value. The font-policy
+probe now mounts at the document root, outside the editor's hidden ancestors, while retaining
+its explicit font and layout styles. No refresh retry or additional cache invalidation is needed.
+Two committed regressions cover hidden-first measurement and hidden editor → reveal → refresh.
+Both failed first in Firefox; the visible control, Chromium and WebKit passed. The repaired
+three-engine focused run passes all 18 cases. Failing-first and repaired logs are retained in
+`native-budget/final/hidden-tab-failing-first.log` and `hidden-tab-fixed.log`.
+The reviewer also confirmed the native budget, inline windows and tab-scan bound, and identified
+the long-row Firefox timing tails as predating this PR. Existing cost tables remain local
+experiments measured before this probe-placement repair; they were not rerun for this fix.
+
+The complete editor suite after the hidden-probe repair passes 312 files and 4,261 tests,
+with one skipped file/test. Package typecheck, lint and formatting pass; its log is
+`native-budget/final/hidden-tab-final-suite.log`.
+
+The main integration after #1121 and #1107 retains content-mode viewport widths before applying
+proportional rounding to ordinary scroll extents. Main's strict unpaced typing burst remains
+unchanged. The native-oracle tests and licensed FreeSans cases retain their existing bounds,
+and main's content, wrap and other cross-engine projects remain registered.
+The merged complete editor suite passes 319 files and 4,404 tests, with one skipped file/test.
+The focused proportional, content, wrap and initial-viewport run passes 28 files and 534 tests;
+a temporary verification config also runs the wrap projects in Firefox, alongside their
+committed Chromium and WebKit projects. Logs and that config are retained under
+`/work/reports/freesans-geometry/merge-*`. Content-layout screenshots from Chromium, Firefox
+and WebKit are retained in `merge-content-look/` and were reviewed. The cost experiments above
+predate this main integration and were not rerun for it.

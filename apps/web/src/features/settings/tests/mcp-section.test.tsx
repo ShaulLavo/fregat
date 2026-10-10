@@ -10,8 +10,9 @@ import { McpConfigRow } from '@/features/settings/components/mcp-config-row'
 import { providerSnapshot } from '../../../../test/factories/chat'
 import { McpSection } from '@/features/settings/components/mcp-section'
 import { expect, test } from '../../../../test/fixtures'
-import { createInProcessClient } from '../../../../test/client'
+import { createInProcessClient, createObservedInProcessClient } from '../../../../test/client'
 import { installTestClient } from '../../../../test/factories/client-binding'
+import { createRequestGate } from '../../../../test/factories/request-gate'
 import { renderWithProviders } from '../../../../test/render'
 import { makeTestServer } from '../../../../test/server'
 
@@ -214,7 +215,8 @@ test('keeps folder, scopes and removal with the displayed list until the selecte
   const folder = path.join(server.root, 'second')
   await mkdir(folder)
   adapter.folders.set(folder, [{ ...adapter.servers[0]!, origin: 'https://second.example.test' }])
-  const restore = installTestClient(createInProcessClient(server))
+  const directory = createRequestGate((request) => new URL(request.url).pathname === '/fs/tree')
+  const restore = installTestClient(createObservedInProcessClient(server, directory.beforeRequest))
   const rendered = renderWithProviders(<McpSection />)
   let release = () => {}
   try {
@@ -224,8 +226,12 @@ test('keeps folder, scopes and removal with the displayed list until the selecte
     release = held.release
     await userEvent.click(screen.getByRole('button', { name: 'Choose folder…' }))
     const picker = await screen.findByRole('dialog', { name: 'Choose folder' })
+    await directory.entered
     await userEvent.click(within(picker).getByRole('button', { name: 'Go to folder' }))
     const input = within(picker).getByRole('textbox', { name: 'Folder path' })
+    expect(input).toBeDisabled()
+    directory.release()
+    await waitFor(() => expect(input).toBeEnabled())
     await userEvent.clear(input)
     await userEvent.type(input, `${folder}{Enter}`)
     await waitFor(() => expect(input).not.toBeVisible())
@@ -250,6 +256,7 @@ test('keeps folder, scopes and removal with the displayed list until the selecte
     expect(adapter.folders.get(folder)).toHaveLength(1)
     expect(screen.getByText('second', { selector: '[data-mcp-folder]' })).toBeVisible()
   } finally {
+    directory.release()
     release()
     rendered.unmount()
     restore()
@@ -342,6 +349,7 @@ test('a literal tilde folder keeps its own MCP list and filesystem owner across 
     const picker = await screen.findByRole('dialog', { name: 'Choose folder' })
     await userEvent.click(within(picker).getByRole('button', { name: 'Go to folder' }))
     const input = within(picker).getByRole('textbox', { name: 'Folder path' })
+    await waitFor(() => expect(input).toBeEnabled())
     await userEvent.clear(input)
     await userEvent.type(input, `${folder}{Enter}`)
     await waitFor(() => expect(input).not.toBeVisible())

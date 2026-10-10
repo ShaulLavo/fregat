@@ -3,8 +3,8 @@ import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import type { FileTreeRenameEvent } from '@workspace/tree'
 import type { TreeViewModel } from '@/features/workspace/state/tree-model'
-import { useIsMutating, useQueryClient } from '@tanstack/react-query'
-import { useRef, useState, type RefObject } from 'react'
+import { hashKey, useIsMutating, useQueryClient } from '@tanstack/react-query'
+import { useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 
 import { useWorkspaceMutationAllowed } from '@/features/editor/hooks/use-workspace-mutation-allowed'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -82,11 +82,18 @@ export function useFsActions({
   const unavailable = useUnavailableEnvironment()
   const workspaceMutationAllowed = useWorkspaceMutationAllowed()
   const workspaceEdits = useOptionalWorkspaceEditService()
+  const treeKey = fileSystemKeys.tree(rootPath)
+  const treeHash = hashKey(treeKey)
+  // Query observers retain their last result when removeQueries removes their query.
+  const treeConfirmed = useSyncExternalStore(
+    (notify) =>
+      queryClient.getQueryCache().subscribe((event) => {
+        if (event.query.queryHash === treeHash) notify()
+      }),
+    () => queryClient.getQueryData(treeKey) !== undefined,
+  )
   const mutationsEnabled =
-    !unavailable &&
-    workspaceMutationAllowed &&
-    workspaceEdits !== null &&
-    Boolean(queryClient.getQueryData(fileSystemKeys.tree(rootPath)))
+    !unavailable && workspaceMutationAllowed && workspaceEdits !== null && treeConfirmed
   const documentStore = useEditorDocumentStoreApi()
   const workspaceStore = useEditorWorkspaceStoreApi()
   const { renameLiveEditorDocument } = useEditorCommands()
