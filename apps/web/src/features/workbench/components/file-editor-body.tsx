@@ -8,6 +8,7 @@ import { isMarkdownPath } from '@/lib/markdown-mode/utils/mode'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import type { FilesystemPath, StandaloneDocumentRef, TabId } from '@/lib/documents/utils/types'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
+import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import { FileLoadError } from '@/features/workbench/components/file-load-error'
 import { CsvFileBody } from '@/features/workbench/components/csv-file-body'
 import { isCsvPath } from '@/features/workbench/utils/csv-path'
@@ -71,6 +72,14 @@ export function FileEditorBody({
   const historyPath = target.kind === 'history' ? target.file.path : null
   const resource = filesystemResource(target)
   const key = documentKey(target)
+  const orphaned = useEditorDocumentState((state) => {
+    const sync = state.liveDocumentsByKey[key]?.sync
+    return sync?.kind === 'file' && sync.orphaned
+  })
+  const loadError =
+    readError ??
+    (fileState.status === 'error' ? fileState.message : null) ??
+    (orphaned ? 'File missing on disk.' : null)
   const editorDocument = liveDocument?.key === key ? liveDocument : null
   const ownsCurrentTab = editorDocument !== null
   const currentActions = ownsCurrentTab ? actions : null
@@ -152,13 +161,23 @@ export function FileEditorBody({
       </Suspense>
     )
 
+  if (!editorDocument && fileState.status === 'error' && resource)
+    return (
+      <FileLoadError
+        path={resource.path}
+        message={fileState.message}
+        hasContent={false}
+        onOpenReadOnly={() => setPagedKey(key)}
+      />
+    )
+
   const textBody = (
     <div className={fileBodyGridClass(splitMarkdown, currentReferences !== null)}>
       <div className='relative flex min-h-0 min-w-0 flex-col overflow-hidden'>
-        {readError && resource ? (
+        {loadError && resource ? (
           <FileLoadError
             path={resource.path}
-            message={readError}
+            message={loadError}
             hasContent
             retained
             onOpenReadOnly={() => setPagedKey(key)}
@@ -189,14 +208,6 @@ export function FileEditorBody({
           onOpenDefinition={currentActions?.openDefinition}
           onOpenReferences={currentActions?.openReferences}
         />
-        {fileState.status === 'error' && resource ? (
-          <FileLoadError
-            path={resource.path}
-            message={fileState.message}
-            hasContent={editorDocument !== null}
-            onOpenReadOnly={() => setPagedKey(key)}
-          />
-        ) : null}
         {!editorDocument && fileState.status !== 'error' ? (
           <div className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'>
             <Spinner size='xs' label='Loading file' />
@@ -229,7 +240,7 @@ export function FileEditorBody({
       buffer={editorDocument?.buffer ?? null}
       view={editorDocument?.view ?? null}
       editable={editorDocument?.editability === 'editable'}
-      readFailed={readError !== null || fileState.status === 'error'}
+      readFailed={loadError !== null}
       tabId={tabId}
     >
       {textBody}

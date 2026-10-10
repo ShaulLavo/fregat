@@ -1,3 +1,4 @@
+import type { EditorDisposable } from '../editor/disposables'
 import type { ScheduledFrame } from '../editor/scheduleFrame'
 import type { WrapAdvance, WrapBreak } from './displayProjectionTypes'
 import type { GlyphAdvances } from './glyphAdvances'
@@ -128,6 +129,11 @@ export interface VirtualizedTextViewInternal {
   wrapBreak: WrapBreak
   /** The measured-width wrap in the projection's config, when the face is proportional. */
   wrapAdvance: WrapAdvance | null
+  readonly styledRowFaces: Map<
+    string,
+    { readonly element: HTMLDivElement; readonly observer: EditorDisposable }
+  >
+  readonly onStyledFaceChange: () => void
   /** The face's glyph advances while it is proportional; null keeps every estimate on columns. */
   glyphs: GlyphAdvances | null
   tabSize: number

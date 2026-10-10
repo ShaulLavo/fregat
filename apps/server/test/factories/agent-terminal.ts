@@ -23,6 +23,7 @@ import { createFakePtyFactory } from './terminal'
 import type { TerminalHostClient } from '../../src/terminal/host-client'
 import type { ShellCommandReader } from '../../src/terminal/foreground'
 import { createInProcessTerminalSocket } from '../terminal-socket'
+import { testLoopbackPeer } from '../../src/testing/request'
 
 export async function createAgentTerminalFixture(
   options: {
@@ -84,6 +85,7 @@ export async function createAgentTerminalFixture(
       metadataDatabase: handle,
       settings: testSettingsOptions(root),
       workspaceEditJournalRoot: path.join(root, 'journals'),
+      system: { peer: testLoopbackPeer },
       devices: { filePath: path.join(root, 'devices.json') },
       terminal: {
         ...(options.hostClient ? { hostClient: options.hostClient } : { ptyFactory: pty.factory }),

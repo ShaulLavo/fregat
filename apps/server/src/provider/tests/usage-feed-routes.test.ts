@@ -27,7 +27,6 @@ beforeEach(async () => {
     systemRoot: root,
     settings: testSettingsOptions(root),
     themes: { root: path.join(root, '.platform-test') },
-    devices: { ownAddresses: () => new Set() },
     orchestration: {
       providerRuntime: false,
       attachmentsDir: path.join(root, 'attachments'),

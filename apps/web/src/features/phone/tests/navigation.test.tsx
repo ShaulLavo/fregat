@@ -37,6 +37,7 @@ test('the phone stack pushes each screen onto the history and Back pops them in 
     await createChatNavigationFixture()
   await domain.createSession(registration.worktreeId, DOMAIN_SESSION)
   await refresh()
+  await navigation.openWorkspace({ environmentId, path: 'main' })
   await navigation.showPhoneSessions()
   expect(useSessionSelectionStore.getState().selection.kind).toBe('auto')
 
@@ -53,6 +54,7 @@ test('the phone stack pushes each screen onto the history and Back pops them in 
   expect(useSessionSelectionStore.getState().selection).toMatchObject({ sessionId: DOMAIN_SESSION })
   await pressBack(navigation)
   expect(useSessionSelectionStore.getState().selection.kind).toBe('auto')
+  expect(editor.workspaceStore.getState().rootFolder?.path).toBe('main')
 })
 
 test('the workbench never writes a phone screen into its address', async () => {

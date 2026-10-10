@@ -157,13 +157,40 @@ export async function syntaxFixture(
       )
     return result
   }
+  const detector = new MergeReviewDetector(
+    mode === 'differential'
+      ? Object.assign(syntax, {
+          batch: (reads: Parameters<NonNullable<MergeReviewSyntax['batch']>>[0]) =>
+            Promise.all(
+              reads.map((read) =>
+                syntax(
+                  read.snapshot,
+                  read.ranges,
+                  read.contentKey,
+                  read.selection,
+                  read.baseSnapshot,
+                ),
+              ),
+            ),
+        })
+      : syntax,
+  )
+  if (mode === 'differential') {
+    const detect = detector.detect.bind(detector)
+    const sequential = new MergeReviewDetector((...args) => syntax(...args))
+    detector.detect = async (...args) => {
+      const result = await detect(...args)
+      deepStrictEqual(result, await sequential.detect(...args))
+      return result
+    }
+  }
   return {
     syntax,
     metrics,
     resetMetrics() {
       for (const key of Object.keys(metrics) as (keyof typeof metrics)[]) metrics[key] = 0
     },
-    detector: new MergeReviewDetector(syntax),
+    detector,
     get calls() {
       return calls
     },

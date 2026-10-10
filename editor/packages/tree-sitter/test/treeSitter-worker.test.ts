@@ -553,44 +553,102 @@ describe('parse document reuse', () => {
   type WorkerParsedDocument = Parameters<typeof replaceCachedDocument>[1]
   type WorkerParseRequest = Parameters<typeof reusableParsedDocument>[0]
 
-  const fakeParsedDocument = (length: number, deleted: string[]): WorkerParsedDocument =>
-    ({
-      snapshotVersion: 1,
-      languageId: 'typescript',
-      source: inputFromText('x'.repeat(length)),
-      layers: [{ tree: { delete: () => deleted.push('root') } }],
-      degraded: [],
-      missingLanguages: [],
-      size: length,
-      lastUsed: 0,
-    }) as unknown as WorkerParsedDocument
+  const fakeParsedDocument = (
+    length: number,
+    deleted: string[],
+    readOnly = false,
+  ): WorkerParsedDocument => ({
+    readOnly,
+    snapshotVersion: 1,
+    languageId: 'typescript',
+    source: inputFromText('x'.repeat(length)),
+    layers: [
+      {
+        id: 'root',
+        key: 'root',
+        kind: 'root',
+        parentId: null,
+        parentLanguageId: null,
+        languageId: 'typescript',
+        depth: 0,
+        ranges: [],
+        tree: { delete: () => deleted.push('root') } as unknown as Tree,
+      },
+    ],
+    degraded: [],
+    missingLanguages: [],
+    size: length,
+    lastUsed: 0,
+  })
 
-  const parseRequest = (runtimeSessionId: string, snapshotVersion: number): WorkerParseRequest =>
-    ({
-      documentId: 'doc',
-      runtimeSessionId,
-      languageId: 'typescript',
-      snapshotVersion,
-    }) as unknown as WorkerParseRequest
+  const parseRequest = (
+    runtimeSessionId: string,
+    snapshotVersion: number,
+    readOnly?: boolean,
+  ): WorkerParseRequest => ({
+    type: 'parse',
+    documentId: 'doc',
+    runtimeSessionId,
+    languageId: 'typescript',
+    snapshotVersion,
+    readOnly,
+    includeHighlights: false,
+    generation: 1,
+    source: messageSource,
+  })
 
   const sourceOfLength = (length: number) => inputFromText('x'.repeat(length))
 
-  it('reuses the cached document for an identical document version', async () => {
+  it.each([
+    { cachedReadOnly: false, requestedReadOnly: undefined },
+    { cachedReadOnly: false, requestedReadOnly: false },
+    { cachedReadOnly: false, requestedReadOnly: true },
+    { cachedReadOnly: true, requestedReadOnly: true },
+  ])('reuses an identical version with compatible intent: %j', async (intent) => {
     const runtimeSessionId = 'runtime-reuse'
     const deleted: string[] = []
-    const document = fakeParsedDocument(10, deleted)
+    const document = fakeParsedDocument(10, deleted, intent.cachedReadOnly)
     replaceCachedDocument(runtimeSessionId, document)
 
     expect(
-      await reusableParsedDocument(parseRequest(runtimeSessionId, 1), sourceOfLength(10), {
-        startedAt: 0,
-        budgetMs: Infinity,
-        flag: null,
-      }),
+      await reusableParsedDocument(
+        parseRequest(runtimeSessionId, 1, intent.requestedReadOnly),
+        sourceOfLength(10),
+        {
+          startedAt: 0,
+          budgetMs: Infinity,
+          flag: null,
+        },
+      ),
     ).toBe(document)
+    expect(document.readOnly).toBe(intent.cachedReadOnly)
     expect(deleted).toEqual([])
     disposeDocument(runtimeSessionId)
   })
+
+  it.each([undefined, false])(
+    'retires an immutable snapshot before mutable promotion: readOnly=%s',
+    async (readOnly) => {
+      const runtimeSessionId = 'runtime-promotion'
+      const deleted: string[] = []
+      replaceCachedDocument(runtimeSessionId, fakeParsedDocument(10, deleted, true))
+
+      expect(
+        await reusableParsedDocument(
+          parseRequest(runtimeSessionId, 1, readOnly),
+          sourceOfLength(10),
+          {
+            startedAt: 0,
+            budgetMs: Infinity,
+            flag: null,
+          },
+        ),
+      ).toBeNull()
+      expect(deleted).toEqual(['root'])
+      disposeDocument(runtimeSessionId)
+      expect(deleted).toEqual(['root'])
+    },
+  )
 
   it('drops the same-version snapshot before reparsing when content length differs', async () => {
     const runtimeSessionId = 'runtime-length-mismatch'

@@ -77,6 +77,7 @@ export class CanvasRowPainter {
   private backgroundStart = 0
   private backgroundEnd = 0
   private readonly cellColors: CanvasCellColors[] = []
+  private readonly cells: RenderCell[] = []
   private colors: CanvasColorCache
   private currentAlpha = 1
   private currentFill?: string
@@ -121,8 +122,13 @@ export class CanvasRowPainter {
   }
 
   invalidate(): void {
+    this.finishFrame()
     this.backgroundColor = undefined
     this.plainRows.clear()
+  }
+
+  finishFrame(): void {
+    this.cells.length = 0
   }
 
   setTheme(theme: CanonicalRendererTheme): void {
@@ -137,6 +143,7 @@ export class CanvasRowPainter {
     width: number,
     allowCellDamage = true,
     capturedPlainText?: string | null,
+    clearRow = true,
   ): void {
     const damage = allowCellDamage
       ? this.plainDamage(row, cursor, width, capturedPlainText)
@@ -156,6 +163,10 @@ export class CanvasRowPainter {
       // Spreading the source row would invoke its complete-cell getter.
       row = { y: row.y, dirty: row.dirty, cells }
     }
+    if (!allowCellDamage && row.packed && !this.context.glyph) {
+      const cells = row.packed.readInto(this.cells)
+      row = { y: row.y, dirty: row.dirty, cells }
+    }
     const y = row.y * this.font.deviceCellHeight
     this.currentFill = undefined
     this.currentFont = this.fonts[0]
@@ -166,7 +177,7 @@ export class CanvasRowPainter {
       this.context.beginPath()
       this.context.rect(x, y, paintWidth, this.font.deviceCellHeight)
       this.context.clip()
-      this.context.clearRect(x, y, paintWidth, this.font.deviceCellHeight)
+      if (clearRow) this.context.clearRect(x, y, paintWidth, this.font.deviceCellHeight)
       if (plain) {
         this.paintPlain(damage.text, cursor, row.y, damage.first, damage.end)
         return

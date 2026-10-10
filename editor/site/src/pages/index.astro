@@ -1,12 +1,12 @@
 ---
 import Manual from '../layouts/Manual.astro'
 import { NAV } from '../manual/content'
-import { renderCode } from '../manual/render'
+import { renderExample } from '../manual/examples'
 import hero from '../examples/hero.ts?raw'
 
 const heroSource = hero.replace(/\n$/, '')
-const sample = await renderCode(heroSource, 'typescript')
-const install = await renderCode('npm install @singapore-editor/core', 'shellscript')
+const sample = (await renderExample(heroSource, 'typescript')).replace('<figure data-example', '<figure class="hero" data-home-example data-example').replace('typescript example</span>', 'This is a Singapore editor, configured for TypeScript.</span>')
+const install = await renderExample('npm install @singapore-editor/core', 'shellscript')
 const start = NAV.find((section) => section.label === 'Start here')!
 const tagline = 'A code editor for the browser that keeps every version.'
 ---
@@ -19,20 +19,11 @@ const tagline = 'A code editor for the browser that keeps every version.'
       piece table, and anchors follow text through edits. Parsing, highlighting and language
       servers run in workers.
     </p>
-    <figure class="hero">
-      <div class="hero-box src">
-        <div class="hero-static" set:html={sample.html} />
-      </div>
-      <figcaption>
-        <span>This is a Singapore editor, configured for TypeScript. Edit this.</span>
-        <span class="hero-mode"></span>
-      </figcaption>
-    </figure>
+    <Fragment set:html={sample} />
     <h2>Install</h2>
-    <div class="src install" set:html={install.html} />
+    <Fragment set:html={install} />
     <p>
-      Then follow the <a href={start.pages[1]!.href}>quick start</a>. Every docs page opens in the
-      same editor you are installing.
+      Then follow the <a href={start.pages[1]!.href}>quick start</a>. The docs explain how to configure and use the editor.
     </p>
     <h2>Start here</h2>
     <ul class="index">
@@ -55,8 +46,9 @@ const tagline = 'A code editor for the browser that keeps every version.'
       and contributions go.
     </footer>
   </main>
-  <script is:inline type="application/json" id="hero-source" set:html={JSON.stringify(heroSource)} />
   <script>
-    import '../manual/home'
+    import '../manual/live-examples'
+    import { setUpSearch } from '../manual/search'
+    setUpSearch()
   </script>
 </Manual>

@@ -53,3 +53,5 @@ export { createTestTerminalHost } from './terminal-host/testing'
 
 export { LogReaderService } from './observability/log-reader'
 export { releaseSource } from './machines/update'
+
+export { testLoopbackPeer, testLoopbackRequest } from './testing/request'

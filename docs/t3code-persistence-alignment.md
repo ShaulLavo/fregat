@@ -1,3 +1,9 @@
+> Historical comparison. The active reference is the October 10 published T3 Code nightly
+> `v0.0.46-nightly.20261010.2922`, commit `bd2346eda2e2c380d1844869c7fd16c279d2190f`.
+> [Plan 343](../plans/343-t3code-nightly-orchestration.md) owns the Approved, deferred rewrite.
+> The findings, percentages, paths, and receipts below describe their original revisions.
+> Re-audit affected behavior against nightly before scheduling implementation.
+
 # T3Code Parity — Client Persistence
 
 > **Measured 2026-09-22.** Reference at `references/t3code` commit `4a560b4e`; ours at the

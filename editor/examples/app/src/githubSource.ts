@@ -1,9 +1,10 @@
+import { createStructuredError } from './structured-errors.ts'
+
 export const REPOSITORY_OWNER = 'ShaulLavo'
 export const REPOSITORY_NAME = 'singapore'
 const REPOSITORY_BRANCH = 'main'
 
 const COMMIT_ENDPOINT = `https://api.github.com/repos/${REPOSITORY_OWNER}/${REPOSITORY_NAME}/commits/${REPOSITORY_BRANCH}`
-const FETCH_CONCURRENCY = 8
 
 const TEXT_EXTENSIONS = new Set([
   '.css',
@@ -23,34 +24,14 @@ const TEXT_EXTENSIONS = new Set([
 
 const TEXT_FILENAMES = new Set(['.gitignore'])
 
-type GitHubTreeResponse = {
-  readonly sha?: unknown
-  readonly tree?: unknown
-  readonly truncated?: unknown
-}
-
-type GitHubCommitResponse = {
-  readonly sha?: unknown
-  readonly commit?: {
-    readonly tree?: {
-      readonly sha?: unknown
-    }
-  }
-}
-
-type GitHubTreeItem = {
-  readonly path?: unknown
-  readonly type?: unknown
-  readonly sha?: unknown
-  readonly size?: unknown
-}
-
 export type SourceFile = {
   readonly path: string
   readonly sha: string
   readonly size: number
   readonly text: string
 }
+
+export type SourceEntry = Pick<SourceFile, 'path' | 'sha' | 'size'>
 
 export type SourceSnapshot = {
   readonly owner: string
@@ -59,7 +40,7 @@ export type SourceSnapshot = {
   readonly commitSha: string
   readonly treeSha: string
   readonly fetchedAt: number
-  readonly files: readonly SourceFile[]
+  readonly files: readonly SourceEntry[]
 }
 
 export type RepositorySourceRef = {
@@ -68,20 +49,17 @@ export type RepositorySourceRef = {
 }
 
 export async function fetchRepositorySource(
-  sourceRef?: RepositorySourceRef,
+  sourceRef: RepositorySourceRef,
+  signal?: AbortSignal,
 ): Promise<SourceSnapshot> {
-  const resolvedRef = sourceRef ?? (await fetchRepositoryRef())
-  const tree = await fetchRepositoryTree(resolvedRef.treeSha)
-  const entries = parseTreeEntries(tree)
-  const files = await mapWithConcurrency(entries, FETCH_CONCURRENCY, (entry) =>
-    fetchSourceFile(resolvedRef.commitSha, entry),
-  )
+  const tree = await fetchRepositoryTree(sourceRef.treeSha, signal)
+  const files = parseTreeEntries(tree)
 
   return {
     owner: REPOSITORY_OWNER,
     repo: REPOSITORY_NAME,
     branch: REPOSITORY_BRANCH,
-    commitSha: resolvedRef.commitSha,
+    commitSha: sourceRef.commitSha,
     treeSha: tree.sha,
     fetchedAt: Date.now(),
     files,
@@ -98,14 +76,24 @@ export function isSourceTextPath(path: string): boolean {
   return TEXT_EXTENSIONS.has(extensionForPath(path))
 }
 
-export async function fetchRepositoryRef(): Promise<RepositorySourceRef> {
-  const response = await fetch(COMMIT_ENDPOINT)
-  if (!response.ok) throw new Error(`GitHub commit fetch failed: ${response.status}`)
+export async function fetchRepositoryRef(signal?: AbortSignal): Promise<RepositorySourceRef> {
+  const response = await fetch(COMMIT_ENDPOINT, { signal })
+  if (!response.ok)
+    throw createStructuredError('FETCH_FAILED', { operation: 'commit', status: response.status })
 
-  const body = (await response.json()) as GitHubCommitResponse
-  if (typeof body.sha !== 'string') throw new Error('GitHub commit response missing sha')
-  if (typeof body.commit?.tree?.sha !== 'string')
-    throw new Error('GitHub commit response missing tree sha')
+  const body: unknown = await response.json()
+  if (
+    !isRecord(body) ||
+    typeof body.sha !== 'string' ||
+    !isRecord(body.commit) ||
+    !isRecord(body.commit.tree) ||
+    typeof body.commit.tree.sha !== 'string'
+  ) {
+    throw createStructuredError('INVALID_RESPONSE', {
+      operation: 'commit',
+      expected: 'commit and tree ids',
+    })
+  }
 
   return {
     commitSha: body.sha,
@@ -115,20 +103,28 @@ export async function fetchRepositoryRef(): Promise<RepositorySourceRef> {
 
 async function fetchRepositoryTree(
   treeSha: string,
+  signal?: AbortSignal,
 ): Promise<{ readonly sha: string; readonly tree: unknown[] }> {
-  const response = await fetch(treeEndpoint(treeSha))
-  if (!response.ok) throw new Error(`GitHub tree fetch failed: ${response.status}`)
+  const response = await fetch(treeEndpoint(treeSha), { signal })
+  if (!response.ok)
+    throw createStructuredError('FETCH_FAILED', { operation: 'tree', status: response.status })
 
-  const body = (await response.json()) as GitHubTreeResponse
-  if (body.truncated === true) throw new Error('GitHub tree response was truncated')
-  if (typeof body.sha !== 'string') throw new Error('GitHub tree response missing sha')
-  if (!Array.isArray(body.tree)) throw new Error('GitHub tree response missing tree')
+  const body: unknown = await response.json()
+  if (!isRecord(body) || typeof body.sha !== 'string' || !Array.isArray(body.tree)) {
+    throw createStructuredError('INVALID_RESPONSE', {
+      operation: 'tree',
+      expected: 'tree id and entries',
+    })
+  }
+  if (body.truncated === true) {
+    throw createStructuredError('INVALID_RESPONSE', { operation: 'tree', truncated: true })
+  }
 
   return { sha: body.sha, tree: body.tree }
 }
 
-function parseTreeEntries(tree: { readonly tree: readonly unknown[] }): GitHubTreeFileEntry[] {
-  const entries: GitHubTreeFileEntry[] = []
+function parseTreeEntries(tree: { readonly tree: readonly unknown[] }): SourceEntry[] {
+  const entries: SourceEntry[] = []
 
   for (const item of tree.tree) {
     const entry = parseTreeFileEntry(item)
@@ -139,8 +135,9 @@ function parseTreeEntries(tree: { readonly tree: readonly unknown[] }): GitHubTr
   return entries.sort((left, right) => left.path.localeCompare(right.path))
 }
 
-function parseTreeFileEntry(item: unknown): GitHubTreeFileEntry | null {
-  const entry = item as GitHubTreeItem
+function parseTreeFileEntry(item: unknown): SourceEntry | null {
+  if (!isRecord(item)) return null
+  const entry = item
   if (entry.type !== 'blob') return null
   if (typeof entry.path !== 'string') return null
   if (typeof entry.sha !== 'string') return null
@@ -154,15 +151,14 @@ function parseTreeFileEntry(item: unknown): GitHubTreeFileEntry | null {
   }
 }
 
-type GitHubTreeFileEntry = {
-  readonly path: string
-  readonly sha: string
-  readonly size: number
-}
-
-async function fetchSourceFile(ref: string, entry: GitHubTreeFileEntry): Promise<SourceFile> {
-  const response = await fetch(sourceFileRawUrl(entry.path, ref))
-  if (!response.ok) throw new Error(`GitHub raw fetch failed for ${entry.path}: ${response.status}`)
+export async function fetchSourceFile(
+  ref: string,
+  entry: SourceEntry,
+  signal?: AbortSignal,
+): Promise<SourceFile> {
+  const response = await fetch(sourceFileRawUrl(entry.path, ref), { signal })
+  if (!response.ok)
+    throw createStructuredError('FETCH_FAILED', { operation: 'file', status: response.status })
 
   return {
     ...entry,
@@ -178,26 +174,8 @@ function rawSourceBase(ref: string): string {
   return `https://raw.githubusercontent.com/${REPOSITORY_OWNER}/${REPOSITORY_NAME}/${ref}`
 }
 
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  concurrency: number,
-  mapper: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results = Array.from<R | undefined>({ length: items.length })
-  let nextIndex = 0
-
-  async function worker(): Promise<void> {
-    for (;;) {
-      const index = nextIndex
-      nextIndex += 1
-      if (index >= items.length) return
-      results[index] = await mapper(items[index]!)
-    }
-  }
-
-  const workerCount = Math.min(concurrency, items.length)
-  await Promise.all(Array.from({ length: workerCount }, worker))
-  return results as R[]
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }
 
 function fileName(path: string): string {

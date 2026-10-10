@@ -6,6 +6,7 @@ import {
 import { isRecord } from '@workspace/utils/objects'
 import { expect } from 'vitest'
 import type { App } from '../src/app'
+import { captureRequestHeaders } from '../src/devices/trust'
 
 export function createInProcessTerminalSocket(
   app: App,
@@ -23,9 +24,14 @@ export function createInProcessTerminalSocket(
     return expect.unreachable('Missing terminal WebSocket hooks')
   const messages: TerminalServerMessage[] = []
   const closes: { code?: number; reason?: string }[] = []
+  const request = new Request('http://127.0.0.1:3001/terminal', {
+    headers: { ...headers, origin, host: '127.0.0.1:3001' },
+  })
+  captureRequestHeaders(request, '127.0.0.1')
   const socket = {
     raw: {},
     data: {
+      request,
       headers: { ...headers, origin },
       query: Object.fromEntries(Object.entries(input).map(([key, value]) => [key, String(value)])),
     },

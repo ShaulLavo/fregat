@@ -207,7 +207,7 @@ export async function fetchTree(path: FilesystemPath, signal: AbortSignal, clien
       context: { method: 'GET', path, route: '/fs/tree' },
       operation: 'fs.tree',
     })
-    logTreeError(path, error, startedAt, signal, owner)
+    logFilesystemError('fs.tree', path, error, startedAt, signal, owner)
     throw error
   }
 }
@@ -241,7 +241,7 @@ export async function fetchFile(
       context: { method: 'GET', path, route: '/fs/read' },
       operation: 'fs.read',
     })
-    logReadError(path, error, startedAt, signal, owner)
+    logFilesystemError('fs.read', path, error, startedAt, signal, owner)
     throw error
   }
 }
@@ -701,43 +701,22 @@ function queueReadSuccessLog(
   })
 }
 
-function logReadError(
+function logFilesystemError(
+  action: 'fs.read' | 'fs.tree',
   path: string,
   error: unknown,
   startedAt: number,
   signal: AbortSignal,
   owner: FileLogOwner,
 ) {
-  if (signal.aborted) return
-  if (isAbortError(error)) return
-
-  log.warn({
+  if (signal.aborted || isAbortError(error)) return
+  const summary = errorSummary(error)
+  log[summary.code === 'NOT_FOUND' ? 'info' : 'warn']({
     ...owner,
-    action: 'fs.read',
+    action,
     area: 'fs',
     durationMs: elapsedMs(startedAt),
-    error: errorSummary(error),
-    outcome: 'error',
-    path,
-  })
-}
-
-function logTreeError(
-  path: string,
-  error: unknown,
-  startedAt: number,
-  signal: AbortSignal,
-  owner: FileLogOwner,
-) {
-  if (signal.aborted) return
-  if (isAbortError(error)) return
-
-  log.warn({
-    ...owner,
-    action: 'fs.tree',
-    area: 'fs',
-    durationMs: elapsedMs(startedAt),
-    error: errorSummary(error),
+    error: summary,
     outcome: 'error',
     path,
   })

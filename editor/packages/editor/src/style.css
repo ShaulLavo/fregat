@@ -328,7 +328,8 @@
   line-height: inherit;
   max-height: var(--editor-row-height);
   overflow: hidden;
-  user-select: none;
+  /* WebKit moves CSS highlight paint from unselectable widget text onto adjacent text. */
+  user-select: text;
   vertical-align: top;
   white-space: normal;
 }

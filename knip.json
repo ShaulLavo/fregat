@@ -163,6 +163,7 @@
         "src/index.ts",
         "src/logging/evlog.ts",
         "src/logging/index.ts",
+        "src/paint.ts",
         "src/public/document.ts",
         "src/public/extensions.ts",
         "src/public/keymap.ts",
@@ -174,7 +175,8 @@
         "src/**/*.worker.ts",
         "bench/**/*.ts",
         "test/types/**/*.ts",
-        "test/reading-order.proof.mjs"
+        "test/reading-order.proof.mjs",
+        "vitest.snapshot.config.ts"
       ],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
       "ignoreDependencies": ["@playwright/test"]
@@ -354,6 +356,7 @@
       ]
     },
     "editor/site": {
+      "entry": ["scripts/capture-page.ts", "src/examples/*.ts"],
       "ignoreDependencies": ["@singapore-editor/*", "satteri", "react", "@types/react", "solid-js"]
     }
   },

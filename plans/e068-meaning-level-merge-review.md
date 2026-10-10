@@ -98,10 +98,12 @@ them).
 - **Determinism.** The detector reads only the confirmed log and the text it produces, so every
   copy marks the same units with the same IDs (unit kind plus the character ID of its first
   character). Pending local edits are ignored until confirmed.
-- **Cost.** Off the edit path: runs in the tree-sitter worker after the parse that follows a
-  remote batch, only over changed ranges that contain concurrent edits. Documents without a
-  session or with one author do no work. Budget: under 2 ms per batch for 100k-line files with
-  100 concurrent edits, measured.
+- **Cost.** Off the edit path: the coordinator runs on the invoking thread after the parse
+  that follows a remote batch; syntax reads use the parser worker over changed ranges that
+  contain concurrent edits. Documents without a
+  session or with one author do no work. The owner accepts the measured 3–4 ms complete
+  detector median for 100k-line files with 100 concurrent edits for now (2026-10-10).
+  Further reductions and the former under-2-ms target are Later work, not delivery gates.
 - **Review.** A mark over the unit and a gutter dot; the hover names the authors and shows the
   base, theirs and yours versions of the unit. Resolutions:
   - Keep both: dismiss the mark.
@@ -128,7 +130,7 @@ them).
    Run `bun run --cwd editor/packages/collab bench:concurrency` after its package build.
    Cost evidence lives in `editor/packages/collab/bench/concurrency-evidence.json`.
    The [append cost follow-up](#concurrency-append-cost) reduces retained-window bookkeeping.
-   These are shared-machine experiments; the detector's full 2 ms budget remains a step 3 gate.
+   These are shared-machine experiments; the current cost decision is recorded in the batch phase follow-up below.
 2. **Merge-unit queries** in `packages/tree-sitter-languages`, first for TypeScript, TSX,
    JavaScript, JSON, CSS, Markdown, Python, Rust and Go; the other languages in `languages.json`
    use the line fallback until they get a file.
@@ -152,9 +154,10 @@ them).
    Verification covers original fixtures for every grammar, separator-enclosing LF/CRLF fallback,
    lazy compilation, incremental edits, stale requests, deepest nested injections, MDX fences,
    injected-language fallback, UTF-16 offsets and all ten independent-review blockers.
-3. **Detector:** functional implementation and live worker wiring verified 2026-10-09;
-   **step incomplete** until projected-query integration and the unchanged
-   **under-2-ms batch gate** pass. The demand-only
+3. **Detector: Delivered 2026-10-10.** Functional implementation, live worker wiring and
+   projected-query integration are verified. The owner accepts the measured batch cost
+   for now; the former under-2-ms gate is retired. Earlier cost-gate statements below are
+   historical evidence, superseded by the batch phase follow-up. The demand-only
    `@singapore-editor/collaboration/merge-review` export combines confirmed concurrency and an
    injectable syntax reader without adding a dependency between collab and tree-sitter.
    It emits `overlap`, `parse`, `signature` and `orphan`, retains exact concurrent edges,
@@ -209,7 +212,8 @@ them).
    Projection snapshots are reused per detect call, and mark edges are accumulated once.
    No changes were made to `packages/collab/src/concurrency.ts`; its append tuning is separate.
 
-   **The independent-unit median and marked 8 ms median pass; the 2 ms tail gate remains open.**
+   **The independent-unit median and marked 8 ms median passed in this earlier experiment.**
+   The current acceptance decision is recorded in the batch phase follow-up.
    Run `bun run --cwd editor/packages/collaboration bench:merge-review` after workspace builds.
    The 2026-10-09 detector-cost follow-up includes append, exact pairs, identity mapping and
    real syntax queries. Current parsing, authoring, window construction, application, IPC and
@@ -461,8 +465,8 @@ recorded load and power without enforcing either guard. These are **unguarded, l
 shared-machine experiments**. Browser after runs recorded one-minute loads 3.48/3.54; cursor
 after/after/before runs recorded 3.15/3.30/3.25; detector-gate after/after/before runs recorded
 3.06/3.10/3.08. The earlier load-below-3 qualification was unsupported and is withdrawn.
-All Mac timing numbers below are descriptive observations; they establish neither a qualified
-latency result nor cursor cost-regression proof. No guarded rerun was performed. Linux uses
+Those earlier Mac timing results are descriptive observations; they establish neither a qualified
+latency result nor cursor cost-regression proof. Those experiments had no enforced load guard. Linux uses
 the i7-14700K and Node 26.7.0 through non-quiet bench-class admission; its wall times are not
 verdicts. Raw samples, source hashes and arithmetic summaries remain unchanged.
 
@@ -535,7 +539,7 @@ units from the same 100-edit batch; every run asserts all 50 overlap marks.
 | Result JSON UTF-8 bytes per batch            | 61,444–61,644    | 92,166–92,466          |
 
 The ordinary bridge awaits one worker query per range in
-`editor/packages/tree-sitter/src/mergeReview.ts:160–182`. The dense batch adds 50 projected
+`editor/packages/tree-sitter/src/mergeReview.ts:160–182`. The dense batch adds 50 current-range
 queries. Byte counts cover these query envelopes, are computed after timing and are a
 reproducible JSON-size proxy. They are not structured-clone wire bytes or a count of all
 worker traffic. Round trips include worker query/projection work and any source reads.
@@ -595,15 +599,287 @@ does not enforce these conditions. Linux runs remain non-quiet and report alloca
 only. Early pilots with unavailable GC, interleaved controls and
 an overly broad cursor timer are excluded from the final comparisons.
 
+#### Batched worker reads
+
+The bridge groups all ranges from one syntax read into a single `reviewBatch`
+request. Independent detector reads in the same analysis step share that request through
+`TreeSitterReviewSyntax.batch`. The worker evaluates them in input order using the existing
+current-unit and author-projection query paths. A runtime cancellation flag covers the batch;
+individual stale/cancelled results still make the affected read unavailable. Batch release
+waits for the worker task and releases every source loan, including when a loan release fails.
+The retained projection limit and base-tree ownership are unchanged. Batch cancellation and entry-local cancellation are combined throughout execution; runtime
+disposal cancels the batch without mutating caller-owned entry flags. Concurrent pairs share in-flight formatting comparisons by edit and
+unit; their independent current/projection reads enter the same batch. A real-parser coarse-unit
+regression catches duplicate comparisons while the reads are still pending.
+
+The non-quiet Linux experiment over the same 100k-line, four-author, 100-edit fixtures proves
+100 ordinary / 150 dense query exchanges become one total worker request per detector batch.
+All eight after samples per shape assert the one-request bound and exact equality against a
+reader without coalescing. Both shapes retain their marks, including all 50 dense overlaps.
+The baseline traffic in this reproduction is entirely `mergeUnit`; the extra dense ranges
+are current deletion footprints, not author projections. Projection batches are separately
+covered by real-worker tests, including mixed current/projected reads, nested languages,
+stale/cancelled entries, runtime disposal and rejected source-loan release. New projected
+sources still use the document-source loan protocol; this experiment does not establish a
+constant count of source-transfer messages for arbitrary projection-heavy histories.
+
+| Linux, experiment, shared machine | Ordinary before / after       | Dense before / after          |
+| --------------------------------- | ----------------------------- | ----------------------------- |
+| Query request/result pairs        | 100 / 1                       | 150 / 1                       |
+| Query request JSON UTF-8 bytes    | 31,536–31,836 / 4,521–4,525   | 47,304–47,754 / 6,589–6,593   |
+| Query result JSON UTF-8 bytes     | 61,444–61,644 / 24,953–24,955 | 92,166–92,466 / 37,339–37,341 |
+
+JSON sizes remain a payload-size proxy. They are not structured-clone wire bytes. Linux
+elapsed times are excluded from verdicts while the PC runs the owner's Bevy workload.
+`editor/packages/collaboration/bench/batched-worker-evidence.json` records source hashes,
+request counts and guarded Mac A/B/B/A samples. Both portable JavaScript/WASM versions were
+built on Linux before taking the Mac turn. The controller enforces AC and one-minute load
+below 3 immediately before every sample block; recorded loads were 2.98, 2.76, 2.44 and 2.27.
+One warmup pass and four measured fixture-order passes per block give 16 samples per shape
+and production version. Every sample matches the non-coalescing reader, and mark hashes
+match across versions. These are worker-only **experiment, shared machine** results; UI
+samples are omitted.
+
+| Guarded M1 Mac, before / after | Ordinary         | Dense, 50 overlaps |
+| ------------------------------ | ---------------- | ------------------ |
+| Total worker requests          | 100 / 1          | 150 / 1            |
+| Complete detector median       | 50.95 / 48.50 ms | 52.10 / 49.45 ms   |
+| Complete detector p95          | 52.20 / 49.90 ms | 53.00 / 50.40 ms   |
+| Summed query round-trip median | 49.25 / 47.25 ms | 50.55 / 48.05 ms   |
+
+P95 uses nearest rank. The median completion observations are about 5% lower. The exchange
+count goal is met, but one reply still takes roughly 47–48 ms and the 2 ms target remains
+open. Count reduction alone does not explain that remaining cost.
+
+Two earlier setup attempts stopped before collecting any timing sample because load was
+4.78 and 3.12. A queued retry also reached its ten-minute background limit before admission.
+The successful retry used portable bundles and a longer bounded guard wait. Failed attempts
+supply no timing verdict; every attempt removed its owned Mac temporary directory.
+
+The runtime benchmark preloads its observed lazy dependencies to prevent Vite from reloading
+a test while it records samples. A cold run passes without the previous reload warning.
+
+The runtime bench also now waits for both lazy hover controllers before editing and measuring
+hover opening. A reproduced command-dispatch failure showed that two animation frames did
+not guarantee the demand-loaded hover plugin was ready. The readiness check is outside all
+reported timers; no hover speedup is claimed.
+
+#### Review revisions and worker phase profile
+
+Oversized logical reads now split into messages containing at most 256 selections, counting
+an empty descriptor as one selection. Current and projected loops yield to the worker event
+queue every 32 selections. Every message shares one overall cancellation deadline with its
+entry contexts, and each context observes both the batch and entry flags during native
+progress checks. Cancelling or superseding the logical batch stops posting later chunks.
+Results retain their original range/read order. Reads of another base settle outstanding
+queries and release their projected source loans before admitting that base. The six-snapshot
+and 8,000,000-source-unit retention limits remain unchanged.
+
+Seven real-worker regressions failed before these fixes and pass afterward. They cover a
+20,000-range read with a highlighting reply before completion, the 256-selection ceiling
+and 79-message count, separate current/projected cancellation flags, mid-work cancellation
+and supersession, and sequential/batch equality across seven small snapshots or three
+3,000,000-unit snapshots with mixed projected bases. Final cleanup returns source reads to
+zero. An eighth regression verifies that review admissions declare immutable parse intent.
+The review-revision real-worker corpus has 41 tests. The 226-test collaboration corpus now compares
+coalescing against the plain reader across its differential corpus, 10,000 seeded histories
+and peer-convergence histories.
+
+One further guarded Mac turn profiled the remaining reply and tested the single observed
+cause in A/B/B/A order. AC and one-minute load below 3 were checked before each block;
+loads were 2.82, 2.63, 2.57 and 2.51. Each version has 16 samples per shape. This is a
+worker-only **experiment, shared machine**, with probes enabled and nearest-rank p95.
+The after control suppresses idle warm-up only for the owned benchmark review runtime
+prefix. Production uses the general `readOnly` parse option, with final Linux counts
+confirming the same removal. No runtime-prefix special case is shipped.
+
+| Guarded Mac phase, median before / after | Ordinary        | Dense, 50 overlaps |
+| ---------------------------------------- | --------------- | ------------------ |
+| Complete detector                        | 48.45 / 3.20 ms | 50.00 / 3.80 ms    |
+| Complete detector p95                    | 50.20 / 4.70 ms | 51.20 / 4.60 ms    |
+| One query reply                          | 47.15 / 1.90 ms | 48.60 / 2.40 ms    |
+| Post to worker receipt                   | 45.75 / 0.05 ms | 46.65 / 0.10 ms    |
+| Receipt to execution start               | 0.00 / 0.00 ms  | 0.00 / 0.00 ms     |
+| Worker execution                         | 1.50 / 1.70 ms  | 1.80 / 2.05 ms     |
+| Worker completion to main receipt        | 0.00 / 0.20 ms  | 0.10 / 0.25 ms     |
+| Range work, including native queries     | 1.40 / 1.70 ms  | 1.80 / 2.00 ms     |
+| Native query subset                      | 0.50 / 0.60 ms  | 0.45 / 0.70 ms     |
+| Queued idle-reparse span                 | 49.90 / 0 ms    | 49.90 / 0 ms       |
+| Native parse subset of idle span         | 43.85 / 0 ms    | 44.05 / 0 ms       |
+
+The delay is before the worker receives the batch event. An already-running synchronous
+idle reparse blocks that event; it warms the tree for a later edit that an immutable review
+base never performs. It is not parsing inside the batch or a slow source transfer. Both
+Linux and Mac batch probes count zero source commands, source acquisitions, source-copy
+callbacks and native parses. Ordinary/dense still use one actual request, 100/150 ranges,
+400/500 non-root native queries and 3/4 cooperative yields. Before the fix, each review base
+also incurs one idle native parse and one source-copy callback copying 4096 units; after,
+there are no review idle-reparse spans. All mark hashes remain identical, including the
+50 dense overlaps. Linux supports these count conclusions only, with no quiet admission
+or elapsed-time verdict while Bevy runs.
+
+Native query time is nested within range work, and source-copy time within parse work.
+Delivery and the idle span overlap. The rows are phase observations, not additive exclusive
+costs. Instrumentation and the shared machine limit the comparison; it is not an
+uninstrumented release-speed claim. The ordinary complete median is still above 2 ms,
+and no other optimization was attempted. Portable samples, guards, counts and final
+production source hashes at `9bdfb67152b9928f075287bc04ee2670523f76fe` are in
+`editor/packages/collaboration/bench/worker-phase-evidence.json`. Raw evidence is retained
+under `/work/reports/e068-i-20261010/profile-mac/` and the before/after Linux profile directories.
+
+#### Immutable snapshot ownership correction
+
+Retained `ParsedDocument` records now preserve their immutable intent. A read-only request
+can reuse a mutable tree without changing its intent. A same-version mutable parse retires
+an immutable snapshot and builds a fresh mutable tree. An edit whose previous version is immutable
+also retires that base and parses the complete edited source under the edit's cancellation
+context. It never passes the immutable root or its injected layers to live incremental
+reuse. Ordinary mutable edits retain the existing incremental path. Projected snapshots
+and partial bootstrap previews stay immutable, and injection reloads preserve their
+owner's intent.
+
+Two additional real-worker regressions failed at `9bdfb67152b9928f075287bc04ee2670523f76fe`.
+They cover direct editing from an immutable version and same-version immutable-to-mutable
+parsing followed by editing. A fresh mutable control first establishes that the native
+`treeSitter.parseRoot` phase is observable. Both final edits match the full control's
+highlight captures, packed tokens and errors. The direct path has no incremental-edit
+phase; the promoted path has a fresh parse followed by an ordinary incremental edit.
+Disposal returns both tree count and source-read count to zero. The two tests extend the
+merge-unit corpus to 43 tests. The original guarded phase evidence remains pinned to its
+measured source, not to this later ownership correction. No new timing claim is made.
+
+The package's default node suite subsequently reproduced one reuse failure: its fake
+`ParsedDocument` omitted the required `readOnly` boolean behind a whole-object cast.
+The fixture now supplies the complete document and request contracts, with the native
+fake tree as the only cast boundary. Node controls cover mutable reuse with omitted and
+explicit `false` intent, immutable reuse with `true`, and immutable-to-mutable retirement
+with both mutable request forms. That fixture-only correction left production reuse
+unchanged and passed 146 node tests across 18 files and 165 browser tests across eight
+files, plus package typecheck, lint and editor health.
+
+A follow-up node and real-worker regression reproduced the reverse intent transition:
+a read-only request dropped an already mutable tree and its next edit took the full
+parse path. Refusal now applies only to immutable-to-mutable promotion. Mutable reuse
+preserves the cached object's `readOnly: false` intent. The browser regression compares
+the next edit's highlighting and phase names against a known-good ordinary incremental
+edit and a fresh full parse, then proves zero retained trees and source reads on disposal.
+Ordinary incremental edits also report `treeSitter.parseRoot`, so its absence is not a
+valid incremental-edit predicate; `treeSitter.edit` distinguishes the edit path. The
+read-only request itself has no root-parse phase.
+
+`createTreeSitterReviewSyntax` allocates dedicated `merge-review-${UUID}-${batch}` runtime
+sessions, and the example creates that reader separately from the live editor. Those
+review reads do not currently share live runtime identities. The one-way reuse rule
+also preserves mutable trees for callers that explicitly share a backend runtime.
+The final full suites pass 147 node tests, 166 browser tests (including 44 merge-unit
+regressions) and 226 collaboration tests. Workspace builds, parser types/lint, editor
+health and plan checks also pass. No new timing experiment or claim accompanies this fix.
+
+#### Batch phase follow-up and acceptance (2026-10-10)
+
+The owner accepts the 3–4 ms complete detector median for now. Cost research is complete
+for this delivery; the former 2 ms target and tighter tails are Later work, not a current gate.
+This decision supersedes earlier gate wording without changing any recorded measurement.
+
+A fresh guarded Mac baseline at `917e6da49cd610209ecb7d55508ed8275f76e5e6` uses the real
+parser worker over 100k TypeScript lines, four authors, 8,192 retained records and 100
+concurrent edits. Two blocks supply 16 samples per shape; AC and one-minute load below 3
+are recorded before each block (2.77 and 2.86). Each pass uses ordinary/dense/dense/ordinary
+order after one warmup pass. These are probe-enabled **experiments, shared machine**, with
+nearest-rank p95. Current parsing and window construction are excluded.
+
+| Baseline phase, median              | Ordinary | Dense, 50 overlaps |
+| ----------------------------------- | -------- | ------------------ |
+| Complete detector                   | 3.10 ms  | 3.65 ms            |
+| Complete detector p95               | 5.30 ms  | 4.50 ms            |
+| Detector outside the worker reply   | 1.20 ms  | 1.40 ms            |
+| Request construction through post   | 0.40 ms  | 0.40 ms            |
+| Synchronous post serialization      | 0.00 ms  | 0.10 ms            |
+| Post to worker receipt              | 0.10 ms  | 0.15 ms            |
+| Receipt to execution start          | 0.00 ms  | 0.00 ms            |
+| Worker execution                    | 1.60 ms  | 1.90 ms            |
+| Native query subset                 | 0.40 ms  | 0.50 ms            |
+| Worker completion to main receipt   | 0.20 ms  | 0.20 ms            |
+| Main receipt to detector completion | 0.80 ms  | 1.00 ms            |
+| Separate mark publication filtering | 1.00 ms  | 77.85 ms           |
+| Detector plus publication filtering | 4.50 ms  | 81.55 ms           |
+
+Mark publication is a separate operation omitted from the earlier detector totals. The
+probe invokes the real `MergeReview.unsuperseded` against the real confirmed window and
+snapshot and asserts unchanged marks. It excludes listener dispatch and DOM painting.
+Native query time is nested within worker execution; request construction includes detector
+preparation, and main-receipt-to-completion includes decoding and mark construction together.
+The rows and their medians are not additive exclusive costs. An earlier raw probe field
+accidentally used subsequent serial-control requests; the portable evidence derives the
+correct receipt-to-completion interval from the captured batched message.
+
+The sizeable finding is publication repeatedly scanning all retained edits for each pair,
+including history that cannot follow either alternative. `ConfirmedWindow.editsAfter` now
+resolves predecessor identities once, scans only the greater-Lamport suffix of the existing
+canonical candidate index, and checks the existing ancestry intervals. Unknown identities
+return no successors; empty predecessor lists return all retained text edits. Publication
+checks effect visibility and unit intersection only for those successors and returns early
+for an empty mark set. No extra index, parser change or scheduling change is needed.
+
+Causal successor regressions compare against the old identity predicate after reordered
+arrivals, eviction and effect-command bridges. Existing publication regressions retain
+causal supersession, follow-ups outside the unit and effect visibility. The real-worker
+probe compares batched versus serial detector results and publication versus detector marks.
+Ordinary/dense counts remain one message, 100/150 ranges, 400/500 non-root native queries,
+3/4 yields and zero source commands, acquisitions, copy callbacks or native parses.
+
+A second guarded Mac turn compares before/after/after/before versions. AC and one-minute
+load below 3 are recorded before each block (2.88, 2.74, 2.71 and 2.89), with 16 samples
+per version and shape. The larger publication scan occurs on every dense batch in this
+fixture: each of its 50 competing pairs checks the 8,192-entry history. It is outside the
+previously quoted 3–4 ms detector total and runs on the invoking thread before publishing
+marks. It was not a slow worker query.
+
+| Guarded comparison, median before / after | Ordinary       | Dense, 50 overlaps |
+| ----------------------------------------- | -------------- | ------------------ |
+| Complete detector                         | 3.15 / 3.30 ms | 3.90 / 4.10 ms     |
+| Publication filtering                     | 1.20 / 0.00 ms | 87.30 / 0.10 ms    |
+| Detector plus publication filtering       | 4.90 / 3.30 ms | 91.20 / 4.20 ms    |
+| Detector plus publication filtering p95   | 7.30 / 5.80 ms | 112.50 / 7.10 ms   |
+
+The zero ordinary median is below this browser timer's resolution, not proof of zero elapsed
+work. Detector time is unchanged within shared-machine variation; no detector speedup or
+under-2-ms claim is made. Tight tails are not established. A non-quiet Linux count experiment
+on the same 50 latest competing pairs reduces causal identity-index reads from 819,200 to
+100 with identical successor results. These are counts only, not a Linux timing verdict.
+
+Portable guarded samples, phase summaries, source revision, measured patch hash and Linux
+counts are in `editor/packages/collaboration/bench/batch-phase-evidence.json`. Raw evidence
+and private controllers are retained under `/work/reports/e068-j-20261010/`; Mac temporary
+sources are removed after each turn. The new successor regression fails on the original
+source and passes after the change. Final narrow checks pass 32 collab tests across both
+engine projects and 42 collaboration tests, package types/lint, full-text and command-reference
+checks, and plan checks. `editor health` still fails on main for an inherited source-cycle
+baseline delta; the coordinator handles that separately, and this change does not accept it.
+The nine already-shipped `./paint` exports missing from main's API inventory are synchronized;
+no other generated inventory changes are included.
+
+**Later follow-up (Approved, scheduled later):** repeat the phase-free detector and publication
+measurements together, including 2–8 authors and nearest-rank tails. Candidate
+and orphan phases have resolved-Promise allocation opportunities (ordinary baseline medians
+0.40 and 0.30 ms); native parent traversal may have small repeated work. Neither is an
+established sizeable saving. Request serialization and queueing are already lean in this
+profile. Do not attribute every tail to GC. No further micro-optimisation is shipped here.
+
 Remaining Approved work:
 
 - [ ] Establish cursor cost-regression proof with an A/B/B/A rerun that enforces and records
       AC power and one-minute load below 3 before each sample block. Retain exact-result checks.
-- [ ] Continue the ordinary 2 ms tail investigation using the uninstrumented detector gate and
-      instrumented probe together. Do not assign all tails to GC or close the gate from a median.
-- [ ] Reduce the 100 sequential current-unit worker exchanges in `mergeReview.ts:160–182`.
-      Preserve cancellation, source retention and projection ownership; repeat the real-worker
-      ordinary/dense benchmark and retain per-batch request counts and mark equality.
+- [x] Complete the batch cost research for now at the owner-accepted 3–4 ms detector median.
+      The guarded phase profile identifies a separate retained-history publication scan;
+      successor filtering removes that work without changing marks. Further tuning is Later work.
+- [x] Group the current-unit worker exchanges into one request per ordinary/dense batch.
+      Retain exact mark equality, cancellation, source ownership and bounded projection caches;
+      the batched worker reads evidence above covers the real-worker regression checks.
+- [x] Profile the remaining batched worker cost. The guarded phase experiment below identifies
+      immutable-snapshot idle warm-up as the queued work. Skip that warm-up with explicit
+      `readOnly` parse intent; keep it for mutable documents. This experiment observed a
+      3.20 ms ordinary detector median, accepted for now by the later cost decision.
 - [ ] Bound late damaged-root/error-range checks and wide/injected incremental fallbacks.
       `bench/cursor.test.ts` now reproduces the expensive late damaged-root lookup independently
       of syntax-query execution; repeat it with the existing full-reparse differential corpus.
@@ -617,8 +893,10 @@ Remaining Approved work:
 - False positives: seeded E066 simulations where authors type in different functions produce zero
   marks across 10,000 runs; where they type in the same function, every run marks it.
 - Determinism: all peers in E067 simulations report identical mark sets after convergence.
-- Cost: a bench of 100k-line TypeScript with 2–8 authors and 100 concurrent edits per batch
-  meets the 2 ms budget; documents without a session show zero detector calls.
+- Cost: retain exact-result evidence for 100k-line TypeScript with 100 concurrent edits.
+  The four-author real-worker experiment establishes the accepted 3–4 ms detector median;
+  tighter tails and fresh 2–8-author comparisons are Later work. Documents without a session
+  show zero detector calls.
 - `look` screenshots of a mark, its hover and each resolution, read back.
 
 ## Risks and decisions

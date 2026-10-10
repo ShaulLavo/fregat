@@ -1,0 +1,1061 @@
+{
+  "qualification": "experiment, shared machine",
+  "scope": "Ordinary and dense 100k-line, four-author, 100-edit fixtures. New projected sources still use separate document-source loan messages.",
+  "linux": {
+    "method": "Non-quiet shared Linux host. Counts and UTF-8 JSON-size proxies only; elapsed times excluded.",
+    "before": [
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 100,
+        "requestJsonUtf8Bytes": 31536,
+        "resultJsonUtf8Bytes": 61444
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 150,
+        "requestJsonUtf8Bytes": 47304,
+        "resultJsonUtf8Bytes": 92166
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 150,
+        "requestJsonUtf8Bytes": 47304,
+        "resultJsonUtf8Bytes": 92166
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 100,
+        "requestJsonUtf8Bytes": 31608,
+        "resultJsonUtf8Bytes": 61516
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 100,
+        "requestJsonUtf8Bytes": 31636,
+        "resultJsonUtf8Bytes": 61544
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 150,
+        "requestJsonUtf8Bytes": 47454,
+        "resultJsonUtf8Bytes": 92316
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 150,
+        "requestJsonUtf8Bytes": 47754,
+        "resultJsonUtf8Bytes": 92466
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 100,
+        "requestJsonUtf8Bytes": 31836,
+        "resultJsonUtf8Bytes": 61644
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 100,
+        "requestJsonUtf8Bytes": 31836,
+        "resultJsonUtf8Bytes": 61644
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 150,
+        "requestJsonUtf8Bytes": 47754,
+        "resultJsonUtf8Bytes": 92466
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 150,
+        "requestJsonUtf8Bytes": 47754,
+        "resultJsonUtf8Bytes": 92466
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 100,
+        "requestJsonUtf8Bytes": 31836,
+        "resultJsonUtf8Bytes": 61644
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 100,
+        "requestJsonUtf8Bytes": 31836,
+        "resultJsonUtf8Bytes": 61644
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 150,
+        "requestJsonUtf8Bytes": 47754,
+        "resultJsonUtf8Bytes": 92466
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 150,
+        "requestJsonUtf8Bytes": 47754,
+        "resultJsonUtf8Bytes": 92466
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 100,
+        "requestJsonUtf8Bytes": 31836,
+        "resultJsonUtf8Bytes": 61644
+      }
+    ],
+    "after": [
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 4521,
+        "resultJsonUtf8Bytes": 24953,
+        "workerRequests": 1,
+        "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 6589,
+        "resultJsonUtf8Bytes": 37339,
+        "workerRequests": 1,
+        "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 6589,
+        "resultJsonUtf8Bytes": 37339,
+        "workerRequests": 1,
+        "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 4521,
+        "resultJsonUtf8Bytes": 24953,
+        "workerRequests": 1,
+        "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 4522,
+        "resultJsonUtf8Bytes": 24954,
+        "workerRequests": 1,
+        "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 6590,
+        "resultJsonUtf8Bytes": 37340,
+        "workerRequests": 1,
+        "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 6593,
+        "resultJsonUtf8Bytes": 37341,
+        "workerRequests": 1,
+        "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 4525,
+        "resultJsonUtf8Bytes": 24955,
+        "workerRequests": 1,
+        "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 4525,
+        "resultJsonUtf8Bytes": 24955,
+        "workerRequests": 1,
+        "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 6593,
+        "resultJsonUtf8Bytes": 37341,
+        "workerRequests": 1,
+        "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 6593,
+        "resultJsonUtf8Bytes": 37341,
+        "workerRequests": 1,
+        "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 4525,
+        "resultJsonUtf8Bytes": 24955,
+        "workerRequests": 1,
+        "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 4525,
+        "resultJsonUtf8Bytes": 24955,
+        "workerRequests": 1,
+        "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 6593,
+        "resultJsonUtf8Bytes": 37341,
+        "workerRequests": 1,
+        "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "dense",
+        "marks": 50,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 6593,
+        "resultJsonUtf8Bytes": 37341,
+        "workerRequests": 1,
+        "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+        "exactMarkEquality": true
+      },
+      {
+        "mode": "ordinary",
+        "marks": 0,
+        "queryExchanges": 1,
+        "requestJsonUtf8Bytes": 4525,
+        "resultJsonUtf8Bytes": 24955,
+        "workerRequests": 1,
+        "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+        "exactMarkEquality": true
+      }
+    ]
+  },
+  "mac": {
+    "method": "Worker-only production A/B/B/A blocks on a shared Mac. Each block records AC power and one-minute load below 3 immediately before sampling. One warmup pass and four measured A/B/B/A fixture-order passes per block, eight samples per shape. Two blocks per revision give 16 samples per shape/version. P95 uses the nearest-rank definition. Marks match both the non-coalescing oracle and the other production version. UI timings are omitted.",
+    "blocks": [
+      {
+        "name": "1-before",
+        "revision": "before",
+        "guard": {
+          "onAC": true,
+          "oneMinuteLoad": 2.98
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+          "platform": "MacIntel"
+        },
+        "samples": [
+          {
+            "mode": "ordinary",
+            "elapsedMs": 50.89999961853027,
+            "queryRoundTripsMs": 48.80000019073486,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 49.09999990463257,
+            "queryRoundTripsMs": 47.09999990463257,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 52.09999990463257,
+            "queryRoundTripsMs": 50.69999980926514,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 50.5,
+            "queryRoundTripsMs": 49.100000858306885,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 46.09999990463257,
+            "queryRoundTripsMs": 44.59999942779541,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 52.40000009536743,
+            "queryRoundTripsMs": 50.70000076293945,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 48.59999990463257,
+            "queryRoundTripsMs": 47.0,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 51.40000009536743,
+            "queryRoundTripsMs": 50.30000019073486,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 50.299999713897705,
+            "queryRoundTripsMs": 48.79999876022339,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 52.799999713897705,
+            "queryRoundTripsMs": 51.20000076293945,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 53,
+            "queryRoundTripsMs": 51.200000286102295,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 47.5,
+            "queryRoundTripsMs": 46.60000038146973,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 51.69999980926514,
+            "queryRoundTripsMs": 50.80000019073486,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 51.5,
+            "queryRoundTripsMs": 50.09999895095825,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 52.69999980926514,
+            "queryRoundTripsMs": 51.0,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 51.30000019073486,
+            "queryRoundTripsMs": 50.0,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          }
+        ]
+      },
+      {
+        "name": "2-after",
+        "revision": "after",
+        "guard": {
+          "onAC": true,
+          "oneMinuteLoad": 2.76
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+          "platform": "MacIntel"
+        },
+        "samples": [
+          {
+            "mode": "ordinary",
+            "elapsedMs": 47.60000038146973,
+            "queryRoundTripsMs": 46,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 49.90000009536743,
+            "queryRoundTripsMs": 48.09999990463257,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 49.30000019073486,
+            "queryRoundTripsMs": 44.5,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 48.80000019073486,
+            "queryRoundTripsMs": 47.700000286102295,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 47.80000019073486,
+            "queryRoundTripsMs": 46.80000019073486,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 49.5,
+            "queryRoundTripsMs": 48.09999990463257,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 49,
+            "queryRoundTripsMs": 47.60000038146973,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 48.09999990463257,
+            "queryRoundTripsMs": 46.59999990463257,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 49.59999990463257,
+            "queryRoundTripsMs": 48.5,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 49.40000009536743,
+            "queryRoundTripsMs": 48,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 46.30000019073486,
+            "queryRoundTripsMs": 45.09999990463257,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 48.69999980926514,
+            "queryRoundTripsMs": 47.80000019073486,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 49.5,
+            "queryRoundTripsMs": 48.40000009536743,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 49.5,
+            "queryRoundTripsMs": 48.09999990463257,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 48.90000009536743,
+            "queryRoundTripsMs": 47.59999990463257,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 49.90000009536743,
+            "queryRoundTripsMs": 48.5,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          }
+        ]
+      },
+      {
+        "name": "3-after",
+        "revision": "after",
+        "guard": {
+          "onAC": true,
+          "oneMinuteLoad": 2.44
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+          "platform": "MacIntel"
+        },
+        "samples": [
+          {
+            "mode": "ordinary",
+            "elapsedMs": 48.19999980926514,
+            "queryRoundTripsMs": 46.5,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 47.09999990463257,
+            "queryRoundTripsMs": 45.40000009536743,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 48.80000019073486,
+            "queryRoundTripsMs": 47.5,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 49.299999713897705,
+            "queryRoundTripsMs": 48.30000019073486,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 42.40000009536743,
+            "queryRoundTripsMs": 41.19999980926514,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 49.60000038146973,
+            "queryRoundTripsMs": 48.30000019073486,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 48.5,
+            "queryRoundTripsMs": 47.10000038146973,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 47.200000286102295,
+            "queryRoundTripsMs": 45.700000286102295,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 48.90000009536743,
+            "queryRoundTripsMs": 47.799999713897705,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 50.40000009536743,
+            "queryRoundTripsMs": 48.90000009536743,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 49.80000019073486,
+            "queryRoundTripsMs": 48.40000009536743,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 46.09999990463257,
+            "queryRoundTripsMs": 44.90000009536743,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 48.30000019073486,
+            "queryRoundTripsMs": 47.30000019073486,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 50.09999990463257,
+            "queryRoundTripsMs": 48.80000019073486,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 50.30000019073486,
+            "queryRoundTripsMs": 49,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 48.700000286102295,
+            "queryRoundTripsMs": 47.200000286102295,
+            "workerRequests": 1,
+            "queryExchanges": 1,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          }
+        ]
+      },
+      {
+        "name": "4-before",
+        "revision": "before",
+        "guard": {
+          "onAC": true,
+          "oneMinuteLoad": 2.27
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+          "platform": "MacIntel"
+        },
+        "samples": [
+          {
+            "mode": "ordinary",
+            "elapsedMs": 51.90000009536743,
+            "queryRoundTripsMs": 49.30000019073486,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 49.90000009536743,
+            "queryRoundTripsMs": 48.10000038146973,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 52.10000038146973,
+            "queryRoundTripsMs": 50.39999961853027,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 51,
+            "queryRoundTripsMs": 49.90000009536743,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 46.09999990463257,
+            "queryRoundTripsMs": 44.90000009536743,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 52.90000009536743,
+            "queryRoundTripsMs": 51.40000009536743,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 49.5,
+            "queryRoundTripsMs": 47.89999961853027,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 52.19999980926514,
+            "queryRoundTripsMs": 50.90000009536743,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 51,
+            "queryRoundTripsMs": 49.59999990463257,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 52.5,
+            "queryRoundTripsMs": 51.09999990463257,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 52.80000019073486,
+            "queryRoundTripsMs": 51.5,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 47.30000019073486,
+            "queryRoundTripsMs": 46.09999990463257,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 50.799999713897705,
+            "queryRoundTripsMs": 49.200000286102295,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 51.59999990463257,
+            "queryRoundTripsMs": 49.80000019073486,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "dense",
+            "elapsedMs": 52,
+            "queryRoundTripsMs": 50.10000038146973,
+            "workerRequests": 150,
+            "queryExchanges": 150,
+            "marks": 50,
+            "markHash": "84ced0e8b88735702c4458c3f478ffd6046128bcc34dad0887f2555c488c8adc",
+            "exactMarkEquality": true
+          },
+          {
+            "mode": "ordinary",
+            "elapsedMs": 51.39999961853027,
+            "queryRoundTripsMs": 50.39999961853027,
+            "workerRequests": 100,
+            "queryExchanges": 100,
+            "marks": 0,
+            "markHash": "6a14b3dd642a6119f1c6e4dbcd7acf29536737a374929feae3f1affafa325dd3",
+            "exactMarkEquality": true
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "ordinary": {
+        "before": {
+          "sampleCount": 16,
+          "completeDetector": {
+            "medianMs": 50.94999980926514,
+            "p95Ms": 52.19999980926514
+          },
+          "summedQueryRoundTrips": {
+            "medianMs": 49.25000023841858,
+            "p95Ms": 50.90000009536743
+          },
+          "workerRequests": 100
+        },
+        "after": {
+          "sampleCount": 16,
+          "completeDetector": {
+            "medianMs": 48.5,
+            "p95Ms": 49.90000009536743
+          },
+          "summedQueryRoundTrips": {
+            "medianMs": 47.25000023841858,
+            "p95Ms": 48.5
+          },
+          "workerRequests": 1
+        },
+        "medianReductionPercent": 4.808635561210761,
+        "medianSpeedRatio": 1.050515459984848
+      },
+      "dense": {
+        "before": {
+          "sampleCount": 16,
+          "completeDetector": {
+            "medianMs": 52.10000014305115,
+            "p95Ms": 53
+          },
+          "summedQueryRoundTrips": {
+            "medianMs": 50.549999713897705,
+            "p95Ms": 51.5
+          },
+          "workerRequests": 150
+        },
+        "after": {
+          "sampleCount": 16,
+          "completeDetector": {
+            "medianMs": 49.450000047683716,
+            "p95Ms": 50.40000009536743
+          },
+          "summedQueryRoundTrips": {
+            "medianMs": 48.049999952316284,
+            "p95Ms": 49
+          },
+          "workerRequests": 1
+        },
+        "medianReductionPercent": 5.086372529925754,
+        "medianSpeedRatio": 1.0535894862044912
+      }
+    }
+  },
+  "baselineCommit": "d14c74ee69c4d70a50bdce678d1980f8f9f563c2",
+  "productionSourceHashes": {
+    "before": {
+      "editor/packages/collaboration/src/merge-review.ts": "e2110240afd9a4acf7f88745ec7389e98ec8c63d344caf8d1d5ddad2812179e2",
+      "editor/packages/tree-sitter/src/index.ts": "239f3a963233a3cdad177b126d88d33b6c763f916167f443ac63f202e87c19c9",
+      "editor/packages/tree-sitter/src/mergeReview.ts": "6298b6146060b8db7fe2f4b07c85ea6822daba200860306c695fc8875dc6388e",
+      "editor/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts": "d913990b7780d845bc0331a2592af05534d7aaaf2329d5854f8d91d3c3d88096",
+      "editor/packages/tree-sitter/src/treeSitter/types.ts": "3777e9d6ab925d6c41cc54fe8800271334cb6e7d7301b477d52301876429cb05",
+      "editor/packages/tree-sitter/src/treeSitter/workerClient.ts": "65c948a334ceb1e561b320623fef86efb8789d995a763d3c92600dff28539488"
+    },
+    "after": {
+      "editor/packages/collaboration/src/merge-review.ts": "542743c7e1fae4105f6debc5daf4d374a49ee6d99df45e3b5ee39f13a830d499",
+      "editor/packages/tree-sitter/src/index.ts": "b4de5d2fbc883fbdce609b2ee5a40ecf6c2a31e799f04cd2aeabe8bf8cf9b6ff",
+      "editor/packages/tree-sitter/src/mergeReview.ts": "a9cb52e8cc917671218075dc37b41f0ed09d10c203e09c77203f9858b7bbbef0",
+      "editor/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts": "8004838982d55c1140a0881f7c0362170688a7e3fab019ad58511ccba00495ba",
+      "editor/packages/tree-sitter/src/treeSitter/types.ts": "8725e2c510fce4b61e604a4acf13570fcd573dc37099657dadc25b002833dde0",
+      "editor/packages/tree-sitter/src/treeSitter/workerClient.ts": "4ce110ad68d458d319469810b5432ff025cf9a5fa7664f3f9aa73a189a73adcb"
+    }
+  }
+}

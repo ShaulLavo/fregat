@@ -12,14 +12,7 @@ import type { DeviceStore } from './device-store'
 import { PairingCodes } from './pairing-codes'
 import { pairingErrors } from './structured-errors'
 import type { TailnetOwners } from './tailnet-owner'
-import {
-  deviceCredential,
-  forwardedClient,
-  forwardedPeer,
-  isThisMachine,
-  ownAddresses,
-  type HeaderReader,
-} from './trust'
+import { deviceCredential, isDirectLocal, forwardedPeer, type HeaderReader } from './trust'
 
 /** A device unseen this long is dropped, and pairs again. */
 const DEVICE_IDLE_MS = 30 * 24 * 60 * 60_000
@@ -46,19 +39,19 @@ export class DevicePairing {
   private readonly store: DeviceStore
   private readonly codes = new PairingCodes()
   private readonly required: () => boolean
-  private readonly own: () => ReadonlySet<string>
+  private readonly trustedProxyHosts: () => readonly string[]
   private readonly tailnet: TailnetOwners | null
   private readonly now: () => number
   private readonly appUrl: string | null
   /** The close of every live socket, by the device or Tailscale address it was admitted for. */
-  private readonly live = new Map<string, Set<() => void>>()
+  private readonly live = new Map<string, Map<() => void, HeaderReader>>()
   readonly cookieName: string
 
   constructor(options: {
     readonly store: DeviceStore
     readonly required: () => boolean
     readonly cookieName: string
-    readonly ownAddresses?: () => ReadonlySet<string>
+    readonly trustedProxyHosts?: () => readonly string[]
     readonly tailnet?: TailnetOwners
     readonly now?: () => number
     /** The app's public base URL that devices open, for links; null when only loopback serves it. */
@@ -67,7 +60,7 @@ export class DevicePairing {
     this.store = options.store
     this.required = options.required
     this.cookieName = options.cookieName
-    this.own = options.ownAddresses ?? ownAddresses
+    this.trustedProxyHosts = options.trustedProxyHosts ?? (() => [])
     this.tailnet = options.tailnet ?? null
     this.now = options.now ?? Date.now
     this.appUrl = options.appUrl ?? null
@@ -87,21 +80,20 @@ export class DevicePairing {
    * start of each request; it asks at most once a minute per address.
    */
   async identify(header: HeaderReader) {
-    const peer = forwardedPeer(header)
-    if (peer === null || !this.tailnet || isThisMachine(peer, this.own())) return
+    if (isDirectLocal(header)) return
+    const peer = this.proxyPeer(header)
+    if (peer === null || !this.tailnet) return
     await this.tailnet.resolve(peer)
   }
 
   admit(header: HeaderReader): Admission {
-    const client = forwardedClient(header)
-    if (client === null || isThisMachine(client, this.own()))
-      return { trust: 'host', deviceId: null }
+    if (isDirectLocal(header)) return { trust: 'host', deviceId: null }
+    const peer = this.proxyPeer(header)
     const device = this.device(header)
     if (device) {
       this.markSeen(device.id, device.lastSeenAt)
       return { trust: 'device', deviceId: device.id }
     }
-    const peer = forwardedPeer(header)
     const verdict = peer === null || !this.tailnet ? 'not-tailnet' : this.tailnet.verdict(peer)
     recordRequestContext({ tailnetTrust: verdict })
     if (verdict === 'same-user') return { trust: 'tailnet', deviceId: null }
@@ -116,8 +108,8 @@ export class DevicePairing {
   hold(header: HeaderReader, close: () => void) {
     const key = this.holdKey(header)
     if (key === null) return noop
-    const closes = this.live.get(key) ?? new Set()
-    closes.add(close)
+    const closes = this.live.get(key) ?? new Map<() => void, HeaderReader>()
+    closes.set(close, header)
     this.live.set(key, closes)
     return () => {
       closes.delete(close)
@@ -145,13 +137,25 @@ export class DevicePairing {
    * vouches for. Run on a timer and whenever settings change.
    */
   async recheckTailnet() {
-    const addresses = [...this.live.keys()].flatMap((key) =>
+    const addresses = Array.from(this.live.keys()).flatMap((key) =>
       key.startsWith(TAILNET_KEY) ? [key.slice(TAILNET_KEY.length)] : [],
     )
     for (const address of addresses) {
       await this.tailnet?.resolve(address)
       const verdict = this.tailnet?.verdict(address) ?? 'off'
-      if (verdict !== 'same-user' && this.isRequired()) this.closeSockets(TAILNET_KEY + address)
+      if (!this.isRequired()) continue
+      if (verdict !== 'same-user') {
+        this.closeSockets(TAILNET_KEY + address)
+        continue
+      }
+      const key = TAILNET_KEY + address
+      const closes = this.live.get(key)
+      for (const [close, header] of closes ?? []) {
+        if (this.proxyPeer(header) === address) continue
+        closes?.delete(close)
+        close()
+      }
+      if (closes?.size === 0) this.live.delete(key)
     }
   }
 
@@ -189,13 +193,22 @@ export class DevicePairing {
     const id = crypto.randomUUID()
     const secret = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url')
     const at = new Date(this.now()).toISOString()
+    const replaced =
+      claim.relaySourceId === undefined
+        ? []
+        : this.store
+            .list()
+            .filter((device) => device.relaySourceId === claim.relaySourceId)
+            .map((device) => device.id)
     this.store.add({
       id,
+      relaySourceId: claim.relaySourceId,
       label: claim.label,
       secretHash: hash(secret),
       pairedAt: at,
       lastSeenAt: at,
     })
+    for (const previous of replaced) this.closeSockets(previous)
     return { deviceId: id, cookie: this.cookie(`${id}.${secret}`, secure) }
   }
 
@@ -221,10 +234,18 @@ export class DevicePairing {
     this.closeSockets(id)
   }
 
+  private proxyPeer(header: HeaderReader) {
+    try {
+      return forwardedPeer(header, this.trustedProxyHosts())
+    } catch {
+      return null
+    }
+  }
+
   private holdKey(header: HeaderReader) {
     const { trust, deviceId } = this.admit(header)
     if (deviceId !== null) return deviceId
-    const peer = forwardedPeer(header)
+    const peer = this.proxyPeer(header)
     return trust === 'tailnet' && peer !== null ? TAILNET_KEY + peer : null
   }
 
@@ -236,7 +257,7 @@ export class DevicePairing {
   private closeSockets(id: string) {
     const closes = this.live.get(id)
     this.live.delete(id)
-    for (const close of closes ?? []) close()
+    for (const close of closes?.keys() ?? []) close()
   }
 
   private device(header: HeaderReader) {

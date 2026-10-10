@@ -4,6 +4,8 @@ import type { SourceSnapshot } from '../src/githubSource.ts'
 import {
   clearSourceCache,
   loadCachedSourceSnapshot,
+  loadCachedSourceFile,
+  saveSourceFileToCache,
   saveSourceSnapshotToCache,
 } from '../src/sourceCache.ts'
 
@@ -16,32 +18,31 @@ describe('source cache', () => {
 
   it('stores, reads, and clears a source snapshot', async () => {
     await saveSourceSnapshotToCache(snapshot(), opfs)
+    await saveSourceFileToCache(
+      { path: 'README.md', sha: 'readme-sha', size: 8, text: '# Editor' },
+      opfs,
+    )
 
     await expect(loadCachedSourceSnapshot(opfs)).resolves.toMatchObject({
       repo: 'singapore',
       commitSha: 'commit-sha',
       treeSha: 'tree-sha',
-      files: [{ path: 'README.md', text: '# Editor' }],
+      files: [{ path: 'README.md', sha: 'readme-sha' }],
     })
+
+    await expect(loadCachedSourceFile('readme-sha', opfs)).resolves.toBe('# Editor')
 
     await clearSourceCache(opfs)
     await expect(loadCachedSourceSnapshot(opfs)).resolves.toBeNull()
   })
 
-  it('returns null when a cached object is missing', async () => {
+  it('keeps the tree usable before any file contents are cached', async () => {
     await saveSourceSnapshotToCache(snapshot(), opfs)
-    const cacheDir = await opfs.getDirectoryHandle('editor-github-source-cache')
-    const objectsDir = await cacheDir.getDirectoryHandle('objects')
-
-    await objectsDir.removeEntry('readme-sha')
-
-    await expect(loadCachedSourceSnapshot(opfs)).resolves.toBeNull()
-  })
-
-  it('writes the manifest after source objects', async () => {
-    await saveSourceSnapshotToCache(snapshot(), opfs)
-
-    expect(opfs.writeLog.at(-1)).toBe('manifest.json')
+    await expect(loadCachedSourceSnapshot(opfs)).resolves.toMatchObject({
+      files: [{ path: 'README.md' }],
+    })
+    await expect(loadCachedSourceFile('readme-sha', opfs)).resolves.toBeNull()
+    expect(opfs.writeLog).toEqual(['manifest.json'])
   })
 })
 
@@ -53,7 +54,7 @@ function snapshot(): SourceSnapshot {
     commitSha: 'commit-sha',
     treeSha: 'tree-sha',
     fetchedAt: 1,
-    files: [{ path: 'README.md', sha: 'readme-sha', size: 8, text: '# Editor' }],
+    files: [{ path: 'README.md', sha: 'readme-sha', size: 8 }],
   }
 }
 

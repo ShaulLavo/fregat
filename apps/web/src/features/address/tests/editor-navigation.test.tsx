@@ -1,3 +1,4 @@
+import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 import { editorTabRecordsForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import {
   testTabContent,
@@ -6,7 +7,7 @@ import {
   testContentMatches,
   testTabContents,
 } from '../../../../test/factories/document-targets'
-import { filesystemPath, tabId as testTabId } from '@/lib/documents/utils/identity'
+import { fileDocumentKey, filesystemPath, tabId as testTabId } from '@/lib/documents/utils/identity'
 import { rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { test, expect } from '../../../../test/fixtures'
@@ -26,12 +27,23 @@ import {
 test('committed multi-file rename reconciles every path', async ({ client, server }) => {
   const workspace = await navigationWorkspace(client, server)
   seedWorkspaceCache({ ...workspace, tabPaths: ['repo/a.ts', 'repo/b.ts'] })
-  const { harness, navigation } = await renderAddressHarness({
+  const { application, harness, navigation } = await renderAddressHarness({
     initialEntries: [`${workspace.base}/f/a.ts`],
   })
   await waitForNavigation(navigation)
+  const queries = application.getSnapshot().queryClient
+  const unopenedPath = filesystemPath('repo/b.ts')
+  const unopenedQuery = fileSnapshotQueryOptions(unopenedPath)
+  queries.removeQueries({ queryKey: unopenedQuery.queryKey, exact: true })
+  expect(
+    harness.documents.getState().getLiveEditorDocument(fileDocumentKey(unopenedPath)),
+  ).toBeNull()
   await rename(path.join(server.root, 'repo/a.ts'), path.join(server.root, 'repo/renamed-a.ts'))
   await rename(path.join(server.root, 'repo/b.ts'), path.join(server.root, 'repo/renamed-b.ts'))
+  // A read can observe the disk rename before its document-path notification arrives.
+  await expect(queries.query({ ...unopenedQuery, retry: false })).rejects.toBeDefined()
+  expect(queries.getQueryState(unopenedQuery.queryKey)?.status).toBe('error')
+  expect(editorTabContents(harness.workspace)).toContainEqual(testTabContent('repo/b.ts'))
   const commands = navigation.editorCommands(harness.workspace)
   const results = ['a', 'b'].map((name) =>
     commands.renameLiveEditorDocument(
@@ -46,6 +58,49 @@ test('committed multi-file rename reconciles every path', async ({ client, serve
   expect(navigation.router.history.location.href).toContain('/f/renamed-a.ts')
   expect(navigation.router.history.location.href).not.toContain('f%2Fb.ts')
 })
+
+test.for([false, true])(
+  'plain deletion keeps a restored tab recoverable, opened=%s',
+  async (opened, { client, server }) => {
+    const workspace = await navigationWorkspace(client, server)
+    seedWorkspaceCache({ ...workspace, tabPaths: ['repo/a.ts', 'repo/b.ts'] })
+    const { application, harness, navigation } = await renderAddressHarness({
+      initialEntries: [`${workspace.base}/f/a.ts`],
+    })
+    await waitForNavigation(navigation)
+    const commands = navigation.editorCommands(harness.workspace)
+    const deleted = filesystemPath('repo/b.ts')
+    const queries = application.getSnapshot().queryClient
+    const query = fileSnapshotQueryOptions(deleted)
+    if (opened) {
+      expect(await commands.openFileSurface(deleted)).toEqual({ status: 'applied' })
+      // The address harness omits the editor body that mounts a loaded file's buffer.
+      harness.documents.getState().ensureLiveEditorDocument(await queries.query(query))
+    }
+    const documents = harness.documents.getState()
+    expect(Boolean(documents.getLiveEditorDocument(fileDocumentKey(deleted)))).toBe(opened)
+    queries.removeQueries({ queryKey: query.queryKey, exact: true })
+    await unlink(path.join(server.root, deleted))
+    await expect(queries.query({ ...query, retry: false })).rejects.toBeDefined()
+    expect(queries.getQueryState(query.queryKey)?.status).toBe('error')
+    expect(editorTabContents(harness.workspace)).toContainEqual(testTabContent(deleted))
+    if (opened) {
+      expect(
+        harness.documents.getState().getLiveEditorDocument(fileDocumentKey(deleted))?.sync,
+      ).toMatchObject({ orphaned: true })
+      const tab = editorTabRecordsForWorkbenchPanels(
+        harness.workspace.getState().workbenchPanels,
+      ).find((tab) => testContentMatches(tab.content, deleted))!
+      expect(await commands.closeTab(tab.id)).toEqual({ status: 'applied' })
+    } else {
+      expect(await commands.discardLiveEditorDocument(testDocumentRef(deleted)).settled).toEqual({
+        status: 'applied',
+      })
+    }
+    expect(editorTabContents(harness.workspace)).toEqual(testTabContents(['repo/a.ts']))
+    expect(harness.workspace.getState().selectedTabContent).toEqual(testTabContent('repo/a.ts'))
+  },
+)
 
 test('committed multi-file deletion reconciles every path', async ({ client, server }) => {
   const workspace = await navigationWorkspace(client, server)

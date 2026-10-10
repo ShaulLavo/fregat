@@ -1,5 +1,9 @@
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import { documentKey } from '@/lib/documents/utils/identity'
+import { skipToken, useQuery } from '@tanstack/react-query'
+import type { FileSnapshot } from '@/lib/file-snapshot'
+import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
+import { toClientError } from '@/lib/client-error-taxonomy'
 import { assignRef } from '@workspace/ui/lib/assign-ref'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
@@ -45,13 +49,21 @@ export function EditorTabButton({
   readonly loading: boolean
   readonly tab: EditorTabModel
 }) {
-  const deleted = useEditorDocumentState((state) => {
+  const resource = tabFileResource(tab.content)
+  const snapshot = useQuery<FileSnapshot>(
+    resource
+      ? { ...fileSnapshotQueryOptions(resource.path), enabled: false }
+      : { queryKey: ['workbench', 'non-file-tab'], queryFn: skipToken },
+  )
+  const orphaned = useEditorDocumentState((state) => {
     if (tab.content.kind !== 'document') return false
     const sync = state.liveDocumentsByKey[documentKey(tab.content.document)]?.sync
     return sync?.kind === 'file' && sync.orphaned
   })
-  const displayTab = deleted
-    ? { ...tab, name: `${tab.name} (deleted)`, title: `${tab.title} (deleted on disk)` }
+  const missing =
+    orphaned || (snapshot.error !== null && toClientError(snapshot.error).category === 'not_found')
+  const displayTab = missing
+    ? { ...tab, name: `${tab.name} (missing)`, title: `${tab.title} (missing on disk)` }
     : tab
   const unavailable = useUnavailableEnvironment()
   const position = useEditorWorkspaceState((state) =>

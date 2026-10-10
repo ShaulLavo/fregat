@@ -156,6 +156,11 @@ test('a bridge dependency and an effect command preserve transitive causality', 
       const fresh = new ConfirmedWindow(history.slice(0, end), limit)
       expect(window.edits).toEqual(fresh.edits)
       expect(window.pairs()).toEqual(fresh.pairs())
+      for (const predecessor of history.slice(0, end)) {
+        expect(window.editsAfter([predecessor.id])).toEqual(
+          window.edits.filter((edit) => window.isAfter(edit.envelope.id, [predecessor.id])),
+        )
+      }
     }
   }
 })
@@ -282,4 +287,25 @@ test('causal successors cover every dependency and exclude concurrent or evicted
   }
   const suffix = new ConfirmedWindow(history, 2)
   expect(suffix.isAfter(history.at(-1)!.id, [history[0]!.id])).toBe(false)
+})
+
+test('causal successor reads match identity checks after reordered arrivals and eviction', () => {
+  for (let seed = 0; seed < 10; seed++) {
+    const history = confirmedHistory(seed)
+    for (const limit of [0, 7, 32]) {
+      const window = new ConfirmedWindow(history.slice(0, 16), limit)
+      window.append(history.slice(16))
+      const reordered = new ConfirmedWindow(history.slice(16), limit)
+      reordered.append(history.slice(0, 16))
+      for (const current of [window, reordered]) {
+        const identities = history.map((edit) => edit.id)
+        const selections = identities.map((id, i) => [id, identities[(i + 1) % identities.length]!])
+        for (const predecessors of selections.concat([[], [{ actor: 'unknown', seq: 1 }]])) {
+          expect(current.editsAfter(predecessors)).toEqual(
+            current.edits.filter((edit) => current.isAfter(edit.envelope.id, predecessors)),
+          )
+        }
+      }
+    }
+  }
 })
