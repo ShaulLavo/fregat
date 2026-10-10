@@ -744,6 +744,15 @@ Disposal returns both tree count and source-read count to zero. The two tests ex
 merge-unit corpus to 43 tests. The original guarded phase evidence remains pinned to its
 measured source, not to this later ownership correction. No new timing claim is made.
 
+The package's default node suite subsequently reproduced one reuse failure: its fake
+`ParsedDocument` omitted the required `readOnly` boolean behind a whole-object cast.
+The fixture now supplies the complete document and request contracts, with the native
+fake tree as the only cast boundary. Node controls cover mutable reuse with omitted and
+explicit `false` intent, immutable reuse with `true`, and immutable-to-mutable retirement
+with both mutable request forms. Production reuse remains unchanged. The full package
+script passes all 146 node tests across 18 files and 165 browser tests across eight files;
+package typecheck, lint and editor health also pass.
+
 Remaining Approved work:
 
 - [ ] Establish cursor cost-regression proof with an A/B/B/A rerun that enforces and records
