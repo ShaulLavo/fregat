@@ -1138,6 +1138,10 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     if (!this.accessibility) return
     if (this.execution.kind === 'async' && this.execution.submittedOutput)
       this.accessibilitySubmittedOutput = true
+    if (this.accessibility.rowElements.length === 0) {
+      this.runUiOperation('frame.accessibility', () => this.refreshAccessibility())
+      return
+    }
     if (this.accessibilityTimer !== undefined) return
     const view = owningWindow(this.elementsValue!.root)
     this.accessibilityTimer = view.setTimeout(() => {

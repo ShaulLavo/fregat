@@ -65,7 +65,7 @@ afterAll(() => {
   runtime.dispose()
 })
 
-async function fixture(publicText = true, gpu = false) {
+async function fixture(publicText = true, gpu = false, settleAccessibility = true) {
   const host = document.createElement('div')
   host.style.cssText = 'width:400px;height:180px;position:relative'
   document.body.append(host)
@@ -117,7 +117,7 @@ async function fixture(publicText = true, gpu = false) {
   clock.flush()
   expect(renderer).toBeDefined()
   if (publicText) expect(publishedFrame(terminal)).toBeDefined()
-  await expect.poll(() => controller(terminal).rowElements.length).toBe(3)
+  if (settleAccessibility) await expect.poll(() => controller(terminal).rowElements.length).toBe(3)
   return { clock, elements, errors, host, renderer: renderer!, session, snapshots, terminal }
 }
 
@@ -219,6 +219,16 @@ function assertDisplayed(
 }
 
 describe('accessibility from real submitted native frames', () => {
+  it('hydrates the first display immediately and announces startup output', async () => {
+    const { terminal, clock, errors } = await fixture(false, true, false)
+    const accessibility = controller(terminal)
+    expect(accessibility.rowElements).toHaveLength(3)
+    terminal.write('startup 界😀')
+    clock.flush()
+    await expect.poll(() => accessibility.liveRegion.textContent).toBe('startup 界😀')
+    expect(errors).toEqual([])
+  })
+
   it('coalesces paints, keeps native text lazy and announces the latest Unicode output', async () => {
     const harness = await fixture(false, true)
     const { terminal, clock } = harness
