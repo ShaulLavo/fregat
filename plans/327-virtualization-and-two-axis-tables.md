@@ -54,7 +54,7 @@ At execution start, record checkout, package versions, browser, viewport, densit
 
 Collect first useful paint, per-frame work and frame intervals, longest tasks, forced-layout time, mount/reuse counts, mounted rows/columns/cells, retained metadata/cache size, source reads and anchor movement. Attribute parsing/indexing, view construction, browser layout and paint separately. Wall time includes deferred work; publishing a quick first frame must not hide indefinite reconstruction or incorrect navigation.
 
-Use the existing [Editor transform](../editor/packages/editor/bench/displayTransforms.ts) and [virtualization](../editor/packages/editor/bench/virtualization.ts) benches, then prove browser behavior through `verify-fregat`. Heavy suites, builds, browser runs and measurements use the repository heavy runner; paired timing runs use quiet admission. Store evidence under the existing Fregat evidence directory and record relative report links in this plan when units land. Fixtures and committed runners must work from a fresh clone on any supported machine.
+Use the existing [Editor transform](../editor/packages/editor/bench/displayTransforms.ts) and [virtualization](../editor/packages/editor/bench/virtualization.ts) benches, then prove browser behavior through `verify-fregat`. Heavy suites, builds, browser runs and measurements use host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill; paired timing runs use quiet admission. Store evidence under the existing Fregat evidence directory and record relative report links in this plan when units land. Fixtures and committed runners must work from a fresh clone on any supported machine.
 
 ## Execution units
 
