@@ -63,6 +63,8 @@ import type {
   TreeSitterSelectionRange,
   TreeSitterSelectionRequest,
   TreeSitterMergeUnitRequest,
+  TreeSitterReviewBatchRequest,
+  TreeSitterReviewBatchResult,
   TreeSitterMergeUnitResult,
   TreeSitterMergeUnit,
   TreeSitterProjectedMergeUnitsRequest,
@@ -2889,6 +2891,48 @@ const collectError = (node: Node): TreeSitterError | null => {
   }
 }
 
+const queryReviewBatch = async (
+  request: TreeSitterReviewBatchRequest,
+): Promise<TreeSitterReviewBatchResult> => {
+  const results: TreeSitterProjectedMergeUnitsResult[] = []
+  for (const item of request.queries) {
+    const query = {
+      ...item,
+      cancellationBuffer: item.cancellationBuffer ?? request.cancellationBuffer,
+    }
+    if (query.type === 'projectMergeUnits') {
+      const source = resolveRequestSource(query)
+      try {
+        results.push(await queryProjectedMergeUnits(query, source))
+      } finally {
+        source.dispose()
+      }
+      continue
+    }
+    const identity = {
+      documentId: query.documentId,
+      snapshotVersion: query.snapshotVersion,
+      languageId: query.languageId,
+    }
+    const units: (TreeSitterMergeUnit & { readonly languageId: string })[][] = []
+    let status: 'ok' | 'stale' | 'cancelled' = 'ok'
+    for (const range of query.ranges) {
+      const result = await queryMergeUnit({ ...query, type: 'mergeUnit', range })
+      if (result.status !== 'ok') {
+        status = result.status
+        break
+      }
+      units.push(
+        (result.units ?? [result.unit]).map((unit) => ({ ...unit, languageId: result.languageId })),
+      )
+    }
+    results.push(
+      status === 'ok' ? { ...identity, status, units } : { ...identity, status, units: [] },
+    )
+  }
+  return { results }
+}
+
 const queryProjectedMergeUnits = async (
   request: TreeSitterProjectedMergeUnitsRequest,
   source: TreeSitterPieceTableInput,
@@ -3739,6 +3783,7 @@ const handleRequest = async (
   if (payload.type === 'edit') return editDocument(payload, source!)
   if (payload.type === 'queryRange') return queryDocumentRange(payload)
   if (payload.type === 'selection') return selectDocument(payload)
+  if (payload.type === 'reviewBatch') return queryReviewBatch(payload)
   if (payload.type === 'mergeUnit') return queryMergeUnit(payload)
   if (payload.type === 'projectMergeUnits') return queryProjectedMergeUnits(payload, source!)
 
@@ -3783,7 +3828,8 @@ const executeRequest = async (
   const markdown =
     'languageId' in payload && (payload.languageId === 'markdown' || payload.languageId === 'mdx')
   const task =
-    (markdown || payload.type === 'projectMergeUnits') && runtimeSessionId
+    (markdown || payload.type === 'projectMergeUnits' || payload.type === 'reviewBatch') &&
+    runtimeSessionId
       ? awaitRuntimeTasks(runtimeSessionId).then(() => handleRequest(request, source))
       : handleRequest(request, source)
   const completed = task.finally(() => source?.dispose())

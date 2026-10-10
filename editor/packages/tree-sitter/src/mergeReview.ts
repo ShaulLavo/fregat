@@ -6,11 +6,22 @@ import {
 } from '@singapore-editor/core/internal/document-worker'
 import { TreeSitterWorkerClient, type TreeSitterBackend } from './treeSitter/workerClient'
 import type { TreeSitterLanguageDescriptor } from './treeSitter/registry'
-import type { TreeSitterMergeUnit, TreeSitterSyntaxRange } from './treeSitter/types'
+import type {
+  TreeSitterMergeUnit,
+  TreeSitterSyntaxRange,
+  TreeSitterReviewBatchRequest,
+} from './treeSitter/types'
 
 export type TreeSitterReviewUnit = TreeSitterMergeUnit & {
   readonly languageId: string
   readonly hasErrors: boolean
+}
+export type TreeSitterReviewRead = {
+  readonly snapshot: PieceTableSnapshot
+  readonly ranges: readonly TreeSitterSyntaxRange[]
+  readonly contentKey?: boolean
+  readonly selection?: 'enclosing' | 'touching'
+  readonly baseSnapshot?: PieceTableSnapshot
 }
 export type TreeSitterReviewSyntax = ((
   snapshot: PieceTableSnapshot,
@@ -19,6 +30,9 @@ export type TreeSitterReviewSyntax = ((
   selection?: 'enclosing' | 'touching',
   baseSnapshot?: PieceTableSnapshot,
 ) => Promise<readonly (readonly TreeSitterReviewUnit[])[] | null>) & {
+  batch(
+    reads: readonly TreeSitterReviewRead[],
+  ): Promise<readonly (readonly (readonly TreeSitterReviewUnit[])[] | null)[]>
   /** Release snapshot trees between review batches. */
   release(): Promise<void>
   dispose(): Promise<void>
@@ -94,51 +108,78 @@ export function createTreeSitterReviewSyntax(options: {
     return entry
   }
 
-  async function project(
-    snapshot: PieceTableSnapshot,
-    baseSnapshot: PieceTableSnapshot,
-    ranges: readonly TreeSitterSyntaxRange[],
-    contentKey: boolean,
-    selection: 'enclosing' | 'touching',
-  ): Promise<readonly (readonly TreeSitterReviewUnit[])[] | null> {
-    if (!backend.projectMergeUnits) return null
-    const base = await admit(baseSnapshot)
-    if (!(await base.ready) || disposed) return null
-    const delivery = new DocumentDelivery(createEditorSnapshotBuffer(snapshot), base.id)
-    const scope = delivery.createScope()
-    try {
-      const loan = await scope.source.prepareReader(backend.sourceEndpoint, delivery.current()!)
-      if (!loan) return null
+  function readBatch(reads: readonly TreeSitterReviewRead[]) {
+    return serial(async () => {
+      if (disposed || !backend.reviewBatch) return reads.map(() => null)
+      await (registration ??= backend.registerLanguages(options.languages))
+      const queries: TreeSitterReviewBatchRequest['queries'][number][] = []
+      const cleanup: (() => Promise<void>)[] = []
       try {
-        if (disposed) return null
-        const edit = diffPieceTableSnapshots(baseSnapshot, snapshot)
-        const result = await backend.projectMergeUnits({
-          documentId: base.id,
-          runtimeSessionId: base.id,
-          languageId: options.languageId,
-          baseSnapshotVersion: base.version,
-          snapshotVersion: ++version,
-          source: loan.reference,
-          inputEdits: createTreeSitterInputEdits(
-            createEditorSnapshotBuffer(baseSnapshot).getTextSnapshot(),
-            edit ? [edit] : [],
-          ),
-          ranges,
-          selection,
-          analysis: true,
-          ...(contentKey ? { contentKey: true as const } : {}),
-        })
-        if (!result || result.status !== 'ok' || disposed) return null
-        return result.units.map((units) =>
-          units.map((unit) => ({ ...unit, hasErrors: unit.hasErrors ?? false })),
+        for (const read of reads) {
+          const {
+            snapshot,
+            ranges,
+            baseSnapshot,
+            contentKey = false,
+            selection = 'enclosing',
+          } = read
+          const entry = await admit(baseSnapshot ?? snapshot)
+          if (!(await entry.ready) || disposed) return reads.map(() => null)
+          const identity = {
+            documentId: entry.id,
+            runtimeSessionId: entry.id,
+            languageId: options.languageId,
+            snapshotVersion: entry.version,
+            ranges,
+            selection,
+            analysis: true as const,
+            ...(contentKey ? { contentKey: true as const } : {}),
+          }
+          if (!baseSnapshot) {
+            queries.push({ ...identity, type: 'mergeUnits' })
+            continue
+          }
+          const delivery = new DocumentDelivery(createEditorSnapshotBuffer(snapshot), entry.id)
+          const scope = delivery.createScope()
+          let loan: Awaited<ReturnType<typeof scope.source.prepareReader>>
+          cleanup.push(async () => {
+            try {
+              await loan?.dispose()
+            } finally {
+              scope.dispose()
+              delivery.dispose()
+            }
+          })
+          loan = await scope.source.prepareReader(backend.sourceEndpoint, delivery.current()!)
+          if (!loan) return reads.map(() => null)
+          const edit = diffPieceTableSnapshots(baseSnapshot, snapshot)
+          queries.push({
+            ...identity,
+            type: 'projectMergeUnits',
+            baseSnapshotVersion: entry.version,
+            snapshotVersion: ++version,
+            source: loan.reference,
+            inputEdits: createTreeSitterInputEdits(
+              createEditorSnapshotBuffer(baseSnapshot).getTextSnapshot(),
+              edit ? [edit] : [],
+            ),
+          })
+        }
+        if (disposed) return reads.map(() => null)
+        const result = await backend.reviewBatch({ runtimeSessionId: runtime(), queries })
+        if (!result || result.results.length !== reads.length || disposed)
+          return reads.map(() => null)
+        return result.results.map((result) =>
+          result.status === 'ok'
+            ? result.units.map((units) =>
+                units.map((unit) => ({ ...unit, hasErrors: unit.hasErrors ?? false })),
+              )
+            : null,
         )
       } finally {
-        await loan.dispose()
+        await disposeReads(cleanup)
       }
-    } finally {
-      scope.dispose()
-      delivery.dispose()
-    }
+    })
   }
 
   const read: TreeSitterReviewSyntax = Object.assign(
@@ -148,39 +189,9 @@ export function createTreeSitterReviewSyntax(options: {
       contentKey = false,
       selection: 'enclosing' | 'touching' = 'enclosing',
       baseSnapshot?: PieceTableSnapshot,
-    ) =>
-      serial(async () => {
-        if (disposed || !backend.mergeUnit) return null
-        await (registration ??= backend.registerLanguages(options.languages))
-        if (disposed) return null
-        if (baseSnapshot) return project(snapshot, baseSnapshot, ranges, contentKey, selection)
-        const entry = await admit(snapshot)
-        if (!(await entry.ready) || disposed) return null
-        const result: (readonly TreeSitterReviewUnit[])[] = []
-        for (const range of ranges) {
-          if (disposed) return null
-          const units = await backend.mergeUnit({
-            documentId: entry.id,
-            runtimeSessionId: entry.id,
-            languageId: options.languageId,
-            snapshotVersion: entry.version,
-            range,
-            selection,
-            analysis: true,
-            ...(contentKey ? { contentKey: true as const } : {}),
-          })
-          if (!units || units.status !== 'ok') return null
-          result.push(
-            (units.units ?? [units.unit]).map((unit) => ({
-              ...unit,
-              languageId: units.languageId,
-              hasErrors: unit.hasErrors ?? false,
-            })),
-          )
-        }
-        return result
-      }),
+    ) => (await readBatch([{ snapshot, ranges, contentKey, selection, baseSnapshot }]))[0] ?? null,
     {
+      batch: readBatch,
       release() {
         return serial(async () => {
           const id = runtime()
@@ -206,4 +217,10 @@ export function createTreeSitterReviewSyntax(options: {
     },
   )
   return read
+}
+
+async function disposeReads(cleanup: readonly (() => Promise<void>)[]): Promise<void> {
+  const settled = await Promise.allSettled(cleanup.map((dispose) => dispose()))
+  const failed = settled.find((result) => result.status === 'rejected')
+  if (failed?.status === 'rejected') throw failed.reason
 }

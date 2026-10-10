@@ -2,6 +2,7 @@ export { createTreeSitterInputEdits } from './treeSitter/edits'
 export {
   createTreeSitterReviewSyntax,
   type TreeSitterReviewSyntax,
+  type TreeSitterReviewRead,
   type TreeSitterReviewUnit,
 } from './mergeReview'
 export {

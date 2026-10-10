@@ -18,6 +18,8 @@ import type {
   TreeSitterRangeResult,
   TreeSitterSelectionRequest,
   TreeSitterMergeUnitRequest,
+  TreeSitterReviewBatchRequest,
+  TreeSitterReviewBatchResult,
   TreeSitterMergeUnitResult,
   TreeSitterProjectedMergeUnitsRequest,
   TreeSitterProjectedMergeUnitsResult,
@@ -139,6 +141,9 @@ export type TreeSitterBackend = {
     payload: TreeSitterRangePayload,
     signal?: AbortSignal,
   ): Promise<TreeSitterRangeResult | undefined>
+  reviewBatch?(
+    payload: Omit<TreeSitterReviewBatchRequest, 'type'>,
+  ): Promise<TreeSitterReviewBatchResult | undefined>
   projectMergeUnits?(
     payload: TreeSitterProjectedMergeUnitsPayload,
   ): Promise<TreeSitterProjectedMergeUnitsResult | undefined>
@@ -357,6 +362,26 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
       signal,
     )
     return isTreeSitterRangeResult(result) ? result : undefined
+  }
+
+  public reviewBatch(
+    payload: Omit<TreeSitterReviewBatchRequest, 'type'>,
+  ): Promise<TreeSitterReviewBatchResult | undefined> {
+    return this.trackRuntimeTask(payload.runtimeSessionId, this.finishReviewBatch(payload))
+  }
+
+  private async finishReviewBatch(
+    payload: Omit<TreeSitterReviewBatchRequest, 'type'>,
+  ): Promise<TreeSitterReviewBatchResult | undefined> {
+    if (!(await this.ensureWorkerReady())) return undefined
+    const result = await this.postRequest({
+      type: 'reviewBatch',
+      ...payload,
+      cancellationBuffer:
+        payload.cancellationBuffer ??
+        (this.createCancellationFlag()?.buffer as SharedArrayBuffer | undefined),
+    })
+    return result && 'results' in result ? result : undefined
   }
 
   public mergeUnit(
@@ -749,6 +774,9 @@ export class TreeSitterWorkerOwner {
   }
   [backendBinding](): TreeSitterBackend {
     return this.#backend
+  }
+  reviewBatch(payload: Omit<TreeSitterReviewBatchRequest, 'type'>) {
+    return this.#backend.reviewBatch(payload)
   }
   projectMergeUnits(
     payload: TreeSitterProjectedMergeUnitsPayload,

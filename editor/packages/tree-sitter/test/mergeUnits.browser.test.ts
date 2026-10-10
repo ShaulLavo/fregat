@@ -350,7 +350,7 @@ it('the live review reader admits snapshots and retires worker sources', async (
     backend: client,
   })
   const parse = vi.spyOn(client, 'parse')
-  const project = vi.spyOn(client, 'projectMergeUnits')
+  const project = vi.spyOn(client, 'reviewBatch')
   const base = createPieceTableSnapshot('const value = 0;\n')
   const projected = applyBatchToPieceTable(base, [{ from: 14, to: 15, text: '1' }])
   const ranges = [{ startIndex: 14, endIndex: 15 }]
@@ -359,8 +359,8 @@ it('the live review reader admits snapshots and retires worker sources', async (
     'lexical_declaration',
   )
   expect(parse).toHaveBeenCalledTimes(1)
-  expect(project).toHaveBeenCalledTimes(1)
-  expect(project.mock.calls[0]![0]).toMatchObject({
+  expect(project).toHaveBeenCalledTimes(2)
+  expect(project.mock.calls[1]![0].queries[0]).toMatchObject({
     baseSnapshotVersion: parse.mock.calls[0]![0].snapshotVersion,
     inputEdits: [
       {
@@ -381,7 +381,7 @@ it('the live review reader admits snapshots and retires worker sources', async (
     )
   }
   expect(parse).toHaveBeenCalledTimes(1)
-  expect(project).toHaveBeenCalledTimes(9)
+  expect(project).toHaveBeenCalledTimes(10)
   await syntax.release()
   const retired = await client.inspectRetention()
   expect(retired?.documentCount).toBe(0)
@@ -794,7 +794,7 @@ it('the live review reader preserves nested fence languages in projected units',
     { from: startIndex, to: startIndex + 1, text: '9' },
   ])
   const parse = vi.spyOn(client, 'parse')
-  const project = vi.spyOn(client, 'projectMergeUnits')
+  const project = vi.spyOn(client, 'reviewBatch')
   expect((await syntax(base, ranges, true))?.[0]?.[0]).toMatchObject({
     type: 'pair',
     languageId: 'json',
@@ -805,9 +805,11 @@ it('the live review reader preserves nested fence languages in projected units',
     hasErrors: false,
   })
   expect(parse).toHaveBeenCalledTimes(1)
-  expect(project).toHaveBeenCalledTimes(1)
-  const result = await project.mock.results[0]!.value
-  expect(result).toMatchObject({ languageId: 'markdown', units: [[{ languageId: 'json' }]] })
+  expect(project).toHaveBeenCalledTimes(2)
+  const result = await project.mock.results[1]!.value
+  expect(result).toMatchObject({
+    results: [{ languageId: 'markdown', units: [[{ languageId: 'json' }]] }],
+  })
   await syntax.dispose()
   expect((await client.inspectRetention())?.source.readCount).toBe(0)
 })
@@ -831,20 +833,23 @@ it.each(['stale', 'cancelled'] as const)(
     const ranges = [{ startIndex: 14, endIndex: 15 }]
     await syntax(base, ranges)
     const baseline = await client.inspectRetention()
-    const query = client.projectMergeUnits.bind(client)
+    const query = client.reviewBatch.bind(client)
     const cancellationBuffer = new SharedArrayBuffer(4)
     Atomics.store(new Int32Array(cancellationBuffer), 0, 1)
-    const project = vi
-      .spyOn(client, 'projectMergeUnits')
-      .mockImplementation((request) =>
-        query(
-          status === 'stale'
-            ? { ...request, baseSnapshotVersion: -1 }
-            : { ...request, cancellationBuffer },
+    const project = vi.spyOn(client, 'reviewBatch').mockImplementation((request) =>
+      query({
+        ...request,
+        queries: request.queries.map((item) =>
+          item.type === 'projectMergeUnits'
+            ? status === 'stale'
+              ? { ...item, baseSnapshotVersion: -1 }
+              : { ...item, cancellationBuffer }
+            : item,
         ),
-      )
+      }),
+    )
     expect(await syntax(projected, ranges, false, 'enclosing', base)).toBeNull()
-    expect(await project.mock.results[0]!.value).toMatchObject({ status, units: [] })
+    expect(await project.mock.results[0]!.value).toMatchObject({ results: [{ status, units: [] }] })
     expect((await client.inspectRetention())?.source).toEqual(baseline?.source)
     project.mockRestore()
     expect((await syntax(projected, ranges, false, 'enclosing', base))?.[0]?.[0]?.type).toBe(
@@ -854,3 +859,179 @@ it.each(['stale', 'cancelled'] as const)(
     expect((await client.inspectRetention())?.source.readCount).toBe(0)
   },
 )
+
+it('groups current ranges and independent projections without changing units or retaining sources', async () => {
+  const { createTreeSitterReviewSyntax } = await import('../src/mergeReview')
+  const { createPieceTableSnapshot, applyBatchToPieceTable } =
+    await import('@singapore-editor/core/document')
+  const descriptor = await resolveTreeSitterLanguageContribution(
+    TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+  )
+  const syntax = createTreeSitterReviewSyntax({
+    languageId: 'typescript',
+    languages: [descriptor],
+    backend: client,
+  })
+  const base = createPieceTableSnapshot('const value = 0;\n')
+  const ranges = Array.from({ length: 100 }, () => ({ startIndex: 14, endIndex: 15 }))
+  const current = await syntax(base, ranges)
+  const before = await client.inspectRetention()
+  const batch = vi.spyOn(client, 'reviewBatch')
+  const reads = [{ snapshot: base, ranges }].concat(
+    Array.from({ length: 10 }, (_, index) => ({
+      snapshot: applyBatchToPieceTable(base, [{ from: 14, to: 15, text: String(index) }]),
+      ranges,
+      baseSnapshot: base,
+    })),
+  )
+  const result = await syntax.batch(reads)
+  expect(batch).toHaveBeenCalledTimes(1)
+  expect(result).toHaveLength(11)
+  expect(result.every((units) => JSON.stringify(units) === JSON.stringify(current))).toBe(true)
+  expect((await client.inspectRetention())?.source).toEqual(before?.source)
+  await syntax.release()
+  const after = await client.inspectRetention()
+  expect(after?.documentCount).toBe(0)
+  expect(after?.source.readCount).toBe(0)
+  await syntax.dispose()
+})
+
+it('reports stale and cancelled batch entries independently in input order', async () => {
+  const text = 'const value = 0;\n'
+  await parseTreeDocument(client, {
+    ...document,
+    snapshotVersion: 1,
+    text,
+    resultMode: 'parseOnly',
+  })
+  const cancellationBuffer = new SharedArrayBuffer(4)
+  Atomics.store(new Int32Array(cancellationBuffer), 0, 1)
+  const query = {
+    ...document,
+    type: 'mergeUnits' as const,
+    snapshotVersion: 1,
+    ranges: [{ startIndex: 14, endIndex: 15 }],
+  }
+  const result = await client.reviewBatch({
+    runtimeSessionId: document.runtimeSessionId,
+    queries: [{ ...query, snapshotVersion: -1 }, { ...query, cancellationBuffer }, query],
+  })
+  expect(result?.results.map((entry) => entry.status)).toEqual(['stale', 'cancelled', 'ok'])
+  client.disposeDocument(document.runtimeSessionId)
+  await client.awaitRuntimeSessionIdle(document.runtimeSessionId)
+  expect(
+    (await client.reviewBatch({ runtimeSessionId: document.runtimeSessionId, queries: [query] }))
+      ?.results[0]?.status,
+  ).toBe('stale')
+})
+
+it('cancels a posted batch when its runtime is disposed and waits for cleanup', async () => {
+  const queued = new TreeSitterWorkerClient({
+    workerFactory() {
+      const worker = new Worker(
+        new URL('../src/treeSitter/treeSitter.worker.ts', import.meta.url),
+        { type: 'module' },
+      )
+      const send = worker.postMessage.bind(worker)
+      worker.postMessage = (message, options?: StructuredSerializeOptions | Transferable[]) => {
+        if (message.payload?.type === 'reviewBatch')
+          queued.disposeDocument(message.payload.runtimeSessionId)
+        if (Array.isArray(options)) send(message, options)
+        else send(message, options)
+      }
+      return worker
+    },
+  })
+  try {
+    const descriptor = await resolveTreeSitterLanguageContribution(
+      TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+    )
+    await queued.registerLanguages([descriptor])
+    const identity = { ...document, runtimeSessionId: 'dispose-review-batch', snapshotVersion: 1 }
+    await parseTreeDocument(queued, {
+      ...identity,
+      text: 'const value = 0;\n',
+      resultMode: 'parseOnly',
+    })
+    expect(
+      await queued.reviewBatch({
+        runtimeSessionId: identity.runtimeSessionId,
+        queries: [
+          {
+            ...identity,
+            type: 'mergeUnits',
+            ranges: [{ startIndex: 14, endIndex: 15 }],
+          },
+          {
+            ...identity,
+            type: 'mergeUnits',
+            cancellationBuffer: new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT),
+            ranges: [{ startIndex: 14, endIndex: 15 }],
+          },
+        ],
+      }),
+    ).toMatchObject({
+      results: [
+        { status: 'cancelled', units: [] },
+        { status: 'cancelled', units: [] },
+      ],
+    })
+    await queued.awaitRuntimeSessionIdle(identity.runtimeSessionId)
+    const retention = await queued.inspectRetention()
+    expect(retention?.documentCount).toBe(0)
+    expect(retention?.source.readCount).toBe(0)
+  } finally {
+    await queued.dispose()
+  }
+})
+
+it('retires every projected source when a loan release rejects', async () => {
+  const { createTreeSitterReviewSyntax } = await import('../src/mergeReview')
+  const { createPieceTableSnapshot, applyBatchToPieceTable } =
+    await import('@singapore-editor/core/document')
+  const descriptor = await resolveTreeSitterLanguageContribution(
+    TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+  )
+  const syntax = createTreeSitterReviewSyntax({
+    languageId: 'typescript',
+    languages: [descriptor],
+    backend: client,
+  })
+  const base = createPieceTableSnapshot('const value = 0;\n')
+  await syntax(base, [])
+  const connect = client.sourceEndpoint.connect.bind(client.sourceEndpoint)
+  let releases = 0
+  const spy = vi.spyOn(client.sourceEndpoint, 'connect').mockImplementation(async () => {
+    const connection = await connect()
+    if (!connection) return null
+    return {
+      ...connection,
+      send: (command, signal) => {
+        if (command.kind === 'unpin') {
+          releases++
+          return Promise.reject('loan release refused')
+        }
+        return connection.send(command, signal)
+      },
+    }
+  })
+  try {
+    await expect(
+      syntax.batch(
+        Array.from({ length: 2 }, (_, index) => ({
+          snapshot: applyBatchToPieceTable(base, [{ from: 14, to: 15, text: String(index + 1) }]),
+          ranges: [{ startIndex: 14, endIndex: 15 }],
+          baseSnapshot: base,
+        })),
+      ),
+    ).rejects.toBe('loan release refused')
+    expect(releases).toBe(2)
+    await syntax.release()
+    const retention = await client.inspectRetention()
+    expect(retention?.documentCount).toBe(0)
+    expect(retention?.source.readCount).toBe(0)
+  } finally {
+    spy.mockRestore()
+    await syntax.dispose()
+  }
+})

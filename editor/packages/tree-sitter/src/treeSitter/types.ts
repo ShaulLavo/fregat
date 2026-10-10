@@ -161,6 +161,23 @@ export type TreeSitterMergeUnitResult = {
   | { readonly status: 'stale' | 'cancelled'; readonly unit: null }
 )
 
+export type TreeSitterReviewBatchRequest = {
+  readonly type: 'reviewBatch'
+  readonly cancellationBuffer?: SharedArrayBuffer
+  readonly runtimeSessionId: string
+  readonly queries: readonly (
+    | (Omit<TreeSitterMergeUnitRequest, 'type' | 'range'> & {
+        readonly type: 'mergeUnits'
+        readonly ranges: readonly TreeSitterSyntaxRange[]
+      })
+    | TreeSitterProjectedMergeUnitsRequest
+  )[]
+}
+
+export type TreeSitterReviewBatchResult = {
+  readonly results: readonly TreeSitterProjectedMergeUnitsResult[]
+}
+
 export type TreeSitterProjectedMergeUnitsRequest = {
   readonly type: 'projectMergeUnits'
   readonly documentId: string
@@ -308,6 +325,7 @@ export type TreeSitterWorkerRequestPayload =
   | TreeSitterSelectionRequest
   | TreeSitterMergeUnitRequest
   | TreeSitterProjectedMergeUnitsRequest
+  | TreeSitterReviewBatchRequest
   | TreeSitterDisposeDocumentRequest
   | TreeSitterRuntimeBarrierRequest
   | TreeSitterIdleFenceRequest
@@ -321,6 +339,7 @@ export type TreeSitterWorkerResult =
   | TreeSitterSelectionResult
   | TreeSitterMergeUnitResult
   | TreeSitterProjectedMergeUnitsResult
+  | TreeSitterReviewBatchResult
   | { readonly retention: TreeSitterWorkerRetentionSnapshot }
   | undefined
 
