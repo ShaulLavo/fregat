@@ -33,10 +33,13 @@ export type DocumentPaintRow = {
   readonly style: DocumentPaintStyle
   readonly runs: readonly DocumentPaintRun[]
   readonly heading: { readonly level: number; readonly name: string; readonly id: string } | null
+  readonly gutterBackgroundColor: string
+  readonly gutterInsetBackgroundColor: string
   readonly gutter: readonly {
     readonly text: string
     readonly width: number
     readonly color: string
+    readonly backgroundColor: string
     readonly paddingRight: number
   }[]
 }
@@ -185,6 +188,7 @@ function gutter(value: unknown): value is DocumentPaintRow['gutter'][number] {
     text(value.text, 256) &&
     finite(value.width, 4096) &&
     color(value.color) &&
+    color(value.backgroundColor) &&
     finite(value.paddingRight, 4096)
   )
 }
@@ -196,6 +200,8 @@ function row(value: unknown): value is DocumentPaintRow {
     value.height > 0 &&
     style(value.style) &&
     heading(value.heading) &&
+    color(value.gutterBackgroundColor) &&
+    color(value.gutterInsetBackgroundColor) &&
     Array.isArray(value.runs) &&
     value.runs.length <= 16_384 &&
     value.runs.every(run) &&

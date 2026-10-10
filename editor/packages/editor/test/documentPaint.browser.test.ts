@@ -449,3 +449,104 @@ it('records Chromium CPU slowdown as a restore experiment', async () => {
     await commands.proofDocumentPaintThrottle(1)
   }
 })
+
+it('restores and resizes padded content at its live height and pixels', async () => {
+  const text = 'alpha beta gamma delta epsilon zeta '.repeat(8)
+  const { host, editor, options, item } = mount(text, false, 'Snapshot Mono', false)
+  const scroller = host.querySelector<HTMLElement>('.editor-virtualized')!
+  scroller.style.padding = '0 16px'
+  const samples = []
+  for (const width of [320, 390, 1280]) {
+    host.style.width = `${width}px`
+    await frames()
+    samples.push({
+      width,
+      height: editor.getContentHeight(),
+      pixels: await pixels(`padded-${width}-live`),
+    })
+  }
+  const saved = editor.captureSnapshot({ scope: 'document' })
+  expect(saved.status).toBe('ready')
+  if (saved.status !== 'ready') return
+  editor.dispose()
+  const style = document.createElement('style')
+  style.textContent = '#document-paint-proof .editor-virtualized { padding: 0 16px; }'
+  host.append(style)
+  const next = new Editor(host, { ...options, snapshot: saved.paint, documentKey: 'padding' })
+  item.editor = next
+  expect(next.getPresentationState()).toBe('provisional')
+  for (const sample of samples) {
+    host.style.width = `${sample.width}px`
+    await frames()
+    expect(next.getContentHeight()).toBe(sample.height)
+    expect(changedPixels(sample.pixels, await pixels(`padded-${sample.width}-static`))).toBe(0)
+  }
+})
+it('preserves active-line gutter backgrounds in static paint', async () => {
+  const { host, editor, options, item } = mount('alpha\nbeta\nlast', false, 'Snapshot Mono', false)
+  editor.dispose()
+  const next = new Editor(host, {
+    ...options,
+    cursorLineHighlight: { rowBackground: false, gutterNumber: false, gutterBackground: true },
+  })
+  item.editor = next
+  next.setText('alpha\nbeta\nlast')
+  next.setSelection(0)
+  host
+    .querySelector<HTMLElement>('.editor-virtualized')!
+    .style.setProperty('--editor-cursor-line-gutter-background', '#ff0000')
+  next.focus()
+  await frames()
+  const saved = next.captureSnapshot({ scope: 'document' })
+  expect(saved.status).toBe('ready')
+  if (saved.status !== 'ready') return
+  const live = await pixels('active-gutter-live')
+  const overlay = document.createElement('div')
+  overlay.style.cssText = 'position:absolute;inset:0'
+  host.append(overlay)
+  const restored = mountPaintSnapshot(overlay, decodePaintSnapshot(saved.paint)!, { width: 1280 })!
+  expect(restored).not.toBeNull()
+  host.querySelector<HTMLElement>('.editor-virtualized')!.style.visibility = 'hidden'
+  const after = await pixels('active-gutter-static')
+  expect(changedPixels(live, after)).toBe(0)
+})
+
+it('waits for an unloaded document font before the first standalone paint', async () => {
+  const { host, editor } = mount(code, false, 'Snapshot Mono', false)
+  await frames()
+  const saved = editor.captureSnapshot({ scope: 'document' })
+  expect(saved.status).toBe('ready')
+  if (saved.status !== 'ready') return
+  const decoded = decodePaintSnapshot(saved.paint)!
+  if (decoded.format !== 6) return
+  const fontFamily = 'Snapshot Cold'
+  const style = { ...decoded.style, fontFamily }
+  const paint = {
+    ...decoded,
+    style,
+    rows: decoded.rows.map((row) => ({
+      ...row,
+      style: { ...row.style, fontFamily },
+      runs: row.runs.map((run) => ({ ...run, style: { ...run.style, fontFamily } })),
+    })),
+  }
+  const face = new FontFace(fontFamily, `url(${monoUrl})`)
+  document.fonts.add(face)
+  const target = document.createElement('div')
+  host.append(target)
+  try {
+    expect(face.status).toBe('unloaded')
+    expect(document.fonts.status).toBe('loaded')
+    expect(mountPaintSnapshot(target, paint, { width: 390 })).toBeNull()
+    expect(target.childElementCount).toBe(0)
+    await face.load()
+    await document.fonts.ready
+    const restored = mountPaintSnapshot(target, paint, { width: 390 })!
+    expect(restored).not.toBeNull()
+    expect(restored.element.textContent).toContain('const value')
+    restored.dispose()
+  } finally {
+    document.fonts.delete(face)
+    target.remove()
+  }
+})

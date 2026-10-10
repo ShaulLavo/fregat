@@ -646,7 +646,7 @@ export class VirtualizedTextView {
 
   private restoreDocumentPaint(paint: SavedDocumentPaint): boolean {
     if (this.view.scrollMode !== 'content') return false
-    const width = this.scrollElement.clientWidth
+    const width = this.documentPaintWidth()
     this.releaseProvisionalPaint()
     const mounted = mountDocumentPaint(this.view.spacer, paint, { width })
     if (!mounted) return false
@@ -677,10 +677,15 @@ export class VirtualizedTextView {
     return true
   }
 
+  private documentPaintWidth(): number {
+    const padding = scrollElementPadding(this.scrollElement)
+    return Math.max(0, this.scrollElement.clientWidth - padding.left - padding.right)
+  }
+
   private synchronizeDocumentPaint(): void {
     const provisional = this.provisionalDocumentPaint
     if (!provisional) return
-    const width = this.scrollElement.clientWidth
+    const width = this.documentPaintWidth()
     if (width !== provisional.width) {
       const mounted = mountDocumentPaint(this.view.spacer, provisional.paint, { width })
       if (!mounted) return

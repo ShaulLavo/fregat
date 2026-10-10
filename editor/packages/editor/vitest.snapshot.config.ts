@@ -1,5 +1,6 @@
 import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { arch, cpus, release, tmpdir, type } from 'node:os'
+import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { playwright } from '@vitest/browser-playwright'
@@ -9,6 +10,30 @@ import { workspaceRoot } from '../../scripts/workspace-root.ts'
 
 const evidence = mkdtempSync(join(tmpdir(), 'singapore-document-paint-'))
 const results: unknown[] = []
+const require = createRequire(import.meta.url)
+writeFileSync(
+  join(evidence, 'environment.json'),
+  JSON.stringify(
+    {
+      os: { type: type(), release: release(), arch: arch(), cpu: cpus()[0]?.model },
+      runtime: process.versions,
+      playwright: require('@playwright/test/package.json').version,
+      vitest: require('vitest/package.json').version,
+      method: {
+        repetitions: 30,
+        percentileIndex: 28,
+        widths: [320, 390, 1280],
+        dpr: [1, 2, 3],
+        timers: 'decode, synchronous mount, forced layout; font already ready',
+        pixels: 'exact RGBA, caret-only mask; live, replay and serialized HTML',
+        qualification:
+          'restore timing experiment; site startup and first-painted frame remain unqualified',
+      },
+    },
+    null,
+    2,
+  ),
+)
 console.info('Document paint evidence', evidence)
 
 export default defineConfig({

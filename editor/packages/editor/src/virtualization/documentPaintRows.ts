@@ -21,7 +21,7 @@ export function mountDocumentPaint(
   options: { readonly width?: number } = {},
 ): MountedPaintSnapshot | null {
   const document = host.ownerDocument
-  if (document.fonts?.status !== 'loaded') return null
+  if (!fontsReady(document, paint)) return null
   const width = options.width ?? host.clientWidth
   if (!Number.isFinite(width) || width <= paint.gutterWidth + paint.characterWidth) return null
   const root = document.createElement('div')
@@ -86,7 +86,8 @@ export function mountDocumentPaint(
       const element = document.createElement('div')
       element.dataset.editorDocumentPaintRow = String(rowCount - 1)
       applyStyle(element, row.style, paint.style)
-      element.style.cssText += `position:absolute;top:${top}px;left:${paint.gutterWidth}px;right:0;height:${row.height}px;line-height:${row.height}px;white-space:pre;contain:style size;box-sizing:border-box;will-change:transform;`
+      // Live rows are translated compositor layers; top positioning changes WebKit underline ink.
+      element.style.cssText += `position:absolute;top:0;transform:translateY(${top}px);left:${paint.gutterWidth}px;right:0;height:${row.height}px;line-height:${row.height}px;white-space:pre;contain:style size;box-sizing:border-box;will-change:transform;`
       if (start === 0 && row.heading) {
         element.setAttribute('role', 'heading')
         element.setAttribute('aria-level', String(row.heading.level))
@@ -113,6 +114,18 @@ export function mountDocumentPaint(
   }
 }
 
+function fontsReady(document: Document, paint: SavedDocumentPaint): boolean {
+  if (document.fonts?.status !== 'loaded') return false
+  const font = (style: DocumentPaintStyle) =>
+    `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+  const fonts = new Set([font(paint.style)])
+  for (const row of paint.rows) {
+    fonts.add(font(row.style))
+    for (const run of row.runs) fonts.add(font(run.style))
+  }
+  return [...fonts].every((font) => document.fonts.check(font))
+}
+
 function appendRuns(
   element: HTMLElement,
   runs: readonly DocumentPaintRun[],
@@ -132,18 +145,25 @@ function appendRuns(
     }
     const span = element.ownerDocument.createElement(run.href ? 'a' : 'span')
     span.textContent = run.text.slice(from, to)
-    applyStyle(span, run.style, run.href ? undefined : rowStyle)
+    applyStyle(span, run.style, rowStyle)
     if (run.href) {
+      span.style.color = run.style.color
+      span.style.textDecoration = run.style.textDecoration
       span.setAttribute('href', run.href)
       span.setAttribute('rel', 'noopener noreferrer')
-      Object.assign(span.style, {
+      const widget = element.ownerDocument.createElement('span')
+      Object.assign(widget.style, {
         display: 'inline-block',
         lineHeight: 'inherit',
         maxHeight: element.style.height,
         overflow: 'hidden',
         verticalAlign: 'top',
         whiteSpace: 'pre',
+        userSelect: 'none',
       })
+      widget.append(span)
+      element.append(widget)
+      continue
     }
     if (run.style.visibility === 'hidden') span.setAttribute('aria-hidden', 'true')
     element.append(span)
@@ -170,15 +190,29 @@ function appendGutter(
     lineHeight: `${row.height}px`,
     contain: 'layout paint style size',
     willChange: 'transform',
+    backgroundColor: row.gutterBackgroundColor,
   })
   const inset = width - row.gutter.reduce((sum, cell) => sum + cell.width, 0)
   element.style.paddingLeft = `${inset}px`
   element.style.boxSizing = 'border-box'
+  if (inset > 0) {
+    const band = parent.ownerDocument.createElement('span')
+    Object.assign(band.style, {
+      position: 'absolute',
+      left: '0',
+      top: '0',
+      bottom: '0',
+      width: `${inset}px`,
+      backgroundColor: row.gutterInsetBackgroundColor,
+    })
+    element.append(band)
+  }
   for (const cell of row.gutter) {
     const label = parent.ownerDocument.createElement('span')
     label.textContent = first ? cell.text : ''
     Object.assign(label.style, {
       color: cell.color,
+      backgroundColor: cell.backgroundColor,
       width: `${cell.width}px`,
       paddingRight: `${cell.paddingRight}px`,
       textAlign: 'right',

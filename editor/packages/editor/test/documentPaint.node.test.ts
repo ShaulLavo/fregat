@@ -37,6 +37,8 @@ function fixture(count = 1): SavedDocumentPaint {
       height: 20,
       style,
       heading: null,
+      gutterBackgroundColor: 'transparent',
+      gutterInsetBackgroundColor: 'transparent',
       gutter: [],
       runs: [{ text: 'alpha beta gamma', style, href: null }],
     })),
@@ -77,7 +79,18 @@ it('bounds total runs, text, rows, height and gutter width', () => {
     { rows: [{ ...paint.rows[0], height: 1025 }] },
     {
       rows: [
-        { ...paint.rows[0], gutter: [{ text: '1', width: 100, color: '#000', paddingRight: 0 }] },
+        {
+          ...paint.rows[0],
+          gutter: [
+            {
+              text: '1',
+              width: 100,
+              color: '#000',
+              backgroundColor: 'transparent',
+              paddingRight: 0,
+            },
+          ],
+        },
       ],
     },
   ])
@@ -154,4 +167,26 @@ it('refuses unsafe style values and malformed heading facts', () => {
       }),
     ),
   ).toBeNull()
+})
+
+it('refuses unsafe row, inset and cell gutter backgrounds', () => {
+  const paint = fixture()
+  const row = paint.rows[0]!
+  for (const changed of [
+    { ...row, gutterBackgroundColor: 'url(https://example.com)' },
+    { ...row, gutterInsetBackgroundColor: 'url(https://example.com)' },
+    {
+      ...row,
+      gutter: [
+        {
+          text: '1',
+          width: 32,
+          color: '#000',
+          backgroundColor: 'url(https://example.com)',
+          paddingRight: 0,
+        },
+      ],
+    },
+  ])
+    expect(decodeSnapshot(JSON.stringify({ ...paint, rows: [changed] }))).toBeNull()
 })

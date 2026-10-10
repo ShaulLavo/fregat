@@ -64,6 +64,12 @@ export function captureDocumentPaint(
               id: row.element.id,
             }
           : null,
+      gutterBackgroundColor: getComputedStyle(row.gutterElement).backgroundColor,
+      gutterInsetBackgroundColor: row.gutterElement.classList.contains(
+        'editor-virtualized-cursor-line-gutter-band',
+      )
+        ? getComputedStyle(row.gutterElement, '::before').backgroundColor
+        : 'transparent',
       gutter,
     })
     previousBufferRow = row.bufferRow
@@ -220,6 +226,7 @@ function captureGutter(
       text: cell.hidden ? '' : counter![1]!,
       width: view.gutterContributionWidths.get(contribution.id) ?? 0,
       color: style.color,
+      backgroundColor: style.backgroundColor,
       paddingRight: Number.parseFloat(style.paddingRight) || 0,
     })
   }
