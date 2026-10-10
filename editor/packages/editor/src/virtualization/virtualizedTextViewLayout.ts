@@ -213,7 +213,13 @@ function proportionalWrapAdvance(
   const current = view.wrapAdvance
   if (current && current.width === width && current.glyphs === glyphs) return current
 
-  return { width, glyphs, advance: (codePoint) => glyphs.advance(codePoint) }
+  return {
+    width,
+    glyphs,
+    advance: (codePoint) => glyphs.advance(codePoint),
+    measure: view.monospace ? undefined : glyphs.measure,
+    minimumTabAdvance: view.monospace ? undefined : glyphs.minimumTabAdvance,
+  }
 }
 
 export function setWrapEnabledLayout(
