@@ -1,0 +1,6 @@
+---
+import { renderExample } from '../manual/examples'
+const { code, lang = 'text' } = Astro.props
+const html = await renderExample(code, lang)
+---
+<Fragment set:html={html} />

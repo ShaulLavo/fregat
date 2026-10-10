@@ -1,11 +1,3 @@
-/** A docs page the editor can open: its Markdown path under `docs/`, URL and source URL. */
-export type ManualPage = {
-  readonly file: string
-  readonly url: string
-  readonly source: string
-  readonly title: string
-}
-
 const ORIGIN = 'https://docs.invalid'
 
 /**

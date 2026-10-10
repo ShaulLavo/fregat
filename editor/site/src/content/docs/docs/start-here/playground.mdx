@@ -3,9 +3,8 @@ title: Build a TypeScript playground
 description: Add syntax, search and a browser-based TypeScript language service.
 ---
 
-import { Code } from '@astrojs/starlight/components'
+import Code from '../../../../components/Code.astro'
 import source from '../../../../examples/playground.ts?raw'
-import Playground from '../../../../components/Playground.astro'
 
 Build a TypeScript editor with syntax colours, line numbers, find, a minimap and language diagnostics. Start with the Quick start container in a Vite browser application.
 
@@ -39,15 +38,15 @@ Add `createMinimapPlugin()` and its stylesheet. The minimap appears beside the t
 
 <Code code={source} lang='ts' title='playground.ts' />
 
-Call `mountPlayground` with your container and dispose the returned editor when the view closes. The live editor below runs that same file.
+Call `mountPlayground` with your container and dispose the returned editor when the view closes. The demo runs an interactive editor.
 
-<Playground />
+[Open the interactive demo](https://singapore.shaulavo.dev/demo/) to edit files.
 
 Change `'two'` to `2`. The TypeScript diagnostic should clear after the worker processes the edit. Hover over `twice` to inspect its type.
 
 You have built an editor with a second virtual file and a local language service. It needs no external language-server process. The guides cover worker hosting and sharing a project across editors.
 
-[Open the full demo](https://shaulavo.dev/singapore/demo/) to browse the repository through the GitHub API and edit its files.
+[Open the full demo](https://singapore.shaulavo.dev/demo/) to browse the repository through the GitHub API and edit its files.
 
 ## If it doesn't work
 

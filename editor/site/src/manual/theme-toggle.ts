@@ -35,3 +35,5 @@ system.addEventListener('change', () => {
   if (!root.dataset.theme) changed()
 })
 changed()
+
+new MutationObserver(changed).observe(root, { attributes: true, attributeFilter: ['data-theme'] })

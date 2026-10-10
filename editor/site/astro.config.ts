@@ -4,6 +4,7 @@ import { createStarlightTypeDocPlugin } from 'starlight-typedoc'
 import linksValidator from 'starlight-links-validator'
 import { existsSync } from 'node:fs'
 import { packages } from './scripts/packages'
+import { examplePaint } from './src/manual/examples'
 import { SECTIONS } from './src/manual/sections'
 
 const references = packages.map((entry) => {
@@ -38,6 +39,7 @@ const manualPage = (slug: string) =>
 
 export default defineConfig({
   site: process.env.SITE_ORIGIN,
+  markdown: { syntaxHighlight: false, rehypePlugins: [examplePaint] },
   trailingSlash: 'always',
   vite: {
     // Native and WebAssembly bindings resolve from their installed package directories.
@@ -51,6 +53,8 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Singapore',
+      expressiveCode: false,
+      components: { Head: './src/components/Head.astro' },
       description: 'Documentation for the Singapore browser code editor.',
       customCss: ['./src/styles/site.css'],
       editLink: { baseUrl: 'https://github.com/ShaulLavo/fregat/edit/main/editor/site/' },

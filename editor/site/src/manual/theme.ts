@@ -1,6 +1,7 @@
+import type { EditorTheme } from '@singapore-editor/core/rendering'
 /**
  * The docs palette is a set of `--sg-*` CSS variables (`manual.css`). Static pages colour tokens
- * with `s-*` classes and the takeover passes the same variables to Singapore's `Editor`, so both
+ * with `s-*` classes and inline examples pass the same variables to Singapore's `Editor`, so both
  * read one table and a token cannot change colour at the swap.
  */
 export const SYNTAX_COLORS = {
@@ -47,3 +48,35 @@ export function syntaxIdForColor(color: string): SyntaxColorId | null {
 export const syntaxStyles = (Object.entries(SYNTAX_COLORS) as [SyntaxColorId, string][])
   .map(([id, role]) => `.${syntaxClass(id)}{color:var(--sg-${role})}`)
   .join('')
+
+/** Reads the page palette as resolved colours; `light-dark()` values resolve against the page. */
+export function paletteTheme(host: HTMLElement, surface: 'bg' | 'code-bg'): EditorTheme {
+  const probe = document.createElement('span')
+  probe.hidden = true
+  host.append(probe)
+  const color = (role: string) => {
+    probe.style.color = `var(--sg-${role})`
+    return getComputedStyle(probe).color
+  }
+  const syntax = Object.fromEntries(
+    (Object.entries(SYNTAX_COLORS) as [SyntaxColorId, string][]).map(([id, role]) => [
+      id,
+      color(role),
+    ]),
+  )
+  const background = color('bg')
+  const [red = 0, green = 0, blue = 0] = background.match(/[\d.]+/g)?.map(Number) ?? []
+  const theme: EditorTheme = {
+    type: 0.2126 * red + 0.7152 * green + 0.0722 * blue < 128 ? 'dark' : 'light',
+    backgroundColor: color(surface),
+    foregroundColor: color('fg'),
+    gutterBackgroundColor: color('bg'),
+    gutterForegroundColor: color('gutter'),
+    caretColor: color('caret'),
+    selectionColor: color('selection'),
+    popupBackgroundColor: color('bg'),
+    syntax,
+  }
+  probe.remove()
+  return theme
+}

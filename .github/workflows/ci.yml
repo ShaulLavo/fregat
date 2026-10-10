@@ -433,6 +433,12 @@ jobs:
         with:
           build-packages: '[]'
 
+      - name: Install Singapore browser test dependencies
+        if: ${{ contains(needs.changes.outputs.sites, 'singapore') || contains(needs.changes.outputs.sites, 'fregat') || needs.changes.outputs.tooling == 'true' }}
+        uses: ./.github/actions/install-browsers
+        with:
+          playwright: editor/site/node_modules/.bin/playwright
+          browsers: chromium webkit
       - name: Build production sites
         env:
           CI_SITES: ${{ needs.changes.outputs.sites }}
@@ -440,18 +446,12 @@ jobs:
       - name: Test Singapore documentation checks
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
         run: bun run --cwd editor/site test
-      - name: Install Singapore browser test dependencies
-        if: ${{ contains(needs.changes.outputs.sites, 'singapore') || contains(needs.changes.outputs.sites, 'fregat') || needs.changes.outputs.tooling == 'true' }}
-        uses: ./.github/actions/install-browsers
-        with:
-          playwright: editor/site/node_modules/.bin/playwright
-          browsers: chromium webkit
       - name: Test landing page playback
         run: bun run test:scripts scripts/site-player.test.ts
       - name: Test mobile overflow detection
         if: ${{ needs.changes.outputs.tooling == 'true' }}
         run: bun scripts/product-sites/test-mobile.mjs
-      - name: Test Singapore editor history restoration
+      - name: Test Singapore docs browsing and examples
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
         run: bun run --cwd editor/site test:browser
       - name: Check landing page focus, contrast and motion controls
