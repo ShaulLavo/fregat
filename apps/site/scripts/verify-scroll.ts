@@ -54,9 +54,13 @@ try {
       samples: [] as { ms: number; y: number; bounds: number[] }[],
       shifts: [] as { ms: number; value: number; replicaOnly: boolean }[],
       wallpapers: [] as boolean[],
+      persisted: false,
     }
     let start = 0
     Object.assign(window, { reloadEvidence: state })
+    addEventListener('pageshow', (event) => {
+      state.persisted = event.persisted
+    })
     if (PerformanceObserver.supportedEntryTypes.includes('layout-shift')) {
       new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
@@ -79,7 +83,11 @@ try {
     }
     function sample() {
       const hero = document.querySelector('.hero')
-      if (!hero || getComputedStyle(hero).paddingTop !== '64px') {
+      if (
+        !hero ||
+        getComputedStyle(hero).paddingTop !== '64px' ||
+        getComputedStyle(hero).visibility === 'hidden'
+      ) {
         requestAnimationFrame(sample)
         return
       }
@@ -159,7 +167,8 @@ try {
           sample.bounds.map((bound, index) => Math.abs(bound - first.bounds[index]!)),
         ),
       )
-      const restored = state.samples.filter((sample) => sample.ms >= 1000)
+      // The first visible frame must already be restored; a top-frame flash is a failure.
+      const restored = state.samples
       const scrollDrift = Math.max(...restored.map((sample) => Math.abs(sample.y - expected)))
       // Playback intentionally moves illustration contents; page layout must stay steady.
       const pageShift = state.shifts
@@ -178,6 +187,43 @@ try {
       if (layoutDrift !== 0 || scrollDrift !== 0 || pageShift > 0) failures.push(label)
     }
   }
+  // A saved reload position must not affect a fresh visit or a fragment destination.
+  await page.evaluate(() => scrollTo(0, 400))
+  await page.waitForTimeout(300)
+  await page.goto('http://site.test/fregat/?fresh=1')
+  assert.equal(await page.evaluate(() => scrollY), 0, 'Fresh navigation starts at the top')
+  await page.goBack()
+  await page.waitForFunction(() => Math.abs(scrollY - 400) <= 1)
+  const persisted = await page.evaluate(
+    () =>
+      (window as typeof window & { reloadEvidence: { persisted: boolean } }).reloadEvidence
+        .persisted,
+  )
+  console.log(`${values.engine}: back navigation preserved 400px; bfcache ${persisted}`)
+  if (evidence)
+    await writeFile(join(evidence, 'back-navigation.json'), JSON.stringify({ persisted, y: 400 }))
+  await page.goto('http://site.test/fregat/#review')
+  for (const reload of [false, true]) {
+    if (reload) await page.reload()
+    await page.waitForFunction(() => {
+      const target = document.querySelector('#review')!.getBoundingClientRect().top + scrollY
+      return Math.abs(scrollY - target) <= 1
+    })
+    assert.equal(await page.evaluate(() => history.scrollRestoration), 'auto')
+  }
+  await page.goto('http://site.test/fregat/?invalid=1')
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      `fregat.site.scroll:${location.pathname}`,
+      JSON.stringify({ y: 650, height: 10 }),
+    )
+  })
+  await page.reload()
+  assert.equal(await page.evaluate(() => scrollY), 0, 'Invalid saved dimensions start at the top')
+  assert.equal(
+    await page.evaluate(() => getComputedStyle(document.documentElement).visibility),
+    'visible',
+  )
   if (evidence) {
     await page.evaluate(() => scrollTo(0, 0))
     await page.screenshot({ path: join(evidence, `${values.engine}-mobile.png`) })

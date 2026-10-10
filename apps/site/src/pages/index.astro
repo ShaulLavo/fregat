@@ -23,6 +23,50 @@ const ogImage = new URL(`${base}og.jpg`, Astro.site)
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script is:inline>
+      (() => {
+        const key = `fregat.site.scroll:${location.pathname}`
+        const navigation = performance.getEntriesByType('navigation')[0]
+        const reload = navigation?.type === 'reload' && !location.hash
+        let saved = null
+        let ready = false
+        try {
+          const record = JSON.parse(sessionStorage.getItem(key) ?? 'null')
+          if (
+            reload && record && Number.isFinite(record.y) && record.y >= 0 &&
+            Number.isFinite(record.height) && record.height > record.y
+          ) saved = record
+        } catch {
+          // Storage can be unavailable in a restricted browser context.
+        }
+        history.scrollRestoration = saved ? 'manual' : 'auto'
+        // Streamed HTML must not paint at the top before its saved position is applied.
+        if (saved?.y > 0) document.documentElement.style.visibility = 'hidden'
+        document.addEventListener('fregat:parsed', () => {
+          const height = document.documentElement.scrollHeight
+          if (saved && height > saved.y) {
+            scrollTo(0, Math.min(saved.y, Math.max(0, height - innerHeight)))
+          }
+          document.documentElement.style.removeProperty('visibility')
+          ready = true
+        }, { once: true })
+        function save() {
+          if (!ready) return
+          try {
+            sessionStorage.setItem(key, JSON.stringify({
+              y: scrollY,
+              height: document.documentElement.scrollHeight,
+            }))
+          } catch {
+            // A denied storage write leaves the next visit at its normal starting position.
+          }
+        }
+        addEventListener('pagehide', save)
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'hidden') save()
+        })
+      })()
+    </script>
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="color-scheme" content="dark light" />
@@ -213,6 +257,9 @@ const ogImage = new URL(`${base}og.jpg`, Astro.site)
     </footer>
 
     <Icons />
+    <script is:inline>
+      document.dispatchEvent(new Event('fregat:parsed'))
+    </script>
     <script>
       import '../scripts/player.ts'
     </script>
