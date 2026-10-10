@@ -2,8 +2,10 @@ import type { MorphFrame, MorphPiece } from './morph-frame'
 
 const LAYER_CLASS = 'editor-morph-layer'
 const PIECE_CLASS = 'editor-morph-piece'
-const ENTER_BLUR = 'blur(3px)'
-const LEAVE_BLUR = 'blur(2px)'
+// Entering text starts this blurred (px) and this far below its row (share of the row height).
+const ENTER_BLUR_PX = 3
+const ENTER_DROP = 0.18
+const LEAVE_BLUR_PX = 2
 
 /** Where a piece is on screen right now, which may be part way through an earlier morph. */
 export type VisualPiece = {
@@ -12,6 +14,8 @@ export type VisualPiece = {
   readonly top: number
   readonly height: number
   readonly opacity: number
+  /** Gaussian blur radius in px. */
+  readonly blur: number
   readonly color: string | undefined
   readonly fontStyle: string | undefined
   readonly fontWeight: string | number | undefined
@@ -26,10 +30,11 @@ export type MorphTiming = {
 type Target = {
   readonly piece: MorphPiece
   readonly span: HTMLElement
-  /** Offset from the final spot the move starts at, and the opacity an enter starts from. */
+  /** Offset from the final spot, opacity and blur the piece starts from. */
   readonly fromX: number
   readonly fromY: number
   readonly fromOpacity: number
+  readonly fromBlur: number
   readonly animation: Animation | null
 }
 
@@ -102,12 +107,17 @@ export class MorphRun {
         x: target.piece.x + target.fromX * remaining,
         top: target.piece.top + target.fromY * remaining,
         opacity: target.fromOpacity + (1 - target.fromOpacity) * progress,
+        blur: target.fromBlur * remaining,
       }
     })
-    const leaving = this.leaving.map((entry) => ({
-      ...entry.visual,
-      opacity: entry.visual.opacity * (1 - easedProgress(entry.animation)),
-    }))
+    const leaving = this.leaving.map((entry) => {
+      const progress = easedProgress(entry.animation)
+      return {
+        ...entry.visual,
+        opacity: entry.visual.opacity * (1 - progress),
+        blur: entry.visual.blur + (LEAVE_BLUR_PX - entry.visual.blur) * progress,
+      }
+    })
     return pieces.concat(leaving)
   }
 
@@ -137,16 +147,21 @@ export class MorphRun {
     const fromX = old.x - piece.x
     const fromY = old.top - piece.top
     const fromOpacity = old.opacity
-    if (Math.abs(fromX) < 0.5 && Math.abs(fromY) < 0.5 && fromOpacity >= 0.99) {
-      return { piece, span, fromX: 0, fromY: 0, fromOpacity: 1, animation: null }
+    const fromBlur = old.blur
+    if (Math.abs(fromX) < 0.5 && Math.abs(fromY) < 0.5 && fromOpacity >= 0.99 && fromBlur < 0.05) {
+      return { piece, span, fromX: 0, fromY: 0, fromOpacity: 1, fromBlur: 0, animation: null }
     }
     // A downward wave: rows lower in the frame set off slightly later.
     const wave = rowCount > 1 ? piece.row / (rowCount - 1) : 0
     const delay = timing.durationMs * 0.1 * wave
     const animation = span.animate(
       [
-        { transform: `translate(${fromX}px, ${fromY}px)`, opacity: fromOpacity },
-        { transform: 'translate(0, 0)', opacity: 1 },
+        {
+          transform: `translate(${fromX}px, ${fromY}px)`,
+          opacity: fromOpacity,
+          filter: `blur(${fromBlur}px)`,
+        },
+        { transform: 'translate(0, 0)', opacity: 1, filter: 'blur(0)' },
       ],
       {
         duration: timing.durationMs * 0.85,
@@ -155,16 +170,17 @@ export class MorphRun {
         fill: 'both',
       },
     )
-    return { piece, span, fromX, fromY, fromOpacity, animation }
+    return { piece, span, fromX, fromY, fromOpacity, fromBlur, animation }
   }
 
   // New text arrives in reading order, like a stream, after the old text has made room.
   private enter(piece: MorphPiece, order: number, count: number, timing: MorphTiming): Target {
     const span = this.span(piece, piece.color)
     const spread = count > 1 ? order / (count - 1) : 0
+    const drop = piece.height * ENTER_DROP
     const animation = span.animate(
       [
-        { opacity: 0, filter: ENTER_BLUR, transform: 'translateY(0.25em)' },
+        { opacity: 0, filter: `blur(${ENTER_BLUR_PX}px)`, transform: `translateY(${drop}px)` },
         { opacity: 1, filter: 'blur(0)', transform: 'translateY(0)' },
       ],
       {
@@ -174,22 +190,33 @@ export class MorphRun {
         fill: 'both',
       },
     )
-    return { piece, span, fromX: 0, fromY: 0, fromOpacity: 0, animation }
+    return {
+      piece,
+      span,
+      fromX: 0,
+      fromY: drop,
+      fromOpacity: 0,
+      fromBlur: ENTER_BLUR_PX,
+      animation,
+    }
   }
 
   private leave(visual: VisualPiece, timing: MorphTiming): Leaving {
     const span = this.span(visual, visual.color)
     const animation = span.animate(
       [
-        { opacity: visual.opacity, filter: 'blur(0)' },
-        { opacity: 0, filter: LEAVE_BLUR },
+        { opacity: visual.opacity, filter: `blur(${visual.blur}px)` },
+        { opacity: 0, filter: `blur(${LEAVE_BLUR_PX}px)` },
       ],
       { duration: timing.durationMs * 0.25, easing: 'cubic-bezier(0.2, 0, 0, 1)', fill: 'both' },
     )
     return { visual, span, animation }
   }
 
-  private span(piece: Omit<VisualPiece, 'opacity'>, color: string | undefined): HTMLElement {
+  private span(
+    piece: Omit<VisualPiece, 'opacity' | 'blur'>,
+    color: string | undefined,
+  ): HTMLElement {
     const span = this.host.ownerDocument.createElement('span')
     span.className = PIECE_CLASS
     span.textContent = piece.text
@@ -238,10 +265,10 @@ export class MorphRun {
 
 /** The frame's pieces as they would stand with nothing animating. */
 export function restingPieces(frame: MorphFrame): VisualPiece[] {
-  return frame.pieces.map((piece) => ({ ...piece, opacity: 1 }))
+  return frame.pieces.map((piece) => ({ ...piece, opacity: 1, blur: 0 }))
 }
 
-function visualOf(piece: MorphPiece, span: HTMLElement): Omit<VisualPiece, 'opacity'> {
+function visualOf(piece: MorphPiece, span: HTMLElement): Omit<VisualPiece, 'opacity' | 'blur'> {
   return {
     text: piece.text,
     x: piece.x,

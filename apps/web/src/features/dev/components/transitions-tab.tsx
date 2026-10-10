@@ -28,7 +28,14 @@ export function TransitionsTab() {
   const timers = useRef<number[]>([])
   useEffect(() => () => clearTimers(timers.current), [])
 
+  // Any action cancels a pending stream or rewrite, whose offsets and text it would overwrite.
+  const cancelPending = () => {
+    clearTimers(timers.current)
+    timers.current = []
+  }
+
   const goTo = (next: number) => {
+    cancelPending()
     if (!editor) return
     const count = TRANSITION_STEPS.length
     const index = ((next % count) + count) % count
@@ -37,8 +44,13 @@ export function TransitionsTab() {
   }
 
   const schedule = (delays: readonly number[], run: (index: number) => void) => {
-    clearTimers(timers.current)
+    cancelPending()
     timers.current = delays.map((delay, index) => window.setTimeout(() => run(index), delay))
+  }
+
+  const runCommand = (command: 'undo' | 'redo') => {
+    cancelPending()
+    editor?.dispatchCommand(command)
   }
 
   const streamFunction = () => {
@@ -71,10 +83,10 @@ export function TransitionsTab() {
           <span className='text-muted-foreground text-xs tabular-nums'>
             Step {step + 1} of {TRANSITION_STEPS.length}
           </span>
-          <Button variant='ghost' onClick={() => editor?.dispatchCommand('undo')}>
+          <Button variant='ghost' onClick={() => runCommand('undo')}>
             Undo
           </Button>
-          <Button variant='ghost' onClick={() => editor?.dispatchCommand('redo')}>
+          <Button variant='ghost' onClick={() => runCommand('redo')}>
             Redo
           </Button>
           <Button variant='ghost' onClick={streamFunction}>

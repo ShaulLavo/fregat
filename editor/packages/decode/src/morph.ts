@@ -1,5 +1,6 @@
 import type {
   EditorContributionChange,
+  EditorDisposable,
   EditorPlugin,
   EditorRowPresentation,
   EditorViewContribution,
@@ -7,7 +8,7 @@ import type {
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
-import { TextMeasurer, canvasFont } from './measure'
+import { TextMeasurer, canvasFont, renderedTabColumns } from './measure'
 import { buildFrame, recolorFrame, type MorphFrame } from './morph-frame'
 import { matchPieces } from './morph-match'
 import { MorphRun, restingPieces, springEasing, type MorphTiming } from './morph-run'
@@ -73,6 +74,7 @@ class MorphViewContribution implements EditorViewContribution {
   private run: MorphRun | null = null
   private readonly hidden = new Map<HTMLElement, HiddenRow>()
   private timing: MorphTiming | null = null
+  private readonly typing: EditorDisposable
 
   public constructor(
     private readonly context: EditorViewContributionContext,
@@ -80,6 +82,8 @@ class MorphViewContribution implements EditorViewContribution {
   ) {
     // Added to an editor that already shows a document, the first change still needs its before.
     if (context.hasDocument()) this.latest = context.getSnapshot()
+    // Typed text shows at once: a keystroke settles any morph instead of joining it.
+    this.typing = context.onDidType(() => this.finish())
   }
 
   public update(
@@ -95,7 +99,12 @@ class MorphViewContribution implements EditorViewContribution {
       this.finish()
       return
     }
-    if (kind === 'layout') this.measurer = null
+    if (kind === 'layout') {
+      // New metrics or wrapping: the overlay's coordinates no longer match the rows.
+      this.measurer = null
+      this.finish()
+      return
+    }
     if (kind === 'tokens' && this.run) {
       this.run.recolor(recolorFrame(this.run.targetFrame, snapshot.tokens))
       return
@@ -110,6 +119,7 @@ class MorphViewContribution implements EditorViewContribution {
   }
 
   public dispose(): void {
+    this.typing.dispose()
     this.finish()
   }
 
@@ -129,6 +139,11 @@ class MorphViewContribution implements EditorViewContribution {
   }
 
   private morph(previous: EditorViewSnapshot, snapshot: EditorViewSnapshot): void {
+    // Chips, hidden markup and phantom text are painted as something other than their source.
+    if (this.context.getInlineReplacementRanges().length > 0) {
+      this.finish()
+      return
+    }
     const rows = this.collectRows(snapshot)
     const measurer = this.ensureMeasurer(snapshot, rows)
     const next = buildFrame(snapshot, measurer, this.options.maxPieces)
@@ -218,11 +233,14 @@ class MorphViewContribution implements EditorViewContribution {
   ): TextMeasurer {
     const fontSource = rows[0]?.element ?? this.context.contentElement
     const font = canvasFont(fontSource)
-    if (this.measurer?.font === font) return this.measurer
+    const tabColumns = renderedTabColumns(this.context.scrollElement, snapshot.tabSize)
+    if (this.measurer?.font === font && this.measurer.tabColumns === tabColumns)
+      return this.measurer
     this.measurer = new TextMeasurer(
       this.context.scrollElement.ownerDocument,
       font,
       snapshot.metrics.characterWidth,
+      tabColumns,
     )
     return this.measurer
   }

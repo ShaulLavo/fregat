@@ -524,6 +524,39 @@ describe('createMorphPlugin', () => {
     )
   })
 
+  it('settles a running morph the moment the user types', () => {
+    const typing: { listener: ((text: string) => void) | null } = { listener: null }
+    const { context, contribution } = mountMorph({}, (listener) => (typing.listener = listener))
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(12))
+    expect(context.contentElement.querySelector('.editor-morph-layer')).not.toBeNull()
+
+    typing.listener?.('a')
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+    expect(rowAnimations().every((entry) => entry.cancel.mock.calls.length > 0)).toBe(true)
+  })
+
+  it('settles when layout changes under a running morph', () => {
+    const { context, contribution } = mountMorph()
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(12))
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'layout')
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+  })
+
+  it('leaves rows alone when their paint cannot be redrawn', () => {
+    const { context, contribution } = mountMorph()
+    const next = snapshot({ text: EDITED, textVersion: 2 })
+    const rows = next.visibleRows.map((row) => ({
+      ...row,
+      mountedPaintSupport: 'unreplayable-plugin-css' as const,
+    }))
+    contribution.update({ ...next, visibleRows: rows }, 'content', edit(12))
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+    expect(rowAnimations()).toHaveLength(0)
+  })
+
   it('stays still under reduced motion', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
     const { context, contribution } = mountMorph()
@@ -545,7 +578,10 @@ function edit(size: number, kind: EditorContributionChange['kind'] = 'edit') {
   } as unknown as EditorContributionChange
 }
 
-function mountMorph(options: MorphPluginOptions = {}): {
+function mountMorph(
+  options: MorphPluginOptions = {},
+  onDidType?: (listener: (text: string) => void) => void,
+): {
   context: EditorViewContributionContext
   contribution: EditorViewContribution
   presentations: EditorRowPresentation[]
@@ -558,7 +594,16 @@ function mountMorph(options: MorphPluginOptions = {}): {
     }),
   )
   const presentations: EditorRowPresentation[] = []
-  const context = viewContext(presentations)
+  const base = viewContext(presentations)
+  const context: EditorViewContributionContext = onDidType
+    ? {
+        ...base,
+        onDidType: (listener) => {
+          onDidType(listener)
+          return { dispose: vi.fn() }
+        },
+      }
+    : base
   populateRows(context.contentElement, snapshot())
   const contribution = provider?.createContribution(context)
   if (!contribution) throw new Error('morph contribution was not created')

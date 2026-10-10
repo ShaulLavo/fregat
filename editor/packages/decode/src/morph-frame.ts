@@ -31,7 +31,8 @@ const WHITESPACE = /^\s+$/
 /**
  * The visible rows as positioned pieces, split at both syntax-token and word
  * boundaries so a piece never straddles two colours. Null when a mounted row
- * is a horizontal window of a long line, whose x origin is not the row start.
+ * is a horizontal window of a long line, whose x origin is not the row start,
+ * or carries paint the overlay cannot redraw.
  */
 export function buildFrame(
   snapshot: EditorViewSnapshot,
@@ -40,11 +41,13 @@ export function buildFrame(
 ): MorphFrame | null {
   const pieces: MorphPiece[] = []
   const styleAt = tokenStyleLookup(snapshot.tokens)
-  const tabWidth = measurer.width(' ') * snapshot.tabSize
+  const tabWidth = measurer.tabWidth
   let row = 0
   for (const visible of snapshot.visibleRows) {
     if (visible.kind !== 'text') continue
     if (typeof visible.text !== 'string') return null
+    // Paint the overlay cannot redraw, such as plugin CSS, would vanish with the hidden row.
+    if (visible.mountedPaintSupport !== 'replayable') return null
     if (visible.text.length === 0) continue
     appendRowPieces(pieces, {
       text: visible.text,

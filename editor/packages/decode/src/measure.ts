@@ -11,9 +11,15 @@ export class TextMeasurer {
     document: Document,
     public readonly font: string,
     private readonly fallbackCharWidth: number,
+    /** Columns per tab stop, as the rows render them (`tab-size`). */
+    public readonly tabColumns: number,
   ) {
     this.context = document.createElement('canvas').getContext('2d')
     if (this.context) this.context.font = font
+  }
+
+  public get tabWidth(): number {
+    return this.width(' ') * this.tabColumns
   }
 
   public width(text: string): number {
@@ -25,6 +31,13 @@ export class TextMeasurer {
     this.widths.set(text, width)
     return width
   }
+}
+
+/** The tab width the editor renders with; the snapshot's `tabSize` is the detected indent instead. */
+export function renderedTabColumns(scrollElement: Element, fallback: number): number {
+  const style = scrollElement.ownerDocument.defaultView?.getComputedStyle(scrollElement)
+  const columns = Number.parseFloat(style?.getPropertyValue('--editor-tab-size') ?? '')
+  return Number.isFinite(columns) && columns > 0 ? columns : fallback
 }
 
 /** The canvas font string for an element's computed font. */
