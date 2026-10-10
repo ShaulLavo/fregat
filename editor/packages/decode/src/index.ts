@@ -87,6 +87,8 @@ class DecodeViewContribution implements EditorViewContribution {
     this.finish()
     if (!documentId || snapshot.textSnapshot.length === 0) return
     if (reducedMotion(this.context)) return
+    // Chips, hidden markup and phantom text are painted as something other than their source.
+    if (this.context.getInlineReplacementRanges().length > 0) return
     this.animatedDocumentId = documentId
     const rows = this.cover.collect(snapshot)
     const measurer = this.ensureMeasurer(snapshot, rows[0]?.presentation.element)

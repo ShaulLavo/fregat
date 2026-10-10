@@ -29,7 +29,8 @@ import { EditorFrame } from '@/features/editor/components/frame'
 import { DiagnosticPeek } from '@/features/editor/components/diagnostic-peek'
 import {
   createCriticalEditorCorePlugins,
-  createMotionPlugins,
+  createRevealPlugins,
+  MORPH_PLUGIN,
 } from '@/features/editor/utils/plugins'
 import { selectionForDefinition } from '@/features/editor/utils/position'
 import { languageIdForFilePath } from '@/lib/file-language'
@@ -284,10 +285,7 @@ export function Editor({
       compareMergeConflict,
     ],
   )
-  const motionPlugins = useMemo(
-    () => createMotionPlugins(decodeMode, morphEnabled),
-    [decodeMode, morphEnabled],
-  )
+  const revealPlugins = useMemo(() => createRevealPlugins(decodeMode), [decodeMode])
   const unicodeHighlights = useUnicodeHighlights()
   const spellcheckPlugin = useSpellcheckPlugin()
   const textMenuRequest = useEditorUiState((state) =>
@@ -299,7 +297,8 @@ export function Editor({
     [unicodeHighlights.plugin],
     analysisAllowed && spellcheckPlugin ? [spellcheckPlugin] : [],
     [diagnosticPeek.plugin, languageServer],
-    motionPlugins,
+    revealPlugins,
+    morphEnabled ? [MORPH_PLUGIN] : [],
     [scrollPersistencePlugin],
     additionalPlugins,
   )

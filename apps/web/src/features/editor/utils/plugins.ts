@@ -104,11 +104,14 @@ export function createCriticalEditorCorePlugins(
   )
 }
 
-/** The motion plugins: the file-open reveal when `mode` is set, and the edit morph. */
-export function createMotionPlugins(mode: DecodeMode | null, morph: boolean): EditorPlugin[] {
-  const reveal: EditorPlugin[] = mode ? [createDecodePlugin({ mode })] : []
-  return reveal.concat(morph ? [createMorphPlugin()] : [])
+/** The file-open reveal, when a mode is set. */
+export function createRevealPlugins(mode: DecodeMode | null): EditorPlugin[] {
+  return mode ? [createDecodePlugin({ mode })] : []
 }
+
+// One instance for every editor, so turning edit animation on or off adds or removes only this
+// plugin: a rebuilt reveal plugin would replay on every open file.
+export const MORPH_PLUGIN = createMorphPlugin()
 
 function createEditorSyntaxHighlightingPlugins(
   languageId: EditorSyntaxLanguageId | null,

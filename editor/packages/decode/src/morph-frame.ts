@@ -51,7 +51,8 @@ export function buildFrame(
     // with the hidden row.
     if (!drawsAsPlainText(visible)) return null
     if (visible.text.length === 0) continue
-    if (row >= maxRows) break
+    // Every mounted row gets covered, so a frame that cannot draw them all draws none.
+    if (row >= maxRows) return null
     appendRowPieces(pieces, {
       text: visible.text,
       startOffset: visible.startOffset,
@@ -156,8 +157,9 @@ function drawsAsPlainText(row: EditorViewSnapshot['visibleRows'][number]): boole
 }
 
 /**
- * Whether the rows a frame was built from now stand somewhere else or start at other text: new
- * metrics, a rewrap or a changed indent. Rows only one side mounts (a scroll) do not count.
+ * Whether the rows a frame was built from now stand somewhere else, hold other text or paint it
+ * differently: new metrics, a rewrap, a changed indent, an inline replacement landing. Rows only
+ * one side mounts (a scroll) do not count.
  */
 export function frameMoved(before: EditorViewSnapshot, after: EditorViewSnapshot): boolean {
   if (
@@ -174,7 +176,9 @@ export function frameMoved(before: EditorViewSnapshot, after: EditorViewSnapshot
       now.top !== row.top ||
       now.startOffset !== row.startOffset ||
       now.endOffset !== row.endOffset ||
-      now.leftSpacerWidth !== row.leftSpacerWidth
+      now.leftSpacerWidth !== row.leftSpacerWidth ||
+      now.text !== row.text ||
+      drawsAsPlainText(now) !== drawsAsPlainText(row)
     )
   })
 }

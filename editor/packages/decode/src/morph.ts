@@ -114,7 +114,12 @@ class MorphViewContribution implements EditorViewContribution {
   // moved under it (new metrics, a rewrap). Newer text waits for its `content` update to retarget.
   private keepCovering(snapshot: EditorViewSnapshot, kind: EditorViewContributionUpdateKind): void {
     const started = this.runSnapshot
-    if (!this.run || !started || snapshot.textVersion !== started.textVersion) return
+    if (!this.run || !started) return
+    if (snapshot.textVersion !== started.textVersion) {
+      // A text change that is not a morph (a save sync) repaints rows the overlay no longer matches.
+      if (kind === 'content') this.finish()
+      return
+    }
     if (frameMoved(started, snapshot)) {
       this.finish()
       return

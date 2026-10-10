@@ -245,6 +245,35 @@ describe('createDecodePlugin', () => {
     expect(rowAnimations()).toHaveLength(0)
   })
 
+  it('opens rows painted with inline replacements without a reveal', () => {
+    const { context, contribution } = mount()
+    vi.spyOn(context, 'getInlineReplacementRanges').mockReturnValue([{ start: 0, end: 2 }])
+    contribution.update(snapshot({ tokens: someTokens() }), 'document')
+
+    expect(revealLayer(context)).toBeNull()
+    expect(rowAnimations()).toHaveLength(0)
+  })
+
+  it('opens without a reveal when more rows are mounted than it may draw', () => {
+    const { context, contribution } = mount({ maxRows: 2 })
+    contribution.update(snapshot({ tokens: someTokens() }), 'document')
+
+    expect(revealLayer(context)).toBeNull()
+    expect(rowAnimations()).toHaveLength(0)
+  })
+
+  it('settles when a covered row starts painting its text differently', () => {
+    const { context, contribution } = mount()
+    const opened = snapshot({ tokens: someTokens() })
+    contribution.update(opened, 'document')
+    const repainted = opened.visibleRows.map((row, index) =>
+      index === 0 ? { ...row, mountedPaintSupport: 'unreplayable-plugin-css' as const } : row,
+    )
+    contribution.update({ ...opened, visibleRows: repainted }, 'tokens')
+
+    expect(revealLayer(context)).toBeNull()
+  })
+
   it('does nothing under reduced motion', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
     const { context, contribution } = mount()
@@ -370,6 +399,18 @@ describe('createMorphPlugin', () => {
       ],
     } as unknown as (typeof rest)[number]
     contribution.update({ ...next, visibleRows: [boxed].concat(rest) }, 'content', edit(12))
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+  })
+
+  it('settles when a save sync replaces the text under a running morph', () => {
+    const { context, contribution } = mountMorph()
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(12))
+    contribution.update(
+      snapshot({ text: SAMPLE, textVersion: 3 }),
+      'content',
+      edit(1, 'synchronize'),
+    )
 
     expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
   })
