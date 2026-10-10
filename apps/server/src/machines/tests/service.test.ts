@@ -77,3 +77,22 @@ test('concurrent relays share a private credential until the SSH connection ends
   await service.resolve('fixture')
   expect(claims()).toHaveLength(2)
 })
+
+test('SSH aliases for one destination share renewal and survive another alias disconnecting', async () => {
+  const { service, requests } = await sshServiceFixture({
+    machines: { fixture: machine, alias: machine },
+  })
+  await Promise.all([service.connect('fixture', 'tab-one'), service.connect('alias', 'tab-two')])
+  const [first, alias] = await Promise.all([service.resolve('fixture'), service.resolve('alias')])
+  const claims = () => requests.filter((request) => request.url.endsWith('/pairing/claim'))
+  expect(claims()).toHaveLength(1)
+  expect(first.cookie).toBe(alias.cookie)
+  await Promise.all([first.refresh!(), alias.refresh!()])
+  expect(claims()).toHaveLength(2)
+  await service.disconnect('fixture', 'tab-one')
+  await service.resolve('alias')
+  expect(claims()).toHaveLength(2)
+  await service.connect('fixture', 'tab-one')
+  await service.resolve('fixture')
+  expect(claims()).toHaveLength(2)
+})

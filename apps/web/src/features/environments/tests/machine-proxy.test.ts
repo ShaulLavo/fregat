@@ -150,48 +150,69 @@ test('relays text and binary WebSocket frames exactly, including input sent befo
   }
 })
 
-test('upgrades an authenticated prefixed request through Elysia and dispatches raw frames', async () => {
-  const remote = remoteMachineSocket()
-  const local = machineProxyClient()
-  const relay = machineProxyAdapter({
-    auth: createAuthConfig({ allowedOrigins: [browserOrigin] }),
-    resolve: () => ({
+test.each([false, true])(
+  'upgrades an authenticated prefixed request with a revoked credential=%s',
+  async (revoked) => {
+    const remote = remoteMachineSocket()
+    const local = machineProxyClient()
+    let renewals = 0
+    const destination = {
       origin: remote.server.url.origin,
       webOrigin: remoteWebOrigin,
       cookie: relayCookie,
-    }),
-  })
-  const response = await relay.app.handle(
-    new Request('http://local/platform-api/machines/dev/proxy/orchestration/rpc?client=a%2Fb', {
-      headers: {
-        origin: browserOrigin,
-        upgrade: 'websocket',
-        connection: 'upgrade',
-        'sec-websocket-key': 'browser-key-must-not-reach-remote',
-        'sec-websocket-version': '13',
+    }
+    const relay = machineProxyAdapter({
+      auth: createAuthConfig({ allowedOrigins: [browserOrigin] }),
+      resolve: () => ({
+        ...destination,
+        cookie: revoked ? 'relay_device=revoked.secret' : relayCookie,
+        refresh: revoked
+          ? async () => {
+              renewals++
+              return destination
+            }
+          : undefined,
+      }),
+      fetcher: async (url, init) => {
+        expect(url.pathname).toBe('/system/capabilities')
+        expect(new Headers(init.headers).get('cookie')).toBe('relay_device=revoked.secret')
+        return Response.json({ error: { code: 'DEVICE_NOT_PAIRED' } }, { status: 401 })
       },
-    }),
-  )
-  expect(response.status).toBeLessThan(400)
-  expect(relay.upgrades).toHaveLength(1)
-  const socket = { ...local.client, data: relay.upgrades[0]?.data }
-  try {
-    dispatchMachineProxySocket('open', socket)
-    dispatchMachineProxySocket('message', socket, '{ "n": 9007199254740993 }')
-    dispatchMachineProxySocket('message', socket, Buffer.from([0, 255, 128]))
-    await expect.poll(() => local.messages.length).toBe(2)
-    expect(local.messages[0]).toBe('{ "n": 9007199254740993 }')
-    expect(local.messages[1]).toEqual(new Uint8Array([0, 255, 128]).buffer)
-    expect(remote.requests[0]?.url).toContain('/orchestration/rpc?client=a%2Fb')
-    expect(remote.requests[0]?.headers.get('sec-websocket-key')).not.toBe(
-      'browser-key-must-not-reach-remote',
+    })
+    const response = await relay.app.handle(
+      new Request('http://local/platform-api/machines/dev/proxy/orchestration/rpc?client=a%2Fb', {
+        headers: {
+          origin: browserOrigin,
+          upgrade: 'websocket',
+          connection: 'upgrade',
+          'sec-websocket-key': 'browser-key-must-not-reach-remote',
+          'sec-websocket-version': '13',
+        },
+      }),
     )
-    expect(remote.requests[0]?.headers.get('origin')).toBe(remoteWebOrigin)
-  } finally {
-    dispatchMachineProxySocket('close', socket, 1000, 'cleanup')
-    await remote.server.stop(true)
-  }
-})
+    expect(response.status).toBeLessThan(400)
+    expect(relay.upgrades).toHaveLength(1)
+    const socket = { ...local.client, data: relay.upgrades[0]?.data }
+    try {
+      dispatchMachineProxySocket('open', socket)
+      dispatchMachineProxySocket('message', socket, '{ "n": 9007199254740993 }')
+      dispatchMachineProxySocket('message', socket, Buffer.from([0, 255, 128]))
+      await expect.poll(() => local.messages.length).toBe(2)
+      expect(local.messages[0]).toBe('{ "n": 9007199254740993 }')
+      expect(local.messages[1]).toEqual(new Uint8Array([0, 255, 128]).buffer)
+      expect(remote.requests[0]?.url).toContain('/orchestration/rpc?client=a%2Fb')
+      expect(remote.requests[0]?.headers.get('sec-websocket-key')).not.toBe(
+        'browser-key-must-not-reach-remote',
+      )
+      expect(remote.requests[0]?.headers.get('origin')).toBe(remoteWebOrigin)
+      expect(remote.requests[0]?.headers.get('cookie')).toBe(relayCookie)
+      expect(renewals).toBe(revoked ? 1 : 0)
+    } finally {
+      dispatchMachineProxySocket('close', socket, 1000, 'cleanup')
+      await remote.server.stop(true)
+    }
+  },
+)
 
 test('wildcard URLs cannot replace the connected machine origin', async () => {
   const targets: URL[] = []

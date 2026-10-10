@@ -66,7 +66,11 @@ describe('web routes', () => {
   })
 
   it('uses a trusted forwarded HTTPS origin in the payload and preloads with the configured base', async () => {
-    const app = await webApp({ allowedOrigins: ['https://example.test'], webBase: '/prefix/' })
+    const app = await webApp({
+      allowedOrigins: ['https://example.test'],
+      webBase: '/prefix/',
+      pairing: false,
+    })
     const request = navigation('/~repo/workbench')
     request.headers.set('x-forwarded-proto', 'https')
     request.headers.set('x-forwarded-host', 'example.test')
@@ -81,6 +85,7 @@ describe('web routes', () => {
   it('uses the same forwarded address for the development adapter default', async () => {
     const app = await webApp({
       development: true,
+      pairing: false,
       allowedOrigins: ['https://example.test'],
       webBase: '/prefix/',
     })
@@ -381,11 +386,13 @@ async function webApp({
   development = false,
   allowedOrigins = defaultOrigins.concat(['http://local']),
   webBase = '/',
+  pairing = true,
 }: {
   devPage?: boolean
   development?: boolean
   allowedOrigins?: readonly string[]
   webBase?: string
+  pairing?: boolean
 } = {}) {
   const root = await fixtureRoot()
   const release = path.join(root, 'stamp-abc-slug')
@@ -406,10 +413,13 @@ async function webApp({
     path.join(release, 'build-config.json'),
     JSON.stringify({ release, commit: 'abc', dirtyFiles: ['x.ts'] }),
   )
+  const settings = testSettingsOptions(root)
+  await mkdir(path.dirname(settings.userFilePath!), { recursive: true })
+  await writeFile(settings.userFilePath!, JSON.stringify({ 'environments.devicePairing': pairing }))
   return createTestApp({
     auth: { allowedOrigins },
     system: { webBase },
-    settings: testSettingsOptions(root),
+    settings,
     web: { root: web, bootstrapDevelopment: development },
     workspaceRoot: root,
   })

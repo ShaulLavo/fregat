@@ -1,3 +1,4 @@
+import { isRecord } from '@workspace/utils/objects'
 import { createMachineProxyError } from './proxy-errors'
 
 export type MachineProxyFetcher = (input: URL, init: RequestInit) => Promise<Response>
@@ -52,16 +53,30 @@ export async function forwardMachineRequest(
   target: URL,
   headers: Headers,
   fetcher: MachineProxyFetcher,
+  refresh?: () => Promise<Headers>,
 ) {
+  let retryRequest: Request | null = null
   try {
-    const response = await fetcher(target, {
+    retryRequest = refresh ? request.clone() : null
+    let response = await fetcher(target, {
       method: request.method,
       headers,
       body: request.body,
       redirect: 'error',
       signal: request.signal,
     })
+    if (refresh && retryRequest && (await isUnpairedResponse(response))) {
+      await response.body?.cancel()
+      response = await fetcher(target, {
+        method: retryRequest.method,
+        headers: await refresh(),
+        body: retryRequest.body,
+        redirect: 'error',
+        signal: retryRequest.signal,
+      })
+    }
     const responseHeaders = endToEndHeaders(response.headers)
+    responseHeaders.delete('set-cookie')
     // Fetch decodes compressed bodies; the original length and encoding no longer apply.
     responseHeaders.delete('content-encoding')
     responseHeaders.delete('content-length')
@@ -75,6 +90,10 @@ export async function forwardMachineRequest(
     })
   } catch (cause) {
     throw createMachineProxyError(cause)
+  } finally {
+    // Release an unused replay branch without waiting for the upload branch to finish.
+    if (retryRequest && !retryRequest.bodyUsed)
+      void retryRequest.body?.cancel().catch(() => undefined)
   }
 }
 
@@ -85,4 +104,14 @@ function endToEndHeaders(source: Headers) {
   }
   for (const name of hopHeaders) headers.delete(name)
   return headers
+}
+
+/** Only an admission rejection is safe to replay: its operation has not run. */
+export async function isUnpairedResponse(response: Response) {
+  if (response.status !== 401) return false
+  const body: unknown = await response
+    .clone()
+    .json()
+    .catch(() => null)
+  return isRecord(body) && isRecord(body.error) && body.error.code === 'DEVICE_NOT_PAIRED'
 }

@@ -108,7 +108,9 @@ SSH machine relays pair their own device over the authenticated, identity-checke
 forward, retain its credential privately in memory, and present it for HTTP and WebSocket hops.
 A stable source-server identity replaces the previous relay device after a restart and closes its
 old sockets; the device list names the source machine. Caller credentials stay on the source machine. The destination still enforces pairing and the
-relay's `Via` marker keeps native-locality operations local.
+relay's `Via` marker keeps native-locality operations local. Aliases share one credential per
+destination identity. Device-admission rejection renews it once; WebSocket upgrades check
+admission first. Relayed responses strip `Set-Cookie` to preserve the source browser’s credential.
 
 ## B2: approve from a notification (later)
 

@@ -15,6 +15,7 @@ import { createInProcessTerminalSocket } from '../../../test/terminal-socket'
 import { machineProxyAdapter } from '../../../test/machine-proxy'
 import { captureRequestHeaders, headersReader } from '../trust'
 import { pairMachineRelay } from '../../machines/pairing'
+import type { MachineProxyTarget } from '../../machines/proxy'
 import { machineProxyHeaders } from '../../machines/proxy-http'
 
 const ORIGIN = 'https://fregat.example'
@@ -385,13 +386,26 @@ test('a machine proxy requires admission at both the relay and its destination',
     cookieName: 'platform_device_test',
   })
   const auth = createAuthConfig({ allowedOrigins: [ORIGIN] }, devices)
+  let renewals = 0
+  const resolve = (): MachineProxyTarget => ({
+    origin: 'http://127.0.0.1:31001',
+    webOrigin: machineOrigin,
+    cookie: relayCookie,
+    refresh: async () => {
+      renewals++
+      relayCookie = await pairMachineRelay(
+        'http://127.0.0.1:31001',
+        machineOrigin,
+        'Fregat relay · workstation',
+        'source-environment',
+        destinationFetch,
+      )
+      return resolve()
+    },
+  })
   const { app } = machineProxyAdapter({
     auth,
-    resolve: () => ({
-      origin: 'http://127.0.0.1:31001',
-      webOrigin: machineOrigin,
-      cookie: relayCookie,
-    }),
+    resolve,
     fetcher: (url, init) => machine.handle(new Request(url, init)),
   })
   const { code } = devices.issueLink(
@@ -447,7 +461,8 @@ test('a machine proxy requires admission at both the relay and its destination',
   const listed = await destinationFetch('http://127.0.0.1:31001/pairing/devices', {
     headers: { origin: machineOrigin },
   })
-  expect(await listed.json()).toMatchObject({
+  const listing = (await listed.json()) as { devices: Array<{ id: string }> }
+  expect(listing).toMatchObject({
     devices: [{ label: 'Fregat relay · renamed-workstation' }],
   })
   const stored = JSON.parse(readFileSync(path.join(home, 'machine-devices.json'), 'utf8')) as {
@@ -458,6 +473,32 @@ test('a machine proxy requires admission at both the relay and its destination',
     headers: { origin: machineOrigin, via: '1.1 fregat', cookie: previousCookie },
   })
   expect(refused.status).toBe(401)
+  expect((await through({ cookie })).status).toBe(200)
+  const removed = await destinationFetch(
+    `http://127.0.0.1:31001/pairing/devices/${listing.devices[0]!.id}`,
+    {
+      method: 'DELETE',
+      headers: { origin: machineOrigin },
+    },
+  )
+  expect(removed.status).toBe(200)
+  expect((await through({ cookie })).status).toBe(200)
+  expect(renewals).toBe(1)
+
+  const link = await destinationFetch('http://127.0.0.1:31001/pairing/links', {
+    method: 'POST',
+    headers: { origin: machineOrigin },
+  })
+  const linkBody = (await link.json()) as { code: string }
+  const claimedThroughRelay = await app.handle(
+    new Request('http://local/platform-api/machines/mac/proxy/pairing/claim', {
+      method: 'POST',
+      headers: { origin: ORIGIN, cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ code: linkBody.code, label: 'Another browser' }),
+    }),
+  )
+  expect(claimedThroughRelay.status).toBe(200)
+  expect(claimedThroughRelay.headers.has('set-cookie')).toBe(false)
   expect((await through({ cookie })).status).toBe(200)
 })
 
