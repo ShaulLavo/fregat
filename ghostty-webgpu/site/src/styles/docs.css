@@ -3,9 +3,16 @@
   margin: 0;
   padding: 0;
   border: 0;
-  background: transparent !important;
   font-size: 0.75rem;
   white-space: pre;
+}
+
+:root[data-theme='light'] .migration-comparison .astro-code {
+  background-color: var(--shiki-light-bg) !important;
+}
+
+:root[data-theme='dark'] .migration-comparison .astro-code {
+  background-color: var(--shiki-dark-bg) !important;
 }
 
 :root[data-theme='light'] .migration-comparison .astro-code,

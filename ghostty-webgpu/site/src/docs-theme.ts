@@ -29,6 +29,6 @@ export const docsTheme = {
 } satisfies Pick<StarlightUserConfig, 'customCss' | 'expressiveCode'>
 
 export const docsCodeThemes = {
-  light: 'github-light-high-contrast',
+  light: 'github-light',
   dark: docsTheme.expressiveCode.themes[0],
 } as const

@@ -45,7 +45,7 @@ async function verifyGuide(page: Page, engine: string, width: number, expected: 
       documentWidth: document.documentElement.scrollWidth,
       tableWidth: element.getBoundingClientRect().width,
       tableScrollWidth: element.scrollWidth,
-      background: getComputedStyle(document.body).backgroundColor,
+      background: getComputedStyle(element.querySelector('pre')!).backgroundColor,
       colors: Array.from(
         new Set(
           Array.from(
