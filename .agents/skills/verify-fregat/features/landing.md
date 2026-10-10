@@ -1,8 +1,11 @@
 # Landing page and product assets
 
-The Astro site in `apps/site` publishes at https://fregat.shaulavo.dev/ through
-`.github/workflows/product-sites.yml`. Its Plates design uses an animated replica shipped
-in PR #1012. The old live-app demo, mock backend and demo scenarios have been removed.
+The Astro site in `apps/site` publishes at https://fregat.shaulavo.dev/ through an assets-only
+Cloudflare Worker. Build with `bash scripts/product-sites/build.sh scripts/product-sites/dist`,
+then publish manually with `bun run product-sites:deploy`. Follow the
+[product-sites runbook](../../../../scripts/product-sites/README.md) for authentication,
+output cleanup and rollback. Its Plates design uses an animated replica shipped in PR #1012.
+The old live-app demo, mock backend and demo scenarios have been removed.
 
 ## Capture the editor
 
