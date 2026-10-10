@@ -52,8 +52,8 @@ so releasing one document never terminates a provider another document borrowed.
    frozen overlay. The first-frame color guarantee applies when compatible analysis for the
    visible range is ready.
 7. Inactive analysis entries are reclaimed under a count limit, never text or Undo. Views and
-   preparation holds protect their entries. Obsolete and abandoned entries go first, then the
-   least recently released. Reclaimed analysis is rebuilt on next use.
+   preparation holds protect their entries. Unleased entries are reclaimed in order of their
+   last release, least recently released first. Reclaimed analysis is rebuilt on next use.
 8. Saved visible paint stays a reload and startup fallback. Retained-tab correctness does not
    depend on it.
 
@@ -138,7 +138,8 @@ measures edit-chain composition.
 Web client, run with real Editor workers in Playwright Chromium:
 
 - `features/editor/tests/prepared-open.browser.tsx`: hover, click and repeated activation share one
-  preparation and one session per provider; hover promotion at 0, 200, 2,000 and 35,000 ms;
+  preparation and one session per provider; hover promotion at 0, 200 and 2,000 ms, and warm
+  reopen after preparation expiry at 35,000 ms;
   dirty text with Undo and Redo tokens checked against captured oracles, saved paint removed.
 - `features/editor/tests/retention-acceptance-*.browser.tsx` (failure, handoff, identity,
   interests, mapping, reload, views, worker): first-frame colors, two independent views, worker

@@ -438,7 +438,7 @@ jobs:
         uses: ./.github/actions/install-browsers
         with:
           playwright: editor/site/node_modules/.bin/playwright
-          browsers: chromium webkit
+          browsers: chromium firefox webkit
       - name: Build production sites
         env:
           CI_SITES: ${{ needs.changes.outputs.sites }}
@@ -457,6 +457,12 @@ jobs:
       - name: Check landing page focus, contrast and motion controls
         if: ${{ contains(needs.changes.outputs.sites, 'fregat') }}
         run: bun run --cwd apps/site verify:a11y
+      - name: Check landing page reload scroll and first-paint layout
+        if: ${{ contains(needs.changes.outputs.sites, 'fregat') }}
+        run: |
+          bun run --cwd apps/site verify:scroll --engine webkit
+          bun run --cwd apps/site verify:scroll --engine chromium
+          bun run --cwd apps/site verify:scroll --engine firefox
       - name: Share production sites with mobile checks
         uses: actions/upload-artifact@v4
         with:
