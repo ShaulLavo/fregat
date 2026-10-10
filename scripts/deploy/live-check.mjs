@@ -1,5 +1,6 @@
 // Headless check of the deployed page through the mesh. Run by scripts/install-release.ts, or after a
 // restart by the promotion step; exits non-zero on a failure the previous release's check lacked.
+// --backend-release supplies built terminal artifacts; installation defaults it to --out.
 import { execFile } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
 import { parseArgs, promisify } from 'node:util'
@@ -19,6 +20,7 @@ const publicFaviconUrl =
 
 const { values } = parseArgs({
   options: {
+    'backend-release': { type: 'string' },
     baseline: { type: 'string', default: '' },
     logs: { type: 'string', default: '' },
     out: { type: 'string', default: fileURLToPath(new URL('.', import.meta.url)) },
@@ -114,7 +116,12 @@ report.failures.push(
 try {
   const { stdout } = await promisify(execFile)(
     'bun',
-    [fileURLToPath(new URL('./live-terminal-check.ts', import.meta.url)), base, values.out],
+    [
+      fileURLToPath(new URL('./live-terminal-check.ts', import.meta.url)),
+      base,
+      values.out,
+      resolve(values['backend-release'] ?? values.out),
+    ],
     { timeout: 180_000, maxBuffer: 4 * 1024 * 1024 },
   )
   report.terminal = JSON.parse(stdout)

@@ -14,3 +14,13 @@ export function waitForTerminalPrompt(
   timeoutMs?: number,
 ): Promise<Pick<TerminalRendering, 'count' | 'promptRendered'>>
 export function terminalFailures(terminal: TerminalRendering): string[]
+
+export function terminalReleaseFailures(
+  deployed: unknown,
+  backend: unknown,
+  protocolVersion: number,
+): string[]
+export function foreignTerminalRequests(
+  requests: readonly string[],
+  origins: readonly string[],
+): string[]

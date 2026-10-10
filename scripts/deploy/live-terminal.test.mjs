@@ -61,6 +61,10 @@ test
     '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas></canvas></div></div>',
     '<div hidden data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><div aria-label="Terminal screen">check$ </div></div></div>',
     '<div aria-label="Terminal screen">check$ </div>',
+    '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu" style="opacity:0"><div aria-label="Terminal screen">check$</div></div></div>',
+    '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu" style="visibility:hidden"><div aria-label="Terminal screen">check$</div></div></div>',
+    '<div style="opacity:0" data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><div aria-label="Terminal screen">check$</div></div></div>',
+    '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu" style="width:0;height:0;overflow:hidden"><div aria-label="Terminal screen">check$</div></div></div>',
   ])('bounds the wait when no live terminal prompt renders (%s)', async (html) => {
   const page = await browser.newPage()
   try {

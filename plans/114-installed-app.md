@@ -409,6 +409,49 @@ adapter plus the existing server, not another application runtime.
   client reaches the same state home and server. Read/validate a served environment identity
   before trusting an already occupied endpoint as this installation.
 
+#### Approved follow-up: deployed terminal live check
+
+**Status: Approved — implement after the read-only split check in PR #1224.**
+The current check renders deployed client assets against a disposable built backend from the
+same commit and reads the deployed terminal-host hello/build through `GET /release`. It does
+not open a terminal on the deployed server. A proxy that rejects deployed `/terminal` requests
+therefore cannot establish deployed PTY spawning or terminal transport health; host hello alone
+establishes the retained host's identity and liveness.
+
+The existing workspace lifecycle cannot leave the owner's state unchanged:
+
+- `apps/server/src/fs/metadata.ts:63–68` inserts durable `workspace_addresses` rows.
+  `apps/server/src/fs/routes.ts` has registration/lookup routes and no address removal route;
+  `forgetPicked` removes recents metadata only. The schema has no cascading project relationship.
+- `apps/web/src/features/terminal/state/register-checkout.ts:34–36` registers a project when
+  a real terminal mounts. `apps/server/src/orchestration/decider.ts:437–448` deletes projects
+  through tombstones and retained orchestration events, not complete removal.
+- `apps/server/src/terminal/service.ts:283–296` kills a shell and deletes terminal history;
+  it does not remove workspace addresses, projects or their events.
+
+Implement an owned disposable workspace/terminal lifecycle that bypasses durable registration,
+uses an isolated shell HOME/history and provider-disabled context, and releases exactly its
+owned shell, host resources and temporary files on success, failure, disconnect and signals.
+Keep ordinary workspace persistence intact. Do not add this lifecycle to PR #1224 or exercise
+it against owner state before its isolation contract is verified.
+
+Acceptance and pickup commands (from the checkout):
+
+1. Reconfirm the blockers with `rg -n 'registerWorkspaceAddress|forgetPicked' apps/server/src/fs`
+   and `rg -n 'projectDeleted|project.deleted|worktree.retired' apps/server/src/orchestration/decider.ts`.
+   Public address removal and hard project deletion were ruled out during the October 10 review.
+2. Add isolated in-process/server tests that compare address/project/event/history state before
+   and after the disposable lifecycle, including failed startup and interrupted cleanup. Require
+   no added durable rows/events, no surviving shell and no changes to ordinary workspace state.
+3. Extend `scripts/deploy/live-terminal-check.ts` to open the deployed terminal transport through
+   this lifecycle, require a visible rendered prompt and record the renderer. Preserve fatal
+   console warnings, bounded waits, exact-origin dependencies and signal cleanup.
+4. Run `bun --bun vitest run --config vitest.scripts.config.mjs scripts/deploy/live-terminal.test.mjs`
+   plus the new lifecycle tests. Build with `bun run build-release --output=<new-temp-release>`;
+   check a disposable installed server with `node scripts/deploy/live-check.mjs --target=<url>
+--out=<evidence> --backend-release=<built-release>`. A `/terminal` rejection must fail the full
+   check, while unrelated existing terminals and durable database state remain unchanged.
+
 #### Updates and uninstall
 
 Reuse `scripts/deploy/release.ts`, staged `releases/`, `current`/`pending` links, explicit restart

@@ -15,7 +15,12 @@ import { tmpdir } from 'node:os'
 import { readLogs } from './logs'
 
 import { TerminalHostClient } from '../../apps/server/src/terminal/host-client'
-import { startIsolatedServer, waitForHealth, type IsolatedServer } from './isolated-server'
+import {
+  isolatedServerEnv,
+  startIsolatedServer,
+  waitForHealth,
+  type IsolatedServer,
+} from './isolated-server'
 
 it.each(['bun', 'node'])(
   'ends the isolated host and its live shell through %s before removing its home',
@@ -101,6 +106,26 @@ it.each([undefined, new URL('http://localhost:5214')])(
   },
   40_000,
 )
+
+it('overrides inherited filesystem roots for private workspace registration', () => {
+  vi.stubEnv('FS_WORKSPACE_ROOT', path.join(tmpdir(), 'unrelated-workspace'))
+  vi.stubEnv('FS_SYSTEM_ROOT', path.join(tmpdir(), 'unrelated-system'))
+  try {
+    const env = isolatedServerEnv({
+      home: path.join(tmpdir(), 'private-home'),
+      logs: path.join(tmpdir(), 'private-logs'),
+      port: 5214,
+      productionRoot: path.join(tmpdir(), 'private-production'),
+      realProviders: false,
+      scratchRoot: tmpdir(),
+      webOrigin: new URL('http://localhost:5214'),
+    })
+    expect(env.FS_WORKSPACE_ROOT).toBe(path.parse(tmpdir()).root)
+    expect(env.FS_SYSTEM_ROOT).toBe(path.parse(tmpdir()).root)
+  } finally {
+    vi.unstubAllEnvs()
+  }
+})
 
 function alive(pid: number) {
   try {

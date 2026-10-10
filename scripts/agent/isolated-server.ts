@@ -58,18 +58,30 @@ export async function startIsolatedServer(
   webOrigin: URL | undefined,
   {
     pathPrefix,
+    releaseRoot,
+    handleSignals = true,
     realProviders = false,
     webRoot,
     settings = {},
     scratchRoot = defaultScratchRoot,
   }: {
     pathPrefix?: string
+    releaseRoot?: string
+    handleSignals?: boolean
     realProviders?: boolean
     scratchRoot?: string
     webRoot?: string
     settings?: Partial<SettingsValues>
   } = {},
 ): Promise<IsolatedServer> {
+  if (
+    releaseRoot &&
+    (!existsSync(path.join(releaseRoot, 'server', 'index.js')) ||
+      !existsSync(path.join(releaseRoot, 'build-config.json')))
+  )
+    throw createScriptError(
+      'The isolated backend requires a built release with its build descriptor.',
+    )
   const directory = mkdtempSync(path.join(scratchRoot, 'fregat-agent-'))
   const home = path.join(directory, 'home')
   const logs = path.join(directory, 'logs')
@@ -82,7 +94,14 @@ export async function startIsolatedServer(
   if (webRoot)
     for (const name of readdirSync(webRoot))
       symlinkSync(path.resolve(webRoot, name), path.join(servedWeb, name))
-  const entry = isolatedReleaseEntry(directory)
+  const entry = releaseRoot
+    ? path.join(path.resolve(releaseRoot), 'server', 'index.js')
+    : isolatedReleaseEntry(directory)
+  if (releaseRoot)
+    copyFileSync(
+      path.join(releaseRoot, 'build-config.json'),
+      path.join(directory, 'served', 'build-config.json'),
+    )
   // Scenarios install their own fixture drivers; only an owner's --real-providers run keeps the
   // built-in accounts on.
   if (!realProviders || Object.keys(settings).length > 0)
@@ -120,7 +139,9 @@ export async function startIsolatedServer(
   const spawn = () =>
     Bun.spawn({
       cmd: [
-        process.execPath,
+        releaseRoot && existsSync(path.join(releaseRoot, 'bin', 'bun'))
+          ? path.join(releaseRoot, 'bin', 'bun')
+          : process.execPath,
         '--preload',
         new URL('./push-boundary.ts', import.meta.url).pathname,
         entry,
@@ -160,8 +181,10 @@ export async function startIsolatedServer(
   const onSignal = (signal: NodeJS.Signals) => {
     void stop().finally(() => process.kill(process.pid, signal))
   }
-  process.once('SIGINT', onSignal)
-  process.once('SIGTERM', onSignal)
+  if (handleSignals) {
+    process.once('SIGINT', onSignal)
+    process.once('SIGTERM', onSignal)
+  }
   try {
     await waitForHealth(child, origin, webOrigin.origin, directory)
   } catch (error) {
@@ -221,6 +244,8 @@ export function isolatedServerEnv(input: {
   const env: Record<string, string | undefined> = {
     ...process.env,
     FS_HOST: '127.0.0.1',
+    FS_SYSTEM_ROOT: path.parse(input.scratchRoot).root,
+    FS_WORKSPACE_ROOT: path.parse(input.scratchRoot).root,
     FS_METADATA_DB: path.join(home, 'fs-metadata.sqlite'),
     OBSERVABILITY_DIR: logs,
     PATH: pathPrefix ? `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}` : process.env.PATH,
@@ -315,10 +340,13 @@ async function stopServer(child: Bun.Subprocess, directory: string, logs?: strin
     if (!stopped) child.kill('SIGKILL')
     await child.exited
   }
-  await stopTerminalHost(path.join(directory, 'home'))
-  if (logs) copyServerLogs(directory, logs)
-  rmSync(hostPaths(path.join(directory, 'home')).directory, { force: true, recursive: true })
-  rmSync(directory, { force: true, recursive: true })
+  try {
+    await stopTerminalHost(path.join(directory, 'home'))
+    if (logs) copyServerLogs(directory, logs)
+  } finally {
+    rmSync(hostPaths(path.join(directory, 'home')).directory, { force: true, recursive: true })
+    rmSync(directory, { force: true, recursive: true })
+  }
 }
 
 function copyServerLogs(directory: string, destination: string) {
