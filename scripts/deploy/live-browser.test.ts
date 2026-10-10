@@ -6,7 +6,7 @@ import { openLiveBrowser } from './live-browser.mjs'
 vi.mock('node:fs', () => ({ existsSync: () => true }))
 vi.mock('playwright', () => ({ chromium: { executablePath: () => 'chromium/chrome' } }))
 
-test.each(['linux', 'darwin', 'win32'])(
+test.each(['linux', 'darwin', 'win32'] as const)(
   'uses the browser platform and a complete compositor on %s',
   async (platform) => {
     const page = {}
