@@ -2,7 +2,7 @@
 
 Solid bindings and reactive controls for the Singapore editor.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -32,13 +32,13 @@ export function EditorPanel() {
 - `controller.element` mounts the view.
 - `controller.state()` reads the current editor state.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/solid/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/solid/overview/)
 
 ## In the Singapore family
 
 `@singapore-editor/core` owns the editor view. This optional package adds Solid lifecycle and state bindings. Choose the other plugins your app needs.
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

@@ -2,7 +2,7 @@
 
 Worker-based syntax highlighting for Singapore editors, diffs, and code snippets.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -30,14 +30,14 @@ await service.dispose()
 - `highlightLines()` splits tokens into line segments.
 - `createHighlightingPlugin()` connects the service to an editor.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/highlighting/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/highlighting/overview/)
 
 ## In the Singapore family
 
 You can use this package on its own. `@singapore-editor/core` owns editor views; optional packages add syntax, search, gutters, and language features.
-Use a bundler that serves the package worker and data assets. See the [hosting guide](https://shaulavo.dev/singapore/docs/guides/bundling/).
+Use a bundler that serves the package worker and data assets. See the [hosting guide](https://singapore.shaulavo.dev/docs/guides/bundling/).
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

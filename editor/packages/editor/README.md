@@ -2,7 +2,7 @@
 
 The browser editor at the core of Singapore, with text editing, selections, undo history, themes, and plugins.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -40,13 +40,13 @@ Content mode supports up to 10,000 display rows, 1,048,576 UTF-16 source units a
 - `openDocument()` gives a document its own identity.
 - `dispose()` releases the view and its plugins.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/core/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/core/overview/)
 
 ## In the Singapore family
 
 Start with `@singapore-editor/core`. Add optional packages for gutters, search, syntax, or language server features.
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

@@ -2,7 +2,7 @@
 
 Line numbers and fold controls for the Singapore editor.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -33,7 +33,7 @@ editor.setText('const value = 1\n')
 - `createLineGutterPlugin()` adds line numbers.
 - `createFoldGutterPlugin()` adds fold controls.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/gutters/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/gutters/overview/)
 
 ## Scroll gutters with the text
 
@@ -52,7 +52,7 @@ Use `'fixed'` to keep gutters at the left edge.
 
 `@singapore-editor/core` owns the editor view. Add these plugins for line numbers and fold controls.
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

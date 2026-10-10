@@ -8,7 +8,7 @@ A code editor for the browser that keeps every version.
   <a href="https://github.com/ShaulLavo/fregat/tree/main/editor"><img src="https://img.shields.io/badge/install-source%20%2F%20workspace-blue" alt="Install from source or workspace" /></a>
 </p>
 <p align="center">
-  <a href="https://shaulavo.dev/singapore/">Website and demo</a> ·
+  <a href="https://singapore.shaulavo.dev/">Website and demo</a> ·
   <a href="https://github.com/ShaulLavo/fregat/blob/main/editor/AGENTS.md#design-documents">Documentation</a> ·
   <a href="https://github.com/ShaulLavo/fregat/blob/main/editor/docs/performance/browser-compare-2026-10-08.md">Benchmarks</a> ·
   <a href="https://github.com/ShaulLavo/fregat/discussions">Discussions</a>
@@ -50,7 +50,7 @@ The [method, raw samples, bundle sizes, and reproduction commands](https://githu
 
 ## Quick start
 
-[Try the browser demo](https://shaulavo.dev/singapore/) to edit text without installing anything.
+[Try the browser demo](https://singapore.shaulavo.dev/) to edit text without installing anything.
 For current code, clone Fregat and prepare its workspace packages:
 
 ```sh
@@ -76,7 +76,7 @@ The [core README](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/
 
 ## Documentation
 
-- [Start here](https://shaulavo.dev/singapore/docs/start-here/introduction/) for setup and the package guides.
+- [Start here](https://singapore.shaulavo.dev/docs/start-here/introduction/) for setup and the package guides.
 - [Known limits](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/limitations.md) for measurement ceilings, analysis budgets and bounded package behavior.
 - [Browser quirks](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/display/browser-quirks.md) for engine bugs and their workarounds.
 

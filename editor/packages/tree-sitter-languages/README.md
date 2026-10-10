@@ -2,7 +2,7 @@
 
 Tree-sitter grammars and syntax queries for Singapore language plugins.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -33,14 +33,14 @@ editor.setText('const value = 1\n', { languageId: 'typescript' })
 - `TREE_SITTER_LANGUAGE_CONTRIBUTIONS` contains the bundled language set.
 - The `/metadata` entry lists language IDs and file extensions.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/tree-sitter-languages/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/tree-sitter-languages/overview/)
 
 ## In the Singapore family
 
 `@singapore-editor/core` owns the editor view. This optional package adds language grammars. Choose the other plugins your app needs.
-Use a bundler that serves the package worker and data assets. See the [hosting guide](https://shaulavo.dev/singapore/docs/guides/bundling/).
+Use a bundler that serves the package worker and data assets. See the [hosting guide](https://singapore.shaulavo.dev/docs/guides/bundling/).
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

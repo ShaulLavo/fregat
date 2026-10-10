@@ -103,11 +103,12 @@ if (directory) {
       (await Promise.all(sitemaps.map((path) => sitemapPages(new URL(path, origin).href)))).flat(),
     )
 }
-urls = [...new Set(urls)]
-  .sort()
-  .filter((_, index) => index % shards === shard)
-  .slice(offset, offset + limit)
+urls = Array.from(new Set(urls))
+urls.sort()
 assert(urls.length > 0, 'No HTML pages selected')
+urls = urls.filter((_, index) => index % shards === shard)
+assert(offset === 0 || offset < urls.length, 'No HTML pages selected')
+urls = urls.slice(offset, offset + limit)
 let failed = 0
 let checked = 0
 

@@ -2,7 +2,7 @@
 
 TypeScript and JavaScript language services in a browser worker for the Singapore editor.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -43,14 +43,14 @@ editor.openDocument({
 - `setWorkspaceFiles()` supplies imported files.
 - `upsertWorkspaceFiles()` updates those files.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/typescript-lsp/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/typescript-lsp/overview/)
 
 ## In the Singapore family
 
 `@singapore-editor/core` owns the editor view. Add this plugin for TypeScript and JavaScript language features.
-Use a bundler that serves the package worker and data assets. See the [hosting guide](https://shaulavo.dev/singapore/docs/guides/bundling/).
+Use a bundler that serves the package worker and data assets. See the [hosting guide](https://singapore.shaulavo.dev/docs/guides/bundling/).
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

@@ -6,7 +6,7 @@
   [PR #1012](https://github.com/ShaulLavo/fregat/pull/1012).
 - Live demo decision confirmed 2026-10-08. Delete the mock backend, app entry, demo assets,
   browser scenarios and second site build. The landing page has no link to the retired demo.
-- Production site: https://shaulavo.dev/fregat/.
+- Production site: https://fregat.shaulavo.dev/.
 - Planned at: Platform `9c1c45d1`, 2026-09-25. Origin: the UI library survey
   ([docs/ui-research/brainless.md](../docs/ui-research/brainless.md)).
 

@@ -2,7 +2,7 @@
 
 React components and hooks for mounting and controlling the Singapore editor.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -37,13 +37,13 @@ export function EditorPanel() {
 - `EditorHost` mounts its view.
 - `useEditorSelector()` subscribes to a state selection.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/react/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/react/overview/)
 
 ## In the Singapore family
 
 `@singapore-editor/core` owns the editor view. This optional package adds React lifecycle and state bindings. Choose the other plugins your app needs.
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

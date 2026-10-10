@@ -101,6 +101,7 @@
         "install-server.ts",
         "import-proxy-usage-key.ts",
         "prod.ts",
+        "product-sites/test-font-assets.mjs",
         "product-sites/test-mobile.mjs",
         "product-sites/verify-mobile.mjs",
         "tui.ts",
