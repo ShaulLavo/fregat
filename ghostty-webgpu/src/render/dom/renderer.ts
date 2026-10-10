@@ -25,6 +25,19 @@ import {
 export { renderFrameToHtml } from './html.js'
 export type { RenderFrameHtmlOptions } from './html.js'
 
+function copyTheme(theme: CanonicalRendererTheme): CanonicalRendererTheme {
+  // Hosts can mutate and reapply RGB inputs; cached styles need an owned comparison snapshot.
+  return {
+    ...theme,
+    background: { ...theme.background },
+    cursor: { ...theme.cursor },
+    cursorText: { ...theme.cursorText },
+    foreground: { ...theme.foreground },
+    selectionBackground: { ...theme.selectionBackground },
+    selectionForeground: { ...theme.selectionForeground },
+  }
+}
+
 function themesEqual(first: CanonicalRendererTheme, second: CanonicalRendererTheme): boolean {
   if (first.minimumContrast !== second.minimumContrast) return false
   const colors = [
@@ -74,7 +87,7 @@ class DomSurface implements RowRendererSurface {
     this.canvasStyle = this.styleDocument.defaultView!.getComputedStyle(this.canvas)
     this.font = copyFittedFont(options.font)
     this.grid = normalizeRendererGrid(options)
-    this.theme = canonicalRendererTheme(mergeRendererTheme(options.theme))
+    this.theme = copyTheme(canonicalRendererTheme(mergeRendererTheme(options.theme)))
     this.defaultStyle = defaultRowStyle(this.font, this.theme, this.grid.columns)
     this.container = this.canvas.ownerDocument.createElement('div')
     this.container.style.position = 'absolute'
@@ -163,9 +176,12 @@ class DomSurface implements RowRendererSurface {
 
   setTheme(theme: CanonicalRendererTheme): RowThemeInvalidation {
     if (themesEqual(this.theme, theme)) return 'cursor'
-    this.theme = theme
-    this.defaultStyle = defaultRowStyle(this.font, theme, this.grid.columns)
-    this.container.firstElementChild?.setAttribute('style', frameStyle(this.font, this.grid, theme))
+    this.theme = copyTheme(theme)
+    this.defaultStyle = defaultRowStyle(this.font, this.theme, this.grid.columns)
+    this.container.firstElementChild?.setAttribute(
+      'style',
+      frameStyle(this.font, this.grid, this.theme),
+    )
     return 'all'
   }
 

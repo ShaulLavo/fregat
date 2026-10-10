@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RenderStateDirty } from '../../core/abi.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import type { RenderRow } from '../../core/types.js'
-import type { CursorState } from '../instances/types.js'
+import type { CursorState, RendererTheme } from '../instances/types.js'
 import type { RendererFrameSnapshot } from '../renderer.js'
 import { Terminal } from '../../dom/terminal.js'
 import { CanvasTerminalRenderer } from '../canvas/renderer.js'
@@ -60,6 +60,7 @@ async function rendererProbe(
   font = probeFont,
   onFrame?: (snapshot: RendererFrameSnapshot) => void,
   onRowsPainted?: (rows: readonly RenderRow[]) => void,
+  theme?: Partial<RendererTheme>,
 ) {
   const runtime = await GhosttyRuntime.create()
   cleanups.push(() => runtime.dispose())
@@ -76,6 +77,7 @@ async function rendererProbe(
     font,
     renderState: state,
     schedulerClock: clock,
+    theme,
     onFrame,
     onRowsPainted: (rows: readonly RenderRow[]) => {
       frames.push(rows.map((row) => row.y))
@@ -136,6 +138,37 @@ async function expectWideGlyphCursorPaint(font = probeFont) {
 }
 
 describe('DOM terminal renderer', () => {
+  it('repaints plain runs when the same theme RGB object is mutated and reapplied', async () => {
+    const foreground = { r: 180, g: 170, b: 160 }
+    const probe = await rendererProbe('dom', '\x1b[?25lplain', probeFont, undefined, undefined, {
+      foreground,
+    })
+    const fresh = await rendererProbe('dom', '\x1b[?25lplain')
+    const run = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame span')!
+    const freshRun = fresh.canvas.parentElement!.querySelector('.ghostty-webgpu-frame span')!
+    fresh.renderer.setTheme({ foreground: { ...foreground } })
+    fresh.clock.flush()
+    expect(getComputedStyle(run).color).toBe('rgb(180, 170, 160)')
+    expect(getComputedStyle(run).color).toBe(getComputedStyle(freshRun).color)
+
+    for (const color of [
+      { r: 25, g: 210, b: 30 },
+      { r: 80, g: 50, b: 190 },
+    ]) {
+      Object.assign(foreground, color)
+      probe.renderer.setTheme({ foreground })
+      fresh.renderer.setTheme({ foreground: { ...foreground } })
+      probe.clock.flush()
+      fresh.clock.flush()
+      expect(run.textContent).toBe('plain')
+      expect(getComputedStyle(freshRun).color).toBe(`rgb(${color.r}, ${color.g}, ${color.b})`)
+      expect(getComputedStyle(run).color).toBe(getComputedStyle(freshRun).color)
+      expect(getComputedStyle(run.parentElement!.parentElement!).color).toBe(
+        getComputedStyle(freshRun.parentElement!.parentElement!).color,
+      )
+    }
+  })
+
   it('refreshes default run styles when contrast, theme, font, and grid change', async () => {
     const probe = await rendererProbe('dom', '\x1b[?25ledit 0000')
     for (const [minimumContrast, weight, columns, cellWidth] of [
