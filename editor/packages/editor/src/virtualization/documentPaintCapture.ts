@@ -111,6 +111,8 @@ function captureStyle(element: HTMLElement): DocumentPaintStyle {
     letterSpacing: style.letterSpacing,
     fontFeatureSettings: style.fontFeatureSettings,
     fontVariationSettings: style.fontVariationSettings,
+    fontKerning: style.fontKerning,
+    fontVariantLigatures: style.fontVariantLigatures,
     visibility: style.visibility === 'hidden' ? 'hidden' : 'visible',
   }
 }
