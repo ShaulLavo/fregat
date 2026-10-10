@@ -1,0 +1,31 @@
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url(../fonts/jetbrains-mono.woff2) format('woff2');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: optional;
+}
+@font-face {
+  font-family: 'Source Serif 4';
+  src: url(../fonts/source-serif-4.woff2) format('woff2');
+  font-weight: 200 900;
+  font-display: optional;
+}
+
+/* Widths and line boxes measured from the bundled fonts against metric-compatible local faces. */
+@font-face {
+  font-family: 'Singapore Mono Fallback';
+  src: local('Courier New'), local('Liberation Mono');
+  size-adjust: 99.984%;
+  ascent-override: 102.017%;
+  descent-override: 30.005%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Singapore Serif Fallback';
+  src: local('Times New Roman'), local('Liberation Serif');
+  size-adjust: 111.556%;
+  ascent-override: 92.869%;
+  descent-override: 30.03%;
+  line-gap-override: 0%;
+}

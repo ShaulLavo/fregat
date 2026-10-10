@@ -66,6 +66,11 @@ jobs:
       - name: Check archive publisher
         run: python3 -m unittest discover -s scripts/product-sites -p 'test_*.py'
       - uses: ./.github/actions/setup
+      - name: Install Singapore capture browser
+        uses: ./.github/actions/install-browsers
+        with:
+          playwright: editor/site/node_modules/.bin/playwright
+          browsers: chromium
       - name: Build production sites
         run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites"
       - name: Package production sites
