@@ -451,9 +451,11 @@ jobs:
       - name: Test mobile overflow detection
         if: ${{ needs.changes.outputs.tooling == 'true' }}
         run: bun scripts/product-sites/test-mobile.mjs
-      - name: Test Singapore docs browsing and examples
+      - name: Test Singapore docs browsing and examples at the root base
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
-        run: bun run --cwd editor/site test:browser
+        run: |
+          bun run --cwd editor/site build --base /
+          bun run --cwd editor/site test:browser
       - name: Check landing page focus, contrast and motion controls
         if: ${{ contains(needs.changes.outputs.sites, 'fregat') }}
         run: bun run --cwd apps/site verify:a11y

@@ -77,8 +77,9 @@ open for the coordinator; the replacement merges before the hosting PR rebases.
 - [x] Exclude example figures from Starlight prose spacing; exact static/live
       pixels, gutter placement and height agree on its playground page.
 - [x] Keep the runtime unloaded on authored and reference pages without examples.
-- [x] Clear rejected runtime promises and use fresh module records for deliberate
-      retry requests. Both engines recover after two aborted downloads.
+- [x] Capture deliberate retry diagnostics and qualify the root-base CI build.
+      Rejected promises are cleared and fresh module records recover after two
+      aborted downloads. The intermittent investigation below remains open.
 - [x] Use a verified zero-match Pagefind query, weight authored headings and wait
       for the current query to settle. Exact title and full-heading searches rank the
       authored Quick start page first.
@@ -94,3 +95,34 @@ Four new Starlight `look` runs (390 and 1280 px, Chromium and WebKit) report hea
 pages; every screenshot was read. The same private preview serves the verified
 revision. CI status is inspected once after pushing and reported in the handoff;
 it is not watched or assumed green.
+
+### Intermittent WebKit retry failure — execution open
+
+The [hosting integration run](https://github.com/ShaulLavo/fregat/actions/runs/38071251341/job/114269009967)
+failed at `editor/site/tests/review.browser.ts:114`: after two announced download
+failures, the third activation still had no `data-example-live` after 20 seconds.
+Chromium passed. The old assertion recorded neither the final status nor the
+request and click sequence, so this does not establish a module-cache cause.
+
+- [x] Run a bounded Linux baseline from `c7e6e27b` with a root-base build:
+      `bun run --cwd editor/site build` then
+      `bun run --cwd editor/site test:browser -- tests/review.browser.ts -t "failed runtime download"`.
+      All 41 repetitions passed in both engines; the complete 37-test browser
+      suite also passed. A broken root-base runtime URL was not reproduced.
+- [x] Record actual clicks, runtime URLs, failed requests, browser errors and the
+      final example state. Capture the attempt number before asynchronous routing
+      so a later request cannot change an earlier request's injected outcome.
+- [x] Run ten bounded diagnostic cases per engine in Ubuntu CI. The explicit
+      root-base build and all 55 browser tests passed in the
+      [diagnostic run](https://github.com/ShaulLavo/fregat/actions/runs/38073480255/job/114275706422).
+      Fresh root-base Mac verification also passed all 20 diagnostic cases. Keep
+      two retry cases per engine in routine CI to bound its cost.
+- [ ] Intermittent; diagnostics in place; investigate on recurrence. Read the
+      failed case's click, network and preparation evidence before changing
+      runtime loading or paint readiness. The original failing run is linked above.
+
+One unexplained failure remains unconfirmed after the bounded qualifications and
+does not block deployment. Do not add a timeout extension or browser-specific
+loading fallback without observing the failed operation. Pending stylesheet
+loading was ruled out for this surface: the production HTML links the editor
+stylesheet before the page scripts.

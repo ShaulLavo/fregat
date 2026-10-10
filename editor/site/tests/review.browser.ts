@@ -84,40 +84,79 @@ for (const engine of ['chromium', 'webkit'] as const) {
           }
         },
       )
-      test('a failed runtime download is requested again by Try again', async () => {
-        const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
-        const page = await context.newPage()
-        let attempts = 0
-        let release!: () => void
-        const held = new Promise<void>((resolve) => {
-          release = resolve
-        })
-        await context.route(/example-editor.*\.js/, async (route) => {
-          attempts++
-          await held
-          if (attempts <= 2) await route.abort()
-          else await route.continue()
-        })
-        try {
-          await page.goto(`${preview.base}/docs/start-here/quick-start/`)
-          const example = page.locator('[data-example]').first()
-          for (let failure = 0; failure < 2; failure++) {
+      test.each([1, 2])(
+        'a failed runtime download is requested again by Try again (run %i)',
+        async (run) => {
+          const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
+          const page = await context.newPage()
+          const events: string[] = []
+          page.on('console', (message) => events.push(`${message.type()}: ${message.text()}`))
+          page.on('pageerror', (error) => events.push(`pageerror: ${error.message}`))
+          page.on('requestfailed', (request) =>
+            events.push(`requestfailed: ${request.url()} ${request.failure()?.errorText}`),
+          )
+          await page.addInitScript(() => {
+            document.addEventListener(
+              'click',
+              (event) => {
+                if ((event.target as Element).closest('.make-live'))
+                  console.debug('Example activation requested')
+              },
+              true,
+            )
+          })
+          let attempts = 0
+          let release!: () => void
+          const held = new Promise<void>((resolve) => {
+            release = resolve
+          })
+          await context.route(/example-editor.*\.js/, async (route) => {
+            const attempt = ++attempts
+            events.push(`runtime request ${attempt}: ${route.request().url()}`)
+            await held
+            if (attempt <= 2) await route.abort()
+            else await route.continue()
+          })
+          try {
+            await page.goto(`${preview.base}/docs/start-here/quick-start/`)
+            const example = page.locator('[data-example]').first()
+            for (let failure = 0; failure < 2; failure++) {
+              await example.getByRole('button', { name: /Edit/ }).click()
+              release()
+              await expect
+                .poll(() => example.getByRole('status').innerText())
+                .toBe('Editor could not load. Try again.')
+            }
             await example.getByRole('button', { name: /Edit/ }).click()
-            release()
             await expect
-              .poll(() => example.getByRole('status').innerText())
-              .toBe('Editor could not load. Try again.')
+              .poll(
+                async () => ({
+                  live: await example.getAttribute('data-example-live'),
+                  ready: await example.getAttribute('data-example-ready'),
+                  status: await example.getByRole('status').innerText(),
+                  disabled: await example.locator('.make-live').getAttribute('aria-disabled'),
+                  attempts,
+                  events: events.slice(),
+                }),
+                { timeout: 20000 },
+              )
+              .toMatchObject({ live: '' })
+            expect(attempts).toBeGreaterThan(2)
+          } finally {
+            release()
+            if (
+              (await page.locator('[data-example]').first().getAttribute('data-example-live')) !==
+              ''
+            )
+              console.error(`Retry failure (${engine}, run ${run}): ${JSON.stringify(events)}`)
+            await writeFile(
+              join(evidence, `${engine}-retry-${run}.json`),
+              JSON.stringify(events, null, 2),
+            )
+            await context.close()
           }
-          await example.getByRole('button', { name: /Edit/ }).click()
-          await expect
-            .poll(() => example.getAttribute('data-example-live'), { timeout: 20000 })
-            .toBe('')
-          expect(attempts).toBeGreaterThan(2)
-        } finally {
-          release()
-          await context.close()
-        }
-      })
+        },
+      )
     },
   )
 }
