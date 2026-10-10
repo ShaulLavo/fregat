@@ -5,10 +5,12 @@ import type {
   SshMachineDefinition,
 } from '@workspace/contracts'
 import { createHash } from 'node:crypto'
+import { hostname } from 'node:os'
 import { recordProcessError } from '../observability/runtime'
 import { createSshAuthentication } from './authentication'
 import { MachineEvents } from './events'
 import { createSshLauncher } from './launcher'
+import { pairMachineRelay } from './pairing'
 import { MachinePrompts } from './prompts'
 import { parseMachineName } from './records'
 import { createSshError, sshAuthCancelled } from './structured-errors'
@@ -25,6 +27,7 @@ type Entry = {
   connecting: Promise<MachineConnectionState> | null
   updating: Promise<MachineConnectionState> | null
   cancelledAt: number | null
+  relayCredential: Promise<string> | null
 }
 
 export type MachineServiceOptions = Pick<
@@ -116,6 +119,7 @@ export class MachineService {
   }
 
   private async disconnectEntry(name: string, entry: Entry, client: string) {
+    entry.relayCredential = null
     const connecting = entry.connecting !== null
     if (connecting) entry.authentication?.cancel()
     if (!connecting && !this.closed && entry.cancelledAt === null) {
@@ -133,6 +137,7 @@ export class MachineService {
 
   private connectEntry(name: string, entry: Entry, client: string) {
     if (entry.connecting) return entry.connecting
+    if (entry.launcher.stateFor(name).phase !== 'live') entry.relayCredential = null
     const operation = this.authenticated(name, entry, client, () =>
       entry.launcher.connectMachine(name),
     ).finally(() => {
@@ -235,7 +240,29 @@ export class MachineService {
       throw createSshError('settings', 'This SSH machine is no longer configured with that target.')
     if (!state || state.phase !== 'live' || entry.cancelledAt !== null)
       throw createSshError('forward', 'Connect this machine before using it.')
-    return { origin: state.origin, webOrigin: this.options.webOrigin }
+    if (entry.relayCredential === null) {
+      const pairing = pairMachineRelay(
+        state.origin,
+        this.options.webOrigin,
+        `Fregat relay · ${hostname().slice(0, 64)}`,
+        this.options.environmentId,
+        this.options.fetcher ?? fetch,
+      ).catch((error: unknown) => {
+        if (entry.relayCredential === pairing) entry.relayCredential = null
+        throw error
+      })
+      entry.relayCredential = pairing
+    }
+    const credential = entry.relayCredential
+    const cookie = await credential
+    if (
+      this.entries.get(name) !== entry ||
+      entry.relayCredential !== credential ||
+      entry.launcher.stateFor(name).phase !== 'live' ||
+      entry.cancelledAt !== null
+    )
+      throw createSshError('forward', 'Connect this machine before using it.')
+    return { origin: state.origin, webOrigin: this.options.webOrigin, cookie }
   }
 
   async close() {
@@ -326,6 +353,7 @@ export class MachineService {
       connecting: null,
       updating: null,
       cancelledAt: null,
+      relayCredential: null,
     }
     this.entries.set(name, entry)
     return entry

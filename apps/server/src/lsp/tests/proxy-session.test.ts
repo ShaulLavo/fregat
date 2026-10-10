@@ -17,6 +17,7 @@ import type { LspServerHandle, LspServerMatch } from '../registry'
 import { encodeLspStdioMessage, LspStdioMessageReader } from '../stdio-rpc'
 import { LspSessionPool } from '../proxy-session'
 import { closeApp, createApp } from '../../app'
+import { testLoopbackPeer } from '../../testing/request'
 import { createMetadataDatabase } from '../../db/client'
 import { testSettingsOptions } from '../../settings/testing'
 import { createWorkspacePaths } from '../../fs/path'
@@ -2504,6 +2505,7 @@ function lspTestApp(root: string, pool: LspSessionPool) {
   return createApp({
     auth: { allowedOrigins: ['http://localhost:5173'] },
     lsp: { pool },
+    system: { peer: testLoopbackPeer },
     metadataDatabase: database,
     orchestration: { database: database.db, pullRequestLookup: null },
     settings: testSettingsOptions(root),

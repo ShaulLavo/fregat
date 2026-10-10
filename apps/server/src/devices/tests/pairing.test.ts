@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { hostname, tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, onTestFinished, test } from 'vitest'
@@ -13,9 +13,11 @@ import { pairServerAddress, pairingCodeText, requestPairingCode } from '../pair-
 import { createAgentTerminalFixture } from '../../../test/factories/agent-terminal'
 import { createInProcessTerminalSocket } from '../../../test/terminal-socket'
 import { machineProxyAdapter } from '../../../test/machine-proxy'
+import { captureRequestHeaders, headersReader } from '../trust'
+import { pairMachineRelay } from '../../machines/pairing'
 import { machineProxyHeaders } from '../../machines/proxy-http'
 
-const ORIGIN = 'https://omarchy.mesh.example'
+const ORIGIN = 'https://fregat.example'
 const PHONE = '100.64.0.9'
 const THIS_MACHINE = '100.64.0.1'
 const TABLET = '100.64.0.10'
@@ -47,27 +49,34 @@ function pairingApp(tailnet?: TailnetLookup) {
   const home = mkdtempSync(path.join(tmpdir(), 'platform-pairing-'))
   homes.push(home)
   const filePath = path.join(home, 'devices.json')
+  const settings = testSettingsOptions(home)
+  mkdirSync(path.dirname(settings.userFilePath!), { recursive: true })
+  writeFileSync(
+    settings.userFilePath!,
+    JSON.stringify({ 'environments.trustedProxyHosts': [new URL(ORIGIN).host] }),
+  )
   const app = createTestApp({
     // The server's own loopback origin is allowed, as `index.ts` allows it.
     auth: { allowedOrigins: [ORIGIN, LOOPBACK] },
     webOrigin: ORIGIN,
     system: { webBase: '/platform/' },
-    settings: testSettingsOptions(home),
+    settings,
     workspaceRoot: home,
     devices: {
       filePath,
       cookieName: 'platform_device_test',
-      ownAddresses: () => new Set([THIS_MACHINE]),
-      tailnet,
+
+      tailnet: tailnet ?? fakeTailnet({}).lookup,
     },
   })
   return { app, filePath }
 }
 
-/** A request as the mesh proxy forwards it from `client`; null for one made on this machine. */
+/** A request through a configured reverse proxy; null for a direct local request. */
 function request(url: string, client: string | null, init: RequestInit = {}) {
   const headers = new Headers(init.headers)
   headers.set('origin', ORIGIN)
+  headers.set('host', client ? new URL(ORIGIN).host : new URL(LOOPBACK).host)
   if (client) {
     headers.set('x-forwarded-for', client)
     headers.set('x-forwarded-proto', 'https')
@@ -90,11 +99,82 @@ async function claim(app: ReturnType<typeof pairingApp>['app'], code: string, cl
   )
 }
 
-test('this machine passes, directly or through the proxy; another device is refused until paired', async () => {
+test('a public proxy without forwarding metadata needs pairing', async () => {
+  const { app } = pairingApp()
+  const incoming = request('/pairing/status', PHONE)
+  incoming.headers.delete('x-forwarded-for')
+  incoming.headers.delete('x-forwarded-proto')
+  expect(await (await app.handle(incoming)).json()).toMatchObject({ trust: 'unpaired' })
+  const guarded = request('/health', PHONE)
+  guarded.headers.delete('x-forwarded-for')
+  guarded.headers.delete('x-forwarded-proto')
+  expect((await app.handle(guarded)).status).toBe(401)
+})
+
+test('forwarded addresses require a configured proxy and a real loopback socket', async () => {
+  const home = mkdtempSync(path.join(tmpdir(), 'platform-pairing-'))
+  homes.push(home)
+  const fake = fakeTailnet({ [PHONE]: OWNER })
+  const devices = new DevicePairing({
+    store: new DeviceStore(path.join(home, 'devices.json')),
+    required: () => true,
+    cookieName: 'platform_device_test',
+
+    trustedProxyHosts: () => [new URL(ORIGIN).host],
+    tailnet: new TailnetOwners({ lookup: fake.lookup, enabled: () => true }),
+  })
+  for (const peer of [null, '203.0.113.9']) {
+    for (const claimed of [PHONE, '127.0.0.1', THIS_MACHINE]) {
+      const headers = captureRequestHeaders(request('/health', claimed), peer)
+      await devices.identify(headers)
+      expect(devices.admit(headers).trust).toBe('unpaired')
+    }
+  }
+  const unknownProxy = request('/health', PHONE)
+  unknownProxy.headers.set('host', 'unknown.example')
+  const headers = captureRequestHeaders(unknownProxy, '127.0.0.1')
+  await devices.identify(headers)
+  expect(devices.admit(headers).trust).toBe('unpaired')
+  expect(fake.asked).toEqual([])
+  expect(
+    devices.admit(captureRequestHeaders(request('/pairing/status', null), '127.0.0.1')).trust,
+  ).toBe('host')
+  expect(devices.admit(headersReader(new Headers())).trust).toBe('unpaired')
+  const missingHost = request('/pairing/status', null)
+  missingHost.headers.delete('host')
+  expect(devices.admit(captureRequestHeaders(missingHost, '127.0.0.1')).trust).toBe('unpaired')
+})
+
+test('a proxy without explicit trust uses pairing even for an owner device', async () => {
+  const { app } = pairingApp(fakeTailnet({ [PHONE]: OWNER }).lookup)
+  const written = await app.handle(
+    request('/settings/write', null, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        target: 'user',
+        mutationId: crypto.randomUUID(),
+        operations: [{ kind: 'set', key: 'environments.trustedProxyHosts', value: [] }],
+      }),
+    }),
+  )
+  expect(written.status).toBe(200)
+  expect((await app.handle(request('/health', PHONE))).status).toBe(401)
+})
+
+test('proxy markers prevent local host trust even when the proxy rewrites Host', async () => {
+  const { app } = pairingApp()
+  for (const marker of ['via', 'forwarded', 'x-real-ip', 'x-forwarded-custom']) {
+    const incoming = request('/pairing/status', null, { headers: { [marker]: 'proxy' } })
+    expect(await (await app.handle(incoming)).json()).toMatchObject({ trust: 'unpaired' })
+  }
+})
+
+test('direct local access passes; forwarded requests use tailnet identity or pairing', async () => {
   const { app } = pairingApp()
 
   expect((await app.handle(request('/health', null))).status).toBe(200)
-  expect((await app.handle(request('/health', '127.0.0.1'))).status).toBe(200)
+  expect((await app.handle(request('/health', '127.0.0.1'))).status).toBe(401)
   expect((await app.handle(request('/health', THIS_MACHINE))).status).toBe(200)
   const refused = await app.handle(request('/health', PHONE))
   expect(refused.status).toBe(401)
@@ -193,10 +273,11 @@ test('a socket from an unpaired device is refused, and one carrying the cookie i
     store: new DeviceStore(path.join(home, 'devices.json')),
     required: () => true,
     cookieName: 'platform_device_test',
-    ownAddresses: () => new Set([THIS_MACHINE]),
   })
   const auth = createAuthConfig({ allowedOrigins: [ORIGIN] }, devices)
-  const { code } = devices.issueLink(() => null)
+  const { code } = devices.issueLink(
+    captureRequestHeaders(request('/pairing/status', null), '127.0.0.1'),
+  )
   const { cookie } = devices.claim({ code, label: 'Pixel · Chrome' }, true)
   const socket = (extra: Record<string, string>) => ({
     headers: { origin: ORIGIN, 'x-forwarded-for': PHONE, ...extra },
@@ -254,10 +335,12 @@ test('the idle sweep drops a device unseen for 30 days and closes what it held',
     store: new DeviceStore(path.join(home, 'devices.json')),
     required: () => true,
     cookieName: 'platform_device_test',
-    ownAddresses: () => new Set([THIS_MACHINE]),
+
     now: () => now,
   })
-  const { code } = devices.issueLink(() => null)
+  const { code } = devices.issueLink(
+    captureRequestHeaders(request('/pairing/status', null), '127.0.0.1'),
+  )
   const { cookie } = devices.claim({ code, label: 'Pixel · Chrome' }, true)
   const header = (name: string) =>
     ({ 'x-forwarded-for': PHONE, cookie: cookie.split(';')[0]! })[name] ?? null
@@ -271,7 +354,7 @@ test('the idle sweep drops a device unseen for 30 days and closes what it held',
   expect(devices.list(null)).toEqual([])
 })
 
-test('through the machine proxy, an admitted device reaches the machine and an unpaired one stops here', async () => {
+test('a machine proxy requires admission at both the relay and its destination', async () => {
   const home = mkdtempSync(path.join(tmpdir(), 'platform-pairing-'))
   homes.push(home)
   const machineOrigin = 'http://localhost:5173'
@@ -279,20 +362,41 @@ test('through the machine proxy, an admitted device reaches the machine and an u
     auth: { allowedOrigins: [machineOrigin] },
     settings: testSettingsOptions(path.join(home, 'machine')),
     workspaceRoot: home,
+    devices: {
+      filePath: path.join(home, 'machine-devices.json'),
+      cookieName: 'platform_device_test',
+    },
   })
+  const destinationFetch: typeof fetch = Object.assign(
+    (url: Parameters<typeof fetch>[0], init?: RequestInit) =>
+      machine.handle(new Request(String(url), init)),
+    { preconnect: fetch.preconnect },
+  )
+  let relayCookie = await pairMachineRelay(
+    'http://127.0.0.1:31001',
+    machineOrigin,
+    'Fregat relay · workstation',
+    'source-environment',
+    destinationFetch,
+  )
   const devices = new DevicePairing({
     store: new DeviceStore(path.join(home, 'devices.json')),
     required: () => true,
     cookieName: 'platform_device_test',
-    ownAddresses: () => new Set([THIS_MACHINE]),
   })
   const auth = createAuthConfig({ allowedOrigins: [ORIGIN] }, devices)
   const { app } = machineProxyAdapter({
     auth,
-    resolve: () => ({ origin: 'http://machine', webOrigin: machineOrigin }),
+    resolve: () => ({
+      origin: 'http://127.0.0.1:31001',
+      webOrigin: machineOrigin,
+      cookie: relayCookie,
+    }),
     fetcher: (url, init) => machine.handle(new Request(url, init)),
   })
-  const { code } = devices.issueLink(() => null)
+  const { code } = devices.issueLink(
+    captureRequestHeaders(request('/pairing/status', null), '127.0.0.1'),
+  )
   const cookie = devices.claim({ code, label: 'iPhone · Safari' }, true).cookie.split(';')[0]!
   const through = (headers: Record<string, string>) =>
     app.handle(
@@ -303,21 +407,58 @@ test('through the machine proxy, an admitted device reaches the machine and an u
 
   expect((await through({ cookie })).status).toBe(200)
   expect((await through({})).status).toBe(401)
-  // The socket relay sends the same headers: the machine admits it as its own hop.
+  // A relay hop also needs admission at its destination.
   const upgrade = new Request('http://local/machines/mac/proxy/orchestration/rpc', {
-    headers: { origin: ORIGIN, 'x-forwarded-for': PHONE, cookie, upgrade: 'websocket' },
+    headers: {
+      origin: ORIGIN,
+      'x-forwarded-for': PHONE,
+      'x-forwarded-custom': 'client-metadata',
+      authorization: 'Bearer source-only',
+      cookie,
+      upgrade: 'websocket',
+    },
   })
-  const relayed = Object.fromEntries(machineProxyHeaders(upgrade, machineOrigin))
+  const relayed = Object.fromEntries(machineProxyHeaders(upgrade, machineOrigin, relayCookie))
   const machineAuth = createAuthConfig(
     { allowedOrigins: [machineOrigin] },
     new DevicePairing({
       store: new DeviceStore(path.join(home, 'machine-devices.json')),
       required: () => true,
       cookieName: 'platform_device_test',
-      ownAddresses: () => new Set(),
     }),
   )
+  expect(relayed['x-forwarded-custom']).toBeUndefined()
+  expect(relayed.authorization).toBeUndefined()
+  expect(relayed.cookie).toBe(relayCookie)
+  expect(relayed.cookie).not.toBe(cookie)
   expect(authenticateWebSocketData({ headers: relayed }, machineAuth)).toBeNull()
+  delete relayed.cookie
+  expect(authenticateWebSocketData({ headers: relayed }, machineAuth)?.code).toBe(
+    'DEVICE_NOT_PAIRED',
+  )
+  const previousCookie = relayCookie
+  relayCookie = await pairMachineRelay(
+    'http://127.0.0.1:31001',
+    machineOrigin,
+    'Fregat relay · renamed-workstation',
+    'source-environment',
+    destinationFetch,
+  )
+  const listed = await destinationFetch('http://127.0.0.1:31001/pairing/devices', {
+    headers: { origin: machineOrigin },
+  })
+  expect(await listed.json()).toMatchObject({
+    devices: [{ label: 'Fregat relay · renamed-workstation' }],
+  })
+  const stored = JSON.parse(readFileSync(path.join(home, 'machine-devices.json'), 'utf8')) as {
+    devices: unknown[]
+  }
+  expect(stored.devices).toHaveLength(1)
+  const refused = await destinationFetch('http://127.0.0.1:31001/health', {
+    headers: { origin: machineOrigin, via: '1.1 fregat', cookie: previousCookie },
+  })
+  expect(refused.status).toBe(401)
+  expect((await through({ cookie })).status).toBe(200)
 })
 
 test('a claim from a page on another origin is refused before the code is looked at', async () => {
@@ -404,7 +545,8 @@ test('a socket from the owner’s Tailscale device is let in once its address is
     store: new DeviceStore(path.join(home, 'devices.json')),
     required: () => true,
     cookieName: 'platform_device_test',
-    ownAddresses: () => new Set([THIS_MACHINE]),
+
+    trustedProxyHosts: () => [new URL(ORIGIN).host],
     tailnet: new TailnetOwners({
       lookup: fakeTailnet({ [PHONE]: OWNER }).lookup,
       enabled: () => true,
@@ -412,11 +554,13 @@ test('a socket from the owner’s Tailscale device is let in once its address is
     }),
   })
   const auth = createAuthConfig({ allowedOrigins: [ORIGIN] }, devices)
-  const data = { headers: { origin: ORIGIN, 'x-forwarded-for': PHONE } }
+  const upgrade = request('/terminal', PHONE)
+  const header = captureRequestHeaders(upgrade, '127.0.0.1')
+  const data = { request: upgrade, headers: { origin: ORIGIN, 'x-forwarded-for': PHONE } }
 
   // Unknown until asked: admission never waits on Tailscale, so it refuses.
   expect(authenticateWebSocketData(data, auth)?.code).toBe('DEVICE_NOT_PAIRED')
-  await devices.identify((name) => (name === 'x-forwarded-for' ? PHONE : null))
+  await devices.identify(header)
   expect(authenticateWebSocketData(data, auth)).toBeNull()
   // A stale answer is no answer.
   now += 61_000
@@ -428,20 +572,22 @@ test('a Tailscale-admitted socket closes once Tailscale or the setting stops vou
   homes.push(home)
   let now = 0
   let enabled = true
+  let trustedHosts = [new URL(ORIGIN).host]
   const nodes: Record<string, TailnetNode> = { [PHONE]: OWNER, '100.64.0.30': OWNER }
   const devices = new DevicePairing({
     store: new DeviceStore(path.join(home, 'devices.json')),
     required: () => true,
     cookieName: 'platform_device_test',
-    ownAddresses: () => new Set([THIS_MACHINE]),
+
+    trustedProxyHosts: () => trustedHosts,
     tailnet: new TailnetOwners({
       lookup: fakeTailnet(nodes).lookup,
       enabled: () => enabled,
       now: () => now,
     }),
   })
-  const header = (address: string) => (name: string) =>
-    name === 'x-forwarded-for' ? address : null
+  const header = (address: string) =>
+    captureRequestHeaders(request('/terminal', address), '127.0.0.1')
   const closed: string[] = []
   for (const address of [PHONE, '100.64.0.30']) {
     await devices.identify(header(address))
@@ -454,9 +600,66 @@ test('a Tailscale-admitted socket closes once Tailscale or the setting stops vou
   now += 61_000
   await devices.recheckTailnet()
   expect(closed).toEqual(['100.64.0.30'])
-  enabled = false
+  trustedHosts = []
   await devices.recheckTailnet()
   expect(closed).toEqual(['100.64.0.30', PHONE])
+  trustedHosts = [new URL(ORIGIN).host]
+  devices.hold(header(PHONE), () => closed.push('setting-off'))
+  enabled = false
+  await devices.recheckTailnet()
+  expect(closed).toEqual(['100.64.0.30', PHONE, 'setting-off'])
+})
+
+test('re-pairing a relay replaces its prior device and closes its sockets', () => {
+  const home = mkdtempSync(path.join(tmpdir(), 'platform-pairing-'))
+  homes.push(home)
+  const store = new DeviceStore(path.join(home, 'devices.json'))
+  const devices = new DevicePairing({ store, required: () => true, cookieName: 'relay_device' })
+  const host = captureRequestHeaders(request('/pairing/status', null), '127.0.0.1')
+  const browser = devices.claim({ code: devices.issueLink(host).code, label: 'Browser' }, false)
+  const other = devices.claim(
+    { code: devices.issueLink(host).code, label: 'Other relay', relaySourceId: 'other-source' },
+    false,
+  )
+  const first = devices.claim(
+    {
+      code: devices.issueLink(host).code,
+      label: 'Fregat relay · workstation',
+      relaySourceId: 'source-server',
+    },
+    false,
+  )
+  const cookie = first.cookie.split(';')[0]!
+  const header = headersReader(new Headers({ cookie }))
+  let closed = false
+  devices.hold(header, () => {
+    closed = true
+  })
+  const second = devices.claim(
+    {
+      code: devices.issueLink(host).code,
+      label: 'Fregat relay · renamed-workstation',
+      relaySourceId: 'source-server',
+    },
+    false,
+  )
+  expect(store.list()).toHaveLength(3)
+  expect(store.list().map((device) => device.id)).toEqual([
+    browser.deviceId,
+    other.deviceId,
+    second.deviceId,
+  ])
+  expect(store.list()[2]).toMatchObject({
+    id: second.deviceId,
+    label: 'Fregat relay · renamed-workstation',
+    relaySourceId: 'source-server',
+  })
+  expect(second.deviceId).not.toBe(first.deviceId)
+  expect(closed).toBe(true)
+  expect(devices.admit(header).trust).toBe('unpaired')
+  expect(
+    devices.admit(headersReader(new Headers({ cookie: second.cookie.split(';')[0]! }))).trust,
+  ).toBe('device')
 })
 
 test('the pair command prints a code the server made over loopback, and its link', async () => {

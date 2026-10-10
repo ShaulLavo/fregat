@@ -1,7 +1,7 @@
 import { isRecord } from '@workspace/utils/objects'
 
 import type { DevicePairing } from './devices/service'
-import { headersReader, type HeaderReader } from './devices/trust'
+import { headersReader, requestHeaderReader, type HeaderReader } from './devices/trust'
 import { errorPayload, FsError } from './fs/errors'
 import { recordRequestContext, recordRequestWarning } from './observability'
 
@@ -63,7 +63,7 @@ function guard(auth: AuthConfig, pairing: boolean) {
     const origin = browserRequestOrigin(request, auth)
     const error =
       localBrowserOriginError(auth, origin) ??
-      (pairing ? unpairedDeviceError(auth, headersReader(request.headers)) : null)
+      (pairing ? unpairedDeviceError(auth, requestHeaderReader(request)) : null)
     if (!error) {
       recordRequestContext({ auth: { outcome: 'success' } })
       return undefined
@@ -86,19 +86,27 @@ function guard(auth: AuthConfig, pairing: boolean) {
 }
 
 export function authenticateWebSocketData(data: unknown, auth: AuthConfig): FsError | null {
-  const headers = isRecord(data) && isRecord(data.headers) ? headersReader(data.headers) : null
+  const headers = socketHeaderReader(data)
   return (
     localBrowserOriginError(auth, originFromWebSocketData(data)) ??
-    (headers ? unpairedDeviceError(auth, headers) : null)
+    unpairedDeviceError(auth, headers ?? (() => null))
   )
+}
+
+function socketHeaderReader(data: unknown): HeaderReader | null {
+  if (!isRecord(data)) return null
+  if (data.request instanceof Request) return requestHeaderReader(data.request)
+  return isRecord(data.headers) ? headersReader(data.headers) : null
 }
 
 const heldSockets = new WeakMap<object, () => void>()
 
 /** Ties an admitted socket to its device, so removing the device closes it. Call once it opens. */
 export function holdWebSocket(data: unknown, auth: AuthConfig, close: () => void) {
-  if (!auth.devices || !isRecord(data) || !isRecord(data.headers)) return
-  heldSockets.set(data, auth.devices.hold(headersReader(data.headers), close))
+  if (!auth.devices || !isRecord(data)) return
+  const header = socketHeaderReader(data)
+  if (!header) return
+  heldSockets.set(data, auth.devices.hold(header, close))
 }
 
 /** Call from the socket's close: it no longer needs closing. */

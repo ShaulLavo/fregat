@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia'
 
 import { authGuard, type AuthConfig } from '../auth'
-import { headersReader } from '../devices/trust'
+import { requestHeaderReader } from '../devices/trust'
 import { recordRequestContext } from '../observability'
 import { createMachineProxyError } from './proxy-errors'
 import {
@@ -15,6 +15,7 @@ import { createMachineProxySocket } from './proxy-socket'
 type MachineProxyTarget = {
   readonly origin: string
   readonly webOrigin: string
+  readonly cookie: string
 }
 
 type MachineProxyOptions = {
@@ -33,7 +34,7 @@ export function createMachineProxyRoutes({ auth, resolve, fetcher = fetch }: Mac
   const handler = async ({ request, params, server }: MachineProxyContext) => {
     const machine = await resolve(params.name)
     const target = machineProxyTarget(machine.origin, request, params['*'])
-    const headers = machineProxyHeaders(request, machine.webOrigin)
+    const headers = machineProxyHeaders(request, machine.webOrigin, machine.cookie)
     const websocket = request.headers.get('upgrade')?.toLowerCase() === 'websocket'
     recordRequestContext({
       area: 'machines',
@@ -46,7 +47,7 @@ export function createMachineProxyRoutes({ auth, resolve, fetcher = fetch }: Mac
     target.protocol = 'ws:'
     // Elysia's .ws() parses JSON before custom parsers. Raw Bun hooks preserve every frame.
     const data = createMachineProxySocket(target, headers, params.name, (close) =>
-      auth.devices ? auth.devices.hold(headersReader(request.headers), close) : noop,
+      auth.devices ? auth.devices.hold(requestHeaderReader(request), close) : noop,
     )
     if (!server?.upgrade(request, { data })) throw createMachineProxyError()
   }

@@ -124,6 +124,14 @@ A browser on another device, such as a phone reaching the machine over the tailn
 
 With no paired browser at hand, run the pair command on the machine, over SSH for example. In an installed release, run `bun current/server/pair.js` from the release folder: `server.releaseRoot`, by default `~/.local/share/fregat/releases` on Linux and `~/Library/Application Support/Fregat/releases` on macOS; an `install-release` installation uses its `productionRoot`. In a checkout, `bun run pair` runs the same command. It asks the server at the `server.address` setting over loopback (`--address=http://127.0.0.1:<port>` picks another server) and prints the code, plus a link when the server is served at an address other devices reach. A code works once, for 5 minutes.
 
+### Reverse proxy device trust
+
+Device admission uses the socket peer. A direct loopback request with a loopback Host and no forwarding markers has host access. Reverse proxies must preserve the incoming public `Host`, or always stamp a forwarding marker such as `Via` or `X-Forwarded-For`. A proxy that rewrites every request to a loopback Host and strips all hop markers makes remote traffic indistinguishable from direct local traffic; that configuration is unsafe.
+
+Other requests use pairing, including proxy requests without `X-Forwarded-For`. To let a proxy identify your own Tailscale devices, set the machine-scoped `environments.trustedProxyHosts` to its public Host values, including a port when one is sent (for example `["fregat.example.com"]`). The proxy must connect over loopback, preserve Host, and **replace** client-supplied `X-Forwarded-For` with a single verified client IP. Multi-address chains and unknown socket peers fail closed. Leave the list empty for proxies that cannot verify that address. `environments.tailnetOwnerDevices` controls whether same-user Tailscale identity grants access; all other devices still pair when `environments.devicePairing` is on.
+
+HTTP requests and WebSocket upgrades use the same captured socket provenance. An SSH machine relay pairs its own device through the authenticated tunnel and keeps the destination credential in server memory. Reconnecting after a source restart replaces that source server’s previous relay device and closes its old sockets; the device list names the relay’s source machine. Both HTTP and WebSocket relays present that credential, while browser credentials stay on the source machine. A hop marker alone grants no device access.
+
 ## optional local release installation
 
 `bun run install-release` is an optional Linux integration with Mesh and user systemd. It builds first by default; `--from=<release-directory>` installs a previously built release. Installation additionally needs `mesh`, `systemctl`, `df`, Node and Playwright Chromium. This integration owns `platform-prod.service` on loopback port 3301. Run it on the machine serving the configured target.

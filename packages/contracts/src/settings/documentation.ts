@@ -167,14 +167,20 @@ export const SETTINGS_DOCUMENTATION = {
   'environments.devicePairing': {
     title: 'Require pairing for other devices',
     description:
-      'A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a code from this machine or a paired device pairs it. This machine’s own browser needs no pairing.',
-    keywords: ['pair', 'phone', 'device', 'security', 'mesh', 'tailnet'],
+      'A browser on another device, such as a phone reaching this machine through a reverse proxy, shows a pairing screen until a code from this machine or a paired device pairs it. This machine’s own browser needs no pairing.',
+    keywords: ['pair', 'phone', 'device', 'security', 'proxy', 'tailnet'],
+  },
+  'environments.trustedProxyHosts': {
+    title: 'Trusted reverse proxy hosts',
+    description:
+      'Public Host values, including any port, whose loopback reverse proxy supplies the client address for device trust. The proxy must preserve Host and replace X-Forwarded-For with the single IP it verified. Other proxy requests use device pairing.',
+    keywords: ['proxy', 'host', 'forwarded', 'security', 'tailnet'],
   },
   'environments.tailnetOwnerDevices': {
     title: 'Let in your own Tailscale devices',
     description:
       'A device signed in to Tailscale as the same user as this machine opens Fregat without pairing. Tagged devices, devices shared from another tailnet, and other users still pair.',
-    keywords: ['pair', 'tailscale', 'tailnet', 'phone', 'device', 'security', 'mesh'],
+    keywords: ['pair', 'tailscale', 'tailnet', 'phone', 'device', 'security', 'proxy'],
   },
   'server.address': {
     title: 'Server address',

@@ -22,29 +22,26 @@ export function machineProxyTarget(origin: string, request: Request, path: strin
 }
 
 /**
- * This server's gate already admitted the caller, so the machine sees this server's own hop: no
- * credentials, and no forwarding metadata naming a device the machine never paired.
+ * The destination receives this relay's own paired credential; caller credentials and forwarded
+ * addresses belong to the source machine and never cross that boundary.
  */
-const FORWARDING_HEADERS = [
-  'forwarded',
-  'x-forwarded-for',
-  'x-forwarded-host',
-  'x-forwarded-port',
-  'x-forwarded-prefix',
-  'x-forwarded-proto',
-  'x-real-ip',
-]
-
-export function machineProxyHeaders(request: Request, webOrigin: string) {
+export function machineProxyHeaders(request: Request, webOrigin: string, cookie: string) {
   const headers = endToEndHeaders(request.headers)
   for (const name of ['host', 'cookie', 'authorization', 'referer', 'content-length']) {
     headers.delete(name)
   }
-  for (const name of FORWARDING_HEADERS) headers.delete(name)
-  for (const name of headers.keys()) {
-    if (name.startsWith('sec-websocket-')) headers.delete(name)
+  // Deleting a header shifts its live iterator, so consume a snapshot of the names.
+  for (const name of Array.from(headers.keys())) {
+    if (
+      name === 'forwarded' ||
+      name === 'x-real-ip' ||
+      name.startsWith('x-forwarded-') ||
+      name.startsWith('sec-websocket-')
+    )
+      headers.delete(name)
   }
   headers.set('origin', webOrigin)
+  headers.set('cookie', cookie)
   // The hop marker the target's locality check reads: a loopback tunnel must not look local.
   headers.set('via', '1.1 fregat')
   return headers
@@ -68,7 +65,7 @@ export async function forwardMachineRequest(
     // Fetch decodes compressed bodies; the original length and encoding no longer apply.
     responseHeaders.delete('content-encoding')
     responseHeaders.delete('content-length')
-    for (const name of responseHeaders.keys()) {
+    for (const name of Array.from(responseHeaders.keys())) {
       if (name.startsWith('access-control-')) responseHeaders.delete(name)
     }
     return new Response(response.body, {

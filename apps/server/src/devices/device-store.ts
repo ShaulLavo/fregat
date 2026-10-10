@@ -5,6 +5,7 @@ import * as v from 'valibot'
 const deviceRecordSchema = v.object({
   id: v.string(),
   label: v.string(),
+  relaySourceId: v.optional(v.string()),
   /** SHA-256 of the device's secret, hex. The secret itself lives only in the device's cookie. */
   secretHash: v.string(),
   pairedAt: v.string(),
@@ -36,7 +37,11 @@ export class DeviceStore {
   }
 
   add(device: DeviceRecord) {
-    this.write(this.list().concat([device]))
+    const kept =
+      device.relaySourceId === undefined
+        ? this.list()
+        : this.list().filter((current) => current.relaySourceId !== device.relaySourceId)
+    this.write(kept.concat([device]))
   }
 
   remove(id: string) {

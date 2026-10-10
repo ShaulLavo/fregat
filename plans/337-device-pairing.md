@@ -85,9 +85,12 @@ pairing URL and QR code (`/pair#token=…`, valid 5 minutes); claiming it sets a
 cookie. Its desktop app bootstraps its own window with a separate desktop token. Pairing there is
 one scan per device, which is the step this section removes, so nothing was copied.
 
-Mechanism (PR #1035): the server runs `tailscale whois --json` on the single `X-Forwarded-For`
-address mesh sets (the server listens only on loopback, so that hop is local), and on its own
-tailnet address. Same `UserProfile.LoginName`, no tags on either side and no `Sharer` gives trust
+Mechanism: socket provenance and Host distinguish direct local requests from forwarded ones.
+`environments.trustedProxyHosts` explicitly names the public Host values whose loopback proxy
+verifies and replaces `X-Forwarded-For` with one client IP. Unknown peers, unconfigured proxies,
+and missing or multi-address forwarding headers use pairing. The server runs
+`tailscale whois --json` on that verified IP and its own tailnet address.
+Same `UserProfile.LoginName`, no tags on either side and no `Sharer` gives trust
 `tailnet`. Verdicts are cached per address for a minute (5 s after a failure) and every failure
 pairs. Sockets admitted this way are checked again every minute and on settings changes, and close
 when the check fails. `environments.tailnetOwnerDevices` (machine scope, on by default) turns it off.
@@ -100,6 +103,12 @@ Checklist:
 - [ ] Show Tailscale-trusted devices in the paired-devices list.
 - [ ] Owner check: the phone on the tailnet opens the app without pairing; a shared-in device still
       gets the pairing screen.
+
+SSH machine relays pair their own device over the authenticated, identity-checked loopback
+forward, retain its credential privately in memory, and present it for HTTP and WebSocket hops.
+A stable source-server identity replaces the previous relay device after a restart and closes its
+old sockets; the device list names the source machine. Caller credentials stay on the source machine. The destination still enforces pairing and the
+relay's `Via` marker keeps native-locality operations local.
 
 ## B2: approve from a notification (later)
 
