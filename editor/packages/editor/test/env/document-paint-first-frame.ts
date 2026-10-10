@@ -12,7 +12,7 @@ export async function proveDocumentPaintFirstFrame(
   markup: string,
   width: number,
   javaScriptEnabled: boolean,
-  activationMode: 'success' | 'refused' | 'throws' | 'missing' = 'success',
+  activationMode: 'success' | 'refused' | 'throws' | 'missing' | 'missing-deferred' = 'success',
 ) {
   const entry = join(evidence, 'activate-document-paint.ts')
   const source = join(import.meta.dirname, '../../src/paint.ts')
@@ -69,33 +69,48 @@ export async function proveDocumentPaintFirstFrame(
       viewport: { width: 1400, height: 900 },
     })
   const safePayload = payload.replaceAll('<', '\\u003c')
-  const prefix = `<!doctype html><html><head><style>body{margin:0}${fonts}</style><script>${bundle.replaceAll('</script', '<\\/script')}</script></head><body><script type="application/json" id="paint-payload">${safePayload}</script><div id="document-paint-proof" style="position:relative;width:${width}px">${markup}</div>`
+  let finishDeferred: (() => void) | undefined
+  const deferred = new Promise<Response>((resolve) => {
+    finishDeferred = () =>
+      resolve(
+        new Response('window.__paintDeferredLoaded=true', {
+          headers: { 'Content-Type': 'text/javascript' },
+        }),
+      )
+  })
+  const deferredScript =
+    activationMode === 'missing-deferred'
+      ? '<script defer src="/document-paint-deferred-proof.js"></script>'
+      : ''
+  const prefix = `<!doctype html><html><head><style>body{margin:0}${fonts}</style><script>${bundle.replaceAll('</script', '<\\/script')}</script>${deferredScript}</head><body><script type="application/json" id="paint-payload">${safePayload}</script><div id="document-paint-proof" style="position:relative;width:${width}px">${markup}</div>`
   const activationCall = `const root=document.querySelector('[data-editor-document-paint]');try{${activationMode === 'refused' ? "root.querySelector('[data-editor-document-paint-source-row]').dataset.editorDocumentPaintStart='1';" : ''}${activationMode === 'throws' ? "CSSStyleSheet.prototype.insertRule=()=>{throw 'activation proof failure'};" : ''}window.__paintProofHandles=[window.__paintProof.activatePaintSnapshotHighlights(root,window.__paintProof.decodePaintSnapshot(document.querySelector('#paint-payload').textContent))];if(window.__paintProofHandles[0])root.dataset.paintActivated='true';}catch{root.dataset.paintFailed='true';}`
-  const tail = `${activationMode === 'missing' ? '' : `<script>${activationCall}</script>`}</body></html>`
+  const tail = `${activationMode.startsWith('missing') ? '' : `<script>${activationCall}</script>`}</body></html>`
   let finishStream: (() => Promise<void>) | undefined
   const encoder = new TextEncoder()
   const server = serve({
     hostname: '127.0.0.1',
     port: 0,
-    fetch: (request) =>
-      new URL(request.url).pathname !== '/document-paint-first-frame-proof'
-        ? new Response(null, { status: 404 })
-        : new Response(
-            new ReadableStream<Uint8Array>({
-              start(controller) {
-                controller.enqueue(encoder.encode(prefix))
-                const held = new Promise<void>((resolve) =>
-                  setTimeout(resolve, javaScriptEnabled ? 1500 : 0),
-                )
-                finishStream = async () => {
-                  await held
-                  controller.enqueue(encoder.encode(tail))
-                  controller.close()
-                }
-              },
-            }),
-            { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' } },
-          ),
+    fetch: (request) => {
+      const path = new URL(request.url).pathname
+      if (path === '/document-paint-deferred-proof.js') return deferred
+      if (path !== '/document-paint-first-frame-proof') return new Response(null, { status: 404 })
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(encoder.encode(prefix))
+            const held = new Promise<void>((resolve) =>
+              setTimeout(resolve, javaScriptEnabled ? 1500 : 0),
+            )
+            finishStream = async () => {
+              await held
+              controller.enqueue(encoder.encode(tail))
+              controller.close()
+            }
+          },
+        }),
+        { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' } },
+      )
+    },
   })
   const url = `http://127.0.0.1:${server.port}/document-paint-first-frame-proof`
   try {
@@ -125,6 +140,19 @@ export async function proveDocumentPaintFirstFrame(
       }
     })
     await finishStream!()
+    let parsed = null
+    if (activationMode === 'missing-deferred') {
+      await fresh.waitForFunction(() => document.readyState === 'interactive')
+      parsed = await fresh.evaluate(() => ({
+        visibility: getComputedStyle(document.querySelector('[data-editor-document-paint]')!)
+          .visibility,
+        gatePending: document.documentElement.classList.contains('editor-document-paint-pending'),
+        deferredLoaded:
+          (window as unknown as { __paintDeferredLoaded?: boolean }).__paintDeferredLoaded === true,
+        readyState: document.readyState,
+      }))
+      finishDeferred!()
+    }
     await fresh.waitForLoadState('load')
     await fresh.evaluate(() => document.fonts.ready)
     if (javaScriptEnabled)
@@ -245,7 +273,7 @@ export async function proveDocumentPaintFirstFrame(
         }),
       )
     }
-    const proof = { ...result, pending, sizes, inputs, counts }
+    const proof = { ...result, pending, parsed, sizes, inputs, counts }
     writeFileSync(
       join(
         evidence,
@@ -255,6 +283,7 @@ export async function proveDocumentPaintFirstFrame(
     )
     return { ...proof, image: firstFrame.toString('base64') }
   } finally {
+    finishDeferred!()
     await context.close()
     server.stop(true)
   }

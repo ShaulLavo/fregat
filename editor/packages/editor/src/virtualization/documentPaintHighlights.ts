@@ -43,16 +43,15 @@ export function prepareDocumentPaintHighlights(document: Document): void {
   document.head.append(stylesheet)
   html.dataset.editorDocumentPaintKey = key
   html.classList.add(PENDING_CLASS)
-  // Missing or failed activation still reveals readable content when parsing ends.
-  document.addEventListener(
-    'DOMContentLoaded',
-    () => {
-      html.classList.remove(PENDING_CLASS)
-      delete html.dataset.editorDocumentPaintKey
-      stylesheet.remove()
-    },
-    { once: true },
-  )
+  // Interactive marks parsing completion before deferred scripts finish loading.
+  const reveal = () => {
+    if (document.readyState === 'loading') return
+    html.classList.remove(PENDING_CLASS)
+    delete html.dataset.editorDocumentPaintKey
+    stylesheet.remove()
+    document.removeEventListener('readystatechange', reveal)
+  }
+  document.addEventListener('readystatechange', reveal)
 }
 
 export function revealDocumentPaintHighlights(root: HTMLElement): void {

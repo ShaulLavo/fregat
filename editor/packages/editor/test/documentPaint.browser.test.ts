@@ -31,7 +31,7 @@ declare module 'vitest/browser' {
       markup: string,
       width: number,
       javaScriptEnabled: boolean,
-      activationMode?: 'success' | 'refused' | 'throws' | 'missing',
+      activationMode?: 'success' | 'refused' | 'throws' | 'missing' | 'missing-deferred',
     ): Promise<{
       image: string
       text: string | null
@@ -42,6 +42,12 @@ declare module 'vitest/browser' {
       visibility: string
       gatePending: boolean
       pending: { visibility: string; height: number; loading: boolean }
+      parsed: {
+        visibility: string
+        gatePending: boolean
+        deferredLoaded: boolean
+        readyState: string
+      } | null
       frames: { visible: boolean; activated: boolean; highlights: number }[]
       inputs: string[]
       counts: number[]
@@ -1082,7 +1088,7 @@ it('refuses mismatched emitted text and preserves foreign highlight registration
   root.remove()
 })
 
-it.each(['refused', 'throws', 'missing'] as const)(
+it.each(['refused', 'throws', 'missing', 'missing-deferred'] as const)(
   'reveals streamed emitted content when activation is %s',
   async (mode) => {
     const { host, editor } = mount('alpha beta\nlast', false, 'Snapshot Serif', false)
@@ -1102,6 +1108,13 @@ it.each(['refused', 'throws', 'missing'] as const)(
     expect(proof.text).toBe(new DOMParser().parseFromString(markup, 'text/html').body.textContent)
     expect(proof.height).toBe(editor.getContentHeight())
     expect(proof.frames.some((frame) => frame.visible)).toBe(true)
+    if (mode === 'missing-deferred')
+      expect(proof.parsed).toEqual({
+        visibility: 'visible',
+        gatePending: false,
+        deferredLoaded: false,
+        readyState: 'interactive',
+      })
   },
 )
 

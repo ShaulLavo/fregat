@@ -69,7 +69,12 @@ export default defineConfig({
           markup: string,
           width: number,
           javaScriptEnabled: boolean,
-          activationMode: 'success' | 'refused' | 'throws' | 'missing' = 'success',
+          activationMode:
+            | 'success'
+            | 'refused'
+            | 'throws'
+            | 'missing'
+            | 'missing-deferred' = 'success',
         ) =>
           proveDocumentPaintFirstFrame(
             page,
