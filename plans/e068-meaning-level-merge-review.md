@@ -461,8 +461,8 @@ recorded load and power without enforcing either guard. These are **unguarded, l
 shared-machine experiments**. Browser after runs recorded one-minute loads 3.48/3.54; cursor
 after/after/before runs recorded 3.15/3.30/3.25; detector-gate after/after/before runs recorded
 3.06/3.10/3.08. The earlier load-below-3 qualification was unsupported and is withdrawn.
-All Mac timing numbers below are descriptive observations; they establish neither a qualified
-latency result nor cursor cost-regression proof. No guarded rerun was performed. Linux uses
+Those earlier Mac timing results are descriptive observations; they establish neither a qualified
+latency result nor cursor cost-regression proof. Those experiments had no enforced load guard. Linux uses
 the i7-14700K and Node 26.7.0 through non-quiet bench-class admission; its wall times are not
 verdicts. Raw samples, source hashes and arithmetic summaries remain unchanged.
 
@@ -535,7 +535,7 @@ units from the same 100-edit batch; every run asserts all 50 overlap marks.
 | Result JSON UTF-8 bytes per batch            | 61,444–61,644    | 92,166–92,466          |
 
 The ordinary bridge awaits one worker query per range in
-`editor/packages/tree-sitter/src/mergeReview.ts:160–182`. The dense batch adds 50 projected
+`editor/packages/tree-sitter/src/mergeReview.ts:160–182`. The dense batch adds 50 current-range
 queries. Byte counts cover these query envelopes, are computed after timing and are a
 reproducible JSON-size proxy. They are not structured-clone wire bytes or a count of all
 worker traffic. Round trips include worker query/projection work and any source reads.
@@ -595,15 +595,85 @@ does not enforce these conditions. Linux runs remain non-quiet and report alloca
 only. Early pilots with unavailable GC, interleaved controls and
 an overly broad cursor timer are excluded from the final comparisons.
 
+#### Batched worker reads
+
+The bridge groups all ranges from one syntax read into a single `reviewBatch`
+request. Independent detector reads in the same analysis step share that request through
+`TreeSitterReviewSyntax.batch`. The worker evaluates them in input order using the existing
+current-unit and author-projection query paths. A runtime cancellation flag covers the batch;
+individual stale/cancelled results still make the affected read unavailable. Batch release
+waits for the worker task and releases every source loan, including when a loan release fails.
+The retained projection limit and base-tree ownership are unchanged. Runtime disposal also
+cancels entry-local flags. Concurrent pairs share in-flight formatting comparisons by edit and
+unit; their independent current/projection reads enter the same batch. A real-parser coarse-unit
+regression catches duplicate comparisons while the reads are still pending.
+
+The non-quiet Linux experiment over the same 100k-line, four-author, 100-edit fixtures proves
+100 ordinary / 150 dense query exchanges become one total worker request per detector batch.
+All eight after samples per shape assert the one-request bound and exact equality against a
+reader without coalescing. Both shapes retain their marks, including all 50 dense overlaps.
+The baseline traffic in this reproduction is entirely `mergeUnit`; the extra dense ranges
+are current deletion footprints, not author projections. Projection batches are separately
+covered by real-worker tests, including mixed current/projected reads, nested languages,
+stale/cancelled entries, runtime disposal and rejected source-loan release. New projected
+sources still use the document-source loan protocol; this experiment does not establish a
+constant count of source-transfer messages for arbitrary projection-heavy histories.
+
+| Linux, experiment, shared machine | Ordinary before / after       | Dense before / after          |
+| --------------------------------- | ----------------------------- | ----------------------------- |
+| Query request/result pairs        | 100 / 1                       | 150 / 1                       |
+| Query request JSON UTF-8 bytes    | 31,536–31,836 / 4,521–4,525   | 47,304–47,754 / 6,589–6,593   |
+| Query result JSON UTF-8 bytes     | 61,444–61,644 / 24,953–24,955 | 92,166–92,466 / 37,339–37,341 |
+
+JSON sizes remain a payload-size proxy. They are not structured-clone wire bytes. Linux
+elapsed times are excluded from verdicts while the PC runs the owner's Bevy workload.
+`editor/packages/collaboration/bench/batched-worker-evidence.json` records source hashes,
+request counts and guarded Mac A/B/B/A samples. Both portable JavaScript/WASM versions were
+built on Linux before taking the Mac turn. The controller enforces AC and one-minute load
+below 3 immediately before every sample block; recorded loads were 2.98, 2.76, 2.44 and 2.27.
+One warmup pass and four measured fixture-order passes per block give 16 samples per shape
+and production version. Every sample matches the non-coalescing reader, and mark hashes
+match across versions. These are worker-only **experiment, shared machine** results; UI
+samples are omitted.
+
+| Guarded M1 Mac, before / after | Ordinary         | Dense, 50 overlaps |
+| ------------------------------ | ---------------- | ------------------ |
+| Total worker requests          | 100 / 1          | 150 / 1            |
+| Complete detector median       | 50.95 / 48.50 ms | 52.10 / 49.45 ms   |
+| Complete detector p95          | 52.20 / 49.90 ms | 53.00 / 50.40 ms   |
+| Summed query round-trip median | 49.25 / 47.25 ms | 50.55 / 48.05 ms   |
+
+P95 uses nearest rank. The median completion observations are about 5% lower. The exchange
+count goal is met, but one reply still takes roughly 47–48 ms and the 2 ms target remains
+open. Count reduction alone does not explain that remaining cost.
+
+Two earlier setup attempts stopped before collecting any timing sample because load was
+4.78 and 3.12. A queued retry also reached its ten-minute background limit before admission.
+The successful retry used portable bundles and a longer bounded guard wait. Failed attempts
+supply no timing verdict; every attempt removed its owned Mac temporary directory.
+
+The runtime bench also now waits for both lazy hover controllers before editing and measuring
+hover opening. A reproduced command-dispatch failure showed that two animation frames did
+not guarantee the demand-loaded hover plugin was ready. The readiness check is outside all
+reported timers; no hover speedup is claimed.
+
 Remaining Approved work:
 
 - [ ] Establish cursor cost-regression proof with an A/B/B/A rerun that enforces and records
       AC power and one-minute load below 3 before each sample block. Retain exact-result checks.
 - [ ] Continue the ordinary 2 ms tail investigation using the uninstrumented detector gate and
       instrumented probe together. Do not assign all tails to GC or close the gate from a median.
-- [ ] Reduce the 100 sequential current-unit worker exchanges in `mergeReview.ts:160–182`.
-      Preserve cancellation, source retention and projection ownership; repeat the real-worker
-      ordinary/dense benchmark and retain per-batch request counts and mark equality.
+- [x] Group the current-unit worker exchanges into one request per ordinary/dense batch.
+      Retain exact mark equality, cancellation, source ownership and bounded projection caches;
+      the batched worker reads evidence above covers the real-worker regression checks.
+- [ ] Profile the remaining batched worker cost. The guarded ordinary/dense query-reply medians
+      are 47.25/48.05 ms with one request; source hashes and all samples are in
+      `editor/packages/collaboration/bench/batched-worker-evidence.json`. Reproduce from
+      `editor/packages/collaboration` with `node ../../../node_modules/vitest/vitest.mjs run
+--config vitest.review-cost.config.ts`. Start at `queryReviewBatch` and `queryMergeUnit`
+      in `editor/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts`; separate worker query
+      execution, source access and exchange latency before assigning the cost to any one of them.
+      Linux elapsed times remain diagnostic; repeat timing comparisons with the guarded Mac turn.
 - [ ] Bound late damaged-root/error-range checks and wide/injected incremental fallbacks.
       `bench/cursor.test.ts` now reproduces the expensive late damaged-root lookup independently
       of syntax-query execution; repeat it with the existing full-reparse differential corpus.

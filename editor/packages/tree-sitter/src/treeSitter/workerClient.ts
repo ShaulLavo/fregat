@@ -610,6 +610,10 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
     for (const pending of this.pendingRequests.values()) {
       if (pending.runtimeSessionId !== runtimeSessionId) continue
       if (pending.cancellationFlag) Atomics.store(pending.cancellationFlag, 0, 1)
+      if (pending.payload.type !== 'reviewBatch') continue
+      for (const query of pending.payload.queries) {
+        if (query.cancellationBuffer) Atomics.store(new Int32Array(query.cancellationBuffer), 0, 1)
+      }
     }
   }
 

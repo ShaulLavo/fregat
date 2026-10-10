@@ -96,7 +96,7 @@ type ReviewState = {
   readonly engine: TextbufferEngine
   readonly current: PieceTableSnapshot
   readonly before: Map<string, PieceTableSnapshot>
-  readonly formatting: Map<string, boolean>
+  readonly formatting: Map<string, Promise<boolean | null>>
 }
 type Candidate = { readonly unit: MergeReviewUnit; readonly pairs: ConcurrentPair[] }
 type MarkAccumulator = Pick<MergeReviewMark, 'kind' | 'unitId' | 'unit'> & {
@@ -303,21 +303,23 @@ export class MergeReviewDetector {
     if (cached !== undefined) return cached
     const before = without(state, [edit])
     if (!whitespaceEdit(edit, before)) return false
-    const afterUnit = (await this.syntax(state.current, [unit], true))?.[0]?.[0]
-    const beforeUnit = (
-      await this.syntax(
+    const comparison = Promise.all([
+      this.syntax(state.current, [unit], true),
+      this.syntax(
         before,
         [projectedRange(state.current, before, unit)],
         true,
         'enclosing',
         state.current,
-      )
-    )?.[0]?.[0]
-    if (!afterUnit || !beforeUnit) return null
-    const formatting =
-      afterUnit.contentKey !== undefined && afterUnit.contentKey === beforeUnit.contentKey
-    state.formatting.set(key, formatting)
-    return formatting
+      ),
+    ]).then(([after, before]) => {
+      const afterUnit = after?.[0]?.[0]
+      const beforeUnit = before?.[0]?.[0]
+      if (!afterUnit || !beforeUnit) return null
+      return afterUnit.contentKey !== undefined && afterUnit.contentKey === beforeUnit.contentKey
+    })
+    state.formatting.set(key, comparison)
+    return comparison
   }
 
   private async cleanVersions(state: ReviewState, candidate: Candidate) {
