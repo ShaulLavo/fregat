@@ -9,6 +9,7 @@ import { chromium } from 'playwright'
 import { attachObserver, observedProblems, serializable } from '../agent/observe.mjs'
 import { readRefusals, refusalFailures } from './live-refusals.mjs'
 import { liveVerdict } from './live-verdict.mjs'
+import { openLiveBrowser } from './live-browser.mjs'
 import { appearanceFailures, inspectAppearance } from './live-appearance.mjs'
 
 // A third-party image the chat renders; proves cross-origin isolation still lets favicons load.
@@ -56,12 +57,7 @@ if (waitMs > 0 && !(await serverReports(values.release, waitMs))) {
   await finish([])
 }
 
-const browser = await chromium.launch({ headless: true })
-const page = await browser.newPage({
-  viewport: { width: 1440, height: 1000 },
-  userAgent:
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36',
-})
+const { browser, page } = await openLiveBrowser(chromium)
 const observed = attachObserver(page, base)
 
 try {
