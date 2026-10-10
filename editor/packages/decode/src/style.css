@@ -1,69 +1,34 @@
-/* While a reveal is pending/running, hide the editor's real rows with a clip so
-   there is no flash of the fully-painted file. The reveal then animates each
-   row's clip-path open (via WAAPI), which sweeps the row's *real* glyphs — and
-   their CSS Custom Highlight colours — into view, so the text is syntax-coloured
-   from the first frame. This rule only covers rows the reveal hasn't taken over
-   yet; the gutter (a separate element) stays visible, so line numbers remain. */
-.editor-decode-active .editor-virtualized-row {
-  clip-path: inset(0 100% 0 0);
-}
-
-/* Hide the editor's own blinking caret during the reveal. */
-.editor-decode-active .editor-virtualized-caret-layer {
-  opacity: 0;
-}
-
-/* Diffusion overlay. The real rows stay clipped-hidden (the editor background is
-   transparent in the workbench, so there is nothing to cover with — we hide
-   geometry and reveal a colour-faithful overlay instead). Anchored at the
-   content origin so it scrolls with the rows (like the caret layer); glyph rows
-   are placed by their top and inherit the editor font / tab-size so columns line
-   up 1:1 with the real rows they hand off to. */
-.editor-decode-glyph-layer {
+/* Overlays for the reveal (`editor-decode-layer`) and the morph (`editor-morph-layer`).
+   Anchored at the content origin so they scroll with the rows; pieces sit at their
+   final spot and WAAPI opacity, filter and transform animations do the rest. */
+.editor-decode-layer,
+.editor-morph-layer {
   height: 0;
-  left: 0;
+  left: var(--editor-gutter-width, 0px);
   pointer-events: none;
   position: absolute;
   top: 0;
   z-index: 4;
 }
 
-.editor-decode-glyph-row {
-  left: var(--editor-gutter-width, 0px);
+.editor-morph-piece {
   position: absolute;
+  transition: color 180ms linear;
   white-space: pre;
+  will-change: transform, opacity;
 }
 
-/* Each glyph carries its final syntax colour (inline) and its opacity is driven
-   inline per denoise step (faint when it first emerges, full once it locks). The
-   short transition smooths the brightness ramp between steps. */
-.editor-decode-glyph {
-  transition: opacity 120ms linear;
-}
-
-/* Our caret layer: one caret per revealing row, riding the reveal edge.
-   Zero-size anchor at content origin so carets (positioned by row top) scroll
-   with the editor content, like the rows themselves. */
-.editor-decode-caret-layer {
-  height: 0;
-  left: 0;
-  pointer-events: none;
-  position: absolute;
-  top: 0;
-  will-change: transform;
-  z-index: 4;
-}
-
+/* The reveal's caret, one per stream, riding the newest piece. */
 .editor-decode-caret {
-  left: var(--editor-gutter-width, 0px);
+  left: 0;
   opacity: 0;
   position: absolute;
+  top: 0;
   width: 2px;
   will-change: transform, opacity;
 }
 
-/* The visible bar — blinks on its own so the caret ticks while typing. The
-   outer caret's window opacity multiplies through, gating it to its turn. */
+/* The visible bar blinks on its own; the outer caret's opacity gates it to its turn. */
 .editor-decode-caret-bar {
   animation: editor-decode-caret-blink 0.6s step-end infinite;
   background: var(--editor-caret-color);
@@ -82,53 +47,26 @@
   }
 }
 
-/* Morph overlay. Anchored at the content origin so it scrolls with the rows;
-   pieces sit at their final spot and WAAPI transforms carry them there. */
-.editor-morph-layer {
-  height: 0;
-  left: var(--editor-gutter-width, 0px);
-  pointer-events: none;
-  position: absolute;
-  top: 0;
-  z-index: 4;
-}
-
-.editor-morph-piece {
-  position: absolute;
-  transition: color 180ms linear;
-  white-space: pre;
-  will-change: transform, opacity;
-}
-
 /* The editor caret would sit at the settled text while the text is still moving. */
 .editor-morph-active .editor-virtualized-caret-layer {
   opacity: 0;
 }
 
+/* While a file writes itself in, what decorates its text waits for the text: the editor caret,
+   whitespace dots and indentation guides would otherwise sit on rows that are still empty. */
+.editor-decode-active .editor-virtualized-caret-layer,
+.editor-decode-active .editor-virtualized-hidden-character-layer,
+.editor-decode-active .editor-scope-lines {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  /* The plugin already no-ops under reduced motion; if the class is ever set,
-     never hide anything. */
-  .editor-decode-active .editor-virtualized-row {
-    clip-path: none;
-  }
-
-  .editor-decode-active .editor-virtualized-caret-layer {
-    opacity: 1;
-  }
-
-  .editor-decode-caret-layer {
+  .editor-decode-layer,
+  .editor-morph-layer {
     display: none;
   }
 
   .editor-decode-caret-bar {
     animation: none;
-  }
-
-  .editor-decode-glyph-layer {
-    display: none;
-  }
-
-  .editor-morph-layer {
-    display: none;
   }
 }

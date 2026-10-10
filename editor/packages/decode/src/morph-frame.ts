@@ -38,6 +38,7 @@ export function buildFrame(
   snapshot: EditorViewSnapshot,
   measurer: TextMeasurer,
   maxPieces: number,
+  maxRows = Number.POSITIVE_INFINITY,
 ): MorphFrame | null {
   const pieces: MorphPiece[] = []
   const styleAt = tokenStyleLookup(snapshot.tokens)
@@ -50,6 +51,8 @@ export function buildFrame(
     // with the hidden row.
     if (!drawsAsPlainText(visible)) return null
     if (visible.text.length === 0) continue
+    // Every mounted row gets covered, so a frame that cannot draw them all draws none.
+    if (row >= maxRows) return null
     appendRowPieces(pieces, {
       text: visible.text,
       startOffset: visible.startOffset,
@@ -151,6 +154,33 @@ function drawsAsPlainText(row: EditorViewSnapshot['visibleRows'][number]): boole
       chunk.mountedPaint.kind === 'replayable' &&
       chunk.mountedPaint.parts.every((part) => part.kind === 'text'),
   )
+}
+
+/**
+ * Whether the rows a frame was built from now stand somewhere else, hold other text or paint it
+ * differently: new metrics, a rewrap, a changed indent, an inline replacement landing. Rows only
+ * one side mounts (a scroll) do not count.
+ */
+export function frameMoved(before: EditorViewSnapshot, after: EditorViewSnapshot): boolean {
+  if (
+    before.metrics.rowHeight !== after.metrics.rowHeight ||
+    before.metrics.characterWidth !== after.metrics.characterWidth
+  ) {
+    return true
+  }
+  const rows = new Map(after.visibleRows.map((row) => [row.index, row]))
+  return before.visibleRows.some((row) => {
+    const now = rows.get(row.index)
+    if (!now) return false
+    return (
+      now.top !== row.top ||
+      now.startOffset !== row.startOffset ||
+      now.endOffset !== row.endOffset ||
+      now.leftSpacerWidth !== row.leftSpacerWidth ||
+      now.text !== row.text ||
+      drawsAsPlainText(now) !== drawsAsPlainText(row)
+    )
+  })
 }
 
 /** Fresh colours for a frame's pieces from a later token pass, by offset. */

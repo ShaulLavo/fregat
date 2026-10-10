@@ -1,6 +1,7 @@
 // NOT-PORTABLE: Imports ignored editor/dist; direct tests require a prior workspace build.
 import {
   acquireRowPresentation,
+  completeRowPresentation,
   invalidateRowPresentations,
 } from '../../editor/dist/rowPresentation'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
@@ -21,8 +22,6 @@ import {
   type DecodePluginOptions,
   type MorphPluginOptions,
 } from '../src/index'
-import { tokenizeLengths } from '../src/tokenize'
-import { collectRevealRows } from '../src/rows'
 import { RangeText } from '../../editor/dist/textContent'
 import { measureString } from '../../editor/dist/textMeasurements'
 import {
@@ -75,12 +74,16 @@ afterEach(() => {
 
 const rowAnimations = () =>
   recorded.filter((entry) => entry.element.classList.contains('editor-virtualized-row'))
-const caretAnimations = () =>
-  recorded.filter((entry) => entry.element.classList.contains('editor-decode-caret'))
-const caretLayer = (context: EditorViewContributionContext) =>
-  context.scrollElement.querySelector('.editor-decode-caret-layer')
-const caretElements = (context: EditorViewContributionContext) =>
-  context.scrollElement.querySelectorAll('.editor-decode-caret')
+const pieceSpans = (context: EditorViewContributionContext) =>
+  Array.from(context.contentElement.querySelectorAll<HTMLElement>('.editor-morph-piece'))
+const pieceDelays = () =>
+  recorded
+    .filter((entry) => entry.element.classList.contains('editor-morph-piece'))
+    .map((entry) => Number(entry.options.delay ?? 0))
+const carets = (context: EditorViewContributionContext) =>
+  context.contentElement.querySelectorAll('.editor-decode-caret')
+const revealLayer = (context: EditorViewContributionContext) =>
+  context.contentElement.querySelector('.editor-decode-layer')
 
 describe('createDecodePlugin', () => {
   it('registers a single view contribution', () => {
@@ -96,373 +99,188 @@ describe('createDecodePlugin', () => {
     expect(registerViewContribution).toHaveBeenCalledOnce()
   })
 
-  it.each([{ scrollTop: 40, scrollRow: 2 }, { scrollLeft: 8 }, { scrollTop: 1 }])(
-    'cancels an active reveal on viewport change %j',
-    (change) => {
-      const { context, contribution } = mount()
-      contribution.update(snapshot({ tokens: someTokens() }), 'document')
-      expect(rowAnimations().length).toBeGreaterThan(0)
-      contribution.updateViewport?.({ ...snapshot().viewport, ...change })
-      expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
-      expect(rowAnimations().every((animation) => animation.cancel.mock.calls.length > 0)).toBe(
-        true,
-      )
-    },
-  )
-
-  it('keeps a pending reveal through viewport restoration until highlighting settles', () => {
+  it('starts the moment a document opens, before its highlight settles', () => {
     const { context, contribution } = mount()
     contribution.update(loading(), 'document')
-    contribution.updateViewport?.({ ...snapshot().viewport, scrollTop: 40, scrollRow: 2 })
-    contribution.update(snapshot({ tokens: someTokens() }), 'tokens')
+
+    expect(revealLayer(context)).not.toBeNull()
+    expect(pieceSpans(context).length).toBeGreaterThan(0)
     expect(rowAnimations().length).toBeGreaterThan(0)
     expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(true)
     contribution.dispose()
   })
 
-  it.each(['autoregressive', 'diffusion'] as const)(
-    'cancels %s on real row invalidation and releases every handle',
-    (mode) => {
-      const { context, contribution, presentations } = mount({ mode })
-      contribution.update(snapshot({ tokens: someTokens() }), 'document')
-      expect(presentations.length).toBeGreaterThan(0)
-      invalidateRowPresentations(presentations[0]!.element)
-      expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
-      expect(caretLayer(context)).toBeNull()
-      expect(context.scrollElement.querySelector('.editor-decode-glyph-layer')).toBeNull()
-      expect(recorded.every((entry) => entry.cancel.mock.calls.length > 0)).toBe(true)
-      expect(
-        presentations.every((handle) => vi.mocked(handle.dispose).mock.calls.length === 1),
-      ).toBe(true)
-      contribution.dispose()
-      expect(
-        presentations.every((handle) => vi.mocked(handle.dispose).mock.calls.length === 1),
-      ).toBe(true)
-    },
-  )
+  it('takes the colours of a highlight that lands mid-reveal', () => {
+    const { context, contribution } = mount()
+    contribution.update(loading(), 'document')
+    expect(pieceSpans(context).some((span) => span.style.color !== '')).toBe(false)
 
-  it.each(['viewport', 'input', 'dispose', 'document'] as const)(
-    'releases row handles on %s cancellation',
+    contribution.update(snapshot({ tokens: someTokens() }), 'tokens')
+
+    expect(pieceSpans(context)[0]?.style.color).toBe('var(--editor-syntax-keyword)')
+    contribution.dispose()
+  })
+
+  it('streams autoregressive pieces in reading order behind one caret', () => {
+    const { context, contribution } = mount({ mode: 'autoregressive' })
+    contribution.update(snapshot({ tokens: someTokens() }), 'document')
+
+    const delays = pieceDelays()
+    expect(delays.length).toBeGreaterThan(3)
+    expect(delays.every((delay, index) => index === 0 || delay > (delays[index - 1] ?? 0))).toBe(
+      true,
+    )
+    expect(carets(context)).toHaveLength(1)
+    contribution.dispose()
+  })
+
+  it('types every row at once in parallel, from staggered starts, one caret per row', () => {
+    const { context, contribution } = mount({ mode: 'parallel' })
+    const opened = snapshot({ tokens: someTokens() })
+    contribution.update(opened, 'document')
+
+    const rows = opened.visibleRows.filter((row) => row.text.length > 0).length
+    expect(carets(context)).toHaveLength(rows)
+    expect(new Set(pieceDelays()).size).toBeGreaterThan(rows / 2)
+    contribution.dispose()
+  })
+
+  it('stamps one token per perTokenMs, scaled by speed', () => {
+    const { contribution } = mount({ mode: 'token', perTokenMs: 40, speed: 2 })
+    contribution.update(snapshot({ tokens: someTokens() }), 'document')
+
+    expect(pieceDelays().slice(0, 4)).toEqual([0, 20, 40, 60])
+    contribution.dispose()
+  })
+
+  it('resolves diffusion pieces out of two scrambles each, with no caret', () => {
+    const { context, contribution } = mount({ mode: 'diffusion' })
+    contribution.update(snapshot({ tokens: someTokens() }), 'document')
+
+    const spans = pieceSpans(context)
+    expect(spans.length % 3).toBe(0)
+    const noisy = spans.filter((span) => !SAMPLE.includes(span.textContent ?? ''))
+    expect(noisy.length).toBeGreaterThan(0)
+    expect(carets(context)).toHaveLength(0)
+    contribution.dispose()
+  })
+
+  it.each(['input', 'edit', 'layout', 'dispose', 'document'] as const)(
+    'shows the real rows and drops the overlay on %s',
     (reason) => {
       const { context, contribution, presentations } = mount()
       contribution.update(snapshot({ tokens: someTokens() }), 'document')
-      const initial = [...presentations]
-      expect(initial.length).toBeGreaterThan(0)
-      if (reason === 'viewport') contribution.updateViewport?.(snapshot().viewport)
       if (reason === 'input') context.scrollElement.dispatchEvent(new Event('keydown'))
+      if (reason === 'edit') contribution.update(snapshot({ textVersion: 2 }), 'content', edit(1))
+      if (reason === 'layout') {
+        contribution.update(snapshot({ metrics: { rowHeight: 24, characterWidth: 8 } }), 'layout')
+      }
       if (reason === 'dispose') contribution.dispose()
-      if (reason === 'document') contribution.update(snapshot({ documentId: 'next' }), 'document')
-      expect(initial.every((handle) => vi.mocked(handle.dispose).mock.calls.length === 1)).toBe(
+      if (reason === 'document') {
+        contribution.update(snapshot({ documentId: 'next', text: '' }), 'document')
+      }
+
+      expect(revealLayer(context)).toBeNull()
+      expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
+      expect(rowAnimations().every((entry) => entry.cancel.mock.calls.length > 0)).toBe(true)
+      expect(presentations.every((handle) => vi.mocked(handle.dispose).mock.calls.length > 0)).toBe(
         true,
       )
-      contribution.dispose()
     },
   )
 
-  it('hides the real rows on open but waits for the highlight to settle before revealing', () => {
+  it('keeps a row hidden when the editor repaints it mid-reveal', () => {
     const { context, contribution } = mount()
+    const opened = snapshot({ tokens: someTokens() })
+    contribution.update(opened, 'document')
+    const row = context.contentElement.querySelector<HTMLElement>('[data-editor-virtual-row="0"]')!
+    invalidateRowPresentations(row)
+    completeRowPresentation(row)
+    const before = recorded.length
 
-    contribution.update(loading(), 'document')
+    contribution.update(opened, 'tokens')
 
-    expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(true)
-    expect(rowAnimations()).toHaveLength(0)
-    expect(caretLayer(context)).toBeNull()
-  })
-
-  it('reveals each real row with a caret once the highlight settles', () => {
-    const { context, contribution } = mount()
-    const withTokens = snapshot({ tokens: someTokens() })
-
-    contribution.update(loading(), 'document')
-    contribution.update(withTokens, 'tokens')
-
-    const expected = withTokens.visibleRows.filter((r) => r.kind === 'text' && r.text.length > 0)
-    expect(rowAnimations()).toHaveLength(expected.length)
-    expect(caretElements(context)).toHaveLength(expected.length)
-    expect(caretAnimations().length).toBeGreaterThan(0)
-    expect(caretLayer(context)).not.toBeNull()
-    expect(caretLayer(context)?.parentElement).toBe(context.contentElement)
-  })
-
-  it('starts immediately when the opened document is already tokenized', () => {
-    const { context, contribution } = mount()
-    contribution.update(snapshot({ tokens: someTokens() }), 'document')
-
-    expect(rowAnimations().length).toBeGreaterThan(0)
-    expect(caretElements(context).length).toBe(rowAnimations().length)
-  })
-
-  it('starts on the settled status alone, with no timer behind it', () => {
-    vi.useFakeTimers()
-    try {
-      const { context, contribution } = mount()
-      contribution.update(loading(), 'document')
-
-      vi.advanceTimersByTime(60_000)
-      expect(rowAnimations()).toHaveLength(0)
-      expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(true)
-
-      contribution.update(loading(), 'tokens')
-      expect(rowAnimations()).toHaveLength(0)
-
-      // A highlight that ended in error settles too; the reveal starts uncoloured.
-      contribution.update(snapshot({ initialHighlightStatus: 'error' }), 'tokens')
-      expect(rowAnimations().length).toBeGreaterThan(0)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('starts at once for a document that has no highlighter', () => {
-    const { contribution } = mount()
-    contribution.update(snapshot({ initialHighlightStatus: 'plain' }), 'document')
-
-    expect(rowAnimations().length).toBeGreaterThan(0)
-  })
-
-  it('shows the document at once on input while it waits', () => {
-    const { context, contribution } = mount()
-    contribution.update(loading(), 'document')
-
-    context.scrollElement.dispatchEvent(new Event('pointerdown', { bubbles: true }))
-    contribution.update(snapshot({ tokens: someTokens() }), 'tokens')
-
-    expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
-    expect(rowAnimations()).toHaveLength(0)
-  })
-
-  it('schedules autoregressive sequentially and parallel with jittered starts', () => {
-    mount({ mode: 'autoregressive' }).contribution.update(
-      snapshot({ tokens: someTokens() }),
-      'document',
-    )
-    expect(rowAnimations()[0]?.options.delay).toBe(0)
-    expect(Number(rowAnimations()[1]?.options.delay)).toBeGreaterThan(0)
-    expect(String(rowAnimations()[0]?.options.easing)).toMatch(/^steps\(/)
-
-    recorded = []
-    mount({ mode: 'parallel', staggerMs: 200 }).contribution.update(
-      snapshot({ tokens: someTokens() }),
-      'document',
-    )
-    const delays = rowAnimations().map((entry) => Number(entry.options.delay))
-    // Jittered into [0, staggerMs), and not a single uniform cascade value.
-    expect(Math.min(...delays)).toBeGreaterThanOrEqual(0)
-    expect(Math.max(...delays)).toBeLessThan(200)
-    expect(new Set(delays).size).toBeGreaterThan(1)
-  })
-
-  it('token mode steps one token at a time, sequentially across rows', () => {
-    mount({ mode: 'token' }).contribution.update(snapshot({ tokens: someTokens() }), 'document')
-
-    const clips = rowAnimations()
-    expect(clips.length).toBeGreaterThan(0)
-
-    // First row "function f() {" → a hidden start frame plus one per token.
-    const firstRow = SAMPLE.split('\n')[0] ?? ''
-    const clip = clips[0]
-    expect(clip?.keyframes).toHaveLength(tokenizeLengths(firstRow).length + 1)
-    // Stepped via per-keyframe step-end, not a top-level steps()/linear easing.
-    expect(clip?.options.easing).toBeUndefined()
-    expect(clip?.keyframes.every((frame) => frame.easing === 'step-end')).toBe(true)
-    expect(clip?.keyframes.at(-1)?.offset).toBe(1)
-
-    // Autoregressive across rows: first starts at 0, the next strictly later.
-    expect(clips[0]?.options.delay).toBe(0)
-    expect(Number(clips[1]?.options.delay)).toBeGreaterThan(0)
-  })
-
-  it('scales timings by the speed option', () => {
-    mount({ mode: 'autoregressive' }).contribution.update(
-      snapshot({ tokens: someTokens() }),
-      'document',
-    )
-    const base = Number(rowAnimations()[0]?.options.duration)
-
-    recorded = []
-    mount({ mode: 'autoregressive', speed: 2 }).contribution.update(
-      snapshot({ tokens: someTokens() }),
-      'document',
-    )
-    const fast = Number(rowAnimations()[0]?.options.duration)
-
-    expect(base).toBeGreaterThan(0)
-    expect(fast).toBeCloseTo(base / 2, 5)
-  })
-
-  it('ignores non-document updates and empty documents', () => {
-    const selectionOnly = mount()
-    selectionOnly.contribution.update(snapshot({ tokens: someTokens() }), 'selection')
-    expect(selectionOnly.context.scrollElement.classList.contains('editor-decode-active')).toBe(
-      false,
-    )
-
-    const empty = mount()
-    empty.contribution.update(snapshot({ text: '', visibleRows: [] }), 'document')
-    expect(empty.context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
-  })
-
-  it('does not re-trigger for the same document id', () => {
-    const { contribution } = mount()
-    contribution.update(snapshot({ tokens: someTokens() }), 'document')
-    const firstCount = rowAnimations().length
-
-    contribution.update(snapshot({ tokens: someTokens() }), 'document')
-
-    expect(rowAnimations()).toHaveLength(firstCount)
-  })
-
-  it('cancels instantly on user input', () => {
-    const { context, contribution } = mount()
-    contribution.update(snapshot({ tokens: someTokens() }), 'document')
-
-    context.scrollElement.dispatchEvent(new Event('keydown', { bubbles: true }))
-
-    expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
-    expect(caretLayer(context)).toBeNull()
-    expect(recorded.every((entry) => entry.cancel.mock.calls.length > 0)).toBe(true)
-  })
-
-  it('tears down on dispose', () => {
-    const { context, contribution } = mount()
-    contribution.update(snapshot({ tokens: someTokens() }), 'document')
-
+    const rehidden = recorded.slice(before).filter((entry) => entry.element === row)
+    expect(rehidden).toHaveLength(1)
+    expect(rehidden[0]?.cancel).not.toHaveBeenCalled()
+    expect(revealLayer(context)).not.toBeNull()
     contribution.dispose()
+  })
 
-    expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
-    expect(caretLayer(context)).toBeNull()
-    expect(recorded.every((entry) => entry.cancel.mock.calls.length > 0)).toBe(true)
+  it('keeps going through a scroll and a layout pass that moves nothing', () => {
+    const { context, contribution } = mount()
+    contribution.update(snapshot({ tokens: someTokens() }), 'document')
+    contribution.updateViewport?.({ ...snapshot().viewport, scrollTop: 40, scrollRow: 2 })
+    context.scrollElement.dispatchEvent(new Event('wheel'))
+    contribution.update(snapshot({ tokens: someTokens() }), 'layout')
+
+    expect(revealLayer(context)).not.toBeNull()
+    contribution.dispose()
+  })
+
+  it('reveals a document once, and never an empty one', () => {
+    const { context, contribution } = mount()
+    contribution.update(snapshot({ documentId: 'empty', text: '' }), 'document')
+    expect(revealLayer(context)).toBeNull()
+
+    contribution.update(snapshot({ tokens: someTokens() }), 'document')
+    contribution.dispose()
+    recorded = []
+    contribution.update(snapshot({ tokens: someTokens() }), 'document')
+    expect(revealLayer(context)).toBeNull()
+    expect(rowAnimations()).toHaveLength(0)
+  })
+
+  it('opens a horizontally windowed long line without a reveal', () => {
+    const { context, contribution } = mount()
+    const opened = snapshot({ tokens: someTokens() })
+    const [first, ...rest] = opened.visibleRows
+    const windowed: EditorViewSnapshot['visibleRows'][number] = {
+      ...first!,
+      text: new RangeText(4000, () => 'x'.repeat(4000), measureString('x')),
+    }
+    contribution.update({ ...opened, visibleRows: [windowed].concat(rest) }, 'document')
+
+    expect(revealLayer(context)).toBeNull()
+    expect(rowAnimations()).toHaveLength(0)
+  })
+
+  it('opens rows painted with inline replacements without a reveal', () => {
+    const { context, contribution } = mount()
+    vi.spyOn(context, 'getInlineReplacementRanges').mockReturnValue([{ start: 0, end: 2 }])
+    contribution.update(snapshot({ tokens: someTokens() }), 'document')
+
+    expect(revealLayer(context)).toBeNull()
+    expect(rowAnimations()).toHaveLength(0)
+  })
+
+  it('opens without a reveal when more rows are mounted than it may draw', () => {
+    const { context, contribution } = mount({ maxRows: 2 })
+    contribution.update(snapshot({ tokens: someTokens() }), 'document')
+
+    expect(revealLayer(context)).toBeNull()
+    expect(rowAnimations()).toHaveLength(0)
+  })
+
+  it('settles when a covered row starts painting its text differently', () => {
+    const { context, contribution } = mount()
+    const opened = snapshot({ tokens: someTokens() })
+    contribution.update(opened, 'document')
+    const repainted = opened.visibleRows.map((row, index) =>
+      index === 0 ? { ...row, mountedPaintSupport: 'unreplayable-plugin-css' as const } : row,
+    )
+    contribution.update({ ...opened, visibleRows: repainted }, 'tokens')
+
+    expect(revealLayer(context)).toBeNull()
   })
 
   it('does nothing under reduced motion', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
     const { context, contribution } = mount()
-
     contribution.update(snapshot({ tokens: someTokens() }), 'document')
 
-    expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
-    expect(recorded).toHaveLength(0)
+    expect(revealLayer(context)).toBeNull()
   })
-})
-
-describe('createDecodePlugin diffusion', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-  })
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  const glyphLayer = (context: EditorViewContributionContext) =>
-    context.scrollElement.querySelector('.editor-decode-glyph-layer')
-  const glyphs = (context: EditorViewContributionContext) => [
-    ...context.scrollElement.querySelectorAll<HTMLElement>('.editor-decode-glyph'),
-  ]
-  // A blank cell holds a space to keep its column width; "filled" = a real glyph.
-  const occupied = (context: EditorViewContributionContext) =>
-    glyphs(context).filter((span) => (span.textContent ?? '').trim().length > 0)
-
-  it('starts blank — a span per character, none filled yet', () => {
-    const { context, contribution } = mount({ mode: 'diffusion' })
-    contribution.update(snapshot({ tokens: someTokens() }), 'document')
-
-    const visibleChars = SAMPLE.replace(/\s/g, '').length
-    expect(glyphLayer(context)).not.toBeNull()
-    expect(glyphLayer(context)?.parentElement).toBe(context.contentElement)
-    expect(glyphs(context)).toHaveLength(visibleChars)
-    // Real rows stay clipped-hidden the whole time; the overlay is all you see.
-    expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(true)
-    // Diffusion starts from empty: every span exists but is blank.
-    expect(occupied(context)).toHaveLength(0)
-    // Each span already carries its final colour (offset 0 is inside the token).
-    expect(glyphs(context)[0]?.style.color).toBe('var(--editor-syntax-keyword)')
-  })
-
-  it('fills in over steps — density grows from sparse to full', () => {
-    const { context, contribution } = mount({ mode: 'diffusion', maxDurationMs: 1000 })
-    contribution.update(snapshot({ tokens: someTokens() }), 'document')
-
-    vi.advanceTimersByTime(250) // wavefront just entering the field
-    const early = occupied(context).length
-    vi.advanceTimersByTime(100) // a few steps later
-    const mid = occupied(context).length
-
-    // Sparse early, denser later, and not yet everything (clusters still emerging).
-    expect(early).toBeGreaterThan(0)
-    expect(mid).toBeGreaterThan(early)
-    expect(mid).toBeLessThan(glyphs(context).length)
-  })
-
-  it('converges and hands off to the real rows', () => {
-    const { context, contribution, presentations } = mount({
-      mode: 'diffusion',
-      maxDurationMs: 1000,
-    })
-    contribution.update(snapshot({ tokens: someTokens() }), 'document')
-
-    vi.advanceTimersByTime(2000)
-    expect(presentations.length).toBeGreaterThan(0)
-    expect(presentations.every((handle) => vi.mocked(handle.dispose).mock.calls.length === 1)).toBe(
-      true,
-    )
-    expect(presentations.every((handle) => !handle.signal.aborted)).toBe(true)
-
-    expect(glyphLayer(context)).toBeNull()
-    expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
-  })
-
-  it('cancels on user input', () => {
-    const { context, contribution } = mount({ mode: 'diffusion' })
-    contribution.update(snapshot({ tokens: someTokens() }), 'document')
-
-    context.scrollElement.dispatchEvent(new Event('keydown', { bubbles: true }))
-
-    expect(glyphLayer(context)).toBeNull()
-    expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
-    // The tick is stopped — advancing time does not resurrect the overlay.
-    vi.advanceTimersByTime(2000)
-    expect(glyphLayer(context)).toBeNull()
-  })
-})
-
-it('animates only mounted long-line text at its horizontal position', () => {
-  const context = viewContext()
-  const readRange = vi.fn(() => '')
-  const base = snapshot().visibleRows[0]!
-  const chunk = {
-    sourceStartOffset: 1000,
-    sourceEndOffset: 1064,
-    rowLocalStart: 1000,
-    rowLocalEnd: 1064,
-    text: new RangeText(64, readRange, measureString('x'.repeat(64))),
-    mountedPaint: { kind: 'replayable', parts: [{ kind: 'text', text: 'x'.repeat(64) }] },
-  } as const
-  const current = snapshot({
-    visibleRows: [
-      {
-        ...base,
-        text: new RangeText(1_000_000, readRange, measureString('x'.repeat(1_000_000))),
-        leftSpacerWidth: 8000,
-        chunks: [chunk],
-      },
-    ],
-  })
-  const element = document.createElement('div')
-  element.className = 'editor-virtualized-row'
-  element.dataset.editorVirtualRow = String(base.index)
-  element.textContent = chunk.mountedPaint.parts[0].text
-  context.scrollElement.appendChild(element)
-
-  const rows = collectRevealRows(context, current, 20)
-
-  expect(rows).toHaveLength(1)
-  expect(rows[0]).toMatchObject({
-    text: 'x'.repeat(64),
-    startOffset: 1000,
-    length: 64,
-    leftSpacerWidth: 8000,
-  })
-  expect(readRange).not.toHaveBeenCalled()
 })
 
 const EDITED = 'function f(a: number) {\n  if (x) {\n    y(a)\n  }\n}\n'
@@ -539,7 +357,10 @@ describe('createMorphPlugin', () => {
   it('settles when layout changes under a running morph', () => {
     const { context, contribution } = mountMorph()
     contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(12))
-    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'layout')
+    contribution.update(
+      snapshot({ text: EDITED, textVersion: 2, metrics: { rowHeight: 24, characterWidth: 8 } }),
+      'layout',
+    )
 
     expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
   })
@@ -578,6 +399,18 @@ describe('createMorphPlugin', () => {
       ],
     } as unknown as (typeof rest)[number]
     contribution.update({ ...next, visibleRows: [boxed].concat(rest) }, 'content', edit(12))
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
+  })
+
+  it('settles when a save sync replaces the text under a running morph', () => {
+    const { context, contribution } = mountMorph()
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(12))
+    contribution.update(
+      snapshot({ text: SAMPLE, textVersion: 3 }),
+      'content',
+      edit(1, 'synchronize'),
+    )
 
     expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
   })

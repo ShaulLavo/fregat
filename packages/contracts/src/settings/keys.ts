@@ -595,6 +595,11 @@ export const SETTINGS_REGISTRY = {
     default: 'off',
     scope: 'window',
   }),
+  'editor.morph.enabled': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'window',
+  }),
   'search.defaultMatchMode': defineSetting({
     schema: v.picklist(['literal', 'regex', 'fuzzy'] as const),
     default: 'literal',

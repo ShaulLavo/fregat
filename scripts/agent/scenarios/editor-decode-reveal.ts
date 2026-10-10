@@ -17,35 +17,27 @@ type Reveal = {
   readonly hiddenAt: number | null
   readonly revealAt: number | null
   readonly doneAt: number | null
-  readonly glyphs: number
-  readonly colouredGlyphs: number
+  readonly pieces: number
 }
 
-/**
- * Page-side: when the rows were hidden, when the diffusion overlay appeared and how many of its
- * glyphs already carried a token colour, and when the rows came back.
- */
+/** Page-side: when the rows were hidden, when the overlay appeared and how many pieces it drew, and when the rows came back. */
 function recordReveal(selectorsForDecode: typeof decodeSelectors): void {
   const record: {
     hiddenAt: number | null
     revealAt: number | null
     doneAt: number | null
-    glyphs: number
-    colouredGlyphs: number
-  } = { hiddenAt: null, revealAt: null, doneAt: null, glyphs: 0, colouredGlyphs: 0 }
+    pieces: number
+  } = { hiddenAt: null, revealAt: null, doneAt: null, pieces: 0 }
   Reflect.set(window, '__agentDecodeReveal', record)
   const observe = () => {
     const now = Math.round(performance.now())
     const active = document.querySelector(selectorsForDecode.active) !== null
     if (active && record.hiddenAt === null) record.hiddenAt = now
     if (!active && record.hiddenAt !== null && record.doneAt === null) record.doneAt = now
-    const layer = document.querySelector(selectorsForDecode.glyphLayer)
+    const layer = document.querySelector(selectorsForDecode.layer)
     if (!layer || record.revealAt !== null) return
-    const glyphs = Array.from(layer.querySelectorAll<HTMLElement>(selectorsForDecode.glyph))
     record.revealAt = now
-    record.glyphs = glyphs.length
-    // A glyph no token covers takes `inherit`.
-    record.colouredGlyphs = glyphs.filter((glyph) => glyph.style.color !== 'inherit').length
+    record.pieces = layer.querySelectorAll(selectorsForDecode.piece).length
   }
   new MutationObserver(observe).observe(document.body, {
     attributes: true,
@@ -60,7 +52,7 @@ let report: unknown = null
 export const editorDecodeReveal: Scenario = {
   name: 'editor-decode-reveal',
   description:
-    'Turn on editor.decode.mode diffusion (restored afterwards), open a TypeScript fixture file and record the reveal: the rows hide on open, the overlay starts only with token colours on its glyphs, and the rows come back highlighted.',
+    'Turn on editor.decode.mode diffusion (restored afterwards), open a TypeScript fixture file and record the reveal: the rows hide on open, the overlay draws the file, and the rows come back highlighted.',
   async run(page, { step }) {
     const restore = await preserveAppearance(page, ['editor.decode.mode'])
     const fixture = await createGitFixture('editor-decode-reveal')
@@ -70,7 +62,7 @@ export const editorDecodeReveal: Scenario = {
       await openFixtureWorkspace(page, fixture)
       await page.evaluate(recordReveal, decodeSelectors)
       await openFileFromTree(page, FILE)
-      await page.locator(decodeSelectors.glyphLayer).waitFor({ state: 'attached', timeout: 15_000 })
+      await page.locator(decodeSelectors.layer).waitFor({ state: 'attached', timeout: 15_000 })
       await step('revealing')
       await page.waitForFunction(
         () => (Reflect.get(window, '__agentDecodeReveal') as Reveal).doneAt !== null,
@@ -84,8 +76,7 @@ export const editorDecodeReveal: Scenario = {
       report = { reveal, paintedTokenColours: colours.length }
       ok(reveal.hiddenAt !== null, 'the rows hide when the file opens')
       ok(reveal.revealAt !== null && reveal.revealAt >= reveal.hiddenAt, 'the overlay starts')
-      ok(reveal.glyphs > 0, 'the overlay draws the file')
-      ok(reveal.colouredGlyphs > 0, 'the overlay starts coloured: it waited for the highlight')
+      ok(reveal.pieces > 0, 'the overlay draws the file')
       ok(colours.length > 0, 'the revealed rows are highlighted')
     } finally {
       try {

@@ -243,44 +243,20 @@
       "snippet": "const timeout = setTimeout("
     },
     {
-      "api": "queueMicrotask",
-      "file": "packages/decode/src/diffusion.ts",
-      "id": "packages/decode/src/diffusion.ts:queueMicrotask:a60528563a",
-      "justification": "Nothing to animate still has to finish asynchronously, or a caller that always sees its completion after returning would see it before returning on an empty document. Guarded by `stopped`, so a cancel between the two beats it.",
-      "line": 178,
-      "snippet": "queueMicrotask(() => {"
-    },
-    {
-      "api": "setInterval",
-      "file": "packages/decode/src/diffusion.ts",
-      "id": "packages/decode/src/diffusion.ts:setInterval:f2b6c75238",
-      "justification": "Drives a fixed-duration decorative overlay at a tick computed from its own duration, and owns the matching `clearInterval` in `stop()`. It paints a layer above the rows rather than editor state, so nothing it does has to be ordered against document work.",
-      "line": 191,
-      "snippet": "const interval = setInterval(() => {"
-    },
-    {
-      "api": "queueMicrotask",
-      "file": "packages/decode/src/morph-run.ts",
-      "id": "packages/decode/src/morph-run.ts:queueMicrotask:b02ba4e3f5",
-      "justification": "A run with nothing to animate still settles after its constructor returns, so the owner has stored the run before `onDone` tears it down. Guarded by `canceled`.",
-      "line": 232,
-      "snippet": "queueMicrotask(fire)"
-    },
-    {
       "api": "requestAnimationFrame",
       "file": "packages/decode/src/morph-run.ts",
       "id": "packages/decode/src/morph-run.ts:requestAnimationFrame:d29155e202",
       "justification": "Colour changes ride a CSS transition, which needs the starting colour painted first. One frame per morph, cancelled with the run.",
-      "line": 214,
+      "line": 226,
       "snippet": "this.colorFrame = requestAnimationFrame(() => {"
     },
     {
       "api": "queueMicrotask",
-      "file": "packages/decode/src/reveal.ts",
-      "id": "packages/decode/src/reveal.ts:queueMicrotask:5894d1d78b",
-      "justification": "Fires the completion callback when no animation was started, so a caller hears about it in the same turn ordering either way.",
-      "line": 313,
-      "snippet": "if (animations.length === 0) queueMicrotask(fire)"
+      "file": "packages/decode/src/piece-span.ts",
+      "id": "packages/decode/src/piece-span.ts:queueMicrotask:84e6525d24",
+      "justification": "A run with nothing to animate still settles after its constructor returns, so the owner has stored the run before `onDone` tears it down. Guarded by `isCanceled`.",
+      "line": 49,
+      "snippet": "queueMicrotask(fire)"
     },
     {
       "api": "requestAnimationFrame",

@@ -77,8 +77,13 @@ function resume(): void {
   for (const animation of document.getAnimations()) animation.play()
 }
 
-async function filmstrip(page: Page, step: (label: string) => Promise<void>, label: string) {
-  for (const ms of [120, 300, 600, 1000, 1500]) {
+async function filmstrip(
+  page: Page,
+  step: (label: string) => Promise<void>,
+  label: string,
+  times: readonly number[] = [120, 300, 600, 1000, 1500],
+) {
+  for (const ms of times) {
     await page.evaluate(freezeAt, ms)
     await step(`${label}-${ms}ms`)
   }
@@ -98,7 +103,7 @@ let report: unknown = null
 export const devTransitions: Scenario = {
   name: 'dev-transitions',
   description:
-    'Step the /dev transitions editor through a refactor in slow motion: pieces move mid-flight, land exactly on the real text, and the real rows come back when the morph ends.',
+    'Step the /dev transitions editor through a refactor and every file-open reveal in slow motion: pieces move mid-flight, land exactly on the real text, and the real rows come back when the animation ends.',
   capture: { width: 900, height: 900 },
   async run(page, { step }) {
     const url = new URL(page.url())
@@ -145,13 +150,32 @@ export const devTransitions: Scenario = {
     await step('stream-settled')
     ok((await editorText(page)).includes('totalWithTax'), 'the streamed function landed')
 
+    const reveals: Record<string, Landing> = {}
+    for (const mode of ['Autoregressive', 'Parallel', 'Token', 'Diffusion']) {
+      await selectors.physicalButton(page, mode).click()
+      await page.locator(morphSelectors.revealLayer).waitFor({ state: 'attached' })
+      await filmstrip(page, step, `open-${mode.toLowerCase()}`, [300, 1200, 2800, 4400])
+      reveals[mode] = await page.evaluate(parkAndCompare, morphSelectors.piece)
+      await page.evaluate(resume)
+      await page.locator(morphSelectors.revealLayer).waitFor({ state: 'detached', timeout: 20_000 })
+    }
+    await step('open-settled')
+
     const visible = await page.evaluate(() =>
       Array.from(
         document.querySelectorAll<HTMLElement>('[data-transitions-editor] .editor-virtualized-row'),
         (row) => getComputedStyle(row).opacity,
       ),
     )
-    report = { landing }
+    report = { landing, reveals }
+    for (const [mode, reveal] of Object.entries(reveals)) {
+      strictEqual(
+        reveal.mismatched.length,
+        0,
+        `${mode} pieces over other text: ${reveal.mismatched}`,
+      )
+      ok(reveal.maxDriftPx <= 0.5, `${mode} pieces land on the real text: ${reveal.maxDriftPx}px`)
+    }
     ok(landing.checked > 20, `enough pieces checked: ${landing.checked}`)
     strictEqual(landing.mismatched.length, 0, `pieces over other text: ${landing.mismatched}`)
     ok(landing.maxDriftPx <= 0.5, `pieces land on the real text: ${landing.maxDriftPx}px`)

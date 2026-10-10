@@ -623,9 +623,15 @@ export const SETTINGS_DOCUMENTATION = {
       token: 'Token',
     },
     details:
-      'Autoregressive types one character at a time, line after line. Parallel types every line at once, staggered. Token streams one token at a time, like a language model. Diffusion settles scrambled glyphs into the text.',
+      'Autoregressive writes the file in reading order behind a caret. Parallel writes every line at once from staggered starts. Token stamps one token at a time, like a language model. Diffusion resolves scrambled text in clusters.',
     description: 'Animate a file as it opens, as if it were being written.',
     keywords: ['decode', 'animation', 'diffusion', 'typewriter'],
+  },
+  'editor.morph.enabled': {
+    title: 'Animate edits',
+    description:
+      'Animate undo, redo, pasted and generated code: text that stays slides to its new place, removed text fades out, and new text streams in. Typing stays instant.',
+    keywords: ['morph', 'animation', 'transition', 'undo', 'motion'],
   },
   'search.defaultMatchMode': {
     optionTitles: { literal: 'Exact text', regex: 'Regular expression', fuzzy: 'Fuzzy' },

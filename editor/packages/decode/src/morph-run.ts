@@ -1,7 +1,7 @@
 import type { MorphFrame, MorphPiece } from './morph-frame'
+import { appendPieceSpan, whenAllFinished, type SpanPiece } from './piece-span'
 
 const LAYER_CLASS = 'editor-morph-layer'
-const PIECE_CLASS = 'editor-morph-piece'
 // Entering text starts this blurred (px) and this far below its row (share of the row height).
 const ENTER_BLUR_PX = 3
 const ENTER_DROP = 0.18
@@ -59,7 +59,7 @@ export class MorphRun {
   private colorFrame = 0
 
   public constructor(
-    private readonly host: HTMLElement,
+    host: HTMLElement,
     private readonly frame: MorphFrame,
     from: readonly VisualPiece[],
     pairs: Int32Array,
@@ -213,23 +213,8 @@ export class MorphRun {
     return { visual, span, animation }
   }
 
-  private span(
-    piece: Omit<VisualPiece, 'opacity' | 'blur'>,
-    color: string | undefined,
-  ): HTMLElement {
-    const span = this.host.ownerDocument.createElement('span')
-    span.className = PIECE_CLASS
-    span.textContent = piece.text
-    const style = span.style
-    style.left = `${piece.x}px`
-    style.top = `${piece.top}px`
-    style.height = `${piece.height}px`
-    style.lineHeight = `${piece.height}px`
-    if (color) style.color = color
-    if (piece.fontStyle) style.fontStyle = piece.fontStyle
-    if (piece.fontWeight !== undefined) style.fontWeight = String(piece.fontWeight)
-    this.layer.appendChild(span)
-    return span
+  private span(piece: SpanPiece, color: string | undefined): HTMLElement {
+    return appendPieceSpan(this.layer, piece, color)
   }
 
   private scheduleRecolor(recolor: readonly [HTMLElement, string][]): void {
@@ -248,18 +233,7 @@ export class MorphRun {
       .map((target) => target.animation)
       .concat(this.leaving.map((entry) => entry.animation))
       .filter((animation): animation is Animation => animation !== null)
-    const fire = () => {
-      if (!this.canceled) onDone()
-    }
-    if (animations.length === 0) {
-      /**
-       * @justification A run with nothing to animate still settles after its constructor returns, so
-       * the owner has stored the run before `onDone` tears it down. Guarded by `canceled`.
-       */
-      queueMicrotask(fire)
-      return
-    }
-    void Promise.allSettled(animations.map((animation) => animation.finished)).then(fire)
+    whenAllFinished(animations, () => this.canceled, onDone)
   }
 }
 

@@ -2,16 +2,16 @@ import type {
   EditorContributionChange,
   EditorDisposable,
   EditorPlugin,
-  EditorRowPresentation,
   EditorViewContribution,
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
 import { TextMeasurer, canvasFont, renderedTabColumns } from './measure'
-import { buildFrame, recolorFrame, type MorphFrame } from './morph-frame'
+import { buildFrame, frameMoved, recolorFrame, type MorphFrame } from './morph-frame'
 import { matchPieces } from './morph-match'
 import { MorphRun, restingPieces, springEasing, type MorphTiming } from './morph-run'
+import { RowCover } from './row-cover'
 import './style.css'
 
 export type MorphPluginOptions = {
@@ -60,11 +60,6 @@ type ResolvedMorphOptions = {
   readonly maxPieces: number
 }
 
-type HiddenRow = {
-  readonly presentation: EditorRowPresentation
-  readonly animation: Animation
-}
-
 class MorphViewContribution implements EditorViewContribution {
   public readonly inputs = ['content', 'tokens', 'viewport', 'layout'] as const
   private latest: EditorViewSnapshot | null = null
@@ -72,7 +67,9 @@ class MorphViewContribution implements EditorViewContribution {
   private before: EditorViewSnapshot | null = null
   private measurer: TextMeasurer | null = null
   private run: MorphRun | null = null
-  private readonly hidden = new Map<HTMLElement, HiddenRow>()
+  /** The snapshot the running morph settles on. */
+  private runSnapshot: EditorViewSnapshot | null = null
+  private readonly cover: RowCover
   private timing: MorphTiming | null = null
   private readonly typing: EditorDisposable
 
@@ -81,6 +78,7 @@ class MorphViewContribution implements EditorViewContribution {
     private readonly options: ResolvedMorphOptions,
   ) {
     // Added to an editor that already shows a document, the first change still needs its before.
+    this.cover = new RowCover(context)
     if (context.hasDocument()) this.latest = context.getSnapshot()
     // Typed text shows at once: a keystroke settles any morph instead of joining it.
     this.typing = context.onDidType(() => this.finish())
@@ -99,23 +97,35 @@ class MorphViewContribution implements EditorViewContribution {
       this.finish()
       return
     }
-    if (kind === 'layout') {
-      // New metrics or wrapping: the overlay's coordinates no longer match the rows.
-      this.measurer = null
-      this.finish()
+    if (kind === 'layout') this.measurer = null
+    if (kind !== 'content' || (change && !TEXT_CHANGES.has(change.kind))) {
+      this.keepCovering(snapshot, kind)
       return
     }
-    if (kind === 'tokens' && this.run) {
-      this.run.recolor(recolorFrame(this.run.targetFrame, snapshot.tokens))
-      return
-    }
-    if (kind !== 'content' || !previous || previous.textVersion === snapshot.textVersion) return
-    if (change && !TEXT_CHANGES.has(change.kind)) return
+    if (!previous || previous.textVersion === snapshot.textVersion) return
     if (!this.shouldMorph(previous, snapshot, change ?? null)) {
       this.finish()
       return
     }
     this.morph(previous, snapshot)
+  }
+
+  // Between changes: keep repainted rows hidden and the overlay coloured, or settle when the rows
+  // moved under it (new metrics, a rewrap). Newer text waits for its `content` update to retarget.
+  private keepCovering(snapshot: EditorViewSnapshot, kind: EditorViewContributionUpdateKind): void {
+    const started = this.runSnapshot
+    if (!this.run || !started) return
+    if (snapshot.textVersion !== started.textVersion) {
+      // A text change that is not a morph (a save sync) repaints rows the overlay no longer matches.
+      if (kind === 'content') this.finish()
+      return
+    }
+    if (frameMoved(started, snapshot)) {
+      this.finish()
+      return
+    }
+    this.cover.refresh(snapshot)
+    if (kind === 'tokens') this.run.recolor(recolorFrame(this.run.targetFrame, snapshot.tokens))
   }
 
   public dispose(): void {
@@ -144,12 +154,12 @@ class MorphViewContribution implements EditorViewContribution {
       this.finish()
       return
     }
-    const rows = this.collectRows(snapshot)
-    const measurer = this.ensureMeasurer(snapshot, rows)
+    const rows = this.cover.collect(snapshot)
+    const measurer = this.ensureMeasurer(snapshot, rows[0]?.presentation.element)
     const next = buildFrame(snapshot, measurer, this.options.maxPieces)
     const from = this.run ? this.run.visualPieces() : this.restingFrom(previous, measurer)
     if (!next || !from) {
-      for (const row of rows) row.dispose()
+      for (const row of rows) row.presentation.dispose()
       this.finish()
       return
     }
@@ -168,7 +178,8 @@ class MorphViewContribution implements EditorViewContribution {
       () => this.finish(),
     )
     this.context.scrollElement.classList.add(ACTIVE_CLASS)
-    this.hideRows(rows)
+    this.runSnapshot = snapshot
+    this.cover.cover(rows)
     this.context.log({
       level: 'info',
       action: 'morph.start',
@@ -183,55 +194,16 @@ class MorphViewContribution implements EditorViewContribution {
     return frame ? restingPieces(frame) : null
   }
 
-  private collectRows(snapshot: EditorViewSnapshot): EditorRowPresentation[] {
-    const rows: EditorRowPresentation[] = []
-    for (const row of snapshot.visibleRows) {
-      const presentation = this.context.getRowPresentation(row.index)
-      if (presentation) rows.push(presentation)
-    }
-    return rows
-  }
-
-  // The real rows stay mounted and laid out underneath; a held opacity animation hides each one
-  // without touching styles the editor owns. A row the editor replaces or recycles shows again.
-  private hideRows(rows: readonly EditorRowPresentation[]): void {
-    for (const presentation of rows) {
-      const element = presentation.element
-      if (this.hidden.has(element)) {
-        presentation.dispose()
-        continue
-      }
-      const animation = element.animate([{ opacity: 0 }, { opacity: 0 }], {
-        duration: Number.POSITIVE_INFINITY,
-        fill: 'both',
-      })
-      const entry = { presentation, animation }
-      this.hidden.set(element, entry)
-      presentation.signal.addEventListener('abort', () => this.showRow(element, entry), {
-        once: true,
-      })
-    }
-  }
-
-  private showRow(element: HTMLElement, entry: HiddenRow): void {
-    if (this.hidden.get(element) !== entry) return
-    this.hidden.delete(element)
-    entry.animation.cancel()
-    entry.presentation.dispose()
-  }
-
   private finish(): void {
     this.context.scrollElement.classList.remove(ACTIVE_CLASS)
-    for (const [element, entry] of this.hidden) this.showRow(element, entry)
+    this.cover.showAll()
+    this.runSnapshot = null
     this.run?.cancel()
     this.run = null
   }
 
-  private ensureMeasurer(
-    snapshot: EditorViewSnapshot,
-    rows: readonly EditorRowPresentation[],
-  ): TextMeasurer {
-    const fontSource = rows[0]?.element ?? this.context.contentElement
+  private ensureMeasurer(snapshot: EditorViewSnapshot, row: Element | undefined): TextMeasurer {
+    const fontSource = row ?? this.context.contentElement
     const font = canvasFont(fontSource)
     const tabColumns = renderedTabColumns(this.context.scrollElement, snapshot.tabSize)
     if (this.measurer?.font === font && this.measurer.tabColumns === tabColumns)

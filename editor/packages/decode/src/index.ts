@@ -1,25 +1,29 @@
 import type {
   EditorPlugin,
-  EditorRowPresentation,
   EditorViewContribution,
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
+import { TextMeasurer, canvasFont, renderedTabColumns } from './measure'
+import { buildFrame, frameMoved, recolorFrame } from './morph-frame'
 import {
   resolveDecodeOptions,
   type DecodePluginOptions,
   type ResolvedDecodeOptions,
 } from './options'
-import { ACTIVE_CLASS, collectRevealRows } from './rows'
-import { runReveal, type RevealHandle } from './reveal'
-import { runDiffusion } from './diffusion'
+import { RevealRun } from './reveal-run'
+import { RowCover } from './row-cover'
 import './style.css'
 
 export type { DecodeMode, DecodePluginOptions } from './options'
 export { createMorphPlugin, type MorphPluginOptions } from './morph'
 
-const INPUT_EVENTS = ['keydown', 'pointerdown', 'wheel'] as const
+const ACTIVE_CLASS = 'editor-decode-active'
+// Input skips the reveal to its end. Scrolling does not: the overlay scrolls with the text.
+const INPUT_EVENTS = ['keydown', 'pointerdown'] as const
+// A reveal draws at most this many pieces; a denser viewport opens without one.
+const MAX_PIECES = 4000
 
 /**
  * File-open "writes itself" animation. Including this plugin turns the effect on;
@@ -37,157 +41,133 @@ export function createDecodePlugin(options: DecodePluginOptions = {}): EditorPlu
 }
 
 class DecodeViewContribution implements EditorViewContribution {
+  public readonly inputs = ['content', 'tokens', 'viewport', 'layout'] as const
   private animatedDocumentId: string | null = null
-  private pendingDocumentId: string | null = null
-  private reveal: RevealHandle | null = null
-  private disposed = false
-  private presentations: readonly EditorRowPresentation[] = []
+  private run: RevealRun | null = null
+  private runFrame: ReturnType<typeof buildFrame> = null
+  private runSnapshot: EditorViewSnapshot | null = null
+  private measurer: TextMeasurer | null = null
+  private readonly cover: RowCover
+  private readonly options: ResolvedDecodeOptions
 
   public constructor(
     private readonly context: EditorViewContributionContext,
-    private readonly options: ResolvedDecodeOptions,
-  ) {}
+    options: ResolvedDecodeOptions,
+  ) {
+    this.cover = new RowCover(context)
+    this.options = scaleTimings(options)
+  }
 
   public update(snapshot: EditorViewSnapshot, kind: EditorViewContributionUpdateKind): void {
-    if (this.disposed) return
-    if (reducedMotion(this.context)) return
-
     if (kind === 'document') {
       this.handleDocumentOpen(snapshot)
       return
     }
-    // A later tick (notably 'tokens') carries the settled highlight a waiting reveal starts on.
-    if (this.pendingDocumentId !== null) this.maybeStart(snapshot)
-  }
-
-  public updateViewport(): void {
-    if (this.reveal === null) return
-    this.teardown()
+    const started = this.runSnapshot
+    if (!this.run || !started) return
+    // New text or new metrics: the overlay no longer matches the rows under it.
+    if (snapshot.textVersion !== started.textVersion || frameMoved(started, snapshot)) {
+      this.finish()
+      return
+    }
+    this.cover.refresh(snapshot)
+    if (kind === 'tokens' && this.runFrame) {
+      this.run.recolor(recolorFrame(this.runFrame, snapshot.tokens))
+    }
   }
 
   public dispose(): void {
-    this.disposed = true
-    this.teardown()
+    this.finish()
   }
 
   private handleDocumentOpen(snapshot: EditorViewSnapshot): void {
     const documentId = snapshot.documentId
-    if (!documentId || documentId === this.animatedDocumentId) return
-    if (snapshot.textSnapshot.length === 0) return
-
-    // A fresh document supersedes any in-flight reveal.
-    this.teardown()
+    if (documentId !== null && documentId === this.animatedDocumentId) return
+    // Any other document, empty or not, supersedes an in-flight reveal.
+    this.finish()
+    if (!documentId || snapshot.textSnapshot.length === 0) return
+    if (reducedMotion(this.context)) return
+    // Chips, hidden markup and phantom text are painted as something other than their source.
+    if (this.context.getInlineReplacementRanges().length > 0) return
     this.animatedDocumentId = documentId
-    this.pendingDocumentId = documentId
-
-    // Hide the real rows immediately (CSS clip) so there is no flash of the
-    // fully-painted file before the reveal, and let input during the wait show it at once.
-    this.context.scrollElement.classList.add(ACTIVE_CLASS)
-    this.addInputListeners()
-    this.maybeStart(snapshot)
-  }
-
-  /** Starts once the document's initial highlight has settled, so the reveal is coloured. */
-  private maybeStart(snapshot: EditorViewSnapshot): void {
-    if (this.pendingDocumentId === null) return
-    if (snapshot.documentId !== this.pendingDocumentId) return
-    if (!highlightSettled(snapshot)) return
-
-    this.pendingDocumentId = null
-    const rows = collectRevealRows(this.context, snapshot, this.options.maxRows)
-    if (rows.length === 0) {
-      this.teardown()
+    const rows = this.cover.collect(snapshot)
+    const measurer = this.ensureMeasurer(snapshot, rows[0]?.presentation.element)
+    const frame = buildFrame(snapshot, measurer, MAX_PIECES, this.options.maxRows)
+    if (!frame || frame.pieces.length === 0) {
+      for (const row of rows) row.presentation.dispose()
       return
     }
-    this.beginReveal(snapshot, rows)
-  }
-
-  private beginReveal(
-    snapshot: EditorViewSnapshot,
-    rows: ReturnType<typeof collectRevealRows>,
-  ): void {
     this.context.log({
       level: 'info',
       action: 'decode.reveal',
       mode: this.options.mode,
-      lineCount: rows.length,
+      pieceCount: frame.pieces.length,
+      rowCount: frame.rowCount,
       languageId: snapshot.languageId,
       highlightStatus: snapshot.initialHighlightStatus,
-      tokenized: snapshot.tokens.length > 0,
     })
-    this.presentations = rows.map((row) => row.presentation)
-    for (const presentation of this.presentations) {
-      presentation.signal.addEventListener('abort', this.cancelOnInput, { once: true })
-    }
-    this.reveal = this.startEngine(snapshot, rows)
+    this.runFrame = frame
+    this.runSnapshot = snapshot
+    this.run = new RevealRun(
+      this.context.contentElement,
+      frame,
+      this.options,
+      (text) => measurer.width(text),
+      () => this.finish(),
+    )
+    this.context.scrollElement.classList.add(ACTIVE_CLASS)
+    this.cover.cover(rows)
+    this.addInputListeners()
   }
 
-  private startEngine(
-    snapshot: EditorViewSnapshot,
-    rows: ReturnType<typeof collectRevealRows>,
-  ): RevealHandle {
-    const onDone = () => this.teardown()
-    // Scale the timings by the speed option here, so the engines stay unaware of
-    // the speed concept — they just get faster numbers.
-    const options = scaleTimings(this.options, this.options.speed)
-    // Diffusion keeps the real rows clipped-hidden (like the clip family) and
-    // reveals a colour-faithful scramble overlay instead; the real rows are
-    // un-clipped only at completion in `teardown`.
-    if (options.mode === 'diffusion') {
-      return runDiffusion(this.context, rows, snapshot.tokens, options, onDone)
-    }
-    return runReveal(this.context, rows, options, onDone)
-  }
-
-  /**
-   * Tear everything down (natural completion, input cancel, new document, dispose).
-   * Remove the hide class *before* cancelling the animations so a row never flips
-   * hidden→shown between the two operations.
-   */
-  private teardown(): void {
+  private finish(): void {
     this.removeInputListeners()
-    this.pendingDocumentId = null
     this.context.scrollElement.classList.remove(ACTIVE_CLASS)
-    this.reveal?.cancel()
-    this.reveal = null
-    const presentations = this.presentations
-    this.presentations = []
-    for (const presentation of presentations) {
-      presentation.signal.removeEventListener('abort', this.cancelOnInput)
-      presentation.dispose()
-    }
+    this.cover.showAll()
+    this.run?.cancel()
+    this.run = null
+    this.runFrame = null
+    this.runSnapshot = null
   }
 
-  private readonly cancelOnInput = (): void => this.teardown()
+  private readonly finishOnInput = (): void => this.finish()
 
   private addInputListeners(): void {
     for (const type of INPUT_EVENTS) {
-      this.context.scrollElement.addEventListener(type, this.cancelOnInput, { capture: true })
+      this.context.scrollElement.addEventListener(type, this.finishOnInput, { capture: true })
     }
   }
 
   private removeInputListeners(): void {
     for (const type of INPUT_EVENTS) {
-      this.context.scrollElement.removeEventListener(type, this.cancelOnInput, { capture: true })
+      this.context.scrollElement.removeEventListener(type, this.finishOnInput, { capture: true })
     }
   }
-}
 
-// Divide every time field by the multiplier (speed > 1 ⇒ shorter ⇒ faster).
-// `mode`/`maxRows` are not timings, so they pass through unchanged.
-function scaleTimings(options: ResolvedDecodeOptions, speed: number): ResolvedDecodeOptions {
-  return {
-    ...options,
-    perCharMs: options.perCharMs / speed,
-    perTokenMs: options.perTokenMs / speed,
-    maxDurationMs: options.maxDurationMs / speed,
-    staggerMs: options.staggerMs / speed,
+  private ensureMeasurer(snapshot: EditorViewSnapshot, fontSource: Element | undefined) {
+    const font = canvasFont(fontSource ?? this.context.contentElement)
+    const tabColumns = renderedTabColumns(this.context.scrollElement, snapshot.tabSize)
+    if (this.measurer?.font === font && this.measurer.tabColumns === tabColumns)
+      return this.measurer
+    this.measurer = new TextMeasurer(
+      this.context.scrollElement.ownerDocument,
+      font,
+      snapshot.metrics.characterWidth,
+      tabColumns,
+    )
+    return this.measurer
   }
 }
 
-function highlightSettled(snapshot: EditorViewSnapshot): boolean {
-  const status = snapshot.initialHighlightStatus
-  return status !== 'idle' && status !== 'loading'
+// Divide every time field by the speed multiplier (speed > 1 ⇒ shorter ⇒ faster).
+function scaleTimings(options: ResolvedDecodeOptions): ResolvedDecodeOptions {
+  return {
+    ...options,
+    perCharMs: options.perCharMs / options.speed,
+    perTokenMs: options.perTokenMs / options.speed,
+    maxDurationMs: options.maxDurationMs / options.speed,
+    staggerMs: options.staggerMs / options.speed,
+  }
 }
 
 function reducedMotion(context: EditorViewContributionContext): boolean {

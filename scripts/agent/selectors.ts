@@ -176,12 +176,13 @@ export const editorTokenPaintSelectors = {
 /** The decode plugin's hidden-rows class, its diffusion overlay, and one overlay glyph. */
 export const decodeSelectors = {
   active: '.editor-decode-active',
-  glyphLayer: '.editor-decode-glyph-layer',
-  glyph: '.editor-decode-glyph',
+  layer: '.editor-decode-layer',
+  piece: '.editor-morph-piece',
 } as const
 export const morphSelectors = {
   editor: (page: Page) => page.locator('[data-transitions-editor]'),
   layer: '.editor-morph-layer',
+  revealLayer: '.editor-decode-layer',
   piece: '.editor-morph-piece',
 } as const
 export const searchEditorSelector = '[aria-label="Search result editor"]'

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@singapore-editor/core/editor'
+import type { DecodeMode } from '@singapore-editor/decode'
 import { Button } from '@workspace/ui/components/button'
 import { Slider } from '@workspace/ui/components/slider'
 import { Switch } from '@workspace/ui/components/switch'
@@ -14,16 +15,29 @@ import {
 const BASE_DURATION_MS = 520
 const SLOW_MOTION = 4
 const STREAM_LINE_MS = 140
+const REVEALS: readonly { readonly mode: DecodeMode; readonly label: string }[] = [
+  { mode: 'autoregressive', label: 'Autoregressive' },
+  { mode: 'parallel', label: 'Parallel' },
+  { mode: 'token', label: 'Token' },
+  { mode: 'diffusion', label: 'Diffusion' },
+]
 
 /** Text changes in a real editor with the morph plugin: steps, undo, and a streamed write. */
 export function TransitionsTab() {
   const [step, setStep] = useState(0)
   const [slow, setSlow] = useState(false)
   const [bounce, setBounce] = useState(18)
+  const [reveal, setReveal] = useState<{ mode: DecodeMode; replay: number }>({
+    mode: 'autoregressive',
+    replay: 0,
+  })
   const scale = slow ? SLOW_MOTION : 1
   const { editor, containerRef } = useTransitionsEditor({
     durationMs: BASE_DURATION_MS * scale,
     bounce: bounce / 100,
+    reveal: reveal.mode,
+    replay: reveal.replay,
+    speed: 1 / scale,
   })
   const timers = useRef<number[]>([])
   useEffect(() => () => clearTimers(timers.current), [])
@@ -46,6 +60,11 @@ export function TransitionsTab() {
   const schedule = (delays: readonly number[], run: (index: number) => void) => {
     cancelPending()
     timers.current = delays.map((delay, index) => window.setTimeout(() => run(index), delay))
+  }
+
+  const openAs = (mode: DecodeMode) => {
+    cancelPending()
+    setReveal((current) => ({ mode, replay: current.replay + 1 }))
   }
 
   const runCommand = (command: 'undo' | 'redo') => {
@@ -75,7 +94,7 @@ export function TransitionsTab() {
     <div className='mx-auto flex max-w-3xl flex-col gap-6 p-(--density-section-padding)'>
       <Section
         title='Morph'
-        detail='Text that survives an edit slides to its new place, removed text fades out, and new text streams in. Undo and redo morph too.'
+        detail='Text that survives an edit slides to its new place, removed text fades out, and new text streams in. Undo and redo morph too. Opening a file writes it in.'
       >
         <div className='flex flex-wrap items-center gap-2'>
           <Button onClick={() => goTo(step - 1)}>Previous</Button>
@@ -96,13 +115,21 @@ export function TransitionsTab() {
             Write from scratch
           </Button>
         </div>
+        <div className='flex flex-wrap items-center gap-2'>
+          <span className='text-muted-foreground text-xs'>Open the file as</span>
+          {REVEALS.map((entry) => (
+            <Button key={entry.mode} variant='ghost' onClick={() => openAs(entry.mode)}>
+              {entry.label}
+            </Button>
+          ))}
+        </div>
         <div
           className='bg-background h-[26rem] overflow-hidden rounded-md'
           data-transitions-editor
           ref={containerRef}
         />
       </Section>
-      <Section title='Motion' detail='Slow motion runs every morph four times longer.'>
+      <Section title='Motion' detail='Slow motion runs every animation four times longer.'>
         <label className='flex items-center gap-2 text-xs'>
           <Switch checked={slow} onCheckedChange={setSlow} />
           Slow motion
