@@ -128,7 +128,7 @@ import { pushRoutes } from './push/routes'
 import { DeviceStore } from './devices/device-store'
 import { pairingRoutes } from './devices/routes'
 import { noTailnet, tailscaleCli, TailnetOwners, type TailnetLookup } from './devices/tailnet-owner'
-import { headersReader } from './devices/trust'
+import { captureRequestHeaders } from './devices/trust'
 import { DevicePairing } from './devices/service'
 import { PushService } from './push/service'
 import { sessionLink } from './push/session-link'
@@ -212,11 +212,10 @@ export type AppOptions = FileSystemServiceOptions & {
     readonly nativePickerHelper?: string | null
     readonly desktop?: () => boolean
   }
-  /** Paired devices: where they are kept, the cookie naming one, and this machine's addresses. */
+  /** Paired devices: where they are kept, their cookie, and the Tailscale lookup. */
   devices?: {
     readonly filePath?: string
     readonly cookieName?: string
-    readonly ownAddresses?: () => ReadonlySet<string>
     /** How this machine asks Tailscale who a device is; tests inject it. */
     readonly tailnet?: TailnetLookup
   }
@@ -627,7 +626,7 @@ export function createApp(options: AppOptions) {
     store: new DeviceStore(options.devices?.filePath ?? defaultDeviceFile()),
     required: () => settings.snapshot().values['environments.devicePairing'],
     cookieName: options.devices?.cookieName ?? 'platform_device',
-    ownAddresses: options.devices?.ownAddresses,
+    trustedProxyHosts: () => settings.snapshot().values['environments.trustedProxyHosts'],
     tailnet: new TailnetOwners({
       lookup: options.devices?.tailnet ?? defaultTailnetLookup(),
       enabled: () => settings.snapshot().values['environments.tailnetOwnerDevices'],
@@ -719,7 +718,11 @@ export function createApp(options: AppOptions) {
   })
   applyObservability(app)
   // Every request, WebSocket upgrades included: admission reads the answer synchronously.
-  app.onRequest(({ request }) => devices.identify(headersReader(request.headers)))
+  app.onRequest(({ request, server }) =>
+    devices.identify(
+      captureRequestHeaders(request, (options.system?.peer ?? socketPeer)(request, server)),
+    ),
+  )
 
   const configured = app
     .use(

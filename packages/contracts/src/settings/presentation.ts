@@ -109,6 +109,11 @@ export const SETTINGS_PRESENTATION = {
     widget: 'boolean',
     category: 'Machines',
   },
+  'environments.trustedProxyHosts': {
+    widget: 'list',
+    category: 'Machines',
+    visibility: 'advanced',
+  },
   'environments.tailnetOwnerDevices': {
     widget: 'boolean',
     category: 'Machines',

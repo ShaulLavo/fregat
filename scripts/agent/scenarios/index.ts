@@ -339,6 +339,7 @@ import { wallpaperPalette } from './wallpaper-palette'
 import { themeBundlePalette } from './theme-bundle-palette'
 import { settingsColdLoad } from './settings-cold-load'
 import { settingsOpen, settingsOpenNavigation } from './settings-open'
+import { deviceTrustSettings } from './device-trust-settings'
 import { serverRestart, serverRestartRecovery } from './server-restart'
 import { serverUpdateDeadline } from './server-update-deadline'
 import { watcherRestart } from './watcher-restart'
@@ -806,6 +807,7 @@ export const scenarios: readonly Scenario[] = [
   settingsColdLoad,
   settingsOpen,
   settingsOpenNavigation,
+  deviceTrustSettings,
   settingsRoutePreparation,
   textFieldFkeys,
   settingsModuleFailure,

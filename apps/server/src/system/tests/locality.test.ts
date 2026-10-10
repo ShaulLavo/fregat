@@ -34,7 +34,7 @@ describe('request locality', () => {
     expect(isLocalRequest(local, null, origins)).toBe(false)
   })
 
-  it('counts a mesh-forwarded request as remote', () => {
+  it('counts a proxy-forwarded request as remote', () => {
     const forwarded = request({ origin: INSTALL_ORIGIN, 'x-forwarded-for': '127.0.0.1' })
     expect(isLocalRequest(forwarded, '127.0.0.1', origins)).toBe(false)
     const prefixed = request({ origin: INSTALL_ORIGIN, 'x-forwarded-prefix': '/platform' })
@@ -52,7 +52,7 @@ describe('request locality', () => {
       headers: { origin: INSTALL_ORIGIN, connection: 'via', via: '1.0 attacker' },
     })
     const relayed = new Request(`${INSTALL_ORIGIN}/system/capabilities`, {
-      headers: machineProxyHeaders(inbound, INSTALL_ORIGIN),
+      headers: machineProxyHeaders(inbound, INSTALL_ORIGIN, 'relay_device=fixture.secret'),
     })
     expect(relayed.headers.get('origin')).toBe(INSTALL_ORIGIN)
     expect(isLocalRequest(relayed, '127.0.0.1', origins)).toBe(false)

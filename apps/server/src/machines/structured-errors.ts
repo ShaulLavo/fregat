@@ -6,6 +6,12 @@ import type { ServerInstallation } from '../installation/descriptor'
 import type { UpdateChannel } from './update'
 
 const machineErrors = defineErrorCatalog('machines', {
+  RELAY_PAIRING: {
+    status: 502,
+    message: 'The machine relay could not pair with its destination.',
+    why: 'The destination must issue a device credential over the authenticated SSH connection before relayed requests can use it.',
+    fix: 'Disconnect this machine and connect again, then check the destination server logs if pairing still fails.',
+  },
   SSH_DISCOVERY: {
     status: 500,
     message: 'SSH hosts could not be listed.',
@@ -156,6 +162,10 @@ const sshErrors = {
 
 export type SshCatalogStep = keyof typeof sshErrors
 export type SshErrorStep = SshCatalogStep | 'protocol'
+
+export function machineRelayPairingError(step: 'links' | 'claim', status: number) {
+  return machineErrors.RELAY_PAIRING({ internal: { step, status } })
+}
 
 /** `fix` replaces the catalog's when the caller knows more, such as the launch log's path. */
 export function createSshError(

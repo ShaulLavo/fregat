@@ -1,10 +1,14 @@
 import { defineConfig, devices } from '@playwright/test'
+import { join } from 'node:path'
 
 const APP_HOST = '127.0.0.1'
 const APP_PORT = 4177
 const APP_ORIGIN = new URL(`http://${APP_HOST}:${APP_PORT}`).origin
 
 export default defineConfig({
+  outputDir: process.env.FREGAT_EVIDENCE_ROOT
+    ? join(process.env.FREGAT_EVIDENCE_ROOT, 'playwright')
+    : 'test-results',
   testDir: 'test',
   testMatch: '**/*.spec.ts',
   webServer: {
@@ -18,7 +22,18 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      testIgnore: '**/mobile-source.spec.ts',
       use: devices['Desktop Chrome'],
+    },
+    {
+      name: 'mobile-webkit',
+      testMatch: '**/mobile-source.spec.ts',
+      use: { ...devices['iPhone 13'], browserName: 'webkit' },
+    },
+    {
+      name: 'mobile-chromium',
+      testMatch: '**/mobile-source.spec.ts',
+      use: { ...devices['iPhone 13'], browserName: 'chromium' },
     },
   ],
 })

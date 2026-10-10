@@ -1,6 +1,6 @@
 import { orchestrationWsClientMessageSchema } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
-import type { createApp } from 'server/testing'
+import { testLoopbackRequest, type createApp } from 'server/testing'
 import * as v from 'valibot'
 import { createClientError } from '../src/errors'
 import { FakeOrchestrationSocket } from './orchestration-socket'
@@ -11,12 +11,17 @@ type InProcessServer = {
 }
 
 export function inProcessOrchestrationSocketFactory(server: InProcessServer) {
-  return (_url: string) => {
+  return (url: string) => {
     const { onOpen, onMessage, onClose } = orchestrationSocketHooks(server.app)
     const socket = new FakeOrchestrationSocket()
+    const parsed = new URL(url)
+    parsed.protocol = parsed.protocol === 'wss:' ? 'https:' : 'http:'
+    const request = new Request(parsed)
+    request.headers.set('origin', server.clientOrigin)
+    testLoopbackRequest(request)
     const peer = {
       raw: {},
-      data: { headers: { origin: server.clientOrigin } },
+      data: { request, headers: { origin: server.clientOrigin } },
       send: (message: string) => socket.deliver(JSON.parse(message)),
       close: (code = 1000) => socket.serverClose({ code, wasClean: true }),
     }

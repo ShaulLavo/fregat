@@ -35,7 +35,8 @@
         "Server release 20260920T125500Z-02885149-plan126-rewind-permissions; web release 20260920T125946Z-b915d3e0-rewind-draft-identity",
         "Focused real-engine/native-process tests pass; live rewind and paired upstream runtime evidence pending",
         "2026-09-26 audit (status-2026-09-26.md): implemented; session-pull-request-badge shows unknown after a failed lookup. Left: a browser step where a failed lookup offers retry and never create (fake gh). Batch C.",
-        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: pull-request-lookup-failure 20260926T175209Z proves retry without Create or gh pr create after lookup failure."
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: pull-request-lookup-failure 20260926T175209Z proves retry without Create or gh pr create after lookup failure.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/pull-request-lookup-failure.ts. No scenario rerun or status change."
       ],
       "report": "adjacent.md",
       "title": "Preserve failed pull-request lookup as failure",
@@ -81,7 +82,8 @@
         "test/parity/t3code/archive.json",
         "/work/tmp/fregat-evidence/20260920T122707Z-scenario-archive-lifecycle/",
         "2026-09-26 audit (status-2026-09-26.md): probe today confirmed open-from-archive and reload retention; archive-lifecycle fails on harness defects H4 and H7, not the product. Closes when batch A repairs and re-runs it.",
-        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: archive-lifecycle 20260926T172834Z passed after H4/H7 repairs. Existing archive placement mapping is accepted."
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: archive-lifecycle 20260926T172834Z passed after H4/H7 repairs. Existing archive placement mapping is accepted.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/archive-lifecycle.ts. No scenario rerun or status change."
       ],
       "closeout": {
         "reconciled_on": "2026-10-03",
@@ -104,7 +106,8 @@
         "test/parity/t3code/archive.json",
         "/work/tmp/fregat-evidence/20260920T122707Z-scenario-archive-lifecycle/",
         "2026-09-26 audit (status-2026-09-26.md): as LIFE-01. Decided 2026-09-26: research recommendation \u2014 the rail archive browser is an implementation mapping of the upstream Settings list, so placement does not hold the row open.",
-        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: archive-lifecycle 20260926T172834Z; H4/H7 and automatic-unarchive residue are delivered."
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: archive-lifecycle 20260926T172834Z; H4/H7 and automatic-unarchive residue are delivered.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/archive-lifecycle.ts. No scenario rerun or status change."
       ],
       "closeout": {
         "reconciled_on": "2026-10-03",
@@ -174,7 +177,8 @@
         "Recorded local tests cover budgets, streams, sockets, client queues and actual engine/client oversized-event recovery",
         "Remaining: live overflow/reconnect recovery and paired upstream runtime comparison; the MCP approval browser run does not verify stream overflow",
         "2026-09-26 audit (status-2026-09-26.md): implemented; no scenario drives overflow. Left: an overflow scenario that recovers the exact text. Batch C.",
-        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: stream-overflow 20260926T175431Z proves ACK-timeout reconnect, cursor resume and exact single text after reload. Item/byte caps have separate server-test evidence."
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: stream-overflow 20260926T175431Z proves ACK-timeout reconnect, cursor resume and exact single text after reload. Item/byte caps have separate server-test evidence.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/stream-overflow.ts. No scenario rerun or status change."
       ],
       "closeout": {
         "reconciled_on": "2026-10-03",
@@ -197,7 +201,8 @@
         "Server release 20260920T125500Z-02885149-plan126-rewind-permissions; web release 20260920T125946Z-b915d3e0-rewind-draft-identity",
         "Focused real-engine/native-process tests pass; live rewind and paired upstream runtime evidence pending",
         "2026-09-26 audit (status-2026-09-26.md): implemented; tests only. Left: a scenario where the native fixture sends item/permissions/requestApproval and the exact grant reply is checked. Batch C.",
-        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: native-permission-grant 20260926T174908Z proves the exact requested profile and session scope reply for native request 992."
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: native-permission-grant 20260926T174908Z proves the exact requested profile and session scope reply for native request 992.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/native-permission-grant.ts. No scenario rerun or status change."
       ],
       "closeout": {
         "reconciled_on": "2026-10-03",
@@ -461,7 +466,10 @@
         "Whole lint/format/typecheck/gates/generated/boundaries pass; web 166 files/1420 tests, contracts 26 files/321 tests, parity Python 47 tests pass; unused check retains three unchanged findings documented in queue-delivery.md",
         "Remaining: Stop during attachment preparation before queue admission, non-Codex mid-turn delivery, complete live overflow/connection/ownership/shortcut matrix, INTERACTION-09 source contexts and provider/OS checks; no paired upstream full-workflow claim",
         "2026-09-26 audit (status-2026-09-26.md): chat-queue passed today after fixture defect H1 at /work/tmp/fregat-evidence/20260926T094128Z-scenario-chat-queue. Left: Stop during attachment preparation, and post-pin 295d7cba (queued messages send while the session is not open; ours drains only from the open composer). Batch D.",
-        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: chat-queue-away 20260926T204841Z, chat-queue-stop-upload 20260926T210422Z and chat-queue 20260926T204904Z close batch D queue residue. Non-Codex capability cases remain with RUNTIME-02."
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: chat-queue-away 20260926T204841Z, chat-queue-stop-upload 20260926T210422Z and chat-queue 20260926T204904Z close batch D queue residue. Non-Codex capability cases remain with RUNTIME-02.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/chat-queue-away.ts. No scenario rerun or status change.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/chat-queue-stop-upload.ts. No scenario rerun or status change.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/chat-queue.ts. No scenario rerun or status change."
       ],
       "closeout": {
         "reconciled_on": "2026-10-03",
@@ -486,7 +494,8 @@
         "Recorded upload/store tests cover interleaved claim/delete, ownership and incomplete streams; question attachment evidence is shared with INTERACTION-04",
         "Remaining: complete pick/drop/paste and concurrent-limit matrix, offline retry and expired-upload recovery, capability-loss and removal races, multi-owner live checks and provider matrix",
         "2026-09-26 audit (status-2026-09-26.md): file-attachments reaches upload, reload and preview, then Download returns 401: a cross-port document navigation carries no Origin (auth.ts accepts a referrer only for same-origin). Dev and agent:browser only; the mesh is same-origin. Left: that fix plus pick/drop/paste, offline retry and expiry steps. Batch D.",
-        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: file-attachments 20260926T210331Z proves pick/drop/paste, offline retry, expiry, preview and download. The earlier 401 is historical."
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: file-attachments 20260926T210331Z proves pick/drop/paste, offline retry, expiry, preview and download. The earlier 401 is historical.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/file-attachments.ts. No scenario rerun or status change."
       ],
       "closeout": {
         "reconciled_on": "2026-10-03",
@@ -510,7 +519,10 @@
         "Recorded tests cover atomic terminal-context transfer, quota failure, pending preparation, ownership and late restore after navigation",
         "Remaining: INTERACTION-09 review/annotation/citation context, cross-environment live restore and complete paired upstream acceptance",
         "2026-09-26 audit (status-2026-09-26.md): chat-stash-context passed today after H1 at /work/tmp/fregat-evidence/20260926T094048Z-scenario-chat-stash-context. Left: review and citation context types from INTERACTION-09. Batch F.",
-        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: chat-assistant-citation 20260926T224550Z and chat-citation-elsewhere 20260926T224321Z prove stash/restore/send with typed citation context. Queue comments have unit evidence; reload-persistent queue has no cited browser scenario."
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: chat-assistant-citation 20260926T224550Z and chat-citation-elsewhere 20260926T224321Z prove stash/restore/send with typed citation context. Queue comments have unit evidence; reload-persistent queue has no cited browser scenario.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/chat-stash-context.ts. No scenario rerun or status change.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/chat-assistant-citation.ts. No scenario rerun or status change.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/chat-citation-elsewhere.ts. No scenario rerun or status change."
       ],
       "closeout": {
         "reconciled_on": "2026-10-03",
@@ -536,7 +548,9 @@
         "Guarded digit shortcuts and independent per-question attachment drafts are implemented; native submitted-answer history has local component tests",
         "Remaining: unsent per-question attachments after reload, native answer-history browser proof and complete blocking/async/capability comparison",
         "2026-09-26 audit (status-2026-09-26.md): async-questions passed today after H1 and H3 at /work/tmp/fregat-evidence/20260926T093239Z-scenario-async-questions. Left: unsent per-question attachments survive reload, and an answer-history browser step. Batch D.",
-        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: async-questions 20260926T205212Z and question-history 20260926T205849Z prove per-question attachment reload and answer history."
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: async-questions 20260926T205212Z and question-history 20260926T205849Z prove per-question attachment reload and answer history.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/async-questions.ts. No scenario rerun or status change.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/question-history.ts. No scenario rerun or status change."
       ],
       "closeout": {
         "reconciled_on": "2026-10-03",
@@ -791,7 +805,8 @@
       "execution_evidence": [
         "Decided 2026-09-25: owner \u2014 build with boundary fixtures only; nothing is spent until the owner does one live redemption.",
         "2026-09-26 audit (status-2026-09-26.md): Codex reset credits built with boundary fixtures in 795526b58 (lane L3, #35): confirmation, account-keyed serialization, durable idempotency (migration 38). Left: an agent:browser scenario on the fixture, batch C; the one live redemption is the owner check. Post-pin 3412097b adds Claude banked resets.",
-        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: reset-credit-redemption 20260926T174929Z proves cancellation and exactly-once fixture redemption. Real-account redemption remains owner-only."
+        "2026-10-03 finite closeout reconciliation, historical receipts reviewed without rerun: status-2026-09-26.md: reset-credit-redemption 20260926T174929Z proves cancellation and exactly-once fixture redemption. Real-account redemption remains owner-only.",
+        "2026-10-10 reference-path clarification for existing historical receipt: scripts/agent/scenarios/reset-credit-redemption.ts. No scenario rerun or status change."
       ],
       "closeout": {
         "reconciled_on": "2026-10-03",

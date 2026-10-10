@@ -1,8 +1,11 @@
 import { isIP } from 'node:net'
-import { networkInterfaces } from 'node:os'
+import { isLoopbackAddress } from '../system/locality'
 
 /** Reads one request header, from a `Headers` or a WebSocket's plain header record. */
-export type HeaderReader = (name: string) => string | null
+export type HeaderReader = ((name: string) => string | null) & {
+  readonly peerAddress?: string | null
+  readonly proxyHop?: boolean
+}
 
 export function headersReader(headers: Headers | Readonly<Record<string, unknown>>): HeaderReader {
   if (headers instanceof Headers) return (name) => headers.get(name)
@@ -12,39 +15,59 @@ export function headersReader(headers: Headers | Readonly<Record<string, unknown
   }
 }
 
-/**
- * The client a forwarding proxy names, or null when the request reached this server directly. The
- * mesh proxy always sets `X-Forwarded-For` and drops any a client sent, so a direct request is one
- * from this machine.
- */
-export function forwardedClient(header: HeaderReader): string | null {
-  const value = header('x-forwarded-for')
-  if (!value) return null
-  return value.split(',')[0]?.trim() || null
+const requestHeaders = new WeakMap<Request, HeaderReader>()
+
+/** Capture socket provenance before admission, including WebSocket upgrades. */
+export function captureRequestHeaders(request: Request, peerAddress: string | null) {
+  const header: HeaderReader = Object.assign(headersReader(request.headers), {
+    peerAddress,
+    proxyHop: Array.from(request.headers.keys()).some(
+      (name) => ['forwarded', 'via', 'x-real-ip'].includes(name) || name.startsWith('x-forwarded-'),
+    ),
+  })
+  requestHeaders.set(request, header)
+  return header
 }
 
-/**
- * The one client address a forwarding proxy names, or null when the header is absent or lists a
- * chain: an identity check only trusts the address the proxy itself saw connect.
- */
-export function forwardedPeer(header: HeaderReader): string | null {
+/** Missing socket provenance fails closed, including in socket callbacks. */
+export function requestHeaderReader(request: Request): HeaderReader {
+  return requestHeaders.get(request) ?? headersReader(request.headers)
+}
+
+/** A direct loopback socket naming a loopback host and carrying no proxy markers. */
+export function isDirectLocal(header: HeaderReader): boolean {
+  if (!header.peerAddress || !isLoopbackAddress(header.peerAddress) || header.proxyHop) return false
+  const host = header('host')
+  const authority = host ? URL.parse(`http://${host}`) : null
+  if (!authority || authority.host !== host?.toLowerCase()) return false
+  const hostname = authority.hostname
+  if (
+    !hostname ||
+    (hostname !== 'localhost' && !isLoopbackAddress(hostname.replace(/^\[|\]$/g, '')))
+  )
+    return false
+  return ![
+    'forwarded',
+    'via',
+    'x-real-ip',
+    'x-forwarded-for',
+    'x-forwarded-host',
+    'x-forwarded-proto',
+    'x-forwarded-prefix',
+    'x-forwarded-port',
+  ].some((name) => header(name) !== null)
+}
+
+/** Only an explicitly trusted loopback proxy may name one client IP. */
+export function forwardedPeer(
+  header: HeaderReader,
+  trustedHosts: readonly string[],
+): string | null {
+  if (!header.peerAddress || !isLoopbackAddress(header.peerAddress)) return null
+  const host = header('host')?.toLowerCase()
+  if (!host || !trustedHosts.some((trusted) => trusted.toLowerCase() === host)) return null
   const value = header('x-forwarded-for')?.trim()
-  if (!value || isIP(value) === 0) return null
-  return value
-}
-
-/** Loopback, or an address one of this machine's own interfaces holds (its tailnet address). */
-export function isThisMachine(address: string, own: ReadonlySet<string>): boolean {
-  const plain = address.replace(/^::ffff:/, '')
-  if (plain === '::1' || plain.startsWith('127.')) return true
-  return own.has(plain)
-}
-
-export function ownAddresses(): ReadonlySet<string> {
-  const addresses = new Set<string>()
-  for (const entries of Object.values(networkInterfaces()))
-    for (const entry of entries ?? []) addresses.add(entry.address.replace(/%.*$/, ''))
-  return addresses
+  return value && isIP(value) !== 0 ? value : null
 }
 
 /** The device credential from the `Cookie` header, split into its id and secret. */
