@@ -65,12 +65,18 @@ jobs:
       - name: Select affected packages
         id: plan
         env:
-          MODE: ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && github.event.before != '0000000000000000000000000000000000000000' && 'changed' || 'full' }}
+          BEFORE_SHA: ${{ github.event.before }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          MODE=full
+          if [[ "$GITHUB_EVENT_NAME" == 'pull_request' ]]; then
+            MODE=changed
+          elif [[ "$GITHUB_EVENT_NAME" == 'push' && "$GITHUB_REF" == refs/heads/* && -n "$BEFORE_SHA" && "$BEFORE_SHA" != '0000000000000000000000000000000000000000' ]]; then
+            MODE=changed
+          fi
           if [[ "$GITHUB_EVENT_NAME" == 'push' && "$MODE" == 'changed' ]]; then
             baseline=$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=20" --jq '[.workflow_runs[] | select(.event == "push" or .event == "schedule" or .event == "workflow_dispatch")][0].head_sha // empty')
             if [[ -n "$baseline" ]] && git merge-base --is-ancestor "$baseline" "$HEAD_SHA"; then
