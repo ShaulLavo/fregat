@@ -1,3 +1,10 @@
+import {
+  recordPacket,
+  recordRowStorage,
+  rowStorage,
+  type RecordRowStorage,
+  type RowPacket,
+} from './row-storage.js'
 import type { CellStyle, RenderCell, RgbColor } from './types.js'
 
 export const PACKED_CELL_WORDS = 6
@@ -35,12 +42,23 @@ export class PackedCells {
   readonly length: number
   private defaultText: string | null | undefined
   private defaultTail = 0
+  private storage?: RecordRowStorage
 
   constructor(
     private readonly words: Uint32Array,
     private readonly graphemes: Uint32Array,
+    private readonly packet?: RowPacket,
   ) {
     this.length = words.length / PACKED_CELL_WORDS
+  }
+
+  get [rowStorage](): RecordRowStorage {
+    return (this.storage ??= recordRowStorage(
+      'packed',
+      this.words,
+      this.graphemes,
+      this.packet ?? recordPacket(this.words, this.graphemes),
+    ))
   }
 
   // The target and its color/style objects are reused scratch; finish using them before the next read.

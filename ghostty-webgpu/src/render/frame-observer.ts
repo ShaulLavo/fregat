@@ -9,6 +9,7 @@ import {
 import type { NativeDisplayedFrame } from '../core/displayed-frame.js'
 import type { CursorState } from './instances/types.js'
 import { copiedFrameRow } from './frame-row.js'
+import { compactRows } from './row-compaction.js'
 import type {
   RendererFrameRow,
   RendererTextFrameRow,
@@ -32,7 +33,20 @@ export class FrameObserver {
 
   private rowCount: number
 
-  constructor(private readonly options: WebGpuTerminalRendererOptions) {
+  constructor(
+    private readonly options: Pick<
+      WebGpuTerminalRendererOptions,
+      | 'rows'
+      | 'onFrame'
+      | 'onTextFrame'
+      | 'onRowsChanged'
+      | 'onRowsPainted'
+      | 'onCleanUpdate'
+      | 'needsFrameRows'
+      | 'retainDisplayedText'
+    > &
+      Partial<WebGpuTerminalRendererOptions>,
+  ) {
     this.rowCount = options.rows
   }
 
@@ -180,7 +194,9 @@ export class FrameObserver {
       const source = this.readTextRows(state, options, rows, fullRows)
       for (const row of source) textRows[row.y] = row
     }
-    return { fullRows, textRows }
+    if (!this.options.onFrame) return { fullRows, textRows: compactRows(textRows) }
+    const compacted = compactRows(fullRows)
+    return { fullRows: compacted, textRows: compacted }
   }
 
   private readTextRows(

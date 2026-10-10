@@ -159,7 +159,7 @@ describe('text-only render rows', () => {
     expect(materialize(state.readTextRows())).toEqual(equivalentTextRows(state.readRows()))
   })
 
-  it('batches ASCII row text while preserving lazy cells across later native updates', async () => {
+  it('owns ASCII row text while preserving lazy cells across later native updates', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 80, rows: 3 })
     const state = runtime.createRenderState(terminal)
@@ -174,7 +174,7 @@ describe('text-only render rows', () => {
     decode.mockRestore()
     batch.mockRestore()
     expect(calls).toBeLessThanOrEqual(rows.length)
-    expect(batches).toBeLessThanOrEqual(1)
+    expect(batches).toBe(1)
     expect(rows.map((row) => row.text)).toEqual(expected.map((row) => row.text))
     terminal.write('\x1b[H\x1b[2Jchanged')
     state.update()

@@ -1441,7 +1441,7 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.readTextRowsCalls()).toBeGreaterThan(textReads)
       harness.terminal.dispose()
 
-      expect(textFrame.rows).toEqual(retainedTextRows)
+      expect(structuredClone(textFrame.rows)).toEqual(retainedTextRows)
       expect(full.rows[0]?.text.trimEnd()).toBe('ABC')
       expect(full.rows[0]?.renderCells[0]?.foreground).toEqual({ r: 12, g: 34, b: 56 })
     },
@@ -1747,7 +1747,7 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.terminal.frameSnapshot()?.rows[0]?.text.trimEnd()).toBe('later')
       harness.terminal.dispose()
 
-      expect(retained.rows).toEqual(retainedRows)
+      expect(structuredClone(retained.rows)).toEqual(retainedRows)
       expect(visible[0]?.trimEnd()).toBe('A界B')
     },
   )
