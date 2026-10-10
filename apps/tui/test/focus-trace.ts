@@ -84,7 +84,7 @@ export function traceFocus(frame: Frame) {
             return Reflect.apply(handler, this, args)
           }
         : handler
-    const timer: unknown = Reflect.apply(realSetTimeout, this, [wrapped, ...rest])
+    const timer: unknown = Reflect.apply(realSetTimeout, this, [wrapped].concat(rest))
     pending.set(timer, entry)
     return timer
   } as typeof setTimeout
@@ -109,21 +109,25 @@ export function traceFocus(frame: Frame) {
     return [
       `focus trace at +${now}ms: now ${frame.renderer.currentFocusedRenderable?.id ?? 'nothing'}`,
       `focus changes (${changes.length}):`,
-      ...changes.map(
-        (change) =>
-          `  +${change.atMs}ms ${change.from} -> ${change.to} ${act(change.insideAct)}\n${format(change.callsite)}`,
-      ),
-      `focus requests (${requests.length}):`,
-      ...requests.map(
-        (request) =>
-          `  +${request.atMs}ms ${request.destination} ${act(request.insideAct)}\n${format(request.callsite)}`,
-      ),
-      `pending timers (${pending.size}):`,
-      ...[...pending.values()].map(
-        (timer) =>
-          `  scheduled +${timer.scheduledAtMs}ms, ${timer.delayMs}ms delay, pending ${now - timer.scheduledAtMs}ms\n${format(timer.callsite)}`,
-      ),
-    ].join('\n')
+    ]
+      .concat(
+        changes.map(
+          (change) =>
+            `  +${change.atMs}ms ${change.from} -> ${change.to} ${act(change.insideAct)}\n${format(change.callsite)}`,
+        ),
+        [`focus requests (${requests.length}):`],
+        requests.map(
+          (request) =>
+            `  +${request.atMs}ms ${request.destination} ${act(request.insideAct)}\n${format(request.callsite)}`,
+        ),
+        [`pending timers (${pending.size}):`],
+        Array.from(
+          pending.values(),
+          (timer) =>
+            `  scheduled +${timer.scheduledAtMs}ms, ${timer.delayMs}ms delay, pending ${now - timer.scheduledAtMs}ms\n${format(timer.callsite)}`,
+        ),
+      )
+      .join('\n')
   }
 
   // Runs when Vitest times a test out too, which skips the test body's catch and finally.

@@ -31,7 +31,7 @@ async function readResult(path) {
 }
 
 function distribution(values) {
-  const sorted = values.toSorted((left, right) => left - right)
+  const sorted = values.sort((left, right) => left - right)
   const quantile = (fraction) => sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)]
   return { count: sorted.length, p50: quantile(0.5), p95: quantile(0.95), max: sorted.at(-1) }
 }

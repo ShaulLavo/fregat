@@ -20,6 +20,7 @@ import type { RenderStateSource, WebGpuTerminalRendererOptions } from '../render
 import { WebGpuUnavailableError } from '../renderer.js'
 import type { RenderSchedulerClock } from '../scheduler.js'
 import { createCompatibleTerminalRenderer } from '../selector.js'
+import { restoreRendererNavigator, stubRendererNavigator } from '../tests/navigator.js'
 import { CanvasTerminalRenderer } from './renderer.js'
 
 const canvases = new Set<HTMLCanvasElement>()
@@ -34,6 +35,7 @@ afterEach(() => {
   resourceCleanups.clear()
   canvases.clear()
   vi.restoreAllMocks()
+  restoreRendererNavigator()
 })
 
 class FakeClock implements RenderSchedulerClock {
@@ -231,7 +233,7 @@ describe('CanvasTerminalRenderer', () => {
     const source = new FakeRenderState([
       row(
         0,
-        [...text].map((text, x) => cell(x, { text })),
+        Array.from(text, (text, x) => cell(x, { text })),
       ),
     ])
     source.cursor.viewport = { wideTail: false, x: 9, y: 0 }
@@ -869,10 +871,9 @@ describe('CanvasTerminalRenderer', () => {
       expectFullRepaint(canvas, source)
       expect(copy).not.toHaveBeenCalled()
       expect(updates).toHaveBeenCalledOnce()
-      const packing = mode === 'fill-text' ? { packed: true } : {}
       expect(reads.mock.calls).toEqual([
-        [{ dirtyOnly: true, ...packing }],
-        [{ rows: new Set([9]), ...packing }],
+        [{ dirtyOnly: true, packed: mode === 'fill-text' }],
+        [{ rows: new Set([9]), packed: mode === 'fill-text' }],
       ])
       expect(reads.mock.results[1]?.value).toEqual(source.rows)
       expect(renderer.metrics.repaintedRows - before.repaintedRows).toBe(8)
@@ -919,7 +920,7 @@ describe('CanvasTerminalRenderer', () => {
         expect(updates).toHaveBeenCalledOnce()
         expect(reads).toHaveBeenCalledExactlyOnceWith({
           rows: new Set([8, 9]),
-          ...(mode === 'fill-text' ? { packed: true } : {}),
+          packed: mode === 'fill-text',
         })
         expect(reads.mock.results[0]?.value).toEqual(source.rows)
       }
@@ -1151,6 +1152,7 @@ describe('CanvasTerminalRenderer', () => {
 
 describe('compatible renderer selection', () => {
   it('releases an acquired device and falls back when the WebGPU context is unavailable', async () => {
+    stubRendererNavigator({ platform: 'MacIntel', userAgent: '' })
     const canvas = createCanvas()
     const getContext = canvas.getContext.bind(canvas)
     Object.defineProperty(canvas, 'getContext', {
@@ -1196,6 +1198,7 @@ describe('compatible renderer selection', () => {
   })
 
   it('does not hide WebGPU programming failures behind the fallback', async () => {
+    stubRendererNavigator({ platform: 'MacIntel', userAgent: '' })
     const canvas = createCanvas()
     const clock = new FakeClock()
     const source = new FakeRenderState([row(0, [cell(0), cell(1)]), row(1, [cell(0), cell(1)])])
@@ -1207,6 +1210,27 @@ describe('compatible renderer selection', () => {
         deviceFactory: () => Promise.reject(failure),
       }),
     ).rejects.toBe(failure)
+  })
+
+  it('does not hide Linux WebGL programming failures behind the fallback', async () => {
+    stubRendererNavigator({ platform: 'Linux x86_64', userAgent: '' })
+    const canvas = createCanvas()
+    const getContext = vi.spyOn(canvas, 'getContext')
+    const clock = new FakeClock()
+    const source = new FakeRenderState([row(0, [cell(0), cell(1)]), row(1, [cell(0), cell(1)])])
+    const deviceFactory = vi.fn(() =>
+      Promise.reject(new WebGpuUnavailableError('adapter', 'No supported adapter')),
+    )
+    vi.spyOn(WebGL2RenderingContext.prototype, 'getShaderParameter').mockReturnValue(false)
+
+    await expect(
+      createCompatibleTerminalRenderer({
+        ...options(canvas, source, clock),
+        deviceFactory,
+      }),
+    ).rejects.toThrow('WebGL shader compilation failed')
+    expect(deviceFactory).not.toHaveBeenCalled()
+    expect(getContext.mock.calls.map(([type]) => type)).toEqual(['webgl2'])
   })
 })
 

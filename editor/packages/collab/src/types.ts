@@ -55,6 +55,8 @@ export interface Engine<Snapshot = unknown> {
   /** Author against the current projection, reserve IDs once, and leave text unchanged. */
   author(edit: OffsetEdit, context: AuthorContext): Envelope
   snapshot(): Snapshot
+  /** A local review snapshot with selected effect states; the live engine and log stay unchanged. */
+  projectEffects(effects: readonly Effect[]): Snapshot
   restore(snapshot: Snapshot): void
 }
 
@@ -75,4 +77,49 @@ export function insertionOf(change: Change): Insert | null {
   if (change.kind === 'insert') return change
   if (change.kind === 'replace') return change.insert
   return null
+}
+
+export function sameEnvelope(a: Envelope, b: Envelope): boolean {
+  if (
+    a.document !== b.document ||
+    a.epoch !== b.epoch ||
+    editKey(a.id) !== editKey(b.id) ||
+    a.lamport !== b.lamport ||
+    a.deps.length !== b.deps.length ||
+    !a.deps.every((id, index) => editKey(id) === editKey(b.deps[index]!)) ||
+    a.change.kind !== b.change.kind
+  )
+    return false
+  const left = a.change
+  const right = b.change
+  if (left.kind === 'setEffects' && right.kind === 'setEffects')
+    return (
+      editKey(left.command) === editKey(right.command) &&
+      left.effects.length === right.effects.length &&
+      left.effects.every(
+        (effect, index) =>
+          editKey(effect.op) === editKey(right.effects[index]!.op) &&
+          effect.active === right.effects[index]!.active,
+      )
+    )
+  if (left.kind === 'setEffects' || right.kind === 'setEffects') return false
+  const insertA = insertionOf(left)
+  const insertB = insertionOf(right)
+  if (
+    insertA &&
+    insertB &&
+    (!sameChar(insertA.start, insertB.start) ||
+      !sameChar(insertA.originLeft, insertB.originLeft) ||
+      !sameChar(insertA.originRight, insertB.originRight) ||
+      insertA.text !== insertB.text)
+  )
+    return false
+  if (left.kind === 'insert' || right.kind === 'insert') return true
+  return (
+    left.spans.length === right.spans.length &&
+    left.spans.every(
+      (span, index) =>
+        sameChar(span.start, right.spans[index]!.start) && span.count === right.spans[index]!.count,
+    )
+  )
 }

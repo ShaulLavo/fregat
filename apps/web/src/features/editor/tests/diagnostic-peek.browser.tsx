@@ -25,10 +25,9 @@ type BrowserRuntime = {
 }
 
 const FILE_PATH = 'repo/a.ts'
-const DOCUMENT_TEXT = [
-  'alpha world gamma',
-  ...Array.from({ length: 80 }, (_, index) => `line ${index}`),
-].join('\n')
+const DOCUMENT_TEXT = ['alpha world gamma']
+  .concat(Array.from({ length: 80 }, (_, index) => `line ${index}`))
+  .join('\n')
 let root: Root | null = null
 let runtime: BrowserRuntime | null = null
 

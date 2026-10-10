@@ -816,6 +816,19 @@
       "dependsOn": ["E027", "E066"],
       "topics": ["Collaborative editing"],
       "baseline": "1e066d38b6455b45d406fce175f902152a58295b"
+    },
+    {
+      "id": "E068",
+      "file": "e068-meaning-level-merge-review.md",
+      "title": "Review edits that merged cleanly but may not make sense together",
+      "status": "Approved",
+      "owner": "Editor",
+      "kind": "Implementation",
+      "priority": "P2",
+      "effort": "L",
+      "dependsOn": ["E063", "E066"],
+      "topics": ["Collaborative editing"],
+      "baseline": "3857795d10a706d75b695931f3b70f34595bdfa2"
     }
   ]
 }

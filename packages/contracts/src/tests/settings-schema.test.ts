@@ -20,7 +20,7 @@ afterEach(async () => {
 
 describe('settings JSON Schema', () => {
   it('contains every registered key and only registered keys', () => {
-    expect(Object.keys(SETTINGS_JSON_SCHEMA.properties)).toEqual([...SETTING_IDS].toSorted())
+    expect(Object.keys(SETTINGS_JSON_SCHEMA.properties)).toEqual(SETTING_IDS.toSorted())
   })
 
   it('derives descriptions and defaults from each descriptor', () => {

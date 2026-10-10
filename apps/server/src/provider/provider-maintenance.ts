@@ -229,7 +229,7 @@ async function runUpdateCommand(
   if (!executable)
     return { exitCode: 127, output: `${command ?? ''}: command not found`, timedOut: false }
 
-  const child = Bun.spawn([executable, ...args], {
+  const child = Bun.spawn([executable].concat(args), {
     env,
     stderr: 'pipe',
     stdin: 'ignore',

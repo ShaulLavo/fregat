@@ -13,7 +13,7 @@ import type {
   LanguageServerDiagnosticMarkerEvent,
   LanguageServerReferencesResult,
 } from '@singapore-editor/lsp-plugin'
-import { useLayoutEffect, useMemo } from 'react'
+import { useLayoutEffect, useMemo, useState } from 'react'
 import { useStore } from 'zustand'
 
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
@@ -75,13 +75,10 @@ export function useLanguageServerPlugin({
     [available, mutateAsync],
   )
   const { service: fileOpenIntent } = useFileOpenIntent()
-  // Manual memo: `languageServerStatusSource` is a useMemo dependency, and the compiler's cache is a
-  // cache, not an identity guarantee — when it recomputes, the useMemo re-runs.
-  const languageServerStatusSource = useMemo(() => createEditorLanguageServerStatusSource(), [])
+  const [languageServerStatusSource] = useState(createEditorLanguageServerStatusSource)
   const onApplyWorkspaceEdit = useWorkspaceEditHost()
   const documentSyncController = useWorkspaceDocumentSyncController()
-  // Manual memo: `target` is a useMemo dependency, and the compiler's cache is a
-  // cache, not an identity guarantee — when it recomputes, the useMemo re-runs.
+  // The plugin memo depends on this target object.
   const target = useMemo(
     () => languageServerTarget ?? { matchPath: filePath },
     [filePath, languageServerTarget],

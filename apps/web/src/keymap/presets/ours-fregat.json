@@ -1,0 +1,52 @@
+[
+  {
+    "command": "workspace.toggleCheckpointChange",
+    "keys": "Mod+Backspace",
+    "replacement": { "keys": "Mod+Shift+Backspace" },
+    "reason": "Zed binds Mod+Backspace in the Git changes list to Restore File."
+  },
+  {
+    "command": "workspace.historyBack",
+    "keys": "Mod+Alt+Z",
+    "replacement": { "keys": "Mod+Alt+U" },
+    "reason": "Zed binds Mod+Alt+Z in the Editor to Restore (macOS) and Reject or Rate Predictions (Linux). Mod+Alt+U pairs with Zed's Mod+U Undo Selection."
+  },
+  {
+    "command": "workspace.historyForward",
+    "keys": "Mod+Alt+Shift+Z",
+    "replacement": { "keys": "Mod+Alt+Shift+U" },
+    "reason": "Pairs with History: back, as Zed's Mod+Shift+U Redo Selection pairs with Mod+U."
+  },
+  {
+    "command": "workspace.focusNextTerminal",
+    "keys": "Mod+PageDown",
+    "platforms": ["linux", "windows"],
+    "replacement": { "keys": "Mod+Alt+PageDown" },
+    "reason": "Zed binds Ctrl+PageDown to the next tab in every pane, including terminals."
+  },
+  {
+    "command": "workspace.focusPreviousTerminal",
+    "keys": "Mod+PageUp",
+    "platforms": ["linux", "windows"],
+    "replacement": { "keys": "Mod+Alt+PageUp" },
+    "reason": "Zed binds Ctrl+PageUp to the previous tab in every pane, including terminals."
+  },
+  {
+    "command": "workspace.toggleDiffViewMode",
+    "keys": "Mod+Shift+D",
+    "replacement": { "keys": "Mod+Alt+Shift+D" },
+    "reason": "Zed binds Mod+Shift+D to the debug panel."
+  },
+  {
+    "command": "workspace.toggleUiMode",
+    "keys": "Mod+Shift+M",
+    "replacement": { "keys": "Mod+Alt+Shift+M" },
+    "reason": "Zed binds Mod+Shift+M to Problems."
+  },
+  {
+    "command": "workspace.newSession",
+    "keys": "Mod+Alt+N",
+    "replacement": { "context": "Workspace && !FileTree" },
+    "reason": "Zed binds Mod+Alt+N in the file tree to New Folder, so the file tree keeps it."
+  }
+]

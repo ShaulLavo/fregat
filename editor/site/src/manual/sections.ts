@@ -36,6 +36,7 @@ export const SECTIONS = [
       ['concepts/workers', 'Workers'],
       ['concepts/highlighting', 'Highlighting'],
       ['concepts/performance', 'Performance'],
+      ['concepts/limitations', 'Known limits'],
     ],
   },
   {

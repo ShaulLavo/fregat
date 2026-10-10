@@ -137,6 +137,13 @@ export function clientErrorDescription(error: Pick<ClientError, 'message' | 'fix
 /** A connection failure as a machine keeps it: a catalog error keeps its code, why and fix. */
 export function toConnectionError(input: unknown, fallback: string): ConnectionError {
   const error = toClientError(input)
+  // A refused request reads "TypeError: Failed to fetch"; the caller's sentence names the machine.
+  if (!error.code && error.category === 'connectivity')
+    return {
+      code: 'CONNECTION_FAILED',
+      message: fallback,
+      fix: 'Check that the machine is on and its address is right, then try again.',
+    }
   if (!error.code)
     return { code: 'CONNECTION_FAILED', message: errorMessage(input, fallback) || fallback }
   return { code: error.code, message: error.message, why: error.why, fix: error.fix }

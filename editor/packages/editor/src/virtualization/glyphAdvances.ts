@@ -1,11 +1,15 @@
+import { cacheShapedRuns } from './shapedRunCache'
+
 /**
- * Per-face glyph advances for a proportional font, read from a 2D canvas set to the face the text is
- * drawn with. Summing single glyphs ignores kerning and shaping, so callers leave a margin; the
- * monospace path never builds one.
+ * Per-face glyph advances from a 2D canvas. Wrapping measures monospace faces too, because CJK and
+ * fallback glyphs can exceed one cell. Proportional geometry measures complete shaped runs.
  */
 export type GlyphAdvances = {
   /** The advance of one code point, in CSS pixels. */
   advance(codePoint: number): number
+  /** Native shaping of a complete run, including kerning and ligatures. */
+  readonly measure?: (text: string) => number
+  readonly minimumTabAdvance?: number
 }
 
 type MeasureContext = {
@@ -39,7 +43,10 @@ export function glyphAdvancesFor(element: HTMLElement): GlyphAdvances | null {
   if (style.letterSpacing !== 'normal' && 'letterSpacing' in context) {
     context.letterSpacing = style.letterSpacing
   }
-  const advances = createGlyphAdvances(context, font, style.letterSpacing)
+  const advances = {
+    ...createGlyphAdvances(context, font, style.letterSpacing),
+    minimumTabAdvance: nativeMinimumTabAdvance(element, font),
+  }
   const byKey = advancesCache.get(element.ownerDocument) ?? new Map<string, GlyphAdvances>()
   byKey.set(key, advances)
   advancesCache.set(element.ownerDocument, byKey)
@@ -49,6 +56,8 @@ export function glyphAdvancesFor(element: HTMLElement): GlyphAdvances | null {
 /** Dropped with the metrics cache: a late web font changes every advance without changing a style. */
 export function clearGlyphAdvancesCache(): void {
   advancesCache = new WeakMap()
+  // WebKit retains a canvas context's fallback face after the requested web font loads.
+  sharedContext = null
 }
 
 function createGlyphAdvances(
@@ -66,6 +75,11 @@ function createGlyphAdvances(
   }
 
   return {
+    measure: cacheShapedRuns((text) => {
+      context.font = font
+      if ('letterSpacing' in context) context.letterSpacing = letterSpacing
+      return context.measureText(text).width
+    }),
     advance(codePoint) {
       if (codePoint < BMP_SIZE) {
         const known = bmp[codePoint]!
@@ -101,4 +115,22 @@ function fontShorthand(style: CSSStyleDeclaration): string {
     .filter((part) => part && part !== 'normal')
     .concat(`${style.fontSize} ${style.fontFamily}`)
     .join(' ')
+}
+
+/** Engines differ in the half-ch tab rule; measure the font policy once with the glyph metrics. */
+function nativeMinimumTabAdvance(element: HTMLElement, font: string): number {
+  const probe = element.ownerDocument.createElement('span')
+  probe.style.cssText =
+    'position:absolute;visibility:hidden;white-space:pre;letter-spacing:0;tab-size:1.25ch'
+  probe.style.font = font
+  probe.textContent = '0'
+  // A hidden editor ancestor must not turn the cached font policy into a zero-width reading.
+  element.ownerDocument.documentElement.append(probe)
+  try {
+    const ch = probe.getBoundingClientRect().width
+    probe.textContent = '0\t'
+    return probe.getBoundingClientRect().width > ch * 1.75 ? ch / 2 : 0
+  } finally {
+    probe.remove()
+  }
 }

@@ -150,8 +150,7 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
   workspaces to `knip.json`.
 - Root `typecheck`/`test`/`lint` now cover all Editor packages, examples and ghostty's browser
   tests; typecheck needs the Editor packages built first.
-- Layout-dependent scripts to update: `bundle-report.ts`, `bundle-owners.test.ts`,
-  `editor-open-benchmark.mjs`, `terminal-reload-proof.mjs`, the `quick-open-linked-file`
+- Layout-dependent scripts to update: `editor-open-benchmark.mjs`, `terminal-reload-proof.mjs`, the `quick-open-linked-file`
   scenario; delete `check-linked-sources.ts`. The setup action loses six sibling clone/build/link
   steps.
 - oxfmt/oxlint versions already match; `.oxfmtrc.json` configs differ. The vitest patch is
@@ -247,7 +246,7 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
 
 PR #199 uses one root workspace install, including ghostty's demo and site. Editor-specific Turbo tasks run from the root; root typecheck builds library exports first. Imported-family Knip entries preserve Fregat's existing checks. Protocol-only ABI enums remain available for the native contract.
 
-Editor keeps its standalone lint policy in `editor/.oxlintrc.json`; Fregat's compiler lint policy covers Fregat workspaces. The bundle gate's Editor owner is now `editor`, carrying its existing byte budget.
+Editor keeps its standalone lint policy in `editor/.oxlintrc.json`; Fregat's compiler lint policy covers Fregat workspaces.
 
 Family formatter options match Fregat; generated-file exclusions remain with each family for standalone installs. Fregat applies the sole Vitest patch at the root. Standalone family CI runs plain `bun install` and uses upstream Vitest.
 

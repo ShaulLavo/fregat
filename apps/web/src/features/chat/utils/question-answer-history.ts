@@ -26,12 +26,13 @@ export function questionAnswerHistory(payload: unknown): readonly QuestionAnswer
   const result = v.safeParse(historySchema, payload)
   if (!result.success) return []
   const { answers, questionTextById, attachmentsByQuestionId } = result.output
-  const ids = new Set([
-    ...Object.keys(questionTextById),
-    ...Object.keys(answers),
-    ...Object.keys(attachmentsByQuestionId),
-  ])
-  return [...ids].map((id) => ({
+  const ids = new Set(
+    Object.keys(questionTextById).concat(
+      Object.keys(answers),
+      Object.keys(attachmentsByQuestionId),
+    ),
+  )
+  return Array.from(ids, (id) => ({
     id,
     question: questionTextById[id] ?? '',
     answer: questionAnswerText(answers[id]),

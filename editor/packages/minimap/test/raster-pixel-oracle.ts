@@ -267,7 +267,7 @@ function canvasPixels(canvas: OffscreenCanvas): Uint8ClampedArray {
 function verifyOverlappingTokens(result: PixelOracleResult): void {
   const pair = createPair({ dpr: 1, renderCharacters: false, alpha: 0, scale: 1 })
   const spanning = { start: 0, end: pair.document.textLength, color: tokenColor(7) }
-  const tokens = [spanning, ...pair.document.tokens.filter((token) => token.end < 2000)]
+  const tokens = [spanning].concat(pair.document.tokens.filter((token) => token.end < 2000))
   try {
     pair.actual.renderer.setTokens(tokens)
     pair.expected.renderer.setTokens([spanning])

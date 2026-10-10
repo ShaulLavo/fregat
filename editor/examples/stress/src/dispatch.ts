@@ -31,10 +31,9 @@ async function setup({ interested, irrelevant }: Setup): Promise<void> {
   const host = document.getElementById('host')!
   host.replaceChildren()
   host.style.cssText = 'width:1000px;height:700px;display:flex'
-  const plugins = [
-    ...Array.from({ length: interested }, () => piece(['selection'])),
-    ...Array.from({ length: irrelevant }, () => piece(['tokens'])),
-  ]
+  const plugins = Array.from({ length: interested }, () => piece(['selection'])).concat(
+    Array.from({ length: irrelevant }, () => piece(['tokens'])),
+  )
   editor = new Editor(host, { defaultText: text(20_000), plugins })
   // @justification Benchmark harness: two frames let the editor mount before any pass is timed.
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))

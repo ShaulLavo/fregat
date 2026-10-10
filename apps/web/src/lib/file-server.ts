@@ -76,7 +76,6 @@ type OpenWorkspaceRootResult = {
 
 export type RecentEntriesOptions = {
   limit: number
-  mode: 'file' | 'folder'
   showHidden: boolean
 }
 

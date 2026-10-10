@@ -46,7 +46,7 @@ const rows = dates.flatMap((createdAt, i) =>
 )
 let sortingCases = 0
 for (let index = 0; index < rows.length; index++) {
-  const corpus = [...rows.slice(index), ...rows.slice(0, index)]
+  const corpus = rows.slice(index).concat(rows.slice(0, index))
   deepStrictEqual(
     corpus.toSorted(comparePinnedSessions),
     upstream.sortPinnedThreadsByOrderKey(corpus),
@@ -60,7 +60,7 @@ for (let index = 0; index < rows.length; index++) {
 let navigationSortCases = 0
 for (const sortOrder of ['created_at', 'updated_at'] as const) {
   for (let index = 0; index < rows.length; index++) {
-    const corpus = [...rows.slice(index), ...rows.slice(0, index)]
+    const corpus = rows.slice(index).concat(rows.slice(0, index))
     deepStrictEqual(
       corpus.toSorted((left, right) => compareSessionsByActivity(left, right, sortOrder)),
       upstream.sortThreads(corpus, sortOrder),
@@ -83,8 +83,8 @@ notDeepStrictEqual(
   'Keyed-first active sorting must fail',
 )
 let settledCases = 0
-for (const settledAt of [null, ...dates]) {
-  for (const completedAt of [null, ...dates]) {
+for (const settledAt of Array.of<string | null>(null).concat(dates)) {
+  for (const completedAt of Array.of<string | null>(null).concat(dates)) {
     for (const updatedAt of dates) {
       const row = {
         id: 's',
@@ -106,7 +106,7 @@ const settledRows = rows.map((row, index) => ({
 }))
 let settledSortCases = 0
 for (let index = 0; index < settledRows.length; index++) {
-  const corpus = [...settledRows.slice(index), ...settledRows.slice(0, index)]
+  const corpus = settledRows.slice(index).concat(settledRows.slice(0, index))
   const expected = corpus.toSorted((left, right) => {
     const leftStamp = upstream.resolveSettledThreadTimestamp(left)
     const rightStamp = upstream.resolveSettledThreadTimestamp(right)
@@ -144,10 +144,9 @@ const orders = [['a', 'm', 'z'], ['m', 'a', 'z'], ['z', 'a', 'm'], ['m'], []]
 let allocationCases = 0
 for (const keysById of keyMaps) {
   for (const reserved of [[], ['n'], ['b', 'n', 'u', 'z']]) {
-    const map = new Map([
-      ...keysById,
-      ...reserved.map((key, index) => [`hidden${index}`, key] as const),
-    ])
+    const map = new Map(
+      Array.from(keysById).concat(reserved.map((key, index) => [`hidden${index}`, key] as const)),
+    )
     for (const orderedIds of orders) {
       const input = { orderedIds, keysById: map, movedId: 'm' }
       deepStrictEqual(planRailReorder(input), upstream.planPinnedReorder(input))
@@ -248,24 +247,24 @@ notDeepStrictEqual(
 )
 let targetCases = 0
 for (const populated of [false, true]) {
-  const items: RailListItem[] = [
-    { kind: 'marker', marker: 'pinned-header' },
-    ...(populated
-      ? [{ kind: 'session' as const, key: 'owner:p', section: 'pinned' as const }]
-      : []),
-    { kind: 'marker', marker: 'pinned-divider' },
-    { kind: 'marker', marker: 'active-placeholder' },
-    ...(populated
-      ? [{ kind: 'session' as const, key: 'owner:a', section: 'active' as const }]
-      : []),
-    { kind: 'marker', marker: 'snoozed-header' },
-    { kind: 'session', key: 'owner:s', section: 'snoozed' },
-    { kind: 'marker', marker: 'settled-header' },
-    { kind: 'marker', marker: 'settled-placeholder' },
-    ...(populated
-      ? [{ kind: 'session' as const, key: 'owner:d', section: 'settled' as const }]
-      : []),
-  ]
+  const items: RailListItem[] = Array.of<RailListItem>({
+    kind: 'marker',
+    marker: 'pinned-header',
+  }).concat(
+    populated ? [{ kind: 'session' as const, key: 'owner:p', section: 'pinned' as const }] : [],
+    [
+      { kind: 'marker', marker: 'pinned-divider' },
+      { kind: 'marker', marker: 'active-placeholder' },
+    ],
+    populated ? [{ kind: 'session' as const, key: 'owner:a', section: 'active' as const }] : [],
+    [
+      { kind: 'marker', marker: 'snoozed-header' },
+      { kind: 'session', key: 'owner:s', section: 'snoozed' },
+      { kind: 'marker', marker: 'settled-header' },
+      { kind: 'marker', marker: 'settled-placeholder' },
+    ],
+    populated ? [{ kind: 'session' as const, key: 'owner:d', section: 'settled' as const }] : [],
+  )
   for (const item of items) {
     for (const over of items) {
       const oldItems = items.map((entry) =>

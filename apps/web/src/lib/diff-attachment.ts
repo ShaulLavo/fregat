@@ -146,15 +146,15 @@ export function diffAttachmentSubject(attachment: DiffAttachment): DiffAttachmen
       const input = attachment.read.input
       const sides =
         attachment.meaning === 'focused' ? ['current', input.new.id] : [input.old.id, input.new.id]
+      const subject: readonly (string | number)[] = [
+        'history',
+        input.scope.environmentId,
+        input.scope.rootPath,
+        input.subject,
+        attachment.meaning,
+      ]
       return {
-        key: JSON.stringify([
-          'history',
-          input.scope.environmentId,
-          input.scope.rootPath,
-          input.subject,
-          attachment.meaning,
-          ...sides,
-        ]),
+        key: JSON.stringify(subject.concat(sides)),
         buffer: input.buffer,
       }
     }
@@ -242,14 +242,17 @@ export function diffAttachmentReferences(attachment: DiffAttachment): readonly o
       return [attachment.read.live.snapshot, attachment.read.saved.snapshot]
     case 'history':
       return [attachment.read.input.old.snapshot, attachment.read.input.new.snapshot]
-    case 'settings':
-      return [
+    case 'settings': {
+      const references: object[] = [
         attachment.read.input.local.buffer,
         attachment.read.input.local.snapshot.snapshot,
-        ...(attachment.read.input.confirmed.kind === 'confirmed'
-          ? [attachment.read.input.confirmed.reader]
-          : []),
       ]
+      return references.concat(
+        attachment.read.input.confirmed.kind === 'confirmed'
+          ? [attachment.read.input.confirmed.reader]
+          : [],
+      )
+    }
     case 'filesystem': {
       const capture = attachment.read.input.capture
       const references: object[] = [capture, attachment.file]

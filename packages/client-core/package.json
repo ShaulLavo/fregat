@@ -62,7 +62,6 @@
     "./files/read": "./src/files/read.ts",
     "./commands/settings": "./src/commands/settings.ts",
     "./themes/registration": "./src/themes/registration.ts",
-    "./themes/palette": "./src/themes/palette.ts",
     "./themes/palette-editing": "./src/themes/palette-editing.ts",
     "./themes/wallpaper-palette": "./src/themes/wallpaper-palette.ts",
     "./address/path-token": "./src/address/path-token.ts",

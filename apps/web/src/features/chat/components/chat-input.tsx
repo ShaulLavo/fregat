@@ -11,11 +11,12 @@ import { resolveComposerInteractionMode } from '@workspace/client-core/chat/comp
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
 import { LexicalComposer, type InitialConfigType } from '@lexical/react/LexicalComposer'
 import { useQuery } from '@tanstack/react-query'
-import type {
-  InteractionMode,
-  ModelSelection,
-  ProviderInstanceId,
-  RuntimeMode,
+import {
+  MAX_CHAT_ATTACHMENTS,
+  type InteractionMode,
+  type ModelSelection,
+  type ProviderInstanceId,
+  type RuntimeMode,
 } from '@workspace/contracts'
 import { $setSelection, type LexicalEditor } from 'lexical'
 import { use, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
@@ -143,7 +144,7 @@ export function ChatInput({
   const terminalContexts = useChatInputDraftStore(terminalContextsSelector)
   const activeFile = useActiveFileChip(rootPath)
   const aliasRoots = use(ComposerRootsContext)
-  const reviewComments = useReviewDraft({ environmentId, rootPaths: [rootPath, ...aliasRoots] })
+  const reviewComments = useReviewDraft({ environmentId, rootPaths: [rootPath].concat(aliasRoots) })
   const persistenceError = useChatInputDraftStore((store) => store.persistenceError)
   const clearStoredDraft = useChatInputDraftStore((store) => store.clearDraft)
   const clearStoredDraftContent = useChatInputDraftStore((store) => store.clearDraftContent)
@@ -533,6 +534,11 @@ export function ChatInput({
                 runtimeMode={runtimeMode}
                 sendDisabled={submissionDisabled || busySendDisabledReason !== null}
                 statusLabel={statusLabel}
+                machineFiles={{
+                  limit: Math.max(0, MAX_CHAT_ATTACHMENTS - images.length),
+                  startPath: rootPath || null,
+                  onAttach: imagePreparation.attachFromMachine,
+                }}
                 onSelectImageFiles={handleImageFiles}
                 onStop={onStop}
                 onSubmit={handleSubmit}

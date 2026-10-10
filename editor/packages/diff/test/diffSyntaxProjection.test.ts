@@ -84,7 +84,7 @@ describe('projectDiffSyntaxTokens', () => {
     const sorted = projectDiffSyntaxTokens({
       rows,
       side: 'old',
-      sources: [{ ...source, tokens: [...tokens].sort((left, right) => left.start - right.start) }],
+      sources: [{ ...source, tokens: tokens.toSorted((left, right) => left.start - right.start) }],
     })
 
     expect(shuffled).toEqual(sorted)
@@ -142,7 +142,7 @@ function referenceProjection(
 
 // A store holds tokens by start, ties in producer order, so that is the order a row reads them in.
 function sortedByStart(tokens: readonly EditorToken[]): readonly EditorToken[] {
-  return [...tokens].sort((left, right) => left.start - right.start)
+  return tokens.toSorted((left, right) => left.start - right.start)
 }
 
 function mulberry(seed: number): () => number {

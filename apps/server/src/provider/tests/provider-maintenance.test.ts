@@ -90,7 +90,7 @@ describe('ProviderMaintenance', () => {
     })
 
     const results = await Promise.all([maintenance.update(CODEX), maintenance.update(CODEX)])
-    expect(results.map((result) => result.outcome).toSorted()).toEqual(['unchanged', 'updated'])
+    expect(results.map((result) => result.outcome).sort()).toEqual(['unchanged', 'updated'])
     expect(results[0]?.advisory).toMatchObject({ installedVersion: LATEST, status: 'current' })
     expect(await updates()).toHaveLength(1)
     expect(fetched).toEqual(['https://registry.npmjs.org/@openai/codex/latest'])

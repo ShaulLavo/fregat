@@ -230,7 +230,7 @@ async function moduleWorkerSources(directory: string): Promise<readonly string[]
       sources.push(`${path.relative(packageDir, file)} -> ${match[1]}`)
     }
   }
-  return sources.toSorted()
+  return sources.sort()
 }
 
 function isTypeScriptModule(name: string): boolean {

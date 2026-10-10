@@ -112,9 +112,9 @@ async function prepare(
       }
     : null
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source))
-  const sha256 = [...new Uint8Array(hash)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
+  const sha256 = Array.from(new Uint8Array(hash), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
   return { ...fixtureFacts(source), sha256 }
 }
 
@@ -372,7 +372,8 @@ function revealHidden() {
 function observe() {
   const rows = [...hosts.querySelectorAll<HTMLElement>('#view-0 [data-editor-virtual-row]')]
   return {
-    geometry: [...hosts.querySelectorAll<HTMLElement>('.editor-virtualized, textarea')].map(
+    geometry: Array.from(
+      hosts.querySelectorAll<HTMLElement>('.editor-virtualized, textarea'),
       (element) => ({
         className: element.className,
         rect: element.getBoundingClientRect().toJSON(),
@@ -413,7 +414,9 @@ async function dispose() {
   if (active) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
     released.push(
-      ...[active.buffer, active.analysis, ...active.editors].map((value) => new WeakRef(value)),
+      new WeakRef(active.buffer),
+      new WeakRef(active.analysis),
+      ...active.editors.map((editor) => new WeakRef(editor)),
     )
     active.inputAbort.abort()
     for (const editor of active.editors) editor.dispose()

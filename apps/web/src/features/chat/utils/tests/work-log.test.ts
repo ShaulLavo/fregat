@@ -84,39 +84,40 @@ describe('chat work log entries', () => {
       'deprecation.notice',
     ]
     const entries = chatWorkLogEntries({
-      activities: [
-        ...quietKinds.map((kind) => activity(kind, { kind, tone: 'info' })),
-        activity('mcp-ready', {
-          kind: 'mcp.status.updated',
-          tone: 'info',
-          payload: {
-            status: { name: 'codex_apps', status: 'ready', error: null, failureReason: null },
-          },
-        }),
-        activity('mcp-failed', {
-          kind: 'mcp.status.updated',
-          tone: 'info',
-          payload: {
-            status: {
-              name: 'GitHub',
-              status: 'failed',
-              error: null,
-              failureReason: 'Authentication required',
+      activities: quietKinds
+        .map((kind) => activity(kind, { kind, tone: 'info' }))
+        .concat([
+          activity('mcp-ready', {
+            kind: 'mcp.status.updated',
+            tone: 'info',
+            payload: {
+              status: { name: 'codex_apps', status: 'ready', error: null, failureReason: null },
             },
-          },
-        }),
-        activity('approval', { kind: 'approval.requested', tone: 'approval' }),
-        activity('runtime', {
-          kind: 'runtime.error',
-          tone: 'error',
-          payload: { message: 'Provider exited' },
-        }),
-        activity('empty-warning', {
-          kind: 'runtime.warning',
-          tone: 'info',
-          summary: 'Unknown SDK message (no displayable text content)',
-        }),
-      ],
+          }),
+          activity('mcp-failed', {
+            kind: 'mcp.status.updated',
+            tone: 'info',
+            payload: {
+              status: {
+                name: 'GitHub',
+                status: 'failed',
+                error: null,
+                failureReason: 'Authentication required',
+              },
+            },
+          }),
+          activity('approval', { kind: 'approval.requested', tone: 'approval' }),
+          activity('runtime', {
+            kind: 'runtime.error',
+            tone: 'error',
+            payload: { message: 'Provider exited' },
+          }),
+          activity('empty-warning', {
+            kind: 'runtime.warning',
+            tone: 'info',
+            summary: 'Unknown SDK message (no displayable text content)',
+          }),
+        ]),
     })
 
     expect(entries.map((entry) => entry.id)).toEqual(['mcp-failed', 'approval', 'runtime'])

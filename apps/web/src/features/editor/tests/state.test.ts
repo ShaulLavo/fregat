@@ -452,7 +452,7 @@ describe('editor workspace state', () => {
         documentTargets.snapshot,
         documentTargets.checkpointFile,
       ]
-      const paths = [documentTargets.file, ...comparisons]
+      const paths = [documentTargets.file].concat(comparisons)
       const panels = workbenchPanelsForPaths(paths, documentTargets.savedComparison)
       const positions = Object.fromEntries(paths.map((path) => [path, { left: 3, top: 120 }]))
       const { commands, documentStore, workspaceStore } = editorHarness({
@@ -470,7 +470,7 @@ describe('editor workspace state', () => {
         filesystemPath('/repo/src/renamed.ts'),
       )
       if (parked) commands.switchRootFolder(pickedDirectory('/repo'))
-      const expectedPaths = ['/repo/src/renamed.ts', ...comparisons]
+      const expectedPaths = ['/repo/src/renamed.ts'].concat(comparisons)
       expect(workspaceStore.getState()).toMatchObject({
         editorHistory: testTabContents(expectedPaths),
         recentlyClosedTabs: testTabContents(expectedPaths),

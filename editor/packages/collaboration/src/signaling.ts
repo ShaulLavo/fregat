@@ -89,7 +89,7 @@ export class WebSocketSignaling implements SignalingClient {
   }
 
   private openSocket(url: string, protocols: readonly string[]): void {
-    const socket = new WebSocket(url, [...new Set(['singapore-collaboration', ...protocols])])
+    const socket = new WebSocket(url, [...new Set(['singapore-collaboration'].concat(protocols))])
     this.sockets.set(url, socket)
     socket.onopen = () => {
       if (this.closed || this.sockets.get(url) !== socket) return

@@ -58,7 +58,7 @@ export function documentSymbolServerId(matches: readonly LspMatch[] | null): str
 
   const navigating = matches
     .filter((match) => match.features.navigation !== undefined)
-    .toSorted((left, right) => left.features.navigation! - right.features.navigation!)
+    .sort((left, right) => left.features.navigation! - right.features.navigation!)
 
   return (navigating[0] ?? matches[0])!.serverId
 }
@@ -257,16 +257,17 @@ function flattenDocumentSymbols(
   symbols: readonly DocumentSymbol[],
   containerName: string | null = null,
 ): readonly FlatDocumentSymbol[] {
-  return symbols.flatMap((symbol) => [
-    {
-      containerName,
-      kind: symbol.kind,
-      name: symbol.name,
-      range: symbol.range,
-      selectionRange: symbol.selectionRange,
-    },
-    ...flattenDocumentSymbols(symbol.children ?? [], symbol.name),
-  ])
+  return symbols.flatMap((symbol) =>
+    [
+      {
+        containerName,
+        kind: symbol.kind,
+        name: symbol.name,
+        range: symbol.range,
+        selectionRange: symbol.selectionRange,
+      },
+    ].concat(flattenDocumentSymbols(symbol.children ?? [], symbol.name)),
+  )
 }
 
 // Servers without hierarchical support answer the flat SymbolInformation list;

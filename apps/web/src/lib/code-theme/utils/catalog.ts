@@ -113,7 +113,9 @@ export function isBuiltinEditorThemeId(themeId: string): boolean {
  * not, and it is already searchable through the row's keywords.
  */
 export function editorThemeOptions(type: EditorColorModeType): readonly EditorThemeOption[] {
-  const builtins = BUILTIN_EDITOR_THEMES.filter((theme) => theme.type === type).map(
+  const builtins = BUILTIN_EDITOR_THEMES.filter(
+    (theme) => theme.type === type,
+  ).map<EditorThemeOption>(
     (theme) =>
       ({
         id: theme.id,
@@ -123,7 +125,7 @@ export function editorThemeOptions(type: EditorColorModeType): readonly EditorTh
         type: theme.type,
       }) satisfies EditorThemeOption,
   )
-  const vscode = VSCODE_THEMES.filter((theme) => theme.type === type).map(
+  const vscode = VSCODE_THEMES.filter((theme) => theme.type === type).map<EditorThemeOption>(
     (theme) =>
       ({
         id: theme.id,
@@ -134,7 +136,7 @@ export function editorThemeOptions(type: EditorColorModeType): readonly EditorTh
       }) satisfies EditorThemeOption,
   )
 
-  return [...builtins, ...vscode]
+  return builtins.concat(vscode)
 }
 
 export function editorThemeColorMode(themeId: string): EditorColorModeType | undefined {

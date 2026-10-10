@@ -241,10 +241,9 @@ function comparisonText(comparison: HistoryComparison<DiffFile | 'too-large'> | 
   if (comparison.result === 'too-large') return `${header}: too large to compare here`
   const hunks = comparison.result?.hunks ?? []
   if (hunks.length === 0) return `${header}: identical text`
-  const lines = hunks.flatMap((hunk) => [
-    hunk.header,
-    ...hunk.lines.map((line) => `${linePrefix(line.type)}${line.text}`),
-  ])
+  const lines = hunks.flatMap((hunk) =>
+    [hunk.header].concat(hunk.lines.map((line) => `${linePrefix(line.type)}${line.text}`)),
+  )
   return `${header}\n${lines.join('\n')}`
 }
 

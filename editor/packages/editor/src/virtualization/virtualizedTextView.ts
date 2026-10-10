@@ -1,3 +1,6 @@
+import type { RevealBlock } from './revealBlock'
+import { assertContentLayout, contentReadingBounds, revealContentRow } from './contentLayout'
+import { isElementNode, isTextareaElement } from '../dom'
 import {
   acquireRowPresentation,
   invalidateRowPresentations,
@@ -31,7 +34,11 @@ import { EditorTokenStore, type EditorTokenInput } from '../syntax/tokenStore'
 import type { TextEdit } from '../tokens'
 import { applyEditorTheme } from '../theme'
 import { measureBrowserTextFace, type BrowserTextMetrics } from './browserMetrics'
-import { FixedRowVirtualizer, type FixedRowVirtualizerSnapshot } from './fixedRowVirtualizer'
+import {
+  DEFAULT_MAX_SCROLL_HEIGHT,
+  FixedRowVirtualizer,
+  type FixedRowVirtualizerSnapshot,
+} from './fixedRowVirtualizer'
 import {
   DEFAULT_OVERSCAN,
   DEFAULT_SELECTION_HIGHLIGHT,
@@ -79,6 +86,7 @@ import {
   renderSelectionHighlight,
   renderTokenHighlights,
   restoreHighlightsAfterBrowserResume,
+  restoreHighlightsAfterPresentation,
   setRangeHighlight,
   setSelection,
   setSelections,
@@ -115,6 +123,7 @@ import {
   sourceEditPatch,
   setTextLayoutState,
   setWrapEnabledLayout,
+  assertContentSnapshot,
   updateVirtualizerRows,
   visualColumnForOffset,
 } from './virtualizedTextViewLayout'
@@ -125,11 +134,12 @@ import {
   boundaryPositionXs,
   boundaryPositionXsForAffinity,
   clearRowGeometryCaches,
+  releaseNativeRowGeometry,
   homogeneousRtlCaretAtRowEdge,
   homogeneousRtlCaretMoveInRow,
   isBidiMeasurementRefusalRow,
-  knownRowContentWidth,
-  measureRowContentWidth,
+  knownRowScrollWidth,
+  measureRowScrollWidth,
   offsetFromDomBoundary,
   rowLocalXFromClientPoint,
   rowHasOnlyBidiControls,
@@ -180,7 +190,6 @@ import {
 } from './virtualizedTextViewRows'
 import type {
   CreateRangeOptions,
-  RevealBlock,
   VirtualizedTextHighlightRange,
   VirtualizedTextHighlightStyle,
   VirtualizedTextSelection,
@@ -307,6 +316,7 @@ export class VirtualizedTextView {
   /** Set when typed text arrives through EditContext rather than the textarea. */
   public readonly editContext: EditorEditContext | null
   private readonly view: VirtualizedTextViewInternal
+  private measuredMaxScrollHeight: number | undefined
   private readonly disposeForegroundHighlightRestore: () => void
   private cancelContentWidthMeasurement: (() => void) | null = null
   private provisionalPaint: { readonly paint: SavedPaint; readonly release: () => void } | null =
@@ -365,9 +375,9 @@ export class VirtualizedTextView {
       longLineChunkSize,
     )
     const tabSize = normalizeTabSize(options.tabSize)
-    const virtualizer = new FixedRowVirtualizer(
-      createVirtualizerOptions(rowHeight, overscan, rowGap, scrollMode, options.scrollPastEnd),
-    )
+    const virtualizer = new FixedRowVirtualizer({
+      ...createVirtualizerOptions(rowHeight, overscan, rowGap, scrollMode, options.scrollPastEnd),
+    })
     const initialTextSnapshot = createStringTextSnapshot('')
     const initialInjectedTextRows = options.injectedTextRows ?? []
     const initialModel = createVirtualizedTextViewModel({
@@ -382,8 +392,7 @@ export class VirtualizedTextView {
     this.scrollElement = scrollElement
     this.contentElement = contentElement
     this.inputElement = inputElement
-    this.editContext =
-      inputElement instanceof HTMLTextAreaElement ? null : createEditContext(inputElement)
+    this.editContext = isTextareaElement(inputElement) ? null : createEditContext(inputElement)
     this.view = {
       disposed: false,
       provisional: false,
@@ -513,7 +522,10 @@ export class VirtualizedTextView {
     view.rowPool.length = 0
     const releaseWidgets = takeInlineWidgets(view)
     const releaseCells = takeGutterCells(view, rows)
-    for (const row of rows) invalidateRowPresentations(row.element)
+    for (const row of rows) {
+      invalidateRowPresentations(row.element)
+      releaseNativeRowGeometry(row)
+    }
     this.releaseProvisionalPaint()
     this.pendingReveal = null
     this.cancelContentWidthMeasurement?.()
@@ -755,6 +767,16 @@ export class VirtualizedTextView {
     return this.atomicRenderDepth > 0 || this.flushingAtomicRender
   }
 
+  get scrollMode(): VirtualizedTextViewScrollMode {
+    return this.view.scrollMode
+  }
+
+  public assertContentSnapshot(text: string | TextSnapshot, replacement = false): void {
+    if (this.view.scrollMode !== 'content') return
+    const snapshot = typeof text === 'string' ? createStringTextSnapshot(text) : text
+    assertContentSnapshot(this.view, snapshot, replacement)
+  }
+
   public setText(
     text: string | TextSnapshot,
     preparedLineStarts?: readonly number[],
@@ -762,6 +784,7 @@ export class VirtualizedTextView {
   ): void {
     const textSnapshot = typeof text === 'string' ? createStringTextSnapshot(text) : text
     const view = this.view
+    assertContentSnapshot(view, textSnapshot)
     this.pendingReveal = null
     view.sameLineTokenEdit = null
     view.tokenProjectionDirtyStartRow = null
@@ -985,10 +1008,17 @@ export class VirtualizedTextView {
     const nextScrollMode = normalizeScrollMode(scrollMode)
     if (view.scrollMode === nextScrollMode) return false
 
+    if (nextScrollMode === 'content') {
+      const snapshot = view.virtualizer.getSnapshot()
+      assertContentLayout(view.model.textLength, view.model.visibleLineCount, snapshot.totalSize)
+    }
     view.scrollMode = nextScrollMode
     setScrollModeAttribute(view.scrollElement, nextScrollMode)
     view.lastRenderedRowsKey = ''
-    view.virtualizer.updateOptions({ scrollMode: nextScrollMode })
+    view.virtualizer.updateOptions({
+      scrollMode: nextScrollMode,
+      maxScrollHeight: nextScrollMode === 'virtualized' ? this.measuredMaxScrollHeight : undefined,
+    })
     return true
   }
 
@@ -1025,6 +1055,7 @@ export class VirtualizedTextView {
     const view = this.view
     const textSnapshot =
       typeof nextText === 'string' ? createStringTextSnapshot(nextText) : nextText
+    assertContentSnapshot(view, textSnapshot)
     this.applyingEdit = true
     try {
       const sameLinePatch = sameLineEditPatch(view, edit)
@@ -1048,6 +1079,7 @@ export class VirtualizedTextView {
 
   public applyEditBatch(batch: TextEditBatch): void {
     const view = this.view
+    assertContentSnapshot(view, batch.after)
     const previousLineCount = view.model.lineCount
     applyTextLayoutTransition(view, batch)
     projectFoldMarkersThroughBatch(view, batch)
@@ -1071,6 +1103,10 @@ export class VirtualizedTextView {
     adoptViewTokens(this.view, tokens)
   }
 
+  public restorePresentationHighlights(): void {
+    restoreHighlightsAfterPresentation(this.view)
+  }
+
   public setTheme(theme: EditorTheme | null | undefined): void {
     applyEditorTheme(this.scrollElement, theme)
   }
@@ -1083,7 +1119,7 @@ export class VirtualizedTextView {
   /** An EditContext only receives text while attached, so a read-only view detaches it. */
   private setInputEditable(editable: boolean): void {
     const input = this.inputElement
-    if (input instanceof HTMLTextAreaElement) {
+    if (isTextareaElement(input)) {
       input.readOnly = !editable
       return
     }
@@ -1220,6 +1256,10 @@ export class VirtualizedTextView {
       this.pendingReveal = { offset, block: 'nearest' }
       return
     }
+    if (this.view.scrollMode === 'content') {
+      this.reveal(offset, 'nearest')
+      return
+    }
     scrollToRow(this.view, rowForOffset(this.view, offset))
   }
 
@@ -1245,6 +1285,18 @@ export class VirtualizedTextView {
     // Initial navigation can arrive before ResizeObserver measures the viewport.
     if (requested !== 'nearest' && view.virtualizer.getSnapshot().viewportHeight === 0) {
       this.pendingReveal = { offset, block: requested, affinity }
+      return
+    }
+
+    if (view.scrollMode === 'content') {
+      const index = affinity
+        ? rowForCaretPosition(view, offset, affinity)
+        : rowForOffset(view, offset)
+      const row = view.rowElements.get(index)?.element
+      flushDeferredCaret(view)
+      const target =
+        view.selections[0]?.head === offset && !view.caretElement.hidden ? view.caretElement : row
+      if (target) revealContentRow(target, requested)
       return
     }
 
@@ -1636,6 +1688,22 @@ export class VirtualizedTextView {
     }
 
     const view = this.view
+    if (
+      this.measuredMaxScrollHeight === undefined &&
+      view.scrollMode === 'virtualized' &&
+      snapshot.viewportHeight > 0 &&
+      view.model.textLength > 0 &&
+      // Discover before native caps are reached, while ordinary opens remain layout-free.
+      snapshot.totalSize > DEFAULT_MAX_SCROLL_HEIGHT / 4 &&
+      snapshot.scrollHeight > snapshot.viewportHeight
+    ) {
+      this.measuredMaxScrollHeight = view.viewport.maxScrollHeight
+      if (
+        this.measuredMaxScrollHeight !== undefined &&
+        view.virtualizer.updateOptions({ maxScrollHeight: this.measuredMaxScrollHeight })
+      )
+        return
+    }
     this.synchronizeScrollPaint(snapshot)
     this.view.viewport.setViewportSize(snapshot.viewportWidth, snapshot.viewportHeight)
     this.reportContentHeight(snapshot.totalSize)
@@ -1730,7 +1798,7 @@ export class VirtualizedTextView {
     for (const row of view.rowElements.values()) {
       if (row.kind !== 'text') continue
 
-      const width = knownRowContentWidth(view, row)
+      const width = knownRowScrollWidth(view, row)
       if (width === null) {
         unmeasured = true
         continue
@@ -1780,10 +1848,10 @@ export class VirtualizedTextView {
     for (const row of view.rowElements.values()) {
       if (row.kind !== 'text') continue
 
-      raised = raiseVisualColumnsSeen(view, measureRowContentWidth(view, row)) || raised
+      raised = raiseVisualColumnsSeen(view, measureRowScrollWidth(view, row)) || raised
     }
 
-    if (!raised) return
+    if (!raised && !view.wrapEnabled) return
     updateContentWidth(view, view.virtualizer.getSnapshot().virtualItems)
   }
 
@@ -1823,6 +1891,7 @@ export class VirtualizedTextView {
       kind: 'same-line',
     }
     renderHiddenCharacters(view)
+    if (!view.monospace) updateContentWidth(view, snapshot.virtualItems)
   }
 
   private applyMultiLineEdit(
@@ -1926,12 +1995,14 @@ function locatePoint(
 ) {
   if (view.provisional) return null
   const bounds = pointViewport(view.scrollElement)
+  const readingBounds =
+    view.scrollMode === 'content' ? contentReadingBounds(view.scrollElement) : bounds
   if (
     !clamp &&
-    (clientX < bounds.left ||
-      clientX >= bounds.right ||
-      clientY < bounds.top ||
-      clientY >= bounds.bottom)
+    (clientX < readingBounds.left ||
+      clientX >= readingBounds.right ||
+      clientY < Math.max(bounds.top, readingBounds.top) ||
+      clientY >= Math.min(bounds.bottom, readingBounds.bottom))
   )
     return null
   const metrics = viewportPointMetrics(view, clientX, clientY)
@@ -2605,7 +2676,7 @@ function rowOffsetFromCaretHit(
 }
 
 function auxiliaryCaretHitElement(node: Node): HTMLElement | null {
-  const element = node instanceof Element ? node : node.parentElement
+  const element = isElementNode(node) ? node : node.parentElement
   return element?.closest<HTMLElement>(AUXILIARY_CARET_HIT_SELECTOR) ?? null
 }
 

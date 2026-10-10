@@ -77,13 +77,13 @@ The owner requested cleanup before starting the next wave on 2026-10-03. The
 [readiness review](plans/wave-readiness-2026-10-03.md) records dependency and overlap decisions.
 This pass updates planning; product implementation starts through each plan's existing gates.
 
-| Wave                | Bounded scope and finish line                                                                                                                                                                 | Entry conditions                                                                                                                                                                                        |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Preparation         | Reconcile launch handoffs, delivered contracts, terminal input ownership and shared-file owners. Preserve deferred work and owner-only checks separately.                                     | Current documentation pass; qualify required runtime/package proofs when the implementation wave starts.                                                                                                |
-| Command foundation  | 204 + 205 → 206 merged in PR #603; caller migration, old API removal and exact standalone qualification are complete. Installed release and live verification passed.                         | Exact standalone family gate qualified under 207; npm stays deferred. Finite main-host input coexists with public 286/287 contracts; their whole programs remain independent.                           |
-| Document foundation | 099 runtime merged in PR #787, installed and read-only live-verified. Each 200 consumer uses its exact 099/198 acquisition and attachment contract; 198 keeps its remaining acceptance scope. | 099 units 2–7 have accepted scoped performance, source/lifetime and host proof. Owner-instance web delivery is complete. Historical unit 0 stays partial; independent 198/200 work keeps its own gates. |
-| Feature batches     | Deliver coherent interaction/editor, navigation/save/search, excerpt/review, Git, terminal, chat and Markdown/document slices in their declared dependency order.                             | Use 206 commands and the exact content contracts each slice needs. Pane/layout changes require the relevant 209 decisions and authorized delivered hosts; preserve TUI/parser/device gates.             |
-| Broad migrations    | Localize consumers under 208's catalog/error contract, then separately authorized 209 workspace units.                                                                                        | Catalog and design preparation may run earlier. Complete-client translation and the whole workspace redesign are not prerequisites for every feature batch.                                             |
+| Wave                | Bounded scope and finish line                                                                                                                                                                                                                        | Entry conditions                                                                                                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Preparation         | Reconcile launch handoffs, delivered contracts, terminal input ownership and shared-file owners. Preserve deferred work and owner-only checks separately.                                                                                            | Current documentation pass; qualify required runtime/package proofs when the implementation wave starts.                                                                                    |
+| Command foundation  | 204 + 205 → 206 merged in PR #603; caller migration, old API removal and exact standalone qualification are complete. Installed release and live verification passed.                                                                                | Exact standalone family gate qualified under 207; npm stays deferred. Finite main-host input coexists with public 286/287 contracts; their whole programs remain independent.               |
+| Document foundation | 099 runtime merged in PR #787, installed and read-only live-verified. 198 analysis ownership and 200 content views are delivered; their contracts and accepted limits are in [document-backed content views](docs/document-backed-content-views.md). | 099 units 2–7 have accepted scoped performance, source/lifetime and host proof. Owner-instance web delivery is complete. Historical unit 0 stays partial.                                   |
+| Feature batches     | Deliver coherent interaction/editor, navigation/save/search, excerpt/review, Git, terminal, chat and Markdown/document slices in their declared dependency order.                                                                                    | Use 206 commands and the exact content contracts each slice needs. Pane/layout changes require the relevant 209 decisions and authorized delivered hosts; preserve TUI/parser/device gates. |
+| Broad migrations    | Localize consumers under 208's catalog/error contract, then separately authorized 209 workspace units.                                                                                                                                               | Catalog and design preparation may run earlier. Complete-client translation and the whole workspace redesign are not prerequisites for every feature batch.                                 |
 
 After 126's finite reconciliation, its named provider/forge/host follow-ons and Mesh
 correctness/access work can proceed where owners and files do not overlap. An owner-only
@@ -115,7 +115,7 @@ The October 3 plans retain the existing structural-cutover limit. Mesh and appli
 work can proceed independently where their files and contracts do not overlap.
 
 1. Address Mesh control authorization in [290](plans/290-mesh-device-authorization.md).
-   Public app removal and pill extraction [291](plans/291-mesh-private-services.md) is separate.
+   Public hosting retirement and dormant pill source [291](plans/291-mesh-private-services.md) shipped in Mesh v0.1.232.
    Update recovery [296](plans/296-mesh-update-recovery.md), installer guidance
    [297](plans/297-mesh-installer-path.md), DNS recovery
    [298](plans/298-mesh-download-dns-recovery.md), and session removal
@@ -140,8 +140,8 @@ work can proceed independently where their files and contracts do not overlap.
    for manual use before scheduler integration. Durable storage
    [293](plans/293-mesh-durable-job-state.md) precedes coordinated dispatch
    [294](plans/294-mesh-job-coordination.md). Schedule recurring collector execution after those guarantees pass; its usable manual command comes first.
-5. Automatic placement [311](plans/311-automatic-machine-placement.md), design-first onboarding
-   [315](plans/315-local-remote-onboarding.md), device pairing [337](plans/337-device-pairing.md), and session attention
+5. Automatic placement [311](plans/311-automatic-machine-placement.md), first-run onboarding
+   [315](plans/315-local-remote-onboarding.md) (web and phone shipped; installed macOS proof pending), device pairing [337](plans/337-device-pairing.md), and session attention
    [316](plans/316-session-attention.md) follow their owning product and verification gates.
    Grammar re-pinning and held-out corpus [317](plans/317-tree-sitter-phase-two-prerequisites.md)
    remain Approved and deferred to Phase 2 preparation. They do not start the stopped parser wave.
@@ -168,6 +168,17 @@ wrap fixes and complete responsive snapshots ship in their own PRs before site i
 This replaces the separate Node prerenderer and owns snapshot restore qualification;
 Plan 338's asset work continues alongside it.
 
+[341](plans/341-html-bootstrap.md) is Approved for a named HTML bootstrap mechanism
+that supplies current appearance and native wallpaper preloads before React. This is
+an independent bounded web/server startup change. Implement it when the owner starts
+the work, after resolving document admission and native backdrop context with Plans
+337 and 114; preserve Plan 320's shared palette generator.
+
+[342](plans/342-app-reactivity-and-async-ownership.md) records the October 9 focused app
+audit and its Approved bounded repairs. MCP subject ownership and shared LSP cancellation
+can run independently; compiler-sensitive web repairs first establish actual compiled test
+coverage. Site playback and TUI theme lifetime repairs retain their existing domain gates.
+
 [335](plans/335-stroke-icons.md) retains the current stroke-icon migration, shared registry
 and selected morph sites. Its broad swap takes the structural window after the keymap
 cutover and before broad new UI batches; registry/mapping preparation can proceed earlier.
@@ -184,21 +195,20 @@ Each program groups Approved plans that share owners and gates. Grouping does no
 scopes into one package rewrite, lift a gate or approve gated units. Sizes are in the
 [inventory](plans/inventory-2026-09-29.md); each plan keeps its own checklist.
 
-| Program                 | Plans                                                                                                                                                                                | When                                                                                                                           | Gates and boundaries                                                                                                                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Desktop app             | [114](plans/114-installed-app.md) Gates 1–4 delivered 2026-10-03                                                                                                                     | Closeout done after approved owner acceptance                                                                                  | Installed Chromium app and native system-webview host replace the old shell. Preserve mesh-owned servers and terminals; 132's transferred Mac vibrancy gate is accepted.                                              |
-| T3 alignment follow-ons | [126](plans/126-t3code-alignment.md), with exact remaining units in the [finite reconciliation](plans/126-t3code-alignment/finite-closeout-2026-10-03.md)                            | Bounded Wave 2 scope is delivered. Provider/forge batches follow keymap; relevant contract research may proceed independently. | Preserve per-session/subproject state-loss gates, pairing re-authorization, live accounts, physical-device proofs and the frozen `7445aa73` oracle. No generic A–F/J closeout is queued.                              |
-| Rich documents          | [156](plans/156-documents-in-the-editor.md) P0–P2 delivered 2026-10-02 (#269/#280/#286); P3+ Approved follow-up                                                                      | Wave 2 scope delivered; schedule follow-ups by format readiness                                                                | Uses existing file identity and 179's isolation policy. P3–P6 follow; P7 DOCX editing stays parked on Markdown and fidelity decisions.                                                                                |
-| Keymap cutover          | [204](plans/204-editor-on-fregat-hotkeys.md) + [205](plans/205-ghostty-on-fregat-hotkeys.md) → [206](plans/206-platform-one-keymap.md); E026 metadata                                | Merged in PR #603; installed and live-verified                                                                                 | Caller migration, old API removal, shadow reporting and exact standalone qualification are merged; installed release and live verification passed. npm stays deferred. Zed/Vim 220–280 remain separate follow-ups.    |
-| Document runtime        | [099](plans/099-document-contributions.md) units 2–7 and [198](plans/198-document-owned-editor-analysis.md) acceptance → [200](plans/200-document-backed-content-views.md) consumers | 099 delivery complete; 198 acceptance proofs and 200 baseline research remain independent                                      | 099 units 2–7 delivered in PR #787 with accepted scoped proof and installed web/live verification. 200 uses each exact 099/198 contract; 197's diff service is delivered. 122 follows 099; 182 and 171 stay separate. |
-| TUI                     | [202](plans/202-tui-ui.md) on upstream OpenTUI                                                                                                                                       | Local controls any time                                                                                                        | Production Markdown cutover waits for the tree-sitter-md M1–M4 producer and Editor semantic S0–S4 consumer gates. Controls use 206's dispatcher. No toolkit package, maintained fork or native release pipeline.      |
-| Localization            | [208](plans/208-all-text-in-json.md)                                                                                                                                                 | Broad migration, by unit                                                                                                       | Catalog and typed generation, then structured-error transport, bounded caller migrations, locale/plural/RTL acceptance. 207 no longer blocks the catalog contract; command/settings metadata coordinates with 206.    |
-| Unified workspace       | [209](plans/209-unified-workspace.md)                                                                                                                                                | Design review any time                                                                                                         | Resolve D1–D6 before affected units. Production implementation needs a separate owner decision. Uses 206 commands, 200 content ownership and 208 catalogs.                                                            |
-| Async runtime           | [328](plans/328-async-runtime-master.md) master + [329](plans/329-async-lifecycle-and-transport.md)–[334](plans/334-async-runtime-verification.md)                                   | Research/planning delivered; implementation deferred at owner request                                                          | Start qualification before package adoption when execution begins. Preserve 099/282 and terminal 287/286/283 gates, exact standalone publication under 207, current domain authority and independent actors.          |
+| Program                 | Plans                                                                                                                                                     | When                                                                                                                           | Gates and boundaries                                                                                                                                                                                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Desktop app             | [114](plans/114-installed-app.md) Gates 1–4 delivered 2026-10-03                                                                                          | Closeout done after approved owner acceptance                                                                                  | Installed Chromium app and native system-webview host replace the old shell. Preserve mesh-owned servers and terminals; 132's transferred Mac vibrancy gate is accepted.                                                                                                 |
+| T3 alignment follow-ons | [126](plans/126-t3code-alignment.md), with exact remaining units in the [finite reconciliation](plans/126-t3code-alignment/finite-closeout-2026-10-03.md) | Bounded Wave 2 scope is delivered. Provider/forge batches follow keymap; relevant contract research may proceed independently. | Preserve per-session/subproject state-loss gates, pairing re-authorization, live accounts, physical-device proofs and the frozen `7445aa73` oracle. No generic A–F/J closeout is queued.                                                                                 |
+| Rich documents          | [156](plans/156-documents-in-the-editor.md) P0–P2 delivered 2026-10-02 (#269/#280/#286); P3+ Approved follow-up                                           | Wave 2 scope delivered; schedule follow-ups by format readiness                                                                | Uses existing file identity and 179's isolation policy. P3–P6 follow; P7 DOCX editing stays parked on Markdown and fidelity decisions.                                                                                                                                   |
+| Keymap cutover          | [204](plans/204-editor-on-fregat-hotkeys.md) + [205](plans/205-ghostty-on-fregat-hotkeys.md) → [206](plans/206-platform-one-keymap.md); E026 metadata     | Merged in PR #603; installed and live-verified                                                                                 | Caller migration, old API removal, shadow reporting and exact standalone qualification are merged; installed release and live verification passed. npm stays deferred. Zed/Vim 220–280 remain separate follow-ups.                                                       |
+| Document runtime        | [099](plans/099-document-contributions.md) units 2–7, 198 analysis ownership and 200 content views                                                        | Delivered 2026-10-09                                                                                                           | 099 units 2–7 delivered in PR #787 with accepted scoped proof and installed web/live verification. 198/200 are retired into [document-backed content views](docs/document-backed-content-views.md). 122 follows 099; 182 and 171 own their search and composer handoffs. |
+| TUI                     | [202](plans/202-tui-ui.md) on upstream OpenTUI                                                                                                            | Local controls any time                                                                                                        | Production Markdown cutover waits for the tree-sitter-md M1–M4 producer and Editor semantic S0–S4 consumer gates. Controls use 206's dispatcher. No toolkit package, maintained fork or native release pipeline.                                                         |
+| Localization            | [208](plans/208-all-text-in-json.md)                                                                                                                      | Broad migration, by unit                                                                                                       | Catalog and typed generation, then structured-error transport, bounded caller migrations, locale/plural/RTL acceptance. 207 no longer blocks the catalog contract; command/settings metadata coordinates with 206.                                                       |
+| Unified workspace       | [209](plans/209-unified-workspace.md)                                                                                                                     | Design review any time                                                                                                         | Resolve D1–D6 before affected units. Production implementation needs a separate owner decision. Uses 206 commands, [content view](docs/document-backed-content-views.md) ownership and 208 catalogs.                                                                     |
+| Async runtime           | [328](plans/328-async-runtime-master.md) master + [329](plans/329-async-lifecycle-and-transport.md)–[334](plans/334-async-runtime-verification.md)        | Research/planning delivered; implementation deferred at owner request                                                          | Start qualification before package adoption when execution begins. Preserve 099/282 and terminal 287/286/283 gates, exact standalone publication under 207, current domain authority and independent actors.                                                             |
 
 Work that can start without waiting for another program: 126's named provider contract research,
-202's local controls, 198's acceptance proofs, 200's baseline
-research and 209's design review. Bounded product lanes continue beside them: Markdown authoring
+202's local controls and 209's design review. Bounded product lanes continue beside them: Markdown authoring
 in 111/108 before 171's composer swap (parser work in 176/189), measured typing in 201, tree
 slices in 178 and Ghostty's [281](plans/281-ghostty-benchmarks-and-positioning.md) benchmarks and
 positioning plus [283](plans/283-ghostty-output-and-input-latency.md) output CPU and input latency,
@@ -254,20 +264,20 @@ spending, or state deletion. Their explicit decisions remain in the owning plans
 The owner removed the fixed “198 first after wave 2” priority on 2026-09-28. Schedule by the
 contracts a consumer needs:
 
-- [198](plans/198-document-owned-editor-analysis.md)'s publication, range/configuration
-  admission, cancellation and retention contracts are proved (PR #203), and its subscriber
-  consumes 099 unit 1's frames. Its browser/memory acceptance matrix remains. No second
-  analysis owner.
+- The document foundation is delivered. 198 (analysis kept with the document) and 200
+  (shared documents behind content views) were retired on 2026-10-09 into
+  [document-backed content views](docs/document-backed-content-views.md), which records their
+  contracts, entry points and accepted limits. Consumers build on those contracts; there is
+  no second analysis owner.
 - [197](plans/197-editor-highlighting-service.md) is delivered (PR #202): Editor owns standalone
-  highlighting and prepared diff syntax. It is independent of 198's retained-view lifetime.
-- [200](plans/200-document-backed-content-views.md) consumes the relevant 099 publication and
-  198 acquisition/attachment guarantees. Comparison integration also needs 197's diff service.
-  Its baseline research can run before those contracts land.
+  highlighting and prepared diff syntax. Immutable comparison sides use its diff syntax path.
 - [182](plans/182-search-view-rendering.md) owns the selected recycled-editor search rendering;
   replacing that selected search renderer with one editor or a multibuffer remains unscheduled.
   Approved [229](plans/229-multibuffer-excerpt-model.md)/[230](plans/230-aggregated-source-views.md)
   retain their excerpt-engine and aggregated-view scopes and gates.
-  [171](plans/171-composer-on-our-editor.md) owns the composer migration. Neither moves into 200.
+  [171](plans/171-composer-on-our-editor.md) owns the composer migration. Both consume the
+  [source range contract](docs/document-backed-content-views.md#source-ranges) through their
+  handoff sections.
 - Collaborative editing (approved 2026-10-08): [E066](plans/e066-collaborative-text.md) gives
   the Editor host-ordered collaboration, [E067](plans/e067-webrtc-collaboration-plugin.md) adds a
   peer-to-peer WebRTC plugin, and the revised [Delta DB plan](plans/delta-db-implementation-plan.md)
@@ -293,8 +303,10 @@ shared React/TypeScript logic. The wave-2 queue above is unchanged.
   local controls can proceed in parallel. The app's Markdown path does not use Marked or its
   token types; removal of Marked from upstream's own package is not a prerequisite.
 - Plan 202 owns local React Markdown overrides and terminal profile/copy/lifecycle tests.
-  Plans 176/189 retain parser ownership and required extensions; 171/179/197/198/200 keep their
-  existing scope. Only exact consumed contracts are prerequisites, not unrelated whole plans.
+  Plans 176/189 retain parser ownership and required extensions; 171/179/197 keep their
+  existing scope, and document ownership follows
+  [document-backed content views](docs/document-backed-content-views.md). Only exact consumed
+  contracts are prerequisites, not unrelated whole plans.
 - Plans 203/206 own keymap infrastructure. Plan 202's controls integrate with that dispatcher;
   they do not introduce a second one. Editor source is canonical in `editor/packages/` after 207.
 - The [coordination and research index](docs/tui-research/ui-plan-links.md) links the retained
@@ -332,9 +344,10 @@ from JavaScript generation. The approved full scope remains; this is its deliver
 [209: one workspace for chat and code](plans/209-unified-workspace.md) is Approved
 for design review. Resolve its D1–D6 gates before the affected implementation units;
 production implementation retains its separate owner authorization. Use the existing
-tab/group and session owners. Schedule command changes against 206, preserve 200
-content ownership, and apply 208 catalogs to new copy. It follows the package cutover
-for implementation; its design work can proceed alongside closeout work.
+tab/group and session owners. Schedule command changes against 206, preserve
+[content view](docs/document-backed-content-views.md) ownership, and apply 208 catalogs to new
+copy. It follows the package cutover for implementation; its design work can proceed
+alongside closeout work.
 
 ## Zed parity workstream
 

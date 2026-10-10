@@ -18,13 +18,14 @@ the revision it inspected; it is not a second implementation queue or proof of t
 | Area                    | References                                                                                                                                                                                           |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Files and documents     | [Filesystem boundaries](filesystem-boundaries.md), [document/tab identity](document-and-tab-domain.md), [async operations](async-operation-ownership.md), [workspace indexes](workspace-indexing.md) |
+| Document content views  | [Document-backed content views](document-backed-content-views.md)                                                                                                                                    |
 | State and UI            | [State ownership](state-ownership.md), [web layering](web-layering.md), [design language](web-design-language.md), [shared patterns](pattern-layer.md)                                               |
 | Sessions and machines   | [Session domain](session-domain.md), [worktree lifecycle](worktree-lifecycle.md), [federated environments](federated-environments.md), [remote releases](remote-server-releases.md)                  |
 | Editor                  | [First paint](editor-first-paint-design.md), [Markdown experiences](markdown-experiences.md), [external edits/LSP](external-edit-lsp-findings.md)                                                    |
 | Keyboard                | [Architecture](keymap/architecture.md), [matching and dispatch](vscode-keymap-development.md)                                                                                                        |
 | Terminals               | [Terminal integration](terminal.md), [terminal host](terminal-host.md), [Ghostty package boundary](ghostty-webgpu-brief.md)                                                                          |
 | Settings and appearance | [Settings reference](settings-reference.md), [theme bundles](theme-bundles.md)                                                                                                                       |
-| Runtime and delivery    | [Boot](boot-and-first-load.md), [deployment](../plans/deployment-design.md), [observability](observability-overhead.md), [web push](web-push.md)                                                     |
+| Runtime and delivery    | [Boot](boot-and-first-load.md), [HTML bootstrap](html-bootstrap.md), [deployment](../plans/deployment-design.md), [observability](observability-overhead.md), [web push](web-push.md)                |
 
 ## Clients
 

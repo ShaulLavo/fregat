@@ -1,90 +1,20 @@
+import { mkdir } from 'node:fs/promises'
+import path from 'node:path'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  providerDriverKindSchema,
-  providerInstanceIdSchema,
-  type ProviderMcpConfigServer,
-  type ProviderMcpDefinition,
-  type ProviderMcpScope,
-} from '@workspace/contracts'
-import { MockProviderAdapter } from 'server/testing'
+import { providerInstanceIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 
+import { McpConfigAdapter } from '../../../../test/factories/mcp-config'
 import { McpConfigRow } from '@/features/settings/components/mcp-config-row'
 import { providerSnapshot } from '../../../../test/factories/chat'
 import { McpSection } from '@/features/settings/components/mcp-section'
 import { expect, test } from '../../../../test/fixtures'
-import { createInProcessClient } from '../../../../test/client'
+import { createInProcessClient, createObservedInProcessClient } from '../../../../test/client'
 import { installTestClient } from '../../../../test/factories/client-binding'
+import { createRequestGate } from '../../../../test/factories/request-gate'
 import { renderWithProviders } from '../../../../test/render'
 import { makeTestServer } from '../../../../test/server'
-
-type Write = { folder: string; name: string; scope: ProviderMcpScope }
-
-/** A Claude instance whose config lives in memory: the probe and `claude mcp` stand-ins. */
-class McpConfigAdapter extends MockProviderAdapter {
-  readonly writes: Array<Write & { definition?: ProviderMcpDefinition }> = []
-  servers: ProviderMcpConfigServer[] = [
-    {
-      auth: 'unknown',
-      error: null,
-      file: '/home/dev/.claude.json',
-      name: 'linear',
-      origin: 'https://mcp.linear.app',
-      scope: 'user',
-      source: 'user',
-      status: 'connected',
-      tools: ['list_issues'],
-      transport: 'http',
-    },
-    {
-      auth: 'unknown',
-      error: null,
-      file: null,
-      name: 'github',
-      origin: null,
-      scope: null,
-      source: 'plugin',
-      status: 'connected',
-      tools: [],
-      transport: 'stdio',
-    },
-  ]
-  listed = 0
-
-  readonly mcpConfig = {
-    scopes: ['user', 'local', 'project'] as ProviderMcpScope[],
-    list: async () => {
-      this.listed += 1
-      return this.servers
-    },
-    add: async (input: Write & { definition: ProviderMcpDefinition }) => {
-      this.writes.push(input)
-      this.servers = [
-        ...this.servers,
-        { ...this.servers[0]!, name: input.name, origin: null, tools: [], transport: 'stdio' },
-      ]
-    },
-    remove: async (input: Write) => {
-      this.writes.push(input)
-      this.servers = this.servers.filter((server) => server.name !== input.name)
-    },
-    read: async (): Promise<ProviderMcpDefinition> => ({
-      transport: 'stdio',
-      command: 'x',
-      args: [],
-      env: {},
-    }),
-  }
-
-  constructor() {
-    super({
-      displayLabel: 'Claude',
-      driverKind: v.parse(providerDriverKindSchema, 'claude'),
-      providerInstanceId: v.parse(providerInstanceIdSchema, 'claude'),
-    })
-  }
-}
 
 test('lists an instance on request, adds a command server with masked values, and deletes one', async () => {
   const adapter = new McpConfigAdapter()
@@ -193,4 +123,250 @@ test('offers copying approved rows and hides copying on unapproved project rows'
     />,
   )
   expect(screen.queryByRole('button', { name: 'Also add deploy to…' })).toBeNull()
+})
+
+test.for(['remove', 'add', 'copy', 'sign-in'] as const)(
+  'keeps %s on the displayed provider while another provider is loading',
+  async (action) => {
+    const first = new McpConfigAdapter({ label: 'Claude A' })
+    const second = new McpConfigAdapter({ id: 'codex', label: 'Codex B', driver: 'codex' })
+    first.servers[0]!.status = 'needs-auth'
+    second.servers[0]!.origin = 'https://b.example.test'
+    second.mcpConfig.scopes = ['user']
+    const server = await makeTestServer({ providerAdapter: first })
+    await server.restart({ additionalProviderAdapters: [second] })
+    const restore = installTestClient(createInProcessClient(server))
+    const rendered = renderWithProviders(<McpSection />)
+    const held = second.holdLists()
+    try {
+      await userEvent.click(await screen.findByRole('tab', { name: 'Claude A' }))
+      const row = (await screen.findByText('linear')).closest('li')!
+      await userEvent.click(screen.getByRole('tab', { name: 'Codex B' }))
+      await held.entered
+      expect(within(row).getByText(/mcp.linear.app/)).toBeVisible()
+      await exerciseMcpAction({ action, row, first, second })
+      expect(screen.getByRole('tab', { name: 'Claude A', hidden: true })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      )
+      expect(
+        screen.getByRole('region', { name: 'Claude A MCP servers', hidden: true }),
+      ).toBeVisible()
+      held.release()
+      await waitFor(() =>
+        expect(screen.getByRole('tab', { name: 'Codex B' })).toHaveAttribute(
+          'aria-selected',
+          'true',
+        ),
+      )
+      expect(await screen.findByText(/b.example.test/)).toBeVisible()
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(screen.queryByRole('link', { name: 'Open sign-in page for linear' })).toBeNull()
+      if (action !== 'copy') expect(second.writes).toEqual([])
+    } finally {
+      held.release()
+      rendered.unmount()
+      restore()
+      await server.cleanup()
+    }
+  },
+)
+
+test.for(['Remove', 'Add server'] as const)(
+  'closes an open %s dialog when the new provider is ready, even with the same server name',
+  async (action) => {
+    const first = new McpConfigAdapter({ label: 'Claude A' })
+    const second = new McpConfigAdapter({ id: 'codex', label: 'Codex B', driver: 'codex' })
+    second.servers[0]!.origin = 'https://b.example.test'
+    second.mcpConfig.scopes = ['user']
+    const server = await makeTestServer({ providerAdapter: first })
+    await server.restart({ additionalProviderAdapters: [second] })
+    const restore = installTestClient(createInProcessClient(server))
+    const rendered = renderWithProviders(<McpSection />)
+    const held = second.holdLists()
+    try {
+      await userEvent.click(await screen.findByRole('tab', { name: 'Claude A' }))
+      const row = (await screen.findByText('linear')).closest('li')!
+      await userEvent.click(screen.getByRole('tab', { name: 'Codex B' }))
+      await held.entered
+      const trigger = action === 'Remove' ? within(row) : screen
+      await userEvent.click(trigger.getByRole('button', { name: action }))
+      const dialog = await screen.findByRole('dialog')
+      if (action === 'Add server')
+        await userEvent.type(within(dialog).getByLabelText('Name'), 'old-draft')
+      held.release()
+      await screen.findByText(/b.example.test/)
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+      await userEvent.click(screen.getByRole('button', { name: 'Add server' }))
+      expect(within(await screen.findByRole('dialog')).getByLabelText('Name')).toHaveValue('')
+      expect(first.writes.concat(second.writes)).toEqual([])
+    } finally {
+      held.release()
+      rendered.unmount()
+      restore()
+      await server.cleanup()
+    }
+  },
+)
+
+test('keeps folder, scopes and removal with the displayed list until the selected folder is read', async () => {
+  const adapter = new McpConfigAdapter()
+  const server = await makeTestServer({ providerAdapter: adapter })
+  const folder = path.join(server.root, 'second')
+  await mkdir(folder)
+  adapter.folders.set(folder, [{ ...adapter.servers[0]!, origin: 'https://second.example.test' }])
+  const directory = createRequestGate((request) => new URL(request.url).pathname === '/fs/tree')
+  const restore = installTestClient(createObservedInProcessClient(server, directory.beforeRequest))
+  const rendered = renderWithProviders(<McpSection />)
+  let release = () => {}
+  try {
+    await userEvent.click(await screen.findByRole('tab', { name: 'Claude' }))
+    const row = (await screen.findByText('linear')).closest('li')!
+    const held = adapter.holdLists()
+    release = held.release
+    await userEvent.click(screen.getByRole('button', { name: 'Choose folder…' }))
+    const picker = await screen.findByRole('dialog', { name: 'Choose folder' })
+    await directory.entered
+    await userEvent.click(within(picker).getByRole('button', { name: 'Go to folder' }))
+    const input = within(picker).getByRole('textbox', { name: 'Folder path' })
+    expect(input).toBeDisabled()
+    directory.release()
+    await waitFor(() => expect(input).toBeEnabled())
+    await userEvent.clear(input)
+    await userEvent.type(input, `${folder}{Enter}`)
+    await waitFor(() => expect(input).not.toBeVisible())
+    await waitFor(() =>
+      expect(within(picker).getByRole('button', { name: /^Open$/ })).toBeEnabled(),
+    )
+    await userEvent.click(within(picker).getByRole('button', { name: /^Open$/ }))
+    await held.entered
+    expect(adapter.listFolders[1]).toBe(folder)
+    await userEvent.click(within(row).getByRole('button', { name: 'Remove' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Delete linear?' })
+    await userEvent.click(within(dialog).getByRole('button', { name: /Delete/ }))
+    await waitFor(() => expect(adapter.writes).toHaveLength(1))
+    expect(adapter.writes[0]).toMatchObject({
+      folder: adapter.listFolders[0],
+      name: 'linear',
+      scope: 'user',
+    })
+    expect(screen.getByText('Home folder')).toBeVisible()
+    held.release()
+    expect(await screen.findByText(/second.example.test/)).toBeVisible()
+    expect(adapter.folders.get(folder)).toHaveLength(1)
+    expect(screen.getByText('second', { selector: '[data-mcp-folder]' })).toBeVisible()
+  } finally {
+    directory.release()
+    release()
+    rendered.unmount()
+    restore()
+    await server.cleanup()
+  }
+})
+
+test('the picker root stays distinct from Home and reaches MCP sign-in as an absolute owner path', async () => {
+  const adapter = new McpConfigAdapter()
+  adapter.servers[0]!.status = 'needs-auth'
+  const server = await makeTestServer({ providerAdapter: adapter })
+  const restore = installTestClient(createInProcessClient(server))
+  const rendered = renderWithProviders(<McpSection />)
+  try {
+    await userEvent.click(await screen.findByRole('tab', { name: 'Claude' }))
+    await screen.findByText('linear')
+    expect(adapter.listFolders[0]).toBe(server.root)
+    await userEvent.click(screen.getByRole('button', { name: 'Choose folder…' }))
+    const picker = await screen.findByRole('dialog', { name: 'Choose folder' })
+    const open = within(picker).getByRole('button', { name: /^Open$/ })
+    await waitFor(() => expect(open).toBeEnabled())
+    await userEvent.click(open)
+    await screen.findByText('Root folder')
+    expect(screen.getByRole('button', { name: 'Home' })).toBeVisible()
+    await waitFor(() => expect(adapter.listed).toBe(2))
+    expect(adapter.listFolders[1]).toBe(server.root)
+    const row = screen.getByText('linear').closest('li')!
+    await userEvent.click(within(row).getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(adapter.signIns).toHaveLength(1))
+    expect(adapter.signIns[0]).toEqual({ folder: server.root, name: 'linear' })
+  } finally {
+    rendered.unmount()
+    restore()
+    await server.cleanup()
+  }
+})
+
+async function exerciseMcpAction({
+  action,
+  row,
+  first,
+  second,
+}: {
+  readonly action: 'remove' | 'add' | 'copy' | 'sign-in'
+  readonly row: HTMLElement
+  readonly first: McpConfigAdapter
+  readonly second: McpConfigAdapter
+}) {
+  if (action === 'remove') {
+    await userEvent.click(within(row).getByRole('button', { name: 'Remove' }))
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: /Delete/ }),
+    )
+    await waitFor(() => expect(first.writes).toHaveLength(1))
+  }
+  if (action === 'add') {
+    await userEvent.click(screen.getByRole('button', { name: 'Add server' }))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'docs')
+    await userEvent.type(within(dialog).getByLabelText('Command'), 'fixture')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add server' }))
+    await waitFor(() => expect(first.writes).toHaveLength(1))
+  }
+  if (action === 'copy') {
+    await userEvent.click(within(row).getByRole('button', { name: 'Also add linear to…' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Also add to Codex B' }))
+    await waitFor(() => expect(first.reads).toHaveLength(1))
+    expect(second.writes[0]?.definition).toMatchObject({ command: 'claude' })
+  }
+  if (action === 'sign-in') {
+    await userEvent.click(within(row).getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(first.signIns).toHaveLength(1))
+    expect(second.signIns).toEqual([])
+  }
+}
+
+test('a literal tilde folder keeps its own MCP list and filesystem owner across Home visits', async () => {
+  const adapter = new McpConfigAdapter()
+  const server = await makeTestServer({ providerAdapter: adapter })
+  const folder = path.join(server.root, '~')
+  await mkdir(folder)
+  adapter.folders.set(folder, [{ ...adapter.servers[0]!, origin: 'https://tilde.example.test' }])
+  const restore = installTestClient(createInProcessClient(server))
+  const rendered = renderWithProviders(<McpSection />)
+  try {
+    await userEvent.click(await screen.findByRole('tab', { name: 'Claude' }))
+    await screen.findByText('linear')
+    expect(adapter.listFolders).toEqual([server.root])
+    await userEvent.click(screen.getByRole('button', { name: 'Choose folder…' }))
+    const picker = await screen.findByRole('dialog', { name: 'Choose folder' })
+    await userEvent.click(within(picker).getByRole('button', { name: 'Go to folder' }))
+    const input = within(picker).getByRole('textbox', { name: 'Folder path' })
+    await waitFor(() => expect(input).toBeEnabled())
+    await userEvent.clear(input)
+    await userEvent.type(input, `${folder}{Enter}`)
+    await waitFor(() => expect(input).not.toBeVisible())
+    const open = within(picker).getByRole('button', { name: /^Open$/ })
+    await waitFor(() => expect(open).toBeEnabled())
+    await userEvent.click(open)
+    await waitFor(() => expect(adapter.listFolders).toEqual([server.root, folder]))
+    expect(await screen.findByText(/tilde.example.test/)).toBeVisible()
+    expect(screen.getByText('~', { selector: '[data-mcp-folder]' })).toBeVisible()
+    await userEvent.click(screen.getByRole('button', { name: 'Home' }))
+    expect(await screen.findByText('Home folder')).toBeVisible()
+    expect(screen.getByText(/mcp.linear.app/)).toBeVisible()
+    expect(screen.queryByText(/tilde.example.test/)).toBeNull()
+    expect(adapter.listFolders).toEqual([server.root, folder])
+  } finally {
+    rendered.unmount()
+    restore()
+    await server.cleanup()
+  }
 })

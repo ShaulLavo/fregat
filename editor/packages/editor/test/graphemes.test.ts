@@ -251,7 +251,7 @@ describe('clusters longer than one search window', () => {
       backward.push(offset)
     }
 
-    expect(backward.toReversed()).toEqual([0, ...forward.slice(0, -1)])
+    expect(backward.reverse()).toEqual([0].concat(forward.slice(0, -1)))
   })
 
   it('keeps a combining mark with the character it marks', () => {

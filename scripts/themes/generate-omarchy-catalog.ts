@@ -17,7 +17,10 @@ const REPOSITORY = 'basecamp/omarchy'
 const clone = path.resolve(values.clone)
 
 function git(...args: string[]) {
-  const result = Bun.spawnSync(['git', '-C', clone, ...args], { stdout: 'pipe', stderr: 'pipe' })
+  const result = Bun.spawnSync(['git', '-C', clone].concat(args), {
+    stdout: 'pipe',
+    stderr: 'pipe',
+  })
   if (result.exitCode !== 0)
     throw new Error(`git ${args.join(' ')} failed: ${result.stderr.toString().trim()}`)
   return result.stdout

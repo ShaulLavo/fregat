@@ -64,7 +64,7 @@ function transfer(
       const chunks = batch.filter((packet) => packet.message.type === 'HISTORY_CHUNK')
       if (reversed) chunks.reverse()
       const other = batch.filter((packet) => packet.message.type !== 'HISTORY_CHUNK')
-      for (const { to, message } of [...other, ...chunks]) {
+      for (const { to, message } of other.concat(chunks)) {
         if (message.type === 'HISTORY_CHUNK' && missing.delete(message.payload.index)) continue
         const before = queue.length
         const accepted = sessions[to === 'a' ? 0 : 1]!.receive(message)

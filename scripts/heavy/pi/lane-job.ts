@@ -73,7 +73,7 @@ const SSH_OPTIONS = [
 export function sshTransport(host: string): LaneTransport {
   return {
     // A login shell: Bun lives in ~/.local/bin, which only the profile puts on PATH.
-    shell: (script) => ['ssh', ...SSH_OPTIONS, host, `bash -lc ${shellQuote(script)}`],
+    shell: (script) => ['ssh'].concat(SSH_OPTIONS, [host, `bash -lc ${shellQuote(script)}`]),
     path: (file) => `${host}:${file}`,
   }
 }

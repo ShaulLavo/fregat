@@ -47,7 +47,7 @@ describe('drag and drop', () => {
     await dragTo(center(row('src/a.ts')), center(row('chain/of/one/')))
     await mouse('up')
     await vi.waitFor(() => expect(events.drops).toHaveLength(1))
-    expect([...events.drops[0]!.draggedPaths].toSorted()).toEqual(['docs/', 'src/a.ts'])
+    expect(events.drops[0]!.draggedPaths.toSorted()).toEqual(['docs/', 'src/a.ts'])
   })
 
   it('a folder row drops into it and a file row drops into its parent', async () => {

@@ -1,3 +1,9 @@
+import { isHtmlElement } from '../dom'
+import {
+  createNativeCarets,
+  PROPORTIONAL_INTACT_NODE_CEILING,
+  type NativeCarets,
+} from './nativeCarets'
 import type { TextContent } from '../textContent'
 import type { MeasuredText } from '../textMeasurements'
 import {
@@ -36,6 +42,7 @@ import type {
 } from './virtualizedTextViewTypes'
 import type { VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
 import { bidiVisualRunIndexAt, memoizedContainsRTL } from './virtualizedTextViewBidi'
+import { pixelsBeforeColumn } from './proportionalRows'
 
 const CONTROL_CHARACTER_CLASS = 'editor-virtualized-control-character'
 // These are exactly the code units the renderer replaces with visible labels or fixed-width boxes.
@@ -161,6 +168,7 @@ type PlanBuffer = {
  * them in different spaces.
  */
 type RowMeasurementContext = {
+  readonly trimSpaces?: boolean
   readonly row: MountedVirtualizedTextRow
   readonly scale: number
 }
@@ -289,6 +297,7 @@ let measuredRowRects: Map<HTMLElement, DOMRect> | null = null
 let measuredRowScales: Map<HTMLElement, number> | null = null
 let measurementScratch: MeasurementScratch | null = null
 const measuredRowWidths = new WeakMap<HTMLElement, RowContentWidthCache>()
+const measuredScrollWidths = new WeakMap<HTMLElement, Pick<RowContentWidthCache, 'key' | 'width'>>()
 const dualCollapsedBidiPositionSupport = new WeakMap<
   Document,
   { readonly getClientRects: Range['getClientRects'] | undefined; readonly supported: boolean }
@@ -463,11 +472,64 @@ export function clearRowGeometryCaches(view: VirtualizedTextViewInternal): void 
   for (const row of view.rowPool) clearRowGeometryCache(row)
 }
 
+type NativeRowCache = {
+  readonly carets: NativeCarets
+  readonly glyphs: VirtualizedTextViewInternal['glyphs']
+  readonly tabSize: number
+  readonly styles: string
+  readonly text: string
+  readonly node: Text
+}
+
+const nativeRows = new WeakMap<MountedVirtualizedTextRow, NativeRowCache>()
+
+export function releaseNativeRowGeometry(row: MountedVirtualizedTextRow): void {
+  nativeRows.delete(row)
+}
+
+function nativeRowCarets(
+  view: VirtualizedTextViewInternal,
+  row: MountedVirtualizedTextRow,
+): NativeCarets | null {
+  if (view.monospace || row.inlineMapping || row.text.length >= PROPORTIONAL_INTACT_NODE_CEILING)
+    return null
+  if (!isSimpleRowText(row) || row.textRenderMode !== 'simple') return null
+  if (row.chunks[0]?.localStart !== 0 || row.chunks.at(-1)?.localEnd !== row.text.length)
+    return null
+  const styles = `${row.inlineKindsClassName}:${row.rowDecorationKey}`
+  const cached = nativeRows.get(row)
+  if (
+    cached?.glyphs === view.glyphs &&
+    cached.tabSize === view.tabSize &&
+    cached.styles === styles &&
+    cached.text === row.textNode.data &&
+    cached.node === row.textNode
+  )
+    return cached.carets
+  const carets = createNativeCarets(row.element, row.textNode, () => rowClientRectScale(row))
+  nativeRows.set(row, {
+    carets,
+    glyphs: view.glyphs,
+    tabSize: view.tabSize,
+    styles,
+    text: row.textNode.data,
+    node: row.textNode,
+  })
+  recordEditorPerformanceDiagnostic('view.nativeShaping', () => ({
+    length: row.text.length,
+    ceiling: PROPORTIONAL_INTACT_NODE_CEILING,
+    path: 'mounted-intact',
+  }))
+  return carets
+}
+
 export function offsetToX(
   view: VirtualizedTextViewInternal,
   row: MountedVirtualizedTextRow,
   offset: number,
 ): number {
+  const native = nativeRowCarets(view, row)
+  if (native) return native.position(clamp(offset - row.startOffset, 0, row.text.length))
   const geometry = ensureRowGeometry(view, row)
   const clamped = clamp(offset, row.startOffset, row.endOffset)
   return xForOffset(geometry, clamped)
@@ -479,17 +541,35 @@ export function xToOffset(
   x: number,
   scale?: number,
 ): number {
+  const native = nativeRowCarets(view, row)
+  if (native) {
+    const before = native.columnAt(x, 'before')
+    const after = Math.min(row.text.length, before + 1)
+    const column = x - native.position(before) < native.position(after) - x ? before : after
+    return row.startOffset + column
+  }
   if (rowUsesCalculatedGeometry(view, row)) return calculatedXToOffset(view, row, x, scale)
 
   const geometry = ensureRowGeometry(view, row)
   return offsetForX(geometry, Math.max(0, x))
 }
 
-/** Null when the row's rendered width is only available for the price of a layout read. */
+/** Intact proportional rows settle their native end once; other measured paths can return null. */
 export function knownRowContentWidth(
   view: VirtualizedTextViewInternal,
   row: MountedVirtualizedTextRow,
 ): number | null {
+  const native = nativeRowCarets(view, row)
+  if (native) return native.position(row.text.length)
+  // A mounted window cannot supply the complete scroll extent of an approximate source row.
+  if (
+    !view.monospace &&
+    !row.inlineMapping &&
+    view.glyphs &&
+    row.text.length >= PROPORTIONAL_INTACT_NODE_CEILING &&
+    isSimpleRowText(row)
+  )
+    return pixelsBeforeColumn(row.text, row.text.length, view.glyphs, view.tabSize)
   const key = rowGeometryCacheKey(view, row)
   const cached = row.geometryCache as RowGeometryCache | null
   if (cached?.key === key && !cached.geometry.plan && Number.isFinite(cached.geometry.width))
@@ -498,6 +578,38 @@ export function knownRowContentWidth(
 
   const measured = measuredRowWidths.get(row.element)
   return measured?.key === key ? measured.width : null
+}
+
+/** Hanging wrap spaces retain caret geometry but contribute no scrolling width. */
+export function knownRowScrollWidth(
+  view: VirtualizedTextViewInternal,
+  row: MountedVirtualizedTextRow,
+): number | null {
+  if (!view.wrapEnabled || !/[ \t]$/.test(row.text.slice(-1))) {
+    return knownRowContentWidth(view, row)
+  }
+  const cached = measuredScrollWidths.get(row.element)
+  return cached?.key === rowGeometryCacheKey(view, row) ? cached.width : null
+}
+
+export function measureRowScrollWidth(
+  view: VirtualizedTextViewInternal,
+  row: MountedVirtualizedTextRow,
+): number {
+  if (!view.wrapEnabled || !/[ \t]$/.test(row.text.slice(-1))) {
+    return measureRowContentWidth(view, row)
+  }
+  const key = rowGeometryCacheKey(view, row)
+  const cached = measuredScrollWidths.get(row.element)
+  if (cached?.key === key) return cached.width
+  const measured = measuredRowContentsRect({
+    row,
+    scale: rowClientRectScale(row),
+    trimSpaces: true,
+  })
+  const width = measured ? measured.left + measured.width : 0
+  measuredScrollWidths.set(row.element, { key, width })
+  return width
 }
 
 /**
@@ -1999,7 +2111,7 @@ function collapsedBoundaryPositionXs(
   for (const boundary of boundaries) {
     appendDistinctBoundaryPositions(positions, collapsedBoundaryXs(measurement, boundary))
   }
-  return positions.toSorted((left, right) => left - right)
+  return positions.sort((left, right) => left - right)
 }
 
 function appendDistinctBoundaryPositions(positions: number[], candidates: readonly number[]): void {
@@ -2044,7 +2156,7 @@ function recoveredBidiBoundaryPositionXs(
   if (recoveredEdgesShareSeam(preceding, following, positions)) {
     return recoveredSameDirectionSeamXs(positions, collapsedXs)
   }
-  return positions.toSorted((left, right) => left - right)
+  return positions.sort((left, right) => left - right)
 }
 
 function recoveredEdgesShareSeam(
@@ -2722,11 +2834,9 @@ function appendUnmeasuredRangeSegment(
 }
 
 function mergeGeometryRangeSegments(
-  segments: readonly GeometryRangeSegment[],
+  segments: GeometryRangeSegment[],
 ): readonly GeometryRangeSegment[] {
-  const sorted = segments.toSorted(
-    (left, right) => left.left - right.left || left.width - right.width,
-  )
+  const sorted = segments.sort((left, right) => left.left - right.left || left.width - right.width)
   const merged: GeometryRangeSegment[] = []
   for (const segment of sorted) appendMergedGeometrySegment(merged, segment)
   return merged
@@ -2846,12 +2956,24 @@ function measuredChunkContentsRect(
   chunk: VirtualizedTextChunk,
 ): { readonly left: number; readonly width: number } | null {
   const first = chunk.parts[0]
-  const last = chunk.parts.at(-1)
+  let lastIndex = chunk.parts.length - 1
+  if (measurement.trimSpaces) {
+    while (lastIndex >= 0) {
+      const part = chunk.parts[lastIndex]!
+      if (part.kind !== 'text' || part.node.data.replace(/[ \t]+$/, '').length > 0) break
+      lastIndex -= 1
+    }
+  }
+  const last = chunk.parts[lastIndex]
   if (!first || !last) return null
 
   const scratch = measurementScratchFor(measurement.row.element.ownerDocument)
   scratch.range.setStartBefore(renderedPartNode(first))
-  scratch.range.setEndAfter(renderedPartNode(last))
+  if (measurement.trimSpaces && last.kind === 'text') {
+    scratch.range.setEnd(last.node, last.node.data.replace(/[ \t]+$/, '').length)
+  } else {
+    scratch.range.setEndAfter(renderedPartNode(last))
+  }
   const rect = scratch.range.getBoundingClientRect()
   scratch.range.selectNodeContents(scratch.parking)
   if (rect.width <= 0) return null
@@ -3304,7 +3426,7 @@ function offsetFromElementBoundary(
   node: Node,
   offset: number,
 ): number | null {
-  if (!(node instanceof HTMLElement)) return null
+  if (!isHtmlElement(node)) return null
   if (!row.element.contains(node) && node !== row.element) return null
   if (node === row.element && offset <= 0) return row.startOffset
   if (node === row.element && offset >= node.childNodes.length) return row.endOffset

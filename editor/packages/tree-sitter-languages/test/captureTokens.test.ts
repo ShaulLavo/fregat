@@ -58,7 +58,7 @@ const collect = (
     }
   }
 
-  return captures.toSorted((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
+  return captures.sort((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
 }
 
 beforeAll(async () => {
@@ -137,7 +137,7 @@ describe('exact-span capture overlaps', () => {
     const names = parseTypeScript(FIXTURE)
       .filter((capture) => capture.startIndex === start && capture.endIndex === end)
       .map((capture) => capture.captureName)
-      .toSorted()
+      .sort()
 
     expect(names).toEqual(['constant', 'constructor', 'type', 'variable'])
   })
@@ -221,12 +221,10 @@ describe('exact-span capture overlaps', () => {
   it('paints a class name the same colour wherever it appears', () => {
     const source = 'class Widget {}\nconst w = new Widget()\nlet z: Widget\n'
     const tokens = treeSitterCapturesToEditorTokens(parseTypeScript(source))
-    const colors = [...source.matchAll(/Widget/g)]
-      .map((match) => match.index)
-      .map(
-        (start) =>
-          tokens.find((token) => token.start <= start && token.end > start)?.style.color ?? null,
-      )
+    const colors = Array.from(source.matchAll(/Widget/g), (match) => match.index).map(
+      (start) =>
+        tokens.find((token) => token.start <= start && token.end > start)?.style.color ?? null,
+    )
 
     expect(colors).toHaveLength(3)
     expect(new Set(colors).size).toBe(1)

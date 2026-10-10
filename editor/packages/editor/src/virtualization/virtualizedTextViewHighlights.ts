@@ -646,6 +646,31 @@ export function clearTokenHighlightsFromRow(
   scheduleHighlightRepaintNudge(view.highlightRegistry)
 }
 
+export function restoreHighlightsAfterPresentation(view: VirtualizedTextViewInternal): void {
+  const registry = view.highlightRegistry
+  if (!registry || !view.scrollElement.isConnected) return
+  restoreTokenHighlightGroups(view, registry)
+  restoreRangeHighlightGroups(view, registry)
+  restoreStyleRuleElements(view)
+
+  // WebKit bug: async syntax ranges registered while hidden can stay unpainted on reveal.
+  // NBSP support selects WebKit, not the bug; remove this when native paint passes without refresh.
+  if (!view.scrollElement.ownerDocument.defaultView?.CSS.supports('-webkit-nbsp-mode', 'space'))
+    return
+
+  // Token groups can contain other editors' ranges. Refresh only this view's memberships.
+  for (const rangesByStyle of view.rowTokenRanges.values()) {
+    for (const [styleKey, ranges] of rangesByStyle) {
+      const group = view.tokenGroups.get(styleKey)
+      if (!group) continue
+      for (const range of ranges) {
+        group.highlight.delete(range)
+        group.highlight.add(range)
+      }
+    }
+  }
+}
+
 export function restoreHighlightsAfterBrowserResume(view: VirtualizedTextViewInternal): void {
   const registry = view.highlightRegistry
   if (!registry) return
@@ -1632,7 +1657,7 @@ function overlayKey(overlay: HighlightOverlay): string {
 }
 
 function nextOverlayBaseName(view: VirtualizedTextViewInternal): string {
-  const names = new Set([...view.overlayBaseGroups.values()].map((group) => group.name))
+  const names = new Set(Array.from(view.overlayBaseGroups.values(), (group) => group.name))
   for (let index = 0; ; index++) {
     const name = `${view.highlightScope}-overlay-base-${index}`
     if (!names.has(name)) return name
@@ -1739,7 +1764,7 @@ function orderRangeHighlights(view: VirtualizedTextViewInternal): void {
 function orderOverlayBases(view: VirtualizedTextViewInternal): void {
   const registry = view.highlightRegistry
   if (!registry?.entries) return
-  const bases = new Set([...view.overlayBaseGroups.values()].map((group) => group.name))
+  const bases = new Set(Array.from(view.overlayBaseGroups.values(), (group) => group.name))
   const producers = new Set(orderedPaintGroups(view).map((group) => group.name))
   const isProducer = (name: string) =>
     name.startsWith(SHARED_TOKEN_HIGHLIGHT_PREFIX) || producers.has(name)

@@ -169,7 +169,7 @@ function findProbe(record: string[]): EditorPlugin {
 /** The rows on screen; retired rows keep their last text, so the container itself is not enough. */
 function visibleText(host: HTMLElement): string {
   const rows = host.querySelectorAll('.editor-virtualized-row[data-editor-virtual-row]')
-  return [...rows].map((row) => row.textContent ?? '').join('\n')
+  return Array.from(rows, (row) => row.textContent ?? '').join('\n')
 }
 
 function press(

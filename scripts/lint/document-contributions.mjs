@@ -9,6 +9,7 @@ const core = 'editor/packages/editor/src/'
 const adapters = new Set([
   'editor/packages/tree-sitter/src/index.ts',
   'editor/packages/tree-sitter/src/session.ts',
+  'editor/packages/tree-sitter/src/mergeReview.ts',
   'editor/packages/tree-sitter/src/treeSitter/source.ts',
   'editor/packages/tree-sitter/src/treeSitter/types.ts',
   'editor/packages/tree-sitter/src/treeSitter/workerClient.ts',
@@ -31,6 +32,7 @@ const rawRuntimeNames = new Set([
 const runtimeFactories = new Set([
   'editor/packages/tree-sitter/src/index.ts',
   'editor/packages/tree-sitter/src/session.ts',
+  'editor/packages/tree-sitter/src/mergeReview.ts',
   'editor/packages/tree-sitter/src/treeSitter/workerClient.ts',
   `${core}shiki/plugin.ts`,
   `${core}shiki/workerClient.ts`,

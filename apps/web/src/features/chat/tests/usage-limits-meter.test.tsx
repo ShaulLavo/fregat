@@ -57,8 +57,12 @@ test('stale exhausted and reset-passed rows remain historical while the rendered
     freshness: 'fresh' as const,
     observedAt: new Date(now - 120_000).toISOString(),
   }
+  const windows: Parameters<typeof UsageLimitsMeter>[0]['accounts'][number]['windows'] = [
+    stale,
+    fresh,
+  ]
   const view = renderWithProviders(
-    <UsageLimitsMeter accounts={[{ ...account, windows: [stale, fresh, ...account.windows] }]} />,
+    <UsageLimitsMeter accounts={[{ ...account, windows: windows.concat(account.windows) }]} />,
   )
   try {
     fireEvent.click(await screen.findByRole('button', { name: 'Account allowances · 19%' }))

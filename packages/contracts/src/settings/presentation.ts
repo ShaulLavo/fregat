@@ -327,6 +327,10 @@ export const SETTINGS_PRESENTATION = {
     widget: 'boolean',
     category: 'Terminal',
   },
+  'terminal.integrated.screenReader': {
+    widget: 'boolean',
+    category: 'Terminal',
+  },
   'terminal.integrated.fontSize': {
     widget: 'number',
     category: 'Terminal',
@@ -789,9 +793,9 @@ export function presentationFor(id: SettingId): SettingPresentation {
   return SETTINGS_PRESENTATION[id]
 }
 
-export const SETTING_CATEGORIES = [
-  ...new Set(SETTING_IDS.map((id) => SETTINGS_PRESENTATION[id].category)),
-]
+export const SETTING_CATEGORIES = Array.from(
+  new Set(SETTING_IDS.map((id) => SETTINGS_PRESENTATION[id].category)),
+)
 
 /** The ids that have a row of their own, in registry order. */
 export const SETTING_ROW_IDS = SETTING_IDS.filter(
@@ -806,5 +810,5 @@ export const SETTING_ROW_IDS = SETTING_IDS.filter(
  * the ordering behind would be a reset only in name.
  */
 export function settingRowIds(id: SettingId): readonly SettingId[] {
-  return [id, ...SETTING_IDS.filter((other) => presentationFor(other).rowOwner === id)]
+  return [id].concat(SETTING_IDS.filter((other) => presentationFor(other).rowOwner === id))
 }

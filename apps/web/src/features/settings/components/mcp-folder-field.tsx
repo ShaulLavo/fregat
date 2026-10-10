@@ -15,6 +15,7 @@ export function McpFolderField({
 }) {
   const owner = useSettingsOwner()
   const [picking, setPicking] = useState(false)
+  const label = folder === '.' ? 'Root folder' : (folder ?? 'Home folder')
 
   return (
     <div className='flex min-w-0 flex-wrap items-center gap-(--density-control-gap)'>
@@ -22,14 +23,14 @@ export function McpFolderField({
       <span
         className='text-foreground min-w-0 flex-1 truncate font-mono text-xs'
         data-mcp-folder
-        title={folder ?? 'Home folder'}
+        title={label}
       >
-        {folder ?? 'Home folder'}
+        {label}
       </span>
       <Button onClick={() => setPicking(true)} size='sm' variant='outline'>
         Choose folder…
       </Button>
-      {folder ? (
+      {folder !== null ? (
         <Button onClick={() => onChange(null)} size='sm' variant='ghost'>
           Home
         </Button>
@@ -37,10 +38,9 @@ export function McpFolderField({
       {picking ? (
         <QueryClientProvider client={owner}>
           <FilePickerDialog
-            mode='folder'
             onOpenChange={setPicking}
             onPick={(entry) => {
-              onChange(entry.path)
+              onChange(entry.path || '.')
               setPicking(false)
             }}
             open

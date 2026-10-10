@@ -64,7 +64,7 @@ function capturesInWindow(
   captures: readonly SpellcheckCapture[],
   window: SpellTextRange,
   keep: (name: string) => boolean,
-): readonly SpellTextRange[] {
+): SpellTextRange[] {
   const ranges: SpellTextRange[] = []
   for (const capture of captures) {
     if (!keep(capture.captureName)) continue
@@ -75,9 +75,9 @@ function capturesInWindow(
   return ranges
 }
 
-function mergeRanges(ranges: readonly SpellTextRange[]): readonly SpellTextRange[] {
+function mergeRanges(ranges: SpellTextRange[]): readonly SpellTextRange[] {
   const merged: SpellTextRange[] = []
-  for (const range of ranges.toSorted((a, b) => a.start - b.start)) {
+  for (const range of ranges.sort((a, b) => a.start - b.start)) {
     const last = merged.at(-1)
     if (last && range.start <= last.end) {
       merged[merged.length - 1] = { start: last.start, end: Math.max(last.end, range.end) }

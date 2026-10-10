@@ -458,7 +458,7 @@ export async function settleRetentionReloadCleanup(
 ) {
   const outcomes: { stage: string; at: number; error: unknown }[] = []
   const complete = mainOperation
-    ? [...actions, { stage: 'join-main-operation', run: () => mainOperation }]
+    ? actions.concat([{ stage: 'join-main-operation', run: () => mainOperation }])
     : actions
   for (const action of complete) {
     try {
@@ -557,7 +557,8 @@ export function observeRetentionEntryEvents(
   const original = emitter.emit
   emitter.emit = function (event, ...args: unknown[]) {
     guardRetentionEntryObservation(() => observe(event, args))
-    return Reflect.apply(original, this, [event, ...args])
+    const arguments_: unknown[] = [event]
+    return Reflect.apply(original, this, arguments_.concat(args))
   }
 }
 
@@ -1002,7 +1003,7 @@ function createRetentionEntryWriter() {
     const facts: PendingEntryFact[] = []
     let selected: Flight | null = null
     for (const fact of queue) {
-      const next = encode([...facts, fact])
+      const next = encode(facts.concat([fact]))
       if (next.kind === 'schema') {
         failed({ code: 'WIRE_SCHEMA' })
         return
@@ -1620,7 +1621,7 @@ export function createRetentionEntryCapture(socketOptions?: { entryPort: number;
       }
     const history = pin(lifetime.values())
     const prior = pin(
-      [...paths].flatMap((path) => {
+      Array.from(paths).flatMap((path) => {
         const record = completions.get(path)
         return record ? [record] : []
       }),
@@ -1822,14 +1823,13 @@ export function createRetentionEntryCapture(socketOptions?: { entryPort: number;
       for (const record of completions.values()) tailRecords.set(record.sequence, record)
       for (const owner of cases.values()) {
         if (!owner.failure) continue
-        for (const record of [
-          ...owner.failure.records,
-          ...owner.failure.predecessors,
-          ...owner.failure.lifetime,
-        ])
+        for (const record of owner.failure.records.concat(
+          owner.failure.predecessors,
+          owner.failure.lifetime,
+        ))
           tailRecords.set(record.sequence, record)
       }
-      const tail = [...tailRecords.values()].sort((a, b) => a.sequence - b.sequence)
+      const tail = Array.from(tailRecords.values()).sort((a, b) => a.sequence - b.sequence)
       const results: Awaited<ReturnType<typeof archiveEntryReceipt>>[] = []
       for (const [output, owner] of cases) {
         if (!owner.failure) continue

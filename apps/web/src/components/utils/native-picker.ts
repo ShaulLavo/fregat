@@ -13,12 +13,7 @@ import { basenameFromOsPath, clientPathFromOsPath } from '@/components/utils/pic
 import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { statPath } from '@/lib/file-server'
-import {
-  isDirectoryEntry,
-  isFileEntry,
-  isPickedFsEntry,
-  type PickedFsEntry,
-} from '@/lib/file-system-types'
+import { isDirectoryEntry, isPickedFsEntry, type PickedFsEntry } from '@/lib/file-system-types'
 import { getPlatformBridge } from '@/lib/platform/bridge'
 import { filePickerKeys, fileSystemKeys } from '@/lib/query-keys'
 import { log, observeClientOperation } from '@/lib/client-logging'
@@ -75,7 +70,7 @@ export function notifyPickerCapabilitiesResult(queryClient: QueryClient, error: 
     error: errorSummary(error, { guidance: true }),
   })
   toastError(
-    'Could not check file chooser availability',
+    'Could not check folder chooser availability',
     {
       description: [failure.why, clientErrorDescription(failure)].filter(Boolean).join(' '),
     },
@@ -100,7 +95,6 @@ export function nativeSelectionOptions(queryClient: QueryClient) {
         {
           action: 'platform.native_picker.summary',
           area: 'platform',
-          mode: request.mode,
           signal,
         },
         async () => {
@@ -117,10 +111,7 @@ export function nativeSelectionOptions(queryClient: QueryClient) {
           if (!path) return null
           const entry = await hydrateSelection(queryClient, client, path, signal)
           signal.throwIfAborted()
-          if (request.mode === 'folder' && !isDirectoryEntry(entry))
-            throw createClientInvariantError('Choose a folder.')
-          if (request.mode === 'file' && !isFileEntry(entry))
-            throw createClientInvariantError('Choose a file.')
+          if (!isDirectoryEntry(entry)) throw createClientInvariantError('Choose a folder.')
           return entry
         },
         (entry) => ({ outcome: entry ? 'selected' : 'cancelled', entryType: entry?.type ?? null }),
@@ -178,5 +169,5 @@ async function hydrateSelection(
   )
   const entry = { ...metadata, name: basenameFromOsPath(path) }
   if (isPickedFsEntry(entry)) return entry
-  throw createClientInvariantError('Choose a file or folder.')
+  throw createClientInvariantError('Choose a folder.')
 }

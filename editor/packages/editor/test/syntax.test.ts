@@ -1160,21 +1160,21 @@ function mountRetryEditor(
   let sessions = 0
   const container = document.createElement('div')
   document.body.appendChild(container)
-  const editor = new Editor(container, {
-    plugins: [
-      {
-        activate: (context) =>
-          context.registerHighlighter({
-            operation: createEditorHighlighterOperation((context) => {
-              sessions += 1
-              return openRuntime(context)
-            }),
+  const initialPlugins: EditorPlugin[] = [
+    {
+      activate: (context) =>
+        context.registerHighlighter({
+          operation: createEditorHighlighterOperation((context) => {
+            sessions += 1
+            return openRuntime(context)
           }),
-      },
-      themeSnapshotPlugin(snapshots),
-      createEditorLoggingPlugin((event) => events.push(event)),
-      ...plugins,
-    ],
+        }),
+    },
+    themeSnapshotPlugin(snapshots),
+    createEditorLoggingPlugin((event) => events.push(event)),
+  ]
+  const editor = new Editor(container, {
+    plugins: initialPlugins.concat(plugins),
     onInitialPaint: (event) => paints.push(event),
   })
   editor.openDocument({ documentId: 'retry.ts', languageId: 'typescript', text: TEXT })

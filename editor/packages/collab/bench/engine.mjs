@@ -28,14 +28,14 @@ function timing(label, setup, run, validate) {
       if (state.keystrokes) keystrokes.push(...state.keystrokes)
     }
   }
-  const sorted = keystrokes.toSorted((a, b) => a - b)
+  const sorted = keystrokes.sort((a, b) => a - b)
   return {
     label,
     medianMs: median(measurements),
     samplesMs: measurements,
     ...(keystrokes.length
       ? {
-          keystrokeMedianMs: median(keystrokes),
+          keystrokeMedianMs: sorted[Math.floor(sorted.length / 2)],
           keystrokeP95Ms: sorted[Math.floor(sorted.length * 0.95)],
           keystrokeMaxMs: sorted.at(-1),
           keystrokesOverBudget: keystrokes.filter((value) => value > 8.3).length,

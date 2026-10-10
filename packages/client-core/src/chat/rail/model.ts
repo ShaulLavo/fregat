@@ -217,7 +217,7 @@ export function sessionRailModel({
   const items = allItems
     .filter((item) => machineFilter === null || item.environmentId === machineFilter)
     .filter((item) => (view === 'archived' ? item.archived : !item.archived))
-    .toSorted(compareRailItems)
+    .sort(compareRailItems)
   const scoped = scope ? items.filter((item) => item.projectGroupKey === scope) : items
   const needle = query.trim().toLowerCase()
   const matching = scoped.filter(
@@ -266,7 +266,7 @@ ${item.machineLabel ?? ''}`
         displayedMembers.length > 1 ? `${displayedMembers.length} machines` : representative.label,
     })
   }
-  const projects = [...projectsById.values()].toSorted(compareProjectsForRail)
+  const projects = Array.from(projectsById.values()).sort(compareProjectsForRail)
   const sections = SECTIONS.map((section) => ({
     ...section,
     groups: projects.flatMap((project) => {

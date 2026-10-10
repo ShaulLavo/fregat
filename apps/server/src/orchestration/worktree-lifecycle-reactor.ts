@@ -135,13 +135,14 @@ export class WorktreeLifecycleReactor {
   async repositoryPath(worktree: OrchestrationWorktree): Promise<string> {
     const model = this.options.getReadModel()
     const base = worktree.baseWorktreeId ? model.worktrees.get(worktree.baseWorktreeId) : null
-    const candidates = new Set([
-      worktree.canonicalPath,
-      ...(base ? [base.canonicalPath] : []),
-      ...[...model.worktrees.values()]
-        .filter((row) => row.projectId === worktree.projectId)
-        .map((row) => row.canonicalPath),
-    ])
+    const candidates = new Set(
+      [worktree.canonicalPath].concat(
+        base ? [base.canonicalPath] : [],
+        [...model.worktrees.values()]
+          .filter((row) => row.projectId === worktree.projectId)
+          .map((row) => row.canonicalPath),
+      ),
+    )
     const managedRoot =
       worktree.ownership === 'platform' || worktree.ownership === 'unclaimed'
         ? path.dirname(worktree.canonicalPath)
@@ -600,7 +601,7 @@ export class WorktreeLifecycleReactor {
           ...setup,
           state,
           exitCode: null,
-          output: [...setup.output, 'Setup interrupted by a server restart.'],
+          output: setup.output.concat(['Setup interrupted by a server restart.']),
           updatedAt: new Date().toISOString(),
         },
         commandId: commandKey('setup-recovery', worktree.id, crypto.randomUUID()),

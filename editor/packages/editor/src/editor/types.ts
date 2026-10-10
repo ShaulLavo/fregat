@@ -104,7 +104,7 @@ export type EditorChangeHandler = (state: EditorState, change: DocumentSessionCh
 export type EditorOptions = {
   readonly documentKey?: string | null
   readonly snapshot?: string | null
-  /** External projections may hold saved paint until their tokens and geometry are ready. */
+  /** Hold saved paint while projections settle; reveal a hidden host before setting ready. */
   readonly presentationReady?: boolean
   readonly onPresentationChange?: (state: 'provisional' | 'live' | 'empty') => void
   readonly defaultText?: string
@@ -141,6 +141,7 @@ export type EditorOptions = {
    * Defaults off on Windows and on elsewhere.
    */
   readonly rtlMoveVisually?: boolean
+  /** `content` paints every row at natural height; outside ancestors own scrolling. */
   readonly scrollMode?: EditorScrollMode
   readonly selectionSyncMode?: EditorSelectionSyncMode
   /** Confusable and invisible characters to point out; both families report unless turned off. */

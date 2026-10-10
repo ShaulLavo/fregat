@@ -184,11 +184,9 @@ function editorThemeToShikiThemeName(
 }
 
 function compactThemeHash(theme: EditorTheme): string {
-  const input = [
-    theme.backgroundColor ?? '',
-    theme.foregroundColor ?? '',
-    ...EDITOR_SHIKI_SYNTAX_SCOPE_MAPPINGS.map(({ key }) => theme.syntax?.[key] ?? ''),
-  ].join('|')
+  const input = [theme.backgroundColor ?? '', theme.foregroundColor ?? '']
+    .concat(EDITOR_SHIKI_SYNTAX_SCOPE_MAPPINGS.map(({ key }) => theme.syntax?.[key] ?? ''))
+    .join('|')
 
   return compactHash(input)
 }

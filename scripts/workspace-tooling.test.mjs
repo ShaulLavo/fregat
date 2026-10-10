@@ -88,7 +88,7 @@ async function prepare({ root, put }) {
 }
 
 function run(root, ...args) {
-  return spawnSync('bun', [script, ...args], { cwd: root, encoding: 'utf8' })
+  return spawnSync('bun', [script].concat(args), { cwd: root, encoding: 'utf8' })
 }
 
 test('checks workspace tools, standalone catalogs and the Astro compiler API', async () => {

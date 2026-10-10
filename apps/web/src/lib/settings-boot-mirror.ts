@@ -8,8 +8,30 @@ import {
   type SettingsValues,
 } from '@workspace/contracts'
 import * as v from 'valibot'
+import { createStore } from 'zustand/vanilla'
+import {
+  APPEARANCE_BOOT_KEYS,
+  appearanceBootValuesSchema,
+  type AppearanceBootValues,
+} from '@workspace/contracts/html-bootstrap'
+import { initialAppearanceValues, bootstrapMode } from '@/lib/html-bootstrap'
 
 import { BOOT_MIRROR_KEY } from '@/lib/boot-keys'
+
+const confirmedAppearance = createStore<{ values: AppearanceBootValues | null }>(() => ({
+  values: null,
+}))
+
+export function resetBootAppearance() {
+  confirmedAppearance.setState({ values: null })
+}
+
+function appearanceValues() {
+  return resolveThemeSettings(
+    confirmedAppearance.getState().values ?? initialAppearanceValues(),
+    bootstrapMode('system'),
+  )
+}
 
 /**
  * Also mirrored, though they are not appearance: the editor's plugin list is
@@ -84,6 +106,7 @@ const MIRRORED_KEYS = [
   'search.quickOpenLimit',
   'search.wholeWord',
   'server.activationTimeoutSeconds',
+  'terminal.integrated.screenReader',
   'terminal.integrated.fontSize',
   'terminal.integrated.cursorBlinking',
   'terminal.integrated.scrollback',
@@ -115,6 +138,7 @@ const MIRRORED_KEYS = [
  */
 export function readSettingsMirror(): MirroredValues {
   const stored = parseStored()
+  const appearance = appearanceValues()
 
   // Validated per key rather than as a whole document. A whole-document parse
   // fails the moment any key is added or removed, which would make the first
@@ -122,8 +146,11 @@ export function readSettingsMirror(): MirroredValues {
   // people notice.
   const values = {} as Record<string, unknown>
   for (const key of MIRRORED_KEYS) {
+    if (APPEARANCE_BOOT_KEYS.some((appearance) => appearance === key)) continue
     values[key] = validValue(key, stored[key])
   }
+
+  Object.assign(values, appearance)
 
   return resolveThemeSettings(
     values as MirroredValues,
@@ -135,6 +162,10 @@ export function readSettingsMirror(): MirroredValues {
 
 /** One cached startup value until the confirmed settings document arrives. */
 export function readSettingBootValue<K extends SettingId>(key: K): SettingsValues[K] {
+  if (APPEARANCE_BOOT_KEYS.some((appearance) => appearance === key)) {
+    const values: SettingsValues = { ...DEFAULT_SETTING_VALUES, ...appearanceValues() }
+    return values[key]
+  }
   if (!MIRRORED_KEYS.some((mirrored) => mirrored === key)) return DEFAULT_SETTING_VALUES[key]
 
   return validValue(key, parseStored()[key])
@@ -163,13 +194,16 @@ export function writeBootMirror(values: SettingsValues, layers: readonly Setting
     }
 
   const mirrored: Record<string, unknown> = {}
-  for (const key of MIRRORED_KEYS) mirrored[key] = values[key]
+  confirmedAppearance.setState({ values: v.parse(appearanceBootValuesSchema, values) })
+  for (const key of MIRRORED_KEYS) {
+    if (APPEARANCE_BOOT_KEYS.some((appearance) => appearance === key)) continue
+    mirrored[key] = values[key]
+  }
 
   try {
     localStorage.setItem(BOOT_MIRROR_KEY, JSON.stringify(mirrored))
   } catch {
-    // A full or unavailable localStorage costs a themed first paint, nothing
-    // more. The settings themselves live on the server.
+    // Non-appearance preferences can still use defaults on another visit.
   }
 }
 
@@ -183,7 +217,7 @@ function validValue<K extends SettingId>(key: K, stored: unknown): SettingsValue
 }
 
 function parseStored(): Record<string, unknown> {
-  // This synchronous path selects the first-paint theme before React mounts.
+  // Only non-appearance preferences read persistent browser storage.
   try {
     const raw = localStorage.getItem(BOOT_MIRROR_KEY)
     if (!raw) return {}

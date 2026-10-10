@@ -503,6 +503,11 @@ export const SETTINGS_DOCUMENTATION = {
     description: 'Send Ctrl+letter and readline Alt shortcuts to the focused terminal shell.',
     keywords: ['terminal', 'shell', 'readline', 'shortcut', 'keybinding'],
   },
+  'terminal.integrated.screenReader': {
+    title: 'Screen reader',
+    description: 'Expose terminal text and announce new output to screen readers.',
+    keywords: ['terminal', 'accessibility', 'screen reader', 'speech', 'output'],
+  },
   'terminal.integrated.fontSize': {
     description: 'Terminal font size in pixels.',
     keywords: ['terminal', 'font', 'size'],
@@ -820,7 +825,7 @@ export const SETTINGS_DOCUMENTATION = {
   'window.nativeDialogTimeoutSeconds': {
     title: 'Native dialog time limit',
     description:
-      'Seconds a desktop file chooser or startup message stays open before its helper closes.',
+      'Seconds a desktop folder chooser or startup message stays open before its helper closes.',
     keywords: ['window', 'picker', 'native', 'timeout'],
   },
   'window.nativeHostStopGraceSeconds': {
@@ -890,14 +895,14 @@ export const SETTINGS_DOCUMENTATION = {
     optionTitles: { auto: 'Auto', columns: 'Columns', list: 'List', icons: 'Icons' },
     title: 'File picker view',
     description:
-      'How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file.',
+      'How the folder picker shows a folder: columns, a list, or icons. Auto uses columns.',
     keywords: ['files', 'folders', 'picker', 'columns', 'list', 'icons', 'finder'],
   },
   'files.previewKilobytes': {
     title: 'Text preview size',
     description:
-      'Kilobytes of a text file the file picker and quick open read for their preview. A longer file shows its first part and says how much of it that is.',
-    keywords: ['files', 'preview', 'picker', 'quick open', 'size', 'kilobytes'],
+      'Kilobytes of a text file quick open reads for its preview. A longer file shows its first part and says how much of it that is.',
+    keywords: ['files', 'preview', 'quick open', 'size', 'kilobytes'],
   },
   'files.showHidden': {
     title: 'Show hidden files in pickers',
@@ -1083,7 +1088,7 @@ export const SETTINGS_DOCUMENTATION = {
     optionTitles: { ours: 'Ours', zed: 'Zed', vscode: 'VS Code' },
     title: 'Keyboard mode',
     description:
-      'The shortcuts your contextual bindings build on. Ours starts with Zed’s keys; Zed tracks its defaults; VS Code uses its editing and app shortcuts.',
+      'The shortcuts your contextual bindings build on. Ours starts with Zed’s keys and adds keys for Fregat’s own commands; Zed tracks its defaults; VS Code uses its editing and app shortcuts.',
     keywords: ['keybinding', 'shortcut', 'preset', 'zed', 'vscode', 'keymap'],
   },
   'keybindings.overrides': {

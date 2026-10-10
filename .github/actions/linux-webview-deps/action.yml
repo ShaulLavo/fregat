@@ -14,3 +14,13 @@ runs:
         sudo sed -i '\|^http://azure\.archive\.ubuntu\.com/ubuntu/|d' /etc/apt/apt-mirrors.txt
         sudo apt-get update
         sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev
+
+    - name: Install Zig 0.17
+      shell: bash
+      run: |
+        directory="$RUNNER_TEMP/fregat-zig"
+        mkdir -p "$directory"
+        curl --fail --location --retry 3 https://ziglang.org/download/0.17.0/zig-x86_64-linux-0.17.0.tar.xz -o "$directory/zig.tar.xz"
+        printf '%s  %s\n' 1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026 "$directory/zig.tar.xz" | sha256sum --check --strict
+        tar -xJf "$directory/zig.tar.xz" -C "$directory"
+        echo "$directory/zig-x86_64-linux-0.17.0" >> "$GITHUB_PATH"

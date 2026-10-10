@@ -1,6 +1,4 @@
 import type { FsEntry } from '@/lib/file-system-types'
-import { isDirectoryEntry } from '@/lib/file-system-types'
-import { formatSizeLabel, type FilePickerMode } from '@/features/file-picker/utils/model'
 import type {
   FileListSortKey,
   FileListSortDirection,
@@ -28,40 +26,88 @@ export type FileListRow =
       entry: FsEntry
       position: number
       showPath: boolean
+      /** A recent folder leading the list, which a tap goes to wherever it lives. */
+      recent: boolean
     }
 
-export function fileListRows(entries: FsEntry[], isSearching: boolean): FileListRow[] {
-  if (!isSearching || !entries.some(hasSearchScope)) {
-    return entries.map((entry, index) => ({
+/** Recent folders shown above the folder they lead, which `folder` names. */
+export type LeadingRecents = {
+  readonly entries: readonly FsEntry[]
+  readonly folder: string
+}
+
+/** Enough recent folders to reach the usual ones without pushing the folder's own rows away. */
+export const LEADING_RECENT_LIMIT = 5
+
+/** The recent folders that lead a folder's rows, newest first. */
+export function leadingRecentEntries(recents: readonly FsEntry[]) {
+  return recents.slice(0, LEADING_RECENT_LIMIT)
+}
+
+export function fileListRows(
+  entries: readonly FsEntry[],
+  isSearching: boolean,
+  recents: LeadingRecents | null = null,
+): FileListRow[] {
+  if (isSearching && entries.some(hasSearchScope)) return searchRows(entries)
+
+  const leading = isSearching ? [] : (recents?.entries ?? [])
+  const folderRows = entries.map((entry, index): FileListRow => ({
+    kind: 'entry',
+    key: entry.path,
+    entry,
+    position: leading.length + index + 1,
+    showPath: false,
+    recent: false,
+  }))
+  if (!recents || leading.length === 0) return folderRows
+
+  const rows: FileListRow[] = [{ kind: 'section', key: 'section:recent', label: 'Recent' }]
+  return rows.concat(
+    leading.map((entry, index): FileListRow => ({
       kind: 'entry',
-      key: entry.path,
+      key: `recent:${entry.path}`,
       entry,
       position: index + 1,
-      showPath: false,
-    }))
-  }
+      showPath: true,
+      recent: true,
+    })),
+    [
+      {
+        kind: 'section',
+        key: 'section:folder',
+        label: entries.length > 0 ? `In ${recents.folder}` : `Nothing in ${recents.folder}`,
+      },
+    ],
+    folderRows,
+  )
+}
 
+function searchRows(entries: readonly FsEntry[]): FileListRow[] {
   let position = 0
   return searchResultSections(entries).flatMap((section) => {
     if (section.entries.length === 0) return []
 
-    return [
+    const rows: FileListRow[] = [
       {
-        kind: 'section' as const,
+        kind: 'section',
         key: `section:${section.scope}`,
         label: section.label,
       },
-      ...section.entries.map((entry) => {
+    ]
+    return rows.concat(
+      section.entries.map((entry): FileListRow => {
         position += 1
         return {
-          kind: 'entry' as const,
+          kind: 'entry',
           key: `${section.scope}:${entry.path}`,
           entry,
           position,
           showPath: true,
+          recent: false,
         }
       }),
-    ]
+    )
   })
 }
 
@@ -69,12 +115,6 @@ export function formatFileListModified(mtimeMs: number) {
   if (mtimeMs <= 0) return 'Unknown'
 
   return compactModifiedFormatter.format(new Date(mtimeMs))
-}
-
-export function fileListSizeLabel(entry: FsEntry) {
-  if (isDirectoryEntry(entry)) return '--'
-
-  return formatSizeLabel(entry)
 }
 
 export function sortButtonLabel(key: FileListSortKey, direction?: FileListSortDirection) {
@@ -87,7 +127,7 @@ function hasSearchScope(entry: FsEntry) {
   return entry.searchScope === 'current' || entry.searchScope === 'system'
 }
 
-function searchResultSections(entries: FsEntry[]) {
+function searchResultSections(entries: readonly FsEntry[]) {
   return [
     {
       scope: 'current' as const,
@@ -102,10 +142,4 @@ function searchResultSections(entries: FsEntry[]) {
   ]
 }
 
-export function fileListGridClass(mode: FilePickerMode) {
-  if (mode === 'folder') {
-    return 'grid-cols-[minmax(0,1fr)_116px_74px] max-sm:grid-cols-1'
-  }
-
-  return 'grid-cols-[minmax(0,1fr)_80px_116px_74px] max-sm:grid-cols-[minmax(0,1fr)_68px]'
-}
+export const FILE_LIST_GRID = 'grid-cols-[minmax(0,1fr)_116px] max-sm:grid-cols-1'

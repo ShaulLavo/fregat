@@ -128,13 +128,13 @@ function addStatToAncestors(ancestors: readonly MutableDirectoryNode[], stat: Ch
 }
 
 function toTreeNodes(directory: MutableDirectoryNode): ChatTurnDiffTreeNode[] {
-  const subdirectories = Array.from(directory.directories.values())
-    .toSorted(compareByName)
+  const subdirectories: ChatTurnDiffTreeNode[] = Array.from(directory.directories.values())
+    .sort(compareByName)
     .map(toDirectoryNode)
     .map(compactDirectoryNode)
-  const files = directory.files.toSorted(compareByName)
+  const files = directory.files.sort(compareByName)
 
-  return [...subdirectories, ...files]
+  return subdirectories.concat(files)
 }
 
 function toDirectoryNode(directory: MutableDirectoryNode): ChatTurnDiffTreeDirectoryNode {

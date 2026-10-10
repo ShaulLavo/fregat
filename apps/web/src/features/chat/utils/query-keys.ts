@@ -26,6 +26,8 @@ export const attachmentQueryKeys = {
     ] as const,
   capabilities: (environmentId: string) =>
     ['chat', 'attachment-capabilities', environmentId] as const,
+  /** Whether this device verifiably is the machine the query client talks to. */
+  machineLocal: () => ['chat', 'attachment-machine-local'] as const,
 }
 
 export const providerAuthKeys = {
@@ -97,4 +99,8 @@ export const machineCapacityKeys = {
 
 export const chatPanelQueryKeys = {
   module: ['chat', 'sidePanelModule'] as const,
+}
+
+export const providerSignInDialogQueryKeys = {
+  module: ['chat', 'providerSignInDialogModule'] as const,
 }

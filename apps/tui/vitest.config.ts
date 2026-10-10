@@ -1,7 +1,19 @@
 import { gitFixtureEnv } from 'server/testing/git-identity'
 import { defineConfig } from 'vitest/config'
+import { compileTui, tuiSources } from './scripts/compiler.ts'
 
 export default defineConfig({
+  plugins: [
+    {
+      name: 'tui-react-compiler',
+      enforce: 'pre',
+      transform(source, id) {
+        const file = id.split('?')[0]
+        if (!tuiSources.test(file)) return
+        return compileTui(file, source)
+      },
+    },
+  ],
   resolve: { alias: { '@': new URL('./src', import.meta.url).pathname } },
   // Keep OpenTUI's class identities consistent with React's native Bun imports.
   ssr: { resolve: { conditions: ['bun', 'node', 'development|production'] } },

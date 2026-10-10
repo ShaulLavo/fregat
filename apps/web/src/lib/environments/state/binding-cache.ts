@@ -57,7 +57,7 @@ export function recordEnvironmentCacheBinding(
 ) {
   if (binding.descriptor.environmentId !== storage.environmentId) return false
   const previous = readEnvironmentBinding(storage) ?? cacheBindings.get(storage.environmentId)
-  const names = [...new Set([...(previous?.names ?? []), ...binding.names])]
+  const names = Array.from(new Set((previous?.names ?? []).concat(binding.names)))
   const origin = previous?.names.includes('local') ? previous.origin : binding.origin
   const next = { ...binding, names, origin }
   cacheBindings.set(storage.environmentId, next)

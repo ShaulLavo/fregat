@@ -1,41 +1,43 @@
 import { scratchPath } from '../paths'
-import { ok, strictEqual } from 'node:assert/strict'
+import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import path from 'node:path'
-import type { Page } from 'playwright'
+import type { Locator, Page } from 'playwright'
 
-import { openGitPanel, selectors } from '../selectors'
+import { openFolderPickerList, openGitPanel, selectors } from '../selectors'
 import type { Scenario } from './index'
 
 export const filePickerNavigation: Scenario = {
   name: 'file-picker-navigation',
   description:
-    'Leave empty folders with keyboard navigation and page above search section headers.',
+    'Leave empty folders with the keyboard and the Up button, keeping the folder left selected, and page above search section headers.',
   async run(page, { step }) {
     const root = await mkdtemp(scratchPath('fregat-picker-navigation-'))
     const prefix = `picker-${crypto.randomUUID()}`
+    // Sorted last, so the list's fallback cursor on its first row cannot pass for its selection.
+    const child = 'zz-empty'
     await Promise.all(
-      ['empty', `${prefix}-a`, `${prefix}-b`].map((name) => mkdir(path.join(root, name))),
+      [child, `${prefix}-a`, `${prefix}-b`].map((name) => mkdir(path.join(root, name))),
     )
     try {
-      await selectors.folderTree(page).waitFor()
-      await selectors.projectMenu(page).click()
-      await selectors.openFolderMenu(page).click()
-      await selectors.pickerDialog(page).waitFor()
+      await openFolderPickerList(page)
       await selectors.pickerOptions(page).first().waitFor()
       await step('folder-picker-ready')
-      for (const key of ['Backspace', 'ArrowLeft']) {
-        await openFolderPath(page, path.join(root, 'empty'))
+      for (const key of ['Backspace', 'ArrowLeft', 'up-button']) {
+        await openFolderPath(page, path.join(root, child))
         await selectors.pickerEmpty(page).waitFor()
         await selectors.pickerList(page).focus()
         await step(`empty-folder-before-${key}`)
-        await page.keyboard.press(key)
+        if (key === 'up-button') await selectors.pickerUpOneFolder(page).click()
+        else await page.keyboard.press(key)
         await selectors
           .pickerOptions(page)
           .filter({ hasText: prefix })
           .first()
           .waitFor({ timeout: 5000 })
+        await expectSelectedRow(page, child, path.join(root, child))
         await step(`parent-after-${key}`)
+        await expectNoFadeWhenFits(selectors.pickerList(page))
       }
       await selectors.pickerSearch(page).fill(prefix)
       const list = selectors.pickerList(page)
@@ -61,6 +63,21 @@ export const filePickerNavigation: Scenario = {
       await rm(root, { recursive: true, force: true })
     }
   },
+}
+
+/** A list whose rows all fit fades neither edge, whatever it showed before. */
+async function expectNoFadeWhenFits(list: Locator) {
+  const state = await list.evaluate((element) => {
+    const scroller = element.closest<HTMLElement>('[data-slot="virtual-list"]') ?? element
+    const style = getComputedStyle(scroller)
+    return {
+      fits: scroller.scrollHeight <= scroller.clientHeight,
+      top: style.getPropertyValue('--scroll-fade-top'),
+      bottom: style.getPropertyValue('--scroll-fade-bottom'),
+    }
+  })
+  ok(state.fits, 'The parent folder rows must fit without scrolling')
+  deepStrictEqual({ top: state.top, bottom: state.bottom }, { top: '0px', bottom: '0px' })
 }
 
 export const gitHistoryScroll: Scenario = {
@@ -90,6 +107,17 @@ export const gitHistoryScroll: Scenario = {
     )
     await step('history-scroll-restored')
   },
+}
+
+/** The row is selected, painted as selected, the list's active row, and the previewed folder. */
+async function expectSelectedRow(page: Page, name: string, folder: string) {
+  const row = selectors.pickerRow(page, name)
+  await row.and(page.locator('[aria-selected="true"]')).waitFor({ timeout: 5000 })
+  await selectors.pickerPreviewPath(page, folder.replace(/^\//u, '')).waitFor({ timeout: 5000 })
+  const id = await row.getAttribute('id')
+  strictEqual(await selectors.pickerList(page).getAttribute('aria-activedescendant'), id)
+  const paint = await row.evaluate((element) => getComputedStyle(element).backgroundColor)
+  ok(paint !== 'rgba(0, 0, 0, 0)', `The selected row must paint a highlight, got ${paint}`)
 }
 
 async function openFolderPath(page: Page, folder: string) {

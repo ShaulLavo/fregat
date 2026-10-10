@@ -1,11 +1,17 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { browserTestResponses } from '../../scripts/browser-test-responses.ts'
 import { workspaceRoot } from '../../scripts/workspace-root.ts'
 import { playwright } from '@vitest/browser-playwright'
+import { devices } from '@playwright/test'
 import { defineConfig } from 'vitest/config'
 
 const crossEngineScrollTests = [
-  'test/{virtualizedTextView,virtualizedTextViewGeometry,wheelScrollTarget,gutterScroll,gutterLeadingInset,gutterPointerEvents,wrappedLineGutter,mouseSelectionAutoScroll,navigationReveal,initialViewport,firstPaint,longLineMeasurements,millionLinePaint,codeViewport,renderDisposal,rowPresentation,proportionalRows,proportionalWrap,wordWrap,defaultLargeDocument,metricProbeScrollExtent,tailGeometry,typography}.browser.test.ts',
+  'test/{virtualizedTextView,virtualizedTextViewGeometry,wheelScrollTarget,gutterScroll,gutterLeadingInset,gutterPointerEvents,wrappedLineGutter,mouseSelectionAutoScroll,navigationReveal,initialViewport,firstPaint,longLineMeasurements,millionLinePaint,codeViewport,renderDisposal,rowPresentation,proportionalRows,proportionalWrap,freeSansShaping,freeSansNativeCarets,wordWrap,defaultLargeDocument,metricProbeScrollExtent,tailGeometry,typography}.browser.test.ts',
 ]
+
+let contentEvidence: string | undefined
 
 export default defineConfig({
   server: { fs: { allow: [workspaceRoot] } },
@@ -39,8 +45,14 @@ export default defineConfig({
         server: { fs: { allow: [workspaceRoot] } },
         optimizeDeps: {
           // tree-sitter-md is plain ESM over web-tree-sitter; served as-is, it is never discovered.
-          exclude: ['web-tree-sitter', 'tree-sitter-md'],
+          exclude: [
+            'web-tree-sitter',
+            'tree-sitter-md',
+            'micromark-util-decode-string',
+            'micromark-util-normalize-identifier',
+          ],
           include: [
+            'evlog/client',
             '@fregat/hotkeys',
             'diff',
             '@shikijs/engine-oniguruma',
@@ -135,6 +147,68 @@ export default defineConfig({
             'test/markdownFencePaint.browser.test.ts',
             'test/paintOrigin.browser.test.ts',
           ],
+        },
+      },
+      {
+        plugins: [browserTestResponses()],
+        server: { fs: { allow: [workspaceRoot] } },
+        test: {
+          name: 'content-layout',
+          include: ['test/contentHeight.browser.test.ts'],
+          browser: {
+            enabled: true,
+            headless: true,
+            viewport: { width: 800, height: 600 },
+            provider: playwright(),
+            commands: {
+              proofContentLayoutScreenshot: async ({ iframe, project }, width: number) => {
+                contentEvidence ??= mkdtempSync(join(tmpdir(), 'singapore-content-layout-'))
+                const path = join(contentEvidence, `${project.name}-${width}.png`)
+                await iframe
+                  .locator('#content-height-proof')
+                  .screenshot({ path, animations: 'disabled' })
+                return path
+              },
+            },
+            instances: [
+              { browser: 'chromium', name: 'content-layout-chromium' },
+              { browser: 'firefox', name: 'content-layout-firefox' },
+              { browser: 'webkit', name: 'content-layout-webkit' },
+              {
+                browser: 'webkit',
+                name: 'content-layout-iphone',
+                viewport: devices['iPhone 15'].viewport,
+                provider: playwright({ contextOptions: devices['iPhone 15'] }),
+              },
+            ],
+          },
+        },
+      },
+      {
+        plugins: [browserTestResponses()],
+        server: { fs: { allow: [workspaceRoot] } },
+        optimizeDeps: {
+          exclude: [
+            'web-tree-sitter',
+            'tree-sitter-md',
+            'micromark-util-decode-string',
+            'micromark-util-normalize-identifier',
+          ],
+        },
+        test: {
+          name: 'wrap-layout',
+          include: ['test/wrapExtent.browser.test.ts', 'test/wordWrapMarkdown.browser.test.ts'],
+          browser: {
+            enabled: true,
+            headless: true,
+            viewport: { width: 390, height: 844 },
+            fileParallelism: false,
+            provider: playwright({ contextOptions: devices['iPhone 13'] }),
+            instances: [
+              { browser: 'chromium', name: 'wrap-layout-chromium' },
+              { browser: 'webkit', name: 'wrap-layout-iphone-webkit' },
+            ],
+          },
         },
       },
       {

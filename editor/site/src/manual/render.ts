@@ -223,7 +223,7 @@ function replacementHref(spec: InlineReplacementSpec): string {
     addEventListener() {},
   }
   const container = { ownerDocument: { createElement: () => anchor }, append() {} }
-  spec.render?.(container as unknown as HTMLElement)
+  spec.render?.(container as unknown as HTMLElement, spec.text, 0)
   return href
 }
 
@@ -357,7 +357,7 @@ export async function renderMarkdown(
   const tokens = tokenClasses(captures.sort((a, b) => a.startIndex - b.startIndex))
 
   const snapshot = createStringTextSnapshot(text)
-  const specs = [...markdownInlineReplacements(snapshot, records)].sort(
+  const specs = markdownInlineReplacements(snapshot, records).sort(
     (a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex,
   )
   const lines = lineRanges(text)

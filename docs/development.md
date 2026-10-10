@@ -6,7 +6,7 @@ how the repo is put together. the [readme](../README.md) covers what fregat is a
 
 - `apps/web`, the editor shell, workspace tree, git views, file picker, client state
 - `apps/server`, elysia rpc for filesystem, git, file watching, auth, provider adapters, and the typescript lsp websockets
-- `apps/desktop`, the Bun launcher, installed Chromium app integration, and native C/Objective-C system-webview hosts
+- `apps/desktop`, the Bun launcher, installed Chromium app integration, and native Zig/Swift system-webview hosts
 - `apps/mac`, the native swift client
 - `apps/tui`, the terminal client
 - `packages/contracts`, shared dtos, runtime schemas, the settings registry
@@ -34,6 +34,16 @@ Relative selection follows a moved checkout. The installer preserves existing cu
 
 ## workspace libraries
 
+The Linux desktop host requires Zig 0.17.x, `pkg-config`, and WebKitGTK 4.1 development headers.
+The macOS host requires Swift 6 and the macOS SDK from the Xcode command-line tools.
+`bun run --cwd apps/desktop build:native` builds the host for the current platform. Linux uses
+`zig translate-c` to generate library declarations, then compiles the Zig host with safety checks.
+The macOS build compiles the Swift host with AppKit and WebKit, targeting macOS 11 and later.
+With a graphical session available, `bun run --cwd apps/desktop verify:native --evidence <directory>`
+exercises the real host's startup scripts, launcher messages, picker cancellation, persistent
+cookies and storage, state-home isolation, and shutdown. It opens temporary verification windows
+and writes protocol receipts to the evidence directory.
+
 Editor packages live in `editor/packages/`, and the terminal library lives in `ghostty-webgpu/`. Bun installs their workspace links from the root `bun.lock`. Run `bun install --frozen-lockfile` at the root, then `bun run build:workspaces` to prepare the exports used by production builds and typechecking.
 
 Desktop launcher bundle tests load these workspace exports too. Build the libraries before running the launcher checks from a fresh checkout:
@@ -56,7 +66,11 @@ The family folders are mirrored to their standalone repositories. Make library c
 
 ## CI turnaround
 
-PR library checks follow the changed family and shared build inputs. Root configuration, patches, workflow actions, scripts, and Turbo global dependencies select every family. Changes confined to app or shared app-package sources leave library checks skipped. Main and manual CI runs validate every family.
+Normal PR and main CI select only packages whose files changed. A web change runs web tests; a server change runs server tests; a terminal change runs terminal verification. Dependencies are built as prerequisites, while their tests remain with their owning package. Root configuration and script changes select root tooling checks. Plans, root documentation, agent Markdown and changesets select formatting.
+
+Each selected package runs its own formatting, lint, types and tests. Terminal verification owns its complete check; Editor browser regressions run when their own package changes. Website builds and mobile smoke checks are limited to the selected sites. Main uses the last successful main run as its comparison point so replaced queued runs remain covered.
+
+Scheduled and manual runs select every package, shared structural checks, standalone packaging, full mobile crawls and benchmark/endurance probes. The selector controls run with `bun --bun vitest run --config vitest.scripts.config.mjs scripts/ci/affected.test.mjs scripts/ci/packages.test.mjs scripts/ci/events.test.mjs`.
 
 Standalone families share one runner. Each uses a fresh `git archive` export and independent install outside the checkout. Editor also installs a second export with hoisted dependencies and checks tree-sitter runtime identity.
 

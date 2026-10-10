@@ -17,6 +17,10 @@ import type {
   TreeSitterRangeRequest,
   TreeSitterRangeResult,
   TreeSitterSelectionRequest,
+  TreeSitterMergeUnitRequest,
+  TreeSitterMergeUnitResult,
+  TreeSitterProjectedMergeUnitsRequest,
+  TreeSitterProjectedMergeUnitsResult,
   TreeSitterSelectionResult,
   TreeSitterSyntaxRange,
   TreeSitterWorkerRequest,
@@ -89,6 +93,12 @@ export type TreeSitterRangePayload = {
   readonly includeCaptures?: boolean
   readonly range: TreeSitterSyntaxRange
 }
+export type TreeSitterMergeUnitPayload = Omit<TreeSitterMergeUnitRequest, 'type'>
+export type TreeSitterProjectedMergeUnitsPayload = Omit<
+  TreeSitterProjectedMergeUnitsRequest,
+  'type'
+>
+
 export type TreeSitterSelectionPayload = Omit<TreeSitterSelectionRequest, 'type'>
 
 export type TreeSitterWorkerLifecycleState =
@@ -129,6 +139,10 @@ export type TreeSitterBackend = {
     payload: TreeSitterRangePayload,
     signal?: AbortSignal,
   ): Promise<TreeSitterRangeResult | undefined>
+  projectMergeUnits?(
+    payload: TreeSitterProjectedMergeUnitsPayload,
+  ): Promise<TreeSitterProjectedMergeUnitsResult | undefined>
+  mergeUnit?(payload: TreeSitterMergeUnitPayload): Promise<TreeSitterMergeUnitResult | undefined>
   select(payload: TreeSitterSelectionPayload): Promise<TreeSitterSelectionResult | undefined>
   disposeDocument(runtimeSessionId: string): void
   awaitRuntimeSessionIdle?(runtimeSessionId: string): Promise<void>
@@ -343,6 +357,36 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
       signal,
     )
     return isTreeSitterRangeResult(result) ? result : undefined
+  }
+
+  public mergeUnit(
+    payload: TreeSitterMergeUnitPayload,
+  ): Promise<TreeSitterMergeUnitResult | undefined> {
+    return this.trackRuntimeTask(payload.runtimeSessionId, this.finishMergeUnit(payload))
+  }
+
+  private async finishMergeUnit(
+    payload: TreeSitterMergeUnitPayload,
+  ): Promise<TreeSitterMergeUnitResult | undefined> {
+    const handle = await this.ensureWorkerReady()
+    if (!handle) return undefined
+    const result = await this.postRequest({ type: 'mergeUnit', ...payload })
+    return result && 'unit' in result ? result : undefined
+  }
+
+  public projectMergeUnits(
+    payload: TreeSitterProjectedMergeUnitsPayload,
+  ): Promise<TreeSitterProjectedMergeUnitsResult | undefined> {
+    return this.trackRuntimeTask(payload.runtimeSessionId, this.finishProjectedMergeUnits(payload))
+  }
+
+  private async finishProjectedMergeUnits(
+    payload: TreeSitterProjectedMergeUnitsPayload,
+  ): Promise<TreeSitterProjectedMergeUnitsResult | undefined> {
+    const handle = await this.ensureWorkerReady()
+    if (!handle) return undefined
+    const result = await this.postRequest({ type: 'projectMergeUnits', ...payload })
+    return result && 'units' in result ? (result as TreeSitterProjectedMergeUnitsResult) : undefined
   }
 
   public select(
@@ -706,6 +750,14 @@ export class TreeSitterWorkerOwner {
   [backendBinding](): TreeSitterBackend {
     return this.#backend
   }
+  projectMergeUnits(
+    payload: TreeSitterProjectedMergeUnitsPayload,
+  ): Promise<TreeSitterProjectedMergeUnitsResult | undefined> {
+    return this.#backend.projectMergeUnits(payload)
+  }
+  mergeUnit(payload: TreeSitterMergeUnitPayload): Promise<TreeSitterMergeUnitResult | undefined> {
+    return this.#backend.mergeUnit(payload)
+  }
   inspect(): TreeSitterWorkerOwnerSnapshot {
     return this.#backend.inspect()
   }
@@ -758,6 +810,7 @@ function languageDescriptorSignature(language: TreeSitterLanguageDescriptor): st
     highlightQuerySource: language.highlightQuerySource,
     id: language.id,
     injectionQuerySource: language.injectionQuerySource,
+    mergeUnitQuerySource: language.mergeUnitQuerySource,
   })
   languageSignatures.set(language, signature)
   return signature

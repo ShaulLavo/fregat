@@ -46,7 +46,10 @@ receipts remain in Git history and the [historical baseline](baseline.md).
 
 `keybindings.preset` selects `ours`, `zed` or `vscode`, with `ours` as the default. The Zed
 translation pins its upstream commit, retains context predicates and command arguments, and
-records actions with no Fregat equivalent. `ours` initially shares that translation. `vscode`
+records actions with no Fregat equivalent. `ours` shares that translation and adds the `vscode`
+application rows for every command Zed has no action for (Fix problem with AI, session undo,
+Chat mode and others); `ours-fregat.json` moves each such key that Zed already uses in an
+overlapping context, and `ours-fregat.test.ts` checks both rules. `vscode`
 combines explicit app rows with named Editor packs; a change to the Editor's standalone defaults
 does not implicitly change a host preset. Regular presets exclude Markdown formatting bindings.
 
@@ -101,7 +104,7 @@ Browsers can intercept reserved tab shortcuts before a page sees them; headless 
 does not qualify a desktop or macOS browser. AltGraph input and physical-key fallback need their
 own browser coverage. Native device verification keeps its separate execution grants.
 
-The initial `ours` deviation keeps the approved document-navigation keys: Mod+[ and Mod+] dispatch `workspace.navigateBack` and `workspace.navigateForward` at Workspace depth. The four source rows record this choice; `zed` retains the pinned Editor indent/outdent bindings.
+The initial `ours` deviation keeps the approved document-navigation keys: Mod+[ and Mod+] dispatch `workspace.navigateBack` and `workspace.navigateForward` at Workspace depth. The four source rows record this choice; `zed` retains the pinned Editor indent/outdent bindings. Fregat's own commands join `ours` with their application keys; [Plan 206](../../plans/206-platform-one-keymap.md) lists the keys that moved because Zed uses them.
 
 An unbound nonprintable chord prefix waits for the next key. Bound prefixes use the continuation timeout; printable text prefixes follow the replay contract. Focus, blur and pointer changes cancel a pending chord.
 

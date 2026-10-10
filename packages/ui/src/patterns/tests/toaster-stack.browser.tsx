@@ -12,7 +12,8 @@ afterEach(() => {
 })
 
 const opacities = () =>
-  [...document.querySelectorAll<HTMLElement>('[data-sonner-toast]')].map(
+  Array.from(
+    document.querySelectorAll<HTMLElement>('[data-sonner-toast]'),
     (element) => getComputedStyle(element).opacity,
   )
 

@@ -69,7 +69,7 @@ export function resolveBrowserCandidates(
   }
   if (env.platform === 'darwin') {
     candidates.push(...macBrowserCandidates(env, fs, env.runMac ?? runMacCommand))
-    return [...deduplicate(candidates), { kind: 'webview' }, { kind: 'tab' }]
+    return deduplicate(candidates).concat([{ kind: 'webview' }, { kind: 'tab' }])
   }
   const desktop = defaultDesktop(env, fs)
   const preferred = desktop && desktopBrowser(desktop, env, fs)
@@ -89,7 +89,7 @@ export function resolveBrowserCandidates(
     if (exported) candidates.push(flatpakCandidate(exported, family.flatpak, 'scan', family.name))
   }
   candidates.sort((a, b) => browserPriority(a) - browserPriority(b))
-  return [...deduplicate(candidates), { kind: 'webview' }, { kind: 'tab' }]
+  return deduplicate(candidates).concat([{ kind: 'webview' }, { kind: 'tab' }])
 }
 
 function browserPriority(value: BrowserCandidate) {
@@ -99,7 +99,7 @@ function browserPriority(value: BrowserCandidate) {
   return 3
 }
 
-function deduplicate(candidates: readonly BrowserCandidate[]) {
+function deduplicate(candidates: readonly BrowserCandidate[]): WindowCandidate[] {
   return candidates.filter(
     (value, index) =>
       candidates.findIndex(
@@ -163,24 +163,22 @@ function findExecutable(binary: string, env: BrowserEnvironment, fs: BrowserFile
 }
 
 function defaultDesktop(env: BrowserEnvironment, fs: BrowserFileSystem) {
-  const roots = [
-    env.configHome || path.join(env.home, '.config'),
-    ...directories(env.configDirs, '/etc/xdg'),
-  ]
-  const data = [
-    env.dataHome || path.join(env.home, '.local/share'),
-    ...directories(env.dataDirs, '/usr/local/share:/usr/share'),
-  ]
+  const roots = [env.configHome || path.join(env.home, '.config')].concat(
+    directories(env.configDirs, '/etc/xdg'),
+  )
+  const data = [env.dataHome || path.join(env.home, '.local/share')].concat(
+    directories(env.dataDirs, '/usr/local/share:/usr/share'),
+  )
   const names = (env.currentDesktop || '')
     .split(':')
     .filter((name) => /^[a-zA-Z0-9_-]+$/.test(name))
     .map((name) => `${name.toLowerCase()}-mimeapps.list`)
   const files = roots.flatMap((root) =>
-    [...names, 'mimeapps.list'].map((name) => path.join(root, name)),
+    names.concat(['mimeapps.list']).map((name) => path.join(root, name)),
   )
   files.push(
     ...data.flatMap((root) =>
-      [...names, 'mimeapps.list'].map((name) => path.join(root, 'applications', name)),
+      names.concat(['mimeapps.list']).map((name) => path.join(root, 'applications', name)),
     ),
   )
   for (const file of files) {
@@ -193,12 +191,10 @@ function defaultDesktop(env: BrowserEnvironment, fs: BrowserFileSystem) {
 }
 
 function desktopBrowser(desktop: string, env: BrowserEnvironment, fs: BrowserFileSystem) {
-  const roots = [
-    env.dataHome || path.join(env.home, '.local/share'),
-    ...directories(env.dataDirs, '/usr/local/share:/usr/share'),
-    path.join(env.home, '.local/share/flatpak/exports/share'),
-    '/var/lib/flatpak/exports/share',
-  ]
+  const roots = [env.dataHome || path.join(env.home, '.local/share')].concat(
+    directories(env.dataDirs, '/usr/local/share:/usr/share'),
+    [path.join(env.home, '.local/share/flatpak/exports/share'), '/var/lib/flatpak/exports/share'],
+  )
   for (const root of roots) {
     const exec = iniValue(
       fs.readFile(path.join(root, 'applications', desktop)),

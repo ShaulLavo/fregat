@@ -9,8 +9,12 @@ import { diffPaneSelector, openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
 const FILLER = Array.from({ length: 30 }, (_, index) => `export const filler${index} = '${index}'`)
-const BEFORE = ['export function first(): number {', '  return 1', '}', ...FILLER, 'const tail = 1']
-const AFTER = ['export function first(): number {', '  return 2', '}', ...FILLER, 'const tail = 2']
+const BEFORE = ['export function first(): number {', '  return 1', '}'].concat(FILLER, [
+  'const tail = 1',
+])
+const AFTER = ['export function first(): number {', '  return 2', '}'].concat(FILLER, [
+  'const tail = 2',
+])
 
 type FrameSample = { readonly rows: number; readonly tokenRanges: number }
 

@@ -94,9 +94,10 @@ function blocksFromIndentedCode(node: MarkdownAstNode, parser: MarkdownParser): 
   const first = recovered.blocks[0]
   if (!first || !node.position) return recovered
 
+  const blocks: MarkdownAstNode[] = [{ ...first, position: node.position }]
   return {
     ...recovered,
-    blocks: [{ ...first, position: node.position }, ...recovered.blocks.slice(1)],
+    blocks: blocks.concat(recovered.blocks.slice(1)),
   }
 }
 
@@ -117,13 +118,13 @@ function parseRecoveredMarkdown(value: string, parser: MarkdownParser): Recovere
   }
 
   const firstValue = first.value.slice(INLINE_PARSE_PREFIX.length)
-  const leading = firstValue ? [{ ...first, value: firstValue }] : []
+  const leading: MarkdownAstNode[] = firstValue ? [{ ...first, value: firstValue }] : []
+  const recoveredBlocks: MarkdownAstNode[] = [
+    { ...paragraph, children: leading.concat(children.slice(1)), type: 'paragraph' },
+  ]
 
   return {
-    blocks: [
-      { ...paragraph, children: [...leading, ...children.slice(1)], type: 'paragraph' },
-      ...blocks.slice(1),
-    ],
+    blocks: recoveredBlocks.concat(blocks.slice(1)),
     source,
   }
 }

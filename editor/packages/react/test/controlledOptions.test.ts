@@ -160,7 +160,7 @@ describe('controlled options', () => {
       mounted.render(optionsWith(descriptor.name, sample.next))
 
       expect(mounted.controller.getEditor()).toBe(instance)
-      expect(spy.mock.calls).toContainEqual([...sample.applied])
+      expect(spy.mock.calls).toContainEqual(sample.applied)
 
       mounted.dispose()
     })
@@ -184,8 +184,8 @@ describe('controlled options', () => {
     mounted.remountHost()
 
     expect(mounted.controller.getEditor()).not.toBe(first)
-    expect(selectionSpy.mock.calls).toContainEqual([...selection.applied])
-    expect(scrollSpy.mock.calls).toContainEqual([...scrollPosition.applied])
+    expect(selectionSpy.mock.calls).toContainEqual(selection.applied)
+    expect(scrollSpy.mock.calls).toContainEqual(scrollPosition.applied)
 
     mounted.dispose()
   })

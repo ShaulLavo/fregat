@@ -142,7 +142,7 @@ export function createSessionLifecycleHistory<Entry extends SessionLifecycleUndo
     /** Drops one batch from either direction; hosts call this when its notice goes away. */
     expire(id: number) {
       const keep = (batch: Batch) => batch.id !== id
-      if (![...stack.undo, ...stack.redo].some((batch) => !keep(batch))) return
+      if (!stack.undo.concat(stack.redo).some((batch) => !keep(batch))) return
       publish({ undo: stack.undo.filter(keep), redo: stack.redo.filter(keep) })
     },
     // Hosts serialize steps with lifecycle mutations; each successful row supplies its inverse receipt.
@@ -160,7 +160,7 @@ export function createSessionLifecycleHistory<Entry extends SessionLifecycleUndo
       publish(taken.stack)
       const applied: Entry[] = []
       let failed = 0
-      for (const entry of [...taken.entry.entries].reverse()) {
+      for (const entry of taken.entry.entries.toReversed()) {
         const inverse = await restore(entry)
         if (!inverse) {
           forget([entry.ref])

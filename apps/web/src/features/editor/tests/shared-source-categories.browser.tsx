@@ -156,9 +156,9 @@ async function sharedCategories(run: Run, fixture: RetentionFixture, signal: Abo
   signal.addEventListener('abort', abort, { once: true })
   try {
     signal.throwIfAborted()
-    host = await retentionCountHost(fixture)
+    host = await retentionCountHost(fixture, signal)
     signal.throwIfAborted()
-    expect([host.a, host.b, ...host.working, ...host.secondaryWorking]).toHaveLength(7)
+    expect([host.a, host.b].concat(host.working, host.secondaryWorking)).toHaveLength(7)
     expect(host.expectedSource.length).toBeGreaterThanOrEqual(4096)
     const initial = host.application.getSnapshot()
     const survivor = host.b

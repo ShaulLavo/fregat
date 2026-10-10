@@ -10,12 +10,6 @@ import {
 } from '../fixture-workspace'
 import { captureScenarioFailure } from '../scenario-failure'
 import {
-  pickerLivePreview,
-  rootlessPickerPreview,
-  finishPreviewScenario,
-  assertPreviewIdentity,
-} from './file-picker-selection'
-import {
   captureFilePreviewFrame,
   filePreviewFrameFacts,
   filePreviewIdentityFacts,
@@ -32,7 +26,7 @@ const diskName = 'native-preview-disk.txt'
 export const quickOpenPreview: Scenario = {
   name: 'quick-open-preview',
   description:
-    'Retain the edited preview through real picker/palette interests, cancel a pending disk capture, then explicitly open the complete file.',
+    'Retain the edited preview through a real palette interest, cancel a pending disk capture, then explicitly open the complete file.',
   requiresIsolatedServer: true,
   async run(page, context) {
     const { step, evidence } = context
@@ -110,8 +104,6 @@ export const quickOpenPreview: Scenario = {
       const headBaseline = counts.liveHead
       ok(fullBaseline > 0, 'Actual initial full acquisition calibrates request counting')
       phase = 'live-previews'
-      const picker = await pickerLivePreview(page, context, fixture, liveName)
-      handles.push(picker)
       await page.keyboard.press(chords.commandPalette)
       const input = selectors.paletteInput(page)
       await input.waitFor({ timeout: 5_000 })
@@ -136,7 +128,7 @@ export const quickOpenPreview: Scenario = {
       strictEqual(actual.sourceStoreMatches, true)
       strictEqual(actual.environmentId, actual.scope?.environmentId)
       strictEqual(actual.scope?.rootPath, fixture.slice(1))
-      strictEqual(actual.interestCount, 2)
+      strictEqual(actual.interestCount, 1)
       strictEqual(actual.exactReadInStore, true)
       strictEqual(actual.nativeBufferMatches, true)
       strictEqual(actual.currentSnapshotMatches, true)
@@ -156,19 +148,15 @@ export const quickOpenPreview: Scenario = {
       )
       throws(() => strictEqual(actual.prefix?.startsWith('DISK_A'), true))
       throws(() => strictEqual(actual.scope?.rootPath, path.join(fixture, 'wrong-owner').slice(1)))
-      const initialIdentity = await palette.evaluate(filePreviewIdentityFacts, picker)
-      assertPreviewIdentity(initialIdentity)
-      await evidence.json('live-peer-calibration.json', {
-        initialIdentity,
+      await evidence.json('live-calibration.json', {
         actual,
-        picker: await picker.evaluate(filePreviewFrameFacts),
         wrongDiskExpectationRejected: true,
         wrongRootExpectationRejected: true,
         controlKind: 'observation assertion discrimination; no live owner injection',
         counts,
         requests,
       })
-      await step('live-picker-and-palette-peers')
+      await step('live-palette-preview')
       const held = new Promise<void>((resolve) => {
         releaseHead = resolve
       })
@@ -202,7 +190,6 @@ export const quickOpenPreview: Scenario = {
       strictEqual((await palette.evaluate(filePreviewFrameFacts))?.kind, 'live')
       await evidence.json('held-live-while-disk-pending.json', {
         palette: await palette.evaluate(filePreviewFrameFacts),
-        picker: await picker.evaluate(filePreviewFrameFacts),
         counts,
         requests,
       })
@@ -210,16 +197,11 @@ export const quickOpenPreview: Scenario = {
       await page.keyboard.press('Escape')
       await selectors.paletteInput(page).waitFor({ state: 'hidden' })
       strictEqual((await palette.evaluate(filePreviewFrameFacts))?.kind, 'released')
-      strictEqual((await picker.evaluate(filePreviewFrameFacts))?.kind, 'live')
-      strictEqual((await picker.evaluate(filePreviewFrameFacts))?.interestCount, 1)
-      await step('palette-close-preserves-picker-peer')
+      strictEqual((await palette.evaluate(filePreviewFrameFacts))?.interestCount, 0)
+      await step('palette-close-releases-preview')
       releaseHead()
       await page.unroute('**/fs/head?*')
       await page.unroute('**/fs/read?*')
-      await page.keyboard.press('Escape')
-      await selectors.pickerDialog(page).waitFor({ state: 'hidden' })
-      strictEqual((await picker.evaluate(filePreviewFrameFacts))?.kind, 'released')
-      strictEqual((await picker.evaluate(filePreviewFrameFacts))?.interestCount, 0)
       await focusEditor(page)
       await page.keyboard.press('Control+Home')
       await page.keyboard.insertText('SECOND_')
@@ -249,7 +231,7 @@ export const quickOpenPreview: Scenario = {
       const editedIdentity = await edited.evaluate(filePreviewIdentityFacts, palette)
       assertPreviewIdentity(editedIdentity)
       strictEqual(
-        (await picker.evaluate(filePreviewFrameFacts))?.capturedSnapshotPrefix,
+        (await palette.evaluate(filePreviewFrameFacts))?.capturedSnapshotPrefix,
         actual.capturedSnapshotPrefix,
       )
       await evidence.json('committed-edit-new-source-read.json', {
@@ -387,7 +369,6 @@ export const quickOpenPreview: Scenario = {
       strictEqual(opened.geometryCommitted, true)
       await evidence.json('explicit-full-open.json', { opened, counts, requests })
       await step('explicit-open-acquires-full-editable-source')
-      await rootlessPickerPreview(page, context, path.join(fixture, 'cold'), diskName)
       await evidence.json('final-requests.json', {
         counts,
         requests,
@@ -404,42 +385,86 @@ export const quickOpenPreview: Scenario = {
     } catch (error) {
       primary = { error }
     } finally {
+      const failureStages: Parameters<typeof finishPreviewScenario>[1] = primary
+        ? [
+            {
+              name: 'failed-request-evidence',
+              run: () =>
+                evidence.json('failed-native-request-facts.json', { phase, counts, requests }),
+            },
+            {
+              name: 'failure-capture',
+              run: () => captureScenarioFailure(page, evidence, 'before-cleanup'),
+            },
+          ]
+        : []
       await finishPreviewScenario(
         primary,
-        [
-          ...(primary
-            ? [
-                {
-                  name: 'failed-request-evidence',
-                  run: () =>
-                    evidence.json('failed-native-request-facts.json', { phase, counts, requests }),
-                },
-                {
-                  name: 'failure-capture',
-                  run: () => captureScenarioFailure(page, evidence, 'before-cleanup'),
-                },
-              ]
-            : []),
-          { name: 'release-head', run: () => releaseHead() },
-          { name: 'request-listener', run: () => page.off('request', request) },
-          { name: 'head-route', run: () => page.unroute('**/fs/head?*') },
-          { name: 'read-route', run: () => page.unroute('**/fs/read?*') },
-          ...handles.map((handle, index) => ({
+        failureStages.concat(
+          [
+            { name: 'release-head', run: () => releaseHead() },
+            { name: 'request-listener', run: () => page.off('request', request) },
+            { name: 'head-route', run: () => page.unroute('**/fs/head?*') },
+            { name: 'read-route', run: () => page.unroute('**/fs/read?*') },
+          ],
+          handles.map((handle, index) => ({
             name: `handle-${index}`,
             run: () => handle.dispose(),
           })),
-          { name: 'navigate-blank', run: () => page.goto('about:blank') },
-          {
-            name: 'release-fixture',
-            run: async () => {
-              await releaseFixture(fixture)
-              fixtureReleased = true
+          [
+            { name: 'navigate-blank', run: () => page.goto('about:blank') },
+            {
+              name: 'release-fixture',
+              run: async () => {
+                await releaseFixture(fixture)
+                fixtureReleased = true
+              },
             },
-          },
-        ],
+          ],
+        ),
         (failures) =>
           evidence.json('fixture-cleanup.json', { released: fixtureReleased, fixture, failures }),
       )
     }
   },
+}
+
+function assertPreviewIdentity(facts: ReturnType<typeof filePreviewIdentityFacts>) {
+  ok(facts, 'Actual longitudinal live references were captured')
+  for (const [name, matches] of Object.entries(facts)) strictEqual(matches, true, name)
+}
+
+async function finishPreviewScenario(
+  primary: { error: unknown } | null,
+  stages: readonly { name: string; run(): unknown | Promise<unknown> }[],
+  report: (failures: readonly { stage: string; error: string }[]) => Promise<unknown>,
+) {
+  const failures: { stage: string; error: unknown }[] = []
+  for (const stage of stages) {
+    try {
+      await stage.run()
+    } catch (error) {
+      failures.push({ stage: stage.name, error })
+    }
+  }
+  const describe = () =>
+    failures.map(({ stage, error }) => ({
+      stage,
+      error: error instanceof Error ? error.message : String(error),
+    }))
+  try {
+    await report(describe())
+  } catch (error) {
+    failures.push({ stage: 'cleanup-evidence', error })
+  }
+  if (failures.length) {
+    try {
+      process.stderr.write(`${JSON.stringify({ previewSecondaryFailures: describe() })}\n`)
+    } catch {
+      // A broken evidence sink cannot replace the scenario or cleanup failure.
+    }
+  }
+  if (primary) throw primary.error
+  const first = failures[0]
+  if (first) throw first.error
 }

@@ -1,3 +1,5 @@
+import { DisplayProjection } from './displayProjection'
+import { assertContentLayout } from './contentLayout'
 import type { TextContent } from '../textContent'
 import type { MeasuredText } from '../textMeasurements'
 import type { FoldMap } from '../foldMap'
@@ -13,7 +15,7 @@ import type { SelectionAffinity } from '../selections'
 import type { TextEdit } from '../tokens'
 import type { TextEditBatch } from '../textEditBatch'
 import type { DisplayProjectionTransition, WrapAdvance } from './displayProjectionTypes'
-import { PROPORTIONAL_WRAP_MARGIN_PX } from './glyphAdvances'
+import { glyphAdvancesFor, PROPORTIONAL_WRAP_MARGIN_PX } from './glyphAdvances'
 import { clamp } from '../style-utils'
 import {
   foldMapMatchesText,
@@ -198,13 +200,26 @@ function proportionalWrapAdvance(
   view: VirtualizedTextViewInternal,
   viewportWidth: number,
 ): WrapAdvance | null {
-  const glyphs = view.glyphs
-  if (!view.wrapEnabled || !glyphs || viewportWidth <= 0) return null
-  const width = Math.max(1, viewportWidth - view.currentGutterWidth - PROPORTIONAL_WRAP_MARGIN_PX)
+  if (!view.wrapEnabled || viewportWidth <= 0) return null
+  const glyphs = view.glyphs ?? glyphAdvancesFor(view.scrollElement)
+  if (!glyphs) return null
+  const width = Math.max(
+    1,
+    viewportWidth -
+      view.currentGutterWidth -
+      view.metrics.characterWidth -
+      PROPORTIONAL_WRAP_MARGIN_PX,
+  )
   const current = view.wrapAdvance
   if (current && current.width === width && current.glyphs === glyphs) return current
 
-  return { width, glyphs, advance: (codePoint) => glyphs.advance(codePoint) }
+  return {
+    width,
+    glyphs,
+    advance: (codePoint) => glyphs.advance(codePoint),
+    measure: view.monospace ? undefined : glyphs.measure,
+    minimumTabAdvance: view.monospace ? undefined : glyphs.minimumTabAdvance,
+  }
 }
 
 export function setWrapEnabledLayout(
@@ -229,9 +244,36 @@ export function setInjectedTextRowsLayout(
   refreshDisplayProjection(view, viewportColumns)
 }
 
+export function assertContentSnapshot(
+  view: VirtualizedTextViewInternal,
+  textSnapshot: TextSnapshot,
+  replacement = false,
+): void {
+  if (view.scrollMode !== 'content') return
+  assertContentLayout(textSnapshot.length, 0, 0)
+  const projection = new DisplayProjection({
+    ...view.model.projection.config,
+    textSnapshot,
+    ...(replacement ? { foldMap: null, inlineMap: null, injectedTextRows: [] } : {}),
+  })
+  const count = projection.rowCount
+  assertContentLayout(
+    textSnapshot.length,
+    count,
+    count * getRowHeight(view) + Math.max(0, count - 1) * view.rowGap,
+  )
+}
+
 export function updateVirtualizerRows(view: VirtualizedTextViewInternal): void {
+  const count = visibleLineCount(view)
+  if (view.scrollMode === 'content')
+    assertContentLayout(
+      view.model.textLength,
+      count,
+      count * getRowHeight(view) + Math.max(0, count - 1) * view.rowGap,
+    )
   const changed = view.virtualizer.updateOptions({
-    count: visibleLineCount(view),
+    count,
     rowGap: view.rowGap,
     rowHeight: getRowHeight(view),
   })

@@ -1,3 +1,4 @@
+import { finalize } from '@/utils/finalize'
 import { useStore } from 'zustand'
 import { useEffect, useRef, useState } from 'react'
 import type { SessionId } from '@workspace/contracts'
@@ -111,22 +112,27 @@ export function CommandPalette({
       return
     }
     setPending(true)
-    try {
-      const saved = await setThemePreference(
-        owner,
-        {
-          kind: 'set',
-          key: 'workbench.palette',
-          value: action.id,
-        },
-        theme.appearance,
-      )
-      if (saved && active.current) onClose()
-    } catch (error) {
-      if (active.current) setReason(connectionFailure(error).message)
-    } finally {
-      if (active.current) setPending(false)
-    }
+    return await finalize(
+      async () => {
+        try {
+          const saved = await setThemePreference(
+            owner,
+            {
+              kind: 'set',
+              key: 'workbench.palette',
+              value: action.id,
+            },
+            theme.appearance,
+          )
+          if (saved && active.current) onClose()
+        } catch (error) {
+          if (active.current) setReason(connectionFailure(error).message)
+        }
+      },
+      () => {
+        if (active.current) setPending(false)
+      },
+    )
   }
   return (
     <Dialog

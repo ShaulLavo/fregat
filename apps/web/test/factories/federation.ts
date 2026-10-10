@@ -94,6 +94,8 @@ export async function createFederationHarness(serverA: TestServer, remote?: Test
   })
   const sockets = new Map<string, FakeOrchestrationSocket[]>()
   const unavailable = new Set<string>()
+  // Subscription frames held per origin, as a slow event stream would leave them.
+  const held = new Map<string, (() => void)[]>()
   const connections = createEnvironmentConnections({
     createTransport: (origin) =>
       createChatTransport(origin, {
@@ -104,7 +106,13 @@ export async function createFederationHarness(serverA: TestServer, remote?: Test
             : inProcessOrchestrationSocketFactory({ app: owner.app, clientOrigin: owner.origin })(
                 '',
               )
-          sockets.set(origin, [...(sockets.get(origin) ?? []), socket])
+          const deliver = socket.deliver.bind(socket)
+          socket.deliver = (message) => {
+            const queue = held.get(origin)
+            if (!queue || !isSubscriptionFrame(message)) return deliver(message)
+            queue.push(() => deliver(message))
+          }
+          sockets.set(origin, (sockets.get(origin) ?? []).concat([socket]))
           if (unavailable.has(origin))
             setTimeout(() => socket.serverClose({ code: 1006, wasClean: false }), 0)
           return socket
@@ -151,11 +159,28 @@ export async function createFederationHarness(serverA: TestServer, remote?: Test
       for (const socket of sockets.get(origin) ?? [])
         socket.serverClose({ code: 1006, wasClean: false })
     },
+    holdEvents(origin: string) {
+      held.set(origin, held.get(origin) ?? [])
+    },
+    releaseEvents(origin: string) {
+      const queue = held.get(origin) ?? []
+      held.delete(origin)
+      for (const deliver of queue) deliver()
+    },
     restoreConnection(origin: string) {
       unavailable.delete(origin)
       window.dispatchEvent(new Event('online'))
     },
   }
+}
+
+function isSubscriptionFrame(message: unknown) {
+  return (
+    typeof message === 'object' &&
+    message !== null &&
+    'kind' in message &&
+    message.kind === 'subscription.next'
+  )
 }
 
 export async function registerFederatedProject(

@@ -1,3 +1,4 @@
+import { isElementNode } from '../dom'
 import type { TextContent } from '../textContent'
 import type { FoldMap } from '../foldMap'
 import type { InlineMap } from '../inlineMap'
@@ -75,7 +76,7 @@ export function normalizeHorizontalOverscan(overscan: number | undefined): numbe
 export function normalizeScrollMode(
   scrollMode: VirtualizedTextViewScrollMode | undefined,
 ): VirtualizedTextViewScrollMode {
-  if (scrollMode === 'static') return 'static'
+  if (scrollMode === 'static' || scrollMode === 'content') return scrollMode
 
   return 'virtualized'
 }
@@ -92,7 +93,7 @@ export function normalizeFoldMarkers(
       startOffset: clamp(marker.startOffset, 0, textLength),
       endOffset: clamp(marker.endOffset, marker.startOffset, textLength),
     }))
-    .toSorted((left, right) => left.startRow - right.startRow || left.endRow - right.endRow)
+    .sort((left, right) => left.startRow - right.startRow || left.endRow - right.endRow)
 }
 
 export function indexFoldMarkersByStartRow(
@@ -253,10 +254,8 @@ export function computeLineStarts(text: string): number[] {
 }
 
 export function rowElementFromNode(node: Node, boundary: HTMLElement): HTMLDivElement | null {
-  if (node instanceof HTMLDivElement && node.dataset.editorVirtualRow !== undefined) return node
-  if (!(node.parentElement instanceof HTMLElement)) return null
-
-  const element = node.parentElement.closest<HTMLDivElement>('[data-editor-virtual-row]')
+  const target = isElementNode(node) ? node : node.parentElement
+  const element = target?.closest<HTMLDivElement>('[data-editor-virtual-row]')
   if (!element || !boundary.contains(element)) return null
   return element
 }

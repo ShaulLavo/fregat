@@ -84,7 +84,7 @@ for (const mode of ['paragraph', 'turn'] as const) {
     const local = new ProviderRuntimeBuffers({ now: () => 0 })
     const id = v.parse(messageIdSchema, 'oracle-message')
     let clock = 0
-    for (const delta of [...texts, 'x'.repeat(24000), 'a\n\n', 'tail']) {
+    for (const delta of texts.concat(['x'.repeat(24000), 'a\n\n', 'tail'])) {
       clock += spacing
       const expected = oracle(
         buffer.get(id),

@@ -61,10 +61,9 @@ export function diffLanguageDocuments({
   const realUri = fileUriForPath(documentPath)
   const newUri = newSideUri(documentPath, newText, newSideIsWorkingTree, ownedText)
 
-  return [
-    ...documentFor('new', newUri, languageId, newText, newUri === realUri),
-    ...documentFor('old', phantomUri(documentPath, 'old', oldText), languageId, oldText, false),
-  ]
+  return documentFor('new', newUri, languageId, newText, newUri === realUri).concat(
+    documentFor('old', phantomUri(documentPath, 'old', oldText), languageId, oldText, false),
+  )
 }
 
 /** A side with no lines is a file that does not exist on that side — added, or deleted. */

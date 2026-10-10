@@ -4,6 +4,7 @@ import type { BuildContext } from './displayProjectionBuild'
 import {
   appendWordWrapText,
   createWordWrapLine,
+  finishWordWrapLine,
   lineBreakRules,
   needsLineBreakRules,
   resetWordWrapLine,
@@ -108,11 +109,12 @@ function scanWordWrapChunk(text: string, state: WrapScan, word: WordWrapLine): v
 
 function appendCodeUnit(code: number, state: WrapScan): void {
   if (code === 9 && !state.explicitEnds) discoverTabs(state)
-  const cells = code === 9 ? state.tabSize - (state.visual % state.tabSize) : 1
+  let cells = code === 9 ? state.tabSize - (state.segmentVisual % state.tabSize) : 1
   if (state.segmentVisual > 0 && state.segmentVisual + cells > state.width) {
     if (state.explicitEnds) state.ends.push(state.length)
     state.rows += 1
     state.segmentVisual = 0
+    cells = code === 9 ? state.tabSize : 1
   }
   state.visual += cells
   state.segmentVisual += cells
@@ -125,7 +127,10 @@ function discoverTabs(state: WrapScan): void {
 }
 
 function finishLine(state: WrapScan): void {
-  if (state.word) adoptWordLine(state, state.word)
+  if (state.word) {
+    finishWordWrapLine(state.word, state.rules)
+    adoptWordLine(state, state.word)
+  }
   if (state.explicitEnds) appendTabbedLine(state)
   state.prefixes.push(state.prefixes[state.prefixes.length - 1]! + state.rows)
   state.tabOffsets.push(state.tabEnds.length)

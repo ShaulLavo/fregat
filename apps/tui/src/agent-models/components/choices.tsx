@@ -55,12 +55,14 @@ export function ModelChoices({
     },
     true,
   )
-  function choose(index = latestSelection.current, submittedQuery = query) {
+  function choose(index?: number, submittedQuery?: string) {
+    const nextQuery = submittedQuery ?? query
+    const selectedIndex = index ?? latestSelection.current
     const submittedOptions =
-      submittedQuery === query
+      nextQuery === query
         ? options
-        : modelChoiceRows({ providers, preferences, value, query: submittedQuery })
-    const option = submittedOptions[index]?.value
+        : modelChoiceRows({ providers, preferences, value, query: nextQuery })
+    const option = submittedOptions[selectedIndex]?.value
     if (!option) return
     if (option.kind === 'account') {
       onAccount(option.provider)

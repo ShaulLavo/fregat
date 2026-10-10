@@ -50,7 +50,7 @@ export function groupMcpServers(servers: readonly ProviderMcpConfigServer[]) {
   const groups = new Map<string, ProviderMcpConfigServer[]>()
   for (const server of servers) {
     const label = mcpSourceLabel(server.source) ?? 'Other'
-    groups.set(label, [...(groups.get(label) ?? []), server])
+    groups.set(label, (groups.get(label) ?? []).concat([server]))
   }
   return [...groups]
 }

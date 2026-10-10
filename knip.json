@@ -46,6 +46,7 @@
       "entry": [
         "boot.css",
         "public/sw.js",
+        "vitest.compiler.config.ts",
         "src/dev-entry.tsx",
         "src/features/address/tests/navigation.types.ts",
         "scripts/chat-parity-proof.mjs",
@@ -62,10 +63,7 @@
         "scripts/verify-workspace-navigation.mjs",
         "test/factories/chat-proof-workspace.tsx"
       ],
-      "ignoreFiles": [
-        "test/fixtures/workbench-file-server/repo/src/editor-tab-{a,b,c}.ts",
-        "test/fixtures/workbench-file-server/picker/editor-tab-a.ts"
-      ],
+      "ignoreFiles": ["test/fixtures/workbench-file-server/repo/src/editor-tab-{a,b,c}.ts"],
       "ignoreUnresolved": ["src/index.ts"]
     },
     "packages/contracts": {
@@ -73,6 +71,8 @@
     },
     "scripts": {
       "entry": [
+        "ci/affected.mjs",
+        "ci/packages.mjs",
         "check-editor-backlog.mjs",
         "check-package-pages.mjs",
         "agent/browser.ts",
@@ -136,11 +136,12 @@
       "entry": ["hotkeys/scripts/check-samples.mjs"],
       "ignoreDependencies": ["typescript-api"],
       "vitest": {
-        "config": ["vitest.scripts.config.mjs"]
+        "config": ["vitest.scripts.config.mjs", "vitest.t3code.config.mjs"]
       }
     },
     "apps/tui": {
       "entry": [
+        "scripts/compiler-preload.ts",
         "src/search/tests/replacement.test-d.ts",
         "test/processes/job-control-launcher.ts",
         "test/processes/job-control-session.ts",
@@ -326,7 +327,7 @@
     },
     "ghostty-webgpu": {
       "ignoreBinaries": ["zig"],
-      "entry": ["src/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],
+      "entry": ["src/index.ts", "src/worker/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],
       "project": ["src/**/*.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"]
     },
     "ghostty-webgpu-line-editor": {
@@ -345,12 +346,20 @@
       "entry": [
         "src/index.ts",
         "src/transports.ts",
+        "src/merge-review.ts",
+        "bench/**/*.ts",
         "server/signaling.ts",
         "examples/signaling-server.ts",
         "test/peer.html",
         "test/broker-process.ts"
       ],
-      "project": ["src/**/*.ts", "server/**/*.ts", "examples/**/*.ts", "test/**/*.ts"]
+      "project": [
+        "src/**/*.ts",
+        "server/**/*.ts",
+        "examples/**/*.ts",
+        "test/**/*.ts",
+        "bench/**/*.ts"
+      ]
     },
     "editor/site": {
       "ignoreDependencies": ["@singapore-editor/*", "satteri", "react", "@types/react", "solid-js"]

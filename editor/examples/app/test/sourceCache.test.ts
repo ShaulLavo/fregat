@@ -109,7 +109,7 @@ class MemoryDirectoryHandle {
 
     for (const [name, directory] of this.directories) {
       const childPath = await directory.resolve(possibleDescendant)
-      if (childPath) return [name, ...childPath]
+      if (childPath) return [name].concat(childPath)
     }
 
     for (const [name, file] of this.files) {

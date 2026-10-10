@@ -39,7 +39,9 @@ function selection(
 /** A view over unwrapped rows, where a display row and a buffer line are the same thing. */
 function createTestView(text: string) {
   const characterWidth = 10
-  const lineStarts = [0, ...[...text].flatMap((char, index) => (char === '\n' ? [index + 1] : []))]
+  const lineStarts = [0].concat(
+    [...text].flatMap((char, index) => (char === '\n' ? [index + 1] : [])),
+  )
   const rowForOffset = (offset: number) => lineStarts.findLastIndex((start) => start <= offset)
   const offsetByDisplayRows = (offset: number, rowDelta: number, goalColumn: number) => {
     const row = Math.min(Math.max(rowForOffset(offset) + rowDelta, 0), lineStarts.length - 1)

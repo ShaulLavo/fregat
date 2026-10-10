@@ -127,18 +127,21 @@ try {
   if (packageMode) {
     const solid = files.filter((file) => origins.get(file)?.includes('/solid/README.md'))
     const other = files.filter((file) => !solid.includes(file))
-    await check('packages', [join(root, 'src/env.d.ts'), ...other])
-    await check('solid-package', [join(root, 'src/env.d.ts'), ...solid], true)
+    await check('packages', [join(root, 'src/env.d.ts')].concat(other))
+    await check('solid-package', [join(root, 'src/env.d.ts')].concat(solid), true)
     console.log(`Checked ${sampleCount} package README samples across ${sources.length} packages.`)
   }
   if (!packageMode) {
     const environment = join(root, 'src/env.d.ts')
-    await check('docs', [
-      environment,
-      ...files.filter((file) => !solidSamples.has(file)),
-      ...['hero.ts', 'playground.ts'].map((file) => join(root, 'src/examples', file)),
-    ])
-    if (solidSamples.size) await check('solid', [environment, ...solidSamples], true)
+    await check(
+      'docs',
+      [environment].concat(
+        files.filter((file) => !solidSamples.has(file)),
+        ['hero.ts', 'playground.ts'].map((file) => join(root, 'src/examples', file)),
+      ),
+    )
+    if (solidSamples.size)
+      await check('solid', [environment].concat(Array.from(solidSamples)), true)
     console.log(`Checked ${sampleCount} inline samples and 2 example files with TypeScript 7.`)
   }
 } finally {

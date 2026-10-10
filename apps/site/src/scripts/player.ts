@@ -26,12 +26,32 @@ function setup(stage: HTMLElement): void {
   const last = times.length
   const narrowAt = Number(stage.dataset.narrowAt ?? 640)
   const pointer = rep.querySelector<HTMLElement>('.pointer')
+  const childTimers = new Set<number>()
   let step = 0
   let timer = 0
   let visible = false
   let held = false
   let elapsedAt = 0
   let clock = 0
+
+  function later(callback: () => void, delay: number): void {
+    const child = window.setTimeout(() => {
+      childTimers.delete(child)
+      callback()
+    }, delay)
+    childTimers.add(child)
+  }
+
+  function cancelPlayback(): void {
+    clearTimeout(timer)
+    timer = 0
+    for (const child of childTimers) clearTimeout(child)
+    childTimers.clear()
+    for (const element of rep!.querySelectorAll('.caret, .pressed')) {
+      element.classList.remove('caret', 'pressed')
+    }
+    pointer?.classList.remove('press')
+  }
 
   function fit(): void {
     const width = stage.clientWidth
@@ -51,16 +71,10 @@ function setup(stage: HTMLElement): void {
     element.textContent = ''
     element.classList.add('caret')
     const tick = (): void => {
-      if (rep!.classList.contains('paused')) {
-        setTimeout(tick, 30)
-        return
-      }
+      if (rep!.classList.contains('paused')) return later(tick, 30)
       shown += Math.max(1, Math.round(text.length / (duration / 30)))
       element.textContent = text.slice(0, shown)
-      if (shown < text.length) {
-        setTimeout(tick, 30)
-        return
-      }
+      if (shown < text.length) return later(tick, 30)
       element.classList.remove('caret')
     }
     tick()
@@ -76,13 +90,14 @@ function setup(stage: HTMLElement): void {
     pointer.style.opacity = '1'
     pointer.style.transform = `translate(${x}px, ${y}px)`
     if (!press) return
-    setTimeout(() => {
+    const release = (): void => {
+      pointer.classList.remove('press')
+      target.classList.remove('pressed')
+    }
+    later(() => {
       pointer.classList.add('press')
       target.classList.add('pressed')
-      setTimeout(() => {
-        pointer.classList.remove('press')
-        target.classList.remove('pressed')
-      }, 160)
+      later(release, 160)
     }, 720)
   }
 
@@ -145,16 +160,14 @@ function setup(stage: HTMLElement): void {
   }
 
   function end(): void {
-    clearTimeout(timer)
-    timer = 0
+    cancelPlayback()
     held = false
     rep!.classList.remove('paused')
     apply(last, false)
   }
 
   function replay(): void {
-    clearTimeout(timer)
-    timer = 0
+    cancelPlayback()
     held = false
     for (const element of rep!.querySelectorAll<HTMLElement>('[data-full]')) {
       element.textContent = element.dataset.full ?? ''

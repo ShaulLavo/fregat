@@ -862,7 +862,7 @@ export class OrchestrationRpcClient {
   }
 
   private rejectPendingRequests(error: unknown) {
-    const requestIds = [...this.pendingRequests.keys()]
+    const requestIds = Array.from(this.pendingRequests.keys())
 
     for (const requestId of requestIds) {
       this.settlePendingRequest(requestId)?.reject(error)
@@ -870,7 +870,7 @@ export class OrchestrationRpcClient {
   }
 
   private failSubscriptions(error: unknown) {
-    const subscriptions = [...this.subscriptions.values()]
+    const subscriptions = Array.from(this.subscriptions.values())
 
     for (const subscription of subscriptions) {
       subscription.queue.fail(error)
