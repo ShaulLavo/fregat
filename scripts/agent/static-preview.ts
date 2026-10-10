@@ -4,13 +4,13 @@ import type { Page } from 'playwright'
 
 import { createScriptError } from '../structured-errors'
 
-export const STATIC_PREVIEW_URL = 'http://fregat-preview.test/fregat/'
+export const STATIC_PREVIEW_URL = 'https://fregat-preview.test/fregat/'
 
 export async function routeStaticPreview(page: Page, directory: string) {
   const root = await realpath(resolve(directory))
   if (!(await stat(root)).isDirectory())
     throw createScriptError('--static-dir must be a directory.')
-  await page.route('http://fregat-preview.test/**', async (route) => {
+  await page.route('https://fregat-preview.test/**', async (route) => {
     const pathname = new URL(route.request().url()).pathname
     const relative = decodeURIComponent(pathname)
       .replace(/^\/fregat\/?/, '')

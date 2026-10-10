@@ -72,6 +72,7 @@ export async function launchBrowser(
   engine: Engine,
   headed: boolean,
   notifications = false,
+  site = false,
 ): Promise<Browser> {
   const playwright = await loadPlaywright()
   const { chromium } = playwright
@@ -88,10 +89,10 @@ export async function launchBrowser(
     tracesDir: path.join(temp.directory, 'traces'),
   }
   try {
-    // The headless shell denies notification permission; full Chromium in headless mode grants it.
+    // Full Chromium grants notifications and matches browser font advances in captured sites.
     const context = await chromium.launchPersistentContext(
       path.join(temp.directory, 'profile'),
-      notifications ? { ...options, channel: 'chromium' } : options,
+      notifications || site ? { ...options, channel: 'chromium' } : options,
     )
     const browser = context.browser()
     if (!browser) {

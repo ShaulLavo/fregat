@@ -659,7 +659,12 @@ async function withPage(
     browser: Browser,
   ) => Promise<number>,
 ) {
-  const browser = await launchBrowser(options.engine, options.headed, options.notifications)
+  const browser = await launchBrowser(
+    options.engine,
+    options.headed,
+    options.notifications,
+    options.site,
+  )
   const context = await browser.newContext({
     // Only Chromium knows these permission names; Firefox and WebKit reject the context.
     permissions: options.engine === 'chromium' ? chromiumPermissions(options) : [],
