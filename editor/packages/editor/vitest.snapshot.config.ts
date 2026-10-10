@@ -37,6 +37,18 @@ writeFileSync(
 console.info('Document paint evidence', evidence)
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@singapore-editor/core/editor': join(import.meta.dirname, 'src/editor.ts'),
+      '@singapore-editor/core/document': join(import.meta.dirname, 'src/public/document.ts'),
+      '@singapore-editor/core/syntax': join(import.meta.dirname, 'src/public/syntax.ts'),
+      '@singapore-editor/core/extensions': join(import.meta.dirname, 'src/public/extensions.ts'),
+      '@singapore-editor/core/internal/document-worker': join(
+        import.meta.dirname,
+        'src/document/workerReader.ts',
+      ),
+    },
+  },
   plugins: [browserTestResponses()],
   server: { fs: { allow: [workspaceRoot] } },
   optimizeDeps: { exclude: ['web-tree-sitter', 'tree-sitter-md'] },

@@ -6,6 +6,7 @@ import {
   type DocumentPaintRun,
   type DocumentPaintStyle,
 } from '../editor/documentPaint'
+import type { EditorTokenStyle } from '../tokens'
 import type { VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
 import type { MountedVirtualizedTextRow } from './virtualizedTextViewTypes'
 import { getMountedRows } from './virtualizedTextViewRows'
@@ -159,6 +160,7 @@ function captureRuns(
         styles.push({ start, end, style: group.style })
       }
     }
+    const resolvedStyles = new Map<EditorTokenStyle, EditorTokenStyle>()
     const boundaries = [...cuts].sort((a, b) => a - b)
     for (let index = 0; index + 1 < boundaries.length; index++) {
       const start = boundaries[index]!
@@ -167,17 +169,38 @@ function captureRuns(
       let style = base
       for (const token of styles) {
         if (token.start > start || token.end < end) continue
+        const resolved = resolvedStyles.get(token.style) ?? resolveTokenStyle(parent, token.style)
+        resolvedStyles.set(token.style, resolved)
         style = {
           ...style,
-          color: token.style.color ?? style.color,
-          backgroundColor: token.style.backgroundColor ?? style.backgroundColor,
-          textDecoration: token.style.textDecoration ?? style.textDecoration,
+          color: resolved.color ?? style.color,
+          backgroundColor: resolved.backgroundColor ?? style.backgroundColor,
+          textDecoration: resolved.textDecoration ?? style.textDecoration,
         }
       }
       runs.push({ text: node.data.slice(start, end), style, href })
     }
   }
   return mergeRuns(runs)
+}
+
+function resolveTokenStyle(parent: HTMLElement, token: EditorTokenStyle): EditorTokenStyle {
+  const probe = parent.ownerDocument.createElement('span')
+  probe.style.display = 'none'
+  if (token.color) probe.style.color = token.color
+  if (token.backgroundColor) probe.style.backgroundColor = token.backgroundColor
+  // Syntax variables inherit from the active editor theme and its surrounding stylesheet.
+  parent.append(probe)
+  try {
+    const computed = parent.ownerDocument.defaultView!.getComputedStyle(probe)
+    return {
+      ...token,
+      color: token.color ? computed.color : undefined,
+      backgroundColor: token.backgroundColor ? computed.backgroundColor : undefined,
+    }
+  } finally {
+    probe.remove()
+  }
 }
 
 const UNREPRESENTED_EFFECTS = [
