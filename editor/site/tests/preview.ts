@@ -2,6 +2,7 @@ import { chromium, type Browser } from 'playwright'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:net'
+import { createServer as createHttpServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -89,6 +90,35 @@ export async function startPreview(mode: 'preview' | 'dev' = 'preview'): Promise
           .then(() => true)
           .catch(() => false),
       ).toBe(false)
+    },
+  }
+}
+
+/** Delays actual successful font responses without disabling the browser HTTP cache. */
+export async function startFontPreview(base: string, fontDelay: number) {
+  const server = createHttpServer(async (request, response) => {
+    const asset = await fetch(new URL(request.url ?? '/', base))
+    const body = Buffer.from(await asset.arrayBuffer())
+    if (/jetbrains-mono.*\.woff2/.test(request.url ?? '')) await setTimeout(fontDelay)
+    response.writeHead(asset.status, {
+      'Content-Type': asset.headers.get('content-type') ?? 'application/octet-stream',
+      'Cache-Control': /\.woff2/.test(request.url ?? '')
+        ? 'public, max-age=31536000, immutable'
+        : 'no-store',
+    })
+    response.end(body)
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  expect(address).not.toBeNull()
+  const port = typeof address === 'object' && address ? address.port : 0
+  return {
+    base: `http://127.0.0.1:${port}${new URL(base).pathname.replace(/\/$/, '')}`,
+    async stop() {
+      server.closeAllConnections()
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      )
     },
   }
 }

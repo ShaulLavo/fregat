@@ -23,6 +23,19 @@ const load = () => {
     })
   return runtime
 }
+function exampleFontChosen() {
+  const root = document.documentElement
+  if (root.dataset.exampleFont !== 'pending') return Promise.resolve()
+  return new Promise<void>((resolve) => {
+    const observer = new MutationObserver(() => {
+      if (root.dataset.exampleFont === 'pending') return
+      observer.disconnect()
+      resolve()
+    })
+    observer.observe(root, { attributes: true, attributeFilter: ['data-example-font'] })
+  })
+}
+
 function prepare(example: HTMLElement) {
   const previous = states.get(example)
   if (previous) return previous
@@ -35,7 +48,8 @@ function prepare(example: HTMLElement) {
   const state: { ready: Promise<ExampleEditor>; host: HTMLElement; editor?: ExampleEditor } = {
     host,
     ready: load().then(async ({ mountExample }) => {
-      await document.fonts.load('14px "JetBrains Mono"')
+      await exampleFontChosen()
+      const fallbackFont = document.documentElement.dataset.exampleFont !== 'mono'
       const theme = example.querySelector<HTMLElement>('[data-example-theme="dark"]')!
       const dark = getComputedStyle(theme).display !== 'none'
       const editor = mountExample(host, {
@@ -43,6 +57,7 @@ function prepare(example: HTMLElement) {
         language: source.language,
         label: `${source.language || 'Text'} example editor`,
         snapshot: source[dark ? 'dark' : 'light'].paint,
+        fallbackFont,
       })
       state.editor = editor
       await editor.ready()

@@ -96,7 +96,7 @@ pages; every screenshot was read. The same private preview serves the verified
 revision. CI status is inspected once after pushing and reported in the handoff;
 it is not watched or assumed green.
 
-### Intermittent WebKit retry failure — execution open
+### WebKit retry failure — slow optional font identified
 
 The [hosting integration run](https://github.com/ShaulLavo/fregat/actions/runs/38071251341/job/114269009967)
 failed at `editor/site/tests/review.browser.ts:114`: after two announced download
@@ -117,12 +117,80 @@ request and click sequence, so this does not establish a module-cache cause.
       [diagnostic run](https://github.com/ShaulLavo/fregat/actions/runs/38073480255/job/114275706422).
       Fresh root-base Mac verification also passed all 20 diagnostic cases. Keep
       two retry cases per engine in routine CI to bound its cost.
-- [ ] Intermittent; diagnostics in place; investigate on recurrence. Read the
-      failed case's click, network and preparation evidence before changing
-      runtime loading or paint readiness. The original failing run is linked above.
+- [x] Investigate the [captured recurrence](https://github.com/ShaulLavo/fregat/actions/runs/38076005583/job/114283053679).
+      The third entry request had no failed-request event. Instrumenting
+      `FontFaceSet.prototype.load` identified the later font wait as the source of
+      `NetworkError`, with the JetBrains Mono face in `error` state.
+- [x] Reproduce the exact two-abort/third-allowed sequence on Mac Chromium and
+      WebKit, first with immediate fonts, then with 1.5-second and 5-second font
+      delays. Immediate responses passed in both engines. Delayed responses
+      failed in WebKit at `document.fonts.load`; Chromium passed.
+- [x] Repeat with a real delayed HTTP font response, without intercepting the
+      font request. WebKit failed with `font-display: optional` and passed with
+      `swap`; the third module response was HTTP 200 in both cases. This rules
+      out a font-route race and a failed static-import dependency for the reproduction.
+- [x] Preserve `font-display: optional`, both preloads and metric-matched
+      fallbacks. Treat expiry of the optional font as nonfatal during live
+      preparation. When the optional face has not loaded, pin the live editor
+      and retained static paint roots to the same metric-matched fallback. WebKit
+      otherwise blanks static text while the expired face downloads and paints
+      it with Mono after the response. Pin both representations so measurements
+      and paint stay on the rendered fallback. Do not introduce a late font
+      swap, module-graph retry or timeout extension.
+- [x] Replace the two identical routine retry cases with immediate-font and
+      1.5-second-delayed-font cases. Record entry/font responses, font-load
+      start/completion/failure and face states alongside the existing click and
+      failure timeline. Assert retained-static/live pixel equality after font
+      selection, unchanged height, and unchanged live pixels after the delayed
+      response finishes. Await font route cleanup before closing the context.
+- [x] Reduce WebKit's optional-font paint bug to plain HTML with a real delayed
+      HTTP response and a fallback-only control. Document the workaround in
+      `editor/docs/display/browser-quirks.md` and add the ready-to-file upstream
+      entry to the owner's local queue. No upstream issue was posted.
 
-One unexplained failure remains unconfirmed after the bounded qualifications and
-does not block deployment. Do not add a timeout extension or browser-specific
-loading fallback without observing the failed operation. Pending stylesheet
-loading was ruled out for this surface: the production HTML links the editor
-stylesheet before the page scripts.
+The final 2026-10-10 Mac qualification preserves optional fonts: all four
+immediate/delayed retry cases pass, including WebKit's recorded font-load failure.
+The complete browser suite passes 43 tests and site unit tests pass 15. Site build,
+types, samples, lint and formatting, plus repository gates pass. Existing wrap,
+height, scroll, focus and normal ready-activation pixel checks remain green.
+The delayed path compares the retained HTML after the browser's expired-font
+selection has been pinned; an initial WebKit frame can be blank before that
+selection, as the standalone upstream reproduction demonstrates.
+
+The source fix is qualified locally; deployment still waits for its PR to merge.
+Pending stylesheet loading was already ruled out: production HTML links editor
+CSS before scripts.
+
+### Page-wide example font choice
+
+- [x] Make one font choice for the whole page after the stylesheets register the
+      code font: Mono when it loads within the 100 ms optional-font block period
+      after the stylesheets load (without waiting for module scripts), otherwise the matched fallback for the rest of the
+      visit. Examples stay transparent while the choice is pending. Static paint and
+      the live editor both read `data-example-font`, so a below-fold example can't
+      paint in one face and go live in another.
+- [x] Cover every Quick start example with delayed-HTTP (0, 20 and 1,500 ms) and warm
+      repeat visits in Chromium, WebKit and Firefox. Fonts, wrapping and height match
+      exactly. Repeat visits choose Mono in all three engines.
+
+### Follow-ups
+
+- [ ] **Static output 1:1 with the live editor (owner, 2026-10-10).** Chromium and
+      WebKit shade some glyph edges differently between the captured static example
+      and the live editor: under 1% of pixels, at most 51/255 per channel. In Quick
+      start's second example, the differences sit on the rows with
+      `setText('const greeting =` and `(event) ⇒ {`. Firefox matches exactly. Likely
+      cause: the static paint splits token runs into separate spans differently from
+      the live rows, which moves glyphs by subpixel amounts. Make the static markup
+      split runs exactly as the live editor does, then tighten `expectSameInk` in
+      `editor/site/tests/review.browser.ts` back to exact equality.
+- [x] **WebKit reload colour flash (2026-10-10).** The static spans retained their
+      colours. A prepared editor's snapshot above them had explicit
+      `visibility: visible`, overriding its wrapper's `visibility: hidden`, and
+      painted before its highlights settled. Removing row containment, promotion,
+      the pending-font opacity, width switching or theme switching did not fix it.
+      Hiding the prepared editor as one opacity group fixes the overlay without
+      changing font timing. The warm-reload test now requires every engine to pass
+      and compares the initial, prepared and activated frames. The reduced case
+      (`visibility: hidden` parent with a `visibility: visible` child) paints the
+      child in every engine; this was an application hiding error.
