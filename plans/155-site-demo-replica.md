@@ -249,3 +249,16 @@ font remains as a test fixture with its license.
 3. **Agents section.** The brainless Claude and Codex ports replace the static `<ol>` sessions in
    `#agents` (as in [brainless.md](../docs/ui-research/brainless.md)), sharing the player.
 4. **The live demo.** Delete it, as decided in question 1 and confirmed 2026-10-08.
+
+## Follow-up: Firefox resize verification
+
+Status: Approved. Main CI failed in the landing-page resize check before the mobile
+project-history fix. At commit `539cf8c1b`,
+[run 38067788083](https://github.com/ShaulLavo/fregat/actions/runs/38067788083)
+passed WebKit and Chromium, then Firefox failed at
+`apps/site/scripts/verify-scroll.ts:154` with
+`AssertionError: Resizing preserves the saved position`. One failing run was observed;
+no local reproduction has been attempted. The assertion runs immediately after
+`page.setViewportSize`, before reading `scrollY`; inspect resize settlement and browser
+scroll anchoring before changing the assertion. Reproduce with
+`bun run --cwd apps/site verify:scroll --engine firefox` after building the site.

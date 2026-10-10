@@ -16,7 +16,12 @@ import { readLogs } from './logs'
 import { createScriptError } from '../structured-errors'
 
 import { TerminalHostClient } from '../../apps/server/src/terminal/host-client'
-import { startIsolatedServer, waitForHealth, type IsolatedServer } from './isolated-server'
+import {
+  isolatedServerEnv,
+  startIsolatedServer,
+  waitForHealth,
+  type IsolatedServer,
+} from './isolated-server'
 
 it.each(['bun', 'node'])(
   'ends the isolated host and its live shell through %s before removing its home',
@@ -68,36 +73,60 @@ it.each(['bun', 'node'])(
   40_000,
 )
 
-it('serves supplied web assets with the isolated promoted release descriptor', async () => {
-  const fixture = mkdtempSync(path.join(tmpdir(), 'fregat-built-web-'))
-  const web = path.join(fixture, 'web')
-  mkdirSync(web)
-  writeFileSync(
-    path.join(web, 'index.html'),
-    '<!doctype html><html><head><style id="platform-palette"></style><script id="fregat-html-bootstrap" type="application/json"></script><link id="fregat-wallpaper-light"><link id="fregat-wallpaper-dark"></head><body><p>Built fixture</p></body></html>',
-  )
-  let server: IsolatedServer | undefined
-  try {
-    server = await startIsolatedServer(new URL('http://localhost:5214'), { webRoot: web })
+it.each([undefined, new URL('http://localhost:5214')])(
+  'serves supplied web assets with origin %s',
+  async (webOrigin) => {
+    const fixture = mkdtempSync(path.join(tmpdir(), 'fregat-built-web-'))
+    const web = path.join(fixture, 'web')
+    mkdirSync(web)
     writeFileSync(
-      path.join(server.directory, 'served', 'build-config.json'),
-      JSON.stringify({ release: 'fixture-promoted', liveCheck: false }),
+      path.join(web, 'index.html'),
+      '<!doctype html><html><head><style id="platform-palette"></style><script id="fregat-html-bootstrap" type="application/json"></script><link id="fregat-wallpaper-light"><link id="fregat-wallpaper-dark"></head><body><p>Built fixture</p></body></html>',
     )
-    const release = await (await fetch(`${server.origin}/release`)).json()
-    expect(release).toMatchObject({
-      release: 'fixture-promoted',
-      server: { release: 'fixture-promoted' },
-      liveCheckRequired: false,
+    let server: IsolatedServer | undefined
+    try {
+      server = await startIsolatedServer(webOrigin, { webRoot: web })
+      writeFileSync(
+        path.join(server.directory, 'served', 'build-config.json'),
+        JSON.stringify({ release: 'fixture-promoted', liveCheck: false }),
+      )
+      const release = await (await fetch(`${server.origin}/release`)).json()
+      expect(release).toMatchObject({
+        release: 'fixture-promoted',
+        server: { release: 'fixture-promoted' },
+        liveCheckRequired: false,
+      })
+      expect(await (await fetch(server.origin)).text()).toContain('Built fixture')
+      await server.stop()
+      expect(existsSync(path.join(web, 'index.html'))).toBe(true)
+      expect(existsSync(path.join(fixture, 'build-config.json'))).toBe(false)
+    } finally {
+      await server?.stop()
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  },
+  40_000,
+)
+
+it('overrides inherited filesystem roots for private workspace registration', () => {
+  vi.stubEnv('FS_WORKSPACE_ROOT', path.join(tmpdir(), 'unrelated-workspace'))
+  vi.stubEnv('FS_SYSTEM_ROOT', path.join(tmpdir(), 'unrelated-system'))
+  try {
+    const env = isolatedServerEnv({
+      home: path.join(tmpdir(), 'private-home'),
+      logs: path.join(tmpdir(), 'private-logs'),
+      port: 5214,
+      productionRoot: path.join(tmpdir(), 'private-production'),
+      realProviders: false,
+      scratchRoot: tmpdir(),
+      webOrigin: new URL('http://localhost:5214'),
     })
-    expect(await (await fetch(server.origin)).text()).toContain('Built fixture')
-    await server.stop()
-    expect(existsSync(path.join(web, 'index.html'))).toBe(true)
-    expect(existsSync(path.join(fixture, 'build-config.json'))).toBe(false)
+    expect(env.FS_WORKSPACE_ROOT).toBe(path.parse(tmpdir()).root)
+    expect(env.FS_SYSTEM_ROOT).toBe(path.parse(tmpdir()).root)
   } finally {
-    await server?.stop()
-    rmSync(fixture, { recursive: true, force: true })
+    vi.unstubAllEnvs()
   }
-}, 40_000)
+})
 
 function alive(pid: number) {
   try {
@@ -340,3 +369,121 @@ it('sends no readiness mutation when the owned child exits during a matching hea
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+it('removes an allocated server directory when the bundled runtime cannot execute', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'isolated-spawn-failure-'))
+  const release = path.join(root, 'release')
+  mkdirSync(path.join(release, 'server'), { recursive: true })
+  mkdirSync(path.join(release, 'bin'))
+  writeFileSync(path.join(release, 'server', 'index.js'), '')
+  writeFileSync(path.join(release, 'build-config.json'), '{}')
+  writeFileSync(path.join(release, 'bin', 'bun'), 'not executable', { mode: 0o600 })
+  try {
+    await expect(
+      startIsolatedServer(undefined, { releaseRoot: release, scratchRoot: root }),
+    ).rejects.toThrow()
+    expect((await import('node:fs')).readdirSync(root)).toEqual(['release'])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+it.skipIf(process.platform === 'win32')(
+  'preserves identity and state after failed host shutdown and permits another stop',
+  async () => {
+    const server = await startIsolatedServer(undefined, { handleSignals: false })
+    const client = new TerminalHostClient({ stateRoot: server.home })
+    const host = await client.host()
+    process.kill(host.pid, 'SIGSTOP')
+    try {
+      await expect(server.stop()).rejects.toMatchObject({ code: 'terminal.HOST_UNREACHABLE' })
+      expect(existsSync(server.home)).toBe(true)
+      expect(alive(host.pid)).toBe(true)
+      const { hostPaths } = await import('../../apps/server/src/terminal-host/protocol')
+      expect(existsSync(hostPaths(server.home).manifest)).toBe(true)
+      process.kill(host.pid, 'SIGCONT')
+      await server.stop()
+      expect(existsSync(server.directory)).toBe(false)
+      expect(alive(host.pid)).toBe(false)
+    } finally {
+      client.close()
+      if (alive(host.pid)) process.kill(host.pid, 'SIGCONT')
+      await server.stop()
+    }
+  },
+  20_000,
+)
+
+it.skipIf(process.platform === 'win32')(
+  'retains the outer HOME and a cleanup handle when startup fails after launching a paused host',
+  async () => {
+    const { withTerminalCheck } = await import('../deploy/live-terminal-scope')
+    const { processStart, stopTerminalHost } =
+      await import('../../apps/server/src/terminal-host/identity')
+    const root = mkdtempSync(path.join(tmpdir(), 'isolated-acquisition-'))
+    const release = path.join(root, 'release')
+    const receipt = path.join(root, 'host.json')
+    mkdirSync(path.join(release, 'server'), { recursive: true })
+    writeFileSync(path.join(release, 'build-config.json'), '{}')
+    writeFileSync(
+      path.join(release, 'server', 'index.js'),
+      `
+      import { TerminalHostClient } from ${JSON.stringify(new URL('../../apps/server/src/terminal/host-client.ts', import.meta.url).href)};
+      import { processStart } from ${JSON.stringify(new URL('../../apps/server/src/terminal-host/identity.ts', import.meta.url).href)};
+      const client = new TerminalHostClient({ stateRoot: process.env.PLATFORM_HOME });
+      const host = await client.host();
+      process.kill(host.pid, 'SIGSTOP');
+      await Bun.write(${JSON.stringify(receipt)}, JSON.stringify({ pid: host.pid, start: processStart(host.pid), stateRoot: process.env.PLATFORM_HOME, runtime: process.env.XDG_RUNTIME_DIR, home: process.env.HOME }));
+      client.close();
+      process.exit(1);
+    `,
+    )
+    let owned: IsolatedServer | undefined
+    let outer = ''
+    try {
+      const result = await withTerminalCheck(
+        root,
+        async (directory) => {
+          outer = directory
+          vi.stubEnv('HOME', directory)
+          try {
+            await startIsolatedServer(undefined, {
+              releaseRoot: release,
+              scratchRoot: root,
+              handleSignals: false,
+              onCreate: (server) => {
+                owned = server
+              },
+            })
+          } catch {}
+        },
+        async () => {
+          await owned?.stop()
+        },
+      ).catch((error: unknown) => error)
+      const record = JSON.parse(readFileSync(receipt, 'utf8'))
+      expect(processStart(record.pid)).toBe(record.start)
+      expect(record.home).toBe(outer)
+      expect(existsSync(outer)).toBe(true)
+      expect(existsSync(record.stateRoot)).toBe(true)
+      expect(owned).toBeDefined()
+      expect(result).toBeInstanceOf(Error)
+      process.kill(record.pid, 'SIGCONT')
+      await owned!.stop()
+      expect(processStart(record.pid)).not.toBe(record.start)
+      expect(existsSync(owned!.directory)).toBe(false)
+    } finally {
+      vi.unstubAllEnvs()
+      if (existsSync(receipt)) {
+        const record = JSON.parse(readFileSync(receipt, 'utf8'))
+        if (processStart(record.pid) === record.start) {
+          process.kill(record.pid, 'SIGCONT')
+          await stopTerminalHost(record.stateRoot, { XDG_RUNTIME_DIR: record.runtime })
+        }
+      }
+      await owned?.stop()
+      rmSync(root, { recursive: true, force: true })
+    }
+  },
+  30_000,
+)
