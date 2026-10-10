@@ -220,9 +220,11 @@ test('canonical Editor CI checks the generated language catalog', () => {
   )
 })
 
-test('canonical Editor CI includes architecture health', () => {
+test('Editor architecture health runs for every selected Editor job', () => {
   const steps = readWorkflow('workspace-libraries.yml').jobs.editor!.steps
-  expect(steps.map((step) => step.run)).toContain('bun run --cwd editor health')
+  const health = steps.find((step) => step.name === 'Check architecture health')!
+  expect(health.run).toBe('bun run --cwd editor health')
+  expect(health.if).toBeUndefined()
 })
 
 test('canonical ghostty CI runs the standalone verification contract', () => {
