@@ -35,6 +35,56 @@
 Superseded by the Zig frame: the JS-side fixes for changed-row uploads, instance building and the JS
 residual. The Zig frame writes only changed ranges and removes those JS stages.
 
+## Full-frame copied row ownership follow-up
+
+Status: Approved. A real-native proof on 2026-10-10 confirmed that retaining only the latest
+`onFrame` snapshot can retain copied cell storage proportional to columns × rows². This is the
+existing full styled-row path, separate from the text-only ownership change on
+`research/r15-text-cache` at `27c4fe45a6fa9632bb20c83a17e6e6b094ab2ad3`.
+
+`ghostty-webgpu/src/core/row-reader.ts:27-35` copies a selected packet, then gives every `PackedCells`
+row a subarray of its records and the whole grapheme pool. The lazy getters in
+`ghostty-webgpu/src/render/frame-row.ts:17-49` retain that packed row, while `FrameObserver` keeps
+unchanged full rows across accepted frames. Detached storage establishes snapshot immutability;
+it does not establish row-local ownership.
+
+The proof uses 40 columns × 100 rows and 100 accepted frames, progressively freezing each row
+while repainting a shrinking suffix with wide text. After three separate event-loop turns with
+full collection, all 200 copied backing buffers remain live: **4,848,000 bytes**, versus
+**96,000 bytes** for one grid of six-word cell records, a **50.5×** ratio. Final row text is exact;
+its SHA-256 is `5db645251f63402cf672578406580e2da69158395609f6d73b4303b5925219cb`.
+This is one deterministic reproduction, not a frequency, CPU or collection-efficiency claim.
+
+Host-only evidence and the executable probe are under
+`/work/reports/terminal-performance-2026-10-04/wave-20261008/lanes/r15-text-cache/`:
+`packed-row-retention-probe.ts`, `packed-row-retention-result.json` and
+`packed-row-retention-probe.log`. Exact command:
+
+```sh
+export PATH=$HOME/.local/share/mise/shims:$PATH
+bash /work/tmp/wave-heavy/run.sh --class light \
+  'r15-text-cache existing full-frame retention proof' -- env PATH="$PATH" \
+  bun /work/reports/terminal-performance-2026-10-04/wave-20261008/lanes/r15-text-cache/packed-row-retention-probe.ts \
+  /work/worktrees/platform/r15-text-cache
+```
+
+The probe takes any checkout path; on another host, copy it to a scratch directory and run
+`bun <probe-path> <checkout-path>`. It uses real `GhosttyRuntime`, only the latest `onFrame`
+snapshot, weak buffer references and exact final text. Forced collection and the absence of held
+historical snapshots rule out those alternative explanations. The text-only retained-buffer
+proof is a separate result and does not certify this full-frame path.
+
+- [ ] Give copied styled rows independent cell and grapheme storage, preserving lazy reads,
+      packed style decoding, wide/combining/ZWJ content and immutable held snapshots. Bound retained
+      payload by grid records plus live grapheme content; use linear bookkeeping without a second
+      identity cache.
+- [ ] Add a portable real-native regression for progressively frozen rows, resize, clear and
+      disposal. Prove a single held row keeps only its own copied payload alive.
+- [ ] Screen affected full-row consumers, including Canvas, DOM and `onFrame`, with prospective
+      frozen inputs and exact text/cell/pixel controls. Linux is non-quiet instruction-only under
+      the owner's current host policy; leave energy qualification to the Mac. Keep this runtime
+      change separate from the already frozen text-only screen.
+
 ## Every renderer gets the same treatment
 
 Owner, 2026-10-02: WebGPU is the main path, but every renderer ghostty-webgpu ships (WebGPU, WebGL,
