@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-- Status: Approved repair work, recorded 2026-10-09. The owner authorized execution on 2026-10-09. Repairs are in delivery; remaining merges, merged-main checks, and installation gate completion.
+- Status: Completed 2026-10-10. The owner approved execution on 2026-10-09. All nine original units are delivered and verified across the private app, published site, and checkout TUI. The separate GPU release-check finding remains owned and open.
 - Audited at: `847e696846ab85150f89ed1deeef49e5757f4d0b`.
 - Scope: focused application audit following the React Compiler, Query/Router, composition, and state-boundary research. This is a bounded repair queue, not a framework migration.
 - Owners: each unit below names its application domain and existing plan. This file owns the exact new defects, reproduction evidence, ordering, and acceptance. Broader programs retain their scope.
@@ -13,17 +13,17 @@ The unit descriptions preserve the audited baseline and repair contract. The del
 
 ## Execution order
 
-| Unit | Problem                                                                      | Priority | Effort | Fix risk | Confidence                                                  | Dependency                                          | Status            |
-| ---- | ---------------------------------------------------------------------------- | -------- | ------ | -------- | ----------------------------------------------------------- | --------------------------------------------------- | ----------------- |
-| 1    | MCP actions combine old data with a new provider or folder                   | P1       | M      | Medium   | High; Query observer proof and complete action-source trace | None                                                | Awaiting delivery |
-| 2    | Semantic-token cancellation removes other waiters and newer flight ownership | P1       | S      | Low      | High; actual public server API proof                        | None                                                | Awaiting delivery |
-| 3    | App DOM tests silently omit React Compiler                                   | P1       | M      | Medium   | High; actual plugin transform and controlled test pass/fail | None                                                | Awaiting delivery |
-| 4    | Diff live text remains cached after the buffer changes                       | P1       | S      | Low      | High; exact compiled hook execution                         | 3, or an existing compiled browser regression       | Awaiting delivery |
-| 5    | Tree mutation availability ignores cache confirmation changes                | P1       | S      | Low      | High; actual compiled hook test failure                     | 3, or an existing compiled browser regression       | Awaiting delivery |
-| 6    | Recent-folder restoration keeps the initial navigation permission            | P2       | S      | Low      | High; exact compiled hook execution                         | 3, or an existing compiled browser regression       | Awaiting delivery |
-| 7    | Site player child timers overwrite a skipped or replayed story               | P2       | S      | Low      | High; actual player and replica runtime proof               | None                                                | Awaiting delivery |
-| 8    | TUI syntax resources retain the initial theme                                | P2       | M      | Medium   | High; native frames, compiled and selection controls pass   | None                                                | Awaiting delivery |
-| 9    | An old TUI dialog completion can close a newer dialog                        | P2       | S      | Low      | High; real mounted Back/Forward export regression           | Original operation settles; current dialog survives | Awaiting delivery |
+| Unit | Problem                                                                      | Priority | Effort | Fix risk | Confidence                                                  | Dependency                                          | Status    |
+| ---- | ---------------------------------------------------------------------------- | -------- | ------ | -------- | ----------------------------------------------------------- | --------------------------------------------------- | --------- |
+| 1    | MCP actions combine old data with a new provider or folder                   | P1       | M      | Medium   | High; Query observer proof and complete action-source trace | None                                                | Completed |
+| 2    | Semantic-token cancellation removes other waiters and newer flight ownership | P1       | S      | Low      | High; actual public server API proof                        | None                                                | Completed |
+| 3    | App DOM tests silently omit React Compiler                                   | P1       | M      | Medium   | High; actual plugin transform and controlled test pass/fail | None                                                | Completed |
+| 4    | Diff live text remains cached after the buffer changes                       | P1       | S      | Low      | High; exact compiled hook execution                         | 3, or an existing compiled browser regression       | Completed |
+| 5    | Tree mutation availability ignores cache confirmation changes                | P1       | S      | Low      | High; actual compiled hook test failure                     | 3, or an existing compiled browser regression       | Completed |
+| 6    | Recent-folder restoration keeps the initial navigation permission            | P2       | S      | Low      | High; exact compiled hook execution                         | 3, or an existing compiled browser regression       | Completed |
+| 7    | Site player child timers overwrite a skipped or replayed story               | P2       | S      | Low      | High; actual player and replica runtime proof               | None                                                | Completed |
+| 8    | TUI syntax resources retain the initial theme                                | P2       | M      | Medium   | High; native frames, compiled and selection controls pass   | None                                                | Completed |
+| 9    | An old TUI dialog completion can close a newer dialog                        | P2       | S      | Low      | High; real mounted Back/Forward export regression           | Original operation settles; current dialog survives | Completed |
 
 Start 1 and 2 independently. Establish 3 before accepting compiler-sensitive DOM regressions for 4–6. Units 7 and 8 can run independently. Unit 9 starts with a real interaction proof. No public package API needs to change for these application repairs; add patch changesets if execution expands into shipped packages.
 
@@ -219,7 +219,7 @@ Execution:
 
 Exit: the real path is either repaired with a regression or ruled out with direct evidence. Do not treat temporary focus retention as a defect by itself.
 
-## Related boundary and gate repairs found during execution
+## Execution findings and gate checks
 
 - MCP picker paths are relative to their filesystem owner. Passing them directly as provider working directories produced `ENOENT` in the real fixture sign-in path. [PR 1196](https://github.com/ShaulLavo/fregat/pull/1196) resolves list/add/remove/copy/sign-in paths through the owning filesystem, including Home and root selection. Its independent picker review also found that Home and a literal `~` folder shared one key; the corrected key preserves `null` separately. Real picker and route regressions cover both findings.
 - Vite's React plugin parsed inline CSS as TypeScript when a document route ended in `.ts`, `.tsx`, `.js`, or `.jsx`. The bare workbench control returned 200 and the deep file route returned 500 at `@layer boot`. [PR 1198](https://github.com/ShaulLavo/fregat/pull/1198) excludes CSS HTML proxies from that parser. Actual reloads then return 200 with no browser errors, and all 13 configuration cases pass. Evidence: `/work/reports/plan342-wave/vite-proxy/`; the upstream report is ready to file and has not been posted.
@@ -228,12 +228,17 @@ Exit: the real path is either repaired with a regression or ruled out with direc
 - Reactive recent-folder restoration exposed retention fixtures that opened a workspace directly, outside the navigation owner. Four CI reload cases stopped before their baseline file opened. The fixtures now enter through `navigation.openWorkspace`; peer setup awaits the public connection owner. All five reload and three layout controls pass with their original limits and assertions. The old cold peer form remained pending, but its exact save-versus-connect stage was not captured; that observation does not establish an application defect. Evidence: `/work/reports/plan342-wave/fixture-cleanup/` and the retained retention qualification manifest.
 - The new reactive scenario removed its still-mounted fixture root after its six successful assertions, allowing a late Git-status request to return `ENOENT` and 500. Teardown now leaves the page before killing fixture processes and removing its root, while still releasing the fixture if navigation fails. The final local integration passes all six steps with zero server errors, HTTP 500 records, or `ENOENT` strings. Evidence: `/work/reports/plan342-wave/integrated-final/`.
 - A single large native mouse move expands the installed OpenTUI fork's selection container only one ancestor, before any theme change. Complete cross-message selection controls pass. The separate ready-to-file report at the execution-host path `/work/reports/upstream-bugs/opentui-single-move-selection/README.md` covers `0.5.12-bubli.2`; official upstream and a standalone reproduction remain untested. No dependency patch or upstream post is included in this wave.
+- GitHub output serialization quoted the site CSV as `"fregat"`, which the unchanged site builder rejected. [PR 1212](https://github.com/ShaulLavo/fregat/pull/1212) writes string outputs raw while preserving JSON arrays and booleans. All 43 CLI/event checks and the real unchanged site consumer pass. Evidence: `/work/reports/plan342-wave/ci-output/`.
+- GitHub expression coercion made pull requests select the full CI mode because their missing `before` field compared equal to the all-zero SHA. [PR 1214](https://github.com/ShaulLavo/fregat/pull/1214) chooses mode in the actual workflow shell. The official expression evaluator reproduces the old failure, and all 42 real-shell/CLI controls pass. [PR 1215](https://github.com/ShaulLavo/fregat/pull/1215) also fixes 17 existing Markdown format failures without changing their meaning. Evidence: `/work/reports/plan342-wave/ci-mode/` and `docs-format/`.
+- The MCP subject-switch test tried to fill a disabled folder picker while its directories were still loading. [PR 1216](https://github.com/ShaulLavo/fregat/pull/1216) waits for the existing input to become enabled. The deterministic pending-directory control reproduces the old failure, and all 12 cases pass with their original assertions and limits. This repair changes tests only.
+- A PDF browser case exceeded its original 15000 ms bound, and the following case found duplicate `Search PDF` inputs. The original navigation stall remains unconfirmed. A controlled withheld page-five observation reproduces the cleanup leak: one finished viewer remains before the repair, and zero remain afterwards while the timeout stays visible and the next case passes. [PR 1220](https://github.com/ShaulLavo/fregat/pull/1220) makes `onTestFinished` own the local view unmount and mutation-cache unsubscribe. Product source, assertions, and timeout bounds are unchanged. All 16 qualification cases pass. This one-file test cleanup is delivered separately from the nine product units; its CI and merge remain pending at this record. Evidence: `/work/reports/plan342-wave/pdf-fixture/delivery.json` and `owning-plan-ready.json`.
+- A pairing cache-settlement check at `apps/web/src/lib/pairing/tests/claim.test.ts:9` exceeded its unchanged 5000 ms bound in superseded CI run `38002645882`, reporting 6024 ms while 1359 other tests passed. The failed merge `5a86ab116f09545683864fa54de5ac370217206c` has identical pairing source, fixtures, configuration, and lockfile to main `84ea3e0a30d9729f783892c289724875b4dd2e20`. Two controls pass within the original bound. One measured control spent 2352 ms importing the server graph, 18 ms in the test body, and 3 ms on claim and cache invalidation. The original CI stall phase and transform-process cost remain unconfirmed. Reproduce from `apps/web` with `bun --bun vitest run --project node src/lib/pairing/tests/claim.test.ts`. A future failure needs fixture/import/body/route markers and worker plus transform-process observations from that failing process. The execution-host report `/work/reports/plan342-wave/pairing-flake/RESULT.md` retains exact replay commands, logs, and source equality receipts. This remains a timeout observation; the nine application repairs retain their scope.
 
 The execution ledger lives at `/work/reports/plan342-wave/units.tsv`; `/work/reports/plan342-wave/decisions.tsv` retains design and verification pivots. Final delivery receipts live in `/work/reports/plan342-wave/delivery/`.
 
 ## Verified repairs
 
-Installation and the final merged-main checks remain pending.
+All nine original units are merged through `e87357560a39022cbe4b21b20dece9f40ef672b3`. Required current-main CI passes at `2b9aeaceb70c88c77ff0bc85b4bf3fbef3d52b9b`. Source inclusion and the actual delivery checks below close this bounded plan.
 
 | Units | Result                                                                                                                                                                  | Pull request                                          | Verification                                                                                                                                                                           |
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -247,7 +252,20 @@ Installation and the final merged-main checks remain pending.
 
 Compiler regressions run once through normal web tests and CI. Their current files are `use-diff-language-context.compiler.test.tsx`, `use-fs-actions.compiler.test.tsx`, and `use-restore-recent-root.compiler.test.tsx`. The React development skill and [web fixture guide](../apps/web/test/README.md) document this route.
 
-The release installer packages the web app and server. The TUI is a checkout client: `bun run dev:tui` launches `apps/tui/src/main.tsx` through its compiler preload. Updating the checkout delivers units 8 and 9 to the next TUI launch. Its native fixture checks qualify theme and dialog behavior separately from web release checks.
+The release installer packages the web app and server. The owner-served private release at `7d6f95d3d3ac9d924104f739c7340cfa50ed8e3e` already contains the private application repairs. The site is published separately from `2b9aeaceb70c88c77ff0bc85b4bf3fbef3d52b9b`. The TUI is a checkout client: `bun run dev:tui` launches `apps/tui/src/main.tsx` through its compiler preload. The shared checkout's TUI source equals the final wave source, so units 8 and 9 reach its next launch. Its native fixture checks qualify theme and dialog behavior separately from web release checks. The direct production doctor and inspected workbench frame pass. No wave installation, installed TUI binary, active TUI restart, or single bundle containing all nine units is claimed.
+
+## Delivery receipts
+
+- Required current-main [CI run 38011730021](https://github.com/ShaulLavo/fregat/actions/runs/38011730021) passes at `2b9aeaceb70c88c77ff0bc85b4bf3fbef3d52b9b`, with ten successful jobs and five skips.
+- [Pages run 38011729899](https://github.com/ShaulLavo/fregat/actions/runs/38011729899) publishes that source to [the live site](https://shaullavo.github.io/fregat/). The published `site-replica-playback` scenario passes all nine steps at 1440 × 1200 and 390 × 844 with touch. All 18 scenario frames and both settled site looks were inspected. Raw observations contain zero browser problems, errors, warnings, or failed requests. Exact directories are indexed by the execution-host receipt `/work/reports/plan342-wave/delivery/site-final-proof.json`.
+- The final TUI source builds with `bun run --cwd apps/tui build`, and `bun run dev:tui --help` exits successfully through the documented compiler preload. Help disables watch and returns before runtime initialization. The source tree equals the wave's final TUI tree. The execution-host receipt `/work/reports/plan342-wave/delivery/tui-final-source.json` retains both commands, exit statuses, source identities, and logs. This qualifies the next source launch; no active owner TUI restart or installed TUI binary is claimed.
+- The owner-served private release `20261010T010203Z-7d6f95d3-main-0bc98574` has web and server commit `7d6f95d3d3ac9d924104f739c7340cfa50ed8e3e`, zero dirty files, serving phase, and no pending update. It contains every private application repair. The read-only production doctor passes and its settled workbench frame was inspected. The capture has zero page or console errors, failed requests or responses, socket errors, and warn/error server events. Two raw WebGL `ReadPixels` performance warnings are retained. The execution-host receipts `/work/reports/plan342-wave/delivery/served-source-inclusion.json` and `production-gpu-observation.json` record inclusion, capture, and the actual log window. The separately published site merge alone requires no private rebuild.
+
+## External release-check finding
+
+The private release still records `liveCheck.status = failed` at 2026-10-10 01:03:10 UTC. Its recorded reason is `No available adapters` plus a WebGL `ReadPixels` GPU-stall warning. The later direct production doctor at 01:30:35 UTC passes and records only the two `ReadPixels` performance warnings. Its renderer is Headless Chrome 153 with ANGLE/SwiftShader. That observation does not clear the failed metadata or establish global GPU health.
+
+The existing `fix-live-check-gpu` work owns this separate finding. The independent delivery review accepted completion of Plan 342's original unit exits and delivery routes with this flag retained. The review inspected artifacts and PRs because no active transcript path was available; it did not repeat the source or browser checks. Its execution-host artifact is `/work/reports/plan342-wave/trail-review-delivery.md`.
 
 ## Rerunnable audit evidence
 
@@ -273,12 +291,12 @@ The compiled-tree test was run from `apps/web` using `bun --bun vitest run --con
 
 ## Delivery gates
 
-- [ ] Units 1 and 2 have isolated regressions and their domain repair checks pass.
-- [ ] Unit 3 proves compilation; units 4–6 pass compiled regressions and their real user paths.
-- [ ] Unit 7 keeps final and replayed frames stable; site screenshots have been reviewed.
-- [ ] Unit 8 passes native theme replacement without losing editing state.
-- [ ] Unit 9 has a reproduced repair or a tested rejection.
-- [ ] `bun run gates`, relevant typechecks, and required portable checks pass for each delivered unit.
-- [ ] Commit each verified repair by its paths, push through the normal workflow, and record browser/TUI evidence. Install authorized application changes through the execution host's workflow and verify the served release.
+- [x] Units 1 and 2 have isolated regressions and their domain repair checks pass.
+- [x] Unit 3 proves compilation; units 4–6 pass compiled regressions and their real user paths.
+- [x] Unit 7 keeps final and replayed frames stable; site screenshots have been reviewed.
+- [x] Unit 8 passes native theme replacement without losing editing state.
+- [x] Unit 9 has a reproduced repair or a tested rejection.
+- [x] `bun run gates`, relevant typechecks, and required portable checks pass for each delivered unit.
+- [x] Verified repairs are committed, pushed, and merged. Owner-served private source, published Pages playback, and the checkout TUI source route are verified with their actual receipts. The separate failed GPU release-check metadata remains recorded and owned.
 
 Keep issue creation out of this queue. Stop a unit and report concrete evidence if drift removes the failing path or the repair requires an unrelated architecture change.
