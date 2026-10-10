@@ -1,3 +1,4 @@
+import { isSimpleRowText } from '../textCharacters'
 import type { EditorMarkerHit } from '../pointQueries'
 import type { TextContent } from '../textContent'
 import { measureWhitespaceDotGlyph, type WhitespaceDotGlyph } from './browserMetrics'
@@ -57,6 +58,7 @@ type HiddenCharacterPass = {
   readonly selectionKey: string
   readonly suspicious: SuspiciousCharacterSettings
   spaceGlyph: WhitespaceDotGlyph | null
+  readonly trailingColumns: Map<number, number>
 }
 
 /**
@@ -166,6 +168,7 @@ export function renderHiddenCharacters(view: VirtualizedTextViewInternal): void 
     selectionKey: hiddenCharacterSelectionKey(view),
     suspicious: view.suspiciousCharacters,
     spaceGlyph: null,
+    trailingColumns: new Map(),
   }
   const plans: HiddenCharacterRowPlan[] = []
   for (const row of view.rowElements.values()) {
@@ -266,10 +269,16 @@ function appendWhitespaceMarkers(
   pass: HiddenCharacterPass,
 ): void {
   if (pass.mode === 'hidden') return
-  // What sits at the end of a wrapped segment is the middle of the line it was cut from, so a row
-  // that carries on below has no trailing whitespace of its own to report.
-  if (pass.mode === 'trailing' && rowContinuesBelow(view, row)) return
-
+  if (
+    pass.mode === 'show-on-selection' &&
+    !view.selections.some(
+      (selection) =>
+        selection.end > selection.start &&
+        selection.start < row.endOffset &&
+        selection.end > row.startOffset,
+    )
+  )
+    return
   const context: HiddenCharacterRowContext = {
     view,
     row,
@@ -287,7 +296,7 @@ function appendWhitespaceMarkersForChunk(
   chunk: VirtualizedTextChunk,
 ): void {
   for (let index = chunk.localStart; index < chunk.localEnd; index += 1) {
-    const char = context.row.text.charAt(index)
+    const char = chunk.text.charAt(index - chunk.localStart)
     appendWhitespaceMarker(markers, context, char, index)
   }
 }
@@ -336,7 +345,7 @@ function appendSuspiciousCharacterMarkers(
   pass: HiddenCharacterPass,
 ): void {
   const { options } = pass.suspicious
-  if (!suspiciousCharactersEnabled(options)) return
+  if (!suspiciousCharactersEnabled(options) || isSimpleRowText(row)) return
 
   const line = suspiciousCharacterScanLine(view, row)
   // A code point the seam runs through belongs to the window before it, which reported it already:
@@ -406,7 +415,7 @@ function shouldShowHiddenCharacter(
   // A tab is an indentation decision wherever it sits, so the quieting of interior whitespace does
   // not extend to it.
   if (mode === 'boundary') return kind === 'tab' || isBoundarySpace(context, localIndex)
-  if (mode === 'trailing') return localIndex > rowWhitespaceBounds(context).last
+  if (mode === 'trailing') return isTrailingSpace(context, localIndex)
   if (mode !== 'show-on-selection') return false
 
   return context.view.selections.some((selection) => selectionContainsOffset(selection, offset))
@@ -437,12 +446,18 @@ function rowWhitespaceBounds(context: HiddenCharacterRowContext): NonWhitespaceB
   return (context.bounds ??= nonWhitespaceBounds(context.row.text))
 }
 
-function rowContinuesBelow(
-  view: VirtualizedTextViewInternal,
-  row: MountedVirtualizedTextRow,
-): boolean {
-  const next = view.model.projection.getRowMetrics(row.index + 1)
-  return next?.source === 'document' && next.bufferRow === row.bufferRow
+function isTrailingSpace(context: HiddenCharacterRowContext, localIndex: number): boolean {
+  const { view, row, pass } = context
+  let last = pass.trailingColumns.get(row.bufferRow)
+  if (last === undefined) {
+    // Trailing whitespace belongs to the source line, including spaces spread over several rows.
+    const text = view.model.projection.getLineText(row.index)
+    last = text.length - 1
+    while (last >= 0 && whitespaceKind(text.charAt(last))) last -= 1
+    pass.trailingColumns.set(row.bufferRow, last)
+  }
+  const start = view.model.projection.getRowMetrics(row.index)?.displayStartColumn ?? 0
+  return start + localIndex > last
 }
 
 function selectionContainsOffset(selection: VirtualizedStoredSelection, offset: number): boolean {

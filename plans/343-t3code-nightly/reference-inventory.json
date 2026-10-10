@@ -1,0 +1,744 @@
+[
+  {
+    "path": ".audit/plan126.tsv",
+    "category": "context-reference",
+    "lines": [2, 13, 14, 16, 18, 20, 24, 25, 26, 27]
+  },
+  {
+    "path": "AGENTS.md",
+    "category": "current-direction",
+    "lines": [33, 34]
+  },
+  {
+    "path": "PLAN.md",
+    "category": "current-direction",
+    "lines": [55, 57, 206, 250, 262, 375]
+  },
+  {
+    "path": "apps/server/src/orchestration/setup-runner.ts",
+    "category": "implementation-or-attribution",
+    "lines": [62, 63]
+  },
+  {
+    "path": "apps/server/src/orchestration/tests/session-lifecycle.test.ts",
+    "category": "implementation-or-attribution",
+    "lines": [2]
+  },
+  {
+    "path": "apps/server/src/orchestration/tests/title-context.t3code.test.ts",
+    "category": "frozen-comparison",
+    "lines": [4, 7, 8]
+  },
+  {
+    "path": "apps/server/src/orchestration/tests/title-links.t3code.test.ts",
+    "category": "frozen-comparison",
+    "lines": [3, 14, 20, 62, 63]
+  },
+  {
+    "path": "apps/server/src/provider/adapters/tests/claude.test.ts",
+    "category": "implementation-or-attribution",
+    "lines": [54]
+  },
+  {
+    "path": "apps/server/src/provider/adapters/utils/codex-elicitation.ts",
+    "category": "implementation-or-attribution",
+    "lines": [55]
+  },
+  {
+    "path": "apps/server/src/provider/adapters/utils/tests/codex-elicitation.test.ts",
+    "category": "implementation-or-attribution",
+    "lines": [218]
+  },
+  {
+    "path": "apps/server/src/testing/t3code-reference.ts",
+    "category": "implementation-or-attribution",
+    "lines": [6, 7, 8, 9, 12, 15, 16, 20, 21]
+  },
+  {
+    "path": "apps/server/test/factories/fake-claude-query.ts",
+    "category": "implementation-or-attribution",
+    "lines": [65]
+  },
+  {
+    "path": "apps/server/vitest.config.ts",
+    "category": "implementation-or-attribution",
+    "lines": [10]
+  },
+  {
+    "path": "apps/web/public/licenses/index.html",
+    "category": "implementation-or-attribution",
+    "lines": [11]
+  },
+  {
+    "path": "apps/web/public/notifications/NOTICE",
+    "category": "implementation-or-attribution",
+    "lines": [1, 4]
+  },
+  {
+    "path": "apps/web/src/features/chat/utils/artifact-templates.ts",
+    "category": "implementation-or-attribution",
+    "lines": [1, 2]
+  },
+  {
+    "path": "apps/web/src/features/chat/utils/command-label.ts",
+    "category": "implementation-or-attribution",
+    "lines": [1]
+  },
+  {
+    "path": "apps/web/src/features/chat/utils/enter-intent.ts",
+    "category": "implementation-or-attribution",
+    "lines": [9]
+  },
+  {
+    "path": "apps/web/src/features/chat/utils/pasted-text.ts",
+    "category": "implementation-or-attribution",
+    "lines": [1]
+  },
+  {
+    "path": "apps/web/src/features/chat/utils/voice-draft.ts",
+    "category": "implementation-or-attribution",
+    "lines": [1]
+  },
+  {
+    "path": "apps/web/src/features/terminal/tests/history.t3code.test.ts",
+    "category": "frozen-comparison",
+    "lines": [7, 8, 9, 14, 15]
+  },
+  {
+    "path": "apps/web/vitest.config.ts",
+    "category": "implementation-or-attribution",
+    "lines": [58]
+  },
+  {
+    "path": "docs/README.md",
+    "category": "current-direction",
+    "lines": [9, 47]
+  },
+  {
+    "path": "docs/chat-dictation.md",
+    "category": "context-reference",
+    "lines": [3, 5, 7]
+  },
+  {
+    "path": "docs/chat-t3code-decisions.tsv",
+    "category": "historical-alignment",
+    "lines": [2, 3, 5, 16, 21, 25]
+  },
+  {
+    "path": "docs/chat-t3code-parity.md",
+    "category": "historical-alignment",
+    "lines": [1, 3, 7, 9, 19, 21, 37, 75, 86, 90, 148, 257, 263]
+  },
+  {
+    "path": "docs/completion-wave.md",
+    "category": "context-reference",
+    "lines": [28]
+  },
+  {
+    "path": "docs/dependency-licences.md",
+    "category": "context-reference",
+    "lines": [24, 121, 123, 206, 342]
+  },
+  {
+    "path": "docs/editor-decorations/survey.md",
+    "category": "context-reference",
+    "lines": [152]
+  },
+  {
+    "path": "docs/markdown-experiences.md",
+    "category": "context-reference",
+    "lines": [15]
+  },
+  {
+    "path": "docs/next-wave.md",
+    "category": "context-reference",
+    "lines": [54, 172, 188]
+  },
+  {
+    "path": "docs/product-vision.md",
+    "category": "current-direction",
+    "lines": [15, 18, 64, 97, 103, 105, 111, 114]
+  },
+  {
+    "path": "docs/prompt-audit.md",
+    "category": "context-reference",
+    "lines": [3, 74, 75, 76, 77, 78, 79, 80]
+  },
+  {
+    "path": "docs/research/packages-as-products/competitive-positioning.md",
+    "category": "context-reference",
+    "lines": [17, 56, 71, 72, 74, 75, 76, 91, 109, 118, 230, 255, 317, 352, 362, 426]
+  },
+  {
+    "path": "docs/research/packages-as-products/fregat-platform.md",
+    "category": "context-reference",
+    "lines": [13, 132, 197]
+  },
+  {
+    "path": "docs/research/packages-as-products/landing-sites.md",
+    "category": "context-reference",
+    "lines": [
+      40, 84, 96, 103, 123, 152, 153, 166, 168, 176, 209, 212, 213, 232, 317, 541, 542, 689, 697
+    ]
+  },
+  {
+    "path": "docs/research/packages-as-products/readme-exemplars.md",
+    "category": "context-reference",
+    "lines": [10, 73, 103, 133, 134, 161, 195, 233, 246, 362, 408]
+  },
+  {
+    "path": "docs/research/packages-as-products/roadmap-highlights.md",
+    "category": "context-reference",
+    "lines": [38]
+  },
+  {
+    "path": "docs/router-evaluation.md",
+    "category": "context-reference",
+    "lines": [99]
+  },
+  {
+    "path": "docs/t3code-parity-second-sweep.md",
+    "category": "historical-alignment",
+    "lines": [1, 3, 7, 10, 13, 17]
+  },
+  {
+    "path": "docs/t3code-persistence-alignment.md",
+    "category": "historical-alignment",
+    "lines": [1, 3, 7, 9, 10, 87]
+  },
+  {
+    "path": "docs/t3code-reference.md",
+    "category": "current-direction",
+    "lines": [1, 5, 6, 10, 11, 16, 19, 20, 21, 22, 23, 28, 73, 103, 111]
+  },
+  {
+    "path": "docs/terminal/zwj-cell-controls-2026-10-03.json",
+    "category": "context-reference",
+    "lines": [11]
+  },
+  {
+    "path": "docs/theme-standardization-reference.md",
+    "category": "context-reference",
+    "lines": [25, 27, 29, 31, 33, 35]
+  },
+  {
+    "path": "docs/tui-research/plans-constraints.md",
+    "category": "context-reference",
+    "lines": [128, 130, 134, 499, 500]
+  },
+  {
+    "path": "docs/tui-research/t1code-tui.md",
+    "category": "context-reference",
+    "lines": [1, 3, 4, 12, 18, 33, 34, 42, 64, 89, 110, 140, 234, 325, 326]
+  },
+  {
+    "path": "docs/tui-research/web-features.md",
+    "category": "context-reference",
+    "lines": [132]
+  },
+  {
+    "path": "docs/ui-research/README.md",
+    "category": "context-reference",
+    "lines": [130]
+  },
+  {
+    "path": "docs/ui-research/extend-ui.md",
+    "category": "context-reference",
+    "lines": [281]
+  },
+  {
+    "path": "docs/ui-research/landing-replicas.md",
+    "category": "context-reference",
+    "lines": [30, 40]
+  },
+  {
+    "path": "docs/ui-research/replay-tools.md",
+    "category": "context-reference",
+    "lines": [74, 85]
+  },
+  {
+    "path": "docs/verification/2026-09-19-chat-follow-up.md",
+    "category": "context-reference",
+    "lines": [3, 5, 23]
+  },
+  {
+    "path": "docs/web-push.md",
+    "category": "context-reference",
+    "lines": [19]
+  },
+  {
+    "path": "ghostty-webgpu/scripts/comparison-mac.mjs",
+    "category": "implementation-or-attribution",
+    "lines": [53, 75, 103]
+  },
+  {
+    "path": "ghostty-webgpu/scripts/comparison-mac.test.mjs",
+    "category": "implementation-or-attribution",
+    "lines": [18, 70, 71, 72, 90, 102, 106, 145, 178]
+  },
+  {
+    "path": "ghostty-webgpu/scripts/comparison-report.mjs",
+    "category": "implementation-or-attribution",
+    "lines": [547]
+  },
+  {
+    "path": "ghostty-webgpu/scripts/comparison-report.test.mjs",
+    "category": "implementation-or-attribution",
+    "lines": [828, 898]
+  },
+  {
+    "path": "knip.json",
+    "category": "context-reference",
+    "lines": [131]
+  },
+  {
+    "path": "package.json",
+    "category": "context-reference",
+    "lines": [124]
+  },
+  {
+    "path": "packages/contracts/src/git.ts",
+    "category": "implementation-or-attribution",
+    "lines": [372]
+  },
+  {
+    "path": "packages/contracts/src/tests/session-vocabulary-allowlist.json",
+    "category": "implementation-or-attribution",
+    "lines": [10, 17]
+  },
+  {
+    "path": "plans/126-t3code-alignment.md",
+    "category": "current-direction",
+    "lines": [
+      1, 3, 6, 7, 11, 20, 25, 39, 42, 49, 56, 58, 64, 171, 176, 177, 178, 200, 201, 202, 203, 204,
+      205, 206, 207, 208, 209, 210, 211, 224, 232, 233, 234, 236, 240, 270, 297, 490, 540, 577
+    ]
+  },
+  {
+    "path": "plans/126-t3code-alignment/adjacent.md",
+    "category": "historical-alignment",
+    "lines": [1, 9, 408]
+  },
+  {
+    "path": "plans/126-t3code-alignment/archive-delivery.md",
+    "category": "historical-alignment",
+    "lines": [12]
+  },
+  {
+    "path": "plans/126-t3code-alignment/async-questions-delivery.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/attachment-upload-delivery.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/audit-protocol.md",
+    "category": "historical-alignment",
+    "lines": [1, 6, 11, 12, 13, 41]
+  },
+  {
+    "path": "plans/126-t3code-alignment/bounded-closeout-2026-09-30.md",
+    "category": "historical-alignment",
+    "lines": [84, 90]
+  },
+  {
+    "path": "plans/126-t3code-alignment/common-actions-delivery.md",
+    "category": "historical-alignment",
+    "lines": [5]
+  },
+  {
+    "path": "plans/126-t3code-alignment/delta-2026-09-24.md",
+    "category": "historical-alignment",
+    "lines": [3, 8, 16, 46]
+  },
+  {
+    "path": "plans/126-t3code-alignment/delta-2026-09-26.md",
+    "category": "historical-alignment",
+    "lines": [3, 7, 43]
+  },
+  {
+    "path": "plans/126-t3code-alignment/evidence/follow-ups-final/turn-interrupt/comparison.json",
+    "category": "historical-alignment",
+    "lines": [3, 61, 65]
+  },
+  {
+    "path": "plans/126-t3code-alignment/evidence/follow-ups-final/turn-interrupt/local.json",
+    "category": "historical-alignment",
+    "lines": [2]
+  },
+  {
+    "path": "plans/126-t3code-alignment/evidence/follow-ups-final/turn-interrupt/upstream.json",
+    "category": "historical-alignment",
+    "lines": [2]
+  },
+  {
+    "path": "plans/126-t3code-alignment/evidence/follow-ups-final/turn-start/comparison.json",
+    "category": "historical-alignment",
+    "lines": [3, 61, 65]
+  },
+  {
+    "path": "plans/126-t3code-alignment/evidence/follow-ups-final/turn-start/local.json",
+    "category": "historical-alignment",
+    "lines": [2]
+  },
+  {
+    "path": "plans/126-t3code-alignment/evidence/follow-ups-final/turn-start/upstream.json",
+    "category": "historical-alignment",
+    "lines": [2]
+  },
+  {
+    "path": "plans/126-t3code-alignment/file-preview-delivery.md",
+    "category": "historical-alignment",
+    "lines": [7]
+  },
+  {
+    "path": "plans/126-t3code-alignment/finite-closeout-2026-10-03.md",
+    "category": "historical-alignment",
+    "lines": [1]
+  },
+  {
+    "path": "plans/126-t3code-alignment/interaction.md",
+    "category": "historical-alignment",
+    "lines": [1, 8]
+  },
+  {
+    "path": "plans/126-t3code-alignment/inventory.json",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/inventory.py",
+    "category": "historical-alignment",
+    "lines": [11, 12]
+  },
+  {
+    "path": "plans/126-t3code-alignment/ledger.json",
+    "category": "historical-alignment",
+    "lines": [15, 82, 106, 461, 591, 753, 1251]
+  },
+  {
+    "path": "plans/126-t3code-alignment/lifecycle.md",
+    "category": "historical-alignment",
+    "lines": [1, 8]
+  },
+  {
+    "path": "plans/126-t3code-alignment/model-options-delivery.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/navigation-delivery.md",
+    "category": "historical-alignment",
+    "lines": [11]
+  },
+  {
+    "path": "plans/126-t3code-alignment/notifications-delivery.md",
+    "category": "historical-alignment",
+    "lines": [9]
+  },
+  {
+    "path": "plans/126-t3code-alignment/ordering-delivery.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/ordering-implementation.md",
+    "category": "historical-alignment",
+    "lines": [3, 10]
+  },
+  {
+    "path": "plans/126-t3code-alignment/protocol-antigravity.md",
+    "category": "historical-alignment",
+    "lines": [1, 8]
+  },
+  {
+    "path": "plans/126-t3code-alignment/protocol-cursor.md",
+    "category": "historical-alignment",
+    "lines": [1, 8]
+  },
+  {
+    "path": "plans/126-t3code-alignment/protocol-grok.md",
+    "category": "historical-alignment",
+    "lines": [1, 8, 68]
+  },
+  {
+    "path": "plans/126-t3code-alignment/protocol-opencode.md",
+    "category": "historical-alignment",
+    "lines": [1, 8]
+  },
+  {
+    "path": "plans/126-t3code-alignment/queue-delivery.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/repository-delivery.md",
+    "category": "historical-alignment",
+    "lines": [201]
+  },
+  {
+    "path": "plans/126-t3code-alignment/response-delivery.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/resumed-execution.md",
+    "category": "historical-alignment",
+    "lines": [5]
+  },
+  {
+    "path": "plans/126-t3code-alignment/review-adjacent.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/review-interaction.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/review-lifecycle.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/runtime.md",
+    "category": "historical-alignment",
+    "lines": [1, 8, 90, 91, 308]
+  },
+  {
+    "path": "plans/126-t3code-alignment/stash-delivery.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/status-2026-09-26.md",
+    "category": "historical-alignment",
+    "lines": [67]
+  },
+  {
+    "path": "plans/126-t3code-alignment/status-2026-09-28.md",
+    "category": "historical-alignment",
+    "lines": [255, 264, 265, 266, 280]
+  },
+  {
+    "path": "plans/126-t3code-alignment/terminal-delivery.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/title-context-delivery.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/126-t3code-alignment/title-links-delivery.md",
+    "category": "historical-alignment",
+    "lines": [3]
+  },
+  {
+    "path": "plans/140-editor-agent-advantage.md",
+    "category": "context-reference",
+    "lines": [67]
+  },
+  {
+    "path": "plans/141-usage-and-rate-limits.md",
+    "category": "context-reference",
+    "lines": [11, 46, 51, 63, 173]
+  },
+  {
+    "path": "plans/143-phone-layout.md",
+    "category": "context-reference",
+    "lines": [18, 41, 43, 53, 84, 135, 136, 152, 330]
+  },
+  {
+    "path": "plans/145-harness-controls/compact.md",
+    "category": "context-reference",
+    "lines": [12, 14]
+  },
+  {
+    "path": "plans/155-site-demo-replica.md",
+    "category": "context-reference",
+    "lines": [121, 123, 246]
+  },
+  {
+    "path": "plans/171-composer-on-our-editor.md",
+    "category": "context-reference",
+    "lines": [13, 87, 88]
+  },
+  {
+    "path": "plans/172-shared-undo-stack.md",
+    "category": "context-reference",
+    "lines": [9]
+  },
+  {
+    "path": "plans/174-external-mcp-servers.md",
+    "category": "context-reference",
+    "lines": [27, 52]
+  },
+  {
+    "path": "plans/181-chat-timeline-end-anchoring.md",
+    "category": "context-reference",
+    "lines": [43, 95]
+  },
+  {
+    "path": "plans/184-dependency-diet.md",
+    "category": "context-reference",
+    "lines": [101]
+  },
+  {
+    "path": "plans/186-pull-request-sync-rate.md",
+    "category": "context-reference",
+    "lines": [18]
+  },
+  {
+    "path": "plans/187-setup-scripts-in-terminals.md",
+    "category": "context-reference",
+    "lines": [16, 19, 21, 25, 26, 46]
+  },
+  {
+    "path": "plans/190-faster-ci.md",
+    "category": "context-reference",
+    "lines": [52, 88]
+  },
+  {
+    "path": "plans/209-unified-workspace.md",
+    "category": "context-reference",
+    "lines": [79]
+  },
+  {
+    "path": "plans/308-account-usage-feed.md",
+    "category": "context-reference",
+    "lines": [11]
+  },
+  {
+    "path": "plans/336-packages-as-products.md",
+    "category": "context-reference",
+    "lines": [45]
+  },
+  {
+    "path": "plans/337-device-pairing.md",
+    "category": "context-reference",
+    "lines": [79, 82, 97]
+  },
+  {
+    "path": "plans/343-t3code-nightly-orchestration.md",
+    "category": "current-direction",
+    "lines": [1, 12, 16, 34, 39, 55, 97, 98, 269, 579, 692, 693]
+  },
+  {
+    "path": "plans/README.md",
+    "category": "current-direction",
+    "lines": [34, 35, 51, 213, 263, 264, 280, 281]
+  },
+  {
+    "path": "plans/deployment-design.md",
+    "category": "context-reference",
+    "lines": [23]
+  },
+  {
+    "path": "plans/environments-and-remote-plan.md",
+    "category": "context-reference",
+    "lines": [14, 15, 77, 81]
+  },
+  {
+    "path": "plans/inventory-2026-09-29.md",
+    "category": "context-reference",
+    "lines": [93]
+  },
+  {
+    "path": "plans/issue-plan-conversion-2026-10-03.md",
+    "category": "context-reference",
+    "lines": [62]
+  },
+  {
+    "path": "plans/t3code-chat-parity-gap-analysis.md",
+    "category": "historical-alignment",
+    "lines": [1, 3, 7, 12, 26, 423, 501, 502]
+  },
+  {
+    "path": "plans/t3code-parity-implementation-plan.md",
+    "category": "historical-alignment",
+    "lines": [
+      1, 3, 9, 15, 16, 17, 30, 31, 47, 54, 77, 139, 143, 149, 375, 376, 377, 378, 379, 380, 381,
+      382, 383, 472, 473, 474, 475, 476, 477, 478, 479, 485, 543, 544, 545, 546, 547, 548, 549, 555,
+      616, 617, 618, 619, 620, 626, 717, 718, 719, 720, 721, 744, 815, 848, 887, 888, 889, 890, 891,
+      892, 917, 959, 960, 961, 962, 963, 964, 965, 971, 1021, 1022, 1091, 1092, 1093, 1094, 1095,
+      1096, 1097, 1098, 1099, 1106, 1107, 1108, 1181, 1185, 1186, 1187, 1188, 1189, 1190, 1191,
+      1192, 1198, 1214, 1221, 1247, 1251, 1252, 1253, 1259, 1296, 1308, 1322, 1327, 1328, 1334,
+      1365, 1399, 1404, 1405, 1414, 1504, 1505, 1506, 1507, 1508, 1509, 1515, 1598, 1604, 1605,
+      1606, 1607, 1608, 1609, 1615, 1621, 1657, 1663, 1664, 1665, 1666, 1667, 1668, 1674, 1720,
+      1721, 1722, 1723, 1724, 1725, 1726, 1732, 1776, 1777, 1778, 1779, 1780, 1781, 1782, 1788,
+      1828, 1829, 1830, 1831, 1832, 1833, 1834, 1840, 1895, 1896, 1897, 1898, 1899, 1900, 1901,
+      1902, 1903, 1957, 1958, 1959, 1960, 1961, 1962, 1970, 1999, 2027, 2029, 2043
+    ]
+  },
+  {
+    "path": "plans/tui-plan.md",
+    "category": "context-reference",
+    "lines": [37, 39]
+  },
+  {
+    "path": "plans/waves.md",
+    "category": "context-reference",
+    "lines": [29, 51]
+  },
+  {
+    "path": "scripts/parity/README.md",
+    "category": "current-direction",
+    "lines": [3, 4, 8, 9, 15, 17, 30, 31, 36, 45, 46, 58, 104]
+  },
+  {
+    "path": "scripts/parity/check.py",
+    "category": "frozen-comparison",
+    "lines": [67, 85]
+  },
+  {
+    "path": "scripts/parity/pinned.ts",
+    "category": "frozen-comparison",
+    "lines": [4, 10, 14, 15]
+  },
+  {
+    "path": "scripts/parity/run.py",
+    "category": "frozen-comparison",
+    "lines": [75, 83, 84]
+  },
+  {
+    "path": "scripts/parity/source.py",
+    "category": "frozen-comparison",
+    "lines": [14, 167, 184, 185, 186]
+  },
+  {
+    "path": "scripts/parity/test_check.py",
+    "category": "frozen-comparison",
+    "lines": [22, 235, 244, 254]
+  },
+  {
+    "path": "scripts/parity/test_source.py",
+    "category": "frozen-comparison",
+    "lines": [304]
+  },
+  {
+    "path": "scripts/t3code-test-wiring.test.ts",
+    "category": "implementation-or-attribution",
+    "lines": [28, 30, 32, 34]
+  },
+  {
+    "path": "test/parity/t3code/archive.json",
+    "category": "frozen-comparison",
+    "lines": [2]
+  },
+  {
+    "path": "test/parity/t3code/operations.json",
+    "category": "frozen-comparison",
+    "lines": [2]
+  },
+  {
+    "path": "vitest.t3code.config.mjs",
+    "category": "context-reference",
+    "lines": [13, 16, 24, 27]
+  }
+]

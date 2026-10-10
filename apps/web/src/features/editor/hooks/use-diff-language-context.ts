@@ -21,15 +21,11 @@ export function useDiffLanguageContext(
   const buffer = useEditorDocumentState((state) =>
     key ? (state.liveDocumentsByKey[key]?.buffer ?? null) : null,
   )
-  // The buffer mutates in place, so its identity cannot invalidate materialized text.
-  const revision = useEditorDocumentState((state) =>
-    key ? (state.documentContentRevisions[key] ?? '') : '',
+  const textSnapshot = useEditorDocumentState((state) =>
+    key ? (state.liveDocumentsByKey[key]?.buffer.getTextSnapshot() ?? null) : null,
   )
   const { analysisAllowed } = useDocumentFeatureTier(buffer)
-  const snapshot = {
-    revision,
-    text: analysisAllowed ? (buffer?.materializeFullText() ?? null) : null,
-  }
+  const ownedText = analysisAllowed ? (textSnapshot?.materializeFullText() ?? null) : null
 
   if (!path || !analysisAllowed) return null
 
@@ -37,7 +33,7 @@ export function useDiffLanguageContext(
     documentPath,
     host,
     newSideIsWorkingTree,
-    ownedText: snapshot.text,
+    ownedText,
     rootPath,
   }
 }

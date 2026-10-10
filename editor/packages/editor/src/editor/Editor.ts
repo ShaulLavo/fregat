@@ -3,10 +3,12 @@ import { acquireEditorDocumentAnalysis, type EditorDocumentAnalysis } from './do
 import { normalizeGutterLeadingInset } from '../virtualization/virtualizedTextViewHelpers'
 import { captureJumpLocation, JumpHistory, type JumpLocation, type JumpCause } from './jumpHistory'
 import type { EditorPointHit, EditorMarkerHit } from '../pointQueries'
-import { decodePaintSnapshot, encodePaintSnapshot } from './paintSnapshot'
+import { encodePaintSnapshot } from './paintSnapshot'
+import { decodeSnapshot as decodePaintSnapshot, type DocumentPaintCapture } from './documentPaint'
 import { detectPlatform } from '@fregat/hotkeys'
 import {
   documentSessionChangeTextSnapshot,
+  registerDocumentSnapshotConstraint,
   getDocumentMutationLeaseState,
   subscribeDocumentMutationLeaseState,
   subscribeDocumentTransactions,
@@ -417,6 +419,7 @@ export class Editor {
   private readonly viewContributions: EditorViewContributionController
   private readonly secondaryWork = new EditorSecondaryWorkScheduler()
   private readonly detachedEditChain = new DocumentEditChain(0, 0)
+  private unregisterContentConstraint: (() => void) | null = null
   private unsubscribeBufferChanges: (() => void) | null = null
   private transactionAttachment: TransactionAttachment | null = null
   private unsubscribeLeaseChanges: (() => void) | null = null
@@ -897,7 +900,10 @@ export class Editor {
   }
 
   setPresentationReady(ready: boolean): void {
+    if (this.disposed) return
+    const revealed = ready && !this.presentationReady
     this.presentationReady = ready
+    if (revealed) this.view.restorePresentationHighlights()
     if (ready) this.commitSnapshotIfReady()
   }
 
@@ -930,7 +936,7 @@ export class Editor {
       return
     }
     this.view.measureInitialViewport()
-    const appearance = this.paintAppearance()
+    const appearance = this.paintAppearance('allow', paint.format === 6 ? 'document' : 'viewport')
     if (paint.appearance !== appearance) {
       // The appearance strings hold font and theme settings: the log names what differs, and
       // only the performance mark keeps the values.
@@ -945,8 +951,9 @@ export class Editor {
     // wider than the one the paint was saved under, by exactly the scrollbar.
     const state = this.view.getState()
     if (
-      Math.abs(paint.boxWidth - state.borderBoxWidth) > 1 ||
-      Math.abs(paint.boxHeight - state.borderBoxHeight) > 1
+      paint.format === 5 &&
+      (Math.abs(paint.boxWidth - state.borderBoxWidth) > 1 ||
+        Math.abs(paint.boxHeight - state.borderBoxHeight) > 1)
     ) {
       this.recordSnapshotAdmission('viewport', {
         savedWidth: paint.boxWidth,
@@ -969,7 +976,23 @@ export class Editor {
     this.recordPresentation('editor.cached_visible_paint')
   }
 
-  captureSnapshot() {
+  captureSnapshot(options: { readonly scope: 'document' }): DocumentPaintCapture
+  captureSnapshot(options?: {
+    readonly scope: 'viewport'
+  }): ReturnType<Editor['captureViewportSnapshot']>
+  captureSnapshot(options?: { readonly scope: 'viewport' | 'document' }) {
+    if (options?.scope !== 'document') return this.captureViewportSnapshot()
+    if (this.disposed || !this.session || this.view.isProvisional || this.preparingDocument)
+      return { status: 'unsupported', reason: 'document-not-ready' } as const
+    if (!this.syntax.renderDataReady || !this.presentationReady)
+      return { status: 'unsupported', reason: 'presentation-not-ready' } as const
+    const appearance = this.paintAppearance('refuse', 'document')
+    if (appearance === null)
+      return { status: 'unsupported', reason: 'appearance-not-ready' } as const
+    return this.view.captureDocumentPaint(appearance)
+  }
+
+  private captureViewportSnapshot() {
     if (this.disposed || !this.session || this.view.isProvisional || this.preparingDocument)
       return null
     if (!this.syntax.renderDataReady || !this.presentationReady) return null
@@ -994,7 +1017,7 @@ export class Editor {
       {
         ...json,
         rows: visible.map((index) => json.rows[index]!),
-        paintLayers: [...json.paintLayers, this.view.captureSelectionPaint()],
+        paintLayers: json.paintLayers.concat([this.view.captureSelectionPaint()]),
       },
       appearance,
       visible.map((index) => gutters[index]!),
@@ -1018,7 +1041,10 @@ export class Editor {
 
   // A pending face blocks capture, which would save fallback geometry. It must not block showing
   // a paint: the saved one was taken under the loaded face, the very thing still arriving.
-  private paintAppearance(pendingFonts: 'refuse' | 'allow' = 'allow'): string | null {
+  private paintAppearance(
+    pendingFonts: 'refuse' | 'allow' = 'allow',
+    scope: 'viewport' | 'document' = 'viewport',
+  ): string | null {
     const window = this.el.ownerDocument.defaultView
     if (!window) return null
     const fonts = this.el.ownerDocument.fonts
@@ -1029,7 +1055,7 @@ export class Editor {
     if (layers === null) return null
     return JSON.stringify({
       font: [
-        style.fontFamily,
+        scope === 'document' ? normalizePaintFontFamily(style.fontFamily) : style.fontFamily,
         style.fontSize,
         style.fontWeight,
         style.fontStyle,
@@ -1041,9 +1067,13 @@ export class Editor {
         style.color,
         style.backgroundColor,
       ],
-      devicePixelRatio: window.devicePixelRatio,
+      ...(scope === 'viewport' ? { devicePixelRatio: window.devicePixelRatio } : {}),
       // Merged from three sources, so key order depends on which arrived first; values decide.
-      theme: withSortedKeys(this.resolvedTheme()),
+      theme: withSortedKeys(
+        scope === 'document'
+          ? normalizePaintTheme(this.resolvedTheme(), this.el)
+          : this.resolvedTheme(),
+      ),
       // Row height only. With the font stack equal, a different cell width means a face is still
       // loading, and that must not veto the paint the loaded face is about to match.
       rowHeight: state.metrics.rowHeight,
@@ -1145,9 +1175,11 @@ export class Editor {
     if (!paint || this.preparingDocument || this.committingPresentation) return false
     const state = this.view.getState()
     const matches =
-      Math.abs(state.borderBoxWidth - paint.boxWidth) <= 1 &&
-      Math.abs(state.borderBoxHeight - paint.boxHeight) <= 1 &&
-      this.paintAppearance() === paint.appearance
+      (paint.format === 6 ||
+        (Math.abs(state.borderBoxWidth - paint.boxWidth) <= 1 &&
+          Math.abs(state.borderBoxHeight - paint.boxHeight) <= 1)) &&
+      this.paintAppearance('allow', paint.format === 6 ? 'document' : 'viewport') ===
+        paint.appearance
     if (matches) return false
     this.withdrawSnapshot()
     return true
@@ -1404,7 +1436,7 @@ export class Editor {
 
   private readHotkeysContext() {
     const booleans = this.getKeymapContext()
-    const identifiers = ['Editor', ...Object.keys(booleans).filter((key) => booleans[key])]
+    const identifiers = ['Editor'].concat(Object.keys(booleans).filter((key) => booleans[key]))
     const documentExtension = this.documentId?.match(/\.([^./]+)$/)?.[1]?.toLowerCase()
     const extension = this.options.keymapContext?.extension ?? documentExtension
     return {
@@ -1548,7 +1580,7 @@ export class Editor {
     // The suggestion joins the same map rather than one of its own: a document rendering itself
     // through replacements is still that document, and ghost text has to take its columns from what
     // is on screen rather than from text the reader cannot see.
-    const specs = [...carried, ...derived, ...this.inputSelection.inlineSuggestionSpecs()]
+    const specs = carried.concat(derived, this.inputSelection.inlineSuggestionSpecs())
     this.view.setInlineMap(specs.length === 0 ? null : createInlineMap(snapshot, specs))
   }
 
@@ -1583,7 +1615,7 @@ export class Editor {
     const registered = this.pluginHost.getInlineReplacementProviders()
     const direct = this.inlineReplacementProvider
     if (!direct) return registered
-    return [direct, ...registered]
+    return [direct].concat(registered)
   }
 
   setSyntaxFolds(folds: readonly FoldRange[]): void {
@@ -2346,6 +2378,7 @@ export class Editor {
 
   setScrollMode(scrollMode: EditorOptions['scrollMode']): void {
     if (!this.view.setScrollMode(scrollMode)) return
+    this.syncContentConstraint()
 
     this.notifyViewContributions('layout', null)
     this.log({
@@ -2388,7 +2421,11 @@ export class Editor {
     | EditorCommandDeclaration<EditorCommandId>
     | EditorContributedCommandDeclaration
   )[] {
-    return [...EDITOR_COMMANDS, ...this.pluginHost.getContributedCommands()]
+    const commands: readonly (
+      | EditorCommandDeclaration<EditorCommandId>
+      | EditorContributedCommandDeclaration
+    )[] = EDITOR_COMMANDS
+    return commands.concat(this.pluginHost.getContributedCommands())
   }
 
   private refusesMutation(command: string): boolean {
@@ -2418,6 +2455,7 @@ export class Editor {
   }
 
   attachSession(session: DocumentSession, options: EditorSessionOptions = {}): void {
+    this.view.assertContentSnapshot(session.getTextSnapshot(), true)
     const analysis = options.analysis ?? options.preparedDocument?.analysis
     if (analysis && analysis.buffer !== editorBufferSession(session)?.buffer)
       throw new TypeError('Document analysis must reference the attached buffer')
@@ -2584,6 +2622,7 @@ export class Editor {
     options: ResetOwnedDocumentOptions,
     transactionBefore?: ReplacementTransactionBefore,
   ): number {
+    this.view.assertContentSnapshot(document.text, true)
     this.preparingDocument = true
     const savedScroll = this.pendingDocumentScroll ?? this.view.provisionalScrollPosition
     if (!options.scrollPosition && savedScroll)
@@ -3106,7 +3145,7 @@ export class Editor {
         deactivatedCount:
           this.lifecycleSummary.plugin.deactivatedCount + disposingPluginNames.length,
         disposedCount: this.lifecycleSummary.plugin.disposedCount + disposingPluginNames.length,
-        names: [...this.lifecycleSummary.pluginNames].toSorted(),
+        names: Array.from(this.lifecycleSummary.pluginNames).sort(),
       },
       syntax: this.lifecycleSummary.syntax,
     })
@@ -3280,7 +3319,7 @@ export class Editor {
       layer: 0,
       priority: 0,
       disposal: NO_DISPLAY_PROJECTION_DISPOSAL,
-      value: [...acceptedFolds],
+      value: acceptedFolds,
     })
     return true
   }
@@ -3321,7 +3360,7 @@ export class Editor {
     const contributed = this.displayProjections.values('folds')
     if (this.manualFolds.length === 0) return contributed
 
-    const contributedFolds = contributed.flatMap((projection) => [...projection.value])
+    const contributedFolds = contributed.flatMap((projection) => projection.value)
     const compatibleManualFolds = this.manualFolds.filter(
       (fold) =>
         !index || nestableFoldRanges([fold], index.ranges(fold.startLine, fold.endLine)).length > 0,
@@ -3329,8 +3368,7 @@ export class Editor {
     const manualFolds = nestableFoldRanges(compatibleManualFolds, contributedFolds)
     if (manualFolds.length === 0) return contributed
 
-    return [
-      ...contributed,
+    return contributed.concat([
       {
         kind: 'folds',
         owner: MANUAL_FOLD_PROJECTION_OWNER,
@@ -3341,7 +3379,7 @@ export class Editor {
         disposal: NO_DISPLAY_PROJECTION_DISPOSAL,
         value: manualFolds,
       },
-    ]
+    ])
   }
 
   private syncFoldStateFromProjections(): void {
@@ -3911,6 +3949,7 @@ export class Editor {
     const bufferSession = editorBufferSession(session)
     if (!bufferSession) return
 
+    this.syncContentConstraint()
     this.syncTransactionSubscription()
     this.unsubscribeBufferChanges = bufferSession.buffer.subscribe((event) =>
       this.handleBufferChange(bufferSession, event),
@@ -3957,7 +3996,19 @@ export class Editor {
     }
   }
 
+  private syncContentConstraint(): void {
+    this.unregisterContentConstraint?.()
+    this.unregisterContentConstraint = null
+    const buffer = this.session && editorBufferSession(this.session)?.buffer
+    if (!buffer || this.view.scrollMode !== 'content') return
+    this.unregisterContentConstraint = registerDocumentSnapshotConstraint(buffer, (snapshot) =>
+      this.view.assertContentSnapshot(snapshot),
+    )
+  }
+
   private disposeBufferSubscriptions(): void {
+    this.unregisterContentConstraint?.()
+    this.unregisterContentConstraint = null
     this.releaseTransactionAttachment()
     this.bufferPublication = null
     this.unsubscribeBufferChanges?.()
@@ -5731,7 +5782,7 @@ class ContributionClaims {
 
   release(): readonly EditorDisposable[] {
     this.released = true
-    const claims = [...this.claims].toReversed()
+    const claims = Array.from(this.claims).reverse()
     this.claims.clear()
     return claims
   }
@@ -5765,7 +5816,7 @@ function withSortedKeys(value: unknown): unknown {
   if (value === null || typeof value !== 'object') return value
   return Object.fromEntries(
     Object.entries(value)
-      .toSorted(([left], [right]) => (left < right ? -1 : 1))
+      .sort(([left], [right]) => (left < right ? -1 : 1))
       .map(([key, entry]) => [key, withSortedKeys(entry)]),
   )
 }
@@ -5775,9 +5826,47 @@ function appearanceDifference(saved: string, live: string | null): readonly stri
   try {
     const before: Record<string, unknown> = JSON.parse(saved)
     const after: Record<string, unknown> = JSON.parse(live)
-    const keys = new Set([...Object.keys(before), ...Object.keys(after)])
+    const keys = new Set(Object.keys(before).concat(Object.keys(after)))
     return [...keys].filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
   } catch {
     return ['unreadable']
+  }
+}
+
+function normalizePaintFontFamily(value: string): string {
+  return (value.match(/'[^']*'|"[^"]*"|[^,]+/g) ?? [])
+    .map((family) =>
+      family
+        .trim()
+        .replace(/^(['"])(.*)\1$/, '$2')
+        .toLowerCase(),
+    )
+    .join(',')
+}
+
+function normalizePaintTheme(theme: EditorTheme | null, host: HTMLElement): unknown {
+  if (!theme) return null
+  const probe = host.ownerDocument.createElement('span')
+  probe.style.cssText = 'position:absolute;visibility:hidden'
+  host.append(probe)
+  const normalize = (value: string): string => {
+    probe.style.color = ''
+    probe.style.color = value
+    return probe.style.color ? host.ownerDocument.defaultView!.getComputedStyle(probe).color : value
+  }
+  try {
+    return Object.fromEntries(
+      Object.entries(theme).map(([key, value]) => {
+        if (typeof value === 'string' && key.endsWith('Color')) return [key, normalize(value)]
+        if ((key === 'syntax' || key === 'colors') && value && typeof value === 'object')
+          return [
+            key,
+            Object.fromEntries(Object.entries(value).map(([id, color]) => [id, normalize(color)])),
+          ]
+        return [key, value]
+      }),
+    )
+  } finally {
+    probe.remove()
   }
 }

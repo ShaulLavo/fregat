@@ -195,8 +195,7 @@ screen-reader scenarios; M the host swap as a whole.
 
 ### Q4. Cost
 
-Measured with `bun run --cwd apps/web bundle:report --dir=/work/platform-production/current/web`
-(the reporter Plan 109 uses; the release has `bundle-stats.json`), release
+Historical measurement from the retired Plan 109 reporter, release
 `20260925T173354Z-ed96e9f1-main`. First-load JS is 1,639 KB gz.
 
 - `@singapore-editor/core` is 221.8 KB gz of first load and 221.8 KB gz total: all of it already
@@ -267,6 +266,8 @@ removing Lexical. Keep the original breakdown here for its implementation detail
 ## Draft ownership handoff from Plan 200
 
 Future work for this plan, after the composer runs on our editor. Plan 200 did not migrate Lexical.
+The ownership and source range contracts this builds on are in
+[document-backed content views](../docs/document-backed-content-views.md).
 
 - **Identity.** A draft becomes one more `UnsyncedDocumentRef` variant, keyed as drafts are today:
   environment, workspace root and draft key (`chatInputDraftStorageId`). The workspace document

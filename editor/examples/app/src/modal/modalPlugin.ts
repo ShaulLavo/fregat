@@ -28,25 +28,24 @@ const WORD_WINDOW = 4096
  * A bounded modal editing proof built only on public exports (Editor E028): normal and insert
  * modes, h j k l w b 0 $, counts, d with a motion, dd, diw, Escape and u.
  */
-const modalRows = [
-  ...Array.from({ length: 95 }, (_, index) => String.fromCharCode(index + 32)),
-  'Escape',
-].flatMap((key) =>
-  [false, true].map((shift): EditorKeymapPack['linux'][number] => ({
-    keys: [{ key, shift }],
-    command: 'example.modal.stroke',
-    context: 'Editor && !EditorWidget && modalNormal',
-  })),
-)
+const modalRows = Array.from({ length: 95 }, (_, index) => String.fromCharCode(index + 32))
+  .concat(['Escape'])
+  .flatMap((key) =>
+    [false, true].map((shift): EditorKeymapPack['linux'][number] => ({
+      keys: [{ key, shift }],
+      command: 'example.modal.stroke',
+      context: 'Editor && !EditorWidget && modalNormal',
+    })),
+  )
 const escapeRow = {
   keys: 'Escape',
   command: 'example.modal.stroke',
   context: 'Editor && !EditorWidget && modalInsert',
 }
 export const modalPack: EditorKeymapPack = {
-  linux: [...modalRows, escapeRow],
-  mac: [...modalRows, escapeRow],
-  windows: [...modalRows, escapeRow],
+  linux: modalRows.concat([escapeRow]),
+  mac: modalRows.concat([escapeRow]),
+  windows: modalRows.concat([escapeRow]),
 }
 
 export function createModalEditingPlugin(): EditorPlugin {
@@ -141,9 +140,7 @@ function deleteRanges(scope: EditorViewScope, rangeFor: (offset: number) => Rang
 }
 
 function mergeRanges(ranges: readonly Range[]): Range[] {
-  const sorted = ranges
-    .filter((range) => range.end > range.start)
-    .toSorted((a, b) => a.start - b.start)
+  const sorted = ranges.filter((range) => range.end > range.start).sort((a, b) => a.start - b.start)
   const merged: Range[] = []
   for (const range of sorted) {
     const last = merged.at(-1)
@@ -213,7 +210,7 @@ function graphemeBefore(scope: EditorViewScope, offset: number, lineStart: numbe
 
 function segments(chunk: string): string[] {
   const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
-  return [...segmenter.segment(chunk)].map((entry) => entry.segment)
+  return Array.from(segmenter.segment(chunk), (entry) => entry.segment)
 }
 
 function motionRange(

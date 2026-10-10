@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { finalize } from '@/utils/finalize'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useCommandFocus } from '@/commands/hooks/use-command-focus'
 import { useCommands } from '@/commands/hooks/use-commands'
 import { Dialog } from '@/components/dialog'
@@ -23,6 +24,13 @@ export function PathDialog({
   const [value, setValue] = useState(initial)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const mounted = useRef(true)
+  useLayoutEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
   const commands = useCommands()
   useCommandFocus(
     {
@@ -39,14 +47,19 @@ export function PathDialog({
     if (busy || !path.trim()) return
     setBusy(true)
     setError('')
-    try {
-      await onSubmit(path.trim())
-      onClose()
-    } catch (failure) {
-      setError(connectionFailure(failure).message)
-    } finally {
-      setBusy(false)
-    }
+    return await finalize(
+      async () => {
+        try {
+          await onSubmit(path.trim())
+          if (mounted.current) onClose()
+        } catch (failure) {
+          setError(connectionFailure(failure).message)
+        }
+      },
+      () => {
+        setBusy(false)
+      },
+    )
   }
   return (
     <Dialog

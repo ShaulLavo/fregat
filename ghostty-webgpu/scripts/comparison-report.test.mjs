@@ -227,6 +227,43 @@ test('output memory keeps retained storage, WASM capacity, and RSS separate', ()
   assert.equal(rows.find(({ metric }) => metric === 'memory/output/rss-delta').median, 6)
 })
 
+for (const path of ['bytes', 'string']) {
+  test(`${path} memory reports exclude retained fixture storage at every terminal count`, () => {
+    for (const count of [1, 8, 17]) {
+      const fixtureBytes = path === 'bytes' ? 5 * 1048576 : 8 * 1048576
+      const snapshot = (multiplier, preparedBytes) => ({
+        heap: {
+          usedSize: preparedBytes + count * multiplier * 131072,
+          backingStorageSize: preparedBytes + count * multiplier * 65536,
+        },
+        wasmBytes: multiplier ? 65536 : 0,
+        rssBytes: preparedBytes * 3 + count * multiplier * 1048576,
+      })
+      const report = (preparedBytes, terminalMultiplier) =>
+        summaries({
+          runs: [
+            {
+              variant: 'ghostty-dom',
+              path,
+              count,
+              memory: {
+                empty: snapshot(0, preparedBytes),
+                initial: snapshot(terminalMultiplier, preparedBytes),
+                history: snapshot(terminalMultiplier * 2, preparedBytes),
+              },
+              output: {
+                cpu: { percentOfOneCore: 0 },
+                memory: snapshot(terminalMultiplier * 3, preparedBytes),
+              },
+            },
+          ],
+        }).filter(({ metric }) => metric.startsWith('memory/'))
+      assert.deepEqual(report(fixtureBytes, 1), report(0, 1))
+      assert(report(fixtureBytes, 0).every(({ median }) => median === 0))
+    }
+  })
+}
+
 test('thin antialiased glyphs qualify without counting neutral or transparent ink', () => {
   const png = new PNG({ width: 5, height: 1 })
   png.data.set([0, 95, 0, 255, 100, 0, 0, 255, 255, 255, 255, 255, 80, 80, 80, 255, 0, 255, 0, 0])
@@ -389,7 +426,7 @@ test('CPU sampling rejects both newly born and exited processes', () => {
   )
   assert.throws(() => cpuSample(prior, [], 1000), /process set changed/)
   assert.throws(
-    () => cpuSample(prior, [...prior, { id: 2, type: 'gpu', cpuTime: 0 }], 1000),
+    () => cpuSample(prior, prior.concat([{ id: 2, type: 'gpu', cpuTime: 0 }]), 1000),
     /process set changed/,
   )
 })
@@ -1043,10 +1080,11 @@ test('native renderer pairs retain generic counterpart values and per-session id
     'ghostty-dom': 'xterm-dom',
   }
   artifact.variants = Object.keys(counterparts).concat(Object.values(counterparts))
-  artifact.runs = Object.entries(counterparts).flatMap(([native, counterpart]) => [
-    ...nativeRuns.map((run) => ({ ...run, variant: native })),
-    ...otherRuns.map((run) => ({ ...run, variant: counterpart })),
-  ])
+  artifact.runs = Object.entries(counterparts).flatMap(([native, counterpart]) =>
+    nativeRuns
+      .map((run) => ({ ...run, variant: native }))
+      .concat(otherRuns.map((run) => ({ ...run, variant: counterpart }))),
+  )
   artifact.frameBuilders = ['zig']
   const rows = pairedRatios(artifact)
   assert.equal(rows.length, 28)

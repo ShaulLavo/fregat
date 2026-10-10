@@ -328,7 +328,7 @@ function subscribeSearchBuffers({
 
 function workspaceSlicesCacheValue(state: EditorWorkspaceStore): WorkspaceSlicesCacheValue {
   const activeRootPath = state.rootFolder?.path ?? null
-  const parked = Array.from(state.parkedWorkspaces.entries()).toSorted(
+  const parked = Array.from(state.parkedWorkspaces.entries()).sort(
     (left, right) => right[1].lastActiveAt - left[1].lastActiveAt,
   )
   const slices = new Map<string, CachedWorkspaceSlice>(parked)
@@ -342,11 +342,9 @@ function workspaceSlicesCacheValue(state: EditorWorkspaceStore): WorkspaceSlices
     })
   }
 
+  const activeOrder: string[] = activeRootPath !== null ? [activeRootPath] : []
   return {
-    order:
-      activeRootPath !== null
-        ? [activeRootPath, ...parked.map((entry) => entry[0])]
-        : parked.map((entry) => entry[0]),
+    order: activeOrder.concat(parked.map((entry) => entry[0])),
     slices,
   }
 }

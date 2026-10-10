@@ -3,7 +3,7 @@ import { commands } from 'vitest/browser'
 import { activeEditorTab } from '@/lib/documents/utils/groups'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { ensureFileSnapshotQuery } from '@/lib/file-snapshot-query-cache'
-import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace'
+import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-recording'
 import { mountRetentionAcceptanceApp } from '../../../../test/factories/retention-acceptance-app'
 import {
   assertRetentionAcceptancePaint,

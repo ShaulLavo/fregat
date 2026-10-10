@@ -45,7 +45,8 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "bench": "node bench/engine.mjs",
-    "bench:fragmented": "node bench/fragmented.mjs"
+    "bench:fragmented": "node bench/fragmented.mjs",
+    "bench:concurrency": "node bench/concurrency.mjs"
   },
   "dependencies": {
     "@singapore-editor/textbuffer": "workspace:*"

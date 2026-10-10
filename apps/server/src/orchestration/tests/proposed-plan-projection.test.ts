@@ -22,10 +22,11 @@ afterEach(() => {
 
 describe('orchestration proposed plan projection', () => {
   it('keeps the plan markdown readable after a reload', () => {
-    const fixture = project([
-      ...sessionBootstrapEvents(),
-      proposedPlanUpsertedEvent({ planId: 'plan-1', planMarkdown }),
-    ])
+    const fixture = project(
+      sessionBootstrapEvents().concat([
+        proposedPlanUpsertedEvent({ planId: 'plan-1', planMarkdown }),
+      ]),
+    )
 
     // A fresh query over the same file is what a restart sees: no replay, no
     // live events, only what the projection wrote.
@@ -39,22 +40,24 @@ describe('orchestration proposed plan projection', () => {
   })
 
   it('reports an unimplemented plan as actionable in both projections', () => {
-    const fixture = project([
-      ...sessionBootstrapEvents(),
-      proposedPlanUpsertedEvent({ planId: 'plan-1', planMarkdown }),
-    ])
+    const fixture = project(
+      sessionBootstrapEvents().concat([
+        proposedPlanUpsertedEvent({ planId: 'plan-1', planMarkdown }),
+      ]),
+    )
 
     expect(shellSession(fixture).hasActionableProposedPlan).toBe(true)
     expect(memorySession(fixture).hasActionableProposedPlan).toBe(true)
   })
 
   it('stops offering a plan once a turn is started from it', () => {
-    const fixture = project([
-      ...sessionBootstrapEvents(),
-      proposedPlanUpsertedEvent({ planId: 'plan-1', planMarkdown }),
-      turnStartEvent('turn-1', requestedAt, { planId: 'plan-1', sessionId: SESSION_ID }),
-      proposedPlanImplementedEvent(SESSION_ID, requestedAt),
-    ])
+    const fixture = project(
+      sessionBootstrapEvents().concat([
+        proposedPlanUpsertedEvent({ planId: 'plan-1', planMarkdown }),
+        turnStartEvent('turn-1', requestedAt, { planId: 'plan-1', sessionId: SESSION_ID }),
+        proposedPlanImplementedEvent(SESSION_ID, requestedAt),
+      ]),
+    )
     const detail = fixture.snapshots.sessionDetailSnapshot(SESSION_ID)
 
     expect(detail.proposedPlans[0]).toMatchObject({
@@ -66,15 +69,16 @@ describe('orchestration proposed plan projection', () => {
   })
 
   it('never latches: a plan that arrives already implemented is not actionable', () => {
-    const fixture = project([
-      ...sessionBootstrapEvents(),
-      proposedPlanUpsertedEvent({
-        implementationSessionId: SESSION_ID,
-        implementedAt: requestedAt,
-        planId: 'plan-1',
-        planMarkdown,
-      }),
-    ])
+    const fixture = project(
+      sessionBootstrapEvents().concat([
+        proposedPlanUpsertedEvent({
+          implementationSessionId: SESSION_ID,
+          implementedAt: requestedAt,
+          planId: 'plan-1',
+          planMarkdown,
+        }),
+      ]),
+    )
 
     expect(shellSession(fixture).hasActionableProposedPlan).toBe(false)
     expect(memorySession(fixture).hasActionableProposedPlan).toBe(false)

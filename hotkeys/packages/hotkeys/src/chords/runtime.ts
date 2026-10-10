@@ -193,7 +193,7 @@ export function createChordRuntime<Payload, Context, Source>(
       node: edge.node,
       keys: pending ? `${pending.keys} ${edge.keys}` : edge.keys,
       count,
-      buffer: [...(pending?.buffer ?? []), entry],
+      buffer: (pending?.buffer ?? []).concat([entry]),
       started: pending?.started ?? Date.now(),
       focus: pending ? pending.focus : options.currentFocus?.(),
       // Zed times out a bound prefix or typed text; once running, the timeout restarts per stroke.
@@ -341,7 +341,7 @@ export function createChordRuntime<Payload, Context, Source>(
       const step = replayPrefix(rest)
       claimed ??= step.claimed
       rest = step.rest
-      if (rest.length) sequence = lookupSequence([...rest, entry])
+      if (rest.length) sequence = lookupSequence(rest.concat([entry]))
     }
     report(ended, 'unmatched', claimed)
     return sequence ? resumeSequence(sequence) : undefined

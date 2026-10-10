@@ -93,12 +93,11 @@ export async function preserveAppearance(page: Page, onlyKeys?: readonly string[
   const operations = (onlyKeys ?? keys).flatMap((key): readonly SettingOperation[] => {
     const entry = Object.entries(raw).find(([name]) => name === key)
     if (key === 'keybindings.overrides' && entry)
-      return [
-        { kind: 'reset', keys: [key] },
-        ...v
+      return Array.of<SettingOperation>({ kind: 'reset', keys: [key] }).concat(
+        v
           .parse(keybindingOverridesSchema, entry[1])
           .map((binding) => ({ kind: 'keybinding.append' as const, entry: binding })),
-      ]
+      )
     return [entry ? { kind: 'set', key, value: entry[1] } : { kind: 'reset', keys: [key] }]
   })
   return async () => {

@@ -1,15 +1,15 @@
 import { ModuleLoadError } from '@/components/module-load-error'
-import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import type { useDisplayedShell } from '@/features/workspace/hooks/use-displayed-shell'
+import type { ShellProps } from '@/lib/shell/utils/props'
 
 /** The displayed shell, or its first load. */
 export function ShellBody({
+  children,
   query,
   rootPath,
-}: {
+}: ShellProps & {
   readonly query: ReturnType<typeof useDisplayedShell>['query']
-  readonly rootPath: FilesystemPath
 }) {
   if (query.isPending)
     return (
@@ -27,5 +27,5 @@ export function ShellBody({
     )
 
   const Shell = query.data
-  return <Shell rootPath={rootPath} />
+  return <Shell rootPath={rootPath}>{children}</Shell>
 }

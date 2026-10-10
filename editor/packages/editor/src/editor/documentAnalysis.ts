@@ -1078,12 +1078,11 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
   }
 
   override retainedResults(): readonly EditorSyntaxResult[] {
-    return [
-      ...new Set([
-        ...super.retainedResults(),
-        ...[...this.ranges.values()].map((cached) => cached.result),
-      ]),
-    ]
+    return Array.from(
+      new Set(
+        super.retainedResults().concat(Array.from(this.ranges.values(), (cached) => cached.result)),
+      ),
+    )
   }
 
   override dispose(): void {
@@ -1470,12 +1469,12 @@ function createAnalysis(options: {
       entries.clear()
       const releaseBuffer = unsubscribe
       unsubscribe = undefined
-      completeDocumentCleanup([
-        () => releaseBuffer?.(),
-        ...owned.map((entry) => () => entry.dispose()),
-        () => scheduler.dispose(),
-        () => delivery.dispose(),
-      ])
+      completeDocumentCleanup(
+        [() => releaseBuffer?.()].concat(
+          owned.map((entry) => () => entry.dispose()),
+          [() => scheduler.dispose(), () => delivery.dispose()],
+        ),
+      )
     },
   }
   return analysis

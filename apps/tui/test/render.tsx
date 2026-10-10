@@ -4,10 +4,15 @@ import type { CliRenderer } from '@opentui/core'
 import { act, type ReactNode } from 'react'
 import { createTuiError } from '@/host/utils/structured-errors'
 
-export async function renderTui(node: ReactNode, options: TestRendererOptions) {
+export async function renderTui(
+  node: ReactNode,
+  options: TestRendererOptions,
+  configureRenderer?: (renderer: CliRenderer) => void,
+) {
   const previous = Reflect.get(globalThis, 'IS_REACT_ACT_ENVIRONMENT')
   Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true)
   const frame = await createTestRenderer(options)
+  configureRenderer?.(frame.renderer)
   const root = createRoot(frame.renderer)
   await act(async () => {
     root.render(node)

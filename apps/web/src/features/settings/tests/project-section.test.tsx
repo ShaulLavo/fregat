@@ -210,11 +210,9 @@ test('all project rows write and reset on their execution owner while grouping s
     expect(
       (await fetchSettings(undefined, federation.clientB)).values['chat.projectGroupingOverrides'],
     ).toEqual({})
-    for (const name of [
-      ...rows.map(([name]) => name),
-      'Title generation model',
-      'Project grouping',
-    ]) {
+    for (const name of rows
+      .map(([name]): string => name)
+      .concat(['Title generation model', 'Project grouping'])) {
       await userEvent.click(await screen.findByRole('combobox', { name }))
       await userEvent.click(await screen.findByRole('option', { name: /^Default ·/ }))
     }

@@ -164,8 +164,8 @@ export function subjectRangeSegments(
   ).map(({ left, width }) => ({ left, width }))
 }
 
-function mergeOracleRects(rects: readonly OracleRect[]): readonly OracleRect[] {
-  const sorted = rects.toSorted((left, right) => left.left - right.left || left.width - right.width)
+function mergeOracleRects(rects: OracleRect[]): readonly OracleRect[] {
+  const sorted = rects.sort((left, right) => left.left - right.left || left.width - right.width)
   const merged: OracleRect[] = []
   for (const rect of sorted) appendMergedRect(merged, rect)
   return merged
@@ -191,7 +191,7 @@ function requiredBoundary(
   return boundary
 }
 
-function localRects(row: MountedVirtualizedTextRow, range: Range): readonly OracleRect[] {
+function localRects(row: MountedVirtualizedTextRow, range: Range): OracleRect[] {
   const rowLeft = row.element.getBoundingClientRect().left
   return Array.from(range.getClientRects(), (rect) => ({
     left: rect.left - rowLeft,

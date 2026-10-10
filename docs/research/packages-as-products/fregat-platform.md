@@ -275,7 +275,7 @@ event, and every error says why and how to fix it, with a button that hands it t
 
 - `bun run agent:browser look|scenario|trace|renders|caches` with 394 scenarios, mock provider,
   `--touch` phone emulation, isolated state homes.
-- Heavy-job runner with memory-aware admission ([Plan 284](../../../plans/284-resource-aware-heavy-jobs.md)).
+- The owner's private [heavy-runner tool](https://github.com/ShaulLavo/heavy-runner) provides memory-aware admission. It is separate from Fregat and contributor workflows.
 
 ### What Mesh adds (optional, separate repo)
 

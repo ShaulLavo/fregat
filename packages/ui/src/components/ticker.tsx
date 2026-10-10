@@ -14,7 +14,7 @@ export function Ticker({
   return (
     <span aria-label={text} role='img' className='inline-flex font-mono tabular-nums'>
       <span aria-hidden className='inline-flex'>
-        {Array.from(text).map((character, index) =>
+        {Array.from(text, (character, index) =>
           /[0-9]/.test(character) ? (
             <TickerDigit key={text.length - index} value={Number(character)} />
           ) : (

@@ -281,7 +281,7 @@ function rejectCrossingFoldRanges(folds: readonly FoldRange[]): FoldRangeIngesti
 }
 
 function sortedFoldRangesForIngestion(folds: readonly FoldRange[]): readonly FoldRange[] {
-  return [...folds].toSorted(compareFoldRangesForIngestion)
+  return folds.toSorted(compareFoldRangesForIngestion)
 }
 
 function compareFoldRangesForIngestion(left: FoldRange, right: FoldRange): number {

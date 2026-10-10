@@ -76,7 +76,7 @@ function serviceTierDescriptor(
     advertisedDefault && tiers.some((tier) => tier.id === advertisedDefault)
       ? advertisedDefault
       : 'default'
-  const options = [{ id: 'default', label: 'Standard' }, ...tiers].map((tier) => ({
+  const options = [{ id: 'default', label: 'Standard' }].concat(tiers).map((tier) => ({
     ...tier,
     ...(tier.id === defaultTier ? { isDefault: true } : {}),
   }))

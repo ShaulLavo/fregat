@@ -295,10 +295,12 @@ function searchResultPendingIdsCacheKey(
 ) {
   if (!pendingResultIds) return ''
 
-  const ids = Array.isArray(pendingResultIds) ? pendingResultIds : Array.from(pendingResultIds)
+  const ids = Array.isArray(pendingResultIds)
+    ? pendingResultIds.toSorted()
+    : Array.from(pendingResultIds).sort()
   if (ids.length === 0) return ''
 
-  return ids.toSorted().map(searchResultPendingIdCachePart).join('')
+  return ids.map(searchResultPendingIdCachePart).join('')
 }
 
 function searchResultPendingIdCachePart(id: SearchResultId) {

@@ -165,14 +165,26 @@ export function DiffPane({
     },
   })
 
+  // Before the publish effects: a restoration reported to split sync needs both panes registered.
+  useLayoutEffect(() => {
+    if (!onRegisterEditor) return
+
+    onRegisterEditor(side, controller.getEditor())
+    return () => onRegisterEditor(side, null)
+  }, [controller, onRegisterEditor, side])
+
   const publishRows = useEffectEvent(() => {
     const editor = controller.getEditor()
     if (!editor || appliedFile.current !== file) return
-    persistence?.publish(editor, attachment, plugin.getRows(), plugin.getTokens(), {
-      backend: syntaxBackend,
-      theme: syntaxTheme,
-      enabled: highlight,
-    })
+    const installed = persistence?.publish(
+      editor,
+      attachment,
+      plugin.getRows(),
+      plugin.getTokens(),
+      { backend: syntaxBackend, theme: syntaxTheme, enabled: highlight },
+    )
+    // Restoring a projection moves the viewport without a scroll report; split sync must hear it.
+    if (installed) onScroll?.(side, editor.getScrollPosition(), 'restoration')
     notePressPaint('diffs', file.path, 'text')
   })
 
@@ -239,13 +251,6 @@ export function DiffPane({
     )
     return () => subscription.dispose()
   }, [controller, onScroll, persistence, side])
-
-  useLayoutEffect(() => {
-    if (!onRegisterEditor) return
-
-    onRegisterEditor(side, controller.getEditor())
-    return () => onRegisterEditor(side, null)
-  }, [controller, onRegisterEditor, side])
 
   return (
     <div

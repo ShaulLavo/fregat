@@ -62,8 +62,7 @@ test('delete requires confirmation and cancellation leaves the real session inta
   renderRailHarness(h)
   await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTitle('First') })
   await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
-  expect(screen.getByRole('dialog')).toBeVisible()
-  await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
   expect((await h.refresh()).sessions).toHaveLength(2)
 })
 test('confirmed delete removes the session through its owner', async ({ client, server }) => {

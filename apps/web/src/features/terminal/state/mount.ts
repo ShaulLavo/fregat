@@ -30,6 +30,7 @@ import { DEFAULT_CODE_FONT } from '@workspace/contracts'
 import { UNFOCUSED_TERMINAL_CURSOR_STYLE } from '@/features/terminal/utils/appearance'
 import { playFeedback } from '@workspace/ui/patterns/feedback-layer'
 import { log } from '@/lib/client-logging'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { elapsedMs, nowMs } from '@workspace/utils/timing'
 
 export type TerminalInputSender = (data: string) => boolean
@@ -343,6 +344,7 @@ function createTerminal(runtime: GhosttyRuntime, scrollback: number) {
       },
       scrollbackLimit: scrollback,
     },
+    accessibility: readSettingsMirror()['terminal.integrated.screenReader'] ? {} : undefined,
     links: { activateUri: openTerminalUri },
     runtime: { kind: 'borrowed', runtime },
   })

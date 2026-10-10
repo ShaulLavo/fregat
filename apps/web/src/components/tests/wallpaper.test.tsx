@@ -9,6 +9,10 @@ import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-c
 
 import { expect, test } from '../../../test/fixtures'
 import { renderWithProviders } from '../../../test/render'
+import {
+  installWallpaperPreload,
+  removeHtmlBootstrap,
+} from '../../../test/factories/html-bootstrap'
 
 function disableMotion() {
   const matchMedia = window.matchMedia.bind(window)
@@ -19,14 +23,14 @@ function disableMotion() {
   )
 }
 
-function markDesktopPreload(status: 'ready' | 'error') {
+function markDesktopPreload() {
   const href = new URL(wallpaperStillUrl(primaryServerOrigin())!, document.baseURI).href
-  window.platformBootWallpaper = { href, status }
+  installWallpaperPreload(href)
 }
 
 afterEach(() => {
   vi.restoreAllMocks()
-  delete window.platformBootWallpaper
+  removeHtmlBootstrap()
 })
 
 test('a remote environment starts with the bundled image, never the primary desktop', ({
@@ -76,7 +80,7 @@ test('a loaded desktop image replaces the fallback without remounting the decode
 
 test('an already preloaded desktop is the only image on the first render', () => {
   disableMotion()
-  markDesktopPreload('ready')
+  markDesktopPreload()
   const rendered = renderWithProviders(<WebWallpaper />, { command: false })
 
   expect(rendered.container.querySelectorAll('img')).toHaveLength(1)
@@ -85,10 +89,11 @@ test('an already preloaded desktop is the only image on the first render', () =>
   ).toHaveAttribute('src', wallpaperStillUrl(primaryServerOrigin()))
 })
 
-test('a failed boot preload starts directly with the bundled image', () => {
+test('a failed preloaded image falls back to the bundled image', () => {
   disableMotion()
-  markDesktopPreload('error')
+  markDesktopPreload()
   const rendered = renderWithProviders(<WebWallpaper />, { command: false })
+  fireEvent.error(rendered.container.querySelector('img')!)
 
   expect(rendered.container.querySelectorAll('img')).toHaveLength(1)
   expect(

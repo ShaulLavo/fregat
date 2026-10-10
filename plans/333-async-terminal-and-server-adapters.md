@@ -38,7 +38,7 @@ NativeWatchHost uses one lazy Bun Worker with ref:false, typed attachment acknow
 
 SerialWorker extraction preserves FIFO/per-enqueue failure/continued drain. SweepScheduler extraction preserves periodic/on-demand starts and at most one rerun. ReactorScheduler's fixed-point drain remains a domain coordinator because participants enqueue one another. Engine/App shutdown order remains explicit, including early LSP/terminal cleanup and stopping new provider work.
 
-Wallpaper decoding and Claude discovery are child processes with hard-kill deadlines. LSP processes retain their JSON-RPC session pool and shutdown races. Dedicated-worker abstractions do not replace their process isolation or supervisors. OS heavy-job slices, FIFO admission and quiet measurement holds remain in scripts/heavy.
+Wallpaper decoding and Claude discovery are child processes with hard-kill deadlines. LSP processes retain their JSON-RPC session pool and shutdown races. Dedicated-worker abstractions do not replace their process isolation or supervisors. OS heavy-job slices, FIFO admission and quiet measurement holds belong to the private [heavy-runner repository](https://github.com/ShaulLavo/heavy-runner) and execution-host instructions.
 
 Queries/mutations retain origin/root/lifetime, TanStack state and cache settlement. Package scheduling does not retarget operations when selected machine changes, or turn a cancelled UI wait into rollback of committed server effects.
 

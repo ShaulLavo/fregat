@@ -81,16 +81,16 @@ test('serializes picks and preserves cancellation and Unicode paths', async () =
   })
   fake.stdout.write('{"event":"ready"}\n')
   await host.ready
-  const first = host.pick({ mode: 'folder' })
-  const second = host.pick({ mode: 'file' })
+  const first = host.pick({})
+  const second = host.pick({ startingPath: '/資料' })
   await tick()
   expect(fake.commands).toHaveLength(1)
   fake.stdout.write('{"event":"picked","paths":[]}\n')
   expect(await first).toEqual([])
   await tick()
   expect(fake.commands).toHaveLength(2)
-  fake.stdout.write(`${JSON.stringify({ event: 'picked', paths: ['/資料/"file"\n.txt'] })}\n`)
-  expect(await second).toEqual(['/資料/"file"\n.txt'])
+  fake.stdout.write(`${JSON.stringify({ event: 'picked', paths: ['/資料/"folder"\n'] })}\n`)
+  expect(await second).toEqual(['/資料/"folder"\n'])
   host.close()
   fake.finish()
   await host.exited
@@ -111,10 +111,10 @@ test('exit rejects outstanding and queued picks and cleans only this window', as
   })
   fake.stdout.write('{"event":"ready"}\n')
   await host.ready
-  const first = expect(host.pick({ mode: 'folder' })).rejects.toMatchObject({
+  const first = expect(host.pick({})).rejects.toMatchObject({
     code: 'desktop.webview.HOST_FAILED',
   })
-  const second = expect(host.pick({ mode: 'file' })).rejects.toMatchObject({
+  const second = expect(host.pick({ startingPath: '/next' })).rejects.toMatchObject({
     code: 'desktop.webview.HOST_FAILED',
   })
   await tick()
@@ -148,7 +148,7 @@ test('the standalone picker returns cancel without opening a webview', async () 
   const args: unknown[] = []
   const result = pick({
     binary: '/host',
-    options: { mode: 'folder' },
+    options: {},
     spawn: (command) => {
       args.push(command)
       return fake.process
@@ -157,7 +157,7 @@ test('the standalone picker returns cancel without opening a webview', async () 
   fake.stdout.write('{"event":"picked","paths":[]}\n')
   fake.finish()
   expect(await result).toEqual([])
-  expect(args).toEqual([['/host', 'pick', '{"mode":"folder"}']])
+  expect(args).toEqual([['/host', 'pick', '{}']])
 })
 
 test('missing host rejects startup and performs owned cleanup', async () => {
@@ -178,7 +178,7 @@ test('missing host rejects startup and performs owned cleanup', async () => {
 
 test('malformed standalone picker output terminates its process', async () => {
   const fake = fakeHost()
-  const result = pick({ binary: '/host', options: { mode: 'file' }, spawn: () => fake.process })
+  const result = pick({ binary: '/host', options: {}, spawn: () => fake.process })
   fake.stdout.write('invalid json\n')
   await expect(result).rejects.toMatchObject({ code: 'desktop.webview.HOST_FAILED' })
 })
@@ -212,25 +212,25 @@ test('chooser timeout cancels only the chooser, drains late replies, and retains
       fake.stdout.write('{"event":"picked","paths":["/late-selection"]}\n')
       fake.stdout.write('{"event":"pickCancelled"}\n')
     }
-    if (command.pick?.mode === 'file')
+    if (command.pick?.startingPath === '/next')
       fake.stdout.write('{"event":"picked","paths":["/next-selection"]}\n')
   })
   fake.stdout.write('{"event":"ready"}\n')
   await host.ready
-  const first = expect(host.pick({ mode: 'folder' })).rejects.toMatchObject({
+  const first = expect(host.pick({})).rejects.toMatchObject({
     code: 'desktop.webview.PICKER_TIMEOUT',
-    message: 'The file chooser closed after its time limit.',
-    why: 'The file chooser did not receive a selection before the allowed interval ended.',
-    fix: 'Open the file chooser again and select an entry before it closes.',
+    message: 'The folder chooser closed after its time limit.',
+    why: 'The folder chooser did not receive a selection before the allowed interval ended.',
+    fix: 'Open the folder chooser again and select a folder before it closes.',
   })
-  const second = host.pick({ mode: 'file' })
+  const second = host.pick({ startingPath: '/next' })
   await first
   expect(await second).toEqual(['/next-selection'])
   host.evaluate('document.title')
   expect(fake.commands.map((line) => JSON.parse(line))).toEqual([
-    { pick: { mode: 'folder' } },
+    { pick: {} },
     { cancelPick: true },
-    { pick: { mode: 'file' } },
+    { pick: { startingPath: '/next' } },
     { eval: 'document.title' },
   ])
   expect(exited).toBe(false)
@@ -254,10 +254,10 @@ test('unacknowledged chooser cancellation bounds a stalled host and rejects queu
   })
   fake.stdout.write('{"event":"ready"}\n')
   await host.ready
-  const first = expect(host.pick({ mode: 'folder' })).rejects.toMatchObject({
+  const first = expect(host.pick({})).rejects.toMatchObject({
     code: 'desktop.webview.HOST_FAILED',
   })
-  const second = expect(host.pick({ mode: 'file' })).rejects.toMatchObject({
+  const second = expect(host.pick({ startingPath: '/next' })).rejects.toMatchObject({
     code: 'desktop.webview.HOST_FAILED',
   })
   await expect(host.exited).rejects.toMatchObject({ code: 'desktop.webview.HOST_FAILED' })
@@ -270,15 +270,15 @@ test('standalone native chooser timeout exposes selection guidance after reaping
   await expect(
     pick({
       binary: '/host',
-      options: { mode: 'folder' },
+      options: {},
       spawn: () => fake.process,
       budget: { dialogMs: 10, stopGraceMs: 10 },
     }),
   ).rejects.toMatchObject({
     code: 'desktop.webview.PICKER_TIMEOUT',
-    message: 'The file chooser closed after its time limit.',
-    why: 'The file chooser did not receive a selection before the allowed interval ended.',
-    fix: 'Open the file chooser again and select an entry before it closes.',
+    message: 'The folder chooser closed after its time limit.',
+    why: 'The folder chooser did not receive a selection before the allowed interval ended.',
+    fix: 'Open the folder chooser again and select a folder before it closes.',
   })
   await expect(fake.process.exited).resolves.toMatchObject({ code: 1 })
 })
@@ -320,14 +320,11 @@ test.each(['darwin', 'linux'] as const)(
         const closing = window.close()
         fake.finish()
         await closing
-        expect(argv).toEqual([
-          '/host',
-          'http://localhost:3301/',
-          script,
-          '--data-dir',
-          dataDir,
-          ...(platform === 'darwin' ? ['--vibrancy'] : []),
-        ])
+        expect(argv).toEqual(
+          ['/host', 'http://localhost:3301/', script, '--data-dir', dataDir].concat(
+            platform === 'darwin' ? ['--vibrancy'] : [],
+          ),
+        )
         expect(existsSync(script)).toBe(false)
         expect(existsSync(dataDir)).toBe(true)
         const marker = path.join(dataDir, 'stored-view-state')

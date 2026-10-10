@@ -8,7 +8,7 @@ const source = readFileSync(sourcePath, 'utf8').split('export class AmbiguousCha
 const encoded = source?.match(/JSON.parse\(\s*'(.+?)'\s*\)/)?.[1]
 assert(encoded, 'AmbiguousCharacters data was not found')
 const buckets = JSON.parse(encoded.replaceAll('\\"', '"'))
-const entries = [...buckets._common, ...buckets._default]
+const entries = buckets._common.concat(buckets._default)
 assert.equal(entries.length % 2, 0)
 const pairs = []
 for (let index = 0; index < entries.length; index += 2) {

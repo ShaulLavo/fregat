@@ -1,6 +1,6 @@
 # Plan 302: Show private-app output and accurate startup results
 
-Status: APPROVED. Follow the existing temporary-app delivery order. Coordinate ownership changes with [Plan 291's private services](291-mesh-private-services.md).
+Status: Approved. Follow the existing temporary-app delivery order. Coordinate ownership changes with [Plan 291's public-hosting retirement](291-mesh-private-services.md).
 
 Implementation owner: [ShaulLavo/mesh](https://github.com/ShaulLavo/mesh). Reported in [Mesh #55](https://github.com/ShaulLavo/mesh/issues/55), plus the remaining URL diagnostic from [Mesh #103](https://github.com/ShaulLavo/mesh/issues/103).
 
@@ -16,17 +16,17 @@ Give Mesh a folder and an explicit command, then receive an app ID, URL, and acc
 
 At Mesh `cc64b29be5e79f4a8f3fe5fd36674ac17827c0ed`, `internal/cli/app.go` has create/update/inspect and JSON output, but no app-specific logs command. `internal/apps/types.go` contains `Record.Ready`, `RuntimeInfo`, and retained `SetupFailure`. `internal/apps/origin.go` already keeps bounded failed setup output and app-worker references. Reuse these before adding storage. `internal/cli/app_transport.go` owns authenticated owner access and uploads.
 
-Follow the [temporary-app plan](https://github.com/ShaulLavo/mesh/blob/main/docs/plan/06-temporary-apps.md), [T29's implemented lifecycle](https://github.com/ShaulLavo/mesh/blob/main/docs/tasks/T29-temporary-apps.md), and [temporary-app commands](https://github.com/ShaulLavo/mesh/blob/main/docs/temporary-apps.md). Plan 291 supersedes their public visibility controls while retaining private apps and their pill. This plan preserves setup/runtime inspection and expiry cleanup through that change.
+Follow the [temporary-app plan](https://github.com/ShaulLavo/mesh/blob/main/docs/plan/06-temporary-apps.md), [T29's implemented lifecycle](https://github.com/ShaulLavo/mesh/blob/main/docs/tasks/T29-temporary-apps.md), and [temporary-app commands](https://github.com/ShaulLavo/mesh/blob/main/docs/temporary-apps.md). Plan 291 removes all Mesh public hosting while retaining private apps and dormant generic pill source. Mesh does not inject the pill or provide sharing controls. This plan preserves setup/runtime inspection and expiry cleanup through that change.
 
 ## State and output ownership
 
-The origin owns setup, worker state, readiness, and retained output. The edge owns routing and app access. The caller owns its own DNS reachability observation. Keep these facts separate. Allocating a name or publishing a route never means the runtime is ready.
+The origin owns setup, worker state, readiness, and retained output. The private registry owns routing and app access. The caller owns its own DNS reachability observation. Keep these facts separate. Allocating a name or publishing a route never means the runtime is ready.
 
 Extend the existing app result with one current phase and optional failed-step/error information. Creation and update results use the same phase projection as `inspect`. Ready requires the current serving check, starting means readiness remains pending, and failed means setup/startup finished unsuccessfully. Preserve working app state when a staged update fails, while reporting that update's failure separately.
 
 Add `mesh app logs HOST ID` following the existing host-qualified CLI family. Read setup and runtime output through the existing owner authorization. The result identifies app, operation/revision, phase, and output source. A failed create still returns an app ID or retained failure identifier that the printed logs command can resolve. Reuse bounded worker scrollback and `SetupFailure` retention. Define a bounded snapshot as the first delivery. Add follow mode only if the existing stream can support cancellation and expiry without creating another log store.
 
-Keep retained output under the app lifecycle. Preserve failed-start diagnostics for the existing failure-retention interval, including a setup failure whose workspace was cleaned. Expiry and deletion remove app payload/output according to the existing contract. A logs request checks current owner and lifetime before exposing content. Public pages, unpaired browsers, and other identities cannot retrieve it. Avoid commands, environment values, and output tails in public errors or routine operation logs.
+Keep retained output under the app lifecycle. Preserve failed-start diagnostics for the existing failure-retention interval, including a setup failure whose workspace was cleaned. Expiry and deletion remove app payload/output according to the existing contract. A logs request checks current owner and lifetime before exposing content. Unauthenticated browsers and other identities cannot retrieve it. Avoid commands, environment values, and output tails in caller-visible errors or routine operation logs.
 
 Report progress for copying, explicit setup, starting, and ready. Use stderr for human progress and valid final JSON on stdout. Machine results identify the same phase and failed step. Setup/startup failure exits nonzero after writing a parseable structured result. Starting stays an explicit pending result with inspect/logs commands. Bound progress events and avoid polling noise.
 
@@ -35,7 +35,7 @@ After creation returns an app, perform a bounded caller-side DNS check of its ac
 ## Execution checklist
 
 - [ ] Reproduce successful static/server creation, failed setup, early runtime exit, and still-starting state with disposable app directories. Compare current `create`, `update`, and `inspect` results to actual worker state and retained output.
-- [ ] Define one result projection from existing origin/edge facts. Separate failed candidate updates from a still-working prior revision. Identify the ID or failure token needed to inspect a failed create.
+- [ ] Define one result projection from existing origin/registry facts. Separate failed candidate updates from a still-working prior revision. Identify the ID or failure token needed to inspect a failed create.
 - [ ] Add owner-authorized `app logs HOST ID` using current worker output and retained setup failure. Cover setup and runtime output, failed start, owner denial, retention expiry, and deletion. Bound responses and sanitize terminal control sequences in human output without altering stored raw evidence.
 - [ ] Add operation progress through the existing authenticated app request flow. Preserve retry IDs so reconnecting observers cannot duplicate an app or setup command. Keep stderr progress separate from final stdout JSON.
 - [ ] Make create/update exit status match setup/startup outcome. Supply app ID, URL, phase, failed step, and copyable inspect/logs commands for human results. Keep starting distinguishable from ready and failure.

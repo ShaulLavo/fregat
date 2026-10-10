@@ -11,7 +11,7 @@ import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import type { ChatInputDraftTarget } from '@/features/chat/state/chat-input-draft-store'
 import type { useVoiceInput } from '../hooks/use-voice-input'
 import { ChatInputDictation } from './chat-input-dictation'
-import { ChatInputAttachButton } from './chat-input-attach-button'
+import { ChatInputAttachButton, type MachineFilesAttach } from './chat-input-attach-button'
 import { ChatInputSubmitButton } from './chat-input-submit-button'
 import { ComposerControlsMenu } from './composer-controls-menu'
 import { ContextUsageRing } from './context-usage-ring'
@@ -43,6 +43,7 @@ export function ChatInputActions({
   disabledReason = null,
   draftTarget,
   interactionMode,
+  machineFiles,
   onSelectImageFiles,
   onStop,
   onSubmit,
@@ -59,6 +60,7 @@ export function ChatInputActions({
   pendingAction?: ComposerPendingAction
   draftTarget: ChatInputDraftTarget
   interactionMode: InteractionMode
+  machineFiles: MachineFilesAttach
   onSelectImageFiles: (files: readonly File[]) => void
   onStop: () => void
   onSubmit: () => Promise<boolean>
@@ -97,7 +99,7 @@ export function ChatInputActions({
       ref={actionsRef}
     >
       <div className='flex min-w-0 items-center justify-between gap-2'>
-        {/* Every control and readout in one run from the left; Send stands alone in the corner.
+        {/* Every control and readout in one run from the left; dictation and Send hold the corner.
             On a phone the 40px targets already space the glyphs, so the gap goes to the model name. */}
         <div className='phone:gap-0 flex min-w-0 flex-1 items-center gap-1'>
           <ModelPicker busy={busy} disabled={disabled} narrow={narrow} />
@@ -117,6 +119,7 @@ export function ChatInputActions({
           <ChatInputAttachButton
             captureScope={`${draftTarget.environmentId}:${draftTarget.draftKey}`}
             disabled={disabled}
+            machineFiles={machineFiles}
             onSelectFiles={onSelectImageFiles}
           />
           {contextMeterEnabled && contextUsage && !tiny ? (
@@ -146,7 +149,7 @@ export function ChatInputActions({
             </span>
           ) : null}
         </div>
-        <div className='flex shrink-0 items-center gap-1'>
+        <div className='phone:gap-0 flex shrink-0 items-center gap-1'>
           {voice ? <ChatInputDictation voice={voice} disabled={disabled} /> : null}
           <PromptStashBadge disabled={disabled} draftTarget={draftTarget} />
           <ChatInputSubmitButton

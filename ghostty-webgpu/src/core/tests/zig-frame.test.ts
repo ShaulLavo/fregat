@@ -70,7 +70,7 @@ function readyFrame(frameOptions = options): void {
 function expectNativeRecords(frame: ZigFrameBuilder): void {
   expect(frame.cellData).toHaveLength(frame.columns * frame.rows * 16)
   expect(frame.glyphData).toHaveLength(frame.columns * frame.rows * 24)
-  expect([...frame.cellData, ...frame.glyphData].every(Number.isFinite)).toBe(true)
+  expect(frame.cellData.every(Number.isFinite) && frame.glyphData.every(Number.isFinite)).toBe(true)
   expect(frame.missingGlyphs).toEqual([])
   for (let index = 0; index < frame.columns * frame.rows; index += 1) {
     const cell = frame.cellData.subarray(index * 16, index * 16 + 16)
@@ -84,6 +84,234 @@ function expectNativeRecords(frame: ZigFrameBuilder): void {
 }
 
 describe('WASM frame records', () => {
+  it.each([false, true])(
+    'reuses unchanged native cells after row movement with stableRows=%s',
+    async (stableRows) => {
+      let cellReads = 0
+      const instantiate = WebAssembly.instantiate
+      vi.spyOn(WebAssembly, 'instantiate').mockImplementation(async (module, imports) => {
+        const read = imports?.env?.ghostty_cell_get
+        if (typeof read !== 'function') return instantiate(module, imports)
+        return instantiate(module, {
+          ...imports,
+          env: {
+            ...imports?.env,
+            ghostty_cell_get: (...args: number[]) => {
+              cellReads += 1
+              return read(...args)
+            },
+          },
+        })
+      })
+      runtime = await GhosttyRuntime.create()
+      const terminal = runtime.createTerminal({ columns: 8, rows: 4 })
+      const state = runtime.createRenderState(terminal)
+      terminal.write('\x1b[?25laaaaaaaa\r\nbbbbbbbb\r\naaaaaaaa\r\nbbbbbbbb')
+      state.update()
+      builder = state.createFrameBuilder(8, 4)
+      readyFrame({ ...options, stableRows })
+      state.acknowledge()
+      terminal.write('\r\naaaaaaaa')
+      state.update()
+      readyFrame({ ...options, stableRows, full: false })
+      expect(builder.rowOffset).toBe(stableRows ? 1 : 0)
+      state.acknowledge()
+      cellReads = 0
+      terminal.write('\x1b[1;2Ha')
+      state.update()
+      readyFrame({ ...options, stableRows, full: false })
+      expect(cellReads).toBe(5)
+      const cells = builder.cellData.slice()
+      const glyphs = builder.glyphData.slice()
+      readyFrame({ ...options, stableRows })
+      expect(builder.cellData).toEqual(cells)
+      expect(builder.glyphData).toEqual(glyphs)
+    },
+  )
+
+  it('keeps the stock layout until actual row movement and preserves it across edits', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('a0\r\na1\r\na2\r\na3')
+    state.update()
+    builder = state.createFrameBuilder(24, 4)
+    readyFrame({ ...options, stableRows: true })
+    expect(builder.stableRows).toBe(false)
+    for (const scroll of [false, true]) {
+      if (scroll) {
+        state.acknowledge()
+        terminal.write('\x1b[4;1H\r\na0')
+        state.update()
+        readyFrame({ ...options, stableRows: true, full: false })
+        expect(builder.rowOffset).toBe(1)
+      }
+      state.acknowledge()
+      terminal.write('\x1b[2;5Hb')
+      state.update()
+      readyFrame({ ...options, stableRows: true, full: false })
+      expect(builder.rowChanges).toBe(0)
+      expect(builder.rowOffset).toBe(scroll ? 1 : 0)
+      expect(builder.stableRows).toBe(scroll)
+      const cell = new Uint8Array(
+        builder.cellData.buffer,
+        builder.cellData.byteOffset,
+        builder.cellData.byteLength,
+      ).slice()
+      const glyph = new Uint8Array(
+        builder.glyphData.buffer,
+        builder.glyphData.byteOffset,
+        builder.glyphData.byteLength,
+      ).slice()
+      readyFrame({ ...options, stableRows: true })
+      expect(
+        new Uint8Array(
+          builder.cellData.buffer,
+          builder.cellData.byteOffset,
+          builder.cellData.byteLength,
+        ),
+      ).toEqual(cell)
+      expect(
+        new Uint8Array(
+          builder.glyphData.buffer,
+          builder.glyphData.byteOffset,
+          builder.glyphData.byteLength,
+        ),
+      ).toEqual(glyph)
+    }
+  })
+
+  it('retains the complete layout transition through missing-glyph retries', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('a0\r\na1\r\na2\r\na3')
+    state.update()
+    builder = state.createFrameBuilder(24, 4)
+    readyFrame({ ...options, stableRows: true })
+    state.acknowledge()
+    terminal.write('\r\nB0')
+    state.update()
+    readyFrame({ ...options, stableRows: true, full: false })
+    expect(builder.rowChanges).toBe(3)
+    expect(builder.changedRanges().map((range) => range.row)).toEqual([0, 1, 2, 3])
+    for (const range of builder.changedRanges()) {
+      expect(range.cell.byteLength).toBe(24 * 64)
+      expect(range.glyph.byteLength).toBe(24 * 96)
+    }
+    state.acknowledge()
+    terminal.write('\x1b[2;1Ha')
+    state.update()
+    readyFrame({ ...options, stableRows: true, full: false })
+    expect(builder.rowChanges).toBe(0)
+  })
+
+  it.each(['row slots', 'glyph'] as const)(
+    'recovers a full frame after a native %s allocation fails during row movement',
+    async (allocation) => {
+      let remaining = 0
+      const instantiate = WebAssembly.instantiate
+      vi.spyOn(WebAssembly, 'instantiate').mockImplementation(async (module, imports) => {
+        const allocate = imports?.env?.ghostty_wasm_alloc
+        if (typeof allocate !== 'function') return instantiate(module, imports)
+        return instantiate(module, {
+          ...imports,
+          env: {
+            ...imports?.env,
+            ghostty_wasm_alloc: (length: number) => {
+              if (remaining > 0 && --remaining === 0) return 0
+              return allocate(length)
+            },
+          },
+        })
+      })
+      runtime = await GhosttyRuntime.create()
+      const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
+      const state = runtime.createRenderState(terminal)
+      terminal.write('\x1b[?25la0\r\na1\r\na2\r\na3')
+      state.update()
+      builder = state.createFrameBuilder(24, 4)
+      readyFrame({ ...options, stableRows: true })
+      state.acknowledge()
+      terminal.write('\r\nB0')
+      state.update()
+      remaining = allocation === 'row slots' ? 1 : 2
+      expect(() => builder!.build({ ...options, stableRows: true, full: false })).toThrow(
+        'out of memory',
+      )
+      expect(remaining).toBe(0)
+      if (allocation === 'row slots') {
+        expect(builder.stableRows).toBe(false)
+        terminal.scrollBy(-1)
+        state.update()
+      }
+      readyFrame({ ...options, stableRows: true })
+      expect(builder.rowChanges).not.toBe(0)
+      expect(builder.changedRanges().map((range) => range.row)).toEqual([0, 1, 2, 3])
+      const cells = builder.cellData.slice()
+      const glyphs = builder.glyphData.slice()
+      readyFrame({ ...options, stableRows: true })
+      expect(builder.cellData).toEqual(cells)
+      expect(builder.glyphData).toEqual(glyphs)
+    },
+  )
+
+  it('reports every logical row moved by a physical instance ring', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('\x1b[?25la0\r\na1\r\na2\r\na3')
+    state.update()
+    builder = state.createFrameBuilder(24, 4)
+    readyFrame({ ...options, stableRows: true })
+    state.acknowledge()
+    terminal.write('\r\na0')
+    state.update()
+    readyFrame({ ...options, stableRows: true, full: false })
+    expect(builder.rowOffset).toBe(1)
+    state.acknowledge()
+    terminal.write('\r\na0')
+    state.update()
+    readyFrame({ ...options, stableRows: true, full: false })
+    expect(builder.rowOffset).toBe(2)
+    expect(builder.changedRanges().map((range) => range.row)).toEqual([0, 1, 2, 3])
+    expect(
+      builder
+        .changedRanges()
+        .slice(0, 3)
+        .every((range) => range.cell.byteLength === 0 && range.glyph.byteLength === 0),
+    ).toBe(true)
+    expect(builder.changedRanges().at(-1)?.glyph.byteOffset).toBe(24 * 96)
+  })
+
+  it('rebuilds all records when a replacement device changes the physical row layout', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('\x1b[?25la0\r\na1\r\na2\r\na3')
+    state.update()
+    builder = state.createFrameBuilder(24, 4)
+    readyFrame({ ...options, stableRows: true })
+    state.acknowledge()
+    terminal.write('\r\na0')
+    state.update()
+    readyFrame({ ...options, stableRows: true, full: false })
+    expect(builder.rowOffset).toBe(1)
+    readyFrame({ ...options, stableRows: false, full: false })
+    expect(builder.rowOffset).toBe(0)
+    const cells = builder.cellData.slice()
+    const glyphs = builder.glyphData.slice()
+    readyFrame(options)
+    expect(builder.cellData).toEqual(cells)
+    expect(builder.glyphData).toEqual(glyphs)
+    readyFrame({ ...options, stableRows: true, full: false })
+    const physicalCells = builder.cellData.slice()
+    const physicalGlyphs = builder.glyphData.slice()
+    readyFrame({ ...options, stableRows: true })
+    expect(builder.cellData).toEqual(physicalCells)
+    expect(builder.glyphData).toEqual(physicalGlyphs)
+  })
+
   it('retains each cached row’s appearance across an unchanged partial build', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
@@ -576,9 +804,11 @@ describe('WASM Unicode descriptors and native records', () => {
   )
 
   it.each(
-    [...zigUnicodeFixtures, ...zigGlyphCollisionFixtures].flatMap((fixture) =>
-      (['grayscale', 'color'] as const).map((kind) => ({ ...fixture, kind })),
-    ),
+    zigUnicodeFixtures
+      .concat(zigGlyphCollisionFixtures)
+      .flatMap((fixture) =>
+        (['grayscale', 'color'] as const).map((kind) => ({ ...fixture, kind })),
+      ),
   )('matches distinct $kind atlas records for $name', async ({ content, kind }) => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 40, rows: 3 })
@@ -745,14 +975,14 @@ describe('WASM Unicode descriptors and native records', () => {
     const terminal = runtime.createTerminal({ columns: 40, rows: 10 })
     const state = runtime.createRenderState(terminal)
     const texts = Array.from({ length: 180 }, (_, index) => String.fromCodePoint(0x4e00 + index))
-    terminal.write(`\x1b[?25l${[...texts, ...texts].join('')}`)
+    terminal.write(`\x1b[?25l${texts.concat(texts).join('')}`)
     state.update()
     builder = state.createFrameBuilder(40, 10)
     expect(builder.build(options)).toBe(2)
     const keys = [...builder.missingGlyphs]
     expect(keys).toHaveLength(180)
     expect(new Set(keys).size).toBe(180)
-    expect(keys.map((key) => builder!.glyphInput(key).text).sort()).toEqual([...texts].sort())
+    expect(keys.map((key) => builder!.glyphInput(key).text).sort()).toEqual(texts.sort())
     const registered = fixtureGlyphs('grayscale')
     for (const key of keys.slice(0, 90))
       builder.registerGlyph(key, registered.resolveInput(builder.glyphInput(key)))

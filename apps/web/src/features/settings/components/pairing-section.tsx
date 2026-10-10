@@ -11,7 +11,7 @@ import { usePairingLink } from '@/features/settings/hooks/use-pairing-link'
 import { usePairingStatus } from '@/features/settings/hooks/use-pairing-status'
 
 /**
- * The devices that may reach this machine from elsewhere, such as a phone over the mesh. This
+ * The devices that may reach this machine from elsewhere, such as a phone through a reverse proxy. This
  * machine and any paired device can make links and remove the other devices.
  */
 export function PairingSection() {
@@ -73,7 +73,7 @@ export function PairingSection() {
       {devices.data?.length === 0 ? (
         <EmptyState
           align='start'
-          description='A phone reaching this machine over the mesh shows a pairing screen until it is paired.'
+          description='A phone reaching this machine shows a pairing screen until it is paired.'
           title='No paired devices'
         />
       ) : null}

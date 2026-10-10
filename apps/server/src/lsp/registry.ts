@@ -102,7 +102,16 @@ const jsProjectMarkers = [
   'package.json',
 ] as const
 
-const tsExtensions = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts'] as const
+const tsExtensions: readonly string[] = [
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.mts',
+  '.cts',
+]
 
 /** Tool-specific markers keep supplementary linters and formatters opt-in per project. */
 const eslintConfigMarkers = ['eslint.config.*', '.eslintrc*'] as const
@@ -272,7 +281,7 @@ const lspServers: readonly LspServerDefinition[] = withBuiltInFeatures([
   },
   {
     id: 'eslint',
-    extensions: Array.from<string>(tsExtensions).concat('.vue'),
+    extensions: tsExtensions.concat(['.vue']),
     adoptionMarkers: eslintConfigMarkers,
     root: (filePath, workspaceRoot) => nearestRoot(filePath, workspaceRoot, jsProjectMarkers),
     spawn: (root) =>
@@ -444,15 +453,14 @@ const lspServers: readonly LspServerDefinition[] = withBuiltInFeatures([
   },
   {
     id: 'oxlint',
-    extensions: Array.from<string>(tsExtensions).concat('.vue', '.astro', '.svelte'),
+    extensions: tsExtensions.concat(['.vue', '.astro', '.svelte']),
     adoptionMarkers: oxlintConfigMarkers,
     root: (filePath, workspaceRoot) => nearestRoot(filePath, workspaceRoot, jsProjectMarkers),
     spawn: (root) => spawnOxlint(root),
   },
   {
     id: 'biome',
-    extensions: [
-      ...tsExtensions,
+    extensions: tsExtensions.concat([
       '.json',
       '.jsonc',
       '.vue',
@@ -462,7 +470,7 @@ const lspServers: readonly LspServerDefinition[] = withBuiltInFeatures([
       '.graphql',
       '.gql',
       '.html',
-    ],
+    ]),
     adoptionMarkers: biomeConfigMarkers,
     root: (filePath, workspaceRoot) => nearestRoot(filePath, workspaceRoot, jsProjectMarkers),
     spawn: (root) => spawnBiome(root),
@@ -687,7 +695,7 @@ export function bestLspMatchForFeature(
   return (
     matches
       .filter((match) => match.server.features?.[feature] !== undefined)
-      .toSorted((left, right) => compareFeatureRank(left, right, feature))[0] ?? null
+      .sort((left, right) => compareFeatureRank(left, right, feature))[0] ?? null
   )
 }
 

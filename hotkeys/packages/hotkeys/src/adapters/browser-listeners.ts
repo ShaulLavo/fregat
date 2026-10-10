@@ -33,7 +33,7 @@ export const browserKeyEffects: KeyEffects<KeyboardEvent> = {
 /** Types a replayed printable key into the text field it was pressed in. */
 export function replayTextInput(input: KeyInput, event: KeyboardEvent): void {
   const text = event.key
-  if (input.modifiers.ctrl || input.modifiers.meta || [...text].length !== 1) return
+  if (input.modifiers.ctrl || input.modifiers.meta || Array.from(text).length !== 1) return
   const field = event.target
   if (!(field instanceof HTMLElement) || !isInputElement(field)) return
   if (hasEditContext(field)) {

@@ -1,3 +1,4 @@
+import { WebGlUnavailableError } from './unavailable.js'
 import type { ZigFrameBuilder } from '../../core/zig-frame.js'
 import type { AtlasKind, AtlasPageUpload, AtlasTextureLayout } from '../atlas/types.js'
 import { CELL_INSTANCE_BYTES, GLYPH_INSTANCE_BYTES } from '../instances/layout.js'
@@ -23,6 +24,8 @@ interface Pipeline {
   readonly buffer: WebGLBuffer
   readonly program: WebGLProgram
   readonly vertexArray: WebGLVertexArrayObject
+  drawable: Uint8Array
+  drawInstanceCount: number
 }
 
 function positiveInteger(name: string, value: number): void {
@@ -33,7 +36,7 @@ function positiveInteger(name: string, value: number): void {
 function maximumInteger(context: WebGL2RenderingContext, parameter: number): number {
   const value: unknown = context.getParameter(parameter)
   if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return value
-  throw new Error('WebGL did not provide a valid resource limit')
+  throw new WebGlUnavailableError('limits', 'WebGL did not provide a valid resource limit')
 }
 
 function validateOptions(options: WebGlTextPassOptions): void {
@@ -47,9 +50,9 @@ function validateOptions(options: WebGlTextPassOptions): void {
   const textureLimit = maximumInteger(context, context.MAX_TEXTURE_SIZE)
   const layerLimit = maximumInteger(context, context.MAX_ARRAY_TEXTURE_LAYERS)
   if (options.atlasLayout.layerCount > layerLimit)
-    throw new RangeError('Atlas exceeds WebGL layers')
+    throw new WebGlUnavailableError('limits', 'Atlas exceeds WebGL layers')
   if (Math.max(options.atlasLayout.pageWidth, options.atlasLayout.pageHeight) > textureLimit) {
-    throw new RangeError('Atlas exceeds WebGL texture dimensions')
+    throw new WebGlUnavailableError('limits', 'Atlas exceeds WebGL texture dimensions')
   }
 }
 
@@ -133,8 +136,8 @@ export class WebGlTextPass {
     this.ensureActive()
     this.frameUploadedBytesValue = 0
     const plan = planUploadRanges(updates)
-    this.writeRanges(this.cells.buffer, frame.cellData, plan.cell)
-    this.writeRanges(this.glyphs.buffer, frame.glyphData, plan.glyph)
+    this.writeRanges(this.cells, frame.cellData, plan.cell, CELL_INSTANCE_BYTES)
+    this.writeRanges(this.glyphs, frame.glyphData, plan.glyph, GLYPH_INSTANCE_BYTES)
     return plan.cell.length + plan.glyph.length
   }
 
@@ -150,7 +153,7 @@ export class WebGlTextPass {
     this.resizePipeline(this.glyphs, GLYPH_INSTANCE_BYTES)
   }
 
-  submit(): void {
+  submit(): number {
     this.ensureActive()
     const gl = this.context
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
@@ -167,9 +170,9 @@ export class WebGlTextPass {
     gl.clearColor(0, 0, 0, 0)
     gl.clear(gl.COLOR_BUFFER_BIT)
     this.bindAtlas()
-    this.draw(this.cells)
-    this.draw(this.glyphs)
+    const draws = this.draw(this.cells) + this.draw(this.glyphs)
     gl.bindVertexArray(null)
+    return draws
   }
 
   capturePixels(): Uint8Array {
@@ -205,7 +208,7 @@ export class WebGlTextPass {
   }
 
   private own<T>(resource: T | null, release: (resource: T) => void): T {
-    if (!resource) throw new Error('WebGL resource allocation failed')
+    if (!resource) throw new WebGlUnavailableError('allocation', 'WebGL resource allocation failed')
     this.cleanup.push(() => release(resource))
     return resource
   }
@@ -247,7 +250,13 @@ export class WebGlTextPass {
     gl.bindVertexArray(null)
     gl.useProgram(program)
     gl.uniform2f(this.uniform(program, 'viewport'), this.width, this.height)
-    return { buffer, program, vertexArray }
+    return {
+      buffer,
+      program,
+      vertexArray,
+      drawable: new Uint8Array(this.instanceCount),
+      drawInstanceCount: 0,
+    }
   }
 
   private uniform(program: WebGLProgram, name: string): WebGLUniformLocation {
@@ -257,6 +266,8 @@ export class WebGlTextPass {
   }
 
   private resizePipeline(pipeline: Pipeline, stride: number): void {
+    pipeline.drawable = new Uint8Array(this.instanceCount)
+    pipeline.drawInstanceCount = 0
     const gl = this.context
     gl.bindBuffer(gl.ARRAY_BUFFER, pipeline.buffer)
     gl.bufferData(gl.ARRAY_BUFFER, this.instanceCount * stride, gl.DYNAMIC_DRAW)
@@ -334,13 +345,14 @@ export class WebGlTextPass {
   }
 
   private writeRanges(
-    buffer: WebGLBuffer,
+    pipeline: Pipeline,
     data: Float32Array,
     ranges: readonly InstanceByteRange[],
+    stride: number,
   ): void {
     if (ranges.length === 0) return
     const gl = this.context
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+    gl.bindBuffer(gl.ARRAY_BUFFER, pipeline.buffer)
     for (const range of ranges) {
       gl.bufferSubData(
         gl.ARRAY_BUFFER,
@@ -350,19 +362,43 @@ export class WebGlTextPass {
         range.byteLength / 4,
       )
       this.frameUploadedBytesValue += range.byteLength
+      this.updateDrawExtent(pipeline, data, range, stride)
     }
   }
 
-  private draw(pipeline: Pipeline): void {
+  private updateDrawExtent(
+    pipeline: Pipeline,
+    data: Float32Array,
+    range: InstanceByteRange,
+    stride: number,
+  ): void {
+    const start = range.byteOffset / stride
+    const end = (range.byteOffset + range.byteLength) / stride
+    const floats = stride / 4
+    for (let index = start; index < end; index += 1) {
+      const offset = index * floats
+      const drawable = Number(data[offset + 2]! > 0 && data[offset + 3]! > 0)
+      pipeline.drawable[index] = drawable
+      if (drawable) pipeline.drawInstanceCount = Math.max(pipeline.drawInstanceCount, index + 1)
+    }
+    while (pipeline.drawInstanceCount > 0 && !pipeline.drawable[pipeline.drawInstanceCount - 1])
+      pipeline.drawInstanceCount -= 1
+  }
+
+  private draw(pipeline: Pipeline): number {
+    if (pipeline.drawInstanceCount === 0) return 0
     const gl = this.context
     gl.useProgram(pipeline.program)
     gl.bindVertexArray(pipeline.vertexArray)
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.instanceCount)
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, pipeline.drawInstanceCount)
+    return 1
   }
 
   private assertNoError(operation: string): void {
     const code = this.context.getError()
     if (code === this.context.NO_ERROR) return
+    if (code === this.context.OUT_OF_MEMORY || code === this.context.CONTEXT_LOST_WEBGL)
+      throw new WebGlUnavailableError('allocation', `${operation} failed with WebGL error ${code}`)
     throw new Error(`${operation} failed with WebGL error ${code}`)
   }
 }

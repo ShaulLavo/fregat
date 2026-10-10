@@ -12,7 +12,7 @@ export function initialOwnedText(external: string): OwnedTextState {
 }
 
 export function commitOwnedText(state: OwnedTextState, next: string): OwnedTextState {
-  return { ...state, text: next, pending: [...state.pending, next] }
+  return { ...state, text: next, pending: state.pending.concat([next]) }
 }
 
 /**

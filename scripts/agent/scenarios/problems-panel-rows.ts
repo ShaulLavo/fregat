@@ -98,7 +98,7 @@ export const problemsPanelRows: Scenario = {
       const composer = selectors.chatMessage(page)
       await composer.waitFor({ timeout: 15_000 })
       await page.waitForFunction(
-        (element) => (element?.textContent ?? '').includes('Investigate and fix the cause'),
+        (element) => (element?.textContent ?? '').includes('Fix this error'),
         await composer.elementHandle(),
         { timeout: 10_000 },
       )
@@ -120,7 +120,7 @@ export const problemsPanelRows: Scenario = {
       await peek.getByRole('button', { name: 'Fix with AI', exact: true }).click()
       await peek.waitFor({ state: 'detached', timeout: 10_000 })
       await page.waitForFunction(
-        (element) => (element?.textContent ?? '').includes('Investigate and fix the cause'),
+        (element) => (element?.textContent ?? '').includes('Fix this error'),
         await composer.elementHandle(),
         { timeout: 10_000 },
       )

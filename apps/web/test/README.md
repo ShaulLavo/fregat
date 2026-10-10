@@ -5,6 +5,26 @@ application against a temporary workspace. `client` and `directInProcessFetcher`
 call its real routes without opening a server socket. Provider activity uses the
 fixture's `MockProviderAdapter`.
 
+## Compiler-sensitive regressions
+
+Name a regression `*.compiler.test.tsx` to run it in the **compiler** project through
+the ordinary `bun run test` and CI commands. It uses the same Happy DOM setup,
+in-process server, and Bun resolution as **dom**, and compiles browser application
+source with the web build's installed `oxc-transform-react`. The compilation control
+checks memo reuse, revision invalidation, and owner replacement through rendered hooks.
+
+For a focused compiled regression, run the standalone configuration from
+`apps/web`:
+
+```sh
+bun --bun vitest run --config vitest.compiler.config.ts src/features/workspace/tests/use-fs-actions.compiler.test.tsx -t 'saved rows cannot start mutations until the tree is confirmed'
+```
+
+The standalone configuration also accepts ordinary DOM files before their coverage
+moves to a compiler regression. Keep the file filter narrow.
+Use shared fixtures and render helpers in compiler regressions. The DOM project
+excludes compiler test files so each regression runs only with compilation enabled.
+
 ## Binary response assertions
 
 Use the **node** project (`*.test.ts`) to verify binary response bytes, including

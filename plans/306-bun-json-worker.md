@@ -44,7 +44,7 @@ Browser code must retain browser asset loading. A native filesystem adapter belo
 - [ ] Verify a deliberately invalid/missing grammar produces the expected structured failure and settles its request. Verify disposal and a repeated JSON initialization release their resources and cannot publish into a disposed session.
 - [ ] Rerun the new regression and the narrow original settings test under Bun. Confirm structural readiness is positive and the observed externalized-filesystem error is gone. Keep the dialog flake investigation separate.
 - [ ] Run the existing real-browser worker client regression with JSON coverage, and inspect JSON settings-editor syntax in the actual app. If the loader path is shared by Markdown, add only the narrow Markdown load control needed to protect that contract.
-- [ ] Build affected workspaces before consumer checks. Run package typecheck and narrow tests through the repository's heavy-job wrapper where required. Commit the owned paths, push, deploy the web consumer, and record the artifact/runtime and inspected browser evidence.
+- [ ] Build affected workspaces before consumer checks. Run package typecheck and narrow tests through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill where required. Commit the owned paths, push, deploy the web consumer, and record the artifact/runtime and inspected browser evidence.
 
 ## Verification and acceptance
 

@@ -98,11 +98,11 @@ export function readLiveColorTheme(queryClient: QueryClient, fallback?: ColorThe
 }
 
 function replayActiveColorTheme(
-  active: readonly ActiveSettingsIntent[],
+  active: ActiveSettingsIntent[],
   fallback?: ColorTheme,
 ): ColorTheme | undefined {
   let theme = fallback
-  for (const entry of active.toSorted((left, right) => left.sequence - right.sequence)) {
+  for (const entry of active.sort((left, right) => left.sequence - right.sequence)) {
     for (const operation of entry.patch.request.operations) {
       theme = colorThemeAfterOperation(theme, operation)
     }

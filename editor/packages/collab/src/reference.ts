@@ -10,6 +10,7 @@ import type {
   CharacterIdentity,
   Engine,
   Envelope,
+  Effect,
   IdSpan,
   Insert,
   LeftOrigin,
@@ -167,6 +168,16 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
     }
   }
 
+  projectEffects(effects: readonly Effect[]): ReferenceSnapshot {
+    const snapshot = this.snapshot()
+    const projected = new Effects()
+    projected.restore(this.effects.project(effects))
+    return {
+      effects: projected.snapshot(),
+      nodes: snapshot.nodes.map((node) => ({ ...node, deleted: !projected.visible(node.id) })),
+    }
+  }
+
   restore(snapshot: ReferenceSnapshot): void {
     this.root = rootNode()
     this.nodes = new Map()
@@ -227,7 +238,7 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
       throw new CollabFailure('invalid-insert')
     const left = this.get(insert.originLeft)
     const right = insert.originRight === 'end' ? null : this.get(insert.originRight)
-    const order = [this.root, ...this.ordered()]
+    const order = [this.root].concat(this.ordered())
     if (right && order.indexOf(left) >= order.indexOf(right))
       throw new CollabFailure('reversed-origins')
     for (let i = 0; i < insert.text.length; i++) {

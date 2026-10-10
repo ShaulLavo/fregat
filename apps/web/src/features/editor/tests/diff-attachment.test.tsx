@@ -570,3 +570,66 @@ test('a failing mirrored scroll listener releases the split interleaving guard',
     r.dispose()
   }
 })
+
+test('split in-place refresh keeps both panes on one paired row and scrolls on continuously over either pane', async () => {
+  stubEditorViewport({ height: 120, width: 300 })
+  stubHighlightApi()
+  const base = Array.from({ length: 200 }, (_, index) => `line${index + 1} ${'x'.repeat(60)}`)
+  const replaced = (index: number) => index >= 59 && index < 140
+  const before = base.map((line, index) => (replaced(index) ? `${line} old` : line))
+  const after = base.map((line, index) => (replaced(index) ? `${line} new` : line))
+  const inserted = Array.from({ length: 5 }, (_, index) => `inserted${index}`)
+  const revised = after.slice(0, 59).concat(inserted, after.slice(59))
+  const revision = (lines: readonly string[], name: string) =>
+    projectionControl(
+      createTextDiff({
+        oldFile: { path: 'source.txt', text: before.join('\n') },
+        newFile: { path: 'source.txt', text: lines.join('\n') },
+        contextLines: 1000,
+      }),
+      'source.txt',
+      name,
+    )
+  const presentation = createTabPresentation()
+  const observed = observeDiffEditors()
+  const view = renderWithProviders(
+    <DiffEditor attachment={revision(after, 'r1')} mode='split' presentation={presentation} />,
+  )
+  await waitFor(() =>
+    expect(observed.read('new').snapshot.viewport.clientHeight).toBeGreaterThan(0),
+  )
+  const rowOf = (line: number) =>
+    presentation.diffPanes.new.plugin!.getRows().findIndex((row) => row.newLineNumber === line)
+  const offsetOf = (row: number) =>
+    presentation.diffPanes.new
+      .plugin!.getRows()
+      .slice(0, row)
+      .reduce((sum, entry) => sum + entry.text.length + 1, 0)
+  const height = observed.read('new').snapshot.metrics.rowHeight
+  const reading = observed.read('new').editor
+  reading.setScrollPosition({ top: rowOf(100) * height - 24, left: 0 })
+  reading.setSelection(offsetOf(rowOf(100)), offsetOf(rowOf(100)) + 7, { reveal: false })
+  const above = rowOf(100) * height - reading.getScrollPosition().top
+  expect(observed.read('old').editor.getScrollPosition().top).toBe(reading.getScrollPosition().top)
+
+  view.rerender(
+    <DiffEditor attachment={revision(revised, 'r2')} mode='split' presentation={presentation} />,
+  )
+  await waitFor(() =>
+    expect(observed.read('new').editor.materializeFullText()).toContain('inserted0'),
+  )
+  const refreshed = observed.read('new')
+  const selection = refreshed.snapshot.selections[0]!
+  expect(
+    refreshed.editor.materializeFullText().slice(selection.startOffset, selection.endOffset),
+  ).toBe('line100')
+  const top = refreshed.editor.getScrollPosition().top
+  expect(rowOf(105) * height - top).toBe(above)
+  expect(observed.read('old').editor.getScrollPosition().top).toBe(top)
+
+  observed.read('old').editor.setScrollPosition({ top: top + 24 })
+  expect(observed.read('new').editor.getScrollPosition().top).toBe(top + 24)
+  expect(observed.read('old').editor.getScrollPosition().top).toBe(top + 24)
+  observed.read('new').editor.setScrollPosition({ top: top + 48 })
+  expect(observed.read('old').editor.getScrollPosition().top).toBe(top + 48)
+})

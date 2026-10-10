@@ -19,7 +19,7 @@ const files = new Set(MANUAL_SOURCES.keys())
 
 const pageUrl = (slug: string) => `${base}docs/${slug}/`
 
-export const MANUAL_PAGES: readonly ManualPage[] = [...MANUAL_SOURCES].map(([file, text]) => ({
+export const MANUAL_PAGES: readonly ManualPage[] = Array.from(MANUAL_SOURCES, ([file, text]) => ({
   file,
   url: pageUrl(file.replace(/\.md$/, '')),
   source: `${base}docs/${file}`,

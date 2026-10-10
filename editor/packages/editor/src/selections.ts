@@ -377,7 +377,7 @@ const normalizeSelections = (
   const resolved = selections.map((selection, index) =>
     resolveSelectionWithSource(snapshot, selection, index === lastAddedIndex),
   )
-  const sorted = resolved.toSorted(compareResolvedSelections)
+  const sorted = resolved.sort(compareResolvedSelections)
   const normalized: ResolvedSelectionWithSource[] = []
 
   for (const selection of sorted) appendNormalizedSelection(snapshot, normalized, selection)

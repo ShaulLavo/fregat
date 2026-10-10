@@ -16,6 +16,8 @@ export type DisplayProjectionConfig = {
    * is on, and bounds how much of a line one uniform row may hold.
    */
   readonly wrapAdvance?: WrapAdvance | null
+  /** Effective fonts of presentation-styled source rows. */
+  readonly rowWrapAdvances?: ReadonlyMap<number, WrapAdvance>
   readonly tabSize: number
 }
 
@@ -23,6 +25,8 @@ export type DisplayProjectionConfig = {
 export type WrapAdvance = {
   readonly width: number
   readonly advance: (codePoint: number) => number
+  readonly measure?: (text: string) => number
+  readonly minimumTabAdvance?: number
   /** The table `advance` reads, so a face change is visible by identity. */
   readonly glyphs?: object
 }

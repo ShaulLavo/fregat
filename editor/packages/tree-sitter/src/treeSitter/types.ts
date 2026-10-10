@@ -121,6 +121,93 @@ export type TreeSitterParseAckResult = {
     }
 )
 
+export type TreeSitterMergeUnit = TreeSitterSyntaxRange & {
+  readonly source: 'syntax' | 'line'
+  readonly hasErrors?: boolean
+  readonly contentKey?: string
+  readonly type: string
+  readonly signature: string | null
+  readonly parent:
+    | (TreeSitterSyntaxRange & {
+        readonly type: string
+        readonly commutative: boolean
+      })
+    | null
+}
+
+export type TreeSitterMergeUnitRequest = {
+  readonly type: 'mergeUnit'
+  readonly selection?: 'enclosing' | 'touching'
+  readonly analysis?: true
+  readonly contentKey?: true
+  readonly cancellationBuffer?: SharedArrayBuffer
+  readonly documentId: string
+  readonly runtimeSessionId: string
+  readonly snapshotVersion: number
+  readonly languageId: TreeSitterLanguageId
+  readonly range: TreeSitterSyntaxRange
+}
+
+export type TreeSitterMergeUnitResult = {
+  readonly documentId: string
+  readonly snapshotVersion: number
+  readonly languageId: TreeSitterLanguageId
+} & (
+  | {
+      readonly status: 'ok'
+      readonly unit: TreeSitterMergeUnit
+      readonly units?: readonly TreeSitterMergeUnit[]
+    }
+  | { readonly status: 'stale' | 'cancelled'; readonly unit: null }
+)
+
+export type TreeSitterReviewBatchRequest = {
+  readonly type: 'reviewBatch'
+  readonly cancellationBuffer?: SharedArrayBuffer
+  readonly runtimeSessionId: string
+  readonly queries: readonly (
+    | (Omit<TreeSitterMergeUnitRequest, 'type' | 'range'> & {
+        readonly type: 'mergeUnits'
+        readonly ranges: readonly TreeSitterSyntaxRange[]
+      })
+    | TreeSitterProjectedMergeUnitsRequest
+  )[]
+}
+
+export type TreeSitterReviewBatchResult = {
+  readonly results: readonly TreeSitterProjectedMergeUnitsResult[]
+}
+
+export type TreeSitterProjectedMergeUnitsRequest = {
+  readonly type: 'projectMergeUnits'
+  readonly documentId: string
+  readonly runtimeSessionId: string
+  readonly baseSnapshotVersion: number
+  readonly snapshotVersion: number
+  readonly languageId: TreeSitterLanguageId
+  readonly source: DocumentWorkerReadReference
+  readonly inputEdits: readonly TreeSitterInputEdit[]
+  readonly ranges: readonly TreeSitterSyntaxRange[]
+  readonly analysis?: true
+  readonly contentKey?: true
+  readonly selection?: 'enclosing' | 'touching'
+  readonly cancellationBuffer?: SharedArrayBuffer
+}
+
+export type TreeSitterProjectedMergeUnitsResult = {
+  readonly documentId: string
+  readonly snapshotVersion: number
+  readonly languageId: TreeSitterLanguageId
+} & (
+  | {
+      readonly status: 'ok'
+      readonly units: readonly (readonly (TreeSitterMergeUnit & {
+        readonly languageId: TreeSitterLanguageId
+      })[])[]
+    }
+  | { readonly status: 'stale' | 'cancelled'; readonly units: readonly [] }
+)
+
 export type TreeSitterRangeResult = TreeSitterParseResult & {
   readonly range: TreeSitterSyntaxRange
 }
@@ -148,6 +235,8 @@ export type TreeSitterParseRequest = {
   readonly includeHighlights: boolean
   readonly includeCaptures?: boolean
   readonly resultMode?: 'full' | 'parseOnly' | 'bootstrap'
+  /** Immutable snapshots need no background warm-up for a later edit. */
+  readonly readOnly?: boolean
   readonly source: DocumentWorkerReadReference
   readonly generation: number
   readonly cancellationBuffer?: SharedArrayBuffer
@@ -236,6 +325,9 @@ export type TreeSitterWorkerRequestPayload =
   | TreeSitterEditRequest
   | TreeSitterRangeRequest
   | TreeSitterSelectionRequest
+  | TreeSitterMergeUnitRequest
+  | TreeSitterProjectedMergeUnitsRequest
+  | TreeSitterReviewBatchRequest
   | TreeSitterDisposeDocumentRequest
   | TreeSitterRuntimeBarrierRequest
   | TreeSitterIdleFenceRequest
@@ -247,12 +339,17 @@ export type TreeSitterWorkerResult =
   | TreeSitterParseAckResult
   | TreeSitterRangeResult
   | TreeSitterSelectionResult
+  | TreeSitterMergeUnitResult
+  | TreeSitterProjectedMergeUnitsResult
+  | TreeSitterReviewBatchResult
   | { readonly retention: TreeSitterWorkerRetentionSnapshot }
   | undefined
 
 export type TreeSitterWorkerRetentionSnapshot = {
   readonly documentCount: number
   readonly snapshotCount: number
+  /** Projection dependencies visited while disposing cached highlighting snapshots. */
+  readonly projectionCleanupVisits: number
   /** Unique generic layer Tree objects. Markdown internal trees are unavailable. */
   readonly treeCount: number
   readonly markdownDocumentEntries: number
@@ -299,6 +396,7 @@ export type TreeSitterWorkerRetentionSnapshot = {
       readonly highlightQueryCount: number
       readonly foldQueryCount: number
       readonly injectionQueryCount: number
+      readonly mergeUnitQueryCount: number
     }[]
   }
   readonly unmeasuredResources: readonly (

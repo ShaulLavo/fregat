@@ -194,8 +194,8 @@ export function AgentRail({
     }
     restoreFocus()
   }
-  function open(index = latestSelection.current) {
-    const row = rows[index]?.value
+  function open(index?: number) {
+    const row = rows[index ?? latestSelection.current]?.value
     if (row?.kind === 'project') onSelectProject(row.project.id)
     if (row?.kind === 'session') onSelectSession(row.session.id)
   }
@@ -242,10 +242,11 @@ export function AgentRail({
       matches: (target) => target.widgetId === 'agent-composer',
     })
   }
-  function manageWorktrees(row?: RailRow, origin = commands.focus.capture()) {
+  function manageWorktrees(row?: RailRow, origin?: ReturnType<typeof commands.focus.capture>) {
+    const capturedOrigin = origin === undefined ? commands.focus.capture() : origin
     const worktree = checkout(row)
     const id = row?.kind === 'project' ? row.project.id : (worktree?.projectId ?? projectId)
-    if (id) setModal({ kind: 'worktrees', projectId: id, origin })
+    if (id) setModal({ kind: 'worktrees', projectId: id, origin: capturedOrigin })
   }
   function mark(range = false) {
     if (current?.kind !== 'session') return
@@ -579,7 +580,7 @@ export function AgentRail({
             !candidate.archivedAt &&
             snapshot.worktreeById[candidate.worktreeId]?.projectId === item.projectId,
         )
-        .toSorted((left, right) => compareSessionsByActivity(left, right, sessionSortOrder))[0]
+        .sort((left, right) => compareSessionsByActivity(left, right, sessionSortOrder))[0]
       if (survivor) onSelectSession(survivor.id)
       else onSelectWorktree(item.worktree.id)
     }

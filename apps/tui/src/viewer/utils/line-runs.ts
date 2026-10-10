@@ -35,7 +35,7 @@ export function viewerLineRuns({
     boundaries.add(cursor)
     boundaries.add(cursor + ((text.codePointAt(cursor) ?? 0) > 0xffff ? 2 : 1))
   }
-  const points = [...boundaries].toSorted((left, right) => left - right)
+  const points = Array.from(boundaries).sort((left, right) => left - right)
   const runs: { text: string; fg: ColorInput; bg?: ColorInput }[] = []
   for (let index = 0; index < points.length - 1; index += 1) {
     const start = points[index]

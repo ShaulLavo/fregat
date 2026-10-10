@@ -9,7 +9,7 @@ import { terminalPanelQueryOptions } from '@/features/terminal/utils/panel-query
 import { logsPanelQueryOptions } from '@/features/logs/utils/panel-query'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
-import { readSettingsMirror } from '@/lib/settings-boot-mirror'
+import { initialAppearanceValues, readHtmlBootstrap } from '@/lib/html-bootstrap'
 import { ApplicationBootstrap } from '@/components/application-bootstrap'
 import { StrictMode } from 'react'
 import { Button } from '@workspace/ui/components/button'
@@ -47,23 +47,25 @@ import { fontsInUse } from '@/lib/fonts/utils/stack'
 import { runtimeCapabilities } from '@/lib/platform/capabilities'
 import { launchAddress } from '@/components/utils/launch-address'
 import { applyBackdrop, resolveBackdrop } from '@/lib/platform/backdrop.ts'
-import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace.ts'
+import { startEditorPerformanceRecording } from '@/features/editor/state/performance-recording-start'
 import { reportReactError } from '@/lib/react-error-reporting.ts'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
 import { takePairingCodeFromLocation } from '@/lib/pairing/state/link-claim'
 import { useShellStore, watchShellKind } from '@/lib/shell/state/store'
 import { COARSE_POINTER_QUERY } from '@/lib/shell/utils/kind'
 import { shellQueryOptions } from '@/features/workspace/utils/shell-query'
+import { warmDeferredOverlays } from '@/components/utils/overlay-modules'
 
-installEditorPerformanceTraceFromUrl()
 configureIntentPrediction()
 initializeClientLogging()
-applyBackdrop(resolveBackdrop())
-// Before `createRoot`, deliberately. The mirrored appearance is initial
+void startEditorPerformanceRecording(resourceQueryClient)
+const htmlBootstrap = readHtmlBootstrap()
+applyBackdrop(htmlBootstrap?.kind === 'app' ? htmlBootstrap.backdrop : resolveBackdrop())
+// Before `createRoot`, deliberately. The document appearance is initial
 // document state: descendants construct geometry and read computed styles on
 // their first render. `AppearanceProvider` corrects it from the server snapshot
 // in React's insertion phase before later layout effects run.
-const boot = readSettingsMirror()
+const boot = initialAppearanceValues()
 applyAppearance(boot, document.documentElement, systemColorMode() === 'dark')
 applyPaletteStylesheet(document, bootPaletteStylesheet(boot['workbench.palette']))
 const visualViewport = window.visualViewport
@@ -155,10 +157,12 @@ void start().catch((cause: unknown) => {
 async function start() {
   // Paired before the bootstrap asks the machine anything, so its first request carries the cookie.
   // Loaded only for a pairing link; if it fails to load, the pairing screen still takes the code.
-  if (pairingCode)
-    await import('@/lib/pairing/state/claim-at-boot')
+  if (pairingCode) {
+    const reloading = await import('@/lib/pairing/state/claim-at-boot')
       .then(({ claimAtBoot }) => claimAtBoot(pairingCode))
-      .catch(() => undefined)
+      .catch(() => false)
+    if (reloading) return
+  }
   if (renderer.disposed) return
   // The boot script already preloads the chosen shell's chunks; this evaluates them before the first render.
   const kind = useShellStore.getState().kind
@@ -249,7 +253,9 @@ async function start() {
 // Warm closed views on idle. A failed prefetch is silent: the query retries when opened.
 function prefetchDeferredChunks() {
   if (renderer.disposed) return
+  // The phone warms these once its first screen is ready.
   if (useShellStore.getState().kind === 'phone') return
+  warmDeferredOverlays()
   void resourceQueryClient
     .query(paletteContentQueryOptions)
     .then(() => undefined)

@@ -15,19 +15,24 @@ afterEach(async () => {
 })
 
 describe('filesystem recents', () => {
-  it('records and returns picked files, folders, and their symlinks', async () => {
+  it('records folders and folder symlinks and refuses files', async () => {
     const root = await fixtureRoot()
     await mkdir(path.join(root, 'folder'))
     await writeFile(path.join(root, 'file.ts'), 'export {}\n')
+    await symlink('folder', path.join(root, 'linked-folder'))
     await symlink('file.ts', path.join(root, 'linked.ts'))
     const app = testApp(root)
 
-    for (const recentPath of ['folder', 'file.ts', 'linked.ts']) {
-      const response = await recordRecent(app, recentPath)
-      expect(response.status).toBe(200)
+    for (const recentPath of ['folder', 'linked-folder']) {
+      expect((await recordRecent(app, recentPath)).status).toBe(200)
+    }
+    for (const recentPath of ['file.ts', 'linked.ts']) {
+      const refused = await recordRecent(app, recentPath)
+      expect(refused.status).toBe(400)
+      expect(await errorCode(refused)).toBe('INVALID_PATH')
     }
 
-    const response = await recentEntries(app, { limit: 10, mode: 'file', showHidden: true })
+    const response = await recentEntries(app, { limit: 10, showHidden: true })
     const payload = (await response.json()) as {
       entries: Array<{ path: string; targetType?: string; type: string }>
     }
@@ -36,10 +41,14 @@ describe('filesystem recents', () => {
     expect(payload.entries).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ path: 'folder', type: 'directory' }),
-        expect.objectContaining({ path: 'file.ts', type: 'file' }),
-        expect.objectContaining({ path: 'linked.ts', targetType: 'file', type: 'symlink' }),
+        expect.objectContaining({
+          path: 'linked-folder',
+          targetType: 'directory',
+          type: 'symlink',
+        }),
       ]),
     )
+    expect(payload.entries).toHaveLength(2)
   })
 
   it('rejects unpickable and out-of-workspace paths', async () => {
@@ -71,52 +80,31 @@ describe('filesystem recents', () => {
       expect((await recordRecent(app, hiddenPath)).status).toBe(200)
     }
 
-    const response = await recentEntries(app, {
-      limit: 1,
-      mode: 'folder',
-      showHidden: false,
-    })
+    const response = await recentEntries(app, { limit: 1, showHidden: false })
     const payload = (await response.json()) as { entries: Array<{ path: string }> }
 
     expect(response.status).toBe(200)
     expect(payload.entries).toEqual([expect.objectContaining({ path: 'visible' })])
   })
 
-  it('filters folder mode by effective type and can include hidden entries', async () => {
+  it('includes hidden folders only when asked', async () => {
     const root = await fixtureRoot()
     await mkdir(path.join(root, '.hidden-folder'))
     await mkdir(path.join(root, 'folder'))
-    await writeFile(path.join(root, 'file.ts'), 'export {}\n')
-    await symlink('folder', path.join(root, 'linked-folder'))
-    await symlink('file.ts', path.join(root, 'linked-file.ts'))
     const app = testApp(root)
 
-    for (const recentPath of ['.hidden-folder', 'linked-file.ts', 'linked-folder', 'file.ts']) {
+    for (const recentPath of ['.hidden-folder', 'folder']) {
       expect((await recordRecent(app, recentPath)).status).toBe(200)
     }
 
-    const response = await recentEntries(app, {
-      limit: 10,
-      mode: 'folder',
-      showHidden: true,
-    })
-    const payload = (await response.json()) as {
-      entries: Array<{ path: string; targetType?: string; type: string }>
+    const paths = async (showHidden: boolean) => {
+      const response = await recentEntries(app, { limit: 10, showHidden })
+      const payload = (await response.json()) as { entries: Array<{ path: string }> }
+      return payload.entries.map((entry) => entry.path).sort()
     }
 
-    expect(response.status).toBe(200)
-    expect(payload.entries).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ path: '.hidden-folder', type: 'directory' }),
-        expect.objectContaining({
-          path: 'linked-folder',
-          targetType: 'directory',
-          type: 'symlink',
-        }),
-      ]),
-    )
-    expect(payload.entries.map((entry) => entry.path)).not.toContain('file.ts')
-    expect(payload.entries.map((entry) => entry.path)).not.toContain('linked-file.ts')
+    expect(await paths(true)).toEqual(['.hidden-folder', 'folder'])
+    expect(await paths(false)).toEqual(['folder'])
   })
 })
 
@@ -147,11 +135,10 @@ function recordRecent(app: ReturnType<typeof createTestApp>, recentPath: string)
 
 function recentEntries(
   app: ReturnType<typeof createTestApp>,
-  query: { limit: number; mode: 'file' | 'folder'; showHidden: boolean },
+  query: { limit: number; showHidden: boolean },
 ) {
   const search = new URLSearchParams({
     limit: String(query.limit),
-    mode: query.mode,
     showHidden: String(query.showHidden),
   })
 

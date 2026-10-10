@@ -26,6 +26,25 @@ required future work, with streaming and rendering acceptance checks.
   source before their live-preview decorations land.
 - Method, tables and pinned versions: [docs/markdown-parser/measurements.md](../docs/markdown-parser/measurements.md).
 
+## TanStack Markdown reference, 2026-10-09
+
+[TanStack Markdown](https://tanstack.com/markdown/latest) is cloned at
+`references/tanstack-markdown`, inspected at
+[`d9b5ef7133ba514f7269cd8f29b5719cd34f5836`](https://github.com/TanStack/markdown/tree/d9b5ef7133ba514f7269cd8f29b5719cd34f5836).
+Study its [architecture](https://github.com/TanStack/markdown/blob/d9b5ef7133ba514f7269cd8f29b5719cd34f5836/docs/project/architecture.md)
+for a serializable AST shared by HTML and framework renderers, safe HTML and URL
+defaults, and separately imported rendering and highlighting adapters.
+Its [AI streaming profile](https://github.com/TanStack/markdown/blob/d9b5ef7133ba514f7269cd8f29b5719cd34f5836/docs/guides/ai-streaming.md)
+reparses accumulated text and suppresses incomplete trailing blocks. Compare that
+behavior with our chat migration and shared semantic contract in
+[the Editor and TUI consumer plan](bubli-markdown-consumer.md).
+
+The upstream syntax profile covers controlled technical content and intentionally
+omits full CommonMark and GFM conformance. Use its implementation and corpus checks
+as research for the remaining rendering work; retain this plan's selected parser
+and correctness gates. Upstream bundle and performance figures need local measurement
+before they inform a change here.
+
 ## Implementation evidence — 2026-09-28
 
 - Published `tree-sitter-md@0.1.0` from `5dd917a`; npm tarball integrity matches the verified pack.
@@ -36,7 +55,7 @@ required future work, with streaming and rendering acceptance checks.
   replace historical first-frame/payload numbers below. Giant blocks exceed frame/input budgets;
   the integration uses a retained worker parser and exact revision-bound visible outputs.
 - Editor integration uses one retained owner across hover and view attachments, including the
-  necessary Plan 198 ownership API. Live preview consumes records; colors, folds and fence ranges
+  document analysis ownership API ([contracts](../docs/document-backed-content-views.md#analysis-and-attachment-contracts)). Live preview consumes records; colors, folds and fence ranges
   use the same MarkdownDocument. Old Markdown/inline grammars and queries are removed.
 - Focused validation: 368 Editor lifecycle/owner/inline/fold tests, 64 real worker browser checks,
   73 language checks and 92 Platform ownership/preparation tests. Repository gates and Editor,
@@ -84,7 +103,7 @@ The 120 figure counts reported comparisons, not 120 independent bugs.
 Development can continue with Phase 0. Editor release is gated on its correctness work. Full
 rendered-block UX additionally needs Plan 111 Phases 4–5 and Plan 108 Phase 2; a parser alone does
 not provide block layout, hit testing or editing controls. Document lifetime and result admission
-must follow [Plan 198](198-document-owned-editor-analysis.md), with one compatible parser document
+must follow the [document analysis contracts](../docs/document-backed-content-views.md#analysis-and-attachment-contracts), with one compatible parser document
 per retained buffer and view-specific selections and range demands.
 
 ## Outcome
@@ -354,9 +373,10 @@ from the completed Phase 0 rewrite).
      gates. Publishing credentials may need the owner; implementation and package checks do not.
 1. **Markdown document in `@singapore-editor/markdown`** (M; Editor `packages/markdown`).
    Implement the [proposed behaviour contract](../docs/markdown-parser/editor-behaviour.md#proposed-contract-for-platform).
-   One compatible parser belongs to the retained source buffer's analysis, aligned with Plan 198;
-   view attachment borrows it. Feed committed edits once, preserve undo, and dispose with the
-   analysis owner. Reconcile integration order with Plan 198 before changing its ownership APIs.
+   One compatible parser belongs to the retained source buffer's analysis, following the
+   [document analysis contracts](../docs/document-backed-content-views.md#analysis-and-attachment-contracts); view attachment
+   borrows it. Feed committed edits once, preserve undo, and dispose with the analysis owner.
+   Changes to the analysis ownership APIs keep those contracts and update that page.
    Use the current full-source block/definition pass and lazy visible inline resolution first.
    Prepare/warm through Plans 170/177's existing paths; request restored visible ranges too.
    Measure cold preparation, worst-case blocks, input latency and memory in Chromium. The current

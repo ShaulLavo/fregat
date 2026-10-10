@@ -1,3 +1,4 @@
+import { finalize } from '@/utils/finalize'
 import { presentationFor } from '@workspace/contracts/settings/presentation'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
 import { useTerminalDimensions } from '@opentui/react'
@@ -71,34 +72,39 @@ export function SettingsEditor({
     if (pending || lifetime.signal.aborted) return
     setFailure(null)
     setPending(true)
-    try {
-      const outcome = await saveSettingDraft({
-        id,
-        draft: input,
-        snapshot: base,
-        target,
-        owner,
-        signal: lifetime.signal,
-        mode,
-      })
-      if (lifetime.signal.aborted) return
-      if (outcome !== 'acknowledged') {
-        setFailure('Save failed. Your draft is kept; retry or cancel to inspect the failure.')
-        return
-      }
-      lifetime.close()
-    } catch (error) {
-      if (lifetime.signal.aborted) return
-      const conflict = errorStringField(error, 'code') === 'settings.RAW_REVISION_STALE'
-      setFailure(
-        conflict
-          ? 'Settings changed elsewhere. Cancel and reopen to load the current value.'
-          : (errorStringField(error, 'message') ??
-              'Invalid value. Check the type and allowed range.'),
-      )
-    } finally {
-      if (!lifetime.signal.aborted) setPending(false)
-    }
+    return await finalize(
+      async () => {
+        try {
+          const outcome = await saveSettingDraft({
+            id,
+            draft: input,
+            snapshot: base,
+            target,
+            owner,
+            signal: lifetime.signal,
+            mode,
+          })
+          if (lifetime.signal.aborted) return
+          if (outcome !== 'acknowledged') {
+            setFailure('Save failed. Your draft is kept; retry or cancel to inspect the failure.')
+            return
+          }
+          lifetime.close()
+        } catch (error) {
+          if (lifetime.signal.aborted) return
+          const conflict = errorStringField(error, 'code') === 'settings.RAW_REVISION_STALE'
+          setFailure(
+            conflict
+              ? 'Settings changed elsewhere. Cancel and reopen to load the current value.'
+              : (errorStringField(error, 'message') ??
+                  'Invalid value. Check the type and allowed range.'),
+          )
+        }
+      },
+      () => {
+        if (!lifetime.signal.aborted) setPending(false)
+      },
+    )
   }
   useCommandHandlers({
     'dialog.confirm': {

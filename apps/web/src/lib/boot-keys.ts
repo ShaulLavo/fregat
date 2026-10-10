@@ -1,20 +1,17 @@
 // Shared with the pre-paint boot script (src/boot-appearance.ts), which must stay free of
 // anything heavier than a string so it can be inlined into index.html.
+import type { HtmlBootstrap } from '@workspace/contracts/html-bootstrap'
 export const BOOT_MIRROR_KEY = 'platform.settings-boot-mirror.v1'
-export const PALETTE_BOOT_KEY = 'platform.palette-boot.v1'
 export const PALETTE_STYLE_ID = 'platform-palette'
 /** The JSON script in index.html naming each shell's chunks. */
 export const SHELL_CHUNKS_ID = 'shell-chunks'
 
-/** The desktop wallpaper the boot script preloads, handed to the app that renders it. */
-export type BootWallpaperPreload = {
-  readonly href: string
-  status: 'pending' | 'ready' | 'error'
-}
-
 declare global {
+  interface HTMLLinkElement {
+    platformWallpaperImage?: HTMLImageElement
+  }
   interface Window {
-    platformBootWallpaper?: BootWallpaperPreload
+    platformHtmlBootstrap?: { readonly element: Element; readonly value: HtmlBootstrap | null }
     /** Injected by `agent:browser` so a run drives its own throwaway API server. */
     platformDevServerUrl?: string
   }
@@ -24,5 +21,6 @@ declare global {
 export function developmentServerUrl(): string {
   // Node-environment tests import the client, and it resolves this at module load.
   const injected = typeof window === 'undefined' ? undefined : window.platformDevServerUrl
-  return injected ?? 'http://localhost:3001'
+  const bootstrap = typeof window === 'undefined' ? undefined : window.platformHtmlBootstrap?.value
+  return injected ?? (bootstrap?.kind === 'app' ? bootstrap.apiBase : 'http://localhost:3001')
 }

@@ -13,6 +13,7 @@ import { compareTraceSummaries, formatTraceSummary, summarizeTrace } from './tra
 import { summarizeSelectors } from './selector-stats'
 import { captureTraceSources } from './trace-source-maps'
 import { captureSize, type CaptureSize } from './capture-options'
+import { routeHtmlBootstrap } from './html-bootstrap'
 import {
   openStaticPreview,
   routeStaticPreview,
@@ -291,8 +292,7 @@ async function look(options: Options) {
       `ready: ${ready ? 'yes' : 'no'}`,
       `health: ${health.ok ? 'ok' : health.reasons.join('; ')}`,
       `problems: ${problems.length === 0 ? 'none' : ''}`,
-      ...problems.map((problem) => `- ${problem}`),
-    ]
+    ].concat(problems.map((problem) => `- ${problem}`))
     await writeSummary(evidence, lines)
     return (options.doctor || options.site) && !health.ok ? 1 : 0
   })
@@ -315,14 +315,14 @@ async function runScenario(scenario: Scenario, options: Options) {
         'readiness.json',
         await page
           .evaluate(() => ({
-            busy: [...document.querySelectorAll('[aria-busy]')].map((node) => ({
+            busy: Array.from(document.querySelectorAll('[aria-busy]'), (node) => ({
               tag: node.tagName,
               label: node.getAttribute('aria-label'),
               busy: node.getAttribute('aria-busy'),
               colorMode: node.getAttribute('data-color-mode'),
               slot: node.getAttribute('data-slot'),
             })),
-            fonts: [...document.fonts].map((face) => ({
+            fonts: Array.from(document.fonts, (face) => ({
               family: face.family,
               status: face.status,
             })),
@@ -339,13 +339,15 @@ async function runScenario(scenario: Scenario, options: Options) {
       if (scenario.inspect) await evidence.json('inspection.json', await scenario.inspect(page))
       const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })
       await evidence.json('observed.json', { problems, ...serializable(observed) })
-      await writeSummary(evidence, [
-        `# scenario ${scenario.name}`,
-        '',
-        'app never became ready',
-        `screenshot: ${evidence.file('failure.png')}`,
-        ...problems.map((problem) => `- ${problem}`),
-      ])
+      await writeSummary(
+        evidence,
+        [
+          `# scenario ${scenario.name}`,
+          '',
+          'app never became ready',
+          `screenshot: ${evidence.file('failure.png')}`,
+        ].concat(problems.map((problem) => `- ${problem}`)),
+      )
       return 1
     }
     if (options.productWallpaper) await alignProductWallpaper(page, evidence)
@@ -401,10 +403,11 @@ async function runScenario(scenario: Scenario, options: Options) {
       `duration: ${durationMs}ms`,
       `result: ${failure ? `failed: ${failure}` : 'completed'}`,
       `steps: ${steps.map((file) => evidence.file(file)).join(', ')}`,
-      ...captureLines,
-      `problems: ${problems.length === 0 ? 'none' : ''}`,
-      ...problems.map((problem) => `- ${problem}`),
-    ]
+    ].concat(
+      captureLines,
+      [`problems: ${problems.length === 0 ? 'none' : ''}`],
+      problems.map((problem) => `- ${problem}`),
+    )
     await writeSummary(evidence, lines)
     return failure ? 1 : 0
   })
@@ -431,7 +434,7 @@ async function traceScenario(scenario: Scenario, options: Options) {
     }
     const tracePath = evidence.file('trace.json')
     const categories = options.selectorStats
-      ? [...TRACE_CATEGORIES, 'disabled-by-default-blink.debug']
+      ? TRACE_CATEGORIES.concat(['disabled-by-default-blink.debug'])
       : TRACE_CATEGORIES
     await browser.startTracing(page, { categories, path: tracePath })
     await page.evaluate(() => performance.mark('fregat:scenario:start'))
@@ -455,9 +458,9 @@ async function traceScenario(scenario: Scenario, options: Options) {
     const raw = await Bun.file(tracePath).text()
     if (options.selectorStats) await evidence.json('selector-stats.json', summarizeSelectors(raw))
     const generated = summarizeTrace(raw)
-    const frames = [...generated.longTasks, ...generated.phaseTasks].flatMap((task) =>
-      task.sampledFrames.map((frame) => frame.generated),
-    )
+    const frames = generated.longTasks
+      .concat(generated.phaseTasks)
+      .flatMap((task) => task.sampledFrames.map((frame) => frame.generated))
     const sources = await captureTraceSources(page, evidence, frames)
     const summary = summarizeTrace(raw, sources)
     await evidence.json('trace-summary.json', summary)
@@ -472,8 +475,7 @@ async function traceScenario(scenario: Scenario, options: Options) {
       `screenshot: ${evidence.file('page.png')}`,
       `source maps: ${evidence.file('trace-sources.json')}`,
       '',
-      ...formatTraceSummary(summary),
-    ]
+    ].concat(formatTraceSummary(summary))
     if (options.selectorStats)
       lines.push(
         '',
@@ -567,18 +569,21 @@ async function countRenders(scenario: Scenario, options: Options) {
       '',
       '| component | renders | no DOM change | parent-driven | subtree ms | what changed |',
       '| --- | --- | --- | --- | --- | --- |',
-      ...rows
+    ].concat(
+      rows
         .slice(0, 25)
         .map(
           (row) =>
             `| ${row.component} | ${row.renders} | ${row.noDomChange} | ${row.parentDriven} | ${row.timeMs} | ${row.changes.join(', ') || '-'} |`,
         ),
-      '',
-      `full table: ${evidence.file('renders.json')}`,
-      `cumulative step counts: ${evidence.file('render-steps.json')}`,
-      `problems: ${problems.length === 0 ? 'none' : ''}`,
-      ...problems.map((p) => `- ${p}`),
-    ]
+      [
+        '',
+        `full table: ${evidence.file('renders.json')}`,
+        `cumulative step counts: ${evidence.file('render-steps.json')}`,
+        `problems: ${problems.length === 0 ? 'none' : ''}`,
+      ],
+      problems.map((p) => `- ${p}`),
+    )
     await writeSummary(evidence, lines)
     return failure ? 1 : 0
   })
@@ -661,8 +666,16 @@ async function withPage(
     viewport: { width: options.width, height: options.height },
     deviceScaleFactor: options.scale,
     ...(options.touch ? { hasTouch: true, isMobile: true } : {}),
+    ...(options.touch
+      ? {
+          userAgent:
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1',
+        }
+      : {}),
     ...(options.productWallpaper ? { userAgent: PRODUCT_USER_AGENT } : {}),
   })
+  if (options.server && new URL(options.url).origin !== options.server.origin)
+    await routeHtmlBootstrap(context, options.url, options.server.origin)
   if (options.server)
     await context.addInitScript(
       `window.platformDevServerUrl = ${JSON.stringify(options.server.origin)}`,
@@ -811,8 +824,7 @@ async function appendLogs(evidence: Evidence, server: IsolatedServer | undefined
   const lines = [
     '',
     `logs (warn+, ${window}): ${events.length === 0 ? 'none' : `${events.length}, see logs.txt`}`,
-    ...fullLog,
-  ]
+  ].concat(fullLog)
   await Bun.write(summary, `${existing}${lines.join('\n')}\n`)
 }
 
@@ -836,7 +848,7 @@ function isEngine(value: string): value is Engine {
 
 function chromiumPermissions(options: Options) {
   const clipboard = ['clipboard-read', 'clipboard-write']
-  return options.notifications ? [...clipboard, 'notifications'] : clipboard
+  return options.notifications ? clipboard.concat(['notifications']) : clipboard
 }
 
 process.exitCode = await main()

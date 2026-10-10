@@ -299,7 +299,7 @@ describe('tree view browser behavior', () => {
       currentModel.scrollToPath('src/features/a-0.ts', { behavior: 'smooth', focus: false })
     })
     flushSync(() => {
-      currentModel.resetPaths([...browserPaths(80), 'src/features/0-before.ts'])
+      currentModel.resetPaths(browserPaths(80).concat(['src/features/0-before.ts']))
     })
     const rows = tree.querySelectorAll<HTMLButtonElement>('button[data-item-path]')
     expect(rows[1]?.dataset.itemPath).toBe('src/features/0-before.ts')

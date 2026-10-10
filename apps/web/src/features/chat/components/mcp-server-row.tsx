@@ -41,7 +41,10 @@ export function McpServerRow({
     <ListRow
       className='h-auto flex-col items-stretch gap-0.5 py-(--density-row-padding-y)'
       interactive={false}
-      title={[server.name, status, ...facts, hint].filter(Boolean).join(' · ')}
+      title={[server.name, status]
+        .concat(facts, hint ? [hint] : [])
+        .filter(Boolean)
+        .join(' · ')}
     >
       <span className='flex min-w-0 items-center gap-(--density-control-gap)'>
         <span className='min-w-0 flex-1 truncate'>{server.name}</span>

@@ -47,7 +47,7 @@ async function retentionLayoutArchive(
     JSON.stringify({
       label,
       origin: context.page.url(),
-      failures: [...(annotationFailure?.failures ?? []), ...failures].map((failure) => ({
+      failures: (annotationFailure?.failures ?? []).concat(failures).map((failure) => ({
         stage: failure.stage,
         error: failure.error instanceof Error ? failure.error.message : String(failure.error),
       })),

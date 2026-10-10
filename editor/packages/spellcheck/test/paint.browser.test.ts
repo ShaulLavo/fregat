@@ -19,7 +19,9 @@ it('draws spelling marks without a language or syntax tokens', async () => {
 
   const baseRanges = [...CSS.highlights]
     .filter(([name]) => name.includes('-overlay-base-'))
-    .flatMap(([, highlight]) => [...highlight].map((range) => [range.startOffset, range.endOffset]))
+    .flatMap(([, highlight]) =>
+      Array.from(highlight, (range) => [range.startOffset, range.endOffset]),
+    )
   expect(baseRanges).toEqual([[4, 9]])
   editor.focus()
   editor.setSelection(0)
@@ -27,7 +29,9 @@ it('draws spelling marks without a language or syntax tokens', async () => {
   await new Promise((resolve) => requestAnimationFrame(resolve))
   const updatedRanges = [...CSS.highlights]
     .filter(([name]) => name.includes('-overlay-base-'))
-    .flatMap(([, highlight]) => [...highlight].map((range) => [range.startOffset, range.endOffset]))
+    .flatMap(([, highlight]) =>
+      Array.from(highlight, (range) => [range.startOffset, range.endOffset]),
+    )
   expect(updatedRanges).toEqual([[5, 10]])
   expect(spellingInk(await rowPixels(host.id))).toBeGreaterThan(20)
 })

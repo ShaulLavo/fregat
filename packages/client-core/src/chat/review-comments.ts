@@ -76,7 +76,7 @@ export function extractReviewComments(text: string): {
   const match = LEADING_BLOCK.exec(text)
   if (!match) return { comments: [], text }
 
-  const comments = [...(match[1] ?? '').matchAll(COMMENT)].flatMap((entry) => {
+  const comments = Array.from((match[1] ?? '').matchAll(COMMENT)).flatMap((entry) => {
     const anchor = v.safeParse(anchorJsonSchema, unescapeContextMarkup(entry[2] ?? ''))
     if (!anchor.success) return []
     return [

@@ -15,6 +15,7 @@ import {
 import { diffPaneSelector, openGitPanel, selectors } from '../selectors'
 
 type Mode = 'stacked' | 'split'
+const SHARED = 3
 type Position = { top: number; left: number; width: number; contentWidth: number }
 type Subject = { tab: string; source: string; rows: string[] }
 const files = ['b.txt', 'c.txt', 'split-b.txt', 'split-c.txt', 'late.txt', 'current.txt']
@@ -31,7 +32,7 @@ export const gitDiffScroll: Scenario = {
   name: 'git-diff-scroll',
   requiresIsolatedServer: true,
   description:
-    'Split and stacked diffs restore both scroll axes, copy the selected source line, keep the reading position through an in-place revision refresh, and an uncached late reply preserves the selected comparison.',
+    'Split and stacked diffs restore both scroll axes on revisit and page reload, copy the selected source line, keep the reading position through an in-place revision refresh, keep each place through rapid switching with delayed reads, and an uncached late reply preserves the selected comparison.',
   inspect: async (page) => inspection.get(page) ?? null,
   async run(page, { step, evidence }) {
     const fixture = await createGitFixture('diff-scroll')
@@ -48,9 +49,11 @@ export const gitDiffScroll: Scenario = {
       await openGitPanel(page)
       await disablePrefetch(page)
       for (const mode of ['stacked', 'split'] satisfies Mode[]) {
-        await verifyMode(page, mode, observations, step)
-        if (mode === 'stacked') await verifyCopyAndRefresh(page, fixture, reads, observations, step)
+        const saved = await verifyMode(page, mode, observations, step)
+        await verifyPageReload(page, mode, saved, observations, step)
+        await verifyCopyAndRefresh(page, mode, fixture, reads, observations, step)
       }
+      await verifyRapidSwitch(page, observations, step)
       await verifyLateRead(page, evidence, reads, observations, step)
     } catch (error) {
       await capture(page, observations, 'failed-control')
@@ -118,23 +121,120 @@ async function verifyMode(
     'A visited diff must restore its offset',
   )
   await step(`${mode}-restored-first-diff`)
+  return saved
+}
+
+async function verifyPageReload(
+  page: Page,
+  mode: Mode,
+  saved: Position[],
+  observations: unknown[],
+  step: (label: string) => Promise<void>,
+) {
+  const file = mode === 'stacked' ? 'b.txt' : 'split-b.txt'
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await waitForSubject(page, file, mode)
+  await page.waitForTimeout(600)
+  const reloaded = await capture(page, observations, `${mode}-page-reloaded`)
+  deepStrictEqual(
+    reloaded.map(({ top, left }) => ({ top, left })),
+    saved.map(({ top, left }) => ({ top, left })),
+    'A page reload restores the diff on both axes',
+  )
+  await openGitPanel(page)
+  await step(`${mode}-page-reloaded`)
+}
+
+async function verifyRapidSwitch(
+  page: Page,
+  observations: unknown[],
+  step: (label: string) => Promise<void>,
+) {
+  await selectChange(page, 'split-b.txt')
+  await waitForSubject(page, 'split-b.txt', 'split')
+  await page.waitForTimeout(400)
+  const first = await capture(page, observations, 'rapid-first-before')
+  ok(
+    first.every(({ top }) => top > 500),
+    `The first diff keeps its place: ${JSON.stringify(first)}`,
+  )
+  await selectChange(page, 'split-c.txt')
+  await waitForSubject(page, 'split-c.txt', 'split')
+  await scrollers(page).first().hover()
+  await page.mouse.wheel(0, 600)
+  await page.waitForTimeout(400)
+  const second = await capture(page, observations, 'rapid-second-before')
+  ok(
+    second.every(({ top }) => top > 300 && top !== first[0]!.top),
+    `The second diff holds its own place: ${JSON.stringify({ first, second })}`,
+  )
+  const delayed = async (route: Route) => {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    await route.fallback()
+  }
+  await page.route('**/git/diff?*', delayed)
+  try {
+    for (const file of [
+      'split-b.txt',
+      'split-c.txt',
+      'split-b.txt',
+      'split-c.txt',
+      'split-b.txt',
+    ]) {
+      await selectChange(page, file)
+      await page.waitForTimeout(60)
+    }
+    await waitForSubject(page, 'split-b.txt', 'split')
+    await page.waitForTimeout(900)
+    const landed = await capture(page, observations, 'rapid-first-after')
+    deepStrictEqual(
+      landed.map(({ top, left }) => ({ top, left })),
+      first.map(({ top, left }) => ({ top, left })),
+      'Rapid switching with delayed reads returns the first diff to its own place',
+    )
+    await step('rapid-first-after')
+    await selectChange(page, 'split-c.txt')
+    await waitForSubject(page, 'split-c.txt', 'split')
+    await page.waitForTimeout(900)
+    const other = await capture(page, observations, 'rapid-second-after')
+    deepStrictEqual(
+      other.map(({ top, left }) => ({ top, left })),
+      second.map(({ top, left }) => ({ top, left })),
+      'The second diff keeps its own place, not the first one',
+    )
+    await step('rapid-second-after')
+  } finally {
+    await page.unroute('**/git/diff?*', delayed)
+  }
+}
+
+// The row tooltip of the change just clicked covers its neighbour until the pointer leaves.
+async function selectChange(page: Page, file: string) {
+  await scrollers(page).first().hover()
+  await selectors.gitChangeRow(page, file).click()
 }
 
 async function verifyCopyAndRefresh(
   page: Page,
+  mode: Mode,
   fixture: string,
   reads: string[],
   observations: unknown[],
   step: (label: string) => Promise<void>,
 ) {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
-  await scrollers(page).first().hover()
-  await page.mouse.wheel(0, 8000)
-  await page.waitForTimeout(400)
+  const file = mode === 'stacked' ? 'b.txt' : 'split-b.txt'
+  const pane = mode === 'stacked' ? 0 : 1
+  if (mode === 'stacked') {
+    await scrollers(page).first().hover()
+    await page.mouse.wheel(0, 8000)
+    await page.waitForTimeout(400)
+  }
   const row = await page.evaluate(`(() => {
-    const scroller = document.querySelector(${JSON.stringify(`${diffPaneSelector} ${selectors.diffScrollerSelector}`)})
+    const pane = document.querySelectorAll(${JSON.stringify(diffPaneSelector)})[${pane}]
+    const scroller = pane.querySelector(${JSON.stringify(selectors.diffScrollerSelector)})
     const bounds = scroller.getBoundingClientRect()
-    const rows = [...document.querySelectorAll(${JSON.stringify(selectors.comparisonRowsSelector)})]
+    const rows = [...pane.querySelectorAll('[data-editor-virtual-row]')]
       .map(element => element.getBoundingClientRect())
       .filter(rect => rect.height > 0 && rect.top >= bounds.top && rect.bottom <= bounds.bottom)
       .sort((left, right) => left.top - right.top)
@@ -146,34 +246,72 @@ async function verifyCopyAndRefresh(
   await page.keyboard.press('Home')
   await page.keyboard.press('Shift+End')
   const copied = await copySelection(page)
-  const match = /^b\.txt after line (\d+) /.exec(copied)
+  const match = new RegExp(`^${file.replace('.', '\\.')} after line (\\d+) `).exec(copied)
   ok(match, `Copy must yield one whole new-side line: ${JSON.stringify(copied.slice(0, 80))}`)
   const line = Number(match[1])
   strictEqual(
     copied,
-    fixtureText('b.txt', 'after').split('\n')[line],
+    fixtureLines(file, 'after')[line],
     'The copied text is the selected source line, exactly',
   )
   ok(line > 20, `The selection sits at the scrolled reading position: line ${line}`)
-  const before = await capture(page, observations, 'stacked-selection-copied')
-  await step('stacked-selection-copied')
+  const before = await capture(page, observations, `${mode}-selection-copied`)
+  await step(`${mode}-selection-copied`)
 
   const readsBefore = reads.length
-  const inserted = Array.from({ length: 5 }, (_, i) => `b.txt inserted line ${i}`).join('\n')
-  await writeFile(path.join(fixture, 'b.txt'), `${inserted}\n${fixtureText('b.txt', 'after')}`)
+  const inserted = Array.from({ length: 5 }, (_, i) => `${file} inserted line ${i}`)
+  const at = mode === 'stacked' ? 0 : SHARED
+  const lines = fixtureLines(file, 'after')
+  await writeFile(
+    path.join(fixture, file),
+    lines.slice(0, at).concat(inserted, lines.slice(at)).join('\n'),
+  )
   for (let waited = 0; reads.length === readsBefore; waited += 100) {
     ok(waited < 10_000, 'The diff rereads after its file changes on disk')
     await page.waitForTimeout(100)
   }
   await page.waitForTimeout(600)
-  const after = await capture(page, observations, 'stacked-revision-refreshed')
-  strictEqual(await copySelection(page), copied, 'The refreshed diff keeps the selected source line')
-  ok(
-    Math.abs(after[0]!.top - (before[0]!.top + 5 * height)) <= 1,
-    `Five lines inserted above move the reading position by five rows: ${JSON.stringify({ before, after, height })}`,
+  const after = await capture(page, observations, `${mode}-revision-refreshed`)
+  strictEqual(
+    await copySelection(page),
+    copied,
+    'The refreshed diff keeps the selected source line',
   )
-  strictEqual(after[0]!.left, before[0]!.left, 'The refresh keeps the horizontal offset')
-  await step('stacked-revision-refreshed')
+  const reading = before.at(-1)!.top + 5 * height
+  ok(
+    after.every(({ top }) => Math.abs(top - reading) <= 1),
+    `Five new-side lines inserted above move the reading pane five rows, and a split keeps both panes on that row: ${JSON.stringify({ before, after, height })}`,
+  )
+  deepStrictEqual(
+    after.map(({ left }) => left),
+    before.map(({ left }) => left),
+    'The refresh keeps the horizontal offset',
+  )
+  await step(`${mode}-revision-refreshed`)
+  if (mode === 'split') await verifyContinuousSplit(page, observations, step)
+}
+
+async function verifyContinuousSplit(
+  page: Page,
+  observations: unknown[],
+  step: (label: string) => Promise<void>,
+) {
+  for (const [pane, side] of [
+    [0, 'old'],
+    [1, 'new'],
+  ] as const) {
+    const prior = await positions(page)
+    await scrollers(page).nth(pane).hover()
+    await page.mouse.wheel(0, 48)
+    await page.waitForTimeout(300)
+    const moved = await capture(page, observations, `split-scrolled-over-${side}`)
+    ok(
+      moved.every(({ top }) => top === moved[0]!.top) &&
+        moved.every(({ top }, index) => top > prior[index]!.top),
+      `Scrolling down over the ${side} pane moves both panes down together: ${JSON.stringify({ prior, moved })}`,
+    )
+  }
+  await step('split-scrolled-after-refresh')
 }
 
 async function copySelection(page: Page) {
@@ -190,10 +328,17 @@ async function prepareFixture(fixture: string) {
 }
 
 function fixtureText(file: string, version: string) {
-  return Array.from(
-    { length: 300 },
-    (_, i) => `${file} ${version} line ${i} ${`${file} ${version} wide `.repeat(20)}`,
-  ).join('\n')
+  return fixtureLines(file, version).join('\n')
+}
+
+// Split files keep three shared context lines at each end around one replaced block, so the
+// paired split rows include real context rows.
+function fixtureLines(file: string, version: string) {
+  const shared = (i: number) => file.startsWith('split-') && (i < SHARED || i >= 300 - SHARED)
+  return Array.from({ length: 300 }, (_, i) => {
+    const kind = shared(i) ? 'shared' : version
+    return `${file} ${kind} line ${i} ${`${file} ${kind} wide `.repeat(20)}`
+  })
 }
 
 async function disablePrefetch(page: Page) {

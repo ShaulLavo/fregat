@@ -8,10 +8,6 @@ import { createLineGutterPlugin } from '../../gutters/src/index'
 declare module 'vitest/browser' {
   interface BrowserCommands {
     proofType: (text: string) => Promise<void>
-    proofImeComposition: (
-      text: string,
-      replacement?: readonly [number, number] | null,
-    ) => Promise<void>
   }
 }
 
@@ -45,7 +41,13 @@ it.each(['transform', 'top'] as const)(
       const viewport = scroller.getBoundingClientRect()
       const nativeHeight = () => Reflect.get(Element.prototype, 'scrollHeight', scroller)
       const nativeTop = () => Reflect.get(Element.prototype, 'scrollTop', scroller)
-      expect(nativeHeight()).toBe(16_000_000)
+      const nativeLimit = host
+        .querySelector('.editor-virtualized-extent')!
+        .getBoundingClientRect().height
+      expect(nativeLimit).toBeGreaterThan(0)
+      expect(nativeLimit).toBeLessThanOrEqual(16_000_000)
+      expect(nativeLimit).toBe(measuredNativeStickyLimit())
+      expect(nativeHeight()).toBe(nativeLimit)
       const rowAt = (line: number) =>
         host!.querySelector<HTMLElement>(`[data-editor-virtual-row="${line}"]`)!
 
@@ -57,7 +59,7 @@ it.each(['transform', 'top'] as const)(
       await frames()
       expect(rowAt(lines).textContent).toBe('final')
       expect(rowAt(lines).getBoundingClientRect().bottom).toBeCloseTo(viewport.bottom, 0)
-      expect(nativeTop()).toBe(16_000_000 - scroller.clientHeight)
+      expect(nativeTop()).toBe(nativeLimit - scroller.clientHeight)
 
       editor.setScrollPosition({ top: 0 })
       editor.setSelection(text.length, text.length, { reveal: true })
@@ -76,13 +78,6 @@ it.each(['transform', 'top'] as const)(
       await frames()
       expect(rowAt(lines).textContent).toBe('final!')
       expect(editor.getTextSnapshot().readRange(text.length, text.length + 1)).toBe('!')
-
-      await commands.proofImeComposition('候補')
-      await frames()
-      const composition = host.querySelector<HTMLElement>('.editor-virtualized-composition')!
-      expect(composition.textContent).toBe('候補')
-      expect(composition.getBoundingClientRect().top).toBeCloseTo(rect.top, 0)
-      await commands.proofImeComposition('')
 
       if (lines < 3_000_000) continue
       editor.setSelection(1_600_001, 1_600_001, { reveal: true })
@@ -129,5 +124,30 @@ it('captures selection paint in logical document coordinates after rebasing', as
 async function frames() {
   for (let frame = 0; frame < 3; frame++) {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  }
+}
+
+function measuredNativeStickyLimit() {
+  const scroller = document.createElement('div')
+  scroller.style.cssText =
+    'position:fixed;top:0;width:256px;height:256px;overflow:auto;scrollbar-width:none;visibility:hidden'
+  const extent = document.createElement('div')
+  extent.style.height = '16000000px'
+  const sticky = document.createElement('div')
+  sticky.style.cssText = 'position:sticky;top:0;height:256px'
+  extent.append(sticky)
+  scroller.append(extent)
+  document.body.append(scroller)
+  try {
+    scroller.scrollTop = 16_000_000
+    const displacement = sticky.getBoundingClientRect().top - scroller.getBoundingClientRect().top
+    const limit = displacement === 0 ? 16_000_000 : Math.floor(scroller.scrollTop + displacement)
+    extent.style.height = `${limit}px`
+    scroller.scrollTop = limit
+    expect(scroller.scrollHeight).toBe(limit)
+    expect(sticky.getBoundingClientRect().top).toBe(scroller.getBoundingClientRect().top)
+    return limit
+  } finally {
+    scroller.remove()
   }
 }

@@ -2,7 +2,7 @@
 
 Status: Approved, 2026-10-03. Execution deferred; research and planning only now.
 Owner: shared runtime recovery contracts, document contributions and terminal execution owners. Parent: [328](328-async-runtime-master.md).
-Dependencies: [329](329-async-lifecycle-and-transport.md), [330](330-async-scheduling-and-admission.md), existing [099](099-document-contributions.md), [198](198-document-owned-editor-analysis.md) and [287](287-ghostty-worker-mode.md) authority contracts.
+Dependencies: [329](329-async-lifecycle-and-transport.md), [330](330-async-scheduling-and-admission.md), existing [099](099-document-contributions.md), [document analysis](../docs/document-backed-content-views.md) and [287](287-ghostty-worker-mode.md) authority contracts.
 
 ## Outcome
 

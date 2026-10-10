@@ -21,7 +21,8 @@ export function spellingMenuSection(options: SpellingMenuOptions): MenuSection {
       label: 'Add to Dictionary',
       run: () => options.accept('user'),
     }),
-    ...(options.hasWorkspace
+  ].concat(
+    options.hasWorkspace
       ? [
           actionItem({
             id: 'spelling.addToWorkspaceDictionary',
@@ -30,9 +31,9 @@ export function spellingMenuSection(options: SpellingMenuOptions): MenuSection {
             run: () => options.accept('workspace'),
           }),
         ]
-      : []),
-  ]
-  return section('spelling', [...suggestionItems(word, options), ...dictionaries])
+      : [],
+  )
+  return section('spelling', suggestionItems(word, options).concat(dictionaries))
 }
 
 function suggestionItems(word: string, options: SpellingMenuOptions) {

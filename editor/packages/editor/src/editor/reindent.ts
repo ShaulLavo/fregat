@@ -188,7 +188,7 @@ function literalOpener(tokens: LiteralTokens): RegExp | null {
   if (tokens.blockComment?.open) units.add(tokens.blockComment.open.charCodeAt(0))
   if (units.size === 0) return null
 
-  const escaped = [...units].map((unit) => `\\u${unit.toString(16).padStart(4, '0')}`)
+  const escaped = Array.from(units, (unit) => `\\u${unit.toString(16).padStart(4, '0')}`)
   return new RegExp(`[${escaped.join('')}]`, 'g')
 }
 
@@ -256,7 +256,7 @@ function rowRangesForSelections(
     .filter((range): range is RowRange => range !== null)
   const merged: RowRange[] = []
 
-  for (const range of ranges.toSorted((left, right) => left.startRow - right.startRow)) {
+  for (const range of ranges.sort((left, right) => left.startRow - right.startRow)) {
     const previous = merged[merged.length - 1]
     if (!previous || range.startRow > previous.endRow + 1) {
       merged.push(range)

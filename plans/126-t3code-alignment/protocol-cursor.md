@@ -1,3 +1,8 @@
+> Historical Plan 126 source and scope record. [Plan 343](../343-t3code-nightly-orchestration.md)
+> owns the Approved, deferred nightly rewrite at `bd2346eda2e2c380d1844869c7fd16c279d2190f`.
+> Preserve these receipts and remaining requirements. Recheck affected contracts and provider
+> behavior against nightly before implementing them.
+
 # RUNTIME-02 protocol survey: Cursor (`cursor-agent`)
 
 Upstream read at T3 Code `7a12aff4` (2026-09-25), 14 commits past the plan pin `7445aa73`. Driver files that

@@ -1,14 +1,20 @@
 import net from 'node:net'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { afterEach, expect, test } from 'vitest'
-import configFn, { bunInstallCacheRoot, requireLiteralAddress } from './vite.config'
+import configFn, {
+  bunDependencyRoots,
+  bunInstallCacheRoot,
+  requireLiteralAddress,
+} from './vite.config'
+
+const customCacheRoot = path.join(os.tmpdir(), 'fregat-bun-cache')
 
 test('bunInstallCacheRoot reads BUN_INSTALL_CACHE_DIR when set', () => {
-  expect(bunInstallCacheRoot({ BUN_INSTALL_CACHE_DIR: '/work/cache/bun/cache' })).toBe(
-    '/work/cache/bun/cache',
-  )
+  expect(bunInstallCacheRoot({ BUN_INSTALL_CACHE_DIR: customCacheRoot })).toBe(customCacheRoot)
 })
 
 test('bunInstallCacheRoot falls back to the default Bun cache location', () => {
@@ -19,15 +25,34 @@ test('dev server fs.allow includes the bun install cache root', () => {
   // Bun's isolated linker can symlink a dependency straight into this cache
   // instead of the workspace; Vite denies serving a real path outside `fs.allow`.
   const previous = process.env.BUN_INSTALL_CACHE_DIR
-  process.env.BUN_INSTALL_CACHE_DIR = '/work/cache/bun/cache'
+  process.env.BUN_INSTALL_CACHE_DIR = customCacheRoot
   try {
     // A build never reads dev-linked packages (that needs editor deps in package.json).
     const resolved = configFn({ command: 'build', mode: 'production' })
-    expect(resolved.server?.fs?.allow).toContain('/work/cache/bun/cache')
+    expect(resolved.server?.fs?.allow).toContain(customCacheRoot)
   } finally {
     if (previous === undefined) delete process.env.BUN_INSTALL_CACHE_DIR
     else process.env.BUN_INSTALL_CACHE_DIR = previous
   }
+})
+
+test('bunDependencyRoots resolves a linked installed dependency store', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'fregat-dependency-roots-'))
+  try {
+    const root = path.join(directory, 'checkout')
+    const store = path.join(directory, 'dependencies')
+    mkdirSync(path.join(root, 'node_modules'), { recursive: true })
+    mkdirSync(store)
+    symlinkSync(store, path.join(root, 'node_modules/.bun'), 'junction')
+    expect(bunDependencyRoots(root)).toEqual([realpathSync(store)])
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('dev server allows the real installed dependency store', () => {
+  const resolved = configFn({ command: 'build', mode: 'production' })
+  for (const store of bunDependencyRoots()) expect(resolved.server?.fs?.allow).toContain(store)
 })
 
 test('requireLiteralAddress falls back when WEB_HOST is unset', () => {
@@ -46,10 +71,15 @@ test('requireLiteralAddress rejects a hostname that needs DNS resolution', () =>
 
 let blocker: net.Server | undefined
 let stray: Awaited<ReturnType<typeof createServer>> | undefined
+let cacheDirectory: string | undefined
 
 afterEach(async () => {
   await stray?.close()
   stray = undefined
+  if (cacheDirectory) {
+    await rm(cacheDirectory, { recursive: true, force: true })
+    cacheDirectory = undefined
+  }
   if (blocker) {
     const server = blocker
     blocker = undefined
@@ -78,6 +108,34 @@ test('a second dev server on a port already bound on 127.0.0.1 fails instead of 
   await expect(stray.listen()).rejects.toThrow(/already in use/)
   await expect(canConnect('::1', port)).resolves.toBe(false)
 }, 20_000)
+
+test.for([
+  'workbench?tabs=-',
+  'workbench/f/a.ts?tabs=@',
+  'workbench/f/a.tsx?tabs=@',
+  'workbench/f/a.js?tabs=@',
+  'workbench/f/a.jsx?tabs=@',
+  'workbench/d/worktree/live/a.ts?tabs=f/a.ts~@&side=git',
+])('inline boot CSS loads at %s', async (route) => {
+  cacheDirectory = await mkdtemp(path.join(os.tmpdir(), 'fregat-vite-config-'))
+  const resolved = configFn({ command: 'serve', isPreview: false, mode: 'development' })
+  stray = await createServer({
+    ...resolved,
+    configFile: false,
+    root: import.meta.dirname,
+    cacheDir: cacheDirectory,
+    logLevel: 'silent',
+    optimizeDeps: { noDiscovery: true, include: [] },
+    server: { ...resolved.server, middlewareMode: true, hmr: false },
+  })
+
+  const html = await stray.transformIndexHtml(
+    `/~fixture.workspace/${route}`,
+    '<!doctype html><html><head></head><body></body></html>',
+  )
+  expect(html).toContain('id="fregat-boot-style"')
+  expect(html).toContain('@layer boot')
+})
 
 function freePort() {
   return new Promise<number>((resolve) => {

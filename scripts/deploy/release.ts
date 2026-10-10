@@ -24,7 +24,7 @@ import {
   missingReleaseFiles,
   writeRuntimeManifest,
 } from '../../apps/server/src/installation/release-files'
-import { buildNative } from '../../apps/desktop/scripts/build-native'
+import { buildNative, copyNativeHost } from '../../apps/desktop/scripts/build-native'
 import { errorMessage } from '../../packages/contracts/src/error-fields'
 
 export type Checkout = {
@@ -114,7 +114,7 @@ export async function buildWeb(release: Release, base = '/', execute = run, root
     path.join(release.directory, 'web-build.log'),
     execute,
   )
-  stampWebRelease(release.web, release.name)
+  await stampWebRelease(release.web, release.name)
 }
 
 /** How long a hashed asset stays loadable after the release that built it is replaced. */
@@ -201,7 +201,7 @@ function bundleNativePicker(release: Release, root: string) {
     const built = buildNative(path.join(root, 'apps/desktop'))
     if (!built) return log('server', 'native chooser helper: none for this platform')
     mkdirSync(path.join(release.server, 'native'), { recursive: true })
-    cpSync(built, path.join(release.server, 'native', 'platform-webview'))
+    copyNativeHost(built, path.join(release.server, 'native', 'platform-webview'))
     log('server', 'native chooser helper bundled')
   } catch (error) {
     log('server', `native chooser helper not bundled: ${errorMessage(error)}`)
@@ -250,10 +250,13 @@ export async function verifyCandidateFiles(release: Release, base = '/') {
     !readdirSync(path.join(release.web, 'assets')).some((file) => file.endsWith('.wasm')) &&
       'no wasm artifact in web/assets',
     !existsSync(path.join(release.server, 'index.js')) && 'server/index.js is missing',
-    ...(await missingReleaseFiles(release.server)).map(
-      (file) => `server/${file} is missing; install with --server to rebuild the server`,
-    ),
-  ].filter((problem): problem is string => typeof problem === 'string')
+  ]
+    .concat(
+      (await missingReleaseFiles(release.server)).map(
+        (file) => `server/${file} is missing; install with --server to rebuild the server`,
+      ),
+    )
+    .filter((problem): problem is string => typeof problem === 'string')
   if (problems.length === 0) return
 
   throw createScriptError(

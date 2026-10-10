@@ -48,9 +48,8 @@ export function approvalResponseEvents(
     return repeatedAnswer(command, state)
   }
 
-  return [
-    answerSubmitted(command, state, at),
-    ...one(
+  return [answerSubmitted(command, state, at)].concat(
+    one(
       command,
       at,
       'session.approval-response-requested',
@@ -64,7 +63,7 @@ export function approvalResponseEvents(
       // the response with the request without unpacking the payload.
       { metadata: { requestId: command.requestId } },
     ),
-  ]
+  )
 }
 
 /** An approval dies with its turn, so every turn end closes the ones still open. */

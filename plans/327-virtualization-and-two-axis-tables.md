@@ -54,7 +54,7 @@ At execution start, record checkout, package versions, browser, viewport, densit
 
 Collect first useful paint, per-frame work and frame intervals, longest tasks, forced-layout time, mount/reuse counts, mounted rows/columns/cells, retained metadata/cache size, source reads and anchor movement. Attribute parsing/indexing, view construction, browser layout and paint separately. Wall time includes deferred work; publishing a quick first frame must not hide indefinite reconstruction or incorrect navigation.
 
-Use the existing [Editor transform](../editor/packages/editor/bench/displayTransforms.ts) and [virtualization](../editor/packages/editor/bench/virtualization.ts) benches, then prove browser behavior through `verify-fregat`. Heavy suites, builds, browser runs and measurements use the repository heavy runner; paired timing runs use quiet admission. Store evidence under the existing Fregat evidence directory and record relative report links in this plan when units land. Fixtures and committed runners must work from a fresh clone on any supported machine.
+Use the existing [Editor transform](../editor/packages/editor/bench/displayTransforms.ts) and [virtualization](../editor/packages/editor/bench/virtualization.ts) benches, then prove browser behavior through `verify-fregat`. Heavy suites, builds, browser runs and measurements use host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill; paired timing runs use quiet admission. Store evidence under the existing Fregat evidence directory and record relative report links in this plan when units land. Fixtures and committed runners must work from a fresh clone on any supported machine.
 
 ## Execution units
 
@@ -106,6 +106,28 @@ Exit: repeated view-switch costs improve on the implicated tier and remain withi
 - [ ] Record the engine decision. A replacement requires a measured gain at actual application scale with equivalent positioning and interaction semantics. Preserve TanStack when that comparison provides no benefit.
 
 Exit: confirmed shared-wrapper waste is addressed, and the engine decision has evidence. Coordinate chat behavior changes with [181](181-chat-timeline-end-anchoring.md).
+
+### P2 follow-up: Restore paint after an unchanged editor is reparented
+
+Status: Approved investigation, recorded 2026-10-09. The failing restoration branch is unconfirmed.
+
+The `editor-lsp-tab-switch` scenario shows syntax colors and diagnostic highlights missing after returning to an unchanged tab. Text, the caret, and the red minimap diagnostic marker remain. Waiting 30 seconds for the CSS error highlight also timed out. The retained editor connection sent no document close or new diagnostic request for that file. This affects the retained hidden-document contract in [Plan 099](099-document-contributions.md).
+
+The failure occurs with both the new lazy-state status source at `a2d562df9` and the exact previous hook source from `534d8b582`. A scratch Vite load plugin served the previous hook while keeping the rest of the checkout unchanged. The changed status-source ownership is therefore not the cause. Initial error paint succeeds; the failure begins after switching away and back.
+
+Evidence directories on the execution host:
+
+- Current hook: `/work/tmp/fregat-evidence/20261009T181700Z-scenario-editor-lsp-tab-switch-mKxl9Z/`.
+- Previous hook: `/work/tmp/fregat-evidence/20261009T181944Z-scenario-editor-lsp-tab-switch-ESbMlz/`.
+- Previous hook with a bounded 30-second repaint wait: `/work/tmp/fregat-evidence/20261009T182205Z-scenario-editor-lsp-tab-switch-j9Q9OY/`. Its `baseline-proof/` holds the original hook and one-off server configuration.
+
+Read each `inspection.json`, structured log, and `03-failure-before-cleanup.png`. Protocol observations must distinguish editor diagnostic connections from temporary document-symbol connections. The latter deliberately open and close their own documents; counting their closes as editor teardown hides the paint failure.
+
+Reproduce with a direct loopback Vite server on an explicit free port. From `apps/web`, run `WEB_PORT=5219 bun --bun vite --host 127.0.0.1 --port 5219 --strictPort`. From the repository root, run `WEB_PORT=5219 bun run agent:browser scenario editor-lsp-tab-switch`. Follow the execution host's scheduling instructions and stop the private server afterwards. An intervening proxy can cause the isolated HTML bootstrap to reject its fixture API header before the app loads.
+
+- [ ] Extend the unchanged hide/show control in `editor/packages/editor/test/virtualizedTextView.browser.test.ts:517` to reparent the existing view into and out of a hidden container, as `apps/web/src/lib/keep-alive/state/store.ts:50` does. Keep text and tokens unchanged, and add a diagnostic-style range highlight.
+- [ ] Capture mounted rows, registered Highlight sizes, and `range.startContainer.isConnected` before parking and after returning. Inspect `fixedRowVirtualizer.ts:446` and `:570`, `virtualizedTextView.ts:1678`, and `diagnosticsPresenter.ts:246` for the failing restoration path. Generic unchanged hide/show already has a syntax control; reparenting with diagnostic ranges is the missing comparison.
+- [ ] Fix the confirmed owner, then run the control and `editor-lsp-tab-switch`. Keep the strict paint assertion and prove that returning introduces no replacement diagnostic connection or document reopen. Do not mask the failure with an edit, token replacement, fresh diagnostic request, or an arbitrary sleep.
 
 ## Verification and completion
 

@@ -170,7 +170,7 @@ export function reachablePackages(packages: Record<string, unknown>, roots: read
 // A nested resolution `a/b/dep` wins over `a/dep`, which wins over the hoisted `dep`.
 function lockKeyFor(packages: Record<string, unknown>, parent: readonly string[], name: string) {
   for (let depth = parent.length; depth > 0; depth--) {
-    const key = [...parent.slice(0, depth), name].join('/')
+    const key = parent.slice(0, depth).concat([name]).join('/')
     if (key in packages) return key
   }
   return name in packages ? name : null

@@ -56,7 +56,7 @@ function run(
 ) {
   const action = editActionForCommand(command, text, selections, options)
   let out = text
-  for (const edit of [...action.edits].sort((left, right) => right.from - left.from)) {
+  for (const edit of action.edits.toSorted((left, right) => right.from - left.from)) {
     out = out.slice(0, edit.from) + edit.text + out.slice(edit.to)
   }
 
@@ -445,7 +445,7 @@ describe('what counts as a list item', () => {
     if (!result) return null
 
     let out = text
-    for (const edit of [...result.edits].sort((left, right) => right.from - left.from)) {
+    for (const edit of result.edits.toSorted((left, right) => right.from - left.from)) {
       out = out.slice(0, edit.from) + edit.text + out.slice(edit.to)
     }
 

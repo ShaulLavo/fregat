@@ -65,7 +65,7 @@ Reuse the existing price catalog and saved price provenance. A subscription tran
 - [ ] Update Settings Usage with host/tool coverage and scan age. Keep the previous range's header and body together until the new range is ready. Keep account limits and transcript totals separately labeled.
 - [ ] Remove recorder/import paths that now duplicate the canonical history source. Preserve Fregat-only utility generations and session attribution only where tests establish their value.
 - [ ] Run narrow server, ledger, parser, and Settings fixture checks. Extend `settings-usage` and `claude-usage-import`; add missing multi-source scenarios and read back `look` evidence.
-- [ ] Compare scan bytes, wall time, and memory before/after on the same corpus through the heavy runner. Confirm that range changes read cache and that UI reads cause zero provider calls and zero host launches.
+- [ ] Compare scan bytes, wall time, and memory before/after on the same corpus through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill. Confirm that range changes read cache and that UI reads cause zero provider calls and zero host launches.
 - [ ] Commit and push owned paths, run required gates, deploy changed server/web code, and verify the served history report with its coverage labels. Update the root roadmap and this checklist.
 
 ## Acceptance and verification

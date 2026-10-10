@@ -39,6 +39,10 @@ test.each([
 
 test.each([
   [
+    'editor/packages/tree-sitter/src/mergeReview.ts',
+    "import { DocumentDelivery } from '@singapore-editor/core/internal/document-worker'; import { TreeSitterWorkerClient } from './treeSitter/workerClient'; new TreeSitterWorkerClient()",
+  ],
+  [
     'editor/packages/tree-sitter/src/session.ts',
     "import { waitForDocumentWork } from '@singapore-editor/core/internal/document-worker'",
   ],

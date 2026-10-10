@@ -5,11 +5,13 @@ import {
   MAX_CHAT_ATTACHMENT_BYTES,
   MAX_CHAT_FILE_ATTACHMENT_BYTES,
   attachmentUploadInputSchema,
+  machineFileAttachInputSchema,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { Elysia } from 'elysia'
 
 import { observeRequestOperation } from '../observability'
+import { attachMachineFile, type MachineFiles } from './machine-files'
 import {
   attachmentFilePath,
   defaultAttachmentsDir,
@@ -39,9 +41,12 @@ const ATTACHMENT_CACHE_CONTROL = 'private, max-age=31536000, immutable'
  */
 export function attachmentRoutes({
   attachmentsDir = defaultAttachmentsDir(),
+  files,
   ownership,
 }: {
   attachmentsDir?: string
+  /** This server's filesystem, which a client can attach files from by path. */
+  files: MachineFiles
   ownership: AttachmentOwnership
 }) {
   return new Elysia({ name: 'attachment-routes' })
@@ -53,6 +58,14 @@ export function attachmentRoutes({
     }))
     .post('/attachments/uploads', ({ body }) =>
       createAttachmentUpload(attachmentsDir, v.parse(attachmentUploadInputSchema, body), ownership),
+    )
+    .post('/attachments/uploads/from-machine', ({ body }) =>
+      attachMachineFile({
+        attachmentsDir,
+        files,
+        ownership,
+        path: v.parse(machineFileAttachInputSchema, body).path,
+      }),
     )
     .put(
       '/attachments/uploads/:id',

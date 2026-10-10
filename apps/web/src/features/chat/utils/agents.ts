@@ -193,7 +193,7 @@ export function chatAgentTree(agents: readonly ChatAgentEntry[]): ChatAgentNode[
       roots.push(entry)
       continue
     }
-    childrenOf.set(parent, [...(childrenOf.get(parent) ?? []), entry])
+    childrenOf.set(parent, (childrenOf.get(parent) ?? []).concat([entry]))
   }
 
   const placed = new Set<string>()
@@ -208,7 +208,7 @@ export function chatAgentTree(agents: readonly ChatAgentEntry[]): ChatAgentNode[
   // A parent cycle has no root; its members still show, flat.
   const orphans = agents.filter((entry) => !placed.has(entry.agent.threadId))
 
-  return [...tree, ...orphans.map(node)]
+  return tree.concat(orphans.map(node))
 }
 
 export function chatAgentElapsed(entry: ChatAgentEntry) {

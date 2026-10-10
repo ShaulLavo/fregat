@@ -54,14 +54,12 @@ async function tokenizeSnippet(
   if (text.length === 0) return []
 
   const documentId = `editor-snippet-${nextSnippetId++}`
-  const highlighters = [
-    ...sources.flatMap((source) => (source.highlighter ? [source.highlighter] : [])),
-    ...pluginHost.getHighlighterProviders(),
-  ]
-  const structural = [
-    ...sources.flatMap((source) => (source.syntax ? [source.syntax] : [])),
-    ...pluginHost.getSyntaxProviders(),
-  ]
+  const highlighters = sources
+    .flatMap((source) => (source.highlighter ? [source.highlighter] : []))
+    .concat(pluginHost.getHighlighterProviders())
+  const structural = sources
+    .flatMap((source) => (source.syntax ? [source.syntax] : []))
+    .concat(pluginHost.getSyntaxProviders())
   if (highlighters.length > 0) {
     const submitted = createSnippetDocument(text, 'as-submitted')
     const analysis = createEditorDocumentAnalysis({ buffer: submitted.buffer, documentId })

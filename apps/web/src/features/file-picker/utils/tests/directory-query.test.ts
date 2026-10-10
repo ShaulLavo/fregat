@@ -10,8 +10,8 @@ import { filePickerKeys } from '@/lib/query-keys'
 
 test('keeps streamed search prefixes stale and preserves the folder preview', () => {
   const queryClient = new QueryClient()
-  const baseQueryKey = filePickerKeys.directory('project', '', 'file', false)
-  const searchQueryKey = filePickerKeys.directory('project', 'read', 'file', false)
+  const baseQueryKey = filePickerKeys.directory('project', '', false)
+  const searchQueryKey = filePickerKeys.directory('project', 'read', false)
   const currentEntry = directoryEntry('project')
   const match = fileEntry('project/readme.md')
 

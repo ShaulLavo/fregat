@@ -309,195 +309,6 @@
       "minimum": 1,
       "type": "integer"
     },
-    "developer.heavyJobClasses": {
-      "default": {
-        "bench": {
-          "ceilingMiB": 9216,
-          "estimateMiB": 3072
-        },
-        "browser": {
-          "ceilingMiB": 10240,
-          "estimateMiB": 4096
-        },
-        "build": {
-          "ceilingMiB": 4096,
-          "estimateMiB": 3072
-        },
-        "light": {
-          "ceilingMiB": 2048,
-          "estimateMiB": 1536
-        },
-        "suite": {
-          "ceilingMiB": 8192,
-          "estimateMiB": 6656
-        }
-      },
-      "description": "Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.",
-      "markdownDescription": "Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.\n\nThe estimate is what admission reserves for a job of the class until the job uses it. The ceiling is the memory limit of the job’s slice: the kernel kills a job that grows past it.",
-      "properties": {
-        "bench": {
-          "properties": {
-            "ceilingMiB": {
-              "maximum": 262144,
-              "minimum": 16,
-              "type": "integer"
-            },
-            "estimateMiB": {
-              "maximum": 262144,
-              "minimum": 16,
-              "type": "integer"
-            }
-          },
-          "required": ["ceilingMiB", "estimateMiB"],
-          "type": "object"
-        },
-        "browser": {
-          "properties": {
-            "ceilingMiB": {
-              "maximum": 262144,
-              "minimum": 16,
-              "type": "integer"
-            },
-            "estimateMiB": {
-              "maximum": 262144,
-              "minimum": 16,
-              "type": "integer"
-            }
-          },
-          "required": ["ceilingMiB", "estimateMiB"],
-          "type": "object"
-        },
-        "build": {
-          "properties": {
-            "ceilingMiB": {
-              "maximum": 262144,
-              "minimum": 16,
-              "type": "integer"
-            },
-            "estimateMiB": {
-              "maximum": 262144,
-              "minimum": 16,
-              "type": "integer"
-            }
-          },
-          "required": ["ceilingMiB", "estimateMiB"],
-          "type": "object"
-        },
-        "light": {
-          "properties": {
-            "ceilingMiB": {
-              "maximum": 262144,
-              "minimum": 16,
-              "type": "integer"
-            },
-            "estimateMiB": {
-              "maximum": 262144,
-              "minimum": 16,
-              "type": "integer"
-            }
-          },
-          "required": ["ceilingMiB", "estimateMiB"],
-          "type": "object"
-        },
-        "suite": {
-          "properties": {
-            "ceilingMiB": {
-              "maximum": 262144,
-              "minimum": 16,
-              "type": "integer"
-            },
-            "estimateMiB": {
-              "maximum": 262144,
-              "minimum": 16,
-              "type": "integer"
-            }
-          },
-          "required": ["ceilingMiB", "estimateMiB"],
-          "type": "object"
-        }
-      },
-      "required": ["bench", "browser", "build", "light", "suite"],
-      "type": "object"
-    },
-    "developer.heavyJobCpuLoadLimit": {
-      "default": 1,
-      "description": "Runnable tasks per core at or above which heavy-job admission starts no further job while one runs.",
-      "markdownDescription": "Runnable tasks per core at or above which heavy-job admission starts no further job while one runs.\n\nThe one-minute load average divided by the number of cores: 1 means every core has a runnable task. CPU pressure’s `some` share stays high on an idle desktop and its `full` share reads zero for the whole machine, so admission counts runnable tasks.",
-      "maximum": 16,
-      "minimum": 0.1,
-      "type": "number"
-    },
-    "developer.heavyJobLogDirectory": {
-      "default": "/work/platform-production/heavy-jobs",
-      "description": "Directory where `scripts/heavy/run.ts` writes one JSON line per heavy job: its peak memory, CPU time, wall time and exit code. `scripts/heavy/report.ts` reads it.",
-      "minLength": 1,
-      "type": "string"
-    },
-    "developer.heavyJobMemoryPressureLimit": {
-      "default": 10,
-      "description": "Percent of memory pressure at or above which heavy-job admission starts no further job while one runs.",
-      "markdownDescription": "Percent of memory pressure at or above which heavy-job admission starts no further job while one runs.\n\nMemory pressure is the share of the last ten seconds in which some task waited for memory (`/proc/pressure/memory`, `some avg10`). It stays near zero until the machine reclaims or swaps.",
-      "maximum": 100,
-      "minimum": 0,
-      "type": "number"
-    },
-    "developer.heavyJobMemoryReserveMiB": {
-      "default": 2048,
-      "description": "MiB of available memory that heavy-job admission leaves free for the desktop, the app and work outside the wrapper.",
-      "maximum": 65536,
-      "minimum": 0,
-      "type": "integer"
-    },
-    "developer.heavyJobQuietHoldSeconds": {
-      "default": 600,
-      "description": "Maximum seconds for quiet admission, a running quiet hold, and an external drain request, measured independently.",
-      "markdownDescription": "Maximum seconds for quiet admission, a running quiet hold, and an external drain request, measured independently.\n\nA `--quiet` job waits for finite jobs to finish while later jobs queue behind it. Declared servers keep running and count toward resource admission. Admission and execution each get this many seconds. Expiry releases the request or stops the running job and returns exit 75; invoke it again for a fresh queue ticket. A `drain.request` is honoured for this many seconds from its first observation.",
-      "maximum": 7200,
-      "minimum": 1,
-      "type": "integer"
-    },
-    "developer.heavyJobQuietPolicy": {
-      "default": {
-        "allowedClasses": ["light"],
-        "concurrentCpus": [],
-        "measurementCpus": []
-      },
-      "description": "Classes allowed alongside a quiet measurement. Light jobs keep their memory and pressure checks. Empty CPU sets use the machine scheduler.",
-      "markdownDescription": "Classes allowed alongside a quiet measurement. Light jobs keep their memory and pressure checks. Empty CPU sets use the machine scheduler.\n\nUse an empty allowedClasses array to hold new light jobs during measurements. The measurementCpus and concurrentCpus fields currently accept empty arrays, preserving host scheduling. CPU affinity requires a validated scheduling implementation.",
-      "properties": {
-        "allowedClasses": {
-          "items": {
-            "const": "light"
-          },
-          "type": "array"
-        },
-        "concurrentCpus": {
-          "items": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "maxItems": 0,
-          "type": "array"
-        },
-        "measurementCpus": {
-          "items": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "maxItems": 0,
-          "type": "array"
-        }
-      },
-      "required": ["allowedClasses", "concurrentCpus", "measurementCpus"],
-      "type": "object"
-    },
-    "developer.heavyJobStopGraceSeconds": {
-      "default": 10,
-      "description": "Seconds a stopped heavy job, and anything a finished one left running, gets between SIGTERM and SIGKILL.",
-      "maximum": 600,
-      "minimum": 1,
-      "type": "integer"
-    },
     "developer.simulatedLatencyMs": {
       "default": 0,
       "description": "Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.",
@@ -747,7 +558,7 @@
     },
     "environments.devicePairing": {
       "default": true,
-      "description": "A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a code from this machine or a paired device pairs it. This machine’s own browser needs no pairing.",
+      "description": "A browser on another device, such as a phone reaching this machine through a reverse proxy, shows a pairing screen until a code from this machine or a paired device pairs it. This machine’s own browser needs no pairing.",
       "type": "boolean"
     },
     "environments.loadBalancing": {
@@ -829,6 +640,15 @@
       "description": "A device signed in to Tailscale as the same user as this machine opens Fregat without pairing. Tagged devices, devices shared from another tailnet, and other users still pair.",
       "type": "boolean"
     },
+    "environments.trustedProxyHosts": {
+      "default": [],
+      "description": "Public Host values, including any port, whose loopback reverse proxy supplies the client address for device trust. The proxy must preserve Host and replace X-Forwarded-For with the single IP it verified. Other proxy requests use device pairing.",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
     "files.autoSave": {
       "default": "off",
       "description": "Save edited files automatically, and when.",
@@ -860,13 +680,13 @@
     },
     "files.picker.view": {
       "default": "auto",
-      "description": "How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file.",
+      "description": "How the folder picker shows a folder: columns, a list, or icons. Auto uses columns.",
       "enum": ["auto", "columns", "icons", "list"],
       "type": "string"
     },
     "files.previewKilobytes": {
       "default": 64,
-      "description": "Kilobytes of a text file the file picker and quick open read for their preview. A longer file shows its first part and says how much of it that is.",
+      "description": "Kilobytes of a text file quick open reads for its preview. A longer file shows its first part and says how much of it that is.",
       "maximum": 1024,
       "minimum": 4,
       "type": "integer"
@@ -1044,7 +864,7 @@
     },
     "keybindings.preset": {
       "default": "ours",
-      "description": "The shortcuts your contextual bindings build on. Ours starts with Zed’s keys; Zed tracks its defaults; VS Code uses its editing and app shortcuts.",
+      "description": "The shortcuts your contextual bindings build on. Ours starts with Zed’s keys and adds keys for Fregat’s own commands; Zed tracks its defaults; VS Code uses its editing and app shortcuts.",
       "enum": ["ours", "vscode", "zed"],
       "type": "string"
     },
@@ -1662,6 +1482,11 @@
       "minimum": 6,
       "type": "integer"
     },
+    "terminal.integrated.screenReader": {
+      "default": true,
+      "description": "Expose terminal text and announce new output to screen readers.",
+      "type": "boolean"
+    },
     "terminal.integrated.scrollback": {
       "default": 10000,
       "description": "How many lines of output the terminal keeps.",
@@ -1708,7 +1533,7 @@
     },
     "window.nativeDialogTimeoutSeconds": {
       "default": 300,
-      "description": "Seconds a desktop file chooser or startup message stays open before its helper closes.",
+      "description": "Seconds a desktop folder chooser or startup message stays open before its helper closes.",
       "maximum": 3600,
       "minimum": 1,
       "type": "integer"

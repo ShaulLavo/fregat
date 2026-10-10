@@ -27,7 +27,7 @@ const TEXT_MENU_EDITOR_COMMANDS = [
   'editor.action.revealDefinitionAside',
 ] as const
 
-const ASYNC_COMMAND_IDS = [
+const BASE_ASYNC_COMMAND_IDS: readonly PlatformCommandId[] = [
   'workspace.exportTranscript',
   'workspace.undoSessionAction',
   'workspace.redoSessionAction',
@@ -90,8 +90,6 @@ const ASYNC_COMMAND_IDS = [
   'workspace.newSession',
   'workspace.nextItem',
   'workspace.previousItem',
-  ...ITEM_POSITIONS.map(selectItemCommandId),
-  ...ITEM_POSITIONS.map(sidebarPanelCommandId),
   'workspace.closeCurrentTab',
   'workspace.newChat',
   'workspace.acceptCommitMessage',
@@ -107,7 +105,11 @@ const ASYNC_COMMAND_IDS = [
   'workspace.setSystemTheme',
   'workspace.toggleWallpaper',
   'wallpaper.next',
-] as const satisfies readonly PlatformCommandId[]
+]
+const ASYNC_COMMAND_IDS = BASE_ASYNC_COMMAND_IDS.concat(
+  ITEM_POSITIONS.map(selectItemCommandId),
+  ITEM_POSITIONS.map(sidebarPanelCommandId),
+)
 
 const FILE_OPERATION_COMMAND_IDS = [
   'fileTree.newFile',
@@ -117,7 +119,7 @@ const FILE_OPERATION_COMMAND_IDS = [
   'workspace.saveFile',
   'workspace.saveAllFiles',
   'workspace.revertFile',
-] as const satisfies readonly PlatformCommandId[]
+] satisfies readonly PlatformCommandId[]
 
 const WORKSPACE_OPERATION_COMMAND_IDS = [
   'chat.stashPrompt',
@@ -142,7 +144,7 @@ const WORKSPACE_OPERATION_COMMAND_IDS = [
   'workspace.toggleWallpaper',
   'wallpaper.next',
   'workspace.newSession',
-] as const satisfies readonly PlatformCommandId[]
+] satisfies readonly PlatformCommandId[]
 
 const FILE_BACKED_COMMAND_IDS = [
   'workspace.cycleMarkdownView',
@@ -161,7 +163,7 @@ const FILE_BACKED_COMMAND_IDS = [
   'workspace.revealActiveFileInTree',
   'workspace.acceptCommitMessage',
   'workspace.discardCommitMessage',
-] as const satisfies readonly PlatformCommandId[]
+] satisfies readonly PlatformCommandId[]
 
 const TAB_OPEN_COMMAND_IDS = [
   'workspace.splitEditorRight',
@@ -173,7 +175,7 @@ const TAB_OPEN_COMMAND_IDS = [
   'workspace.focusThirdEditorGroup',
   'workspace.focusEditor',
   'workspace.closeCurrentTab',
-] as const satisfies readonly PlatformCommandId[]
+] satisfies readonly PlatformCommandId[]
 
 const CHAT_MODE_COMMAND_IDS = [
   'chat.stashPrompt',
@@ -187,11 +189,11 @@ function commandIdsWhere(predicate: (command: CommandEntry) => boolean) {
   return platformCommands
     .filter(predicate)
     .map((command) => command.id)
-    .toSorted()
+    .sort()
 }
 
-function expectedCommandIds(ids: readonly PlatformCommandId[]) {
-  return ids.toSorted()
+function expectedCommandIds(ids: PlatformCommandId[]) {
+  return ids.sort()
 }
 
 function commandIdsWithUndoCategory(category: CommandUndoCategory) {

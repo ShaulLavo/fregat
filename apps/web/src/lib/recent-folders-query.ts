@@ -22,9 +22,5 @@ export function recentFoldersQueryOptions({ enabled }: { enabled: boolean }) {
 }
 
 function fetchRecentFolders(signal: AbortSignal, client: Client) {
-  return fetchRecentEntries(
-    { limit: RECENT_FOLDER_LIMIT, mode: 'folder', showHidden: true },
-    signal,
-    client,
-  )
+  return fetchRecentEntries({ limit: RECENT_FOLDER_LIMIT, showHidden: true }, signal, client)
 }

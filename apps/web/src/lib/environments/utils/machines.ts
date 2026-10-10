@@ -13,5 +13,5 @@ export function connectedMachines(
     if (machines.has(environmentId) && entry.kind !== 'primary') continue
     machines.set(environmentId, { ...entry, environmentId })
   }
-  return [...machines.values()]
+  return Array.from(machines.values())
 }

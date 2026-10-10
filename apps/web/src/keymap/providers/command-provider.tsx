@@ -6,7 +6,8 @@ import { selectSettingsView } from '@/features/settings/state/view-store'
 import { selectSettingsScope } from '@/features/settings/state/scope-store'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { PickerDialog } from '@/features/environments/components/picker-dialog'
+import { DeferredOverlay } from '@/components/deferred-overlay'
+import { pickerDialogModuleQueryOptions } from '@/features/environments/utils/picker-dialog-module'
 import { CloneRepositoryDialog } from '@/features/git/components/clone-repository-dialog'
 import { StartPullRequestSessionDialog } from '@/features/chat-mode/components/start-pull-request-session-dialog'
 import { parentPath } from '@/lib/path-formatters'
@@ -331,8 +332,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     () => resolvedPlatformKeyBindings(defaults, overrides),
     [defaults, overrides],
   )
-  // Badge snapshots and menu contexts depend on this table's identity.
-  const displayBindings = useMemo(() => displayPlatformKeyBindings(bindings), [bindings])
+  const displayBindings = displayPlatformKeyBindings(bindings)
   const { keymap, pendingChord } = useAppKeymap({
     bindings,
     bus,
@@ -424,7 +424,16 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     <CommandContext value={value}>
       <KeyBindingsContext value={displayBindings}>{children}</KeyBindingsContext>
       {environmentDialog ? (
-        <PickerDialog mode={environmentDialog} onClose={() => setEnvironmentDialog(null)} />
+        <DeferredOverlay
+          label='machine picker'
+          module={pickerDialogModuleQueryOptions}
+          open
+          onClose={() => setEnvironmentDialog(null)}
+        >
+          {({ PickerDialog }) => (
+            <PickerDialog mode={environmentDialog} onClose={() => setEnvironmentDialog(null)} />
+          )}
+        </DeferredOverlay>
       ) : null}
       {cloneParent !== null ? (
         <CloneRepositoryDialog

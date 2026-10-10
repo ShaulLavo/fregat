@@ -43,15 +43,16 @@ export class Effects {
     const spans = this.runs.get(span.start.bunch) ?? []
     this.runs.set(
       span.start.bunch,
-      [
-        ...spans,
-        {
-          start: span.start.counter,
-          count: span.count,
-          insert: key,
-          deletes: [],
-        },
-      ].sort((a, b) => a.start - b.start),
+      spans
+        .concat([
+          {
+            start: span.start.counter,
+            count: span.count,
+            insert: key,
+            deletes: [],
+          },
+        ])
+        .sort((a, b) => a.start - b.start),
     )
   }
 
@@ -68,24 +69,39 @@ export class Effects {
   }
 
   set(command: EditId, effects: readonly Effect[]): void {
+    if (effects.some((effect) => effect.op.actor !== command.actor))
+      throw new CollabFailure('foreign-effect')
+    const targets = this.targets(effects)
+    if (targets.size === 0) throw new CollabFailure('empty-effects')
+    for (const [key, active] of targets) this.states.set(key, active)
+    this.commands.add(editKey(command))
+  }
+
+  project(effects: readonly Effect[]): EffectsSnapshot {
+    const targets = this.targets(effects)
+    const snapshot = this.snapshot()
+    return {
+      ...snapshot,
+      states: snapshot.states.map(([key, active]) => [key, targets.get(key) ?? active]),
+    }
+  }
+
+  private targets(effects: readonly Effect[]): ReadonlyMap<string, boolean> {
     const targets = new Map<string, boolean>()
     for (const effect of effects) {
       const key = editKey(effect.op)
-      if (effect.op.actor !== command.actor) throw new CollabFailure('foreign-effect')
       if (!this.states.has(key)) throw new CollabFailure('unknown-effect')
       if (typeof effect.active !== 'boolean') throw new CollabFailure('invalid-effect-state')
       if (targets.has(key) && targets.get(key) !== effect.active)
         throw new CollabFailure('conflicting-effects')
       targets.set(key, effect.active)
     }
-    if (targets.size === 0) throw new CollabFailure('empty-effects')
-    for (const [key, active] of targets) this.states.set(key, active)
-    this.commands.add(editKey(command))
+    return targets
   }
 
   snapshot(): EffectsSnapshot {
     return {
-      runs: [...this.runs].map(([bunch, spans]) => [
+      runs: Array.from(this.runs, ([bunch, spans]) => [
         bunch,
         spans.map((span) => ({ ...span, deletes: [...span.deletes] })),
       ]),
@@ -112,7 +128,7 @@ function deleteSpan(span: ProvenanceSpan, target: IdSpan, key: string): readonly
   if (start >= end || span.deletes.includes(key)) return [span]
   const result: ProvenanceSpan[] = []
   if (span.start < start) result.push({ ...span, count: start - span.start })
-  result.push({ ...span, start, count: end - start, deletes: [...span.deletes, key] })
+  result.push({ ...span, start, count: end - start, deletes: span.deletes.concat([key]) })
   if (end < span.start + span.count)
     result.push({ ...span, start: end, count: span.start + span.count - end })
   return result

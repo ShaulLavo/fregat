@@ -405,7 +405,14 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
       expect(state.mountedRows[0]!.text).toBe(text.slice(0, state.mountedRows[0]!.text.length))
       expect(state.mountedRows[0]!.text.length).toBeLessThan(40)
       const range = retained.view.createRange(0, 10, { scrollIntoView: false })!
-      expect(state.metrics.characterWidth).toBeCloseTo(range.getBoundingClientRect().width / 10, 1)
+      const probe = document.createElement('span')
+      probe.style.cssText = 'position:absolute;font:inherit;white-space:pre'
+      probe.textContent = range.toString()
+      state.mountedRows[0]!.element.append(probe)
+      // A selected Range can enclose whole pixels; the element retains the font's advance.
+      const nativeAdvance = probe.getBoundingClientRect().width / probe.textContent.length
+      probe.remove()
+      expect(state.metrics.characterWidth).toBeCloseTo(nativeAdvance, 1)
       expect(tokenRangesIn(retained.host).length).toBeGreaterThan(0)
       assertNativeCaret(retained.view, 7)
 
@@ -579,16 +586,23 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
       view.scrollElement.dispatchEvent(new Event('scroll'))
       await browserFrames(3)
       const state = view.getState()
-      const firstRow = state.mountedRows.find((row) => row.index === state.visibleRange.start)!
-      const offset = firstRow.startOffset
+      const viewport = view.scrollElement.getBoundingClientRect()
+      const rangeStartRow = state.mountedRows.find((row) => row.index === state.visibleRange.start)
+      expect(rangeStartRow).toBeDefined()
+      expect(rangeStartRow!.bufferRow).toBeGreaterThanOrEqual(849_999)
+      expect(rangeStartRow!.text).toBe('x')
+      const rangeStartBufferRow = rangeStartRow!.bufferRow
+      expect(rangeStartRow!.gutterElement.getBoundingClientRect().top).toBe(
+        rangeStartRow!.element.getBoundingClientRect().top,
+      )
+      const caretRow = state.mountedRows.find(
+        (row) => row.element.getBoundingClientRect().top >= viewport.top,
+      )
+      expect(caretRow).toBeDefined()
+      const offset = caretRow!.startOffset
       view.focusInput()
       view.setSelection(offset, offset)
       expect(state.scrollTop).toBeGreaterThan(16_000_000)
-      expect(firstRow.bufferRow).toBeGreaterThanOrEqual(849_999)
-      expect(firstRow.text).toBe('x')
-      expect(firstRow.gutterElement.getBoundingClientRect().top).toBe(
-        firstRow.element.getBoundingClientRect().top,
-      )
       assertNativeCaret(view, offset)
       const savedScroll = view.getState().scrollTop
       const savedRange = view.getState().visibleRange
@@ -602,6 +616,15 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
       await browserFrames(3)
       expect(view.getState().scrollTop).toBeCloseTo(savedScroll, 5)
       expect(view.getState().visibleRange).toEqual(savedRange)
+      const restoredRangeStartRow = view
+        .getState()
+        .mountedRows.find((row) => row.index === savedRange.start)
+      expect(restoredRangeStartRow).toBeDefined()
+      expect(restoredRangeStartRow!.bufferRow).toBe(rangeStartBufferRow)
+      expect(restoredRangeStartRow!.text).toBe('x')
+      expect(restoredRangeStartRow!.gutterElement.getBoundingClientRect().top).toBe(
+        restoredRangeStartRow!.element.getBoundingClientRect().top,
+      )
       expect(view.createRange(offset, offset + 1, { scrollIntoView: false })?.toString()).toBe('x')
       expect(tokenRangesIn(host).length).toBeGreaterThan(0)
       assertNativeCaret(view, offset)

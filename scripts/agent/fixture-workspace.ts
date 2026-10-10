@@ -8,14 +8,17 @@ import { selectors, waitForApp } from './selectors'
 import { processesIn } from './fixture-processes'
 
 export async function fixtureGit(project: string, args: readonly string[]) {
-  const process = Bun.spawn(['git', '-C', project, ...args], { stdout: 'ignore', stderr: 'pipe' })
+  const process = Bun.spawn(['git', '-C', project].concat(args), {
+    stdout: 'ignore',
+    stderr: 'pipe',
+  })
   if (await process.exited)
     throw createScriptError(`Fixture git failed: ${await new Response(process.stderr).text()}`)
 }
 
 /** A git command's trimmed stdout, empty when it fails. */
 export async function fixtureGitOutput(root: string, args: readonly string[]) {
-  const child = Bun.spawn(['git', '-C', root, ...args], { stdout: 'pipe', stderr: 'ignore' })
+  const child = Bun.spawn(['git', '-C', root].concat(args), { stdout: 'pipe', stderr: 'ignore' })
   return (await new Response(child.stdout).text()).trim()
 }
 
@@ -163,7 +166,7 @@ export async function chooseFixtureFolder(
   await selectors.pickerGoToFolder(page).click()
   await selectors.pickerFolderPath(page).fill(fixture)
   await page.keyboard.press('Enter')
-  await selectors.pickerRow(page, 'a.txt').waitFor()
+  await selectors.pickerBrowsing(page, fixture).waitFor()
   await beforeChoose?.()
   await selectors.pickerChoose(page).click()
   await selectors.pickerDialog(page).waitFor({ state: 'hidden' })

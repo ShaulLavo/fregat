@@ -65,7 +65,7 @@ for (const directory of packageDirectories) {
     1,
     `${manifest.name}: one standalone typed example`,
   )
-  const destinations = [...readme.matchAll(/\]\(([^)]+)\)/g)].map((match) => match[1])
+  const destinations = Array.from(readme.matchAll(/\]\(([^)]+)\)/g), (match) => match[1])
   for (const destination of destinations) {
     assert(destination.startsWith('https://'), `${manifest.name}: use absolute HTTPS links`)
     links.add(destination)
@@ -76,7 +76,7 @@ const sourceLinks = new Set()
 for (const link of links) {
   const prefix = 'https://github.com/ShaulLavo/fregat/blob/main/'
   if (!link.startsWith(prefix)) continue
-  const path = link.slice(prefix.length)
+  const path = link.slice(prefix.length).split('#')[0]
   assert(!path.split('/').includes('..'), `Source link must stay in the checkout: ${link}`)
   await readFile(join(root, path))
   sourceLinks.add(link)

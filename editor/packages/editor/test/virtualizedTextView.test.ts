@@ -24,6 +24,7 @@ import {
   measureBrowserTextMetrics,
 } from '../src/virtualization/browserMetrics'
 import { type VirtualizedTextHighlightRegistry, VirtualizedTextView } from '../src/virtualization'
+import { ScrollViewport } from '../src/virtualization/scrollViewport'
 import type { VirtualizedTextViewInternal } from '../src/virtualization/virtualizedTextViewInternals'
 
 const highlightsMap = new Map<string, Highlight>()
@@ -217,7 +218,8 @@ describe('VirtualizedTextView', () => {
       const state = view.getState()
       expect(state.metrics.characterWidth).toBe(10)
       expect(state.gutterWidth).toBe(40)
-      expect(state.mountedRows[0]?.text.length).toBe(6)
+      // Five text columns and one caret column fit beside the measured 40 px gutter.
+      expect(state.mountedRows[0]?.text.length).toBe(5)
     } finally {
       measurement.mockRestore()
     }
@@ -441,6 +443,46 @@ describe('VirtualizedTextView', () => {
     })
   })
 
+  it.each(['virtualized', 'static'] as const)(
+    'defers native cap discovery until supplied-metrics content is tall in %s mode',
+    (scrollMode) => {
+      view.dispose()
+      const capSpy = vi.spyOn(ScrollViewport.prototype, 'maxScrollHeight', 'get')
+      const rectSpy = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockReturnValue(new DOMRect(0, 0, 256, 256))
+      try {
+        view = new VirtualizedTextView(container, {
+          highlightRegistry: mockRegistry,
+          overscan: 0,
+          scrollMode,
+          scrollPastEnd: false,
+          textMetrics: { characterWidth: 7, rowHeight: 18 },
+        })
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setScrollMetrics(0, 100)
+        view.setScrollMode('virtualized')
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setText('x')
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setText(createLines(1_000))
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setText(createLines(200_000))
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setText(createLines(250_000))
+        expect(capSpy).toHaveBeenCalledTimes(1)
+        view.setText(createLines(500_000))
+        view.setText(createLines(1_000))
+        view.setScrollMode('static')
+        view.setScrollMode('virtualized')
+        expect(capSpy).toHaveBeenCalledTimes(1)
+      } finally {
+        capSpy.mockRestore()
+        rectSpy.mockRestore()
+      }
+    },
+  )
+
   it('adds bottom scroll padding so the final row can align with the viewport top', () => {
     view.setText(createLines(10))
     view.setScrollMetrics(0, 100)
@@ -575,9 +617,10 @@ describe('VirtualizedTextView', () => {
       other.setText(createLines(100))
       view.setScrollMetrics(0, 100)
       other.setScrollMetrics(0, 100)
-      const ids = [...view.getState().mountedRows, ...other.getState().mountedRows].map(
-        (row) => row.element.id,
-      )
+      const ids = view
+        .getState()
+        .mountedRows.concat(other.getState().mountedRows)
+        .map((row) => row.element.id)
       expect(ids.every(Boolean)).toBe(true)
       expect(new Set(ids).size).toBe(ids.length)
     } finally {
@@ -591,7 +634,8 @@ describe('VirtualizedTextView', () => {
     view.setText(createLines(100))
     for (const top of [0, 20, 80, 400, 380, 60, 0]) {
       view.setScrollMetrics(top, 100)
-      const indexes = [...container.querySelectorAll<HTMLElement>('[data-editor-virtual-row]')].map(
+      const indexes = Array.from(
+        container.querySelectorAll<HTMLElement>('[data-editor-virtual-row]'),
         (row) => Number(row.dataset.editorVirtualRow),
       )
       const parent = view.getState().mountedRows[0]!.element.parentElement!
@@ -630,7 +674,7 @@ describe('VirtualizedTextView', () => {
       )
       const moved = observer
         .takeRecords()
-        .flatMap((record) => [...record.addedNodes, ...record.removedNodes])
+        .flatMap((record) => Array.from(record.addedNodes).concat(Array.from(record.removedNodes)))
       expect(moved.filter((node) => retained.has(node))).toEqual([])
     }
     observer.disconnect()
@@ -1060,7 +1104,7 @@ describe('VirtualizedTextView', () => {
   })
 
   it('keeps horizontal content width independent from recycled row text', () => {
-    view.setText([`${'x'.repeat(100)}`, ...Array.from({ length: 20 }, () => 'x')].join('\n'))
+    view.setText([`${'x'.repeat(100)}`].concat(Array.from({ length: 20 }, () => 'x')).join('\n'))
     view.setScrollMetrics(0, 40)
     const widthAfterLongLine = view.getState().contentWidth
 
@@ -1302,7 +1346,7 @@ describe('VirtualizedTextView', () => {
         text.slice(0, 3_000),
       )
       const highlight = highlightsMap.get(tokenHighlightNames()[0]!)!
-      expect([...highlight].map((range) => range.toString()).join('')).toBe(
+      expect(Array.from(highlight, (range) => range.toString()).join('')).toBe(
         text.slice(tokens.startAt(0), tokens.endAt(0)),
       )
     }
@@ -1448,13 +1492,15 @@ describe('VirtualizedTextView', () => {
     view.setText('abcdefghij')
     view.setScrollMetrics(0, 80, 72)
 
+    // Leave a caret column inside the viewport rather than admitting a fifth text column.
     expect(view.getState().wrapActive).toBe(true)
-    expect(view.getState().totalHeight).toBe(40)
-    expect(view.getState().mountedRows.map((row) => row.text)).toEqual(['abcde', 'fghij'])
+    expect(view.getState().totalHeight).toBe(60)
+    expect(view.getState().mountedRows.map((row) => row.text)).toEqual(['abcd', 'efgh', 'ij'])
     const labels = container.querySelectorAll<HTMLSpanElement>('.editor-virtualized-line-number')
     expect(labels[0]?.style.counterSet).toBe('editor-line 1')
     expect(labels[1]?.hidden).toBe(true)
-    expect(view.textOffsetFromViewportPoint(64, 25)).toBe(9)
+    expect(labels[2]?.hidden).toBe(true)
+    expect(view.textOffsetFromViewportPoint(64, 25)).toBe(8)
   })
 
   it('renders injected text rows without changing document offsets', () => {
@@ -3194,7 +3240,8 @@ describe('VirtualizedTextView', () => {
     expect(rows.map((row) => row.bufferRow)).toEqual([0, 1, 3])
     expect(rows.map((row) => row.text)).toEqual(['a', 'b', 'd'])
     expect(
-      [...container.querySelectorAll<HTMLSpanElement>('.editor-virtualized-line-number')].map(
+      Array.from(
+        container.querySelectorAll<HTMLSpanElement>('.editor-virtualized-line-number'),
         (label) => label.style.counterSet,
       ),
     ).toEqual(['editor-line 1', 'editor-line 2', 'editor-line 4'])
@@ -3600,7 +3647,7 @@ function tokenHighlightNames(): string[] {
 }
 
 function styleElementTexts(): string[] {
-  return [...document.head.querySelectorAll('style')].map((element) => element.textContent ?? '')
+  return Array.from(document.head.querySelectorAll('style'), (element) => element.textContent ?? '')
 }
 
 function tokenHighlightRanges(): AbstractRange[] {

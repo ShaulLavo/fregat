@@ -20,12 +20,13 @@ const readyPath = filesystemPath('repo/src/editor-tab-a.ts')
 const failedPath = filesystemPath('repo/src/editor-tab-b.ts')
 
 test.for([
-  { undoTiming: 'during', text: 'x' },
-  { undoTiming: 'after', text: 'abcdefgh' },
+  { undoTiming: 'during', text: 'x', scriptDelayMs: 0 },
+  { undoTiming: 'after', text: 'abcdefgh', scriptDelayMs: 0 },
+  { undoTiming: 'during', text: 'x', scriptDelayMs: 1_500 },
 ] as const)(
-  'an unavailable real highlighter keeps plain text interactive with Undo $undoTiming retry',
+  'an unavailable real highlighter keeps plain text interactive with Undo $undoTiming retry and $scriptDelayMs ms worker delivery',
   { timeout: 30_000 },
-  async ({ undoTiming, text }, context) => {
+  async ({ undoTiming, text, scriptDelayMs }, context) => {
     const app = await mountRetentionAcceptanceApp()
     await ensureFileSnapshotQuery(app.queryClient, readyPath)
     expect(await app.read().commands.openFileSurface(readyPath)).toMatchObject({
@@ -121,6 +122,11 @@ test.for([
     expect(unavailable.length - workerAttempts).toBeLessThanOrEqual(4)
     if (undoTiming === 'after') await assertBoundedRecovery(edited, workerAttempts)
 
+    if (scriptDelayMs > 0)
+      await commands.delayRequest({
+        ms: scriptDelayMs,
+        path: '/__unavailable-highlighter-worker__.js',
+      })
     const attemptsBeforeUndo = unavailable.length
     expect(controller.commands.dispatchCommand('undo')).toBe(true)
     expect(document.buffer.materializeFullText()).toBe(before)
@@ -137,9 +143,10 @@ test.for([
     }
 
     async function assertBoundedRecovery(source: string, attemptsBeforeBurst: number) {
-      // 2 seconds covers the 75 ms debounce and the 100/400 ms backoff, with delivery slack.
+      // The retry clock is fake; failed script loads still settle on the browser's clock.
       for (let elapsed = 0; elapsed < 2_000; elapsed += 50) {
         await vi.advanceTimersByTimeAsync(50)
+        await awaitEditorSyntaxWorkerIdleFences()
         await nextFrame()
         assertPlainFallback(source)
         if (controller.getSnapshot()?.initialHighlightStatus === 'error') break

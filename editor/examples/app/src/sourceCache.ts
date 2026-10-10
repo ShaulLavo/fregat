@@ -1,4 +1,6 @@
-import type { SourceFile, SourceSnapshot } from './githubSource.ts'
+import type { SourceEntry, SourceFile, SourceSnapshot } from './githubSource.ts'
+
+import { createStructuredError } from './structured-errors.ts'
 
 const CACHE_DIR = 'editor-github-source-cache'
 const OBJECTS_DIR = 'objects'
@@ -31,10 +33,15 @@ export async function loadCachedSourceSnapshot(
     const manifest = await readManifest(cacheDir)
     if (!manifest) return null
 
-    const objectsDir = await getObjectsDirectory(cacheDir, false)
-    if (!objectsDir) return null
-
-    return await hydrateSnapshot(manifest, objectsDir)
+    return {
+      owner: manifest.owner,
+      repo: manifest.repo,
+      branch: manifest.branch,
+      commitSha: manifest.commitSha,
+      treeSha: manifest.treeSha,
+      fetchedAt: manifest.fetchedAt,
+      files: manifest.files,
+    }
   } catch {
     return null
   }
@@ -45,14 +52,34 @@ export async function saveSourceSnapshotToCache(
   root: FileSystemDirectoryHandle | Promise<FileSystemDirectoryHandle> = getOpfsRoot(),
 ): Promise<void> {
   const cacheDir = requireDirectory(await getCacheDirectory(await root, true))
-  const objectsDir = requireDirectory(await getObjectsDirectory(cacheDir, true))
-
-  await Promise.all(snapshot.files.map((file) => writeObjectIfNeeded(objectsDir, file)))
   await writeManifest(cacheDir, createManifest(snapshot))
 }
 
+export async function loadCachedSourceFile(
+  sha: string,
+  root: FileSystemDirectoryHandle | Promise<FileSystemDirectoryHandle> = getOpfsRoot(),
+): Promise<string | null> {
+  try {
+    const cacheDir = await getCacheDirectory(await root, false)
+    if (!cacheDir) return null
+    const objectsDir = await getObjectsDirectory(cacheDir, false)
+    return objectsDir ? await readObject(objectsDir, sha) : null
+  } catch {
+    return null
+  }
+}
+
+export async function saveSourceFileToCache(
+  file: SourceFile,
+  root: FileSystemDirectoryHandle | Promise<FileSystemDirectoryHandle> = getOpfsRoot(),
+): Promise<void> {
+  const cacheDir = requireDirectory(await getCacheDirectory(await root, true))
+  const objectsDir = requireDirectory(await getObjectsDirectory(cacheDir, true))
+  await writeObjectIfNeeded(objectsDir, file)
+}
+
 function requireDirectory(directory: FileSystemDirectoryHandle | null): FileSystemDirectoryHandle {
-  if (!directory) throw new Error('Unable to open OPFS source cache')
+  if (!directory) throw createStructuredError('CACHE_UNAVAILABLE', { operation: 'directory' })
   return directory
 }
 
@@ -66,7 +93,7 @@ export async function clearSourceCache(
   }
 }
 
-function getOpfsRoot(): Promise<FileSystemDirectoryHandle> {
+async function getOpfsRoot(): Promise<FileSystemDirectoryHandle> {
   return navigator.storage.getDirectory()
 }
 
@@ -77,7 +104,7 @@ async function getCacheDirectory(
   try {
     return await root.getDirectoryHandle(CACHE_DIR, { create })
   } catch {
-    if (create) throw new Error('Unable to open OPFS source cache')
+    if (create) throw createStructuredError('CACHE_UNAVAILABLE', { operation: 'directory' })
     return null
   }
 }
@@ -89,7 +116,7 @@ async function getObjectsDirectory(
   try {
     return await cacheDir.getDirectoryHandle(OBJECTS_DIR, { create })
   } catch {
-    if (create) throw new Error('Unable to open OPFS source objects cache')
+    if (create) throw createStructuredError('CACHE_UNAVAILABLE', { operation: 'objects' })
     return null
   }
 }
@@ -106,7 +133,8 @@ async function readManifest(
 }
 
 function parseManifest(text: string): SourceCacheManifest | null {
-  const manifest = JSON.parse(text) as Partial<SourceCacheManifest>
+  const manifest: unknown = JSON.parse(text)
+  if (!isRecord(manifest)) return null
   if (manifest.version !== 1) return null
   if (typeof manifest.owner !== 'string') return null
   if (typeof manifest.repo !== 'string') return null
@@ -129,34 +157,12 @@ function parseManifest(text: string): SourceCacheManifest | null {
 }
 
 function parseManifestFile(file: unknown): SourceCacheManifestFile[] {
-  const item = file as Partial<SourceCacheManifestFile>
+  if (!isRecord(file)) return []
+  const item = file
   if (typeof item.path !== 'string') return []
   if (typeof item.sha !== 'string') return []
   if (typeof item.size !== 'number') return []
   return [{ path: item.path, sha: item.sha, size: item.size }]
-}
-
-async function hydrateSnapshot(
-  manifest: SourceCacheManifest,
-  objectsDir: FileSystemDirectoryHandle,
-): Promise<SourceSnapshot | null> {
-  const files: SourceFile[] = []
-
-  for (const file of manifest.files) {
-    const text = await readObject(objectsDir, file.sha)
-    if (text === null) return null
-    files.push({ ...file, text })
-  }
-
-  return {
-    owner: manifest.owner,
-    repo: manifest.repo,
-    branch: manifest.branch,
-    commitSha: manifest.commitSha,
-    treeSha: manifest.treeSha,
-    fetchedAt: manifest.fetchedAt,
-    files,
-  }
 }
 
 async function readObject(
@@ -219,10 +225,14 @@ function createManifest(snapshot: SourceSnapshot): SourceCacheManifest {
   }
 }
 
-function stripFileText(file: SourceFile): SourceCacheManifestFile {
+function stripFileText(file: SourceEntry): SourceCacheManifestFile {
   return {
     path: file.path,
     sha: file.sha,
     size: file.size,
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }

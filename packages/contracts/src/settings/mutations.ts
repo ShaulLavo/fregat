@@ -59,7 +59,6 @@ const NON_SCALAR_SETTING_IDS = [
   'git.projectWorktreeCleanupOnDelete',
   'workbench.theme.customizations',
   'spellcheck.words',
-  'developer.heavyJobClasses',
 ] as const satisfies readonly SettingId[]
 
 type NonScalarSettingId = (typeof NON_SCALAR_SETTING_IDS)[number]
@@ -367,20 +366,22 @@ export const settingsOperationSchemasByKind = {
   'project.set': projectOverrideOperationSchema,
 } satisfies Record<Exclude<SettingsOperation['kind'], 'set'>, v.GenericSchema>
 
+const leadingOperationKinds: SettingsOperation['kind'][] = ['set']
 /** Every `kind` the operation union accepts, so a rejection can name a bad one. */
-export const SETTINGS_OPERATION_KINDS: readonly SettingsOperation['kind'][] = Object.freeze([
-  'set',
-  ...(Object.keys(settingsOperationSchemasByKind) as Exclude<SettingsOperation['kind'], 'set'>[]),
-])
+export const SETTINGS_OPERATION_KINDS: readonly SettingsOperation['kind'][] = Object.freeze(
+  leadingOperationKinds.concat(
+    Object.keys(settingsOperationSchemasByKind) as Exclude<SettingsOperation['kind'], 'set'>[],
+  ),
+)
 
-export const settingsOperationSchema = v.union([
-  ...scalarSettingOperationSchemas,
-  ...Object.values(settingsOperationSchemasByKind),
-] as unknown as [
-  v.GenericSchema<unknown, SettingsOperation>,
-  v.GenericSchema<unknown, SettingsOperation>,
-  ...v.GenericSchema<unknown, SettingsOperation>[],
-]) as v.GenericSchema<unknown, SettingsOperation>
+const operationSchemas: v.GenericSchema[] = scalarSettingOperationSchemas
+export const settingsOperationSchema = v.union(
+  operationSchemas.concat(Object.values(settingsOperationSchemasByKind)) as unknown as [
+    v.GenericSchema<unknown, SettingsOperation>,
+    v.GenericSchema<unknown, SettingsOperation>,
+    ...v.GenericSchema<unknown, SettingsOperation>[],
+  ],
+) as v.GenericSchema<unknown, SettingsOperation>
 
 const compatibleOperationsSchema = v.pipe(
   v.array(settingsOperationSchema),
@@ -527,10 +528,11 @@ function applySettingsOperation(
   if (operation.kind === 'keybinding.set') return setKeybinding(raw, operation)
   if (operation.kind === 'keybinding.remove') return removeKeybinding(raw, operation)
   if (operation.kind === 'keybinding.append')
-    return replaceSetting(raw, 'keybindings.overrides', [
-      ...storedKeybindings(raw),
-      operation.entry,
-    ])
+    return replaceSetting(
+      raw,
+      'keybindings.overrides',
+      storedKeybindings(raw).concat([operation.entry]),
+    )
   if (operation.kind === 'keybinding.delete') {
     const current = storedKeybindings(raw)
     if (!jsonEqual(current, operation.expected)) return raw
@@ -587,10 +589,10 @@ function setKeybinding(
   raw: Readonly<Record<string, unknown>>,
   operation: SetKeybindingOperation,
 ): Readonly<Record<string, unknown>> {
-  const keys = [...new Set(operation.keys ?? [])]
+  const keys = Array.from(new Set(operation.keys ?? []))
   const context = operation.context ? { context: operation.context } : {}
   const remaining = storedKeybindings(raw).filter((entry) => !matchesKeybinding(entry, operation))
-  const unbinds = [...new Set(operation.defaultKeys ?? [])]
+  const unbinds = Array.from(new Set(operation.defaultKeys ?? []))
     .filter((key) => !keys.includes(key))
     .map((key): KeybindingOverride => ({ keys: key, unbind: operation.command, ...context }))
   const bindings = keys.map((key): KeybindingOverride => ({
@@ -598,7 +600,7 @@ function setKeybinding(
     command: operation.command,
     ...context,
   }))
-  return replaceSetting(raw, 'keybindings.overrides', [...remaining, ...unbinds, ...bindings])
+  return replaceSetting(raw, 'keybindings.overrides', remaining.concat(unbinds, bindings))
 }
 
 function setMachine(
@@ -655,7 +657,9 @@ function setModelMembership(
   const includes = current.some((entry) => matchesModelRef(entry, ref))
   if (includes === member) return raw
 
-  const next = member ? [...current, ref] : current.filter((entry) => !matchesModelRef(entry, ref))
+  const next = member
+    ? current.concat([ref])
+    : current.filter((entry) => !matchesModelRef(entry, ref))
 
   return replaceSetting(raw, key, next)
 }
@@ -706,7 +710,7 @@ function appendProviderSeed(
     config: seed.config ?? {},
   }
 
-  return replaceSetting(raw, 'providers.instances', [...current, instance])
+  return replaceSetting(raw, 'providers.instances', current.concat([instance]))
 }
 
 function setProjectOverride(

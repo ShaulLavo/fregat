@@ -598,6 +598,18 @@ composing keyboard such as Gboard may type the letter), through the mesh.
 
 ## Follow-up items
 
+- **Phone first load grew back (found 2026-10-09).** The split above took the phone's first-load
+  script to 1,071,142 bytes gzip on 2026-09-26. By 2026-10-09 the gated phone conversation load
+  was 1,499,663 bytes on main `91001cdd8`, with 2.1 KB left under its limit. #1159 moves four
+  startup-closed dialogs out (−31.5 KB). The largest remaining cost a phone's first
+  screen does not need is the editor core, about 240 KB of the gzipped startup chunk. It enters
+  the first load through `apps/web/src/state/application-runtime.ts` →
+  `features/editor/state/runtime.ts`, the language-server connection pool and the workspace
+  document service. Next step: create the editor runtime on first use (a document, a file screen,
+  the composer when it needs it), measure with `agent:browser trace phone-startup-timing`
+  before and after. Bundle size is not gated; prioritize this work when startup measurements
+  show a real problem.
+
 Carried in from other plans. They wait for the phone shell and join its split plans.
 
 - **Phone haptics (from Plan 154 Phase 7).** Only if this plan keeps the phone web layout.
@@ -861,3 +873,7 @@ Current owner: [apps/web/src/features/chat/utils/browser-voice-input.ts](https:/
 On iPhone Safari later dictation attempts omitted or misrecognized words. The owner confirmed missing words never appear in live preview, ruling out the final commit filter as their loss point. Browser versus spoken language was not established. SpeechRecognition/webkitSpeechRecognition uses locale, continuous and interim results; PR #920 repaired readiness status only. Capture real-device event timing, selected locale and result counts across first/later attempts, with a known-good control. Never log speech text or audio. Synthetic events do not establish recognition accuracy.
 
 - [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Viewport warning correction, 2026-10-09
+
+The HTML now declares the shared viewport settings. The pre-paint script adds `interactive-widget=resizes-content` when the browser exposes the virtual keyboard API. Chromium retains layout resizing; WebKit keeps its existing visual-viewport inset behavior and receives no unsupported viewport directive. The phone-shell scenario checks that the applied policy matches browser support. Built Chromium and WebKit phone checks retain keyboard-inset and sheet coverage; their evidence is under `/work/tmp/viewport-usage-warnings/proof/`. Device-panel simulators were unavailable, so this qualification uses browser phone emulation rather than a physical on-screen keyboard.
