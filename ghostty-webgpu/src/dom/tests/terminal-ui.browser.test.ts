@@ -1416,7 +1416,9 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.renderer.metrics.zigFrames).toBeGreaterThan(0)
       expect(harness.readRowsCalls()).toBe(0)
       expect(harness.readTextRowsCalls()).toBeGreaterThan(0)
-      expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('ABC')
+      await expect
+        .poll(() => harness.host.querySelector('[role="listitem"]')?.textContent)
+        .toBe('ABC')
       expect(harness.snapshots.at(-1)?.rows.every((row) => !('renderCells' in row))).toBe(true)
       const textFrame = harness.snapshots.at(-1)!
       const retainedTextRows = structuredClone(textFrame.rows)
@@ -1435,7 +1437,9 @@ describe('terminal frame consumer demand in Chromium', () => {
 
       harness.terminal.write(`${escape}[2J${escape}[Hnew output`)
       await settleTerminal(harness.terminal)
-      expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('new output')
+      await expect
+        .poll(() => harness.host.querySelector('[role="listitem"]')?.textContent)
+        .toBe('new output')
       expect(harness.readRowsCalls()).toBe(0)
       expect(harness.readRetainedRowsCalls()).toBe(1)
       expect(harness.readTextRowsCalls()).toBeGreaterThan(textReads)
@@ -1459,7 +1463,9 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.renderer.metrics.zigFrames).toBeGreaterThan(0)
       expect(harness.readRowsCalls()).toBe(0)
       expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('A')
-      expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('A')
+      await expect
+        .poll(() => harness.host.querySelector('[role="listitem"]')?.textContent)
+        .toBe('A')
       const retained = harness.terminal.frameSnapshot()!
       const retainedText = harness.snapshots.at(-1)!
       const textFrames = harness.snapshots.length
@@ -1477,7 +1483,9 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.readRowsCalls()).toBe(0)
       expect(harness.readRetainedRowsCalls()).toBe(1)
       expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('B')
-      expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('B')
+      await expect
+        .poll(() => harness.host.querySelector('[role="listitem"]')?.textContent)
+        .toBe('B')
       expect(harness.terminal.frameSnapshot()?.rows[0]?.text.trimEnd()).toBe('B')
       expect(harness.readRetainedRowsCalls()).toBe(2)
       expect(retained.rows[0]?.text.trimEnd()).toBe('A')
@@ -1936,7 +1944,9 @@ describe('terminal frame consumer demand in Chromium', () => {
 
     harness.terminal.write('!')
     await settleTerminal(harness.terminal)
-    expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('accessible now!')
+    await expect
+      .poll(() => harness.host.querySelector('[role="listitem"]')?.textContent)
+      .toBe('accessible now!')
     expect(harness.snapshots.at(-1)?.rows).toHaveLength(4)
     expect(harness.terminal.setAccessibilityEnabled(false)).toBe(true)
     harness.terminal.write('?')
@@ -2564,7 +2574,9 @@ describe('integrated terminal UI host', () => {
     expect(harness.terminal.textarea).toBe(textarea)
 
     harness.renderer.emit(frame(['accessible row']))
-    expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('accessible row')
+    await expect
+      .poll(() => harness.host.querySelector('[role="listitem"]')?.textContent)
+      .toBe('accessible row')
     expect(harness.terminal.setAccessibilityEnabled(true)).toBe(false)
     expect(harness.terminal.setAccessibilityEnabled(false)).toBe(true)
     expect(harness.host.querySelector('.ghostty-webgpu-accessibility')).toBeNull()
@@ -2602,7 +2614,7 @@ describe('integrated terminal UI host', () => {
     await waitForUi(() => providerText !== undefined, 'Wide-cell provider did not run')
 
     expect(providerText?.startsWith('界A')).toBe(true)
-    expect(host.querySelector('[role="listitem"]')?.textContent).toBe('界A')
+    await expect.poll(() => host.querySelector('[role="listitem"]')?.textContent).toBe('界A')
   })
 
   it('emits an error only when an accepted OSC 52 browser completion later fails', async () => {
@@ -2696,7 +2708,7 @@ describe('integrated terminal UI host', () => {
     expect(data).toEqual(apple ? [] : ['\u0003'])
 
     renderer!.emit(frame(['copy me', '', ''], { x: 7, y: 0 }))
-    expect(host.querySelectorAll('[role="listitem"]')).toHaveLength(3)
+    await expect.poll(() => host.querySelectorAll('[role="listitem"]')).toHaveLength(3)
     const scrollbarElement = host.querySelector<HTMLElement>('[role="scrollbar"]')
     expect(scrollbarElement).not.toBeNull()
     scrollbarElement!.focus()

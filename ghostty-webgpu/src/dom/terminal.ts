@@ -175,6 +175,7 @@ const defaultRendererFactory: GhosttyWebGpuRendererFactory = (options, signal) =
   createCompatibleTerminalRenderer(options, signal)
 
 const defaultScrollbarWidth = 12
+const accessibilityRefreshDelayMs = 100
 
 function scrollbarWidth(value: number | undefined): number {
   if (value === undefined) return defaultScrollbarWidth
@@ -261,8 +262,6 @@ function fittedFontSettingsEqual(
 
 interface TextPublication {
   readonly text: TerminalSubmittedText
-  readonly summary: TerminalSubmittedFrame
-  readonly submittedOutput?: boolean
 }
 
 const createFromSessionInternal = Symbol('createFromSessionInternal')
@@ -273,7 +272,8 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   )
   private readonly pendingText: TextPublication[] = []
   private deliveringText = false
-  private accessibilitySubscription?: GhosttyWebGpuTerminalSubscription
+  private accessibilityTimer?: number
+  private accessibilitySubmittedOutput = false
   private publicFrameSource?: TerminalSubmittedSnapshot
   private publicFrame?: TerminalSubmittedFrame
   private accessibility?: TerminalAccessibilityController
@@ -1118,23 +1118,52 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
 
   private installAccessibility(elements: TerminalElements): void {
     this.cleanup.add(() => this.disableAccessibility())
+    elements.textarea.addEventListener(
+      'focus',
+      () => {
+        this.runUiOperation('frame.accessibility', () => this.refreshAccessibility())
+      },
+      { signal: elements.signal },
+    )
     if (!this.accessibilityOptions) return
     this.enableAccessibility(elements)
   }
 
   private enableAccessibility(elements: TerminalElements): void {
-    const accessibility = this.createAccessibility(elements)
-    this.accessibility = accessibility
-    const update = ({ text, summary, submittedOutput }: TextPublication) => {
-      accessibility.update(
-        { cursor: summary.cursor, paintedCursor: summary.paintedCursor, rows: text.rows },
-        summary.scrollbar,
-        submittedOutput,
-      )
-    }
-    this.accessibilitySubscription = this.subscribeText(update)
-    const current = this.textPublication()
-    if (current) update(current)
+    this.accessibility = this.createAccessibility(elements)
+    this.refreshAccessibility()
+  }
+
+  private scheduleAccessibility(): void {
+    if (!this.accessibility) return
+    if (this.execution.kind === 'async' && this.execution.submittedOutput)
+      this.accessibilitySubmittedOutput = true
+    if (this.accessibilityTimer !== undefined) return
+    const view = owningWindow(this.elementsValue!.root)
+    this.accessibilityTimer = view.setTimeout(() => {
+      this.runUiOperation('frame.accessibility', () => this.refreshAccessibility())
+    }, accessibilityRefreshDelayMs)
+  }
+
+  private refreshAccessibility(): void {
+    this.cancelAccessibilityTimer()
+    const accessibility = this.accessibility
+    if (!accessibility) return
+    const summary = this.execution.submittedFrame
+    if (!summary) return
+    const submittedOutput =
+      this.execution.kind === 'sync'
+        ? undefined
+        : this.accessibilitySubmittedOutput || this.execution.submittedOutput
+    this.accessibilitySubmittedOutput = false
+    // Pull the latest displayed subject here so intervening paints keep native text lazy.
+    accessibility.update(summary, summary.scrollbar, submittedOutput)
+  }
+
+  private cancelAccessibilityTimer(): void {
+    if (this.accessibilityTimer === undefined) return
+    owningWindow(this.elementsValue!.root).clearTimeout(this.accessibilityTimer)
+    this.accessibilityTimer = undefined
   }
 
   private createAccessibility(elements: TerminalElements): TerminalAccessibilityController {
@@ -1157,8 +1186,8 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     const accessibility = this.accessibility
     if (!accessibility) return false
     this.accessibility = undefined
-    this.accessibilitySubscription?.dispose()
-    this.accessibilitySubscription = undefined
+    this.cancelAccessibilityTimer()
+    this.accessibilitySubmittedOutput = false
     accessibility.dispose()
     return true
   }
@@ -1502,6 +1531,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     if (this.stateValue !== 'open' && this.stateValue !== 'opening') return
     this.updateFrameUi(this.execution.kind === 'sync' ? this.execution.submit(snapshot) : snapshot)
     this.publishText()
+    this.scheduleAccessibility()
     if (
       this.execution.kind === 'async' &&
       (this.emitters.frame.hasListeners || this.extensionDispatch.events.frame)
@@ -1515,8 +1545,6 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     const summary = this.execution.submittedFrame
     if (!summary) return undefined
     return {
-      summary,
-      submittedOutput: this.execution.kind === 'sync' ? undefined : this.execution.submittedOutput,
       text: Object.freeze({
         frame: summary.frame,
         rows: summary.rows,

@@ -85,6 +85,18 @@ Call `terminal.dispose()` when you remove it.
 For a real shell, follow the [WebSocket PTY example](https://github.com/ShaulLavo/fregat/blob/main/ghostty-webgpu/docs/integration.md).
 For xterm.js integrations, start with the [API reference](https://github.com/ShaulLavo/fregat/blob/main/ghostty-webgpu/docs/api.md) and map input, output, fitting, and cleanup explicitly.
 
+## Screen reader text
+
+Pass `accessibility: {}` when creating a terminal, or call `setAccessibilityEnabled(true)`.
+The accessible row list and cursor position refresh from the latest displayed frame
+after a 100 ms delay under normal foreground scheduling. Enabling accessibility and
+focusing the input refresh that text immediately. Clean terminals have no refresh timer.
+
+The polite live region announces recent changes to visible rows at the same cadence,
+within its configured character and entry limits. Intermediate frames are coalesced.
+The short delay lets fast output settle into readable text while keeping interactive
+output responsive; visible rendering and public `onText` subscriptions keep their cadence.
+
 ## Planned work
 
 | Work                                                  | Status      | Plan                                                                                                                                                                  |
