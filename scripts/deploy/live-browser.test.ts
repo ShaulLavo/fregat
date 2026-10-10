@@ -10,7 +10,8 @@ test.each(['linux', 'darwin', 'win32'] as const)(
   'uses the browser platform and a complete compositor on %s',
   async (platform) => {
     const page = {}
-    const browser = { newPage: vi.fn().mockResolvedValue(page) }
+    const context = { newPage: vi.fn().mockResolvedValue(page) }
+    const browser = { newContext: vi.fn().mockResolvedValue(context) }
     const chromium = { launch: vi.fn().mockResolvedValue(browser) }
     expect(await openLiveBrowser(chromium, platform)).toEqual({ browser, page })
     expect(chromium.launch).toHaveBeenCalledOnce()
@@ -24,8 +25,9 @@ test.each(['linux', 'darwin', 'win32'] as const)(
       expect(env?.VK_ICD_FILENAMES).toBe(join('chromium', 'vk_swiftshader_icd.json'))
       expect(env?.VK_DRIVER_FILES).toBe(env?.VK_ICD_FILENAMES)
     }
-    expect(browser.newPage).toHaveBeenCalledExactlyOnceWith({
+    expect(browser.newContext).toHaveBeenCalledExactlyOnceWith({
       viewport: { width: 1440, height: 1000 },
     })
+    expect(context.newPage).toHaveBeenCalledExactlyOnceWith()
   },
 )

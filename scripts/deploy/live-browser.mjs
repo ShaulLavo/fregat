@@ -13,6 +13,8 @@ export async function openLiveBrowser(chromium, platform = process.platform) {
         }
       : { headless: true }
   const browser = await chromium.launch(options)
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
+  // Retain the request context after page closure so terminal cleanup can finish.
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+  const page = await context.newPage()
   return { browser, page }
 }

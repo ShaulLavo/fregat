@@ -11,6 +11,7 @@ import { readRefusals, refusalFailures } from './live-refusals.mjs'
 import { liveVerdict } from './live-verdict.mjs'
 import { openLiveBrowser } from './live-browser.mjs'
 import { appearanceFailures, inspectAppearance } from './live-appearance.mjs'
+import { emptyWorkbenchUrl } from './live-terminal.mjs'
 
 // A third-party image the chat renders; proves cross-origin isolation still lets favicons load.
 const publicFaviconUrl =
@@ -61,7 +62,8 @@ const { browser, page } = await openLiveBrowser(chromium)
 const observed = attachObserver(page, base)
 
 try {
-  await page.goto(base, { waitUntil: 'domcontentloaded' })
+  // Keep saved owner workspaces and terminals out of the target-page check.
+  await page.goto(emptyWorkbenchUrl(base), { waitUntil: 'domcontentloaded' })
   await page
     .locator(`[aria-label="Window toolbar"], ${errorFrame}`)
     .first()
@@ -85,7 +87,6 @@ try {
     served,
     rendered,
     publicFavicon,
-    ...serializable(observed),
   })
   report.failures = failures({ served, rendered, publicFavicon, observed })
 } catch (error) {
@@ -99,6 +100,27 @@ try {
   await page.screenshot({ path: resolve(values.out, 'live-failure.png') }).catch(() => {})
 } finally {
   await browser.close()
+}
+Object.assign(report, serializable(observed))
+report.failures.push(
+  ...observedProblems({
+    ...observed,
+    loopbackRequests: observed.loopbackRequests.filter(
+      (url) => new URL(url).origin !== target.origin,
+    ),
+  }),
+)
+
+try {
+  const { stdout } = await promisify(execFile)(
+    'bun',
+    [fileURLToPath(new URL('./live-terminal-check.ts', import.meta.url)), base, values.out],
+    { timeout: 180_000, maxBuffer: 4 * 1024 * 1024 },
+  )
+  report.terminal = JSON.parse(stdout)
+  report.failures.push(...report.terminal.failures)
+} catch (error) {
+  report.failures.push(`terminal check: aborted: ${error.message}`)
 }
 
 report.logNoise = await logNoise(values.logs)
@@ -159,7 +181,6 @@ function failures({ served, rendered, publicFavicon, observed }) {
     found.push(`served release is ${served.release}, expected ${values.release}`)
   if (values.release && rendered.clientRelease !== values.release)
     found.push(`loaded client release is ${rendered.clientRelease}, expected ${values.release}`)
-  found.push(...observedProblems(observed))
   if (rendered.errorFrame)
     found.push(
       `page shows an error frame on ${values.release ?? 'this release'}: ${rendered.errorFrame}`,

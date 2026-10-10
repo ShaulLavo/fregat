@@ -55,7 +55,7 @@ export type IsolatedServer = {
  * it through `window.platformDevServerUrl`.
  */
 export async function startIsolatedServer(
-  webOrigin: URL,
+  webOrigin: URL | undefined,
   {
     pathPrefix,
     realProviders = false,
@@ -105,6 +105,7 @@ export async function startIsolatedServer(
     rmSync(directory, { recursive: true, force: true })
     throw error
   })
+  webOrigin ??= new URL(`http://localhost:${port}`)
   const env = isolatedServerEnv({
     home,
     logs,

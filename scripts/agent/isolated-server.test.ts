@@ -67,36 +67,40 @@ it.each(['bun', 'node'])(
   40_000,
 )
 
-it('serves supplied web assets with the isolated promoted release descriptor', async () => {
-  const fixture = mkdtempSync(path.join(tmpdir(), 'fregat-built-web-'))
-  const web = path.join(fixture, 'web')
-  mkdirSync(web)
-  writeFileSync(
-    path.join(web, 'index.html'),
-    '<!doctype html><html><head><style id="platform-palette"></style><script id="fregat-html-bootstrap" type="application/json"></script><link id="fregat-wallpaper-light"><link id="fregat-wallpaper-dark"></head><body><p>Built fixture</p></body></html>',
-  )
-  let server: IsolatedServer | undefined
-  try {
-    server = await startIsolatedServer(new URL('http://localhost:5214'), { webRoot: web })
+it.each([undefined, new URL('http://localhost:5214')])(
+  'serves supplied web assets with origin %s',
+  async (webOrigin) => {
+    const fixture = mkdtempSync(path.join(tmpdir(), 'fregat-built-web-'))
+    const web = path.join(fixture, 'web')
+    mkdirSync(web)
     writeFileSync(
-      path.join(server.directory, 'served', 'build-config.json'),
-      JSON.stringify({ release: 'fixture-promoted', liveCheck: false }),
+      path.join(web, 'index.html'),
+      '<!doctype html><html><head><style id="platform-palette"></style><script id="fregat-html-bootstrap" type="application/json"></script><link id="fregat-wallpaper-light"><link id="fregat-wallpaper-dark"></head><body><p>Built fixture</p></body></html>',
     )
-    const release = await (await fetch(`${server.origin}/release`)).json()
-    expect(release).toMatchObject({
-      release: 'fixture-promoted',
-      server: { release: 'fixture-promoted' },
-      liveCheckRequired: false,
-    })
-    expect(await (await fetch(server.origin)).text()).toContain('Built fixture')
-    await server.stop()
-    expect(existsSync(path.join(web, 'index.html'))).toBe(true)
-    expect(existsSync(path.join(fixture, 'build-config.json'))).toBe(false)
-  } finally {
-    await server?.stop()
-    rmSync(fixture, { recursive: true, force: true })
-  }
-}, 40_000)
+    let server: IsolatedServer | undefined
+    try {
+      server = await startIsolatedServer(webOrigin, { webRoot: web })
+      writeFileSync(
+        path.join(server.directory, 'served', 'build-config.json'),
+        JSON.stringify({ release: 'fixture-promoted', liveCheck: false }),
+      )
+      const release = await (await fetch(`${server.origin}/release`)).json()
+      expect(release).toMatchObject({
+        release: 'fixture-promoted',
+        server: { release: 'fixture-promoted' },
+        liveCheckRequired: false,
+      })
+      expect(await (await fetch(server.origin)).text()).toContain('Built fixture')
+      await server.stop()
+      expect(existsSync(path.join(web, 'index.html'))).toBe(true)
+      expect(existsSync(path.join(fixture, 'build-config.json'))).toBe(false)
+    } finally {
+      await server?.stop()
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  },
+  40_000,
+)
 
 function alive(pid: number) {
   try {

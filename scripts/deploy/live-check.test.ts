@@ -2,6 +2,16 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
+import { emptyWorkbenchUrl } from './live-terminal.mjs'
+
+test.each(['/', '/demo/'])(
+  'opens an explicit empty workspace without restored tabs under %s',
+  (basePath) => {
+    expect(emptyWorkbenchUrl(`https://example.com${basePath}`)).toBe(
+      `https://example.com${basePath}~-/workbench?tabs=-`,
+    )
+  },
+)
 
 const script = path.join(import.meta.dirname, 'live-check.mjs')
 
