@@ -178,11 +178,43 @@ ul {
 }
 
 .entry {
+  position: relative;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 2px 24px 2px 4px;
   display: block;
   border-radius: 3px;
   white-space: nowrap;
+}
+
+.entry:focus-visible {
+  outline: 1px solid #4fc1ff;
+  outline-offset: -1px;
+}
+
+.entry[aria-busy='true']::after {
+  content: '…';
+  position: absolute;
+  right: 6px;
+}
+
+.entry.error {
+  color: #f48771;
+}
+
+#source-status {
+  min-width: 0;
+  max-width: 35%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #aaa;
+  font-size: 12px;
 }
 
 .entry:hover {
