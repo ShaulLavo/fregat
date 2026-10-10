@@ -1,5 +1,5 @@
 // Checks build-time highlighting and unbroken migration expressions with JavaScript disabled.
-// Usage: bun scripts/verify-migration.ts [evidence-directory] (after `bun run build`)
+// Usage: bun scripts/verify-migration.ts [evidence-directory] [landing-url] (after `bun run build`)
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -9,6 +9,8 @@ import { migrationComparison, migrationRendererOption } from '../src/examples/mi
 
 const dist = fileURLToPath(new URL('../dist/', import.meta.url))
 const evidence = process.argv[2]
+const landingUrl = process.argv[3] ?? 'http://migration.test/ghostty-webgpu/'
+const guideUrl = new URL('docs/start/xterm/', landingUrl).href
 if (evidence) await mkdir(evidence, { recursive: true })
 const widths = Array.from(
   new Set(
@@ -29,8 +31,8 @@ function luminance(color: string): number {
   return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722
 }
 
-async function verifyGuide(page: Page, engine: string, width: number, expected: string[]) {
-  await page.goto('http://migration.test/ghostty-webgpu/docs/start/xterm/')
+async function verifyGuide(page: Page, engine: string, width: number, expected: readonly string[]) {
+  await page.goto(guideUrl)
   await page.evaluate(() => document.fonts.ready)
   const table = page.getByRole('table', { name: 'xterm.js to ghostty-webgpu' })
   assert.deepEqual(await table.locator('pre code').allTextContents(), expected)
@@ -86,12 +88,13 @@ for (const [engine, launcher] of Object.entries({ chromium, webkit })) {
         javaScriptEnabled: false,
         viewport: { width, height: 1000 },
       })
-      await page.route('http://migration.test/**', async (route) => {
-        const path = new URL(route.request().url()).pathname.replace(/^\/ghostty-webgpu\//, '')
-        const file = join(dist, path.endsWith('/') || !path ? `${path}index.html` : path)
-        await route.fulfill({ path: file })
-      })
-      await page.goto('http://migration.test/ghostty-webgpu/')
+      if (!process.argv[3])
+        await page.route('http://migration.test/**', async (route) => {
+          const path = new URL(route.request().url()).pathname.replace(/^\/ghostty-webgpu\//, '')
+          const file = join(dist, path.endsWith('/') || !path ? `${path}index.html` : path)
+          await route.fulfill({ path: file })
+        })
+      await page.goto(landingUrl)
       await page.evaluate(() => document.fonts.ready)
       const table = page.getByRole('table', { name: 'xterm.js to ghostty-webgpu' })
       const expected = migrationComparison.flatMap(({ from, to }) => Array.of<string>(from, to))
