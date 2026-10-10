@@ -123,7 +123,6 @@ const pendingInlineWidgetRepaints = new WeakMap<VirtualizedTextViewInternal, () 
 
 type RowUpdatePass = {
   readonly cursorBufferRow: number | null
-  readonly cursorVirtualRow: number | null
   readonly cursorLineHighlight: VirtualizedTextViewInternal['cursorLineHighlight']
   readonly foldMarkers: ReadonlyMap<number, VirtualizedFoldMarker>
   readonly lineCount: number
@@ -132,7 +131,6 @@ type RowUpdatePass = {
 
 type RowUpdateState = EditorGutterRowContext &
   MeasuredText & {
-    readonly cursorVirtualLine: boolean
     readonly inlineMapping: RowInlineMapping | null
   }
 
@@ -579,7 +577,6 @@ function createRowUpdatePass(
 ): RowUpdatePass {
   return {
     cursorBufferRow: cursorLineBufferRow(view),
-    cursorVirtualRow: cursorLineVirtualRow(view),
     cursorLineHighlight: view.cursorLineHighlight,
     foldMarkers: foldMarkersForPass(view, rows),
     lineCount: view.model.lineCount,
@@ -641,9 +638,8 @@ function rowUpdateState(
     inlineMapping: rowInlineMappingForDisplayRow(displayRow),
     kind: displayRow?.kind ?? 'text',
     primaryText,
-    cursorLine: primaryText && bufferRow === updatePass.cursorBufferRow,
+    cursorLine: isDocumentTextDisplayRow(displayRow) && bufferRow === updatePass.cursorBufferRow,
     cursorLineHighlight: updatePass.cursorLineHighlight,
-    cursorVirtualLine: index === updatePass.cursorVirtualRow,
     foldMarker: primaryText ? (updatePass.foldMarkers.get(bufferRow) ?? null) : null,
     lineCount: updatePass.lineCount,
     toggleFold: updatePass.toggleFold,
@@ -669,9 +665,8 @@ function mountedRowUpdateState(
     inlineMapping: row.inlineMapping ?? null,
     kind: row.kind,
     primaryText,
-    cursorLine: primaryText && row.bufferRow === updatePass.cursorBufferRow,
+    cursorLine: row.source === 'document' && row.bufferRow === updatePass.cursorBufferRow,
     cursorLineHighlight: updatePass.cursorLineHighlight,
-    cursorVirtualLine: row.index === updatePass.cursorVirtualRow,
     foldMarker: primaryText ? (updatePass.foldMarkers.get(row.bufferRow) ?? null) : null,
     lineCount: updatePass.lineCount,
     toggleFold: updatePass.toggleFold,
@@ -719,7 +714,7 @@ function updateRow(
 ): void {
   if (isRowCurrent(view, row, item, snapshot, updatePass)) {
     const state = mountedRowUpdateState(view, row, updatePass)
-    updateCursorLineContentClass(view, row, state.cursorVirtualLine)
+    updateCursorLineContentClass(view, row, state.cursorLine)
     updateGutterRowElement(view, row, item, state)
     if (view.disposed) return
     updateMountedRowPaintFacts(row, state)
@@ -779,7 +774,7 @@ function updateRowElement(
 ): void {
   updateRowFrame(view, row, item)
   applyRowDecoration(view, row, item.index)
-  updateCursorLineContentClass(view, row, state.cursorVirtualLine)
+  updateCursorLineContentClass(view, row, state.cursorLine)
   updateRowInlineKindClasses(row, state.kind === 'text' ? state.inlineMapping : null)
   updateGutterRowElement(view, row, item, state)
   if (view.disposed) return
@@ -2353,7 +2348,8 @@ function updateMountedGutterFacts(
     gutterNumberCursorLine: boolean
     gutterCursorLineBackgroundLaneIds: readonly string[]
   }
-  mutable.gutterNumberCursorLine = state.cursorLine && view.cursorLineHighlight.gutterNumber
+  mutable.gutterNumberCursorLine =
+    state.primaryText && state.cursorLine && view.cursorLineHighlight.gutterNumber
   setCursorLineGutterBand(
     row.gutterElement,
     state.cursorLine &&
@@ -2422,13 +2418,6 @@ export function cursorLineBufferRow(view: VirtualizedTextViewInternal): number |
   return bufferRowForOffset(view, view.selectionHead!)
 }
 
-export function cursorLineVirtualRow(view: VirtualizedTextViewInternal): number | null {
-  const selection = view.selections[0]
-  if (!selection || selection.start !== selection.end) return null
-
-  return rowForCaretPosition(view, selection.head, selection.affinity)
-}
-
 function hasCollapsedSelection(view: VirtualizedTextViewInternal): boolean {
   if (view.selectionHead === null) return false
   if (view.selectionStart === null || view.selectionEnd === null) return false
@@ -2439,50 +2428,21 @@ function hasCollapsedSelection(view: VirtualizedTextViewInternal): boolean {
 export function refreshCursorLineRows(
   view: VirtualizedTextViewInternal,
   previousBufferRow: number | null,
-  previousVirtualRow: number | null,
 ): void {
   const nextBufferRow = cursorLineBufferRow(view)
-  const nextVirtualRow = cursorLineVirtualRow(view)
-  if (previousBufferRow === nextBufferRow && previousVirtualRow === nextVirtualRow) return
+  if (previousBufferRow === nextBufferRow) return
 
-  const rows = [...view.rowElements.values()].filter((row) =>
-    shouldRefreshCursorLineRow(
-      row,
-      previousBufferRow,
-      nextBufferRow,
-      previousVirtualRow,
-      nextVirtualRow,
-    ),
+  const rows = Array.from(view.rowElements.values()).filter(
+    (row) => row.bufferRow === previousBufferRow || row.bufferRow === nextBufferRow,
   )
   const updatePass = createRowUpdatePass(view, rows)
   for (const row of rows) {
-    updateCursorLineContentClass(view, row, row.index === nextVirtualRow)
-    refreshCursorLineGutterCells(view, row, updatePass)
+    const state = mountedRowUpdateState(view, row, updatePass)
+    updateCursorLineContentClass(view, row, state.cursorLine)
+    updateMountedGutterFacts(view, row, state)
+    if (view.gutterContributions.length === 0) continue
+    updateGutterContributionCells(view, row, state)
   }
-}
-
-function shouldRefreshCursorLineRow(
-  row: MountedVirtualizedTextRow,
-  previousBufferRow: number | null,
-  nextBufferRow: number | null,
-  previousVirtualRow: number | null,
-  nextVirtualRow: number | null,
-): boolean {
-  if (row.index === previousVirtualRow || row.index === nextVirtualRow) return true
-
-  return row.bufferRow === previousBufferRow || row.bufferRow === nextBufferRow
-}
-
-function refreshCursorLineGutterCells(
-  view: VirtualizedTextViewInternal,
-  row: MountedVirtualizedTextRow,
-  updatePass: RowUpdatePass,
-): void {
-  const state = mountedRowUpdateState(view, row, updatePass)
-  updateMountedGutterFacts(view, row, state)
-  if (view.gutterContributions.length === 0) return
-
-  updateGutterContributionCells(view, row, state)
 }
 
 function updateCursorLineContentClass(
