@@ -86,7 +86,7 @@ export function createTreeSitterReviewSyntax(options: {
           snapshotVersion,
           source: loan.reference,
         }
-        const result = await backend.parse({ ...identity, resultMode: 'parseOnly' })
+        const result = await backend.parse({ ...identity, resultMode: 'parseOnly', readOnly: true })
         const retained = (await backend.inspectRetention?.())?.documents.find(
           (document) => document.runtimeSessionId === id,
         )?.snapshots
@@ -112,8 +112,31 @@ export function createTreeSitterReviewSyntax(options: {
     return serial(async () => {
       if (disposed || !backend.reviewBatch) return reads.map(() => null)
       await (registration ??= backend.registerLanguages(options.languages))
-      const queries: TreeSitterReviewBatchRequest['queries'][number][] = []
-      const cleanup: (() => Promise<void>)[] = []
+      let queries: TreeSitterReviewBatchRequest['queries'][number][] = []
+      let cleanup: (() => Promise<void>)[] = []
+      const results: (readonly (readonly TreeSitterReviewUnit[])[] | null)[] = []
+      let preparedBase: PieceTableSnapshot | undefined
+      const settle = async (): Promise<void> => {
+        if (!queries.length) return
+        try {
+          const result = await backend.reviewBatch!({ runtimeSessionId: runtime(), queries })
+          for (let index = 0; index < queries.length; index++) {
+            const entry = result?.results[index]
+            results.push(
+              !disposed && entry?.status === 'ok'
+                ? entry.units.map((units) =>
+                    units.map((unit) => ({ ...unit, hasErrors: unit.hasErrors ?? false })),
+                  )
+                : null,
+            )
+          }
+        } finally {
+          const retiring = cleanup
+          cleanup = []
+          queries = []
+          await disposeReads(retiring)
+        }
+      }
       try {
         for (const read of reads) {
           const {
@@ -123,7 +146,11 @@ export function createTreeSitterReviewSyntax(options: {
             contentKey = false,
             selection = 'enclosing',
           } = read
-          const entry = await admit(baseSnapshot ?? snapshot)
+          const base = baseSnapshot ?? snapshot
+          // A new admission may evict any previous base under either retention limit.
+          if (preparedBase && preparedBase !== base) await settle()
+          preparedBase = base
+          const entry = await admit(base)
           if (!(await entry.ready) || disposed) return reads.map(() => null)
           const identity = {
             documentId: entry.id,
@@ -166,16 +193,8 @@ export function createTreeSitterReviewSyntax(options: {
           })
         }
         if (disposed) return reads.map(() => null)
-        const result = await backend.reviewBatch({ runtimeSessionId: runtime(), queries })
-        if (!result || result.results.length !== reads.length || disposed)
-          return reads.map(() => null)
-        return result.results.map((result) =>
-          result.status === 'ok'
-            ? result.units.map((units) =>
-                units.map((unit) => ({ ...unit, hasErrors: unit.hasErrors ?? false })),
-              )
-            : null,
-        )
+        await settle()
+        return results
       } finally {
         await disposeReads(cleanup)
       }

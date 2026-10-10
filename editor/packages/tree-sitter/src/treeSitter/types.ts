@@ -235,6 +235,8 @@ export type TreeSitterParseRequest = {
   readonly includeHighlights: boolean
   readonly includeCaptures?: boolean
   readonly resultMode?: 'full' | 'parseOnly' | 'bootstrap'
+  /** Immutable snapshots need no background warm-up for a later edit. */
+  readonly readOnly?: boolean
   readonly source: DocumentWorkerReadReference
   readonly generation: number
   readonly cancellationBuffer?: SharedArrayBuffer

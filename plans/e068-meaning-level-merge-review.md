@@ -603,8 +603,8 @@ request. Independent detector reads in the same analysis step share that request
 current-unit and author-projection query paths. A runtime cancellation flag covers the batch;
 individual stale/cancelled results still make the affected read unavailable. Batch release
 waits for the worker task and releases every source loan, including when a loan release fails.
-The retained projection limit and base-tree ownership are unchanged. Runtime disposal also
-cancels entry-local flags. Concurrent pairs share in-flight formatting comparisons by edit and
+The retained projection limit and base-tree ownership are unchanged. Batch cancellation and entry-local cancellation are combined throughout execution; runtime
+disposal cancels the batch without mutating caller-owned entry flags. Concurrent pairs share in-flight formatting comparisons by edit and
 unit; their independent current/projection reads enter the same batch. A real-parser coarse-unit
 regression catches duplicate comparisons while the reads are still pending.
 
@@ -652,10 +652,76 @@ Two earlier setup attempts stopped before collecting any timing sample because l
 The successful retry used portable bundles and a longer bounded guard wait. Failed attempts
 supply no timing verdict; every attempt removed its owned Mac temporary directory.
 
+The runtime benchmark preloads its observed lazy dependencies to prevent Vite from reloading
+a test while it records samples. A cold run passes without the previous reload warning.
+
 The runtime bench also now waits for both lazy hover controllers before editing and measuring
 hover opening. A reproduced command-dispatch failure showed that two animation frames did
 not guarantee the demand-loaded hover plugin was ready. The readiness check is outside all
 reported timers; no hover speedup is claimed.
+
+#### Review revisions and worker phase profile
+
+Oversized logical reads now split into messages containing at most 256 selections, counting
+an empty descriptor as one selection. Current and projected loops yield to the worker event
+queue every 32 selections. Every message shares one overall cancellation deadline with its
+entry contexts, and each context observes both the batch and entry flags during native
+progress checks. Cancelling or superseding the logical batch stops posting later chunks.
+Results retain their original range/read order. Reads of another base settle outstanding
+queries and release their projected source loans before admitting that base. The six-snapshot
+and 8,000,000-source-unit retention limits remain unchanged.
+
+Seven real-worker regressions failed before these fixes and pass afterward. They cover a
+20,000-range read with a highlighting reply before completion, the 256-selection ceiling
+and 79-message count, separate current/projected cancellation flags, mid-work cancellation
+and supersession, and sequential/batch equality across seven small snapshots or three
+3,000,000-unit snapshots with mixed projected bases. Final cleanup returns source reads to
+zero. An eighth regression verifies that review admissions declare immutable parse intent.
+The full real-worker corpus has 41 tests. The 226-test collaboration corpus now compares
+coalescing against the plain reader across its differential corpus, 10,000 seeded histories
+and peer-convergence histories.
+
+One further guarded Mac turn profiled the remaining reply and tested the single observed
+cause in A/B/B/A order. AC and one-minute load below 3 were checked before each block;
+loads were 2.82, 2.63, 2.57 and 2.51. Each version has 16 samples per shape. This is a
+worker-only **experiment, shared machine**, with probes enabled and nearest-rank p95.
+The after control suppresses idle warm-up only for the owned benchmark review runtime
+prefix. Production uses the general `readOnly` parse option, with final Linux counts
+confirming the same removal. No runtime-prefix special case is shipped.
+
+| Guarded Mac phase, median before / after | Ordinary        | Dense, 50 overlaps |
+| ---------------------------------------- | --------------- | ------------------ |
+| Complete detector                        | 48.45 / 3.20 ms | 50.00 / 3.80 ms    |
+| Complete detector p95                    | 50.20 / 4.70 ms | 51.20 / 4.60 ms    |
+| One query reply                          | 47.15 / 1.90 ms | 48.60 / 2.40 ms    |
+| Post to worker receipt                   | 45.75 / 0.05 ms | 46.65 / 0.10 ms    |
+| Receipt to execution start               | 0.00 / 0.00 ms  | 0.00 / 0.00 ms     |
+| Worker execution                         | 1.50 / 1.70 ms  | 1.80 / 2.05 ms     |
+| Worker completion to main receipt        | 0.00 / 0.20 ms  | 0.10 / 0.25 ms     |
+| Range work, including native queries     | 1.40 / 1.70 ms  | 1.80 / 2.00 ms     |
+| Native query subset                      | 0.50 / 0.60 ms  | 0.45 / 0.70 ms     |
+| Queued idle-reparse span                 | 49.90 / 0 ms    | 49.90 / 0 ms       |
+| Native parse subset of idle span         | 43.85 / 0 ms    | 44.05 / 0 ms       |
+
+The delay is before the worker receives the batch event. An already-running synchronous
+idle reparse blocks that event; it warms the tree for a later edit that an immutable review
+base never performs. It is not parsing inside the batch or a slow source transfer. Both
+Linux and Mac batch probes count zero source commands, source acquisitions, source-copy
+callbacks and native parses. Ordinary/dense still use one actual request, 100/150 ranges,
+400/500 non-root native queries and 3/4 cooperative yields. Before the fix, each review base
+also incurs one idle native parse and one source-copy callback copying 4096 units; after,
+there are no review idle-reparse spans. All mark hashes remain identical, including the
+50 dense overlaps. Linux supports these count conclusions only, with no quiet admission
+or elapsed-time verdict while Bevy runs.
+
+Native query time is nested within range work, and source-copy time within parse work.
+Delivery and the idle span overlap. The rows are phase observations, not additive exclusive
+costs. Instrumentation and the shared machine limit the comparison; it is not an
+uninstrumented release-speed claim. The ordinary complete median is still above 2 ms,
+and no other optimization was attempted. Portable samples, guards, counts and final
+production source hashes are in
+`editor/packages/collaboration/bench/worker-phase-evidence.json`. Raw evidence is retained
+under `/work/reports/e068-i-20261010/profile-mac/` and the before/after Linux profile directories.
 
 Remaining Approved work:
 
@@ -666,14 +732,10 @@ Remaining Approved work:
 - [x] Group the current-unit worker exchanges into one request per ordinary/dense batch.
       Retain exact mark equality, cancellation, source ownership and bounded projection caches;
       the batched worker reads evidence above covers the real-worker regression checks.
-- [ ] Profile the remaining batched worker cost. The guarded ordinary/dense query-reply medians
-      are 47.25/48.05 ms with one request; source hashes and all samples are in
-      `editor/packages/collaboration/bench/batched-worker-evidence.json`. Reproduce from
-      `editor/packages/collaboration` with `node ../../../node_modules/vitest/vitest.mjs run
---config vitest.review-cost.config.ts`. Start at `queryReviewBatch` and `queryMergeUnit`
-      in `editor/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts`; separate worker query
-      execution, source access and exchange latency before assigning the cost to any one of them.
-      Linux elapsed times remain diagnostic; repeat timing comparisons with the guarded Mac turn.
+- [x] Profile the remaining batched worker cost. The guarded phase experiment below identifies
+      immutable-snapshot idle warm-up as the queued work. Skip that warm-up with explicit
+      `readOnly` parse intent; keep it for mutable documents. The ordinary 2 ms complete
+      detector target remains open, with a 3.20 ms observed median in this experiment.
 - [ ] Bound late damaged-root/error-range checks and wide/injected incremental fallbacks.
       `bench/cursor.test.ts` now reproduces the expensive late damaged-root lookup independently
       of syntax-query execution; repeat it with the existing full-reparse differential corpus.

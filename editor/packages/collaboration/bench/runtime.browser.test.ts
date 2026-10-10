@@ -105,6 +105,11 @@ test('measure real worker batches, dense conflicts, mark painting and hover open
           requestJsonUtf8Bytes: bytes(request.request),
           resultJsonUtf8Bytes: bytes(request.result),
           roundTripMs: request.end! - request.start,
+          sentAtEpochMs: performance.timeOrigin + request.start,
+          receivedAtEpochMs: performance.timeOrigin + request.end!,
+          workerProfile:
+            (request.result as { result?: { profile?: unknown } } | undefined)?.result?.profile ??
+            null,
         }))
         expect(messages.every((message) => Number.isFinite(message.roundTripMs))).toBe(true)
         const workerRequests = allRequests

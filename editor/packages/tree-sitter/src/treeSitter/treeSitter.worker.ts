@@ -1,4 +1,5 @@
 import { editReusableTree } from './reuse'
+import { REVIEW_BATCH_YIELD_RANGES } from './reviewBatch'
 import { parseProjectedTree } from './projection'
 import { TREE_SITTER_BOOTSTRAP_UNITS } from './source'
 import {
@@ -141,6 +142,7 @@ type DocumentCache = {
 type CancellationContext = {
   readonly startedAt: number
   readonly budgetMs: number
+  readonly parent?: CancellationContext
   readonly isStale?: () => boolean
   readonly yieldParsing?: boolean
   readonly flag: Int32Array | null
@@ -781,7 +783,8 @@ const parseFullDocument = async (
     assertRuntimeSessionActive(request.runtimeSessionId)
     replaceCachedDocument(request.runtimeSessionId, parsedDocument)
     disposeBootstrap(request.runtimeSessionId)
-    if (!viewportFirst) scheduleIdleReparse(request.runtimeSessionId, parsedDocument, runtime)
+    if (!viewportFirst && !request.readOnly)
+      scheduleIdleReparse(request.runtimeSessionId, parsedDocument, runtime)
     return parsedDocument
   } catch (error) {
     if (parsedDocument) disposeCachedSnapshot(parsedDocument)
@@ -2895,18 +2898,27 @@ const queryReviewBatch = async (
   request: TreeSitterReviewBatchRequest,
 ): Promise<TreeSitterReviewBatchResult> => {
   const results: TreeSitterProjectedMergeUnitsResult[] = []
-  for (const item of request.queries) {
-    const query = {
-      ...item,
-      cancellationBuffer: item.cancellationBuffer ?? request.cancellationBuffer,
+  const context = createCancellationContext(request.cancellationBuffer, PARSE_BUDGET_MS)
+  let selections = 0
+  for (const query of request.queries) {
+    if (isCancelled(context)) {
+      results.push({
+        documentId: query.documentId,
+        snapshotVersion: query.snapshotVersion,
+        languageId: query.languageId,
+        status: 'cancelled',
+        units: [],
+      })
+      continue
     }
     if (query.type === 'projectMergeUnits') {
       const source = resolveRequestSource(query)
       try {
-        results.push(await queryProjectedMergeUnits(query, source))
+        results.push(await queryProjectedMergeUnits(query, source, context))
       } finally {
         source.dispose()
       }
+      await yieldWorker()
       continue
     }
     const identity = {
@@ -2917,7 +2929,9 @@ const queryReviewBatch = async (
     const units: (TreeSitterMergeUnit & { readonly languageId: string })[][] = []
     let status: 'ok' | 'stale' | 'cancelled' = 'ok'
     for (const range of query.ranges) {
-      const result = await queryMergeUnit({ ...query, type: 'mergeUnit', range })
+      if (selections && selections % REVIEW_BATCH_YIELD_RANGES === 0) await yieldWorker()
+      selections++
+      const result = await queryMergeUnit({ ...query, type: 'mergeUnit', range }, context)
       if (result.status !== 'ok') {
         status = result.status
         break
@@ -2936,6 +2950,7 @@ const queryReviewBatch = async (
 const queryProjectedMergeUnits = async (
   request: TreeSitterProjectedMergeUnitsRequest,
   source: TreeSitterPieceTableInput,
+  parent?: CancellationContext,
 ): Promise<TreeSitterProjectedMergeUnitsResult> => {
   const identity = {
     documentId: request.documentId,
@@ -2950,6 +2965,7 @@ const queryProjectedMergeUnits = async (
   if (!base) return { ...identity, status: 'stale', units: [] }
   const context: CancellationContext = {
     ...createCancellationContext(request.cancellationBuffer, PARSE_BUDGET_MS),
+    parent,
     isStale: () =>
       cachedDocumentForVersion(
         request.runtimeSessionId,
@@ -3108,7 +3124,11 @@ const projectedUnits = async (
   context: CancellationContext,
 ): Promise<TreeSitterProjectedMergeUnitsResult['units']> => {
   const result: Array<TreeSitterProjectedMergeUnitsResult['units'][number]> = []
+  let selections = 0
   for (const requested of request.ranges) {
+    if (selections && selections % REVIEW_BATCH_YIELD_RANGES === 0) await yieldWorker()
+    selections++
+    assertNotCancelled(context)
     const range = normalizedSyntaxRange(requested, projected.document.size)
     const layer =
       deepestLayerForSelection(projected.document, range) ?? projected.document.layers[0]!
@@ -3205,6 +3225,7 @@ const dropProjectedDocuments = (entries: Set<ProjectedDocument>): void => {
 
 const queryMergeUnit = async (
   request: TreeSitterMergeUnitRequest,
+  parent?: CancellationContext,
 ): Promise<TreeSitterMergeUnitResult> => {
   const identity = {
     documentId: request.documentId,
@@ -3240,6 +3261,7 @@ const queryMergeUnit = async (
     return { ...identity, status: 'stale', unit: null }
   const context: CancellationContext = {
     ...createCancellationContext(request.cancellationBuffer, PARSE_BUDGET_MS),
+    parent,
     isStale: () =>
       cachedDocumentForVersion(
         request.runtimeSessionId,
@@ -3725,6 +3747,7 @@ const normalizeAlias = (alias: string): string => {
 const uniqueItems = <T>(items: readonly T[]): readonly T[] => Array.from(new Set(items))
 
 const isCancelled = (context: CancellationContext): boolean => {
+  if (context.parent && isCancelled(context.parent)) return true
   if (context.isStale?.()) return true
   if (context.flag && Atomics.load(context.flag, 0) === 1) return true
   return nowMs() - context.startedAt > context.budgetMs
