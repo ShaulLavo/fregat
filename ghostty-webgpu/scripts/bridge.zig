@@ -502,13 +502,13 @@ fn reuseFrameRow(comptime stable: bool, frame: *Frame, y: u32) c.GhosttyResult {
         if (!std.mem.eql(u8, std.mem.asBytes(cell), std.mem.asBytes(&frame.cell_data[start + x]))) {
             cell_first = @min(cell_first, @as(u32, @intCast(x)));
             cell_end = @intCast(x + 1);
+            frame.cell_data[start + x] = next_cell;
         }
         if (!std.mem.eql(u8, std.mem.asBytes(glyph), std.mem.asBytes(&frame.glyph_data[start + x]))) {
             glyph_first = @min(glyph_first, @as(u32, @intCast(x)));
             glyph_end = @intCast(x + 1);
+            frame.glyph_data[start + x] = next_glyph;
         }
-        frame.cell_data[start + x] = next_cell;
-        frame.glyph_data[start + x] = next_glyph;
     }
     if (frame.ranges_len == frame.ranges_cap) return c.GHOSTTY_OUT_OF_SPACE;
     frame.ranges[frame.ranges_len] = .{
