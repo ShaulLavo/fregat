@@ -41,7 +41,21 @@ export async function openStaticPreview(page: Page, url = STATIC_PREVIEW_URL) {
     await page.getByRole('main').first().waitFor({ timeout: 30_000 })
     await page.evaluate('document.fonts.ready')
     await page.waitForTimeout(500)
-    await page.evaluate('Promise.all(Array.from(document.images, image => image.decode()))')
+    await page.evaluate(() =>
+      Promise.all(
+        Array.from(document.images, (image) => {
+          const bounds = image.getBoundingClientRect()
+          const inViewport =
+            bounds.bottom > 0 &&
+            bounds.right > 0 &&
+            bounds.top < innerHeight &&
+            bounds.left < innerWidth
+          // Offscreen lazy images can leave decode pending while their source is deferred.
+          if (image.loading === 'lazy' && !image.currentSrc && !inViewport) return
+          return image.decode()
+        }),
+      ),
+    )
     return true
   } catch {
     return false
