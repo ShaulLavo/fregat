@@ -37,6 +37,7 @@ editor.openDocument({
 - `createDecodePlugin()` adds a reveal animation.
 - `mode` selects line, parallel, token, or diffusion reveals.
 - `maxDurationMs` caps the animation duration.
+- `createMorphPlugin()` animates text changes: text that survives an edit slides to its new place, removed text fades out, and new text streams in. Undo, redo and large edits morph; typing stays instant.
 
 [Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/decode/overview/)
 
