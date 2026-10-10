@@ -159,7 +159,7 @@ describe('text-only render rows', () => {
     expect(materialize(state.readTextRows())).toEqual(equivalentTextRows(state.readRows()))
   })
 
-  it('batches ASCII row text while preserving lazy cells across later native updates', async () => {
+  it('owns ASCII row text while preserving lazy cells across later native updates', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 80, rows: 3 })
     const state = runtime.createRenderState(terminal)
@@ -174,7 +174,7 @@ describe('text-only render rows', () => {
     decode.mockRestore()
     batch.mockRestore()
     expect(calls).toBeLessThanOrEqual(rows.length)
-    expect(batches).toBeLessThanOrEqual(1)
+    expect(batches).toBe(rows.length)
     expect(rows.map((row) => row.text)).toEqual(expected.map((row) => row.text))
     terminal.write('\x1b[H\x1b[2Jchanged')
     state.update()
@@ -226,7 +226,7 @@ describe('text-only render rows', () => {
     expect(runtime.memory.view.getUint32(extract.mock.calls[0]![6] + 32, true)).toBe(0)
     expect({ scratchAllocations, bitmapAllocations }).toEqual({
       scratchAllocations: allocations,
-      bitmapAllocations: allocations * 2,
+      bitmapAllocations: allocations * grid.rows * 2,
     })
     expect(wordReads).toBe(allocations * cellCount * 2)
     const codepointMask = runtime.memory.view.getUint32(extract.mock.calls[0]![6] + 36, true)

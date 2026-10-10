@@ -32,7 +32,20 @@ export class FrameObserver {
 
   private rowCount: number
 
-  constructor(private readonly options: WebGpuTerminalRendererOptions) {
+  constructor(
+    private readonly options: Pick<
+      WebGpuTerminalRendererOptions,
+      | 'rows'
+      | 'onFrame'
+      | 'onTextFrame'
+      | 'onRowsChanged'
+      | 'onRowsPainted'
+      | 'onCleanUpdate'
+      | 'needsFrameRows'
+      | 'retainDisplayedText'
+    > &
+      Partial<WebGpuTerminalRendererOptions>,
+  ) {
     this.rowCount = options.rows
   }
 
