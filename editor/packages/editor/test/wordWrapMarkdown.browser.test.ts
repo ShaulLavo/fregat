@@ -5,7 +5,7 @@ import { init, MarkdownDocument } from 'tree-sitter-md'
 import { markdownInlineReplacements } from '../../markdown/src/replacements'
 import { createStringTextSnapshot } from '../src/documentTextSnapshot'
 import { Editor } from '../src/editor/Editor'
-import { glyphAdvancesFor } from '../src/virtualization/glyphAdvances'
+import { glyphAdvancesFor, PROPORTIONAL_WRAP_MARGIN_PX } from '../src/virtualization/glyphAdvances'
 import { clearBrowserTextMetricsCache } from '../src/virtualization/browserMetrics'
 import { decodePaintSnapshot, mountPaintSnapshot } from '../src/paint'
 import quickStart from '../../../site/src/content/docs/docs/start-here/quick-start.md?raw'
@@ -273,8 +273,9 @@ async function checkStyledPreview(text: string, width: number, replay: boolean):
     const decoded = decodePaintSnapshot(saved.paint)!
     expect(decoded.format).toBe(6)
     if (decoded.format !== 6) return
+    // Engines quantize computed font sizes to their subpixel layout units.
     for (const [index, size] of [18.9, 16.8, 15.4].entries())
-      expect(Number.parseFloat(decoded.rows[index]!.style.fontSize)).toBeCloseTo(size, 4)
+      expect(Number.parseFloat(decoded.rows[index]!.style.fontSize)).toBeCloseTo(size, 1)
     const rowElements = [...container.querySelectorAll<HTMLElement>('[data-editor-virtual-row]')]
     for (const [index, row] of decoded.rows.entries()) {
       const live = rowElements.find((element) =>
@@ -450,10 +451,10 @@ test.each(['theme', 'stylesheet', 'font'] as const)(
         const range = document.createRange()
         range.selectNodeContents(probe)
         expect(glyphAdvancesFor(heading)!.advance(87)).not.toBeCloseTo(beforeAdvance, 1)
-        expect(glyphAdvancesFor(heading)!.advance(87)).toBeCloseTo(
-          range.getBoundingClientRect().width,
-          1,
-        )
+        // Canvas and DOM shaping may differ within the wrapper's native-layout reserve.
+        expect(
+          Math.abs(glyphAdvancesFor(heading)!.advance(87) - range.getBoundingClientRect().width),
+        ).toBeLessThanOrEqual(PROPORTIONAL_WRAP_MARGIN_PX)
         probe.remove()
       }
       await expectStyledReplay(editor, container)

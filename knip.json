@@ -175,7 +175,8 @@
         "src/**/*.worker.ts",
         "bench/**/*.ts",
         "test/types/**/*.ts",
-        "test/reading-order.proof.mjs"
+        "test/reading-order.proof.mjs",
+        "vitest.snapshot.config.ts"
       ],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
       "ignoreDependencies": ["@playwright/test"]

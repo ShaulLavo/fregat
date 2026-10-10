@@ -69,7 +69,9 @@ export function captureDocumentPaint(
               id: row.element.id,
             }
           : null,
-      gutterBackgroundColor: getComputedStyle(row.gutterElement).backgroundColor || 'transparent',
+      gutterBackgroundColor: view.currentGutterWidth
+        ? getComputedStyle(row.gutterElement).backgroundColor
+        : 'transparent',
       gutterInsetBackgroundColor: row.gutterElement.classList.contains(
         'editor-virtualized-cursor-line-gutter-band',
       )
@@ -85,7 +87,9 @@ export function captureDocumentPaint(
     scope: 'document',
     appearance,
     style: captureStyle(view.scrollElement),
-    gutterBackgroundColor: getComputedStyle(view.gutterElement).backgroundColor || 'transparent',
+    gutterBackgroundColor: view.currentGutterWidth
+      ? getComputedStyle(view.gutterElement).backgroundColor
+      : 'transparent',
     characterWidth: view.metrics.characterWidth,
     monospace: view.monospace,
     gutterWidth: view.currentGutterWidth,
@@ -113,6 +117,8 @@ function captureStyle(element: HTMLElement): DocumentPaintStyle {
     letterSpacing: style.letterSpacing,
     fontFeatureSettings: style.fontFeatureSettings,
     fontVariationSettings: style.fontVariationSettings,
+    fontKerning: style.fontKerning,
+    fontVariantLigatures: style.fontVariantLigatures,
     visibility: style.visibility === 'hidden' ? 'hidden' : 'visible',
   }
 }
