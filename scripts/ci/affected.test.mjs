@@ -32,98 +32,83 @@ test('the four documentation files in PR 1207 do not consume application or libr
   expect(plan.docs_files).toContain('.agents/skills/react-development/SKILL.md')
 })
 
-test('metadata code still receives full validation', () => {
-  expect(select(['.agents/skills/helper.ts']).packages).toHaveLength(graph.packages.size)
-})
+const terminalPrFiles = [
+  '.changeset/desktop-linux-webgl-auto.md',
+  'ghostty-webgpu/docs/api.md',
+  'ghostty-webgpu/src/render/backend-order.test.ts',
+  'ghostty-webgpu/src/render/backend-order.ts',
+  'ghostty-webgpu/src/render/selector.ts',
+  'ghostty-webgpu/src/render/tests/platforms.ts',
+  'ghostty-webgpu/src/render/tests/selector.browser.test.ts',
+  'ghostty-webgpu/src/worker/runtime.ts',
+  'ghostty-webgpu/src/worker/terminal.browser.test.ts',
+  'ghostty-webgpu/src/worker/tests/platform-backend.worker.ts',
+]
 
-test('a web source reader runs contracts checks without treating contracts as changed code', () => {
-  const plan = select(['apps/web/src/features/chat/components/message.tsx'])
-  expect(plan.packages).toEqual(['@workspace/contracts', 'web'])
-  expect(plan).toMatchObject({
-    web: true,
-    server: false,
-    tui: false,
-    desktop: false,
-    site: false,
-    editor: false,
-    ghostty: false,
-    hotkeys: false,
-  })
-})
-
-test('server changes select every real in-process test consumer', () => {
-  const plan = select(['apps/server/src/provider/service.ts'])
-  expect(plan.packages).toEqual([
-    '@workspace/client-core',
-    '@workspace/contracts',
-    'server',
-    'tui',
-    'web',
-  ])
-  expect(plan).toMatchObject({
-    web: true,
-    server: true,
-    tui: true,
-    site: false,
-    editor: false,
-    ghostty: false,
-  })
-})
-
-test('an Editor highlighting change skips unrelated server, TUI and Ghostty suites', () => {
-  expect(select(['editor/packages/highlighting/src/index.ts'])).toMatchObject({
-    web: true,
-    site: true,
-    editor: true,
-    server: false,
-    tui: false,
-    ghostty: false,
-    hotkeys: false,
-  })
-})
-
-test('catalog-backed Hotkeys consumers are selected with their dependents', () => {
-  const plan = select(['hotkeys/packages/hotkeys/src/index.ts'])
-  expect(plan.packages).toEqual(
-    expect.arrayContaining([
-      '@fregat/react-hotkeys',
-      '@workspace/contracts',
-      '@workspace/client-core',
-      '@singapore-editor/core',
-      'ghostty-webgpu',
-      'web',
-      'tui',
-    ]),
-  )
-  expect(plan).toMatchObject({
-    web: true,
-    server: true,
-    tui: true,
-    editor: true,
+test('PR 1208 selects terminal verification and patch-note formatting only', () => {
+  expect(select(terminalPrFiles)).toMatchObject({
+    packages: ['ghostty-webgpu'],
     ghostty: true,
-    hotkeys: true,
-  })
-})
-
-test('nested website ownership does not run its parent library tests', () => {
-  const plan = select(['ghostty-webgpu/site/src/main.ts'])
-  expect(plan.packages).toEqual(['ghostty-webgpu-site'])
-  expect(plan).toMatchObject({ site: true, ghostty: false, editor: false, web: false })
-})
-
-test('the separate line editor selects its verification contract', () => {
-  expect(select(['ghostty-webgpu-line-editor/src/index.ts'])).toMatchObject({ ghostty: true })
-})
-
-test('the native Mac app keeps shared checks and uses its own workflow', () => {
-  expect(select(['apps/mac/MacApp/WorkspaceView.swift'])).toMatchObject({
-    code: true,
-    packages: [],
+    shared: false,
+    docs: true,
     web: false,
     server: false,
     tui: false,
+    editor: false,
+    hotkeys: false,
     site: false,
+    desktop: false,
   })
+})
+
+test('a changeset by itself does not select application or library tests', () => {
+  expect(select(['.changeset/patch.md'])).toMatchObject({
+    packages: [],
+    shared: false,
+    docs: true,
+    ghostty: false,
+    web: false,
+  })
+})
+
+test('mixed terminal and app changes retain affected app checks', () => {
+  expect(select(terminalPrFiles.concat(['apps/web/src/main.tsx']))).toMatchObject({
+    shared: true,
+    ghostty: true,
+    web: true,
+  })
+})
+
+test('full validation still covers terminal consumers and repository checks', () => {
+  expect(select(terminalPrFiles, true)).toMatchObject({
+    shared: true,
+    ghostty: true,
+    web: true,
+    server: true,
+    site: true,
+    exhaustive: true,
+  })
+})
+
+test.each([
+  ['apps/web/src/features/chat/components/message.tsx', 'web'],
+  ['apps/server/src/provider/service.ts', 'server'],
+  ['apps/tui/src/main.tsx', 'tui'],
+  ['editor/packages/highlighting/src/index.ts', '@singapore-editor/highlighting'],
+  ['hotkeys/packages/hotkeys/src/index.ts', '@fregat/hotkeys'],
+  ['packages/contracts/src/index.ts', '@workspace/contracts'],
+  ['ghostty-webgpu/site/src/main.ts', 'ghostty-webgpu-site'],
+  ['ghostty-webgpu/docs/correctness-results.json', 'ghostty-webgpu'],
+])('%s selects only its owning package', (file, name) => {
+  expect(select([file]).packages).toEqual([name])
+  expect(select([file]).tooling).toBe(false)
+})
+
+test('dependencies are built without selecting their tests', () => {
+  const plan = select(['apps/web/src/main.tsx'])
+  expect(plan.packages).toEqual(['web'])
+  expect(requiredLibraries(graph, plan.packages)).toContain('ghostty-webgpu')
+  expect(plan.ghostty).toBe(false)
 })
 
 test.each([
@@ -131,21 +116,29 @@ test.each([
   'bun.lock',
   'turbo.json',
   '.github/workflows/ci.yml',
-  'scripts/dev-sources.ts',
+  '.agents/skills/helper.ts',
   'apps/deleted-package/src/index.ts',
-  'packages/deleted-package/package.json',
-])('%s retains full validation', (file) => {
-  expect(select([file]).packages).toEqual(Array.from(graph.packages.keys()).sort())
+])('%s selects root tooling without every application suite', (file) => {
+  expect(select([file])).toMatchObject({
+    packages: [],
+    tooling: true,
+    web: false,
+    server: false,
+    tui: false,
+    ghostty: false,
+    editor: false,
+  })
 })
 
-test('every Turbo global dependency retains full validation', () => {
-  for (const input of graph.globalInputs) {
-    const file = input
-      .replaceAll('**', 'fixture')
-      .replaceAll('*', 'fixture')
-      .replace('{ts,mjs}', 'ts')
-    expect(select([file]).packages, file).toEqual(Array.from(graph.packages.keys()).sort())
-  }
+test('script changes select the script package and its tooling suite', () => {
+  expect(select(['scripts/dev-sources.ts'])).toMatchObject({
+    packages: ['scripts'],
+    tooling: true,
+    web: false,
+    server: false,
+    tui: false,
+    ghostty: false,
+  })
 })
 
 test.each([
@@ -158,41 +151,21 @@ test.each([
 })
 
 test.each(['docs/settings-reference.md', 'docs/native-syntax-coverage.md'])(
-  'generated documentation %s still selects code checks',
+  'generated documentation %s selects its root tooling owner',
   (file) => {
-    expect(select([file]).packages).toHaveLength(graph.packages.size)
+    expect(select([file])).toMatchObject({ packages: [], tooling: true })
   },
 )
 
-test('root-document task inputs still select the check that reads them', () => {
-  const pkg = graph.packages.get('@workspace/contracts')
-  const custom = { ...graph, packages: new Map(graph.packages) }
-  custom.packages.set(pkg.name, {
-    ...pkg,
-    tasks: pkg.tasks.concat([{ name: 'test', inputs: ['docs/example.md'], dependencies: [] }]),
-  })
-  expect(selectAffected(custom, ['docs/example.md'])).toMatchObject({
-    packages: ['@workspace/contracts'],
-    web: false,
-    server: false,
-  })
-})
-
-test('external check inputs add checks without invalidating production consumers', () => {
-  const plan = select(['editor/bench/compare/protocol.mjs'])
-  expect(plan.packages).toContain('@singapore-editor/core')
-  expect(plan.server).toBe(false)
-})
-
-test('main and manual runs retain the full graph even with no changed files', () => {
+test('scheduled and manual validation retain every package', () => {
   expect(select([], true).packages).toHaveLength(graph.packages.size)
   expect(select([], true)).toMatchObject({
+    tooling: true,
     web: true,
     server: true,
     tui: true,
     editor: true,
     ghostty: true,
-    hotkeys: true,
     site: true,
   })
 })
@@ -226,6 +199,69 @@ test('unknown build targets fail instead of silently omitting checks', () => {
 
 const gitAvailable = Bun.which('git') !== null
 if (!gitAvailable) console.info('Skipping affected CI git proof. Git is required.')
+
+test.skipIf(!gitAvailable).each([
+  [[], ''],
+  [['apps/site/index.html'], 'fregat'],
+  [['apps/site/index.html', 'editor/site/index.html'], 'fregat,singapore'],
+])('CLI exports raw sites %s and JSON arrays', (files, sites) => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'ci-affected-output-'))
+  const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim()
+  try {
+    for (const folder of ['apps/site', 'editor/site', 'docs'])
+      mkdirSync(path.join(directory, folder), { recursive: true })
+    writeFileSync(
+      path.join(directory, 'package.json'),
+      JSON.stringify({
+        workspaces: { packages: ['apps/*', 'editor/site'] },
+        scripts: { 'build:workspaces': 'turbo run build --filter=site' },
+      }),
+    )
+    writeFileSync(path.join(directory, 'turbo.json'), '{"globalDependencies":[],"tasks":{}}')
+    writeFileSync(path.join(directory, 'apps/site/package.json'), '{"name":"site"}')
+    writeFileSync(
+      path.join(directory, 'editor/site/package.json'),
+      '{"name":"singapore-editor-site"}',
+    )
+    git('init', '-q')
+    git('config', 'user.name', 'CI fixture')
+    git('config', 'user.email', 'ci@example.test')
+    git('add', '.')
+    git('commit', '-qm', 'base')
+    const base = git('rev-parse', 'HEAD')
+    writeFileSync(path.join(directory, 'docs/Review note.md'), '# Changed\n')
+    for (const file of files) writeFileSync(path.join(directory, file), '<main>Changed</main>\n')
+    git('add', '.')
+    git('commit', '-qm', 'changed')
+    const output = path.join(directory, 'outputs')
+    const result = Bun.spawnSync(
+      [
+        'bun',
+        path.join(root, 'scripts/ci/affected.mjs'),
+        'changed',
+        base,
+        git('rev-parse', 'HEAD'),
+      ],
+      { cwd: directory, env: { ...process.env, GITHUB_OUTPUT: output } },
+    )
+    expect(result.exitCode, result.stderr.toString()).toBe(0)
+    const selection = JSON.parse(result.stdout.toString())
+    const exported = Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .trimEnd()
+        .split('\n')
+        .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]),
+    )
+    expect(exported.sites).toBe(sites)
+    expect(JSON.parse(exported.packages)).toEqual(selection.packages)
+    expect(JSON.parse(exported.docs_files)).toEqual(['docs/Review note.md'])
+    expect(exported.site).toBe(String(files.length > 0))
+    expect(exported.docs).toBe('true')
+    expect(exported.exhaustive).toBe('false')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
 
 test.skipIf(!gitAvailable)('CLI includes both paths of a rename and the entire PR diff', () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'ci-affected-git-'))

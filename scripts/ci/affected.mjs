@@ -3,7 +3,6 @@ import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 
-const families = ['editor', 'ghostty-webgpu', 'hotkeys']
 const generatedDocs = ['docs/settings-reference.md', 'docs/native-syntax-coverage.*']
 
 function readJson(file) {
@@ -119,6 +118,7 @@ function rootDocument(file) {
     file.startsWith('plans/') ||
     file.startsWith('docs/') ||
     (file.startsWith('.agents/') && file.endsWith('.md')) ||
+    (file.startsWith('.changeset/') && file.endsWith('.md')) ||
     (!file.includes('/') && file.endsWith('.md'))
   )
 }
@@ -129,104 +129,57 @@ function productionDependencies(pkg) {
   )
 }
 
-function expandConsumers(graph, seeds) {
-  const affected = new Set(seeds)
-  for (const name of affected) {
-    for (const pkg of graph.packages.values()) {
-      if (productionDependencies(pkg).includes(name)) affected.add(pkg.name)
-    }
-  }
-  return affected
-}
-
 function changedOwners(graph, files) {
   const seeds = new Set()
-  let global = false
+  let tooling = false
   for (const file of files) {
-    if (matches(file, graph.globalInputs) || matches(file, generatedDocs)) {
-      global = true
+    if (matches(file, generatedDocs)) {
+      tooling = true
       continue
     }
     if (rootDocument(file)) continue
-    if (file.startsWith('apps/mac/')) continue
-    if (file.endsWith('/package.json') && !existsSync(path.join(graph.root, file))) {
-      global = true
-      continue
-    }
     const pkg = owner(graph, file)
     if (pkg) {
       seeds.add(pkg.name)
       continue
     }
-    const family = families.find((name) => file.startsWith(`${name}/`))
-    if (!family) {
-      global = true
-      continue
-    }
-    // A removed workspace no longer has a manifest to describe its former consumers.
-    if (file.startsWith(`${family}/packages/`)) {
-      global = true
-      continue
-    }
-    for (const candidate of graph.packages.values()) {
-      if (candidate.directory.startsWith(`${family}/`) || candidate.directory === family)
-        seeds.add(candidate.name)
-    }
+    if (file.startsWith('apps/mac/')) continue
+    tooling = true
   }
-  return { seeds, global }
-}
-
-function inputReaders(graph, files, changed) {
-  const checks = new Set()
-  for (const pkg of graph.packages.values()) {
-    for (const task of pkg.tasks) {
-      const readsInput = files.some((file) => matches(file, task.inputs))
-      const readsPackage = explicitPackages(task).some((name) => changed.has(name))
-      if (!readsInput && !readsPackage) continue
-      checks.add(pkg.name)
-    }
-  }
-  return checks
+  return { seeds, tooling }
 }
 
 export function selectAffected(graph, files, full = false) {
-  const { seeds, global } = changedOwners(graph, files)
-  for (const pkg of graph.packages.values()) {
-    if (
-      pkg.tasks.some(
-        (task) => task.name === 'build' && files.some((file) => matches(file, task.inputs)),
-      )
-    )
-      seeds.add(pkg.name)
-  }
-  const affected = full || global ? new Set(graph.packages.keys()) : expandConsumers(graph, seeds)
-  // Check-only source readers do not change the package's produced code.
-  const packages = Array.from(
-    new Set(Array.from(affected).concat(Array.from(inputReaders(graph, files, affected)))),
-  ).sort()
+  const owned = changedOwners(graph, files)
+  const packages = Array.from(full ? graph.packages.keys() : owned.seeds).sort()
+  const selected = new Set(packages)
+  const tooling = full || owned.tooling || selected.has('scripts')
   const familyChanged = (family) =>
-    Array.from(affected).some((name) => {
-      const directory = graph.packages.get(name).directory
-      if (directory === 'editor/site' || directory === 'ghostty-webgpu/site') return false
-      return directory === family || directory.startsWith(`${family}/`)
-    })
-  const site = [
-    'site',
-    'singapore-editor-site',
-    'ghostty-webgpu-site',
-    '@singapore-editor/example-app',
-  ].some((name) => affected.has(name))
+    packages.some((name) => graph.packages.get(name).directory.startsWith(`${family}/packages/`))
+  const sites = []
+  if (selected.has('site')) sites.push('fregat')
+  if (selected.has('singapore-editor-site')) sites.push('singapore')
+  if (selected.has('@singapore-editor/example-app')) sites.push('demo')
+  if (selected.has('ghostty-webgpu-site')) sites.push('ghostty-webgpu')
   return {
     exhaustive: full,
-    code: packages.length > 0 || files.some((file) => file.startsWith('apps/mac/')),
+    code: tooling || packages.length > 0,
+    shared:
+      tooling ||
+      packages.some((name) => !['ghostty-webgpu', 'ghostty-webgpu-line-editor'].includes(name)),
+    tooling,
     packages,
-    web: affected.has('web'),
-    server: affected.has('server'),
-    tui: affected.has('tui'),
-    desktop: affected.has('desktop'),
-    site,
-    editor: familyChanged('editor'),
-    ghostty: familyChanged('ghostty-webgpu') || affected.has('ghostty-webgpu-line-editor'),
+    web: selected.has('web'),
+    server: selected.has('server'),
+    tui: selected.has('tui'),
+    tree: selected.has('@workspace/tree'),
+    desktop: selected.has('desktop'),
+    site: sites.length > 0,
+    sites: sites.join(','),
+    editor:
+      familyChanged('editor') ||
+      packages.some((name) => graph.packages.get(name).directory.startsWith('editor/examples/')),
+    ghostty: selected.has('ghostty-webgpu') || selected.has('ghostty-webgpu-line-editor'),
     hotkeys: familyChanged('hotkeys'),
     docs: files.some(rootDocument),
     docs_files: files.filter(
@@ -282,7 +235,9 @@ function main() {
   console.log(JSON.stringify(selection, null, 2))
   if (process.env.GITHUB_OUTPUT) {
     const lines = Object.entries(selection)
-      .map(([key, value]) => `${key}=${JSON.stringify(value)}\n`)
+      .map(
+        ([key, value]) => `${key}=${typeof value === 'string' ? value : JSON.stringify(value)}\n`,
+      )
       .join('')
     appendFileSync(process.env.GITHUB_OUTPUT, lines)
   }

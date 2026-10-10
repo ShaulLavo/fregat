@@ -1,3 +1,5 @@
+import { automaticGpuBackends, type GpuBackend } from '../render/backend-order.js'
+import { isSoftwareWebGpuAdapter } from '../render/adapter.js'
 import { LocalTerminalExecution } from '../dom/execution-local.js'
 import {
   calculateTerminalFittedFont,
@@ -8,8 +10,13 @@ import {
 import type { GhosttyWebGpuRenderer } from '../dom/types.js'
 import type { InactiveCursorStyle } from '../render/cursor.js'
 import type { RenderSchedulerClock } from '../render/scheduler.js'
-import { WebGpuTerminalRenderer, WebGpuUnavailableError } from '../render/renderer.js'
-import { WebGlTerminalRenderer, WebGlUnavailableError } from '../render/webgl/renderer.js'
+import {
+  WebGpuTerminalRenderer,
+  WebGpuUnavailableError,
+  type WebGpuTerminalRendererOptions,
+} from '../render/renderer.js'
+import { WebGlTerminalRenderer } from '../render/webgl/renderer.js'
+import { WebGlUnavailableError } from '../render/webgl/unavailable.js'
 import type {
   TerminalFittedFont,
   TerminalSessionEventType,
@@ -20,11 +27,12 @@ import type {
   WorkerLayout,
   WorkerMessage,
   WorkerRequest,
+  WorkerCanvasReplacement,
   WorkerState,
   TerminalOutputMessage,
 } from './protocol.js'
 import { workerCommandNames, workerOperationTimeout } from './protocol.js'
-import { serializeWorkerFailure, workerError } from './structured-errors.js'
+import { serializeWorkerFailure, TerminalWorkerError, workerError } from './structured-errors.js'
 
 interface WorkerScope {
   readonly fonts: FontFaceSet
@@ -80,8 +88,23 @@ export class TerminalWorkerRuntime {
     readonly resolve: () => void
     readonly reject: (cause: unknown) => void
   }
-  private readonly onMessage = (event: MessageEvent<WorkerRequest>) => {
+  private canvasReplacement?: ReturnType<typeof Promise.withResolvers<OffscreenCanvas>>
+  private readonly onMessage = (event: MessageEvent<WorkerRequest | WorkerCanvasReplacement>) => {
     const request = event.data
+    if (request?.type === 'canvas') {
+      if (
+        request.terminal !== this.initialize.terminal ||
+        request.generation !== this.initialize.generation
+      )
+        return
+      if (!this.canvasReplacement || !(request.canvas instanceof OffscreenCanvas)) {
+        this.fail(workerError('protocol', 'renderer.canvas', { pending: !!this.canvasReplacement }))
+        return
+      }
+      this.canvasReplacement.resolve(request.canvas)
+      this.canvasReplacement = undefined
+      return
+    }
     if (!this.validRequest(request)) {
       this.fail(workerError('protocol', 'request', { control: this.control }))
       return
@@ -221,24 +244,6 @@ export class TerminalWorkerRuntime {
     this.applyLayout(layout)
     const execution = this.native()
     const font = this.fit(layout)
-    let device: GPUDevice | undefined
-    if (this.initialize.backend !== 'webgl') {
-      this.prefetchedAcquisition = this.requestDevice().then((acquired) => {
-        this.prefetchedDevice = acquired
-        return acquired
-      })
-      try {
-        device = await this.prefetchedAcquisition
-      } catch (cause) {
-        if (this.initialize.backend === 'webgpu')
-          throw workerError('capability', 'renderer.webgpu', {
-            causeType: cause instanceof Error ? cause.name : typeof cause,
-          })
-      }
-      if (!device && this.initialize.backend === 'webgpu')
-        throw workerError('capability', 'renderer.webgpu', { device: false })
-    }
-    this.native()
     const options = {
       canvas,
       columns: execution.grid.columns,
@@ -260,24 +265,7 @@ export class TerminalWorkerRuntime {
       onError: (cause: unknown) => this.fail(cause),
     }
     const renderer = await execution.createRenderer(
-      async (input) => {
-        try {
-          if (device) {
-            this.gpuRenderer = WebGpuTerminalRenderer.create({
-              ...input,
-              deviceFactory: this.deviceFactory(device),
-            })
-            return await this.gpuRenderer
-          }
-          return await WebGlTerminalRenderer.create(input)
-        } catch (cause) {
-          if (cause instanceof WebGpuUnavailableError)
-            throw workerError('capability', 'renderer.webgpu', { reason: cause.reason })
-          if (cause instanceof WebGlUnavailableError)
-            throw workerError('capability', 'renderer.webgl', { backend: this.initialize.backend })
-          throw cause
-        }
-      },
+      (input) => this.createRenderer(input),
       options,
       this.abort.signal,
     )
@@ -287,11 +275,86 @@ export class TerminalWorkerRuntime {
     return font
   }
 
-  private async requestDevice(): Promise<GPUDevice> {
+  private async createRenderer(
+    options: WebGpuTerminalRendererOptions,
+  ): Promise<WebGpuTerminalRenderer | WebGlTerminalRenderer> {
+    const backends: readonly GpuBackend[] =
+      this.initialize.backend === 'auto' ? automaticGpuBackends() : [this.initialize.backend]
+    options = { ...options }
+    let unavailable: unknown
+    for (const backend of backends) {
+      this.native()
+      try {
+        if (backend === 'webgl') return await WebGlTerminalRenderer.create(options)
+        return await this.createWebGpuRenderer(options)
+      } catch (cause) {
+        const capabilityFailure =
+          cause instanceof TerminalWorkerError &&
+          cause.code === 'capability' &&
+          cause.operation === 'renderer.webgpu'
+        if (
+          !(
+            cause instanceof WebGpuUnavailableError ||
+            cause instanceof WebGlUnavailableError ||
+            capabilityFailure
+          )
+        )
+          throw cause
+        unavailable = cause
+        if (
+          cause instanceof WebGlUnavailableError &&
+          cause.canvasClaimed &&
+          backend !== backends.at(-1)
+        )
+          options.canvas = await this.replaceCanvas()
+      }
+    }
+    if (unavailable instanceof WebGpuUnavailableError)
+      throw workerError('capability', 'renderer.webgpu', { reason: unavailable.reason })
+    if (unavailable instanceof WebGlUnavailableError)
+      throw workerError('capability', 'renderer.webgl', { backend: this.initialize.backend })
+    throw unavailable
+  }
+
+  private replaceCanvas(): Promise<OffscreenCanvas> {
+    this.native()
+    this.canvasReplacement = Promise.withResolvers<OffscreenCanvas>()
+    this.post({ ...this.watermarks(), type: 'replaceCanvas' })
+    return this.canvasReplacement.promise
+  }
+
+  private async createWebGpuRenderer(
+    options: WebGpuTerminalRendererOptions,
+  ): Promise<WebGpuTerminalRenderer> {
+    this.prefetchedAcquisition = this.requestDevice(
+      this.initialize.backend === 'auto' ? 'hardware' : 'any',
+    ).then((acquired) => {
+      this.prefetchedDevice = acquired
+      return acquired
+    })
+    let device: GPUDevice
+    try {
+      device = await this.prefetchedAcquisition
+    } catch (cause) {
+      throw workerError('capability', 'renderer.webgpu', {
+        causeType: cause instanceof Error ? cause.name : typeof cause,
+      })
+    }
+    this.native()
+    this.gpuRenderer = WebGpuTerminalRenderer.create({
+      ...options,
+      deviceFactory: this.deviceFactory(device),
+    })
+    return this.gpuRenderer
+  }
+
+  private async requestDevice(adapterPolicy: 'hardware' | 'any'): Promise<GPUDevice> {
     this.pendingAcquisitions += 1
     try {
-      const adapter = await navigator.gpu?.requestAdapter()
+      const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' })
       if (!adapter) throw workerError('capability', 'renderer.webgpu', { adapter: false })
+      if (adapterPolicy === 'hardware' && isSoftwareWebGpuAdapter(adapter))
+        throw workerError('capability', 'renderer.webgpu', { softwareAdapter: true })
       const device = await adapter.requestDevice()
       this.acquiredDevices += 1
       return device
@@ -303,7 +366,7 @@ export class TerminalWorkerRuntime {
   private deviceFactory(initialDevice: GPUDevice): () => Promise<GPUDevice> {
     let initial: GPUDevice | undefined = initialDevice
     return async () => {
-      if (!initial) return this.requestDevice()
+      if (!initial) return this.requestDevice('any')
       const device = initial
       initial = undefined
       this.prefetchedDevice = undefined
@@ -637,6 +700,8 @@ export class TerminalWorkerRuntime {
   private async performCleanup(): Promise<void> {
     this.disposed = true
     this.abort.abort()
+    this.canvasReplacement?.reject(workerError('disposed', 'renderer.canvas', { disposed: true }))
+    this.canvasReplacement = undefined
     this.outputWaiter?.reject(workerError('disposed', 'fence', { output: this.output }))
     this.outputPort?.close()
     for (const subscription of this.subscriptions) subscription.dispose()

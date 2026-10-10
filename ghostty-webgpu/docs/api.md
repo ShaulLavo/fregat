@@ -39,9 +39,26 @@ terminal.focus()
 await terminal.dispose()
 ```
 
-`backend` accepts `webgpu`, `webgl` or `auto`. Automatic selection checks worker GPU support
-before choosing a context. Capability failures carry `code`, `operation`, `why`, `fix` and
-runtime facts. `assets` and `workerUrl` can point at explicitly hosted native files and the
+`backend` accepts `webgpu`, `webgl` or `auto`. Automatic selection tries WebGL before hardware
+WebGPU on desktop Linux because WebGL measured lower CPU work there, while macOS, Windows,
+Android, ChromeOS, and other platforms try hardware WebGPU before WebGL. The main-thread
+terminal then falls through to Canvas and DOM when both GPU renderers are unavailable.
+The worker supports the same GPU order. WebGL resource allocation failures advance to the next
+backend on a replacement canvas. Managed main-thread WebGL context-loss recovery follows the
+remaining order, including hardware WebGPU when Linux selected WebGL first.
+Automatic selection skips software WebGPU adapters.
+An explicit `webgpu` backend uses any available WebGPU adapter, including software adapters.
+
+`WebGpuTerminalRenderer.create` can be passed directly as `rendererFactory`. Its
+`adapterPolicy` option defaults to `any`; `hardware` requires an eligible hardware adapter
+for initial acquisition. After device loss, built-in acquisition accepts any available
+replacement, including software adapters, so automatic and explicit WebGPU terminals can
+keep painting on their existing canvas. A supplied `deviceFactory` controls its own initial
+and replacement acquisition policy. Replacement acquisition failures reach the renderer's
+`onError` callback and the terminal's `error` event. Main-thread errors identify the operation
+as `renderer.restore`; worker errors close the worker and release its resources.
+
+Capability failures carry `code`, `operation`, `why`, `fix` and runtime facts. `assets` and `workerUrl` can point at explicitly hosted native files and the
 built standalone `dist/worker/entry.js`; the defaults resolve beside the package output.
 
 Writes copy caller-owned bytes and keep their buffers attached. `attachOutputPort(port)`

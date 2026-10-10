@@ -473,14 +473,15 @@ function ignorableGap(
 }
 
 function sharedDeletion(pair: ConcurrentPair): boolean {
-  return pair[0].deleted.some((left) =>
-    pair[1].deleted.some(
-      (right) =>
+  for (const left of pair[0].deleted)
+    for (const right of pair[1].deleted)
+      if (
         left.start.bunch === right.start.bunch &&
         left.start.counter < right.start.counter + right.count &&
-        right.start.counter < left.start.counter + left.count,
-    ),
-  )
+        right.start.counter < left.start.counter + left.count
+      )
+        return true
+  return false
 }
 
 function collectCandidates(

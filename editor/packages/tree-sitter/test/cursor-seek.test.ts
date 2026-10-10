@@ -2,6 +2,7 @@
 import { createRequire } from 'node:module'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { Language, Parser } from 'web-tree-sitter'
+import { analyzeLineMergeUnit } from '../src/treeSitter/mergeUnits'
 
 const require = createRequire(import.meta.url)
 const grammarRequire = createRequire(
@@ -77,3 +78,55 @@ it.each(['index', 'position'] as const)(
     }
   },
 )
+
+it('preserves inclusive error ranges at late siblings and EOF', () => {
+  const prefix = 'const clean = 1;\n'.repeat(99_998)
+  const text = prefix + 'const broken = ;\nconst final = "unterminated'
+  const tree = parser.parse(text)!
+  const cursor = tree.walk()
+  const errors: { startIndex: number; endIndex: number }[] = []
+  try {
+    let depth = 0
+    for (;;) {
+      const node = cursor.currentNode
+      if (node.isError || node.isMissing)
+        errors.push({ startIndex: node.startIndex, endIndex: node.endIndex })
+      if (node.hasError && cursor.gotoFirstChild()) {
+        depth++
+        continue
+      }
+      if (depth === 0) break
+      if (cursor.gotoNextSibling()) continue
+      while (cursor.gotoParent()) {
+        depth--
+        if (depth === 0 || cursor.gotoNextSibling()) break
+      }
+      if (depth === 0) break
+    }
+    expect(errors.length).toBeGreaterThan(0)
+    const points = [0, prefix.length - 1, prefix.length, text.length].concat(
+      errors.flatMap((error) => [
+        error.startIndex - 1,
+        error.startIndex,
+        error.endIndex,
+        error.endIndex + 1,
+      ]),
+    )
+    for (const startIndex of points) {
+      const unit = {
+        source: 'line' as const,
+        type: 'line',
+        startIndex,
+        endIndex: startIndex,
+        signature: null,
+        parent: null,
+      }
+      expect(analyzeLineMergeUnit(tree.rootNode, unit, { analysis: true }).hasErrors).toBe(
+        errors.some((error) => error.endIndex >= startIndex && error.startIndex <= startIndex),
+      )
+    }
+  } finally {
+    cursor.delete()
+    tree.delete()
+  }
+}, 30_000)

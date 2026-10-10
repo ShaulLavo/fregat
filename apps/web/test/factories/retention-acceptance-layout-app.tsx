@@ -74,8 +74,11 @@ export async function mountRetentionLayoutApp() {
   }
   const application = read().application
   expect(
-    await application.openEnvironmentWorkspaceRoot(activeEnvironmentId(), filesystemPath('repo')),
-  ).toMatch(/opened|already-open/)
+    await navigation.openWorkspace({
+      environmentId: activeEnvironmentId(),
+      path: filesystemPath('repo'),
+    }),
+  ).toMatchObject({ status: 'applied' })
   return {
     identifyReference,
     container,

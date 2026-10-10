@@ -56,15 +56,21 @@ function stopLaneFunction(name: string, graceSec: number) {
   const unit = laneUnit(name)
   const slice = shellQuote(`${unit}.slice`)
   const timer = shellQuote(`${unit}_ceiling.timer`)
-  const ticks = seconds(graceSec, 'graceSec') * 10
+  const graceCs = seconds(graceSec, 'graceSec') * 100
   return `stop_lane() {
   systemctl --user stop ${timer} >/dev/null 2>&1
-  local cg i=0
+  local cg now until
   cg=$(systemctl --user show -p ControlGroup --value ${slice} 2>/dev/null)
   procs() { [ -n "$cg" ] && [ -d "/sys/fs/cgroup$cg" ] && find "/sys/fs/cgroup$cg" -name cgroup.procs -exec cat {} + 2>/dev/null | wc -l || echo 0; }
   if [ "$(procs)" -gt 0 ]; then
     systemctl --user kill --signal=TERM ${slice} >/dev/null 2>&1
-    while [ "$(procs)" -gt 0 ] && [ "$i" -lt ${ticks} ]; do sleep 0.1; i=$((i + 1)); done
+    read -r now _ </proc/uptime
+    until=$((10#\${now/./} + ${graceCs}))
+    while [ "$(procs)" -gt 0 ]; do
+      read -r now _ </proc/uptime
+      [ "$((10#\${now/./}))" -lt "$until" ] || break
+      sleep 0.1
+    done
     if [ "$(procs)" -gt 0 ]; then
       echo "[pi-lane] the job outlived TERM by ${graceSec}s; sending KILL" >&2
       systemctl --user kill --signal=KILL ${slice} >/dev/null 2>&1

@@ -8,6 +8,19 @@ import type {
 import { createScriptError } from '../structured-errors'
 import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
+export const siteReplicaSelectors = {
+  stage: (page: Page, id: string) => page.locator(`[data-replica][id="${id}"]`),
+  replica: (page: Page, id: string) => siteReplicaSelectors.stage(page, id).locator('.rep'),
+  paused: (page: Page, id: string) => siteReplicaSelectors.stage(page, id).locator('.rep.paused'),
+  playing: (page: Page, id: string) =>
+    siteReplicaSelectors.stage(page, id).locator('.rep:not(.paused)'),
+  typed: (page: Page, id: string) =>
+    siteReplicaSelectors.stage(page, id).locator('[data-type]').first(),
+  pressed: (page: Page, id: string) =>
+    siteReplicaSelectors.stage(page, id).locator('.pressed, .pointer.press'),
+  control: (page: Page, id: string) => page.locator(`[data-motion-for="${id}"]`),
+}
+
 export const overlayAlignmentSelectors = {
   pickerFooter: (page: Page) => selectors.pickerDialog(page).locator('[data-slot="dialog-footer"]'),
   pickerFooterButton: (page: Page) =>

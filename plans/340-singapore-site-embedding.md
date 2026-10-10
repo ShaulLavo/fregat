@@ -217,7 +217,7 @@ This is encouraging for a small captured viewport, but WebKit already misses the
 ### Phase 1: Editor embedding and wrap correctness
 
 - [ ] Add portable failing scenarios for the phone and desktop overflow, content-height changes and hidden-to-visible highlight paint.
-- [ ] Implement `scrollMode: 'content'` by reusing static all-row rendering. Test outside scroll reveal, edits, resize, font load, syntax replacements and disposal.
+- [x] Implement `scrollMode: 'content'` by reusing static all-row rendering. Test outside scroll reveal, edits, resize, font load, syntax replacements and disposal.
 - [ ] Fix reproduced wrap/line-breaking failures from the list above. Separate wrap PRs where the root causes differ.
 - [x] Make hidden-to-visible presentation restore existing highlight paint at the owning editor lifecycle boundary. Reuse the existing highlight restoration path where appropriate; no site-wide registry manipulation or timer retry loop.
 - [ ] Give each public editor behavior change a patch changeset for affected packages. Do not edit package version numbers.

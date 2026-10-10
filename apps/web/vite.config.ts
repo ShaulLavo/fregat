@@ -10,7 +10,7 @@ import { defineConfig, type Alias } from 'vite'
 import { portFromEnv } from '../../scripts/runtime-network.ts'
 import { createScriptError } from '../../scripts/structured-errors.ts'
 import { readDevSources, sourceAliases } from '../../scripts/dev-sources.ts'
-import { bundleStatsPlugin } from './scripts/bundle-stats-plugin.ts'
+import { licenseNoticesPlugin } from './scripts/license-notices-plugin.ts'
 import { devPagePlugin } from './scripts/dev-page-plugin.ts'
 import { bootAppearancePlugin } from './scripts/boot-appearance-plugin.ts'
 import { phosphorImportPlugin } from './scripts/phosphor-import-plugin.ts'
@@ -149,7 +149,7 @@ export default defineConfig(({ command, isPreview }) => {
         path.resolve(import.meta.dirname, 'src'),
         path.resolve(workspaceRoot, 'packages/ui/src'),
       ]),
-      bundleStatsPlugin(),
+      licenseNoticesPlugin(),
     ],
     resolve: {
       alias: appAliases.concat(

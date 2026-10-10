@@ -1,3 +1,5 @@
+import type { RevealBlock } from './revealBlock'
+import { assertContentLayout, contentReadingBounds, revealContentRow } from './contentLayout'
 import { isElementNode, isTextareaElement } from '../dom'
 import {
   acquireRowPresentation,
@@ -121,6 +123,7 @@ import {
   sourceEditPatch,
   setTextLayoutState,
   setWrapEnabledLayout,
+  assertContentSnapshot,
   updateVirtualizerRows,
   visualColumnForOffset,
 } from './virtualizedTextViewLayout'
@@ -186,7 +189,6 @@ import {
 } from './virtualizedTextViewRows'
 import type {
   CreateRangeOptions,
-  RevealBlock,
   VirtualizedTextHighlightRange,
   VirtualizedTextHighlightStyle,
   VirtualizedTextSelection,
@@ -761,6 +763,16 @@ export class VirtualizedTextView {
     return this.atomicRenderDepth > 0 || this.flushingAtomicRender
   }
 
+  get scrollMode(): VirtualizedTextViewScrollMode {
+    return this.view.scrollMode
+  }
+
+  public assertContentSnapshot(text: string | TextSnapshot, replacement = false): void {
+    if (this.view.scrollMode !== 'content') return
+    const snapshot = typeof text === 'string' ? createStringTextSnapshot(text) : text
+    assertContentSnapshot(this.view, snapshot, replacement)
+  }
+
   public setText(
     text: string | TextSnapshot,
     preparedLineStarts?: readonly number[],
@@ -768,6 +780,7 @@ export class VirtualizedTextView {
   ): void {
     const textSnapshot = typeof text === 'string' ? createStringTextSnapshot(text) : text
     const view = this.view
+    assertContentSnapshot(view, textSnapshot)
     this.pendingReveal = null
     view.sameLineTokenEdit = null
     view.tokenProjectionDirtyStartRow = null
@@ -991,6 +1004,10 @@ export class VirtualizedTextView {
     const nextScrollMode = normalizeScrollMode(scrollMode)
     if (view.scrollMode === nextScrollMode) return false
 
+    if (nextScrollMode === 'content') {
+      const snapshot = view.virtualizer.getSnapshot()
+      assertContentLayout(view.model.textLength, view.model.visibleLineCount, snapshot.totalSize)
+    }
     view.scrollMode = nextScrollMode
     setScrollModeAttribute(view.scrollElement, nextScrollMode)
     view.lastRenderedRowsKey = ''
@@ -1034,6 +1051,7 @@ export class VirtualizedTextView {
     const view = this.view
     const textSnapshot =
       typeof nextText === 'string' ? createStringTextSnapshot(nextText) : nextText
+    assertContentSnapshot(view, textSnapshot)
     this.applyingEdit = true
     try {
       const sameLinePatch = sameLineEditPatch(view, edit)
@@ -1057,6 +1075,7 @@ export class VirtualizedTextView {
 
   public applyEditBatch(batch: TextEditBatch): void {
     const view = this.view
+    assertContentSnapshot(view, batch.after)
     const previousLineCount = view.model.lineCount
     applyTextLayoutTransition(view, batch)
     projectFoldMarkersThroughBatch(view, batch)
@@ -1233,6 +1252,10 @@ export class VirtualizedTextView {
       this.pendingReveal = { offset, block: 'nearest' }
       return
     }
+    if (this.view.scrollMode === 'content') {
+      this.reveal(offset, 'nearest')
+      return
+    }
     scrollToRow(this.view, rowForOffset(this.view, offset))
   }
 
@@ -1258,6 +1281,18 @@ export class VirtualizedTextView {
     // Initial navigation can arrive before ResizeObserver measures the viewport.
     if (requested !== 'nearest' && view.virtualizer.getSnapshot().viewportHeight === 0) {
       this.pendingReveal = { offset, block: requested, affinity }
+      return
+    }
+
+    if (view.scrollMode === 'content') {
+      const index = affinity
+        ? rowForCaretPosition(view, offset, affinity)
+        : rowForOffset(view, offset)
+      const row = view.rowElements.get(index)?.element
+      flushDeferredCaret(view)
+      const target =
+        view.selections[0]?.head === offset && !view.caretElement.hidden ? view.caretElement : row
+      if (target) revealContentRow(target, requested)
       return
     }
 
@@ -1955,12 +1990,14 @@ function locatePoint(
 ) {
   if (view.provisional) return null
   const bounds = pointViewport(view.scrollElement)
+  const readingBounds =
+    view.scrollMode === 'content' ? contentReadingBounds(view.scrollElement) : bounds
   if (
     !clamp &&
-    (clientX < bounds.left ||
-      clientX >= bounds.right ||
-      clientY < bounds.top ||
-      clientY >= bounds.bottom)
+    (clientX < readingBounds.left ||
+      clientX >= readingBounds.right ||
+      clientY < Math.max(bounds.top, readingBounds.top) ||
+      clientY >= Math.min(bounds.bottom, readingBounds.bottom))
   )
     return null
   const metrics = viewportPointMetrics(view, clientX, clientY)
