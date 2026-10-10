@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ghostty-webgpu/site/**
+      - ghostty-webgpu/src/dom/**
       - ghostty-webgpu/docs/correctness-results.json
       - ghostty-webgpu/docs/benchmarks/**
       - hotkeys/packages/hotkeys/**
@@ -16,6 +17,7 @@ on:
     branches: [main]
     paths:
       - ghostty-webgpu/site/**
+      - ghostty-webgpu/src/dom/**
       - ghostty-webgpu/docs/correctness-results.json
       - ghostty-webgpu/docs/benchmarks/**
       - hotkeys/packages/hotkeys/**
@@ -39,9 +41,9 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Check samples, generate reference and validate links
         run: bun run --cwd ghostty-webgpu/site build --base /fregat/ghostty-webgpu/
-      - name: Install browser
+      - name: Install browsers
         working-directory: ghostty-webgpu/site
-        run: bunx playwright install --with-deps chromium
+        run: bunx playwright install --with-deps chromium webkit
       - name: Verify docs, echo example and search
         working-directory: ghostty-webgpu/site
         run: |
@@ -59,6 +61,7 @@ jobs:
           done
           test "$ready" = 1 || { cat "$RUNNER_TEMP/ghostty-preview.log"; exit 1; }
           bun scripts/verify-docs.ts http://127.0.0.1:4327/fregat/ghostty-webgpu/docs/ "$RUNNER_TEMP/ghostty-docs-evidence"
+          bun scripts/verify-mobile-input.mjs http://127.0.0.1:4327/fregat/ghostty-webgpu/ "$RUNNER_TEMP/ghostty-docs-evidence/mobile-input"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
