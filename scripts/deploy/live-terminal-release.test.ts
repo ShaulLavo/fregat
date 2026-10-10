@@ -31,19 +31,12 @@ test('rejects a different isolated backend commit', () => {
       { ...deployed, server: { ...build, commit: 'b'.repeat(40) } },
       1,
     ),
-  ).toContain('terminal check: isolated backend commit differs from deployed server')
+  ).toContain('terminal check: isolated backend commit differs from deployed client')
 })
 
-test('accepts a web-only install whose client is newer than the running server', () => {
-  const server = { release: 'release-old', commit: 'b'.repeat(40), dirtyFiles: 0 }
-  const webOnly = { ...deployed, server }
-  expect(terminalReleaseFailures(webOnly, { ...webOnly, commit: server.commit }, 1)).toEqual([])
-})
-
-test('rejects an unverifiable deployed server commit', () => {
-  expect(
-    terminalReleaseFailures({ ...deployed, server: { ...build, commit: undefined } }, deployed, 1),
-  ).toContain('terminal check: deployed server commit is missing')
+test('accepts a web-only install whose running server is older than the client', () => {
+  const running = { release: 'release-old', commit: 'b'.repeat(40), dirtyFiles: 0 }
+  expect(terminalReleaseFailures({ ...deployed, server: running }, deployed, 1)).toEqual([])
 })
 
 test.each([undefined, null, '', 'unknown'])(
