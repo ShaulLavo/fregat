@@ -1,3 +1,4 @@
+import { reactiveOwnerSnapshots } from './reactive-owner-snapshots'
 import { overlayAlignment } from './overlay-alignment'
 import { commandFoundation } from './command-foundation'
 import { clientLogDelivery } from './client-log-delivery'
@@ -477,6 +478,7 @@ import { collaborationMergeReview } from './collaboration-merge-review'
 
 export const scenarios: readonly Scenario[] = [
   siteReplicaPlayback,
+  reactiveOwnerSnapshots,
   collaborationMergeReview,
   overlayAlignment,
   unknownWorkspaceSettings,

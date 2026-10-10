@@ -21,7 +21,7 @@ export function useRestoreRecentWorkspaceRoot() {
   const [settledRootPath, setSettledRootPath] = useState<string | null>(null)
   const navigation = useNavigation()
   const navigationStatus = useSyncExternalStore(navigation.subscribe, navigation.getSnapshot)
-  const addressClaimsRoot = !navigation.permitsRecentRoot()
+  const addressClaimsRoot = !navigation.permitsRecentRoot(navigationStatus)
   const recentFolders = useQuery(
     recentFoldersQueryOptions({ enabled: rootPath === null && !addressClaimsRoot }),
   )
