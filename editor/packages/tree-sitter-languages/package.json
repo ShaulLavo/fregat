@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/tree-sitter-languages",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Tree-sitter grammars and syntax queries for Singapore language plugins.",
   "keywords": [
     "browser",

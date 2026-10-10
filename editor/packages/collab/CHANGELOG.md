@@ -1,5 +1,37 @@
 # @singapore-editor/collab
 
+## 0.0.3
+
+### Patch Changes
+
+- [#1112](https://github.com/ShaulLavo/fregat/pull/1112) [`378f5d9`](https://github.com/ShaulLavo/fregat/commit/378f5d9bb47e5a9188839e251c5c81f544d2e251) - Breaking: `DocumentEngine` implementations must provide `sequenceBatch` and `applyBatch`. Update custom session transports to carry `SUBMIT.payload.edits` and `CONFIRM.payload.records` arrays. Fixed repeated pending-edit replay during offline rejoin by advancing unchanged `Participant` acknowledgements without restoring or reapplying the optimistic document.
+
+- [#1230](https://github.com/ShaulLavo/fregat/pull/1230) [`39cb0f4`](https://github.com/ShaulLavo/fregat/commit/39cb0f40cd2ad41d363ac4cb889fc4296d53a41e) - Added `ConfirmedWindow.editsAfter` to read retained text edits that causally follow every supplied edit identity. Improved merge-review mark publication performance for long confirmed histories without changing the marks.
+
+- [#1167](https://github.com/ShaulLavo/fregat/pull/1167) [`2266ab2`](https://github.com/ShaulLavo/fregat/commit/2266ab2c0e61b400611528ce1fa6cdae73e3a516) - Improved `ConfirmedWindow.append` performance for confirmed batches that follow the retained suffix. Canonical retention, retries, and concurrent pair results stay the same.
+
+- [#1178](https://github.com/ShaulLavo/fregat/pull/1178) [`958e7df`](https://github.com/ShaulLavo/fregat/commit/958e7df9bcab0ded8273b6dc00049a8642b87486) - Improved `ConfirmedWindow.pairs(batch)` and `MergeReviewDetector.detect()` to reduce the cost of reviewing confirmed edits. Added an optional base snapshot argument to `MergeReviewSyntax` so projected versions can reuse retained syntax.
+
+  Added `TreeSitterWorkerOwner.projectMergeUnits()` and `createTreeSitterInputEdits()` to review projected versions with bounded parent-context parsing and incremental fallback. Fixed damaged-line error lookups scanning unrelated syntax while keeping highlighting trees unchanged.
+
+  Fixed projected merge-unit requests retaining new syntax trees and sources after cancellation or query failure. Highlighting eviction now releases only projections of its own snapshot, so unrelated review sessions add no cleanup work.
+
+- [#1164](https://github.com/ShaulLavo/fregat/pull/1164) [`9dc5a14`](https://github.com/ShaulLavo/fregat/commit/9dc5a14f8595f34a78af996f5fa665a880467ce7) - Added `MergeReviewDetector` through `@singapore-editor/collaboration/merge-review` with per-range syntax groups to report confirmed concurrent edits sharing syntax units, breaking a clean parse, duplicating a signature, or leaving stranded text. Added `TextbufferEngine.effectActive()` to identify active edits. Improved `TreeSitterWorkerOwner.mergeUnit()` with cancellable Markdown work, cached parent eligibility, and optional error/token analysis for review readers.
+
+- [#1156](https://github.com/ShaulLavo/fregat/pull/1156) [`91001cd`](https://github.com/ShaulLavo/fregat/commit/91001cdd85b595c61f02f4991e2e87c28c261e7a) - Breaking: Custom `Engine` implementations must implement `projectEffects(effects)` to return a snapshot with the selected effect states while preserving live state. Added `projectEffects` to `ReferenceEngine` and `TextbufferEngine` for local review snapshots that preserve the edit log. Added `ConfirmedWindow` to find concurrent edits by different authors and their inserted and deleted character ID spans within a bounded confirmed history.
+
+- [#1176](https://github.com/ShaulLavo/fregat/pull/1176) [`f0e5906`](https://github.com/ShaulLavo/fregat/commit/f0e59061c8d2b189d82f9bc8e52590ba98668da1) - Added `mergeReview` to `createCollaborationPlugin` for confirmed concurrent-edit highlights, author-version hovers, local dismissal and bounded resolutions that reach every peer. Added `onMergeReview(unit, versions)` for host actions.
+
+  Added `createTreeSitterReviewSyntax` for demand-only review reads from immutable document snapshots, and `mergeUnit` touching selection for intersected syntax units. Author projections reuse the confirmed syntax tree through `projectMergeUnits` and preserve nested injected languages, including code fences. Added `createEditorSnapshotBuffer` and `DocumentDelivery` to the internal document-worker entry point for snapshot reader integrations.
+
+  Fixed completed merge resolutions reappearing as new review actions. Added `ConfirmedWindow.isAfter` for retained causal ancestry, and restricted review detection to remote confirmations with deferred demand for concurrent pending acknowledgements.
+
+  Added `TooltipPart.presentation: 'controls'` for content-sized shared hovers with pane-bounded placement and a visible button footer. Review actions remain visible while long version comparisons scroll. Fixed host focus outlines appearing around comparison content; keyboard focus remains visible on buttons, and content sections use tone-only separation.
+
+- [#1112](https://github.com/ShaulLavo/fregat/pull/1112) [`378f5d9`](https://github.com/ShaulLavo/fregat/commit/378f5d9bb47e5a9188839e251c5c81f544d2e251) - Improved verification of collaborative merge ordering across concurrent insertions, deletions, replacements, selective undo, and offline branch replay.
+- Updated dependencies []:
+  - @singapore-editor/textbuffer@0.2.8
+
 ## 0.0.2
 
 ### Patch Changes
