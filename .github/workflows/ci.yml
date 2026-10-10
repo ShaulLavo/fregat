@@ -457,6 +457,11 @@ jobs:
       - name: Check landing page focus, contrast and motion controls
         if: ${{ contains(needs.changes.outputs.sites, 'fregat') }}
         run: bun run --cwd apps/site verify:a11y
+      - name: Check landing page reload scroll and first-paint layout
+        if: ${{ contains(needs.changes.outputs.sites, 'fregat') }}
+        run: |
+          bun run --cwd apps/site verify:scroll --engine webkit
+          bun run --cwd apps/site verify:scroll --engine chromium
       - name: Share production sites with mobile checks
         uses: actions/upload-artifact@v4
         with:
