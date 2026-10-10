@@ -1,12 +1,16 @@
 import { afterEach, assert, expect, it, vi } from 'vitest'
 import { commands } from 'vitest/browser'
 import { Editor } from '../src/editor/Editor'
+import { init, MarkdownDocument } from 'tree-sitter-md'
+import { markdownInlineReplacements } from '../../markdown/src/replacements'
+import { decodePaintSnapshot, mountPaintSnapshot } from '../src/paint'
+import '../../markdown/src/style.css'
 import { VirtualizedTextView } from '../src/virtualization'
 import '../src/style.css'
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
-    proofHighlightPaintScreenshot: (hostId: string) => Promise<string>
+    proofHighlightPaintScreenshot: (hostId: string, label?: string) => Promise<string>
   }
 }
 
@@ -114,8 +118,8 @@ function mount() {
   return { host, view }
 }
 
-async function pixels(hostId: string): Promise<ImageData> {
-  const screenshot = await commands.proofHighlightPaintScreenshot(hostId)
+async function pixels(hostId: string, label?: string): Promise<ImageData> {
+  const screenshot = await commands.proofHighlightPaintScreenshot(hostId, label)
   const bytes = Uint8Array.from(atob(screenshot), (character) => character.charCodeAt(0))
   const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
   const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
@@ -262,3 +266,80 @@ it('limits native presentation invalidation to the engine capability that needs 
     host.remove()
   }
 })
+
+it.for(['light', 'dark'] as const)(
+  'keeps plain text beside a Markdown link in foreground in %s',
+  async (appearance) => {
+    await init()
+    const source = '[MMMM](https://example.com) MMMM\nlast'
+    const parser = new MarkdownDocument()
+    parser.setText(source)
+    const host = document.createElement('div')
+    host.id = `link-boundary-${appearance}`
+    host.style.cssText = 'width:390px;height:100px;position:relative'
+    document.body.append(host)
+    const foreground = appearance === 'dark' ? '#ffffff' : '#000000'
+    const editor = new Editor(host, {
+      scrollMode: 'content',
+      fontSize: 24,
+      lineHeight: 32,
+      theme: {
+        type: appearance,
+        foregroundColor: foreground,
+        backgroundColor: appearance === 'dark' ? '#000000' : '#ffffff',
+      },
+    })
+    const target = document.createElement('div')
+    target.id = `${host.id}-static`
+    target.style.cssText = 'width:390px;position:relative'
+    document.body.append(target)
+    let restored: ReturnType<typeof mountPaintSnapshot> = null
+    try {
+      editor.setText(source)
+      editor.setSelection(source.length)
+      editor.setInlineReplacementProvider((context) =>
+        markdownInlineReplacements(context.textSnapshot, parser.decorations(0, source.length)),
+      )
+      editor.setTokens([{ start: 0, end: source.indexOf(')') + 1, style: { color: '#ff0000' } }])
+      await expect.poll(() => host.querySelector('a')?.textContent).toBe('MMMM')
+      const row = host.querySelector<HTMLElement>('[data-editor-virtual-row="0"]')!
+      const plain = row.lastChild as Text
+      expect(plain.data).toBe(' MMMM')
+      const bounds = document.createRange()
+      bounds.selectNodeContents(plain)
+      const left = Math.ceil(bounds.getBoundingClientRect().left - row.getBoundingClientRect().left)
+      const live = await pixels(host.id, `${appearance}-live`)
+      expect(redInkAfter(live, left)).toBe(0)
+      const saved = editor.captureSnapshot({ scope: 'document' })
+      expect(saved.status).toBe('ready')
+      assert(saved.status === 'ready')
+      restored = mountPaintSnapshot(target, decodePaintSnapshot(saved.paint)!, { width: 390 })
+      expect(restored).toBeTruthy()
+      const snapshot = await pixels(target.id, `${appearance}-static`)
+      expect(redInkAfter(snapshot, left)).toBe(0)
+      expect(Array.from(snapshot.data)).toEqual(Array.from(live.data))
+      const ranges = [...CSS.highlights].flatMap(([, group]) =>
+        [...group].filter((range) => host.contains(range.startContainer)),
+      )
+      expect(ranges.length).toBeGreaterThan(0)
+      for (const range of ranges) {
+        expect(range.endContainer === plain && range.endOffset === 0).toBe(false)
+        if (range.startContainer.nodeType !== Node.TEXT_NODE) continue
+        expect(range.startOffset).toBeLessThan((range.startContainer as Text).length)
+      }
+    } finally {
+      restored?.dispose()
+      editor.dispose()
+      parser.dispose()
+      host.remove()
+      target.remove()
+    }
+  },
+)
+
+function redInkAfter(image: ImageData, left: number): number {
+  const canvas = new OffscreenCanvas(image.width, image.height)
+  const context = canvas.getContext('2d')!
+  context.putImageData(image, 0, 0)
+  return redInk(context.getImageData(left, 0, image.width - left, image.height))
+}

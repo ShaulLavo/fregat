@@ -12,6 +12,7 @@ const crossEngineScrollTests = [
 ]
 
 let contentEvidence: string | undefined
+let highlightEvidence: string | undefined
 
 export default defineConfig({
   server: { fs: { allow: [workspaceRoot] } },
@@ -267,10 +268,22 @@ export default defineConfig({
                 })
                 return image.toString('base64')
               },
-              proofHighlightPaintScreenshot: async ({ iframe }, hostId: string) => {
+              proofHighlightPaintScreenshot: async (
+                { iframe, project },
+                hostId: string,
+                label?: string,
+              ) => {
+                if (label)
+                  highlightEvidence ??= mkdtempSync(join(tmpdir(), 'singapore-highlight-boundary-'))
+                const path = label
+                  ? join(highlightEvidence!, `${project.name}-${label}.png`)
+                  : undefined
                 const image = await iframe
-                  .locator(`#${hostId} [data-editor-virtual-row="0"]`)
-                  .screenshot({ animations: 'disabled' })
+                  .locator(
+                    `#${hostId} [data-editor-virtual-row="0"], #${hostId} [data-editor-document-paint-row="0"]`,
+                  )
+                  .screenshot({ animations: 'disabled', path })
+                if (path) console.info('Highlight boundary evidence', path)
                 return image.toString('base64')
               },
             },
