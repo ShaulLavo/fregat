@@ -10,7 +10,7 @@ const initial = createPieceTableSnapshot(line.repeat(lines), {
 })
 export const characters = initial.length
 
-export function workload(authors: number, retained: number, marked = false) {
+export function workload(authors: number, retained: number, marked: boolean | 'dense' = false) {
   const engine = new TextbufferEngine(initial)
   const prefix: Envelope[] = []
   const allocator = new CharIdAllocator('history')
@@ -35,11 +35,11 @@ export function workload(authors: number, retained: number, marked = false) {
     const author = new TextbufferEngine()
     author.restore(base)
     const ids = new CharIdAllocator(`edit-${index}`)
-    const position = marked && index >= 96 ? index - (index % 2) : index
+    const position = marked === 'dense' || (marked && index >= 96) ? index - (index % 2) : index
     const offset = prefix.length + Math.floor((lines * (position + 1)) / 101) * line.length + 21
-    let edit = { offset, deleteCount: 1, text: '9' }
-    if (marked && index === 96) edit = { offset: offset - 2, deleteCount: 0, text: ' ' }
-    if (marked && index >= 98)
+    let edit = { offset, deleteCount: 1, text: marked === 'dense' ? String(8 + (index % 2)) : '9' }
+    if (marked === true && index === 96) edit = { offset: offset - 2, deleteCount: 0, text: ' ' }
+    if (marked === true && index >= 98)
       edit = { offset, deleteCount: 10, text: JSON.stringify(`name${index}`) }
     batch.push(
       author.author(edit, {

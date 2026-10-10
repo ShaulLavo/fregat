@@ -235,7 +235,9 @@ function main() {
   console.log(JSON.stringify(selection, null, 2))
   if (process.env.GITHUB_OUTPUT) {
     const lines = Object.entries(selection)
-      .map(([key, value]) => `${key}=${JSON.stringify(value)}\n`)
+      .map(
+        ([key, value]) => `${key}=${typeof value === 'string' ? value : JSON.stringify(value)}\n`,
+      )
       .join('')
     appendFileSync(process.env.GITHUB_OUTPUT, lines)
   }

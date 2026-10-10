@@ -314,10 +314,10 @@ them).
 
    The ordinary p95 and marked batch still exceed the unchanged 2 ms budget. The representative
    marked median passes the additional 8 ms frame target; this is not a dense-conflict worst-case
-   bound. Remaining proof: run the production bridge including worker transport after UI wiring,
-   and bound wide/damaged or injected contexts that take incremental fallback. Reproduce with
-   the benchmark command above and `bench/workload.ts`; retain the ordinary budget and the exact
-   full-reparse differential control while investigating these tails.
+   bound. The 2026-10-10 cost follow-up below measures production worker transport, dense marks
+   and UI work. Wide/damaged or injected contexts that take incremental fallback still need a
+   bound. Reproduce with the benchmark commands and `bench/workload.ts`; retain the ordinary
+   budget and the exact full-reparse differential control while investigating these tails.
 
    A separate **experiment, shared machine** in `paste-evidence.json` compares reviewed head
    `d8ff8d97b4249cf3842e6c72b250c82f9137c6ea` with the revision, using two concurrent insertions
@@ -445,6 +445,168 @@ append-and-query. Final comparison samples assert identical retained edits and e
 Property tests add 30 seeded causally ready arrival histories with mixed canonical insertion
 and tail append, limits including zero, empty/retry batches, effect-command eviction, and
 atomic rejection of malformed batches.
+
+### Cost follow-up, 2026-10-10
+
+Status: Approved. The allocation and cursor changes are implemented. The latency work listed
+below remains open; this follow-up does not waive the 2 ms target.
+
+`editor/packages/collaboration/bench/runtime-cost-comparison.json` retains the final source
+hashes, complete Mac A/B/B/A invocations, raw samples, per-message measurements, power/load
+records and Linux allocation profiles. The baseline is
+`73cca5d261ab9b2a987c53b90d461b218593053c`. All numbers below are **experiment, shared machine**.
+Mac measurements use the Apple M1, macOS 26.4, Node 25.2.1 and headless Chromium. Power
+records show AC. The shared Mac turn serializes cooperating controllers, but those controllers
+recorded load and power without enforcing either guard. These are **unguarded, lock-serialized
+shared-machine experiments**. Browser after runs recorded one-minute loads 3.48/3.54; cursor
+after/after/before runs recorded 3.15/3.30/3.25; detector-gate after/after/before runs recorded
+3.06/3.10/3.08. The earlier load-below-3 qualification was unsupported and is withdrawn.
+All Mac timing numbers below are descriptive observations; they establish neither a qualified
+latency result nor cursor cost-regression proof. No guarded rerun was performed. Linux uses
+the i7-14700K and Node 26.7.0 through non-quiet bench-class admission; its wall times are not
+verdicts. Raw samples, source hashes and arithmetic summaries remain unchanged.
+
+#### Ordinary batches and allocation
+
+The instrumented tail probe holds input shape fixed: 100k TypeScript lines, 100 edits,
+four authors and 8,192 retained records. Every measured batch has 100 ranges, 400 real query
+matches, zero parses and zero marks. Current parsing and window construction stay outside
+timers, although repeated construction contributes heap pressure between batches. Four
+complete ordinary/GC-control/GC-control/ordinary blocks provide 100 samples per mode in each
+invocation. Each production version has two invocations, hence 200 samples per mode.
+
+Nested deletion-overlap callbacks created temporary closures for every concurrent pair.
+The detector now uses short-circuit loops with the same interval test. Separate V8 allocation
+sampling covers 20 detector-only batches per invocation, at a 128-byte sampling interval,
+including collected objects. These are allocation estimates, not exact object counts.
+
+| Machine and method                   | Before estimated bytes per batch | After estimated bytes per batch | Before sampled allocations per batch | After sampled allocations per batch |
+| ------------------------------------ | -------------------------------- | ------------------------------- | ------------------------------------ | ----------------------------------- |
+| Linux, non-quiet A/B/B/A V8 sampling | 4,003,147–4,004,690              | 3,503,210–3,506,924             | 20,143–20,160                        | 18,120–18,128                       |
+| M1 Mac, AC A/B/B/A V8 sampling       | 4,011,935–4,015,703              | 3,502,282–3,620,299             | 20,212–20,221                        | 18,110–18,965                       |
+
+The Linux estimate falls about 12.5%; both Mac after runs also allocate less. This removes
+measured waste without changing the retained-state model, pair results or syntax requests.
+It does not establish a tail-latency improvement.
+
+| M1 instrumented probe     | Median before | Median after | p95 before | p95 after |
+| ------------------------- | ------------- | ------------ | ---------- | --------- |
+| Ordinary                  | 2.305 ms      | 2.349 ms     | 3.001 ms   | 3.650 ms  |
+| Explicit GC outside timer | 4.471 ms      | 4.448 ms     | 4.686 ms   | 4.649 ms  |
+
+Only one of 200 ordinary before samples and two of 200 after samples intersect GC events.
+Removing those samples still leaves p95 at 2.988/3.130 ms before/after. The query and parse
+counts stay identical, so these tails are not an alternate syntax or projection path.
+Explicit GC removes overlapping collections but changes heap conditions and makes this
+probe slower. It is not a lower-bound timer. GC explains some extremes, not the ordinary
+p95 as a whole. The remaining non-GC variation is unresolved; the path is not declared lean
+and the tail work is not dropped.
+
+The unchanged `bench/detector.test.ts` supplies the separate, uninstrumented cost gate.
+Two A/B/B/A invocations per version provide 120 complete-detector samples per setting on
+the M1 Mac on AC, with 8,192 retained records:
+
+| Authors | Median before | Median after | p95 before | p95 after |
+| ------- | ------------- | ------------ | ---------- | --------- |
+| 2       | 1.794 ms      | 1.830 ms     | 3.054 ms   | 2.411 ms  |
+| 4       | 2.020 ms      | 2.037 ms     | 6.489 ms   | 6.307 ms  |
+| 8       | 2.146 ms      | 2.145 ms     | 3.534 ms   | 6.345 ms  |
+
+In these unguarded samples only the two-author median is below 2 ms; no p95 is below it.
+These observations cannot establish a qualified gate pass or failure. The allocation change
+has no established latency win, and the 2 ms target remains open. The attribution probe includes
+query instrumentation and yields with `setImmediate` between samples so GC events can arrive;
+the existing gate has its original scheduling. Their p95 values are not interchangeable.
+The prior Linux median passes remain historical evidence, not a new Mac verdict.
+
+#### Worker requests, dense conflicts and UI
+
+`bench/runtime.browser.test.ts` uses the production bridge and a real parser worker. Each
+invocation warms up once and measures four ordinary/dense/dense/ordinary passes. Two
+invocations per production version provide 16 samples per shape. Dense means 50 conflicting
+units from the same 100-edit batch; every run asserts all 50 overlap marks.
+
+| M1 Mac, AC A/B/B/A, after version            | Ordinary         | Dense, 50 marked units |
+| -------------------------------------------- | ---------------- | ---------------------- |
+| Complete detector median/p95                 | 53.000/53.600 ms | 53.900/56.300 ms       |
+| Summed request/result round trips median/p95 | 51.200/52.400 ms | 52.100/53.500 ms       |
+| Query request/result pairs per batch         | 100              | 150                    |
+| Request JSON UTF-8 bytes per batch           | 31,536–31,836    | 47,304–47,754          |
+| Result JSON UTF-8 bytes per batch            | 61,444–61,644    | 92,166–92,466          |
+
+The ordinary bridge awaits one worker query per range in
+`editor/packages/tree-sitter/src/mergeReview.ts:160–182`. The dense batch adds 50 projected
+queries. Byte counts cover these query envelopes, are computed after timing and are a
+reproducible JSON-size proxy. They are not structured-clone wire bytes or a count of all
+worker traffic. Round trips include worker query/projection work and any source reads.
+Current parsing and window setup are excluded. The approximately 53 ms measures review
+completion, not 53 ms of blocked editor-thread execution. These unguarded observations do
+not establish a qualified cost comparison with the synchronous detector fixture. The actual
+100/150 sequential exchanges identify work to investigate independently of timing.
+
+UI measurements use real two-peer EditorRoom sessions and ReviewView over 100k lines, with
+an injected line syntax reader to isolate painting from parsing. Timers sum every ReviewView
+update during editing and settlement across both editors, including highlight/gutter geometry
+and DOM work. They do not isolate rasterization or compositor presentation. Sixteen after
+samples per shape give the following M1 Mac AC A/B/B/A results.
+
+| Marks per editor | Two-editor update calls | Summed update median/p95 | Hover through two frames median/p95 |
+| ---------------- | ----------------------- | ------------------------ | ----------------------------------- |
+| 1                | 18–19                   | 1.000/1.100 ms           | 33.400/35.400 ms                    |
+| 50               | 214–215                 | 7.200/9.100 ms           | 33.200/34.800 ms                    |
+
+Hover timing includes command dispatch, polling for the visible review dialog and two
+animation frames. It is not isolated CPU time. The captured dense hover was read back and
+shows marks, gutter dots and review actions. The standalone fixture lacks production theme
+styling; this is state evidence, not a product appearance review. No React components
+participate, so React render counts do not apply. No UI speedup is claimed.
+
+#### Cursor replacement and reruns
+
+`mergeRangeHasErrors` now uses `gotoFirstChildForIndex` directly and releases its cursor.
+The previous-sibling inclusion remains inclusive, and EOF checks begin with the last child.
+An independent error-node oracle checks late sibling boundaries and EOF in a 100k-line tree.
+The Node large-document/cursor/error-range suite passes 20 tests; 29 real-worker merge-unit
+browser tests pass. The collaboration corpus passes 225 tests after allocation tuning.
+
+The isolated M1 Mac AC A/B/B/A cursor benchmark measures 100 late comment-line error checks
+in a retained 100k-line TypeScript tree with an early damaged declaration. Parsing and
+merge-unit query execution are excluded. Five warmups and 20 samples per invocation provide
+40 samples per version. Median/p95 is 289.120/290.172 ms before and 249.637/249.954 ms after.
+Results are identical. The numerical decrease is an unguarded observation and does not
+establish a latency improvement or absence of cost regression. Guarded cursor cost-regression
+proof remains open, together with a bound for damaged or injected contexts.
+
+Rerun from the checkout after workspace builds, with an absolute evidence directory:
+
+```sh
+bun run build:workspaces
+E068_EVIDENCE_DIR="$PWD/evidence" bun run --cwd editor/packages/collaboration bench:merge-review bench/tail.test.ts bench/cursor.test.ts
+bun run --cwd editor/packages/collaboration bench:merge-review bench/detector.test.ts
+COLLABORATION_EVIDENCE_DIR="$PWD/evidence" bun run --cwd editor/packages/collaboration bench:review-runtime
+```
+
+Keep benchmark sources fixed while alternating the recorded baseline and current production
+`merge-review.ts` and `mergeUnits.ts` in A/B/B/A order. Each uninstrumented detector invocation
+writes `bench/detector-evidence.json`; retain it separately before the next invocation.
+For qualified Mac reruns, use the shared Mac turn and have the controller enforce and record
+AC power and one-minute load below 3 before each sample block. Holding the turn lock alone
+does not enforce these conditions. Linux runs remain non-quiet and report allocation counts
+only. Early pilots with unavailable GC, interleaved controls and
+an overly broad cursor timer are excluded from the final comparisons.
+
+Remaining Approved work:
+
+- [ ] Establish cursor cost-regression proof with an A/B/B/A rerun that enforces and records
+      AC power and one-minute load below 3 before each sample block. Retain exact-result checks.
+- [ ] Continue the ordinary 2 ms tail investigation using the uninstrumented detector gate and
+      instrumented probe together. Do not assign all tails to GC or close the gate from a median.
+- [ ] Reduce the 100 sequential current-unit worker exchanges in `mergeReview.ts:160–182`.
+      Preserve cancellation, source retention and projection ownership; repeat the real-worker
+      ordinary/dense benchmark and retain per-batch request counts and mark equality.
+- [ ] Bound late damaged-root/error-range checks and wide/injected incremental fallbacks.
+      `bench/cursor.test.ts` now reproduces the expensive late damaged-root lookup independently
+      of syntax-query execution; repeat it with the existing full-reparse differential corpus.
 
 ## Verification
 

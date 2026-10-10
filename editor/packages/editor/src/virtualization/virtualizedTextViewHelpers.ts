@@ -76,7 +76,7 @@ export function normalizeHorizontalOverscan(overscan: number | undefined): numbe
 export function normalizeScrollMode(
   scrollMode: VirtualizedTextViewScrollMode | undefined,
 ): VirtualizedTextViewScrollMode {
-  if (scrollMode === 'static') return 'static'
+  if (scrollMode === 'static' || scrollMode === 'content') return scrollMode
 
   return 'virtualized'
 }

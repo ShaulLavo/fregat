@@ -285,3 +285,30 @@ claiming a Safari version fixed it.
 
 An upstream WebKit report is drafted locally; nothing has been filed. The draft
 records the confirmed site repro, the unsuccessful reductions and the removal check.
+
+## WebKit retains a canvas fallback face after a web font loads
+
+Verified 2026-10-09 with Playwright 1.63.0: WebKit 26.6 on Linux retains the
+fallback face in both existing HTML canvas and OffscreenCanvas 2D contexts.
+Chromium 153.0.8010.12 and Firefox 155.0 update the same retained contexts correctly.
+Real Safari has not been verified.
+
+A minimal repro sets a context's font to a currently unavailable custom face,
+measures `W`, then loads and adds that face through `FontFace` and `document.fonts`.
+After two frames, assign the same font string and measure again. At 14 px, WebKit's
+retained contexts still report the serif fallback width of 13.2138671875 px;
+fresh contexts and native text report 8.39996337890625 px. The problem survives
+reassigning the same font string. No editor or highlighting code is needed.
+
+Our glyph tables use a shared canvas context. Clearing only the tables therefore
+kept wrapped rows measured with the fallback face after the font observer had
+correctly detected the new face. `clearGlyphAdvancesCache()` now also releases
+that context, so the next table is measured in a fresh one. This applies whenever
+font metrics are invalidated, without an engine check or another observer.
+
+`test/contentHeight.browser.test.ts` checks late-font content height and the cached
+`W` advance against native text, including desktop and phone WebKit. The local
+upstream queue contains the standalone HTML, bundled font and three-engine results;
+nothing has been filed. Remove the context reset once retained contexts agree with
+fresh contexts in the standalone repro on supported WebKit, then rerun the content,
+wrap-layout and default browser projects. Keep glyph-table invalidation.
