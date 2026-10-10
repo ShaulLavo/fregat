@@ -415,6 +415,67 @@ it.skipIf(process.platform === 'win32')(
 )
 
 it.skipIf(process.platform === 'win32')(
+  'keeps the host identity through the exit boundary when retrying a failed stop',
+  async () => {
+    const { hostPaths } = await import('../../apps/server/src/terminal-host/protocol')
+    const server = await startIsolatedServer(undefined, { handleSignals: false })
+    const { stopTerminalHost } = await import('../../apps/server/src/terminal-host/identity')
+    const preload = path.join(server.directory, 'hold-host-exit.ts')
+    // Hold the real runtime exit after the host has completed its own shutdown cleanup.
+    writeFileSync(
+      preload,
+      `const exit = process.exit.bind(process);
+      process.exit = (code) => {
+        process.send('exiting');
+        process.once('message', () => exit(code));
+      };`,
+    )
+    const boundary = Promise.withResolvers<void>()
+    let child: Bun.Subprocess | undefined
+    const client = new TerminalHostClient({
+      stateRoot: server.home,
+      launch(argv, env) {
+        child = Bun.spawn([argv[0]!, '--preload', preload].concat(argv.slice(1)), {
+          env,
+          detached: true,
+          stdio: ['ignore', 'ignore', 'inherit'],
+          ipc(message) {
+            if (message === 'exiting') boundary.resolve()
+          },
+        })
+      },
+    })
+    try {
+      await stopTerminalHost(server.home)
+      const host = await client.host()
+      assert(child, 'The fixture must own the host process')
+      process.kill(host.pid, 'SIGSTOP')
+      await expect(server.stop()).rejects.toMatchObject({ code: 'terminal.HOST_UNREACHABLE' })
+      process.kill(host.pid, 'SIGCONT')
+      await boundary.promise
+      expect(child.exitCode).toBeNull()
+      expect(alive(host.pid)).toBe(true)
+      expect(existsSync(hostPaths(server.home).manifest)).toBe(true)
+      const stopping = server.stop()
+      child.send('exit')
+      await stopping
+      expect(alive(host.pid)).toBe(false)
+      expect(existsSync(server.directory)).toBe(false)
+      await child.exited
+    } finally {
+      client.close()
+      if (child?.exitCode === null) {
+        child.kill('SIGCONT')
+        child.kill('SIGKILL')
+        await child.exited
+      }
+      await server.stop()
+    }
+  },
+  20_000,
+)
+
+it.skipIf(process.platform === 'win32')(
   'retains the outer HOME and a cleanup handle when startup fails after launching a paused host',
   async () => {
     const { withTerminalCheck } = await import('../deploy/live-terminal-scope')

@@ -194,7 +194,8 @@ class TerminalHost {
     await Promise.race([exits, Bun.sleep(SHUTDOWN_GRACE_MS)])
     for (const client of this.clients) client.close()
     this.server?.close()
-    this.cleanup()
+    rmSync(this.paths.socket, { force: true })
+    // Keep identity and the lock until exit: teardown must observe this PID, and a new host must wait.
     process.exit(0)
   }
 
@@ -249,14 +250,6 @@ class TerminalHost {
       },
     )
     renameSync(staging, this.paths.manifest)
-  }
-
-  private cleanup() {
-    rmSync(this.paths.socket, { force: true })
-    rmSync(this.paths.manifest, { force: true })
-    // Keep the lock inode: an overlapping launcher may already have opened it.
-    this.lock?.close()
-    this.lock = null
   }
 }
 
