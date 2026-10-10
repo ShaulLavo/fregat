@@ -288,6 +288,14 @@ Chromium observes page long tasks of 52–182 ms during benchmark windows. These
 - [ ] Add a site-specific portable browser scenario and selectors for both home and manual. Extend the existing mobile check to exercise live mode, not only the static phone default.
 - [ ] Site-only changes need no changeset. Keep one implementation PR focused on site integration after the editor PRs merge.
 
+#### Implementation checkpoint (2026-10-10)
+
+The site implementation replaces Node painting with browser capture and editor-produced HTML, shares one content-scrolling reader for home and manuals, and retains edited source across both switches, palettes and manual history. Portable takeover selectors/scenarios and live-mode mobile inspection are implemented. Final capture qualification and the site PR remain pending the two library correctness dependencies, [#1226](https://github.com/ShaulLavo/fregat/pull/1226) and [#1227](https://github.com/ShaulLavo/fregat/pull/1227). On this checkpoint, #1226 reports `mergeStateStatus: DIRTY` at `1020dbea4fc2cb5ad5ab1ec97bbbe329d47d459d` with no CI checks. Keep the native extent and WebKit exact-pixel gates intact.
+
+A queued theme change reproduced an additional site bug in both engines: the old native colours were saved under the new palette. Capturing under an explicitly selected palette fixes it; both engines pass the new before/after regression and failed-live-navigation history control (four cases). Both delayed-editor-entry controls also pass. These runs use an interim direct Astro build and do not qualify the complete capture pipeline or replace the full site matrix. Normal-hook implementation checkpoints passed repository gates and typechecks. The accepted preview's source archive and paired gzip-level-9 baseline pages are preserved with the existing site-embed evidence before app replacement.
+
+After the dependencies merge, merge main, rebuild workspaces, recapture all documents, run the complete browser suite and all four selected-route mobile shards, review `look`/scenario screenshots, and measure cold/warm builds and page weight. Then complete the Phase 3/4 checklist, open the focused site PR and refresh the existing private preview app. Do not publish the interim cropped capture or count scheduler queue time as build time.
+
 ### Phase 4: Acceptance and closeout
 
 - [ ] At 320/390/1280 px in Chromium and WebKit, pixel-compare home and representative manual before takeover, after live settlement and after returning static. Same engine, font, theme, DPR and scroll anchor for each comparison. Also capture intermediate frames to catch a switch flash.
