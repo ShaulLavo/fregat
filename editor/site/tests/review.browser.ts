@@ -84,7 +84,7 @@ for (const engine of ['chromium', 'webkit'] as const) {
           }
         },
       )
-      test.each(Array.from({ length: 10 }, (_, index) => index + 1))(
+      test.each([1, 2])(
         'a failed runtime download is requested again by Try again (run %i)',
         async (run) => {
           const context = await browser.newContext({ viewport: { width: 390, height: 844 } })

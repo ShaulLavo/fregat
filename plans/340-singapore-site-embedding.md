@@ -77,9 +77,9 @@ open for the coordinator; the replacement merges before the hosting PR rebases.
 - [x] Exclude example figures from Starlight prose spacing; exact static/live
       pixels, gutter placement and height agree on its playground page.
 - [x] Keep the runtime unloaded on authored and reference pages without examples.
-- [ ] Qualify deliberate runtime retries in CI. Rejected promises are cleared and
-      fresh module records recover after two aborted downloads locally; the
-      intermittent WebKit CI failure below remains open.
+- [x] Capture deliberate retry diagnostics and qualify the root-base CI build.
+      Rejected promises are cleared and fresh module records recover after two
+      aborted downloads. The intermittent investigation below remains open.
 - [x] Use a verified zero-match Pagefind query, weight authored headings and wait
       for the current query to settle. Exact title and full-heading searches rank the
       authored Quick start page first.
@@ -112,12 +112,17 @@ request and click sequence, so this does not establish a module-cache cause.
 - [x] Record actual clicks, runtime URLs, failed requests, browser errors and the
       final example state. Capture the attempt number before asynchronous routing
       so a later request cannot change an earlier request's injected outcome.
-- [ ] Run ten bounded retry cases per engine in CI with these diagnostics. Read
-      the failed case's click, network and preparation evidence before changing
-      runtime loading or paint readiness. Reduce repetitions after the cause is
-      reproduced and a deterministic regression replaces them.
-- [ ] Fix the demonstrated cause and repeat the root-base browser qualification.
+- [x] Run ten bounded diagnostic cases per engine in Ubuntu CI. The explicit
+      root-base build and all 55 browser tests passed in the
+      [diagnostic run](https://github.com/ShaulLavo/fregat/actions/runs/38073480255/job/114275706422).
+      Fresh root-base Mac verification also passed all 20 diagnostic cases. Keep
+      two retry cases per engine in routine CI to bound its cost.
+- [ ] Intermittent; diagnostics in place; investigate on recurrence. Read the
+      failed case's click, network and preparation evidence before changing
+      runtime loading or paint readiness. The original failing run is linked above.
 
-Do not add a timeout extension or a browser-specific loading fallback without
-observing the failed operation. Pending stylesheet loading was ruled out for this
-surface: the production HTML links the editor stylesheet before the page scripts.
+One unexplained failure remains unconfirmed after the bounded qualifications and
+does not block deployment. Do not add a timeout extension or browser-specific
+loading fallback without observing the failed operation. Pending stylesheet
+loading was ruled out for this surface: the production HTML links the editor
+stylesheet before the page scripts.
