@@ -446,6 +446,8 @@ jobs:
         with:
           playwright: editor/site/node_modules/.bin/playwright
           browsers: chromium webkit
+      - name: Test landing page playback
+        run: bun run test:scripts scripts/site-player.test.ts
       - name: Test mobile overflow detection
         if: ${{ needs.changes.outputs.tooling == 'true' }}
         run: bun scripts/product-sites/test-mobile.mjs
