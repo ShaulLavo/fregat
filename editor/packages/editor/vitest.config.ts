@@ -8,7 +8,7 @@ import { devices } from '@playwright/test'
 import { defineConfig } from 'vitest/config'
 
 const crossEngineScrollTests = [
-  'test/{virtualizedTextView,virtualizedTextViewGeometry,wheelScrollTarget,gutterScroll,gutterLeadingInset,gutterPointerEvents,wrappedLineGutter,mouseSelectionAutoScroll,navigationReveal,initialViewport,firstPaint,longLineMeasurements,millionLinePaint,codeViewport,renderDisposal,rowPresentation,proportionalRows,proportionalWrap,freeSansShaping,freeSansNativeCarets,wordWrap,defaultLargeDocument,metricProbeScrollExtent}.browser.test.ts',
+  'test/{virtualizedTextView,virtualizedTextViewGeometry,wheelScrollTarget,gutterScroll,gutterLeadingInset,gutterPointerEvents,wrappedLineGutter,mouseSelectionAutoScroll,navigationReveal,initialViewport,firstPaint,longLineMeasurements,millionLinePaint,codeViewport,renderDisposal,rowPresentation,proportionalRows,proportionalWrap,freeSansShaping,freeSansNativeCarets,wordWrap,defaultLargeDocument,metricProbeScrollExtent,tailGeometry,typography}.browser.test.ts',
 ]
 
 let contentEvidence: string | undefined
