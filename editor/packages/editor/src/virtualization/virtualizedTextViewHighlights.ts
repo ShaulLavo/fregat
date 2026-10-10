@@ -33,7 +33,6 @@ import {
 import {
   caretPosition,
   cursorLineBufferRow,
-  cursorLineVirtualRow,
   getMountedRows,
   positionInputAtCaret,
   refreshCursorLineRows,
@@ -200,18 +199,16 @@ export function setSelections(
   selections: readonly VirtualizedTextSelection[],
 ): void {
   const previousCursorLine = cursorLineBufferRow(view)
-  const previousCursorRow = cursorLineVirtualRow(view)
   const stored = selections.map((selection) => clampSelection(view, selection))
   view.selections = stored
   setPrimarySelection(view, stored[0] ?? null)
   renderSelectionHighlight(view)
   renderHiddenCharacters(view)
-  refreshCursorLineRows(view, previousCursorLine, previousCursorRow)
+  refreshCursorLineRows(view, previousCursorLine)
 }
 
 export function clearSelection(view: VirtualizedTextViewInternal): void {
   const previousCursorLine = cursorLineBufferRow(view)
-  const previousCursorRow = cursorLineVirtualRow(view)
   view.selectionStart = null
   view.selectionEnd = null
   view.selectionHead = null
@@ -219,7 +216,7 @@ export function clearSelection(view: VirtualizedTextViewInternal): void {
   clearSelectionHighlight(view)
   renderHiddenCharacters(view)
   renderCaret(view)
-  refreshCursorLineRows(view, previousCursorLine, previousCursorRow)
+  refreshCursorLineRows(view, previousCursorLine)
 }
 
 export function renderSelectionHighlight(view: VirtualizedTextViewInternal): void {
