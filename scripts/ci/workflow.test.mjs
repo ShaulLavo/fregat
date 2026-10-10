@@ -21,6 +21,7 @@ test.each([
   ['image-only changes', images, 0],
   ['empty changes', {}, 0],
   ['unsupported Astro', { 'docs/example.astro': '<div>unsupported' }, 0],
+  ['unformatted agent instructions', { '.agents/skills/example/SKILL.md': '# Skill' }, 123],
   ['unformatted JSON5', { 'docs/example.json5': '{answer:42}' }, 123],
   ['unformatted Markdown alias', { 'docs/example.markdown': '# Heading' }, 123],
   ['mixed changes with unformatted text', { ...images, 'docs/example.json5': '{answer:42}' }, 123],
@@ -75,5 +76,22 @@ test.each([
     )
   } finally {
     await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('bundle size does not block CI or repository verification', async () => {
+  const runs = Object.values(workflow.jobs).flatMap((job) =>
+    (job.steps ?? []).map((step) => step.run ?? ''),
+  )
+  expect(runs.join('\n')).not.toContain('bundle:gate')
+  expect(JSON.parse(manifest).scripts.verify).not.toContain('bundle:gate')
+  const web = JSON.parse(await readFile(new URL('apps/web/package.json', root), 'utf8'))
+  expect(web.scripts).not.toHaveProperty('bundle:gate')
+  expect(web.scripts).not.toHaveProperty('bundle:report')
+  expect(await readFile(new URL('lefthook.yml', root), 'utf8')).not.toContain('bundle:gate')
+  for (const file of ['bundle-gate.ts', 'bundle-gate.test.ts', 'first-load-pins.json']) {
+    await expect(readFile(new URL(`apps/web/scripts/${file}`, root))).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
   }
 })

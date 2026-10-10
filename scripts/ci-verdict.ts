@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 type Result<T> = { ok: true; value: T } | { ok: false; issue: string }
-type Event = 'pull_request' | 'push' | 'workflow_dispatch'
+type Event = 'pull_request' | 'push' | 'workflow_dispatch' | 'schedule'
 export type RunIdentity = {
   runId: number
   attempt: number
@@ -31,7 +31,7 @@ type Job = {
   condition: readonly Predicate[] | null
   matrix: Matrix | null
   reusable: string | null
-  inputs: Readonly<Record<string, readonly Predicate[]>>
+  inputs: Readonly<Record<string, readonly Predicate[] | { output: string }>>
 }
 type Workflow = { jobs: ReadonlyMap<string, Job>; needs: readonly string[]; verdictName: string }
 type Context = {
@@ -115,10 +115,18 @@ function parseJob(id: string, value: unknown): Result<Job> {
   if (!parsedCondition.ok) return parsedCondition
   const parsedMatrix = matrix(source.strategy)
   if (!parsedMatrix.ok) return parsedMatrix
-  const inputs: Record<string, readonly Predicate[]> = {}
+  const inputs: Record<string, readonly Predicate[] | { output: string }> = {}
   const supplied = source.with === undefined ? {} : record(source.with)
   if (!supplied) return rejected(`Job ${id} inputs must be an object`)
   for (const [key, expression] of Object.entries(supplied)) {
+    const output =
+      typeof expression === 'string'
+        ? expression.match(/^\$\{\{ needs\.changes\.outputs\.([\w]+) \}\}$/)?.[1]
+        : undefined
+    if (output) {
+      inputs[key] = { output }
+      continue
+    }
     const parsed = condition(expression)
     if (!parsed.ok || parsed.value === null)
       return rejected(`Job ${id} input ${key} is unsupported`)
@@ -196,7 +204,7 @@ function parseContext(value: unknown, graph: Workflow, event: string): Result<Co
     if (typeof output !== 'string') return rejected('Changes output must be a string')
     outputs[key] = output
   }
-  if (!['pull_request', 'push', 'workflow_dispatch'].includes(event))
+  if (!['pull_request', 'push', 'workflow_dispatch', 'schedule'].includes(event))
     return rejected('Workflow event is unsupported')
   return { ok: true, value: { event, results, outputs } }
 }
@@ -204,7 +212,7 @@ function parseContext(value: unknown, graph: Workflow, event: string): Result<Co
 function evaluateCondition(
   predicates: readonly Predicate[] | null,
   context: Context,
-  inputs: Readonly<Record<string, boolean>>,
+  inputs: Readonly<Record<string, boolean | string>>,
 ): Result<boolean> {
   if (predicates === null) return { ok: true, value: true }
   let enabled = false
@@ -219,7 +227,7 @@ function evaluateCondition(
 function evaluatePredicate(
   term: Predicate,
   context: Context,
-  inputs: Readonly<Record<string, boolean>>,
+  inputs: Readonly<Record<string, boolean | string>>,
 ): Result<boolean> {
   switch (term.kind) {
     case 'dispatch':
@@ -270,9 +278,18 @@ function jobNames(job: Job, context: Context): Result<readonly string[]> {
   return { ok: true, value: values.value.map((value) => job.name.replace(token, value)) }
 }
 
-function reusableInputs(job: Job, context: Context): Result<Readonly<Record<string, boolean>>> {
-  const inputs: Record<string, boolean> = {}
+function reusableInputs(
+  job: Job,
+  context: Context,
+): Result<Readonly<Record<string, boolean | string>>> {
+  const inputs: Record<string, boolean | string> = {}
   for (const [key, expression] of Object.entries(job.inputs)) {
+    if ('output' in expression) {
+      const value = context.outputs[expression.output]
+      if (typeof value !== 'string') return rejected('Reusable output input is missing')
+      inputs[key] = value
+      continue
+    }
     const result = evaluateCondition(expression, context, {})
     if (!result.ok) return result
     inputs[key] = result.value
@@ -318,7 +335,7 @@ function expectedChild(
   parent: string,
   child: Job,
   context: Context,
-  inputs: Readonly<Record<string, boolean>>,
+  inputs: Readonly<Record<string, boolean | string>>,
 ): Result<ExpectedJob> {
   if (child.matrix || child.reusable || child.name.includes('${{'))
     return rejected('Reusable child graph is unsupported')
@@ -474,7 +491,10 @@ function contextIdentity(workflowPath: string): Result<RunIdentity> {
     !headSha ||
     !/^[a-f0-9]{40}$/.test(headSha) ||
     !repository ||
-    (event !== 'pull_request' && event !== 'push' && event !== 'workflow_dispatch')
+    (event !== 'pull_request' &&
+      event !== 'push' &&
+      event !== 'workflow_dispatch' &&
+      event !== 'schedule')
   )
     return rejected('CI verdict workflow identity metadata is missing or invalid')
   return { ok: true, value: { runId, attempt, headSha, repository, event, workflowPath } }
