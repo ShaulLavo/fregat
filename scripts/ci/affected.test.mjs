@@ -104,6 +104,51 @@ test.each([
   expect(select([file]).tooling).toBe(false)
 })
 
+test('PR 1232 selects Editor health when changing its baseline and workflow', () => {
+  expect(
+    select([
+      '.github/workflows/workspace-libraries.yml',
+      'editor/docs/architecture/phase-0/health-baseline.json',
+      'scripts/workspace-verification.test.ts',
+    ]),
+  ).toMatchObject({ editor: true, ghostty: false, web: false, server: false })
+})
+
+test.each([
+  'editor/docs/architecture/phase-0/health-baseline.json',
+  'editor/docs/architecture/phase-0/core-public-api.json',
+  'editor/docs/architecture/phase-0/timer-usage.json',
+  'editor/docs/architecture/e056-platform-agnostic-core-sources.json',
+  'editor/scripts/architecture-health.mjs',
+  'editor/scripts/check-full-text-boundary.mjs',
+  'editor/scripts/full-text-boundary-allow.json',
+  'editor/scripts/command-reference.ts',
+  'editor/scripts/workspace-root.ts',
+  'editor/docs/commands.md',
+  'editor/package.json',
+  'editor/site/package.json',
+  'package.json',
+  '.github/workflows/workspace-libraries.yml',
+])('%s selects Editor health without unrelated library or application tests', (file) => {
+  expect(select([file])).toMatchObject({
+    editor: true,
+    ghostty: false,
+    hotkeys: false,
+    web: false,
+    server: false,
+    tui: false,
+  })
+})
+
+test.each([
+  'editor/docs/architecture/phase-0/README.md',
+  'editor/docs/architecture/phase-0/performance-baseline.md',
+  'editor/docs/architecture/extension-hooks.md',
+  'editor/docs/development.md',
+])('%s does not select Editor health', (file) => {
+  expect(select([file]).editor).toBe(false)
+})
+
 test('dependencies are built without selecting their tests', () => {
   const plan = select(['apps/web/src/main.tsx'])
   expect(plan.packages).toEqual(['web'])
@@ -112,7 +157,6 @@ test('dependencies are built without selecting their tests', () => {
 })
 
 test.each([
-  'package.json',
   'bun.lock',
   'turbo.json',
   '.github/workflows/ci.yml',
