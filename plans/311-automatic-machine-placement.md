@@ -54,7 +54,7 @@ After successful Send, a genuinely new independent Auto draft clears the old aut
 - [ ] Keep existing capacity, movement, hook, and draft retry checks green. Add portable cases using injected resource snapshots and real app state. No test needs the owner's machine names or live fleet.
 - [ ] Read back `look` screenshots for Auto's visible selected host, unavailable capacity, and locked drafts. Inspect the query/counter evidence that no disconnected host was connected or awakened.
 - [ ] Compare selection latency and request count on the same fixture setup. Explain any extra connected-host read and remove repeated reads that add no decision value.
-- [ ] Commit and push owned paths, run required gates through the heavy runner, deploy affected server/web code, and verify the served Auto flow. Update this checklist and the root roadmap.
+- [ ] Commit and push owned paths, run required gates through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill, deploy affected server/web code, and verify the served Auto flow. Update this checklist and the root roadmap.
 
 ## Acceptance and verification
 

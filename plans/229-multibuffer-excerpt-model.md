@@ -104,7 +104,7 @@ the shown subject until its new snapshot is ready.
 Run the narrow tests for changed owners and `bun run gates`; pre-commit typecheck
 must pass. Browser scenarios use fixture/mock providers only. Put heavy tests,
 scenarios, builds, and deploys through
-the current heavy wrapper in [AGENTS.md](../AGENTS.md#dev-gates-verification).
+host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill.
 Use an explicit free port for any private dev server and stop it afterward.
 Deploy verified implementation with `bun run install-release`, or
 `bun run install-release --server --restart` when server code changes. Confirm the served release.

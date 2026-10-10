@@ -62,7 +62,6 @@ describe('settings mutation schemas', () => {
       'git.projectWorktreeCleanupOnDelete',
       'workbench.theme.customizations',
       'spellcheck.words',
-      'developer.heavyJobClasses',
     ])
     const expected = SETTING_IDS.filter((id) => !bespokeSettings.has(id))
 

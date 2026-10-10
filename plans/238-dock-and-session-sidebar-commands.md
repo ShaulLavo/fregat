@@ -88,7 +88,7 @@ resizes active/all visible docks and resets them.
 Hiding the focused dock returns focus to the retained pane; terminal fixture identity and input
 remain intact when reopened. Reopening preserves persisted size and visibility intent.
 
-Run heavy checks through the current heavy wrapper in [AGENTS.md](../AGENTS.md#dev-gates-verification).
+Run heavy checks through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill.
 Use fixture providers and fixture language servers. Add scenario selectors in
 `scripts/agent/selectors.ts`, run `bun run agent:browser scenario <name>` for the named scenario above, then
 `bun run agent:browser look`; read screenshots back and record the evidence directory. Run `bun run gates`

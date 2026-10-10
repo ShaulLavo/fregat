@@ -160,7 +160,9 @@ Owner decision: after everything else is done. Then: fix `ghostty-webgpu`'s `rep
 confirms the `@fregat` scope, set `NPM_TRUSTED_PUBLISHING=true`, publish current versions and confirm
 on npm. Until then, READMEs and docs install from npm as written; the published 0.1.2 is known stale.
 
-## Track P: Proof (starts now; benchmarks run through the heavy-job runner)
+## Track P: Proof
+
+On the owner's host, benchmarks use the private [heavy-runner tool](https://github.com/ShaulLavo/heavy-runner) described in the local `fregat-local` skill. Contributor and CI commands run directly.
 
 From the [performance report](../docs/research/packages-as-products/performance-evidence.md):
 

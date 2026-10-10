@@ -49,7 +49,7 @@ Add a production API route beneath `/platform` returning the Mesh v1 shape, capp
 
 ## Phases, tests and PRs
 
-Each PR receives one independent Sol HIGH reviewer, green CI, and a squash merge. Run fail-first tests before implementation and the narrowest plausible failing checks through the heavy wrapper. Every merge receipt belongs below. Merge a green PR after unrelated main movement without redundant CI; shared contracts/lockfiles/build config require re-verification when changed.
+Each PR receives one independent Sol HIGH reviewer, green CI, and a squash merge. Run fail-first tests before implementation and the narrowest plausible failing checks through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill. Every merge receipt belongs below. Merge a green PR after unrelated main movement without redundant CI; shared contracts/lockfiles/build config require re-verification when changed.
 
 - [ ] Phase 0 — publish these Approved updates to Plans 308/309/289, the inventory and root roadmap; `bun run plans:check`, docs format, independent HIGH review, green CI, squash merge.
 - [ ] Phase 1 — server source/cache/contracts/settings and cache-only feed. Fail-first quota normalization, duration, mixed ages, account mismatch, nullable credits, no-data, bounded/coalesced/failure/reset refresh, cache restart, late/out-of-order collector and reset-epoch merge tests, proven/ambiguous identity fixtures, and pure-read request-count tests. Verify with Mesh's strict decoder without contacting a provider.
