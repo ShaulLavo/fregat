@@ -280,6 +280,54 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
     }
   }, 15_000)
 
+  test('a cancelled primary keeps its TERM result when cleanup polling is delayed', async () => {
+    const box = concurrentBox()
+    const observer = createQuietObserver(box)
+    if (observer.kind !== 'ready') expect.fail(observer.reason)
+    const shim = path.join(observer.directory, 'scope.sh')
+    writeFileSync(shim, readFileSync(shim, 'utf8').replace('sleep 0.1\n', 'sleep 0.6\n'))
+    const ready = path.join(box.root, 'leftover-ready')
+    const quiet = start(
+      box,
+      'cancelled-delayed-poll',
+      [
+        'bash',
+        '-c',
+        `(trap '' TERM; echo ready > "${ready}"; exec sleep 60) & while [ ! -e "${ready}" ]; do sleep 0.01; done; echo started; exec sleep 60`,
+      ],
+      { quiet: true, jobClass: 'bench', machine: true, preload: observer.preload },
+    )
+    try {
+      await expect.poll(quiet.stdout, { timeout: 10_000 }).toContain('started')
+      expect(quiet.child.kill('SIGTERM')).toBe(true)
+      const result = await quiet.done
+      const snapshot = freezeQuietObserver(observer, 'failure')
+      if (!('events' in snapshot)) expect.fail(snapshot.unavailable)
+      expect(snapshot.events).toContainEqual(
+        expect.objectContaining({ kind: 'shell', phase: 'payload-return', status: 143 }),
+      )
+      expect(result.code).toBe(143)
+      expect(snapshot.events).toContainEqual(
+        expect.objectContaining({ kind: 'shell', phase: 'cleanup-kill' }),
+      )
+      expect(recordOf(box, 'cancelled-delayed-poll')).toMatchObject({
+        exitCode: 143,
+        leftoverProcesses: 1,
+        quietHoldExpired: false,
+      })
+      expect(live(box.state, 'jobs')).toEqual([])
+      const next = start(box, 'after-delayed-poll', ['true'], {
+        quiet: true,
+        jobClass: 'bench',
+        machine: true,
+      })
+      expect((await next.done).code).toBe(0)
+    } finally {
+      quiet.child.kill('SIGTERM')
+      await quiet.done
+    }
+  }, 15_000)
+
   test.each(['expired', 'cancelled'])(
     'late light servers wait for %s holds and remain running through the next hold',
     async (mode) => {
