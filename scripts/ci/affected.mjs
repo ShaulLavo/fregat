@@ -13,6 +13,7 @@ const editorHealthInputs = [
   'editor/scripts/command-reference.ts',
   'editor/scripts/workspace-root.ts',
   'editor/package.json',
+  'editor/site/package.json',
   'package.json',
   '.github/workflows/workspace-libraries.yml',
 ]

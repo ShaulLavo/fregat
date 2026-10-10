@@ -126,6 +126,7 @@ test.each([
   'editor/scripts/workspace-root.ts',
   'editor/docs/commands.md',
   'editor/package.json',
+  'editor/site/package.json',
   'package.json',
   '.github/workflows/workspace-libraries.yml',
 ])('%s selects Editor health without unrelated library or application tests', (file) => {
