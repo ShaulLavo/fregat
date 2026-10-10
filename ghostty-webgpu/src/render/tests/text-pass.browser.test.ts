@@ -539,6 +539,9 @@ it('reuses the render-pass descriptor while each encoded frame captures its targ
   const commands = targets.map((target) => grid.pass.encode(target.texture.createView(), target))
   expect(encodes.mock.calls[0]?.[0]).toBe(encodes.mock.calls[1]?.[0])
   expect(encodes.mock.calls[1]?.[0]).toBe(encodes.mock.calls[2]?.[0])
+  for (const [descriptor] of encodes.mock.calls) {
+    expect(Array.from(descriptor.colorAttachments)).toEqual([null])
+  }
   device.queue.submit(commands)
   for (const target of targets) {
     await target.buffer.mapAsync(GPUMapMode.READ)
