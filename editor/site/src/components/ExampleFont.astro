@@ -6,16 +6,33 @@
   const choose = (font) => {
     if (root.dataset.exampleFont === 'pending') root.dataset.exampleFont = font
   }
-  // The @font-face rules are parsed with the stylesheets that follow this script.
-  document.addEventListener(
-    'DOMContentLoaded',
-    () => {
-      document.fonts.load('14px "JetBrains Mono"').then(
-        (faces) => choose(faces.length ? 'mono' : 'fallback'),
-        () => choose('fallback'),
-      )
-      setTimeout(() => choose('fallback'), 100)
-    },
-    { once: true },
-  )
+  const decide = () => {
+    document.fonts.load('14px "JetBrains Mono"').then(
+      (faces) => choose(faces.length ? 'mono' : 'fallback'),
+      () => choose('fallback'),
+    )
+    setTimeout(() => choose('fallback'), 100)
+  }
+  // Wait for the stylesheets that register the @font-face rules, but not for deferred or module
+  // scripts, so a stalled script can't keep examples hidden. A stalled stylesheet blocks paint anyway.
+  const afterStylesheets = () => {
+    const pending = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).filter(
+      (link) => !link.sheet,
+    )
+    if (!pending.length) return decide()
+    let left = pending.length
+    const settle = () => {
+      left -= 1
+      if (!left) decide()
+    }
+    for (const link of pending) {
+      link.addEventListener('load', settle, { once: true })
+      link.addEventListener('error', settle, { once: true })
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('readystatechange', afterStylesheets, { once: true })
+  } else {
+    afterStylesheets()
+  }
 </script>

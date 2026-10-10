@@ -165,7 +165,7 @@ CSS before scripts.
 
 - [x] Make one font choice for the whole page after the stylesheets register the
       code font: Mono when it loads within the 100 ms optional-font block period
-      after `DOMContentLoaded`, otherwise the matched fallback for the rest of the
+      after the stylesheets load (without waiting for module scripts), otherwise the matched fallback for the rest of the
       visit. Examples stay transparent while the choice is pending. Static paint and
       the live editor both read `data-example-font`, so a below-fold example can't
       paint in one face and go live in another.
