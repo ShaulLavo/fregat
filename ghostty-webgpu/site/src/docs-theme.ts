@@ -1,4 +1,5 @@
 // Starlight theming that matches the landing page: Mist palette, site fonts, ink-dark code.
+import githubLight from '@shikijs/themes/github-light'
 import type { StarlightUserConfig } from '@astrojs/starlight/types'
 
 const ink = '#15131f'
@@ -29,6 +30,6 @@ export const docsTheme = {
 } satisfies Pick<StarlightUserConfig, 'customCss' | 'expressiveCode'>
 
 export const docsCodeThemes = {
-  light: 'github-light',
+  light: githubLight,
   dark: docsTheme.expressiveCode.themes[0],
 } as const
