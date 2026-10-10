@@ -1,5 +1,12 @@
 # @singapore-editor/diff
 
+## 0.2.8
+
+### Patch Changes
+
+- Updated dependencies [[`01157ea`](https://github.com/ShaulLavo/fregat/commit/01157ea95298f194a8fa8e9f67a17fb6b3cab89d), [`2efacca`](https://github.com/ShaulLavo/fregat/commit/2efacca2529252417548ede3694d58f520c782bd), [`f88c132`](https://github.com/ShaulLavo/fregat/commit/f88c1329594cc6d6e1e64a711727e319c7709c88), [`eb6bbed`](https://github.com/ShaulLavo/fregat/commit/eb6bbed11023d2c59a281a5772bb649976bbf5a8), [`85cc87e`](https://github.com/ShaulLavo/fregat/commit/85cc87ed98a35c21ff430e757a75f2d2721604a8), [`0c1b7fb`](https://github.com/ShaulLavo/fregat/commit/0c1b7fb03285785082f4d7b62ce991fbd487dcf4), [`f0e5906`](https://github.com/ShaulLavo/fregat/commit/f0e59061c8d2b189d82f9bc8e52590ba98668da1), [`60d3c72`](https://github.com/ShaulLavo/fregat/commit/60d3c723c842180fd3fa3c6e8f8f7970f1330307), [`31010b1`](https://github.com/ShaulLavo/fregat/commit/31010b183be61ad044eb57438a58c91dd1c8de79), [`590379e`](https://github.com/ShaulLavo/fregat/commit/590379e72a231dc9cdca814c84a3eba64cedb1a6), [`2b9aeac`](https://github.com/ShaulLavo/fregat/commit/2b9aeaceb70c88c77ff0bc85b4bf3fbef3d52b9b), [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390), [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390), [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390), [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390), [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390), [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390), [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390), [`c254ada`](https://github.com/ShaulLavo/fregat/commit/c254ada9561d41b3696d41ec3e6dd599892bf079), [`5ca1d34`](https://github.com/ShaulLavo/fregat/commit/5ca1d349ab0ec22a1951cc3ba1048b028b7f8f5a), [`671416f`](https://github.com/ShaulLavo/fregat/commit/671416f1c1f3fd150b4bb797b915933ceb7f9cfb), [`9488cc4`](https://github.com/ShaulLavo/fregat/commit/9488cc4dba071e4e995de4cb3fd0485f6e8c510a), [`7b04e6e`](https://github.com/ShaulLavo/fregat/commit/7b04e6e32d054a9045ba5a7f9108cd0db354f56e), [`67c4603`](https://github.com/ShaulLavo/fregat/commit/67c4603448625f31c59175738df0eae89132c869)]:
+  - @singapore-editor/core@0.2.8
+
 ## 0.2.7
 
 ### Patch Changes
