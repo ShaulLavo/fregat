@@ -134,6 +134,7 @@ import {
   boundaryPositionXs,
   boundaryPositionXsForAffinity,
   clearRowGeometryCaches,
+  releaseNativeRowGeometry,
   homogeneousRtlCaretAtRowEdge,
   homogeneousRtlCaretMoveInRow,
   isBidiMeasurementRefusalRow,
@@ -521,7 +522,10 @@ export class VirtualizedTextView {
     view.rowPool.length = 0
     const releaseWidgets = takeInlineWidgets(view)
     const releaseCells = takeGutterCells(view, rows)
-    for (const row of rows) invalidateRowPresentations(row.element)
+    for (const row of rows) {
+      invalidateRowPresentations(row.element)
+      releaseNativeRowGeometry(row)
+    }
     this.releaseProvisionalPaint()
     this.pendingReveal = null
     this.cancelContentWidthMeasurement?.()
@@ -1887,6 +1891,7 @@ export class VirtualizedTextView {
       kind: 'same-line',
     }
     renderHiddenCharacters(view)
+    if (!view.monospace) updateContentWidth(view, snapshot.virtualItems)
   }
 
   private applyMultiLineEdit(
