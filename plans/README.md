@@ -159,7 +159,6 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [285](285-ghostty-site-first-frame-and-real-shell.md) | The ghostty-webgpu site paints before the wasm and runs a real shell                   |
 | [286](286-ghostty-extensions.md)                      | ghostty-webgpu extensions, with a line editor first                                    |
 | [287](287-ghostty-worker-mode.md)                     | ghostty-webgpu worker mode: the terminal on an OffscreenCanvas worker                  |
-| [288](288-pr-preview-environments.md)                 | Preview environments for feature PRs                                                   |
 | [289](289-proxy-usage-feed.md)                        | Historical gateway feed, retired producer, and the Mesh TV panel                       |
 | [290](290-mesh-device-authorization.md)               | Approve devices before Mesh control                                                    |
 | [291](291-mesh-private-services.md)                   | Retire Mesh public hosting and preserve private apps                                   |

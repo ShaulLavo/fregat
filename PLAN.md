@@ -105,7 +105,7 @@ joins a later batch unless it fixes a blocker. Ship verified units throughout th
 | 327 virtualization              | Approved and deferred. Start with its fresh baseline and required CSV two-axis geometry when scheduled; tune editor/search/shared lists only with attributed evidence. Optional engine replacement is separate.         |
 | 293/294 Mesh durable scheduling | Independent infrastructure program. Ship 295's manual collector first; recurring coordinated execution waits for durable/quorum/failover guarantees.                                                                    |
 
-Other deferrals retain their owning boundaries: 288 PR previews, 319 agent UI tools, icon packs,
+Other deferrals retain their owning boundaries: 319 agent UI tools, icon packs,
 stopped parser work, DOCX editing and the native Swift editor-first gate. A program's size is a
 reason to split its delivery; dependency evidence determines whether its foundation moves earlier.
 
@@ -387,8 +387,8 @@ starting with CSV, and measures editor rewrapping, recycled search-editor work a
 costs before tuning. Keep existing renderer ownership and coordinate with 156, 182 and E052.
 CSV column windowing is required; a virtualizer replacement depends on a measured comparison.
 
-[288](plans/288-pr-preview-environments.md) is Approved for later, after the owner's
-greenfield-exit decision and its Mesh prerequisites. [319](plans/319-agent-ui-mcp.md) stays
+PR previews moved to [Mesh plan 15](https://github.com/ShaulLavo/mesh/blob/main/docs/plan/15-worktree-previews.md), Approved for later, after the owner's
+greenfield-exit decision. [319](plans/319-agent-ui-mcp.md) stays
 far in the future. It consumes 087's MCP contracts; opening and placing content also waits
 for the still-unplanned layout system. Driving an already-open view has its separate boundary.
 
