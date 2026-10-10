@@ -226,50 +226,55 @@ for (const engine of ['chromium', 'webkit', 'firefox'] as const) {
         }
       },
     )
-    // WebKit paints a reloaded example without its colours for a moment (plan 340 follow-up).
-    ;(engine === 'webkit' ? test.fails : test)(
-      'warm visits select Mono before paint for every example',
-      async () => {
-        const http = await startFontPreview(preview.base, 0)
-        const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
-        const page = await context.newPage()
-        try {
-          await page.goto(`${http.base}/docs/start-here/quick-start/`)
-          await page.evaluate(() => document.fonts.load('14px "JetBrains Mono"'))
-          await page.reload()
+    test('warm visits select Mono before paint for every example', async () => {
+      const http = await startFontPreview(preview.base, 0)
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
+      const page = await context.newPage()
+      try {
+        await page.goto(`${http.base}/docs/start-here/quick-start/`)
+        await page.evaluate(() => document.fonts.load('14px "JetBrains Mono"'))
+        await page.reload()
+        await expect.poll(() => page.locator('html').getAttribute('data-example-font')).toBe('mono')
+        const examples = page.locator('[data-example]')
+        for (let index = 0; index < (await examples.count()); index++) {
+          const example = examples.nth(index)
+          const stage = example.locator('.example-stage')
+          await stage.scrollIntoViewIfNeeded()
+          const staticPixels = await stage.screenshot()
+          expect(
+            await stage
+              .locator('[data-editor-document-paint]')
+              .first()
+              .evaluate((node) => getComputedStyle(node).fontFamily),
+          ).toContain('JetBrains Mono')
           await expect
-            .poll(() => page.locator('html').getAttribute('data-example-font'))
-            .toBe('mono')
-          const examples = page.locator('[data-example]')
-          for (let index = 0; index < (await examples.count()); index++) {
-            const example = examples.nth(index)
-            const stage = example.locator('.example-stage')
-            await stage.scrollIntoViewIfNeeded()
-            const staticPixels = await stage.screenshot()
-            expect(
-              await stage
-                .locator('[data-editor-document-paint]')
-                .first()
-                .evaluate((node) => getComputedStyle(node).fontFamily),
-            ).toContain('JetBrains Mono')
-            await example.getByRole('button', { name: /Edit/ }).click()
-            await expect
-              .poll(() => example.getAttribute('data-example-live'), { timeout: 20000 })
-              .toBe('')
-            const livePixels = await stage.screenshot({ style: inkOnly })
-            await writeFile(
-              join(evidence, `${engine}-warm-example-${index}-static.png`),
-              staticPixels,
-            )
-            await writeFile(join(evidence, `${engine}-warm-example-${index}-live.png`), livePixels)
-            await expectSameInk(page, livePixels, staticPixels)
-          }
-        } finally {
-          await context.close()
-          await http.stop()
+            .poll(() => example.getAttribute('data-example-ready'), { timeout: 20000 })
+            .toBe('')
+          expect(
+            await example
+              .locator('.example-prepared')
+              .evaluate((node) => getComputedStyle(node).opacity),
+          ).toBe('0')
+          const readyPixels = await stage.screenshot()
+          await writeFile(join(evidence, `${engine}-warm-example-${index}-ready.png`), readyPixels)
+          await expectSameInk(page, readyPixels, staticPixels)
+          await example.getByRole('button', { name: /Edit/ }).click()
+          await expect
+            .poll(() => example.getAttribute('data-example-live'), { timeout: 20000 })
+            .toBe('')
+          const livePixels = await stage.screenshot({ style: inkOnly })
+          await writeFile(
+            join(evidence, `${engine}-warm-example-${index}-static.png`),
+            staticPixels,
+          )
+          await writeFile(join(evidence, `${engine}-warm-example-${index}-live.png`), livePixels)
+          await expectSameInk(page, livePixels, staticPixels)
         }
-      },
-    )
+      } finally {
+        await context.close()
+        await http.stop()
+      }
+    })
   })
 }
 

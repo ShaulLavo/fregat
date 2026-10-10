@@ -122,6 +122,8 @@
   position: absolute;
   inset: 0;
   visibility: hidden;
+  /* Snapshot descendants carry their own visibility, so hide the entire painted group. */
+  opacity: 0;
   pointer-events: none;
 }
 [data-example-live] .example-static {
@@ -130,6 +132,7 @@
 [data-example-live] .example-prepared {
   position: relative;
   visibility: visible;
+  opacity: 1;
   pointer-events: auto;
 }
 .sg-example-editor {

@@ -184,9 +184,12 @@ CSS before scripts.
       the live rows, which moves glyphs by subpixel amounts. Make the static markup
       split runs exactly as the live editor does, then tighten `expectSameInk` in
       `editor/site/tests/review.browser.ts` back to exact equality.
-- [ ] **WebKit paints a reloaded example without colours for a moment.** On a warm
-      reload, WebKit's first frame of Quick start's first example shows plain text
-      even though its spans compute `color: rgb(44, 94, 145)`. The colours appear
-      within 500 ms. This is the owner's "highlights disappear and reappear" report,
-      still present in WebKit. The `warm visits` test is marked `test.fails` for
-      WebKit until it is fixed. Remove that marker with the fix.
+- [x] **WebKit reload colour flash (2026-10-10).** The static spans retained their
+      colours. A prepared editor's snapshot above them had explicit
+      `visibility: visible`, overriding its wrapper's `visibility: hidden`, and
+      painted before its highlights settled. Removing row containment, promotion,
+      the pending-font opacity, width switching or theme switching did not fix it.
+      Hiding the prepared editor as one opacity group fixes the overlay without
+      changing font timing. The warm-reload test now requires every engine to pass
+      and compares the initial, prepared and activated frames. See
+      `editor/docs/display/browser-quirks.md` for the reduced visibility case.
