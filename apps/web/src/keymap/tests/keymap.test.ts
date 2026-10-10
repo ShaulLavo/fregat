@@ -85,6 +85,58 @@ test('generic Editor preset rows exclude widget fields while explicit Find rows 
   }
 })
 
+test('Escape in the text closes the completion list, then the signature hint, then find', () => {
+  const escape = (preset: 'ours' | 'zed' | 'vscode', editor: string) =>
+    bindingsForInput(
+      compileKeymap(
+        defaultPlatformKeyBindings('linux', preset).map(({ entry }) => entry),
+        'linux',
+      ),
+      [createKeyInput({ key: 'Escape' })],
+      ['Workspace', editor].map(parseKeyContext),
+    ).bindings[0]?.command
+  for (const preset of ['ours', 'zed', 'vscode'] as const) {
+    expect(
+      escape(preset, 'Editor writable suggestWidgetVisible parameterHintsVisible findVisible'),
+    ).toBe('hideSuggestWidget')
+    expect(escape(preset, 'Editor writable parameterHintsVisible findVisible')).toBe(
+      'closeParameterHints',
+    )
+    expect(escape(preset, 'Editor writable findVisible')).toBe('closeFind')
+  }
+})
+
+test.each([
+  ['ours', true],
+  ['zed', true],
+  ['vscode', undefined],
+] as const)('%s item keys fire while typing: %s', (preset, fires) => {
+  const items = defaultPlatformKeyBindings('linux', preset).filter(({ command }) =>
+    /^workspace\.(selectItem\d|nextItem|previousItem)$/.test(command ?? ''),
+  )
+  const altTwo = items.find(({ keys }) => keys === 'Alt+2')
+  expect(altTwo?.command).toBe('workspace.selectItem2')
+  expect(altTwo?.firesWhileTyping).toBe(fires)
+})
+
+test('the Zed-based layouts add one Escape row per editor widget', () => {
+  for (const preset of ['ours', 'zed'] as const) {
+    const added = defaultPlatformKeyBindings('linux', preset)
+      .filter(
+        ({ keys, context }) =>
+          keys === 'Escape' &&
+          context?.startsWith('Editor && !EditorWidget') &&
+          context.endsWith('Visible'),
+      )
+      .map(({ command }) => command)
+    expect(added.toSorted()).toEqual([
+      'editor.closeFind',
+      'editor.closeParameterHints',
+      'editor.hideSuggestWidget',
+    ])
+  }
+})
+
 test('a deeper default remains ahead of a user binding on the Workspace', () => {
   const defaults = [
     binding('Ctrl+B', { command: 'workspace.toggleSidebarVisibility', context: 'Workspace' }),

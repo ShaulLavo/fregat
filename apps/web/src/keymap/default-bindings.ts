@@ -25,7 +25,7 @@ import oursFregat from '@/keymap/presets/ours-fregat.json'
 import vscodeApp from '@/keymap/presets/vscode-app.json'
 import { editorCommandIdFromPlatform, editorPlatformCommandId } from '@/keymap/editor-keymap'
 import { isPlatformCommandId, platformCommand } from '@/keymap/table'
-import type { PlatformKeyBinding } from '@/keymap/types'
+import { ITEM_POSITIONS, selectItemCommandId, type PlatformKeyBinding } from '@/keymap/types'
 
 const vscodePacks: readonly EditorKeymapPack[] = [
   vscodeNavigationPack,
@@ -85,7 +85,58 @@ export function defaultPlatformKeyBindings(
     )
   })
   const fregat = preset === 'ours' ? fregatBindings(platform, bindings) : []
-  return appWidgets.concat(widgets, bindings, fregat, readOnly, shell)
+  const cancel = editorCancelRows(platform).map((entry) => presetBinding(entry, platform))
+  return appWidgets.concat(widgets, bindings, fregat, cancel, readOnly, shell).map(itemKeyTyping)
+}
+
+const ITEM_COMMANDS: ReadonlySet<string> = new Set<string>(ITEM_POSITIONS.map(selectItemCommandId))
+  .add('workspace.nextItem')
+  .add('workspace.previousItem')
+
+/**
+ * Zed's tab keys act in every pane, the terminal and the chat composer included, so the Zed-based
+ * layouts fire them while typing. Alt+digit types no character outside macOS; AltGr text and
+ * keypad Alt codes still type. The VS Code layout leaves them to the shell, as VS Code does.
+ */
+function itemKeyTyping(binding: PlatformKeyBinding): PlatformKeyBinding {
+  if (!binding.command || !ITEM_COMMANDS.has(binding.command)) return binding
+  return { ...binding, firesWhileTyping: true }
+}
+
+const EDITOR_CANCEL_COMMANDS: ReadonlySet<string> = new Set([
+  'closeFind',
+  'closeParameterHints',
+  'hideSuggestWidget',
+])
+
+/**
+ * Zed's Escape (`editor::Cancel`) closes the editor's open widgets: the completion list first,
+ * then the signature hint, then find. Fregat has a narrower command for each, so the Zed-based
+ * layouts take their Escape rows from the VS Code packs; later rows win ties.
+ */
+function editorCancelRows(platform: PlatformName) {
+  const find: EditorKeymapPack[PlatformName] = vscodeFindPack[platform]
+  return find
+    .concat(suggestPack[platform])
+    .filter(
+      (entry) =>
+        isEscape(entry.keys) && entry.command !== null && EDITOR_CANCEL_COMMANDS.has(entry.command),
+    )
+}
+
+function isEscape(keys: KeymapEntry['keys']) {
+  if (typeof keys === 'string') return keys === 'Escape'
+  if (keys.length !== 1) return false
+  const [stroke] = keys
+  return (
+    typeof stroke === 'object' &&
+    stroke.key === 'Escape' &&
+    !stroke.alt &&
+    !stroke.ctrl &&
+    !stroke.mod &&
+    !stroke.shift &&
+    !stroke.meta
+  )
 }
 
 type ApplicationRow = (typeof vscodeApp)[number]
