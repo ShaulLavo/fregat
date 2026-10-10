@@ -27,6 +27,7 @@ type DocsEditorOptions = {
   readonly gutterWidth: number
   readonly label: string
   readonly openLink: (href: string) => void
+  readonly snapshot?: string
   /** The palette role the text area paints with; code samples sit on `code-bg`. */
   readonly background?: 'bg' | 'code-bg'
 }
@@ -90,6 +91,9 @@ export function mountDocsEditor(host: HTMLElement, options: DocsEditorOptions) {
   }
   const editor: Editor = new Editor(element, {
     presentationReady: false,
+    scrollMode: 'content',
+    snapshot: options.snapshot,
+    documentKey: options.documentId,
     plugins,
     keymap: { packs: defaultEditorPacks.concat([markdownPack]) },
     fontFamily: options.fontFamily,
@@ -130,7 +134,10 @@ export function mountDocsEditor(host: HTMLElement, options: DocsEditorOptions) {
      */
     async ready(timeoutMs = 8000) {
       const started = performance.now()
-      while (!(editor.getSyntaxRecords() && element.querySelector('[class*="editor-inline-"]'))) {
+      while (
+        editor.getPresentationState() !== 'live' ||
+        !(editor.getSyntaxRecords() && element.querySelector('[class*="editor-inline-"]'))
+      ) {
         const waited = performance.now() - started
         if (waited >= timeoutMs)
           throw new TypeError(`The Markdown preview did not paint within ${Math.round(waited)} ms`)
@@ -144,7 +151,12 @@ export function mountDocsEditor(host: HTMLElement, options: DocsEditorOptions) {
     /** Resolves once code highlighting has painted; rejects when it does not arrive in time. */
     async highlighted(timeoutMs = 8000) {
       const started = performance.now()
-      while (CSS.highlights.size === 0) {
+      while (
+        editor.getPresentationState() !== 'live' ||
+        ![...CSS.highlights.values()].some((group) =>
+          [...group].some((range) => element.contains(range.startContainer)),
+        )
+      ) {
         const waited = performance.now() - started
         if (waited >= timeoutMs)
           throw new TypeError(`Code highlighting did not paint within ${Math.round(waited)} ms`)
@@ -153,9 +165,20 @@ export function mountDocsEditor(host: HTMLElement, options: DocsEditorOptions) {
       await nextFrame()
       return performance.now() - started
     },
-    open(documentId: string, text: string, languageId = 'markdown') {
-      decoratedRecords = null
-      editor.openDocument({ documentId, text, languageId })
+    async capturePaint(timeoutMs = 8000) {
+      const started = performance.now()
+      while (true) {
+        const saved = editor.captureSnapshot({ scope: 'document' })
+        if (saved.status === 'ready') return saved
+        if (saved.reason !== 'presentation-not-ready')
+          throw new TypeError(`${options.documentId}: ${saved.reason}`)
+        const waited = performance.now() - started
+        if (waited >= timeoutMs)
+          throw new TypeError(
+            `${options.documentId}: syntax paint did not settle within ${Math.round(waited)} ms`,
+          )
+        await nextFrame()
+      }
     },
     refreshTheme() {
       editor.setTheme(paletteTheme(host, options.background ?? 'bg'))

@@ -8,6 +8,15 @@ import type {
 import { createScriptError } from '../structured-errors'
 import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
+export const singaporeSiteSelectors = {
+  home: (page: Page) => page.locator('.hero-box'),
+  manual: (page: Page) => page.locator('#doc'),
+  static: (page: Page) => page.locator('body[data-mode="static"]'),
+  live: (page: Page) => page.locator('body[data-mode="editor"]'),
+  goLive: (page: Page) => page.getByRole('button', { name: 'Go live', exact: true }),
+  goStatic: (page: Page) => page.getByRole('button', { name: 'Go static', exact: true }),
+}
+
 export const siteReplicaSelectors = {
   stage: (page: Page, id: string) => page.locator(`[data-replica][id="${id}"]`),
   replica: (page: Page, id: string) => siteReplicaSelectors.stage(page, id).locator('.rep'),

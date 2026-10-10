@@ -56,7 +56,7 @@ for (const engine of ['chromium', 'webkit', 'phone-webkit', 'iphone-webkit'] as 
           const path = surface === 'home' ? '/' : '/docs/start-here/quick-start/'
           const liveSelector =
             surface === 'home' ? '.hero-box[data-mode="editor"]' : 'body[data-mode="editor"]'
-          const captureSelector = surface === 'home' ? '.hero-box' : '.editor-host'
+          const captureSelector = surface === 'home' ? '.hero-box' : '#doc'
 
           const context = await browser.newContext({
             ...(engine === 'iphone-webkit'
@@ -84,7 +84,7 @@ for (const engine of ['chromium', 'webkit', 'phone-webkit', 'iphone-webkit'] as 
             const control = await page
               .locator(surface === 'home' ? '.hero-box' : '#doc')
               .screenshot()
-            await page.getByRole('button', { name: 'Open in editor', exact: true }).click()
+            await page.getByRole('button', { name: 'Go live', exact: true }).click()
             await page.locator(liveSelector).waitFor()
             await page.evaluate(async () => {
               await new Promise((resolve) => requestAnimationFrame(resolve))

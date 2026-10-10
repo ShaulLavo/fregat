@@ -1,0 +1,29 @@
+---
+import { inlineJson, readerDocument, type CapturedDocument } from './captured'
+const { capture, id } = Astro.props as { capture: CapturedDocument; id: string }
+---
+<script is:inline type="application/json" id={id} set:html={inlineJson(readerDocument(capture))} />
+<div class="captured-html">
+  {
+    [312, 382, 752].map((width) => (
+      <div data-captured-width={width}>
+        {(['light', 'dark'] as const).map((theme) => (
+          <div data-captured-theme={theme} data-pagefind-ignore={width === 752 && theme === 'light' ? undefined : ''}>
+            <Fragment set:html={capture[theme].html[width]} />
+            <script is:inline set:html={`SingaporeCapturedPaint.activate(document.currentScript.previousElementSibling,document.getElementById(${inlineJson(id)}),${inlineJson(theme)});`} />
+          </div>
+        ))}
+      </div>
+    ))
+  }
+  {
+    capture.light.headings.map((heading) => (
+      <span
+        id={heading.id}
+        class="captured-anchor"
+        aria-hidden="true"
+        style={`--top-312:${capture.light.anchors[312]![heading.id]}px;--top-382:${capture.light.anchors[382]![heading.id]}px;--top-752:${capture.light.anchors[752]![heading.id]}px;`}
+      />
+    ))
+  }
+</div>

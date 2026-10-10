@@ -14,7 +14,7 @@ try {
   await writeFile(
     join(root, 'good', 'index.html'),
     fixture(
-      '<pre style="max-width:100%;overflow-x:auto"><code>' +
+      '<span style="position:absolute;left:-10000px;visibility:hidden">Font measurement</span><pre style="max-width:100%;overflow-x:auto"><code>' +
         'long-code-'.repeat(100) +
         '</code></pre><div style="max-width:100%;overflow-x:auto"><table style="width:600px"><tr><td>Wide table</td></tr></table><div style="position:sticky;width:600px;height:20px">Scrollable sticky content</div></div>',
     ),

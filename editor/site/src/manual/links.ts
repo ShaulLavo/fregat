@@ -2,6 +2,7 @@
 export type ManualPage = {
   readonly file: string
   readonly url: string
+  readonly paint: string
   readonly source: string
   readonly title: string
 }

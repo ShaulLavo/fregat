@@ -1,13 +1,10 @@
-/* The docs manual (design d1): one reading column whose static rows mirror Singapore's Markdown
-   live preview (22 px rows, marks hidden), so the real editor can take the column over in place.
-   Every metric of `.src` and `.r` must match what the editor draws. The --sg-* values are the
-   editor theme: the takeover passes them to Singapore's Editor. */
+/* Captured and live documents use the editor's 22 px rows and the same palette. */
 @font-face {
   font-family: 'JetBrains Mono';
   src: url(../fonts/jetbrains-mono.woff2) format('woff2');
   font-weight: 400 800;
   font-style: normal;
-  font-display: block;
+  font-display: swap;
 }
 @font-face {
   font-family: 'Source Serif 4';
@@ -69,9 +66,6 @@ body {
   color: var(--sg-fg);
   font: 15px/1.5 var(--chrome);
   -webkit-text-size-adjust: 100%;
-}
-body.manual {
-  overflow: hidden;
 }
 a {
   color: var(--sg-link);
@@ -220,11 +214,14 @@ kbd {
   margin-left: 6px;
 }
 .mode {
+  min-width: calc(9ch + 20px);
   margin-left: auto;
   padding: 0 8px 0 12px;
   flex-shrink: 0;
 }
 .mode button {
+  min-width: 9ch;
+  text-align: right;
   font: inherit;
   color: var(--sg-link);
   background: none;
@@ -233,35 +230,77 @@ kbd {
   cursor: pointer;
 }
 
-/* The column: the static page and the slot the editor mounts into share one box. */
+/* The document owns scrolling in both reading modes. */
 .viewport {
   position: relative;
-  height: calc(100dvh - var(--hh) - var(--ph));
-}
-.pane,
-.editor-host {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--left);
-  width: min(100%, calc(var(--gw) + var(--measure)));
+  padding-bottom: 48px;
 }
 .pane {
-  overflow: auto;
+  position: relative;
+  margin-left: var(--left);
+  width: min(100%, calc(var(--gw) + var(--measure)));
   outline: none;
-  container-type: inline-size;
-  overflow-x: hidden;
 }
-/* No scrollbar in the middle of the page; the margins forward the wheel to the column. */
-.pane,
-.editor-host .editor-virtualized {
-  scrollbar-width: none;
+.editor-host {
+  position: relative;
+  width: 100%;
 }
-.editor-host[data-state='mounting'] {
-  visibility: hidden;
+.paint-article {
+  position: relative;
 }
-body[data-mode='editor'] .pane {
+.captured-anchor {
+  position: absolute;
+  top: var(--top-752);
+  left: 0;
+}
+@media (max-width: 760px) {
+  .captured-anchor {
+    top: var(--top-312);
+  }
+}
+@media (min-width: 390px) and (max-width: 760px) {
+  .captured-anchor {
+    top: var(--top-382);
+  }
+}
+.captured-html > [data-captured-width] {
   display: none;
+}
+.captured-html > [data-captured-width='752'] {
+  display: block;
+}
+.captured-html [data-captured-theme='dark'] {
+  display: none;
+}
+:root[data-theme='dark'] .captured-html [data-captured-theme='light'] {
+  display: none;
+}
+:root[data-theme='dark'] .captured-html [data-captured-theme='dark'] {
+  display: block;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .captured-html [data-captured-theme='light'] {
+    display: none;
+  }
+  :root:not([data-theme='light']) .captured-html [data-captured-theme='dark'] {
+    display: block;
+  }
+}
+@media (max-width: 760px) {
+  .captured-html > [data-captured-width='752'] {
+    display: none;
+  }
+  .captured-html > [data-captured-width='312'] {
+    display: block;
+  }
+}
+@media (min-width: 390px) and (max-width: 760px) {
+  .captured-html > [data-captured-width='312'] {
+    display: none;
+  }
+  .captured-html > [data-captured-width='382'] {
+    display: block;
+  }
 }
 
 /* The page list in the left margin. */
@@ -272,7 +311,6 @@ body[data-mode='editor'] .pane {
   width: 196px;
   max-height: 100%;
   overflow: auto;
-  scrollbar-width: none;
   font: 15px/1.55 var(--chrome);
 }
 .pages h2 {
@@ -303,87 +341,12 @@ body[data-mode='editor'] .pane {
   color: var(--sg-link);
 }
 
-/* The prerendered rows. */
 .src {
   font-family: var(--mono);
   font-size: var(--size);
   line-height: var(--row);
-  font-variant-ligatures: normal;
   color: var(--sg-fg);
-  padding: 0 0 40vh;
 }
-.src > *,
-.src pre,
-.src ul,
-.src blockquote {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.r {
-  display: block;
-  position: relative;
-  min-height: var(--row);
-  margin: 0;
-  /* Reserve one measured glyph for the caret and the editor's 1 px shaping margin. */
-  padding: 0 calc(1ch + 1px) 0 var(--gw);
-  font-size: var(--size);
-  line-height: var(--row);
-  font-weight: 400;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  width: 100cqw;
-}
-.r::before {
-  content: attr(data-n) / '';
-  position: absolute;
-  left: 0;
-  width: calc(var(--gw) - var(--gap));
-  text-align: right;
-  font-size: var(--size);
-  font-weight: 400;
-  font-style: normal;
-  color: var(--sg-gutter);
-  font-variant-numeric: tabular-nums;
-  user-select: none;
-}
-.src .h1,
-.src .h2,
-.src .h3,
-.src .h4,
-.src .h5,
-.src .h6 {
-  font-weight: 700;
-}
-.src .h1 {
-  font-size: calc(var(--size) * 1.35);
-}
-.src .h2 {
-  font-size: calc(var(--size) * 1.2);
-}
-.src .h3 {
-  font-size: calc(var(--size) * 1.1);
-}
-.nw {
-  white-space: nowrap;
-}
-.u {
-  text-decoration: underline;
-}
-/* The preview draws a link label as one widget, so it wraps as a unit. */
-.src a {
-  color: var(--sg-link);
-  text-decoration: underline;
-  white-space: nowrap;
-}
-.src pre,
-.src code {
-  font: inherit;
-}
-.src pre .r {
-  background: linear-gradient(to right, transparent var(--gw), var(--sg-code-bg) var(--gw));
-}
-
 /* Search */
 .search {
   position: fixed;
@@ -468,8 +431,6 @@ body[data-mode='editor'] .pane {
 /* Phones: the page scrolls as a document. */
 @media (max-width: 760px) {
   :root {
-    --gw: 36px;
-    --gap: 12px;
     --left: 0px;
     --measure: calc(100vw - var(--gw) - 8px);
   }
@@ -495,27 +456,6 @@ body[data-mode='editor'] .pane {
   }
   .pathrow {
     padding-left: var(--gw);
-    width: 100%;
-  }
-  .viewport {
-    height: auto;
-  }
-  .nw.wide {
-    white-space: inherit;
-  }
-  .pane {
-    position: static;
-    overflow: visible;
-    overflow-x: clip;
-    width: auto;
-  }
-  .src {
-    padding-bottom: 48px;
-  }
-  body[data-mode='editor'] .viewport {
-    height: calc(100dvh - var(--hh) - var(--ph));
-  }
-  .editor-host {
     width: 100%;
   }
 }
@@ -574,15 +514,6 @@ body[data-mode='editor'] .pane {
   container-type: inline-size;
   padding: 0;
 }
-.hero-box .editor-host {
-  position: absolute;
-  inset: 0;
-  left: 0;
-  width: 100%;
-}
-.hero-box[data-mode='editor'] .hero-static {
-  visibility: hidden;
-}
 .hero figcaption {
   display: flex;
   gap: 16px;
@@ -606,11 +537,6 @@ body[data-mode='editor'] .pane {
 .install {
   container-type: inline-size;
   padding: 0;
-}
-/* Desktop rows round their width up to whole columns, as the editor does; clip the excess. */
-.hero-box,
-.install {
-  overflow-x: clip;
 }
 @media (max-width: 760px) {
   .home-column {

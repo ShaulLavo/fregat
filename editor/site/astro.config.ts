@@ -41,7 +41,7 @@ export default defineConfig({
   trailingSlash: 'always',
   vite: {
     // Native and WebAssembly bindings resolve from their installed package directories.
-    ssr: { external: ['satteri', 'web-tree-sitter', 'tree-sitter-md'] },
+    ssr: { external: ['satteri', 'tree-sitter-md'] },
     define: {
       __SINGAPORE_PACKAGES__: JSON.stringify(
         packages.map(({ name, entryPoints }) => ({ name, entryPointCount: entryPoints.length })),

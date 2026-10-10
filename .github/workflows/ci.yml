@@ -433,6 +433,12 @@ jobs:
         with:
           build-packages: '[]'
 
+      - name: Install site capture and browser test dependencies
+        if: ${{ contains(needs.changes.outputs.sites, 'singapore') || contains(needs.changes.outputs.sites, 'fregat') || needs.changes.outputs.tooling == 'true' }}
+        uses: ./.github/actions/install-browsers
+        with:
+          playwright: editor/site/node_modules/.bin/playwright
+          browsers: chromium webkit
       - name: Build production sites
         env:
           CI_SITES: ${{ needs.changes.outputs.sites }}
@@ -440,12 +446,6 @@ jobs:
       - name: Test Singapore documentation checks
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
         run: bun run --cwd editor/site test
-      - name: Install Singapore browser test dependencies
-        if: ${{ contains(needs.changes.outputs.sites, 'singapore') || contains(needs.changes.outputs.sites, 'fregat') || needs.changes.outputs.tooling == 'true' }}
-        uses: ./.github/actions/install-browsers
-        with:
-          playwright: editor/site/node_modules/.bin/playwright
-          browsers: chromium webkit
       - name: Test landing page playback
         run: bun run test:scripts scripts/site-player.test.ts
       - name: Test mobile overflow detection
@@ -511,7 +511,7 @@ jobs:
         run: |
           paths=()
           if [[ ",$CI_SITES," == *",fregat,"* ]]; then paths+=('/fregat/'); fi
-          if [[ ",$CI_SITES," == *",singapore,"* ]]; then paths+=('/singapore/' '/singapore/docs/start-here/introduction/' '/singapore/docs/start-here/playground/'); fi
+          if [[ ",$CI_SITES," == *",singapore,"* ]]; then paths+=('/singapore/' '/singapore/docs/start-here/introduction/' '/singapore/docs/start-here/quick-start/' '/singapore/docs/start-here/codemirror/' '/singapore/docs/start-here/playground/'); fi
           if [[ ",$CI_SITES," == *",demo,"* ]]; then paths+=('/singapore/demo/'); fi
           if [[ ",$CI_SITES," == *",ghostty-webgpu,"* ]]; then paths+=('/ghostty-webgpu/'); fi
           selection=(--paths "$(IFS=,; echo "${paths[*]}")")

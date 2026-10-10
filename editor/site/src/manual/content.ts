@@ -1,6 +1,6 @@
 /** Build-time index of the docs pages written as plain Markdown. */
 import { resolveDocsLink, type ManualPage } from './links'
-import { renderMarkdown } from './render'
+import { capturedDocument, type CapturedDocument } from './captured'
 import { SECTIONS } from './sections'
 
 const sources = import.meta.glob<string>('../content/docs/docs/{start-here,guides,concepts}/*.md', {
@@ -19,11 +19,12 @@ const files = new Set(MANUAL_SOURCES.keys())
 
 const pageUrl = (slug: string) => `${base}docs/${slug}/`
 
-export const MANUAL_PAGES: readonly ManualPage[] = Array.from(MANUAL_SOURCES, ([file, text]) => ({
+export const MANUAL_PAGES: readonly ManualPage[] = Array.from(MANUAL_SOURCES, ([file]) => ({
   file,
   url: pageUrl(file.replace(/\.md$/, '')),
   source: `${base}docs/${file}`,
-  title: text.match(/^# (.+)$/m)?.[1] ?? file,
+  paint: `${base}docs/${file.replace(/\.md$/, '')}.paint.json`,
+  title: capturedDocument(file).light.headings.find((heading) => heading.level === 1)?.name ?? file,
 }))
 
 export type NavSection = {
@@ -40,11 +41,36 @@ export const NAV: readonly NavSection[] = SECTIONS.map((section) => ({
 }))
 
 export function renderPage(file: string) {
-  const text = MANUAL_SOURCES.get(file)
-  if (text === undefined) throw new TypeError(`No docs page ${file}`)
-  return renderMarkdown(text, (href) => resolveDocsLink(file, href, base, files)).catch(
-    (error: unknown) => {
-      throw new TypeError(`Rendering docs/${file} failed`, { cause: error })
-    },
-  )
+  const capture = capturedDocument(file)
+  const resolve = (href: string) => resolveDocsLink(file, href, base, files).href
+  const palette = (value: CapturedDocument['light']) => {
+    const paint = JSON.parse(value.paint)
+    for (const row of paint.rows)
+      for (const run of row.runs) {
+        if (run.href) run.href = resolve(run.href)
+      }
+    const links = (html: string) =>
+      html.replace(
+        /href="([^"]*)"/g,
+        (_, href: string) =>
+          `href="${resolve(href.replaceAll('&amp;', '&')).replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"`,
+      )
+    return {
+      ...value,
+      paint: JSON.stringify(paint),
+      html: Object.fromEntries(
+        Object.entries(value.html).map(([width, html]) => [width, links(html)]),
+      ),
+    }
+  }
+  const document = {
+    text: capture.text,
+    light: palette(capture.light),
+    dark: palette(capture.dark),
+  }
+  return {
+    ...document,
+    title: document.light.headings.find((heading) => heading.level === 1)?.name ?? file,
+    description: document.light.description,
+  }
 }

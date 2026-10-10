@@ -11,6 +11,7 @@ import { cursorModelCatalog } from './cursor-model-catalog'
 import { machineBalancing } from './machine-balancing'
 import { binaryFileOpen, binaryFileRemote } from './binary-file-open'
 import { ghosttySiteFit } from './ghostty-site-fit'
+import { singaporeSiteTakeover } from './singapore-site-takeover'
 import { siteReplicaPlayback } from './site-replica-playback'
 import { editorPagedReadonly } from './editor-paged-readonly'
 import { editorFeatureTiers } from './editor-feature-tiers'
@@ -478,6 +479,7 @@ import { collaborationMergeReview } from './collaboration-merge-review'
 
 export const scenarios: readonly Scenario[] = [
   siteReplicaPlayback,
+  singaporeSiteTakeover,
   reactiveOwnerSnapshots,
   collaborationMergeReview,
   overlayAlignment,

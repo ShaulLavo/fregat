@@ -12,9 +12,10 @@ The existing apex HTTP redirect and `/healthz` route stay in place.
 
 ## Build and deploy
 
-From a fresh checkout with dependencies installed:
+From a fresh checkout with dependencies and the Singapore capture browser installed:
 
 ```sh
+editor/site/node_modules/.bin/playwright install --with-deps chromium
 bash scripts/product-sites/build.sh /path/to/new-output-directory
 ```
 
@@ -36,7 +37,7 @@ Production deployment remains a separate main-only workflow.
 
 The mobile check visits every built HTML page in touch-enabled Chromium and WebKit at
 320, 360 and 390 CSS pixels, with a device pixel ratio of 2. It also opens the documentation
-search dialog and the repository demo's piece-tree inspector. A page fails if its root scroll
+search dialog, Singapore's live/static toggles and the repository demo's piece-tree inspector. A page fails if its root scroll
 width exceeds the requested CSS width or its mobile layout viewport expands, with no pixel
 tolerance. Elements extending beyond the viewport also fail, including root-clipped content
 and off-screen fixed or sticky controls. Code, tables and sticky editor content can scroll

@@ -3,6 +3,7 @@ import { checkInternalLinks } from './links'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 for (const command of [
+  ['bun', 'scripts/capture.ts'],
   ['bun', 'run', 'typecheck'],
   ['bun', 'run', 'astro', 'build'].concat(process.argv.slice(2)),
 ]) {

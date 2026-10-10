@@ -1,12 +1,10 @@
 ---
 import Manual from '../layouts/Manual.astro'
 import { NAV } from '../manual/content'
-import { renderCode } from '../manual/render'
-import hero from '../examples/hero.ts?raw'
-
-const heroSource = hero.replace(/\n$/, '')
-const sample = await renderCode(heroSource, 'typescript')
-const install = await renderCode('npm install @singapore-editor/core', 'shellscript')
+import Captured from '../manual/Captured.astro'
+import { capturedDocument } from '../manual/captured'
+const sample = capturedDocument('hero.ts')
+const install = capturedDocument('install.sh')
 const start = NAV.find((section) => section.label === 'Start here')!
 const tagline = 'A code editor for the browser that keeps every version.'
 ---
@@ -21,7 +19,9 @@ const tagline = 'A code editor for the browser that keeps every version.'
     </p>
     <figure class="hero">
       <div class="hero-box src">
-        <div class="hero-static" set:html={sample.html} />
+        <div class="hero-static paint-article">
+          <Captured capture={sample} id="document-paint" />
+        </div>
       </div>
       <figcaption>
         <span>This is a Singapore editor, configured for TypeScript. Edit this.</span>
@@ -29,7 +29,9 @@ const tagline = 'A code editor for the browser that keeps every version.'
       </figcaption>
     </figure>
     <h2>Install</h2>
-    <div class="src install" set:html={install.html} />
+    <div class="src install paint-article">
+      <Captured capture={install} id="install-paint" />
+    </div>
     <p>
       Then follow the <a href={start.pages[1]!.href}>quick start</a>. Every docs page opens in the
       same editor you are installing.
@@ -55,7 +57,6 @@ const tagline = 'A code editor for the browser that keeps every version.'
       and contributions go.
     </footer>
   </main>
-  <script is:inline type="application/json" id="hero-source" set:html={JSON.stringify(heroSource)} />
   <script>
     import '../manual/home'
   </script>

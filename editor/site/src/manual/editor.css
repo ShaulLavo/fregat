@@ -1,8 +1,6 @@
 .sg-docs-editor {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  min-height: 0;
+  position: relative;
+  width: 100%;
 }
 .sg-docs-editor > .editor {
   min-width: 0;

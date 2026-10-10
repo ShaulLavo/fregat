@@ -13,7 +13,7 @@ export const FENCE_LANGUAGE_IDS = [
   'shellscript',
 ] as const
 
-export type FenceLanguageId = (typeof FENCE_LANGUAGE_IDS)[number]
+type FenceLanguageId = (typeof FENCE_LANGUAGE_IDS)[number]
 
 export function languageContribution(id: string): TreeSitterLanguageContribution {
   const contribution = TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === id)

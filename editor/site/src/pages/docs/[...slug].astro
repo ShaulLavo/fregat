@@ -1,5 +1,7 @@
 ---
 import Manual from '../../layouts/Manual.astro'
+import Captured from '../../manual/Captured.astro'
+import { inlineJson } from '../../manual/captured'
 import { MANUAL_PAGES, MANUAL_SOURCES, NAV, renderPage } from '../../manual/content'
 
 export function getStaticPaths() {
@@ -48,10 +50,12 @@ const slash = file.lastIndexOf('/') + 1
       }
     </nav>
     <main id="doc" class="pane" tabindex="-1">
-      <article class="src" data-pagefind-body set:html={page.html} />
+      <article class="src paint-article" data-pagefind-body>
+        <Captured capture={page} id="document-paint" />
+      </article>
     </main>
   </div>
-  <script is:inline type="application/json" id="manual-pages" set:html={JSON.stringify(MANUAL_PAGES)} />
+  <script is:inline type="application/json" id="manual-pages" set:html={inlineJson(MANUAL_PAGES)} />
   <script>
     import '../../manual/takeover'
   </script>

@@ -117,7 +117,9 @@ async function inspect(page, viewportWidth) {
     for (const element of document.querySelectorAll('body *')) {
       const rect = element.getBoundingClientRect()
       if (!rect.width || !rect.height || (rect.left >= 0 && rect.right <= width)) continue
-      const position = getComputedStyle(element).position
+      const computed = getComputedStyle(element)
+      if (computed.visibility === 'hidden' || computed.visibility === 'collapse') continue
+      const position = computed.position
       let contained = false
       for (
         let parent = element.parentElement;
@@ -153,7 +155,13 @@ async function inspect(page, viewportWidth) {
 
 async function record(page, engine, url, width, state) {
   await page.setViewportSize({ width, height: width >= 667 ? 390 : 844 })
-  await page.evaluate(() => document.fonts.ready)
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    // The captured reader reflows at the font-ready animation frame after its resize observer.
+    if (!document.querySelector('.paint-article')) return
+    await new Promise((done) => requestAnimationFrame(done))
+    await new Promise((done) => requestAnimationFrame(done))
+  })
   const result = { url, engine, requestedWidth: width, state, ...(await inspect(page, width)) }
   const ok =
     result.scrollWidth <= width && result.width === width && result.overflowing.length === 0
@@ -209,6 +217,7 @@ async function checkPage(page, engine, url) {
     assert(response?.ok(), `${url}: HTTP ${response?.status()}`)
     if (readySelector) await page.locator(readySelector).waitFor({ timeout: 45000 })
     for (const width of widths) await record(page, engine, url, width, 'page')
+    await checkLive(page, engine, url)
     await checkSearch(page, engine, url)
     await checkInspector(page, engine, url)
   } catch (error) {
@@ -220,6 +229,24 @@ async function checkPage(page, engine, url) {
         `${JSON.stringify({ url, engine, error: error.message })}\n`,
       )
   }
+}
+
+async function checkLive(page, engine, url) {
+  const toggle = page.getByRole('button', { name: 'Go live', exact: true })
+  if (!(await toggle.count())) return
+  await toggle.click()
+  await page.locator('body[data-mode="editor"]').waitFor({ timeout: 20000 })
+  for (const width of widths) {
+    await record(page, engine, url, width, 'live')
+    const extents = await page.locator('.editor-host .editor-virtualized').evaluate((element) => ({
+      x: element.scrollWidth - element.clientWidth,
+      y: element.scrollHeight - element.clientHeight,
+    }))
+    assert.deepEqual(extents, { x: 0, y: 0 }, `${url}: live editor owns scrolling`)
+  }
+  await page.getByRole('button', { name: 'Go static', exact: true }).click()
+  await page.locator('body[data-mode="static"]').waitFor()
+  for (const width of widths) await record(page, engine, url, width, 'returned-static')
 }
 
 async function checkSearch(page, engine, url) {

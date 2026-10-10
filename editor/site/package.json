@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
+    "dev": "bun scripts/capture.ts && astro dev",
     "build": "bun scripts/build.ts",
     "preview": "astro preview",
     "docs:check": "bun scripts/check-samples.ts && bun scripts/check-samples.ts --packages",
@@ -44,7 +44,6 @@
     "@types/bun": "1.4.2",
     "@types/react": "19.2.17",
     "astro": "7.3.5",
-    "github-slugger": "2.0.0",
     "hast-util-from-html": "2.0.3",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
@@ -62,7 +61,6 @@
     "typescript": "npm:typescript@6.0.3",
     "unified": "11.0.5",
     "unist-util-visit": "5.1.0",
-    "vitest": "5.0.2",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#121cf0d206a57a98e704dcee0c53e6804c619633"
+    "vitest": "5.0.2"
   }
 }
