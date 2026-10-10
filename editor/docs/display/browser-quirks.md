@@ -86,7 +86,7 @@ Regression coverage lives in
 It checks light and dark Markdown preview at 390 px, exact live/snapshot pixels,
 and the endpoints of both native range types in all three engines.
 
-## Originating link underlines disagree under custom highlights
+## WebKit keeps link underline colours under custom highlights
 
 Verified 2026-10-10 on Linux with Playwright 1.63.0, Chromium 153.0.8010.12
 and WebKit 26.6. Firefox was not checked for this case.
@@ -94,8 +94,8 @@ and WebKit 26.6. Firefox was not checked for this case.
 ### Symptom and scope
 
 When a Markdown link's syntax-token foreground differs from its theme link colour,
-Chromium paints the live underline in the token colour. WebKit keeps the theme
-colour. Document snapshot replay uses the token colour, so WebKit's live and
+Chromium paints the live underline in the token colour, as the CSS highlight
+painting rule requires. WebKit keeps the theme colour, which is a WebKit bug. Document snapshot replay uses the token colour, so WebKit's live and
 replayed underlines differ. The isolated 14 px Snapshot Mono fixture reproduced
 34 changed underline pixels in each of the light and dark themes; Chromium's
 baseline comparisons passed. The docs site's link tokens use the link theme
