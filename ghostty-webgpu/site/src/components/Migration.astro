@@ -2,7 +2,7 @@
 import { Code } from 'astro:components'
 import { docsTheme } from '../docs-theme'
 import { docsHref } from '../site-links'
-import { migrationComparison } from '../examples/migration-comparison'
+import { migrationComparison, migrationRendererOption } from '../examples/migration-comparison'
 
 const theme = docsTheme.expressiveCode.themes[0]
 ---
@@ -10,18 +10,20 @@ const theme = docsTheme.expressiveCode.themes[0]
 <section class="callout" aria-labelledby="xterm-heading">
   <div>
     <h2 id="xterm-heading">Coming from xterm.js</h2>
-    <p>Fit, WebGL and Unicode graphemes are built in. Creation is async, and data stays as bytes from the PTY to the screen.</p>
+    <p>Creation is async, and data stays as bytes from the PTY to the screen.</p>
     <p>Opening fits the host automatically. For an explicit resize, <code>grid</code> holds <code>columns</code> and <code>rows</code>; <code>send</code> is your PTY transport.</p>
-    <p>Renderer options go in <code>opts</code>. <code>auto</code> selects WebGL2/WebGPU with canvas and DOM fallback. <code>gpu</code> is <code>WebGpuTerminalRenderer.create</code>; <code>dom</code> is <code>DomTerminalRenderer.create</code>.</p>
     <a href={docsHref('start/xterm')}>Read the migration guide</a>
   </div>
+  <div>
   <table class="map" aria-label="xterm.js to ghostty-webgpu">
     <thead><tr><th scope="col">xterm.js</th><th scope="col">ghostty-webgpu</th></tr></thead>
     <tbody>{migrationComparison.map(({ from, to }) => (
       <tr>
         <td data-label="xterm.js"><Code code={from} lang={from.startsWith('@') ? 'text' : 'ts'} theme={theme} /></td>
-        <td data-label="ghostty-webgpu">{to.map((code) => <Code code={code} lang="ts" theme={theme} />)}</td>
+        <td data-label="ghostty-webgpu"><Code code={to} lang="ts" theme={theme} /></td>
       </tr>
     ))}</tbody>
   </table>
+  <p>GPU rendering is on by default (WebGPU or WebGL2, with canvas and DOM fallback); choose canvas with <code>{migrationRendererOption}</code>.</p>
+  </div>
 </section>

@@ -5,7 +5,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, webkit } from 'playwright'
-import { migrationComparison } from '../src/examples/migration-comparison'
+import { migrationComparison, migrationRendererOption } from '../src/examples/migration-comparison'
 
 const dist = fileURLToPath(new URL('../dist/', import.meta.url))
 const evidence = process.argv[2]
@@ -27,17 +27,20 @@ for (const [engine, launcher] of Object.entries({ chromium, webkit })) {
       await page.goto('http://migration.test/ghostty-webgpu/')
       await page.evaluate(() => document.fonts.ready)
       const table = page.getByRole('table', { name: 'xterm.js to ghostty-webgpu' })
-      const expected = migrationComparison.flatMap(({ from, to }) =>
-        Array.of<string>(from).concat(to),
-      )
+      const expected = migrationComparison.flatMap(({ from, to }) => Array.of<string>(from, to))
       assert.equal(await table.locator('tbody tr').count(), migrationComparison.length)
       assert.deepEqual(await table.locator('pre code').allTextContents(), expected)
       assert.equal(
         await table
           .locator('td')
-          .filter({ hasText: /built in|terminal\.onData/ })
+          .filter({ hasText: /built in|terminal\.onData|loadAddon|rendererMode|rendererFactory/ })
           .count(),
         0,
+      )
+      assert.equal(await table.locator('td pre').count(), migrationComparison.length * 2)
+      assert.equal(
+        await page.locator('.callout p code').filter({ hasText: migrationRendererOption }).count(),
+        1,
       )
       const layout = await table.evaluate((element) => ({
         viewport: innerWidth,
@@ -90,6 +93,7 @@ for (const [engine, launcher] of Object.entries({ chromium, webkit })) {
       await page.evaluate(() => document.fonts.ready)
       const guideTable = page.getByRole('table', { name: 'xterm.js to ghostty-webgpu' })
       assert.deepEqual(await guideTable.locator('pre code').allTextContents(), expected)
+      assert.equal(await guideTable.locator('td pre').count(), migrationComparison.length * 2)
       const guideLayout = await guideTable.evaluate((element) => ({
         viewport: innerWidth,
         documentWidth: document.documentElement.scrollWidth,
