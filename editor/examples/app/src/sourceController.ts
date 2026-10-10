@@ -271,7 +271,6 @@ export class SourceController {
     entries: IterableIterator<SourceEntry>,
   ): Promise<void> {
     for (const entry of entries) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 0))
       if (this.currentSnapshot !== snapshot) return
       try {
         await this.loadFile(snapshot, entry)
