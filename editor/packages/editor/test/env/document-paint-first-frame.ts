@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import type { Page } from '@playwright/test'
-import { build } from 'bun'
+import { build, serve } from 'bun'
 
 export async function proveDocumentPaintFirstFrame(
   page: Page,
@@ -12,12 +12,13 @@ export async function proveDocumentPaintFirstFrame(
   markup: string,
   width: number,
   javaScriptEnabled: boolean,
+  activationMode: 'success' | 'refused' | 'throws' | 'missing' = 'success',
 ) {
   const entry = join(evidence, 'activate-document-paint.ts')
   const source = join(import.meta.dirname, '../../src/paint.ts')
   writeFileSync(
     entry,
-    `import { decodePaintSnapshot, activatePaintSnapshotHighlights } from ${JSON.stringify(source)}; window.__paintProof = { decodePaintSnapshot, activatePaintSnapshotHighlights };`,
+    `import { decodePaintSnapshot, activatePaintSnapshotHighlights, preparePaintSnapshotHighlights } from ${JSON.stringify(source)}; window.__paintProof = { decodePaintSnapshot, activatePaintSnapshotHighlights }; preparePaintSnapshotHighlights(document);`,
   )
   const activation = await build({
     entrypoints: [entry],
@@ -67,10 +68,36 @@ export async function proveDocumentPaintFirstFrame(
       deviceScaleFactor: await page.evaluate(() => devicePixelRatio),
       viewport: { width: 1400, height: 900 },
     })
-  const url = `${new URL(page.url()).origin}/document-paint-first-frame-proof`
   const safePayload = payload.replaceAll('<', '\\u003c')
-  const html = `<!doctype html><html><head><style>body{margin:0}${fonts}</style></head><body><script>${bundle.replaceAll('</script', '<\\/script')}</script><script type="application/json" id="paint-payload">${safePayload}</script><div id="document-paint-proof" style="position:relative;width:${width}px">${markup}</div><script>window.__paintProofHandles=[window.__paintProof.activatePaintSnapshotHighlights(document.querySelector('[data-editor-document-paint]'),window.__paintProof.decodePaintSnapshot(document.querySelector('#paint-payload').textContent))];if(window.__paintProofHandles[0])document.querySelector('[data-editor-document-paint]').dataset.paintActivated='true';</script></body></html>`
-  await context.route(url, (route) => route.fulfill({ contentType: 'text/html', body: html }))
+  const prefix = `<!doctype html><html><head><style>body{margin:0}${fonts}</style><script>${bundle.replaceAll('</script', '<\\/script')}</script></head><body><script type="application/json" id="paint-payload">${safePayload}</script><div id="document-paint-proof" style="position:relative;width:${width}px">${markup}</div>`
+  const activationCall = `const root=document.querySelector('[data-editor-document-paint]');try{${activationMode === 'refused' ? "root.querySelector('[data-editor-document-paint-source-row]').dataset.editorDocumentPaintStart='1';" : ''}${activationMode === 'throws' ? "CSSStyleSheet.prototype.insertRule=()=>{throw 'activation proof failure'};" : ''}window.__paintProofHandles=[window.__paintProof.activatePaintSnapshotHighlights(root,window.__paintProof.decodePaintSnapshot(document.querySelector('#paint-payload').textContent))];if(window.__paintProofHandles[0])root.dataset.paintActivated='true';}catch{root.dataset.paintFailed='true';}`
+  const tail = `${activationMode === 'missing' ? '' : `<script>${activationCall}</script>`}</body></html>`
+  let finishStream: (() => Promise<void>) | undefined
+  const encoder = new TextEncoder()
+  const server = serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch: (request) =>
+      new URL(request.url).pathname !== '/document-paint-first-frame-proof'
+        ? new Response(null, { status: 404 })
+        : new Response(
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.enqueue(encoder.encode(prefix))
+                const held = new Promise<void>((resolve) =>
+                  setTimeout(resolve, javaScriptEnabled ? 1500 : 0),
+                )
+                finishStream = async () => {
+                  await held
+                  controller.enqueue(encoder.encode(tail))
+                  controller.close()
+                }
+              },
+            }),
+            { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' } },
+          ),
+  })
+  const url = `http://127.0.0.1:${server.port}/document-paint-first-frame-proof`
   try {
     const fresh = await context.newPage()
     let firstImage: Buffer | undefined
@@ -85,9 +112,20 @@ export async function proveDocumentPaintFirstFrame(
       })
     })
     await fresh.addInitScript({
-      content: `window.__paintFrames=[];let remaining=1200;function observe(){const root=document.querySelector('[data-editor-document-paint]');if(root){window.__paintFrames.push({activated:root.dataset.paintActivated==='true',highlights:CSS.highlights.size});if(document.fonts.status==='loaded')window.__capturePaintFrame();}if(--remaining>0&&!window.__stopPaintFrames)requestAnimationFrame(observe)}requestAnimationFrame(observe);`,
+      content: `window.__paintFrames=[];let remaining=1200;function observe(){const root=document.querySelector('[data-editor-document-paint]');if(root){window.__paintFrames.push({visible:getComputedStyle(root).visibility==='visible',activated:root.dataset.paintActivated==='true',highlights:CSS.highlights.size});if(getComputedStyle(root).visibility==='visible'&&document.fonts.status==='loaded')window.__capturePaintFrame();}if(--remaining>0&&!window.__stopPaintFrames)requestAnimationFrame(observe)}requestAnimationFrame(observe);`,
     })
-    await fresh.goto(url)
+    await fresh.goto(url, { waitUntil: 'commit' })
+    await fresh.locator('[data-editor-document-paint]').waitFor({ state: 'attached' })
+    const pending = await fresh.evaluate(() => {
+      const root = document.querySelector<HTMLElement>('[data-editor-document-paint]')!
+      return {
+        visibility: getComputedStyle(root).visibility,
+        height: root.getBoundingClientRect().height,
+        loading: document.readyState === 'loading',
+      }
+    })
+    await finishStream!()
+    await fresh.waitForLoadState('load')
     await fresh.evaluate(() => document.fonts.ready)
     if (javaScriptEnabled)
       await fresh.waitForFunction(
@@ -103,7 +141,7 @@ export async function proveDocumentPaintFirstFrame(
     writeFileSync(
       join(
         evidence,
-        `${project}-${width}-${fixture}-${javaScriptEnabled ? 'first-frame' : 'javascript-off'}.png`,
+        `${project}-${width}-${fixture}-${javaScriptEnabled ? `first-frame-${activationMode}` : 'javascript-off'}.png`,
       ),
       firstFrame,
     )
@@ -116,6 +154,8 @@ export async function proveDocumentPaintFirstFrame(
       }
       state.__stopPaintFrames = true
       return {
+        visibility: getComputedStyle(root).visibility,
+        gatePending: document.documentElement.classList.contains('editor-document-paint-pending'),
         text: root.textContent,
         height: bounds.height,
         rows: [...root.querySelectorAll<HTMLElement>('[data-editor-document-paint-row]')].map(
@@ -136,7 +176,7 @@ export async function proveDocumentPaintFirstFrame(
       }
     })
     const counts: number[] = []
-    if (javaScriptEnabled) {
+    if (javaScriptEnabled && activationMode === 'success') {
       counts.push(await fresh.evaluate(() => CSS.highlights.size))
       await fresh.addScriptTag({ content: bundle })
       counts.push(
@@ -205,16 +245,17 @@ export async function proveDocumentPaintFirstFrame(
         }),
       )
     }
-    const proof = { ...result, sizes, inputs, counts }
+    const proof = { ...result, pending, sizes, inputs, counts }
     writeFileSync(
       join(
         evidence,
-        `${project}-${width}-${fixture}-${javaScriptEnabled ? 'first-frame' : 'javascript-off'}.json`,
+        `${project}-${width}-${fixture}-${javaScriptEnabled ? `first-frame-${activationMode}` : 'javascript-off'}.json`,
       ),
       JSON.stringify(proof, null, 2),
     )
     return { ...proof, image: firstFrame.toString('base64') }
   } finally {
     await context.close()
+    server.stop(true)
   }
 }

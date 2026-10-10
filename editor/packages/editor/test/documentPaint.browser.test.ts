@@ -31,6 +31,7 @@ declare module 'vitest/browser' {
       markup: string,
       width: number,
       javaScriptEnabled: boolean,
+      activationMode?: 'success' | 'refused' | 'throws' | 'missing',
     ): Promise<{
       image: string
       text: string | null
@@ -38,7 +39,10 @@ declare module 'vitest/browser' {
       rows: { text: string | null; x: number; y: number; width: number; height: number }[]
       heading?: string | null
       link?: string | null
-      frames: { activated: boolean; highlights: number }[]
+      visibility: string
+      gatePending: boolean
+      pending: { visibility: string; height: number; loading: boolean }
+      frames: { visible: boolean; activated: boolean; highlights: number }[]
       inputs: string[]
       counts: number[]
       sizes: {
@@ -962,12 +966,22 @@ it('activates emitted syntax synchronously at its first visible frame', async ()
     const overlay = document.createElement('div')
     host.append(overlay)
     const restored = mountPaintSnapshot(overlay, paint, { width })!
+    restored.element.dataset.editorDocumentPaintReady = 'stale-document'
     const markup = restored.element.outerHTML
     restored.dispose()
     overlay.remove()
     const proof = await commands.proofDocumentPaintFirstFrame(saved.paint, markup, width, true)
     expect(proof.frames.length).toBeGreaterThan(0)
-    expect(proof.frames.every((frame) => frame.activated && frame.highlights > 0)).toBe(true)
+    expect(proof.pending).toEqual({
+      visibility: 'hidden',
+      height: editor.getContentHeight(),
+      loading: true,
+    })
+    expect(
+      proof.frames.every((frame) => !frame.visible || (frame.activated && frame.highlights > 0)),
+    ).toBe(true)
+    expect(proof.visibility).toBe('visible')
+    expect(proof.gatePending).toBe(false)
     expect(changedPixels(live, await imagePixels(proof.image))).toBe(0)
     expect(proof.height).toBe(editor.getContentHeight())
     expect(proof.counts[0]).toBeGreaterThan(0)
@@ -1029,6 +1043,9 @@ it.each([false, true])(
         const live = await pixels(`javascript-off-code-${width}-live`)
         expect(changedPixels(live, await imagePixels(proof.image))).toBeGreaterThan(0)
       }
+      expect(proof.pending.visibility).toBe('visible')
+      expect(proof.pending.loading).toBe(true)
+      expect(proof.gatePending).toBe(false)
       expect(proof.frames).toEqual([])
       expect(proof.counts).toEqual([])
     }
@@ -1063,4 +1080,122 @@ it('refuses mismatched emitted text and preserves foreign highlight registration
   expect(activatePaintSnapshotHighlights(root, paint)).toBeNull()
   expect([...CSS.highlights.keys()]).toEqual([...prior])
   root.remove()
+})
+
+it.each(['refused', 'throws', 'missing'] as const)(
+  'reveals streamed emitted content when activation is %s',
+  async (mode) => {
+    const { host, editor } = mount('alpha beta\nlast', false, 'Snapshot Serif', false)
+    await frames()
+    const saved = editor.captureSnapshot({ scope: 'document' })
+    expect(saved.status).toBe('ready')
+    if (saved.status !== 'ready') return
+    const paint = decodePaintSnapshot(saved.paint)!
+    const restored = mountPaintSnapshot(host, paint, { width: 320 })!
+    const markup = restored.element.outerHTML
+    restored.dispose()
+    const proof = await commands.proofDocumentPaintFirstFrame(saved.paint, markup, 320, true, mode)
+    expect(proof.pending.visibility).toBe('hidden')
+    expect(proof.pending.loading).toBe(true)
+    expect(proof.visibility).toBe('visible')
+    expect(proof.gatePending).toBe(false)
+    expect(proof.text).toBe(new DOMParser().parseFromString(markup, 'text/html').body.textContent)
+    expect(proof.height).toBe(editor.getContentHeight())
+    expect(proof.frames.some((frame) => frame.visible)).toBe(true)
+  },
+)
+
+it.each([
+  'repeated',
+  'overlap',
+  'gap',
+  'missing',
+  'reordered',
+  'nested',
+  'oversized-text',
+] as const)('refuses malformed emitted slices: %s before allocating ranges', async (mode) => {
+  const { host, editor } = mount('alpha beta\nlast', false, 'Snapshot Mono', false)
+  await frames()
+  const saved = editor.captureSnapshot({ scope: 'document' })
+  expect(saved.status).toBe('ready')
+  if (saved.status !== 'ready') return
+  const paint = decodePaintSnapshot(saved.paint)!
+  const restored = mountPaintSnapshot(host, paint)!
+  const root = restored.element.cloneNode(true) as HTMLElement
+  restored.dispose()
+  host.append(root)
+  const rows = root.querySelectorAll<HTMLElement>('[data-editor-document-paint-source-row]')
+  const first = rows[0]!
+  if (mode === 'repeated') {
+    const duplicates = document.createDocumentFragment()
+    for (let index = 0; index < 10_001; index++) duplicates.append(first.cloneNode(true))
+    root.append(duplicates)
+  }
+  if (mode === 'overlap') root.append(first.cloneNode(true))
+  if (mode === 'gap') first.dataset.editorDocumentPaintStart = '1'
+  if (mode === 'missing') first.remove()
+  if (mode === 'reordered') root.insertBefore(rows[1]!, first)
+  if (mode === 'nested') first.append(document.createElement('span'))
+  if (mode === 'oversized-text') first.textContent = 'alpha beta'.repeat(10_001)
+  const prior = [...CSS.highlights.entries()]
+  const styles = document.head.querySelectorAll('style').length
+  const createRange = document.createRange.bind(document)
+  let allocations = 0
+  document.createRange = () => {
+    allocations++
+    return createRange()
+  }
+  try {
+    const handle = activatePaintSnapshotHighlights(root, paint)
+    handle?.dispose()
+    expect(handle).toBeNull()
+    expect(allocations).toBe(0)
+    expect([...CSS.highlights.entries()]).toEqual(prior)
+    expect(document.head.querySelectorAll('style').length).toBe(styles)
+  } finally {
+    document.createRange = createRange
+    root.remove()
+  }
+})
+
+it('checks shaping eligibility once per decoded run across wrapped slices', async () => {
+  const text = 'ab'.repeat(64) + '\nlast'
+  const { host, editor } = mount(text, false, 'Snapshot Mono', false)
+  editor.setTokens(
+    Array.from({ length: 128 }, (_, start) => ({
+      start,
+      end: start + 1,
+      style: { color: start % 2 ? '#cc3311' : '#1133cc' },
+    })),
+  )
+  await frames()
+  const saved = editor.captureSnapshot({ scope: 'document' })
+  expect(saved.status).toBe('ready')
+  if (saved.status !== 'ready') return
+  const paint = decodePaintSnapshot(saved.paint)!
+  if (paint.format !== 6) return
+  const restored = mountPaintSnapshot(host, paint, { width: 160 })!
+  expect(restored.rowCount).toBeGreaterThan(paint.rows.length)
+  const root = restored.element.cloneNode(true) as HTMLElement
+  restored.dispose()
+  host.append(root)
+  let reads = 0
+  const runs = paint.rows.flatMap((row) => row.runs)
+  for (const run of runs) {
+    const weight = run.style.fontWeight
+    Object.defineProperty(run.style, 'fontWeight', {
+      get() {
+        reads++
+        return weight
+      },
+    })
+  }
+  const handle = activatePaintSnapshotHighlights(root, paint)
+  try {
+    expect(handle).not.toBeNull()
+    expect(reads).toBe(runs.length)
+  } finally {
+    handle?.dispose()
+    root.remove()
+  }
 })

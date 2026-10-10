@@ -69,6 +69,7 @@ export default defineConfig({
           markup: string,
           width: number,
           javaScriptEnabled: boolean,
+          activationMode: 'success' | 'refused' | 'throws' | 'missing' = 'success',
         ) =>
           proveDocumentPaintFirstFrame(
             page,
@@ -78,6 +79,7 @@ export default defineConfig({
             markup,
             width,
             javaScriptEnabled,
+            activationMode,
           ),
         proofDocumentPaintCold: async (
           { page, project },

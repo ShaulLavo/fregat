@@ -74,6 +74,7 @@ export function mountDocumentPaint(
   for (let index = 0; index < paint.rows.length; index++) {
     const row = paint.rows[index]!
     const text = row.runs.map((run) => run.text).join('')
+    const highlight = canHighlightDocumentPaintRow(row)
     const line = createWordWrapLine()
     if (paint.wrap) {
       appendWordWrapText(line, text, 0, text.length, rules)
@@ -101,9 +102,9 @@ export function mountDocumentPaint(
         element.setAttribute('aria-label', row.heading.name)
         if (row.heading.id) element.id = row.heading.id
       }
-      if (end > start && canHighlightDocumentPaintRow(row)) {
-        element.dataset.editorDocumentPaintSourceRow = String(index)
-        element.dataset.editorDocumentPaintStart = String(start)
+      element.dataset.editorDocumentPaintSourceRow = String(index)
+      element.dataset.editorDocumentPaintStart = String(start)
+      if (end > start && highlight) {
         element.append(document.createTextNode(text.slice(start, end)))
       } else appendRuns(element, row.runs, start, end, row.style)
       fragment.append(element)
