@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { webkit, type Browser } from 'playwright'
 import { hasChromium, startPreview, type Preview } from './preview'
 
@@ -84,9 +85,9 @@ for (const engine of ['chromium', 'webkit'] as const) {
           }
         },
       )
-      test.each([1, 2])(
-        'a failed runtime download is requested again by Try again (run %i)',
-        async (run) => {
+      test.each([0, 1500])(
+        'a failed runtime download retries with the font delayed %i ms',
+        async (fontDelay) => {
           const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
           const page = await context.newPage()
           const events: string[] = []
@@ -95,7 +96,27 @@ for (const engine of ['chromium', 'webkit'] as const) {
           page.on('requestfailed', (request) =>
             events.push(`requestfailed: ${request.url()} ${request.failure()?.errorText}`),
           )
+          page.on('response', (response) => {
+            if (/example-editor|jetbrains-mono/.test(response.url()))
+              events.push(`response: ${response.status()} ${response.url()}`)
+          })
+          await context.route(/jetbrains-mono.*\.woff2/, async (route) => {
+            await delay(fontDelay)
+            await route.continue()
+          })
           await page.addInitScript(() => {
+            const load = FontFaceSet.prototype.load
+            FontFaceSet.prototype.load = async function (font, text) {
+              console.debug('Example font load started')
+              try {
+                const faces = await load.call(this, font, text)
+                console.debug('Example font load completed')
+                return faces
+              } catch (error) {
+                console.error('Example font load failed', error)
+                throw error
+              }
+            }
             document.addEventListener(
               'click',
               (event) => {
@@ -117,8 +138,13 @@ for (const engine of ['chromium', 'webkit'] as const) {
             if (attempt <= 2) await route.abort()
             else await route.continue()
           })
+          const fontResponse = page.waitForEvent('requestfinished', {
+            predicate: (request) => /jetbrains-mono.*\.woff2/.test(request.url()),
+          })
           try {
-            await page.goto(`${preview.base}/docs/start-here/quick-start/`)
+            await page.goto(`${preview.base}/docs/start-here/quick-start/`, {
+              waitUntil: 'domcontentloaded',
+            })
             const example = page.locator('[data-example]').first()
             for (let failure = 0; failure < 2; failure++) {
               await example.getByRole('button', { name: /Edit/ }).click()
@@ -127,6 +153,20 @@ for (const engine of ['chromium', 'webkit'] as const) {
                 .poll(() => example.getByRole('status').innerText())
                 .toBe('Editor could not load. Try again.')
             }
+            if (engine === 'webkit' && fontDelay > 0) {
+              await expect
+                .poll(() =>
+                  page.evaluate(
+                    () =>
+                      Array.from(document.fonts).find((face) => face.family === 'JetBrains Mono')
+                        ?.status,
+                  ),
+                )
+                .toBe('error')
+            }
+            const stage = example.locator('.example-stage')
+            await stage.scrollIntoViewIfNeeded()
+            const before = await stage.boundingBox()
             await example.getByRole('button', { name: /Edit/ }).click()
             await expect
               .poll(
@@ -137,22 +177,61 @@ for (const engine of ['chromium', 'webkit'] as const) {
                   disabled: await example.locator('.make-live').getAttribute('aria-disabled'),
                   attempts,
                   events: events.slice(),
+                  fonts: await page.evaluate(() =>
+                    Array.from(document.fonts, (face) => ({
+                      family: face.family,
+                      status: face.status,
+                    })),
+                  ),
                 }),
                 { timeout: 20000 },
               )
               .toMatchObject({ live: '' })
-            expect(attempts).toBeGreaterThan(2)
+            expect(attempts).toBe(3)
+            if (engine === 'webkit' && fontDelay > 0)
+              expect(
+                events.some((event) => event.startsWith('error: Example font load failed')),
+              ).toBe(true)
+            const after = await stage.boundingBox()
+            expect(after?.height).toBe(before?.height)
+            const livePixels = await stage.screenshot({
+              style:
+                '.editor-virtualized-caret-layer{visibility:hidden!important}.editor-virtualized-cursor-line-row,.editor-virtualized-cursor-line-gutter{background:transparent!important}.editor-virtualized-cursor-line-gutter{color:var(--editor-gutter-foreground)!important}',
+            })
+            // Compare the retained HTML after both views have selected the rendered font.
+            const staticPixels = await stage.screenshot({
+              style:
+                '[data-example-live] .example-static{display:block!important}[data-example-live] .example-prepared{display:none!important}',
+            })
+            await writeFile(
+              join(evidence, `${engine}-retry-font-${fontDelay}-static.png`),
+              staticPixels,
+            )
+            await writeFile(
+              join(evidence, `${engine}-retry-font-${fontDelay}-live.png`),
+              livePixels,
+            )
+            expect(livePixels.equals(staticPixels)).toBe(true)
+            await fontResponse
+            const settledPixels = await stage.screenshot({
+              style:
+                '.editor-virtualized-caret-layer{visibility:hidden!important}.editor-virtualized-cursor-line-row,.editor-virtualized-cursor-line-gutter{background:transparent!important}.editor-virtualized-cursor-line-gutter{color:var(--editor-gutter-foreground)!important}',
+            })
+            expect(settledPixels.equals(livePixels)).toBe(true)
           } finally {
             release()
             if (
               (await page.locator('[data-example]').first().getAttribute('data-example-live')) !==
               ''
             )
-              console.error(`Retry failure (${engine}, run ${run}): ${JSON.stringify(events)}`)
+              console.error(
+                `Retry failure (${engine}, font delay ${fontDelay}): ${JSON.stringify(events)}`,
+              )
             await writeFile(
-              join(evidence, `${engine}-retry-${run}.json`),
+              join(evidence, `${engine}-retry-font-${fontDelay}.json`),
               JSON.stringify(events, null, 2),
             )
+            await context.unrouteAll({ behavior: 'wait' })
             await context.close()
           }
         },

@@ -35,7 +35,17 @@ function prepare(example: HTMLElement) {
   const state: { ready: Promise<ExampleEditor>; host: HTMLElement; editor?: ExampleEditor } = {
     host,
     ready: load().then(async ({ mountExample }) => {
-      await document.fonts.load('14px "JetBrains Mono"')
+      let fallbackFont = !Array.from(document.fonts).some(
+        (face) => face.family === 'JetBrains Mono' && face.status === 'loaded',
+      )
+      // Optional faces can expire; keep live measurements on the static view's rendered face.
+      await document.fonts.load('14px "JetBrains Mono"').catch(() => {
+        fallbackFont = true
+      })
+      if (fallbackFont) {
+        for (const paint of example.querySelectorAll<HTMLElement>('[data-editor-document-paint]'))
+          paint.style.fontFamily = '"Singapore Mono Fallback", monospace'
+      }
       const theme = example.querySelector<HTMLElement>('[data-example-theme="dark"]')!
       const dark = getComputedStyle(theme).display !== 'none'
       const editor = mountExample(host, {
@@ -43,6 +53,7 @@ function prepare(example: HTMLElement) {
         language: source.language,
         label: `${source.language || 'Text'} example editor`,
         snapshot: source[dark ? 'dark' : 'light'].paint,
+        fallbackFont,
       })
       state.editor = editor
       await editor.ready()

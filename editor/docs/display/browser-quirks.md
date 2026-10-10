@@ -469,3 +469,56 @@ upstream queue contains the standalone HTML, bundled font and three-engine resul
 nothing has been filed. Remove the context reset once retained contexts agree with
 fresh contexts in the standalone repro on supported WebKit, then rerun the content,
 wrap-layout and default browser projects. Keep glyph-table invalidation.
+
+## WebKit blanks text after an optional font expires and later paints the downloaded face
+
+Verified 2026-10-10 on macOS 26.4 with Playwright 1.63.0 and WebKit 26.6
+(revision 2359). Chromium 153.0.8010.12 keeps fallback text visible. Real Safari
+has not been verified.
+
+### Symptom
+
+On a slow first visit, Singapore documentation examples can stay blank while
+JetBrains Mono downloads. Making an example editable can report a network error
+after the editor module has downloaded successfully.
+
+### Root cause
+
+With a preloaded `font-display: optional` face and a delayed successful HTTP
+response, WebKit marks the face `error` and `document.fonts.load()` rejects with
+`NetworkError`. Existing text still stays blank. Once the response arrives,
+WebKit paints that text using the downloaded face. The same sequence reproduces
+with one native HTML text row, no editor, and no intercepted font request. A
+second row using only the fallback remains visible throughout.
+
+Optional-font expiry should keep fallback text visible and prevent a late font
+swap. A font-load rejection must also be independent of editor-module readiness.
+
+### Fix
+
+Documentation preparation treats the font-load rejection as nonfatal. If Mono
+was unavailable when preparation began, or its load rejects, both the retained
+static paint roots and the live editor use the same fallback-only stack. This
+also makes live measurements use the rendered fallback and prevents late Mono
+arrival from repainting either view. The normal static/live stack includes the
+existing metric-matched `Singapore Mono Fallback`. Font preloads and
+`font-display: optional` stay unchanged.
+
+### Minimal reproduction
+
+Preload a WOFF2 font and declare it with `font-display: optional`. Render one
+`pre` with that face followed by `monospace`, and a control `pre` with only
+`monospace`. Delay the font's successful HTTP response by five seconds. After
+400 ms, record its `FontFace.status` and call `document.fonts.load()` for it.
+WebKit records `error` and rejects with `NetworkError`; the first row is blank
+before the response and uses the downloaded face afterwards. Chromium retains
+visible fallback text during the delay.
+
+The owner's upstream queue contains standalone HTML, the delayed-response server,
+engine results and before/after screenshots. No upstream issue has been opened.
+Regression coverage lives in `site/tests/review.browser.ts`: two aborted editor
+entry requests, an allowed third request, successful activation with the optional
+font expired, exact retained-static/live pixels and height, and unchanged live
+pixels after the delayed font finishes. Remove the static-root pin once supported
+WebKit keeps the fallback visible and stable in the standalone reproduction;
+retain nonfatal font preparation and the matching fallback stack.
