@@ -86,6 +86,88 @@ Regression coverage lives in
 It checks light and dark Markdown preview at 390 px, exact live/snapshot pixels,
 and the endpoints of both native range types in all three engines.
 
+## Originating link underlines disagree under custom highlights
+
+Verified 2026-10-10 on Linux with Playwright 1.63.0, Chromium 153.0.8010.12
+and WebKit 26.6. Firefox was not checked for this case.
+
+### Symptom and scope
+
+When a Markdown link's syntax-token foreground differs from its theme link colour,
+Chromium paints the live underline in the token colour. WebKit keeps the theme
+colour. Document snapshot replay uses the token colour, so WebKit's live and
+replayed underlines differ. The isolated 14 px Snapshot Mono fixture reproduced
+34 changed underline pixels in each of the light and dark themes; Chromium's
+baseline comparisons passed. The docs site's link tokens use the link theme
+colour and avoid this difference.
+
+### Painting rule
+
+[CSS Pseudo-Elements Level 4, text and text decorations](https://drafts.csswg.org/css-pseudo-4/#highlight-text)
+says the topmost active highlight redraws text and originating-element decorations
+using its own `color`, regardless of the decorations' original colour or fill.
+Chromium's red originating underline follows that rule. Assigning grey
+`text-decoration-color` to the DOM link and its highlight still left Chromium's
+originating underline red, as the rule requires. An explicit highlight decoration
+colour controls decorations introduced by the highlight itself.
+
+Both engines initially reported the highlight's computed decoration colour as
+red, despite their different originating-underline pixels. That computed value
+therefore cannot identify WebKit's observed paint. No Chromium upstream report
+was filed because this evidence matches the specified Chromium behavior.
+
+### Minimal reproduction
+
+```html
+<style>
+  .row {
+    font: 14px/22px monospace;
+    color: #222;
+  }
+  a {
+    color: #222;
+    text-decoration: underline;
+  }
+  #live::highlight(syntax) {
+    color: red;
+  }
+  #saved a {
+    color: red;
+  }
+</style>
+<div class="row" id="live"><a href="https://example.com">MMMM</a></div>
+<div class="row" id="saved"><a href="https://example.com">MMMM</a></div>
+<script>
+  const text = document.querySelector('#live a').firstChild
+  const range = new Range()
+  range.setStart(text, 0)
+  range.setEnd(text, text.length)
+  CSS.highlights.set('syntax', new Highlight(range))
+</script>
+```
+
+The live underline is red in Chromium and grey in WebKit. The second row models
+direct DOM replay and has a red underline in both engines. Setting the token
+colour to `#222` makes the two rows agree.
+
+### Bounded control and current decision
+
+Separately capturing and replaying the originating decoration colour fixed the
+WebKit control but changed Chromium's replay underline to grey while its live
+underline remained red: 32 changed pixels, all on the underline row. Explicit DOM
+and link-scoped highlight decoration colours did not remove that difference.
+
+An experimental highlight-owned grey underline, with the DOM underline removed,
+also failed through document capture and replay: 32 changed pixels in Chromium
+and 34 in WebKit, for both themes. The underline added solely through the control
+stylesheet was absent from the captured token style. Native token-generated
+underlines retained equal mounted and emitted pixels in the separate controls.
+This experiment does not qualify a replacement Markdown decoration pipeline.
+
+The time-boxed investigation leaves snapshot code and Markdown rendering
+unchanged. Matching link-token and theme colours is the qualified docs-site path;
+changing decoration ownership requires separate capture and replay qualification.
+
 ## Native textarea caret leaks through transparent hidden input
 
 **Verified 2026-06 against:** desktop app WebView, user-visible in the Platform
