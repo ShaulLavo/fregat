@@ -98,10 +98,12 @@ them).
 - **Determinism.** The detector reads only the confirmed log and the text it produces, so every
   copy marks the same units with the same IDs (unit kind plus the character ID of its first
   character). Pending local edits are ignored until confirmed.
-- **Cost.** Off the edit path: runs in the tree-sitter worker after the parse that follows a
-  remote batch, only over changed ranges that contain concurrent edits. Documents without a
-  session or with one author do no work. Budget: under 2 ms per batch for 100k-line files with
-  100 concurrent edits, measured.
+- **Cost.** Off the edit path: the coordinator runs on the invoking thread after the parse
+  that follows a remote batch; syntax reads use the parser worker over changed ranges that
+  contain concurrent edits. Documents without a
+  session or with one author do no work. The owner accepts the measured 3–4 ms complete
+  detector median for 100k-line files with 100 concurrent edits for now (2026-10-10).
+  Further reductions and the former under-2-ms target are Later work, not delivery gates.
 - **Review.** A mark over the unit and a gutter dot; the hover names the authors and shows the
   base, theirs and yours versions of the unit. Resolutions:
   - Keep both: dismiss the mark.
@@ -128,7 +130,7 @@ them).
    Run `bun run --cwd editor/packages/collab bench:concurrency` after its package build.
    Cost evidence lives in `editor/packages/collab/bench/concurrency-evidence.json`.
    The [append cost follow-up](#concurrency-append-cost) reduces retained-window bookkeeping.
-   These are shared-machine experiments; the detector's full 2 ms budget remains a step 3 gate.
+   These are shared-machine experiments; the current cost decision is recorded in the batch phase follow-up below.
 2. **Merge-unit queries** in `packages/tree-sitter-languages`, first for TypeScript, TSX,
    JavaScript, JSON, CSS, Markdown, Python, Rust and Go; the other languages in `languages.json`
    use the line fallback until they get a file.
@@ -152,9 +154,10 @@ them).
    Verification covers original fixtures for every grammar, separator-enclosing LF/CRLF fallback,
    lazy compilation, incremental edits, stale requests, deepest nested injections, MDX fences,
    injected-language fallback, UTF-16 offsets and all ten independent-review blockers.
-3. **Detector:** functional implementation and live worker wiring verified 2026-10-09;
-   **step incomplete** until projected-query integration and the unchanged
-   **under-2-ms batch gate** pass. The demand-only
+3. **Detector: Delivered 2026-10-10.** Functional implementation, live worker wiring and
+   projected-query integration are verified. The owner accepts the measured batch cost
+   for now; the former under-2-ms gate is retired. Earlier cost-gate statements below are
+   historical evidence, superseded by the batch phase follow-up. The demand-only
    `@singapore-editor/collaboration/merge-review` export combines confirmed concurrency and an
    injectable syntax reader without adding a dependency between collab and tree-sitter.
    It emits `overlap`, `parse`, `signature` and `orphan`, retains exact concurrent edges,
@@ -209,7 +212,8 @@ them).
    Projection snapshots are reused per detect call, and mark edges are accumulated once.
    No changes were made to `packages/collab/src/concurrency.ts`; its append tuning is separate.
 
-   **The independent-unit median and marked 8 ms median pass; the 2 ms tail gate remains open.**
+   **The independent-unit median and marked 8 ms median passed in this earlier experiment.**
+   The current acceptance decision is recorded in the batch phase follow-up.
    Run `bun run --cwd editor/packages/collaboration bench:merge-review` after workspace builds.
    The 2026-10-09 detector-cost follow-up includes append, exact pairs, identity mapping and
    real syntax queries. Current parsing, authoring, window construction, application, IPC and
@@ -771,19 +775,111 @@ The final full suites pass 147 node tests, 166 browser tests (including 44 merge
 regressions) and 226 collaboration tests. Workspace builds, parser types/lint, editor
 health and plan checks also pass. No new timing experiment or claim accompanies this fix.
 
+#### Batch phase follow-up and acceptance (2026-10-10)
+
+The owner accepts the 3–4 ms complete detector median for now. Cost research is complete
+for this delivery; the former 2 ms target and tighter tails are Later work, not a current gate.
+This decision supersedes earlier gate wording without changing any recorded measurement.
+
+A fresh guarded Mac baseline at `917e6da49cd610209ecb7d55508ed8275f76e5e6` uses the real
+parser worker over 100k TypeScript lines, four authors, 8,192 retained records and 100
+concurrent edits. Two blocks supply 16 samples per shape; AC and one-minute load below 3
+are recorded before each block (2.77 and 2.86). Each pass uses ordinary/dense/dense/ordinary
+order after one warmup pass. These are probe-enabled **experiments, shared machine**, with
+nearest-rank p95. Current parsing and window construction are excluded.
+
+| Baseline phase, median              | Ordinary | Dense, 50 overlaps |
+| ----------------------------------- | -------- | ------------------ |
+| Complete detector                   | 3.10 ms  | 3.65 ms            |
+| Complete detector p95               | 5.30 ms  | 4.50 ms            |
+| Detector outside the worker reply   | 1.20 ms  | 1.40 ms            |
+| Request construction through post   | 0.40 ms  | 0.40 ms            |
+| Synchronous post serialization      | 0.00 ms  | 0.10 ms            |
+| Post to worker receipt              | 0.10 ms  | 0.15 ms            |
+| Receipt to execution start          | 0.00 ms  | 0.00 ms            |
+| Worker execution                    | 1.60 ms  | 1.90 ms            |
+| Native query subset                 | 0.40 ms  | 0.50 ms            |
+| Worker completion to main receipt   | 0.20 ms  | 0.20 ms            |
+| Main receipt to detector completion | 0.80 ms  | 1.00 ms            |
+| Separate mark publication filtering | 1.00 ms  | 77.85 ms           |
+| Detector plus publication filtering | 4.50 ms  | 81.55 ms           |
+
+Mark publication is a separate operation omitted from the earlier detector totals. The
+probe invokes the real `MergeReview.unsuperseded` against the real confirmed window and
+snapshot and asserts unchanged marks. It excludes listener dispatch and DOM painting.
+Native query time is nested within worker execution; request construction includes detector
+preparation, and main-receipt-to-completion includes decoding and mark construction together.
+The rows and their medians are not additive exclusive costs. An earlier raw probe field
+accidentally used subsequent serial-control requests; the portable evidence derives the
+correct receipt-to-completion interval from the captured batched message.
+
+The sizeable finding is publication repeatedly scanning all retained edits for each pair,
+including history that cannot follow either alternative. `ConfirmedWindow.editsAfter` now
+resolves predecessor identities once, scans only the greater-Lamport suffix of the existing
+canonical candidate index, and checks the existing ancestry intervals. Unknown identities
+return no successors; empty predecessor lists return all retained text edits. Publication
+checks effect visibility and unit intersection only for those successors and returns early
+for an empty mark set. No extra index, parser change or scheduling change is needed.
+
+Causal successor regressions compare against the old identity predicate after reordered
+arrivals, eviction and effect-command bridges. Existing publication regressions retain
+causal supersession, follow-ups outside the unit and effect visibility. The real-worker
+probe compares batched versus serial detector results and publication versus detector marks.
+Ordinary/dense counts remain one message, 100/150 ranges, 400/500 non-root native queries,
+3/4 yields and zero source commands, acquisitions, copy callbacks or native parses.
+
+A second guarded Mac turn compares before/after/after/before versions. AC and one-minute
+load below 3 are recorded before each block (2.88, 2.74, 2.71 and 2.89), with 16 samples
+per version and shape. The larger publication scan occurs on every dense batch in this
+fixture: each of its 50 competing pairs checks the 8,192-entry history. It is outside the
+previously quoted 3–4 ms detector total and runs on the invoking thread before publishing
+marks. It was not a slow worker query.
+
+| Guarded comparison, median before / after | Ordinary       | Dense, 50 overlaps |
+| ----------------------------------------- | -------------- | ------------------ |
+| Complete detector                         | 3.15 / 3.30 ms | 3.90 / 4.10 ms     |
+| Publication filtering                     | 1.20 / 0.00 ms | 87.30 / 0.10 ms    |
+| Detector plus publication filtering       | 4.90 / 3.30 ms | 91.20 / 4.20 ms    |
+| Detector plus publication filtering p95   | 7.30 / 5.80 ms | 112.50 / 7.10 ms   |
+
+The zero ordinary median is below this browser timer's resolution, not proof of zero elapsed
+work. Detector time is unchanged within shared-machine variation; no detector speedup or
+under-2-ms claim is made. Tight tails are not established. A non-quiet Linux count experiment
+on the same 50 latest competing pairs reduces causal identity-index reads from 819,200 to
+100 with identical successor results. These are counts only, not a Linux timing verdict.
+
+Portable guarded samples, phase summaries, source revision, measured patch hash and Linux
+counts are in `editor/packages/collaboration/bench/batch-phase-evidence.json`. Raw evidence
+and private controllers are retained under `/work/reports/e068-j-20261010/`; Mac temporary
+sources are removed after each turn. The new successor regression fails on the original
+source and passes after the change. Final narrow checks pass 32 collab tests across both
+engine projects and 42 collaboration tests, package types/lint, full-text and command-reference
+checks, and plan checks. `editor health` still fails on main for an inherited source-cycle
+baseline delta; the coordinator handles that separately, and this change does not accept it.
+The nine already-shipped `./paint` exports missing from main's API inventory are synchronized;
+no other generated inventory changes are included.
+
+**Later follow-up (Approved, scheduled later):** repeat the phase-free detector and publication
+measurements together, including 2–8 authors and nearest-rank tails. Candidate
+and orphan phases have resolved-Promise allocation opportunities (ordinary baseline medians
+0.40 and 0.30 ms); native parent traversal may have small repeated work. Neither is an
+established sizeable saving. Request serialization and queueing are already lean in this
+profile. Do not attribute every tail to GC. No further micro-optimisation is shipped here.
+
 Remaining Approved work:
 
 - [ ] Establish cursor cost-regression proof with an A/B/B/A rerun that enforces and records
       AC power and one-minute load below 3 before each sample block. Retain exact-result checks.
-- [ ] Continue the ordinary 2 ms tail investigation using the uninstrumented detector gate and
-      instrumented probe together. Do not assign all tails to GC or close the gate from a median.
+- [x] Complete the batch cost research for now at the owner-accepted 3–4 ms detector median.
+      The guarded phase profile identifies a separate retained-history publication scan;
+      successor filtering removes that work without changing marks. Further tuning is Later work.
 - [x] Group the current-unit worker exchanges into one request per ordinary/dense batch.
       Retain exact mark equality, cancellation, source ownership and bounded projection caches;
       the batched worker reads evidence above covers the real-worker regression checks.
 - [x] Profile the remaining batched worker cost. The guarded phase experiment below identifies
       immutable-snapshot idle warm-up as the queued work. Skip that warm-up with explicit
-      `readOnly` parse intent; keep it for mutable documents. The ordinary 2 ms complete
-      detector target remains open, with a 3.20 ms observed median in this experiment.
+      `readOnly` parse intent; keep it for mutable documents. This experiment observed a
+      3.20 ms ordinary detector median, accepted for now by the later cost decision.
 - [ ] Bound late damaged-root/error-range checks and wide/injected incremental fallbacks.
       `bench/cursor.test.ts` now reproduces the expensive late damaged-root lookup independently
       of syntax-query execution; repeat it with the existing full-reparse differential corpus.
@@ -797,8 +893,10 @@ Remaining Approved work:
 - False positives: seeded E066 simulations where authors type in different functions produce zero
   marks across 10,000 runs; where they type in the same function, every run marks it.
 - Determinism: all peers in E067 simulations report identical mark sets after convergence.
-- Cost: a bench of 100k-line TypeScript with 2–8 authors and 100 concurrent edits per batch
-  meets the 2 ms budget; documents without a session show zero detector calls.
+- Cost: retain exact-result evidence for 100k-line TypeScript with 100 concurrent edits.
+  The four-author real-worker experiment establishes the accepted 3–4 ms detector median;
+  tighter tails and fresh 2–8-author comparisons are Later work. Documents without a session
+  show zero detector calls.
 - `look` screenshots of a mark, its hover and each resolution, read back.
 
 ## Risks and decisions
