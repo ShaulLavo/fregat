@@ -187,6 +187,27 @@ The width fixtures also cover fractional glyph boundaries, prose, long identifie
 
 The home height numbers alone do not prove duplicate wrapped rows. Their excesses exactly match the existing `scrollPastEnd` padding: `1254 - 638 = 638 - 22`, and `946 - 484 = 484 - 22`. Content-height ownership and hidden-to-visible highlights remain with their separate implementation lane. Deleting the site's independent break policy and proving static/live parity remain Phase 3 work.
 
+### Follow-up: Scaled Markdown heading wrapping
+
+Status: **Approved**. Blocks Phase 3 phone qualification; owned by the editor wrap lane.
+
+- [ ] Wrap native headings and document-paint replay using each row's rendered typography. Keep the site on the shared editor policy and preserve heading size and weight.
+- [ ] Add native and replay extent checks for the actual CodeMirror and Quick start manuals at 312/382 px content widths and 320/390 px touch viewports, including DPR 2.
+
+On 2026-10-10, `bun --cwd editor/site scripts/capture.ts` rejected `start-here-codemirror.md-light: live overflows at 312px: [{"width":312,"scrollWidth":318},{"width":312,"scrollWidth":318}]` before snapshot replay. Quick start's `2. Give the editor a container` heading has a captured row font size of 16.8 px with a 14 px root font. The touch-enabled product-site audit expanded its 320 px layout viewport to 348 px in Chromium and 350 px in WebKit; WebKit's live editor had 38 px extra horizontal scroll extent.
+
+`documentPaintRows.ts` creates glyph advances from the root once and reuses them across rows with different typography. Native heading wrapping also exceeds its content box. Original/live/emitted screenshot equality alone missed this because all three cropped the oversized heading. Build capture now checks horizontal extents before comparing pixels. The activation API is a separate dependency; run this reproduction after its build is available. Keep the failing phone audit and capture-refusal evidence with Phase 3 verification.
+
+### Follow-up: WebKit link-boundary paint
+
+Status: **Approved**. Blocks Phase 3 exact-pixel acceptance. The library/browser cause is unconfirmed; the site lane leaves core source unchanged.
+
+- [ ] Reproduce Quick start's native versus replay colours at a 390 px touch viewport, both palettes, with `bun run --cwd editor/site test:browser tests/manual.browser.ts -t 'manual at 390'`. Use a qualified capture build after the heading fix. Chromium's two cases pass; WebKit's two cases fail on the current interim capture. Do not relax pixel equality or recolour the site to hide it.
+- [ ] Inspect native highlight endpoints around source line 61's languages link and line 67's playground link. Native WebKit colours the literal `to` and `on` as links; replay uses foreground. At the languages link, `editor-shared-token-11` begins at an element boundary and ends on the following `to` text node at offset 0. Replay has no range on that literal. Inspect `editor/packages/editor/src/virtualization/virtualizedTextViewGeometry.ts` around `new StaticRangeConstructor` (line 1479 at the lane's merge base). Establish a minimal boundary-range control before attributing this to WebKit or changing endpoint construction.
+- [ ] Preserve same-engine, same-font pixel comparisons after the fix and rerun the full site takeover matrix.
+
+On 2026-10-10 the 390 px rerun passed two Chromium cases and failed both WebKit palettes after provisional/native readiness was corrected. RGB comparison places the light-palette difference at `(100, 2118, 333, 2329)` in a 382 × 2354 px document screenshot. Evidence is retained under `phase-340-site/runtime-settlement/` in the existing site-embed evidence directory: `phase340-manual390-current.log`, `phase340-webkit-range-boundaries.log`, and the static/live difference crops. The diagnostic converts native `StaticRange` endpoints to a DOM `Range` for inspection; directly calling `intersectsNode` on `StaticRange` was an invalid observation and is excluded. A standalone element-boundary to trailing-text-offset-0 control left `to` in foreground in both engines, so no upstream browser bug is established. Its script, log and before/after images are retained with the same evidence. No provider, remote Mac or core source was used.
+
 ## Snapshot speed budget
 
 First paint is complete editor-produced HTML emitted at build time and remains visible without JavaScript replay. Responsive replay runs at takeover or a toggle, separately from worker/parser startup. These are qualification budgets, not achieved product claims. Speed qualification is a follow-up and does not gate merging the correctness implementation after independent re-review passes:
