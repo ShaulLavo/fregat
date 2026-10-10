@@ -1,5 +1,13 @@
 # @singapore-editor/decode
 
+## 0.2.10
+
+### Patch Changes
+
+- [#1261](https://github.com/ShaulLavo/fregat/pull/1261) [`ad5afbc`](https://github.com/ShaulLavo/fregat/commit/ad5afbcfa63daa4a7d160c343a67d285a8fbb2d4) - Improved the `createDecodePlugin` reveals: they start the moment a file opens instead of waiting for highlighting, take colours as highlighting lands, keep playing through scrolls, and run as compositor animations. Autoregressive, parallel and token modes now write token by token behind a caret; diffusion resolves scrambled tokens in clusters. Morphs and reveals keep a repainted row hidden until they finish.
+- Updated dependencies []:
+  - @singapore-editor/core@0.2.10
+
 ## 0.2.9
 
 ### Patch Changes
