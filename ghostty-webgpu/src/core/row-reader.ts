@@ -1,5 +1,5 @@
 import { PACKED_CELL_WORDS, PACKED_ROW_WORDS, PackedCells } from './packed-cells.js'
-import { copyRowGraphemes } from './row-graphemes.js'
+import { recordPacket } from './row-storage.js'
 import { SnapshotReader, type ExtractSnapshot } from './snapshot-reader.js'
 import type { GhosttyRuntime } from './runtime.js'
 import type { ReadRowsOptions, RenderRow, TerminalSize } from './types.js'
@@ -25,6 +25,9 @@ export class RowReader {
   ): readonly RenderRow[] {
     if (grid.rows === 0) return []
     const snapshot = this.snapshots.read(state, iterator, cells, grid, options)
+    const records = options.packed ? snapshot.cells.slice() : snapshot.cells
+    const graphemes = options.packed ? snapshot.graphemes.slice() : snapshot.graphemes
+    const packet = options.packed ? recordPacket(records, graphemes) : undefined
     const rows: RenderRow[] = []
     for (let offset = 0; offset < snapshot.rows.length; offset += PACKED_ROW_WORDS) {
       const y = snapshot.rows[offset]!
@@ -39,9 +42,7 @@ export class RowReader {
         rows.push({ y, dirty, cells: packed.materialize() })
         continue
       }
-      const records = snapshot.cells.slice(start, start + length)
-      const graphemes = copyRowGraphemes(records, snapshot.graphemes, PACKED_CELL_WORDS, 4, 5)
-      const packed = new PackedCells(records, graphemes)
+      const packed = new PackedCells(records.subarray(start, start + length), graphemes, packet)
       let materialized: RenderRow['cells'] | undefined
       rows.push({
         y,
