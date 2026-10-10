@@ -38,7 +38,8 @@ async function checkLiveTerminal(target: URL, out: string, releaseRoot: string) 
     sessions: [] as Awaited<ReturnType<typeof killCaptureTerminal>>[],
     coverage: {
       client: 'Deployed client rendering with an isolated backend built from the deployed commit.',
-      server: 'Deployed terminal-host hello and build identity from read-only /release.',
+      server:
+        'Deployed terminal-host hello and protocol compatibility from read-only /release; host build is informational.',
       excluded:
         'Opening a terminal on the deployed server requires durable workspace and project registration.',
     },

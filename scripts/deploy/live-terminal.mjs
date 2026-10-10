@@ -63,17 +63,8 @@ export function terminalReleaseFailures(deployed, backend, protocolVersion) {
       host.version !== protocolVersion ||
       !Number.isInteger(host.pid) ||
       !(host.pid > 0)
-    ) {
-      failures.push(`terminal check: ${name} terminal host hello is missing or invalid`)
-      continue
-    }
-    if (
-      typeof release?.server?.release !== 'string' ||
-      host.build?.commit !== release?.server?.commit ||
-      host.build?.release !== release?.server?.release ||
-      host.build?.dirtyFiles !== 0
     )
-      failures.push(`terminal check: ${name} terminal host build differs from ${name} server`)
+      failures.push(`terminal check: ${name} terminal host hello is missing or invalid`)
   }
   return failures
 }

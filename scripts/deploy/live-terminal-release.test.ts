@@ -8,8 +8,17 @@ const deployed = {
   terminalHost: { type: 'hello', version: 1, pid: 100, build },
 }
 
-test('accepts deployed assets and a live host from the verified backend commit', () => {
+test('accepts deployed assets and a live host with the expected protocol', () => {
   expect(terminalReleaseFailures(deployed, deployed, 1)).toEqual([])
+})
+
+test.each(['deployed', 'isolated'])('rejects an incompatible %s terminal host protocol', (name) => {
+  const incompatible = { ...deployed, terminalHost: { ...deployed.terminalHost, version: 2 } }
+  const target = name === 'deployed' ? incompatible : deployed
+  const backend = name === 'isolated' ? incompatible : deployed
+  expect(terminalReleaseFailures(target, backend, 1)).toContain(
+    `terminal check: ${name} terminal host hello is missing or invalid`,
+  )
 })
 
 test('rejects a different isolated backend commit', () => {
@@ -52,14 +61,16 @@ test.each([
 test.each([
   { ...build, commit: 'b'.repeat(40) },
   { ...build, release: 'release-b' },
-])('rejects a terminal host from a different build %j', (hostBuild) => {
+  { release: 'release-old', commit: 'b'.repeat(40), dirtyFiles: 0 },
+  { ...build, dirtyFiles: 1 },
+])('accepts a retained terminal host build as informational %j', (hostBuild) => {
   expect(
     terminalReleaseFailures(
       { ...deployed, terminalHost: { ...deployed.terminalHost, build: hostBuild } },
       deployed,
       1,
     ),
-  ).toContain('terminal check: deployed terminal host build differs from deployed server')
+  ).toEqual([])
 })
 
 test('allows only the deployed asset origin and the exact private API origin', () => {

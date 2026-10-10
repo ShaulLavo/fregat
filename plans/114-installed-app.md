@@ -416,7 +416,9 @@ The current check renders deployed client assets against a disposable built back
 same commit and reads the deployed terminal-host hello/build through `GET /release`. It does
 not open a terminal on the deployed server. A proxy that rejects deployed `/terminal` requests
 therefore cannot establish deployed PTY spawning or terminal transport health; host hello alone
-establishes the retained host's identity and liveness.
+establishes the retained host's identity and liveness. Hosts survive deployments to preserve
+running shells, so the check requires a valid hello and compatible protocol and reports the
+host's build as information. A host from an earlier build passes these checks.
 
 The existing workspace lifecycle cannot leave the owner's state unchanged:
 
