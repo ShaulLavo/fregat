@@ -158,9 +158,20 @@ for (const engine of ['chromium', 'webkit'] as const) {
                 .toMatchObject({ coloured: true })
               expect(await site.goLive(page).count()).toBe(0)
               expect(await page.getByRole('heading', { level: 1 }).innerText()).toBe('Quick start')
-              expect(
-                await page.evaluate(() => document.scrollingElement!.scrollWidth <= innerWidth),
-              ).toBe(true)
+              const layout = () =>
+                page.evaluate(() => ({
+                  viewport: innerWidth,
+                  document: document.scrollingElement!.scrollWidth,
+                  pane: document.getElementById('doc')!.getBoundingClientRect().toJSON(),
+                  roots: [...document.querySelectorAll<HTMLElement>('[data-editor-document-paint]')]
+                    .filter((root) => root.getClientRects().length)
+                    .map((root) => ({
+                      box: root.getBoundingClientRect().toJSON(),
+                      rows: root.querySelectorAll('[data-editor-document-paint-row]').length,
+                      font: getComputedStyle(root).font,
+                    })),
+                }))
+              const before = await layout()
               const options = {
                 style: '.mode button { visibility: hidden !important; }',
               }
@@ -168,7 +179,21 @@ for (const engine of ['chromium', 'webkit'] as const) {
               await context.unroute('**/_astro/*.js')
               await page.reload()
               await site.static(page).waitFor()
-              expect((await site.manual(page).screenshot(options)).equals(emitted)).toBe(true)
+              const restored = await site.manual(page).screenshot(options)
+              const after = await layout()
+              const evidence = new URL('../.capture/evidence/', import.meta.url)
+              mkdirSync(evidence, { recursive: true })
+              writeFileSync(new URL(`emitted-${engine}-${width}-${theme}.png`, evidence), emitted)
+              writeFileSync(
+                new URL(`remounted-${engine}-${width}-${theme}.png`, evidence),
+                restored,
+              )
+              writeFileSync(
+                new URL(`emitted-${engine}-${width}-${theme}.json`, evidence),
+                JSON.stringify({ before, after }, null, 2),
+              )
+              expect(before.document).toBeLessThanOrEqual(before.viewport)
+              expect(restored.equals(emitted)).toBe(true)
             } finally {
               await context.close()
             }
@@ -312,7 +337,17 @@ for (const engine of ['chromium', 'webkit'] as const) {
           await page.goto(`${preview.base}/?editor=off`)
           await site.static(page).waitFor()
           const ink = await site.home(page).screenshot()
+          const bounds = (await site.home(page).boundingBox())!
+          const point = { x: bounds.x + 100, y: bounds.y + 80 }
+          const readingHitsLiveHost = () =>
+            page.evaluate(
+              ({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest('.editor-host')),
+              point,
+            )
+          expect(await readingHitsLiveHost()).toBe(false)
           await site.goLive(page).click()
+          await page.locator('.editor-host').waitFor({ state: 'attached' })
+          expect(await readingHitsLiveHost()).toBe(false)
           await expect.poll(() => site.goLive(page).isEnabled(), { timeout: 15000 }).toBe(true)
           expect(
             await page.evaluate(
@@ -349,6 +384,62 @@ for (const engine of ['chromium', 'webkit'] as const) {
           await page.close()
         }
       })
+      test.each([320, 1280])(
+        'page scrolling and editor reveal share the page at %i px',
+        async (width) => {
+          const page = await browser.newPage({
+            viewport: { width, height: 900 },
+            // Playwright's mobile WebKit wheel input is unavailable; touch layout has separate coverage.
+            isMobile: width < 500 && engine !== 'webkit',
+            hasTouch: width < 500,
+          })
+          try {
+            await page.goto(`${preview.base}/docs/start-here/quick-start/?editor=on`)
+            await site.live(page).waitFor()
+            const apple = await page.evaluate(() =>
+              /mac/i.test(`${navigator.platform} ${navigator.userAgent}`),
+            )
+            await page.evaluate(() => scrollTo(0, 0))
+            await page.mouse.move(1, 300)
+            await page.mouse.wheel(0, 240)
+            await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0)
+            const margin = await page.evaluate(() => scrollY)
+            await page.mouse.move(width / 2, 300)
+            await page.mouse.wheel(0, 240)
+            await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(margin)
+            await page.locator('.editor-virtualized-viewport').click({ position: { x: 70, y: 30 } })
+            await page.keyboard.press(apple ? 'Meta+ArrowDown' : 'Control+End')
+            await expect
+              .poll(() => page.evaluate(() => scrollY), {
+                message: 'Caret end reveal scrolls the page',
+              })
+              .toBeGreaterThan(900)
+            await page.keyboard.press(apple ? 'Meta+ArrowUp' : 'Control+Home')
+            await expect
+              .poll(() => page.evaluate(() => scrollY), {
+                message: 'Caret start reveal scrolls the page',
+              })
+              .toBeLessThan(300)
+            await page.keyboard.press(apple ? 'Meta+f' : 'Control+f')
+            await page
+              .getByRole('textbox', { name: 'Find', exact: true })
+              .fill('A server-rendered page fails to load')
+            await expect
+              .poll(() => page.evaluate(() => scrollY), {
+                message: 'Find match reveal scrolls the page',
+              })
+              .toBeGreaterThan(900)
+            expect(
+              await page.locator('.editor-virtualized').evaluate((element) => ({
+                x: element.scrollWidth - element.clientWidth,
+                y: element.scrollHeight - element.clientHeight,
+              })),
+            ).toEqual({ x: 0, y: 0 })
+          } finally {
+            await page.close()
+          }
+        },
+      )
       test('edited source survives static mode, theme changes, navigation and history', async () => {
         const page = await browser.newPage({
           viewport: { width: 1280, height: 900 },

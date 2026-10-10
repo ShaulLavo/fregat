@@ -92,7 +92,8 @@ const server = await preview({
 })
 let browser
 try {
-  browser = await chromium.launch()
+  // The headless shell rounds font advances differently from the full browser.
+  browser = await chromium.launch({ channel: 'chromium' })
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
   const ink = new Map<number, Buffer>()
   let label = ''
