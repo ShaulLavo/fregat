@@ -1321,6 +1321,7 @@ function addRangeHighlightToChunk(
     chunk,
     range.start,
     range.end,
+    'highlight',
   )
   if (!domRange) return
 

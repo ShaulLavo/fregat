@@ -16,6 +16,76 @@ Related inline workarounds already documented at their call sites:
   (WebKit re-resolves registered CSS Highlight ranges when a painted row's
   transform changes).
 
+## WebKit moves highlights from unselectable inline text onto following text
+
+Verified 2026-10-10 on Linux with Playwright 1.63.0. WebKit 26.6 paints the wrong
+text. Chromium 153.0.8010.12 and Firefox 155.0 paint the intended text.
+The upstream report is ready for the owner to file; no upstream issue has been opened.
+
+### Symptom
+
+In Markdown live preview, plain text after a link takes the link's syntax colour.
+For example, the `to` after a link on a narrow manual page changes colour.
+Document snapshot replay keeps the plain text in the foreground colour.
+
+### Root cause
+
+A CSS Highlight whose range covers text inside an element with `user-select: none`
+paints the following selectable text in WebKit. The reduced reproduction uses one
+highlight and one range, with no editor or overlapping priorities. Removing
+`user-select: none` fixes the paint. Both `Range` and `StaticRange` reproduce it.
+
+The editor also used equivalent DOM boundaries that ended at offset zero in the
+following text node. Moving both endpoints into the covered text improves range
+precision and lets document capture apply token styles inside inline widgets.
+That boundary change alone does not fix WebKit's unselectable-text behaviour.
+
+### Fix
+
+Inline widgets use `user-select: text`. The editor's mouse handlers continue to
+own editor selection. Snapshot replay uses the same widget selection style.
+Native highlight ranges start in the first covered text node and end in the last
+covered text node. Source spans that produce no displayed text create no highlight
+range. Selection and caret geometry retain element-inclusive boundaries so atomic
+widgets keep their full selection background, including padding and adornments.
+Document capture reads those same registered ranges, so link token colours and
+plain-text colours agree with live paint.
+
+### Minimal reproduction
+
+```html
+<style>
+  #row {
+    font: 24px monospace;
+    color: black;
+    white-space: pre;
+  }
+  #row::highlight(link) {
+    color: red;
+  }
+</style>
+<div id="row">
+  <span style="display:inline-block;user-select:none"><a>MMMM</a></span> MMMM
+</div>
+<script>
+  const text = document.querySelector('a').firstChild
+  const range = new StaticRange({
+    startContainer: text,
+    startOffset: 0,
+    endContainer: text,
+    endOffset: text.length,
+  })
+  CSS.highlights.set('link', new Highlight(range))
+</script>
+```
+
+The link should be red and the following text black. WebKit paints the following
+text red. Changing the span to `user-select: text` restores the intended paint.
+Regression coverage lives in
+[highlightPaint.browser.test.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/test/highlightPaint.browser.test.ts).
+It checks light and dark Markdown preview at 390 px, exact live/snapshot pixels,
+and the endpoints of both native range types in all three engines.
+
 ## Native textarea caret leaks through transparent hidden input
 
 **Verified 2026-06 against:** desktop app WebView, user-visible in the Platform
