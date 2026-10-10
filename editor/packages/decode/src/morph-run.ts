@@ -205,9 +205,12 @@ export class MorphRun {
     return span
   }
 
-  // Colour changes ride a CSS transition, which needs the starting colour painted first.
   private scheduleRecolor(recolor: readonly [HTMLElement, string][]): void {
     if (recolor.length === 0) return
+    /**
+     * @justification Colour changes ride a CSS transition, which needs the starting colour painted
+     * first. One frame per morph, cancelled with the run.
+     */
     this.colorFrame = requestAnimationFrame(() => {
       for (const [span, color] of recolor) span.style.color = color
     })
@@ -222,6 +225,10 @@ export class MorphRun {
       if (!this.canceled) onDone()
     }
     if (animations.length === 0) {
+      /**
+       * @justification A run with nothing to animate still settles after its constructor returns, so
+       * the owner has stored the run before `onDone` tears it down. Guarded by `canceled`.
+       */
       queueMicrotask(fire)
       return
     }
