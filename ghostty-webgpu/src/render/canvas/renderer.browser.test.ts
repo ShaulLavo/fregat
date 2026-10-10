@@ -404,6 +404,37 @@ describe('CanvasTerminalRenderer', () => {
     expectFullRepaint(canvas, source)
   })
 
+  it('decodes each dense packed row once for identity and painting', async () => {
+    const clock = new FakeClock()
+    const canvas = createCanvas()
+    const source = new FakeRenderState([row(0, [cell(0)]), row(1, [cell(0)])])
+    source.cursor.visible = false
+    const renderer = await createRenderer(options(canvas, source, clock))
+    clock.flushFrame()
+    const decodes = []
+    for (let y = 0; y < 2; y += 1) {
+      const packed = new PackedCells(
+        new Uint32Array([0x754c + y, 0x030201, 0xffffffff, 1, 0, 0]),
+        new Uint32Array(),
+      )
+      decodes.push(vi.spyOn(packed, 'readInto'))
+      let cells: readonly RenderCell[] | undefined
+      source.rows[y] = {
+        y,
+        dirty: true,
+        packed,
+        get cells() {
+          return (cells ??= packed.materialize())
+        },
+      }
+      source.dirtyRow(y)
+    }
+    renderer.notifyWrite()
+    clock.flushFrame()
+    for (const decode of decodes) expect(decode).toHaveBeenCalledTimes(1)
+    expectFullRepaint(canvas, source)
+  })
+
   it.each([1, 2])(
     'borrows packed cells only within multi-row frames (%i rows)',
     async (rowCount) => {
