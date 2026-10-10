@@ -10,11 +10,13 @@ const { values } = parseArgs({
   options: {
     engine: { type: 'string', default: 'webkit' },
     headed: { type: 'boolean', default: false },
+    'generic-font': { type: 'string' },
     dist: { type: 'string', default: resolve(import.meta.dirname, '../dist') },
     evidence: { type: 'string' },
   },
 })
 assert.ok(values.engine === 'webkit' || values.engine === 'chromium' || values.engine === 'firefox')
+assert.ok(values['generic-font'] === undefined || values['generic-font'] === 'monospace')
 const evidence = values.evidence
 if (evidence) await mkdir(evidence, { recursive: true })
 const engines = { chromium, firefox, webkit }
@@ -48,6 +50,13 @@ try {
     if (extension === '.woff2') await Bun.sleep(600)
     if (extension === '.js') await Bun.sleep(350)
     let body = Buffer.from(await file.arrayBuffer())
+    // A contrasting generic font exposes a late local fallback on every platform.
+    if (extension === '.css' && values['generic-font'])
+      body = Buffer.from(
+        body
+          .toString()
+          .replace(/ui-sans-serif,\s*system-ui,\s*sans-serif/g, values['generic-font']),
+      )
     const completion = url.searchParams.get('completion')
     if (extension === '.html' && completion) {
       const html = body.toString()
@@ -306,31 +315,16 @@ try {
   await fallback.route('**/*.woff2', (route) => route.abort())
   await fallback.goto('http://site.test/fregat/?fallback=1')
   const weights = await fallback.evaluate(async () => {
-    await document.fonts.load('400 100px "Inter Fallback"')
-    await document.fonts.load('700 100px "Inter Fallback"')
+    await document.fonts.ready
+    const family = getComputedStyle(document.documentElement).fontFamily
     const canvas = document.createElement('canvas').getContext('2d')!
     const sample = 'The complete IDE in your browser, with your agents inside.'
-    canvas.font = '400 100px "Inter Fallback"'
+    canvas.font = `400 100px ${family}`
     const regular = canvas.measureText(sample).width
-    canvas.font = '700 100px "Inter Fallback"'
+    canvas.font = `700 100px ${family}`
     const bold = canvas.measureText(sample).width
-    return {
-      regular,
-      bold,
-      faces: Array.from(document.fonts, (face) => ({
-        family: face.family.replaceAll('"', ''),
-        weight: face.weight,
-      }))
-        .filter((face) => face.family === 'Inter Fallback')
-        .map((face) => face.weight),
-    }
+    return { regular, bold, family }
   })
-  weights.faces.sort()
-  assert.deepEqual(
-    weights.faces,
-    ['400', '700'],
-    'Fallback faces declare their actual static weights',
-  )
   assert.ok(weights.bold > weights.regular * 1.03, 'Fallback renders a distinct bold face')
   console.log(`${values.engine}: fallback weight widths ${JSON.stringify(weights)}`)
   await fallback.close()

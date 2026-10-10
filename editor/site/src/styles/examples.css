@@ -6,6 +6,9 @@
 .example-stage {
   position: relative;
   width: 240px;
+  /* Contain prepared editors while their resize observer reflows the new frame. */
+  max-width: 100%;
+  overflow: clip;
 }
 [data-example-width],
 [data-example-theme] {

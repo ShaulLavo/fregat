@@ -465,6 +465,7 @@ jobs:
           bun run --cwd apps/site verify:scroll --engine webkit
           bun run --cwd apps/site verify:scroll --engine chromium
           bun run --cwd apps/site verify:scroll --engine firefox
+          bun run --cwd apps/site verify:scroll --engine firefox --generic-font monospace
       - name: Share production sites with mobile checks
         uses: actions/upload-artifact@v4
         with:

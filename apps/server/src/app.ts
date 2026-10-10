@@ -832,6 +832,10 @@ export function createApp(options: AppOptions) {
         settings: lspSettings,
       }),
     )
+    .get('/terminal/health', ({ set }) => {
+      set.headers['cache-control'] = 'no-store'
+      return terminal.probeHost()
+    })
     .ws('/terminal', terminal.routes(auth))
     .post('/terminal/restart', ({ body }) => terminal.restart(body), {
       body: terminalRestartInputSchema,

@@ -114,6 +114,7 @@ async function localPhonePath(page: Page, step: Step, folder: string) {
   await page.keyboard.press('Escape')
   await selectors.firstWorkspaceChat(page).waitFor()
   await step('phone-empty-chat', page)
+  const initialIndex = await page.evaluate(() => window.history.state.__TSR_index)
   await selectors.firstWorkspaceChatLocal(page).click()
   await selectors.pickerDialog(page).waitFor({ timeout: 30_000 })
   await step('phone-local-picker', page)
@@ -125,6 +126,17 @@ async function localPhonePath(page: Page, step: Step, folder: string) {
     .waitFor({ timeout: 30_000 })
   equal(await selectors.firstWorkspaceChat(page).count(), 0)
   await step('phone-local-project', page)
+  const projectHref = page.url()
+  await page.goBack()
+  await selectors.phoneShell(page).waitFor({ timeout: 30_000 })
+  await step('phone-back-keeps-project', page)
+  equal(await selectors.firstWorkspaceChat(page).count(), 0)
+  equal(new URL(page.url()).pathname.split('/')[1], new URL(projectHref).pathname.split('/')[1])
+  equal(
+    await page.evaluate(() => window.history.state.__TSR_index),
+    initialIndex,
+    'Choosing a project replaces the no-project entry',
+  )
 }
 
 async function chooseFolder(page: Page, folder: string) {
