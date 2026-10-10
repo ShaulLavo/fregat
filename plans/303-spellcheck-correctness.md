@@ -42,7 +42,7 @@ Keep URL, email, path, dotted-name, syntax, inline-replacement, Markdown link-la
 
 ## Verification and acceptance
 
-From `editor/packages/spellcheck/`, the narrow checks are `bun run test -- test/tokenizer.test.ts test/service.test.ts`, then `bun run test -- test/typing.browser.test.ts`. The file filters restrict the package script's configured projects to the relevant cases. Use the repository's heavy-job wrapper for browser runs and benchmarks.
+From `editor/packages/spellcheck/`, the narrow checks are `bun run test -- test/tokenizer.test.ts test/service.test.ts`, then `bun run test -- test/typing.browser.test.ts`. The file filters restrict the package script's configured projects to the relevant cases. Use host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill for browser runs and benchmarks.
 
 Keep portable regression fixtures in the package. Derive probe paths from the checkout and temporary directories. The real app proof is `bun run agent:browser scenario editor-spellcheck`, with inspected evidence retained and a reachable result for the remote owner.
 

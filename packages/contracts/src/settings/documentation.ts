@@ -746,64 +746,6 @@ export const SETTINGS_DOCUMENTATION = {
     description: 'Minutes to wait for busy sessions. --interrupt ends them and restarts.',
     keywords: ['developer', 'deploy', 'restart', 'update', 'busy', 'wait'],
   },
-  'developer.heavyJobLogDirectory': {
-    title: 'Heavy job log directory',
-    description:
-      'Directory where `scripts/heavy/run.ts` writes one JSON line per heavy job: its peak memory, CPU time, wall time and exit code. `scripts/heavy/report.ts` reads it.',
-    keywords: ['developer', 'heavy', 'jobs', 'wrapper', 'memory', 'log', 'report'],
-  },
-  'developer.heavyJobClasses': {
-    title: 'Heavy job classes',
-    details:
-      'The estimate is what admission reserves for a job of the class until the job uses it. The ceiling is the memory limit of the job’s slice: the kernel kills a job that grows past it.',
-    description:
-      'Memory estimate and ceiling, in MiB, for each `scripts/heavy/run.ts --class`: suite, browser, build, bench and light.',
-    keywords: ['developer', 'heavy', 'jobs', 'class', 'memory', 'estimate', 'ceiling', 'admission'],
-  },
-  'developer.heavyJobQuietPolicy': {
-    title: 'Quiet job concurrency',
-    details:
-      'Use an empty allowedClasses array to hold new light jobs during measurements. The measurementCpus and concurrentCpus fields currently accept empty arrays, preserving host scheduling. CPU affinity requires a validated scheduling implementation.',
-    description:
-      'Classes allowed alongside a quiet measurement. Light jobs keep their memory and pressure checks. Empty CPU sets use the machine scheduler.',
-    keywords: ['developer', 'heavy', 'quiet', 'concurrency', 'affinity'],
-  },
-  'developer.heavyJobMemoryReserveMiB': {
-    title: 'Heavy job memory reserve',
-    description:
-      'MiB of available memory that heavy-job admission leaves free for the desktop, the app and work outside the wrapper.',
-    keywords: ['developer', 'heavy', 'jobs', 'memory', 'reserve', 'admission'],
-  },
-  'developer.heavyJobMemoryPressureLimit': {
-    title: 'Heavy job memory pressure limit',
-    details:
-      'Memory pressure is the share of the last ten seconds in which some task waited for memory (`/proc/pressure/memory`, `some avg10`). It stays near zero until the machine reclaims or swaps.',
-    description:
-      'Percent of memory pressure at or above which heavy-job admission starts no further job while one runs.',
-    keywords: ['developer', 'heavy', 'jobs', 'memory', 'pressure', 'psi', 'admission'],
-  },
-  'developer.heavyJobStopGraceSeconds': {
-    title: 'Heavy job stop grace',
-    description:
-      'Seconds a stopped heavy job, and anything a finished one left running, gets between SIGTERM and SIGKILL.',
-    keywords: ['developer', 'heavy', 'jobs', 'stop', 'cancel', 'grace', 'sigterm', 'sigkill'],
-  },
-  'developer.heavyJobQuietHoldSeconds': {
-    title: 'Heavy job quiet hold',
-    details:
-      'A `--quiet` job waits for finite jobs to finish while later jobs queue behind it. Declared servers keep running and count toward resource admission. Admission and execution each get this many seconds. Expiry releases the request or stops the running job and returns exit 75; invoke it again for a fresh queue ticket. A `drain.request` is honoured for this many seconds from its first observation.',
-    description:
-      'Maximum seconds for quiet admission, a running quiet hold, and an external drain request, measured independently.',
-    keywords: ['developer', 'heavy', 'jobs', 'quiet', 'exclusive', 'hold', 'drain', 'benchmark'],
-  },
-  'developer.heavyJobCpuLoadLimit': {
-    title: 'Heavy job CPU load limit',
-    details:
-      'The one-minute load average divided by the number of cores: 1 means every core has a runnable task. CPU pressure’s `some` share stays high on an idle desktop and its `full` share reads zero for the whole machine, so admission counts runnable tasks.',
-    description:
-      'Runnable tasks per core at or above which heavy-job admission starts no further job while one runs.',
-    keywords: ['developer', 'heavy', 'jobs', 'cpu', 'load', 'cores', 'admission'],
-  },
   'window.browser': {
     title: 'Browser',
     description:

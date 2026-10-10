@@ -59,7 +59,6 @@ const NON_SCALAR_SETTING_IDS = [
   'git.projectWorktreeCleanupOnDelete',
   'workbench.theme.customizations',
   'spellcheck.words',
-  'developer.heavyJobClasses',
 ] as const satisfies readonly SettingId[]
 
 type NonScalarSettingId = (typeof NON_SCALAR_SETTING_IDS)[number]

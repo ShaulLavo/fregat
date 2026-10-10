@@ -129,13 +129,14 @@ work can proceed independently where their files and contracts do not overlap.
    shared renderer. Language support [305](plans/305-spellcheck-language-support.md) is independent.
    JSON worker syntax [306](plans/306-bun-json-worker.md), diff topology
    [307](plans/307-diff-row-topology.md), machine controls
-   [318](plans/318-machine-connection-controls.md), and heavy root ownership
-   [312](plans/312-heavy-slice-ownership.md) are bounded correctness units.
+   [318](plans/318-machine-connection-controls.md) are bounded correctness units. Heavy root ownership
+   [312](plans/312-heavy-slice-ownership.md) now belongs to the private
+   [heavy-runner repository](https://github.com/ShaulLavo/heavy-runner).
 3. Build Fregat's bounded usage cache and Mesh feed with [308](plans/308-account-usage-feed.md), alongside
    transcript history [309](plans/309-account-usage-history.md) and allowance visibility
    [310](plans/310-allowance-visibility.md). Plan 308 owns the cache feed; Plan 289's gateway producer is retired from source. Retained gateway tooling is independently owned outside Fregat. The verified DROP source awaits root-only installation under `/work/cli-proxy-api/src`; bundle deployment is separate.
    Quiet admission [313](plans/313-heavy-quiet-lifecycle.md) and non-cache measurements
-   [314](plans/314-heavy-non-cache-memory.md) share the heavy runner but keep separate receipts.
+   [314](plans/314-heavy-non-cache-memory.md) belong to the private [heavy-runner repository](https://github.com/ShaulLavo/heavy-runner), with separate receipts.
 4. Build the ordinary issue collector [295](plans/295-cross-repository-issue-collection.md)
    for manual use before scheduler integration. Durable storage
    [293](plans/293-mesh-durable-job-state.md) precedes coordinated dispatch
@@ -174,10 +175,11 @@ an independent bounded web/server startup change. Implement it when the owner st
 the work, after resolving document admission and native backdrop context with Plans
 337 and 114; preserve Plan 320's shared palette generator.
 
-[342](plans/342-app-reactivity-and-async-ownership.md) records the October 9 focused app
-audit and its Approved bounded repairs. MCP subject ownership and shared LSP cancellation
-can run independently; compiler-sensitive web repairs first establish actual compiled test
-coverage. Site playback and TUI theme lifetime repairs retain their existing domain gates.
+[342](plans/342-app-reactivity-and-async-ownership.md) is Completed. The nine repairs
+cover MCP action ownership, shared LSP cancellation, compiled web reactivity, site
+playback, and TUI theme and dialog lifetimes. Delivery is verified through the owner-served
+private app, published site, and next compiled TUI source launch. The separate failed GPU
+release check remains recorded and owned.
 
 [335](plans/335-stroke-icons.md) retains the current stroke-icon migration, shared registry
 and selected morph sites. Its broad swap takes the structural window after the keymap

@@ -513,46 +513,6 @@ export const SETTINGS_PRESENTATION = {
     category: 'Developer',
     visibility: 'advanced',
   },
-  'developer.heavyJobLogDirectory': {
-    widget: 'string',
-    category: 'Developer',
-    visibility: 'advanced',
-  },
-  'developer.heavyJobClasses': {
-    widget: 'complex',
-    category: 'Developer',
-    visibility: 'advanced',
-  },
-  'developer.heavyJobQuietPolicy': {
-    widget: 'complex',
-    category: 'Developer',
-    visibility: 'advanced',
-  },
-  'developer.heavyJobMemoryReserveMiB': {
-    widget: 'number',
-    category: 'Developer',
-    visibility: 'advanced',
-  },
-  'developer.heavyJobMemoryPressureLimit': {
-    widget: 'number',
-    category: 'Developer',
-    visibility: 'advanced',
-  },
-  'developer.heavyJobStopGraceSeconds': {
-    widget: 'number',
-    category: 'Developer',
-    visibility: 'advanced',
-  },
-  'developer.heavyJobQuietHoldSeconds': {
-    widget: 'number',
-    category: 'Developer',
-    visibility: 'advanced',
-  },
-  'developer.heavyJobCpuLoadLimit': {
-    widget: 'number',
-    category: 'Developer',
-    visibility: 'advanced',
-  },
   'window.browser': {
     widget: 'string',
     category: 'Window',

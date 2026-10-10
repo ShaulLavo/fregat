@@ -150,7 +150,7 @@ Verify/link their receipts before marking these original rows; reuse that implem
 - [ ] Optional feed URL in existing config, bounded/cancellable generic HTTP client, strict v1 validation, at most 60-second cadence, last-good retention. Never parse JSON in View or per frame.
 - [ ] Fail-first stale/no-data/exhausted/reset-passed/unknown routing/mixed-age tests; oversized/bad-schema/HTTP failure/cancellation tests. No real provider calls.
 - [ ] 160×45 provider-grouped approved layout across all six themes; overflow counts, ASCII fallback, 80×24 and resize. Keep zero-allocation View and flat render cost, measure before/after.
-- [ ] Commit fixture PNG and read it back against the approved image. Run narrow affected tests/gates through the heavy wrapper where applicable.
+- [ ] Commit fixture PNG and read it back against the approved image. Run narrow affected tests/gates through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill where applicable.
 
 ### 3. Review and delivery
 
