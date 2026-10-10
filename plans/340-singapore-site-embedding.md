@@ -225,10 +225,16 @@ This is encouraging for a small captured viewport, but WebKit already misses the
 
 ### Phase 2: Complete and responsive snapshot paint
 
-- [ ] Add document capture, safe Markdown fragment capture, shared replay and the lightweight `core/paint` entry. Keep viewport captures and rejection gates covered.
-- [ ] Add capture/restore pixel tests, malformed/oversized payload tests, unsafe link tests, unsupported plugin tests and a complete document above 400 rows.
-- [ ] Prove responsive layout and semantic equivalence in Chromium and WebKit, including theme, DPR, fonts and cold startup. Add a patch changeset for core and Markdown API/behavior changes.
-- [ ] Measure admitted restore against the speed and payload budgets. Commit a portable benchmark/scenario and evidence before claiming it is landing-page ready.
+- [x] Add document capture, safe Markdown fragment capture, shared replay and the lightweight `core/paint` entry. Keep viewport captures and rejection gates covered.
+- [x] Add capture/restore pixel tests, malformed/oversized payload tests, unsafe link tests, unsupported plugin tests and a complete document above 400 rows.
+- [x] Prove responsive layout and semantic equivalence in Chromium and WebKit, including theme, DPR, fonts and cold startup. Add a patch changeset for core and Markdown API/behavior changes.
+- [x] Measure admitted restore against the speed and payload budgets. Commit a portable benchmark/scenario and evidence before claiming it is landing-page ready.
+
+Implementation and exact-pixel proof are in [PR #1217](https://github.com/ShaulLavo/fregat/pull/1217). The final library matrix passes 162 tests across Chromium and WebKit, DPR 1/2/3, both palettes, JetBrains Mono, Source Serif 4 and FreeSans, with one payload reflowed at 320/390/1280 px. It covers serialized HTML, fresh Markdown takeover, hidden-to-visible paint and an isolated cold paint-only entry. Expanded fold candidates remain capturable; collapsed folds are refused.
+
+[Raw evidence](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/performance/document-paint-2026-10-10/results.json) records the final non-quiet Linux experiment and earlier attempts, including failures. The paint entry is 15,620 bytes minified and 5,800 bytes gzip across nine modules, without editor/session/parser/worker imports. Captured payloads span 918–4,716 bytes gzip.
+
+Performance acceptance remains open. Final warm p95 spans 0.5–53 ms and the largest individual sample is 116 ms. WebKit exceeds the 50 ms gate in three fixture/width cases, and Chromium observes page long tasks above 50 ms during benchmark windows. Those observer entries have no per-restore attribution. The 4× Chromium slowdown p95 spans 27.8–41.4 ms and misses the 16 ms goal. These shared-host timings are experiments, not a public speed verdict. The benchmark and measurements are complete; the speed gate and real-site first-visible-frame, scroll-anchor and toggle acceptance remain unqualified. Follow-up uses `bun run --cwd editor/packages/editor bench:paint --project snapshot-<engine>-dpr<1|2|3>` and the raw `samples`, `decode`, `mount`, `layout` and `longTasks` fields. Timing and energy verdicts require an appropriate measurement host under its local scheduling policy.
 
 ### Phase 3: Site capture and takeover
 

@@ -34,8 +34,10 @@ export function captureDocumentPaint(
   const rows: DocumentPaintRow[] = []
   let previousBufferRow = -1
   for (const row of mounted) {
-    if (row.source !== 'document' || row.foldMarker || row.coreBidiRefusal || row.leftSpacerWidth)
-      return unsupported('transformed-row')
+    if (row.source !== 'document') return unsupported('injected-row')
+    if (row.foldMarker?.collapsed) return unsupported('fold-placeholder')
+    if (row.coreBidiRefusal) return unsupported('bidi-row')
+    if (row.leftSpacerWidth) return unsupported('horizontally-windowed-row')
     if (row.rowDecorationClassName && !row.rowDecorationSnapshotStyle)
       return unsupported('plugin-row-style')
     if (row.rowDecorationGutterClassName && !row.rowDecorationSnapshotStyle)
@@ -82,6 +84,7 @@ export function captureDocumentPaint(
     style: captureStyle(view.scrollElement),
     gutterBackgroundColor: getComputedStyle(view.gutterElement).backgroundColor,
     characterWidth: view.metrics.characterWidth,
+    monospace: view.monospace,
     gutterWidth: view.currentGutterWidth,
     rowGap: view.rowGap,
     tabSize: view.tabSize,
@@ -177,12 +180,31 @@ function captureRuns(
   return mergeRuns(runs)
 }
 
+const UNREPRESENTED_EFFECTS = [
+  'transform',
+  'filter',
+  'textShadow',
+  'boxShadow',
+  'backgroundImage',
+] as const
+
+function supportedInlinePaint(element: HTMLElement): boolean {
+  const view = element.ownerDocument.defaultView!
+  const style = view.getComputedStyle(element)
+  if (style.opacity !== '1' || UNREPRESENTED_EFFECTS.some((key) => style[key] !== 'none'))
+    return false
+  return (['::before', '::after'] as const).every((pseudo) =>
+    ['none', 'normal'].includes(view.getComputedStyle(element, pseudo).content),
+  )
+}
+
 function safeInlineParents(element: HTMLElement, row: HTMLElement): boolean {
   for (
     let current: HTMLElement | null = element;
     current && current !== row;
     current = current.parentElement
   ) {
+    if (!supportedInlinePaint(current)) return false
     if (current.tagName !== 'SPAN' && current.tagName !== 'A') return false
     if (current.tagName === 'A' && current.className !== 'editor-markdown-link') return false
     if ([...current.classList].some((name) => !SAFE_INLINE_CLASS.has(name))) return false

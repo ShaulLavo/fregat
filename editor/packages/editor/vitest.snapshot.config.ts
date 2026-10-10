@@ -50,6 +50,77 @@ export default defineConfig({
       viewport: { width: 1400, height: 900 },
       provider: playwright(),
       commands: {
+        proofDocumentPaintCold: async (
+          { page, project },
+          payload: string,
+          entry: string,
+          fonts: readonly (readonly [string, string])[],
+          width: number,
+        ) => {
+          const dpr = await page.evaluate(() => devicePixelRatio)
+          const context = await page
+            .context()
+            .browser()!
+            .newContext({
+              deviceScaleFactor: dpr,
+              viewport: { width: 1400, height: 900 },
+            })
+          const requests: string[] = []
+          const origin = new URL(entry).origin
+          const url = `${origin}/document-paint-cold-proof`
+          await context.route(url, (route) =>
+            route.fulfill({
+              contentType: 'text/html',
+              body: '<!doctype html><body style="margin:0"><div id="document-paint-proof"></div>',
+            }),
+          )
+          context.on('request', (request) => requests.push(new URL(request.url()).pathname))
+          try {
+            const cold = await context.newPage()
+            await cold.goto(url)
+            const result = await cold.evaluate(
+              async ({ payload, entry, fonts, width }) => {
+                const start = performance.now()
+                for (const [family, source] of fonts) {
+                  const face = new FontFace(family, `url(${source})`)
+                  document.fonts.add(await face.load())
+                }
+                await document.fonts.ready
+                const fontReady = performance.now()
+                const { decodePaintSnapshot, mountPaintSnapshot } = await import(
+                  /* @vite-ignore */ entry
+                )
+                const imported = performance.now()
+                const paint = decodePaintSnapshot(payload)
+                const decoded = performance.now()
+                const host = document.querySelector<HTMLElement>('#document-paint-proof')!
+                host.style.width = `${width}px`
+                const mounted = mountPaintSnapshot(host, paint, { width })
+                const inserted = performance.now()
+                mounted.element.getBoundingClientRect()
+                const laidOut = performance.now()
+                await new Promise(requestAnimationFrame)
+                await new Promise(requestAnimationFrame)
+                return {
+                  fontWaitMs: fontReady - start,
+                  importMs: imported - fontReady,
+                  decodeMs: decoded - imported,
+                  mountMs: inserted - decoded,
+                  layoutMs: laidOut - inserted,
+                  frameOpportunityMs: performance.now() - laidOut,
+                  rowCount: mounted.rowCount,
+                  height: mounted.height,
+                }
+              },
+              { payload, entry, fonts, width },
+            )
+            const image = await cold.locator('#document-paint-proof').screenshot()
+            writeFileSync(join(evidence, `${project.name}-cold-entry.png`), image)
+            return { ...result, requests, image: image.toString('base64') }
+          } finally {
+            await context.close()
+          }
+        },
         proofDocumentPaintThrottle: async ({ page, project }, rate: number) => {
           if (!project.name.includes('chromium')) return false
           const session = await page.context().newCDPSession(page)

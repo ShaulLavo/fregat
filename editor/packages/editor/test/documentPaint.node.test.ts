@@ -30,6 +30,7 @@ function fixture(count = 1): SavedDocumentPaint {
     gutterBackgroundColor: 'transparent',
     gutterWidth: 32,
     characterWidth: 8,
+    monospace: true,
     rowGap: 0,
     tabSize: 4,
     wrap: 'word',
@@ -70,6 +71,8 @@ it('bounds total runs, text, rows, height and gutter width', () => {
   const paint = fixture()
   for (const replacement of [
     { characterWidth: 0 },
+    { monospace: undefined },
+    { monospace: 1 },
     { rowGap: -1 },
     { tabSize: 0 },
     { tabSize: 2.5 },

@@ -23,11 +23,29 @@ declare module 'vitest/browser' {
     proofDocumentPaintScreenshot(label: string): Promise<string>
     proofDocumentPaintResult(result: Record<string, unknown>, payload: string): Promise<void>
     proofDocumentPaintThrottle(rate: number): Promise<boolean>
+    proofDocumentPaintCold(
+      payload: string,
+      entry: string,
+      fonts: readonly (readonly [string, string])[],
+      width: number,
+    ): Promise<{
+      readonly image: string
+      readonly requests: readonly string[]
+      readonly fontWaitMs: number
+      readonly importMs: number
+      readonly decodeMs: number
+      readonly mountMs: number
+      readonly layoutMs: number
+      readonly frameOpportunityMs: number
+      readonly rowCount: number
+      readonly height: number
+    }>
   }
 }
 
 const monoUrl = new URL('./fixtures/fonts/jetbrains-mono.woff2', import.meta.url).href
 const serifUrl = new URL('./fixtures/fonts/source-serif-4.woff2', import.meta.url).href
+const sansUrl = new URL('./fixtures/freefont/FreeSans.ttf', import.meta.url).href
 const mounted: { editor?: Editor; host: HTMLElement; dispose?: () => void }[] = []
 
 beforeAll(async () => {
@@ -38,6 +56,7 @@ beforeAll(async () => {
   for (const [family, url] of [
     ['Snapshot Mono', monoUrl],
     ['Snapshot Serif', serifUrl],
+    ['Snapshot Sans', sansUrl],
   ]) {
     const face = new FontFace(family!, `url(${url})`)
     document.fonts.add(await face.load())
@@ -93,8 +112,9 @@ function mount(text: string, markdown: boolean, family: string, dark: boolean) {
   mounted.push(item)
   editor.setText(text)
   editor.setSelection(text.length)
-  if (parser)
-    editor.setInlineReplacementProvider(
+  const installPreview = (target: Editor) => {
+    if (!parser) return
+    target.setInlineReplacementProvider(
       (context) => {
         const records = parser.decorations(0, text.length)
         const replacements = markdownInlineReplacements(context.textSnapshot, records)
@@ -106,16 +126,23 @@ function mount(text: string, markdown: boolean, family: string, dark: boolean) {
       },
       { trigger: 'edit' },
     )
+  }
+  if (parser) installPreview(editor)
   else editor.setTokens([{ start: 0, end: 5, style: { color: '#cc3311' } }])
-  return { host, editor, options, item }
+  return { host, editor, options, item, installPreview }
 }
 
 async function frames() {
+  await document.fonts.ready
   for (let index = 0; index < 3; index++) await new Promise(requestAnimationFrame)
+  await document.fonts.ready
 }
 
 async function pixels(label: string): Promise<ImageData> {
-  const screenshot = await commands.proofDocumentPaintScreenshot(label)
+  return imagePixels(await commands.proofDocumentPaintScreenshot(label))
+}
+
+async function imagePixels(screenshot: string): Promise<ImageData> {
   const bytes = Uint8Array.from(atob(screenshot), (character) => character.charCodeAt(0))
   const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
   const canvas = document.createElement('canvas')
@@ -152,7 +179,7 @@ it.each([false, true])(
     const { host, editor, options, item } = mount(code, false, 'Snapshot Mono', dark)
     await frames()
     const saved = editor.captureSnapshot({ scope: 'document' })
-    expect(saved.status).toBe('ready')
+    expect(saved.status, JSON.stringify(saved)).toBe('ready')
     if (saved.status !== 'ready') return
     for (const width of [320, 390, 1280]) {
       host.style.width = `${width}px`
@@ -174,33 +201,7 @@ it.each([false, true])(
       restored.dispose()
       overlay.remove()
       scroller.style.visibility = ''
-      const samples: number[] = []
-      const target = document.createElement('div')
-      target.style.cssText = 'position:absolute;left:0;top:0'
-      host.append(target)
-      for (let iteration = 0; iteration < 30; iteration++) {
-        const start = performance.now()
-        const decoded = decodePaintSnapshot(saved.paint)!
-        const mounted = mountPaintSnapshot(target, decoded, { width })!
-        mounted.element.getBoundingClientRect()
-        samples.push(performance.now() - start)
-        mounted.dispose()
-      }
-      target.remove()
-      samples.sort((a, b) => a - b)
-      await commands.proofDocumentPaintResult(
-        {
-          fixture: 'code',
-          width,
-          dark,
-          dpr: devicePixelRatio,
-          samples,
-          p95: samples[28],
-          rowCount: restored.rowCount,
-          height,
-        },
-        saved.paint,
-      )
+      await benchmark(saved.paint, width, { fixture: 'code', dark, height })
     }
     const originalPixels = await pixels(`code-${dark}-before-takeover`)
     editor.dispose()
@@ -228,6 +229,8 @@ it.each([
   ['Snapshot Mono', true],
   ['Snapshot Serif', false],
   ['Snapshot Serif', true],
+  ['Snapshot Sans', false],
+  ['Snapshot Sans', true],
 ] as const)(
   'captures real Markdown preview and preserves its links, headings and text in %s, dark=%s',
   async (family, dark) => {
@@ -235,7 +238,9 @@ it.each([
       '# Heading\n**bold** *italic* ~~strike~~ `inline code`\nread [the long label with words and averylongidentifier](https://example.com) now\n\n' +
       manual +
       '\nlast'
-    const { host, editor } = mount(text, true, family, dark)
+    const fixture = mount(text, true, family, dark)
+    const { host, options, item, installPreview } = fixture
+    let editor = fixture.editor
     await frames()
     expect(editor.captureSnapshot()).toBeNull()
     const saved = editor.captureSnapshot({ scope: 'document' })
@@ -245,7 +250,8 @@ it.each([
     for (const width of [320, 390, 1280]) {
       host.style.width = `${width}px`
       await frames()
-      const liveText = [...host.querySelectorAll('[data-editor-virtual-row]')]
+      const liveText = [...host.querySelectorAll<HTMLElement>('[data-editor-virtual-row]')]
+        .sort((a, b) => Number(a.dataset.editorVirtualRow) - Number(b.dataset.editorVirtualRow))
         .map((row) => row.textContent)
         .join('')
       const live = await pixels(`markdown-${family}-${dark}-${width}-live`)
@@ -279,6 +285,28 @@ it.each([
       overlay.remove()
       scroller.style.visibility = ''
       await benchmark(saved.paint, width, { fixture: 'manual', family, dark })
+      editor.dispose()
+      editor = new Editor(host, { ...options, snapshot: saved.paint })
+      item.editor = editor
+      expect(editor.getPresentationState()).toBe('provisional')
+      expect(
+        changedPixels(live, await pixels(`markdown-${family}-${dark}-${width}-provisional`)),
+      ).toBe(0)
+      editor.setText(text)
+      editor.setSelection(text.length)
+      installPreview(editor)
+      await frames()
+      expect(editor.getPresentationState()).toBe('live')
+      expect(
+        changedPixels(live, await pixels(`markdown-${family}-${dark}-${width}-takeover`)),
+      ).toBe(0)
+      host.style.display = 'none'
+      await frames()
+      host.style.display = ''
+      await frames()
+      expect(
+        changedPixels(live, await pixels(`markdown-${family}-${dark}-${width}-revealed`)),
+      ).toBe(0)
     }
   },
 )
@@ -290,7 +318,7 @@ it('captures and mounts every row in a document above 400 rows', async () => {
   const { host, editor } = mount(text, false, 'Snapshot Mono', false)
   await frames()
   const saved = editor.captureSnapshot({ scope: 'document' })
-  expect(saved.status).toBe('ready')
+  expect(saved.status, JSON.stringify(saved)).toBe('ready')
   if (saved.status !== 'ready') return
   const target = document.createElement('div')
   host.append(target)
@@ -347,10 +375,21 @@ async function benchmark(payload: string, width: number, fixture: Record<string,
   const layout: number[] = []
   let htmlBytes = 0
   let rowCount = 0
+  const longTasks: { readonly start: number; readonly duration: number }[] = []
+  const observerAvailable = PerformanceObserver.supportedEntryTypes.includes('longtask')
+  const observer = observerAvailable
+    ? new PerformanceObserver((list) => {
+        for (const entry of list.getEntries())
+          longTasks.push({ start: entry.startTime, duration: entry.duration })
+      })
+    : null
+  observer?.observe({ type: 'longtask' })
   const target = document.createElement('div')
   target.style.cssText = 'position:absolute;left:0;top:0'
   document.body.append(target)
   for (let iteration = 0; iteration < 30; iteration++) {
+    // Each restore gets its own task; the 30 samples must not form one artificial long task.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
     const start = performance.now()
     const paint = decodePaintSnapshot(payload)!
     const decoded = performance.now()
@@ -368,6 +407,10 @@ async function benchmark(payload: string, width: number, fixture: Record<string,
     }
     mounted.dispose()
   }
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  for (const entry of observer?.takeRecords() ?? [])
+    longTasks.push({ start: entry.startTime, duration: entry.duration })
+  observer?.disconnect()
   target.remove()
   const sorted = samples.toSorted((a, b) => a - b)
   await commands.proofDocumentPaintResult(
@@ -383,7 +426,12 @@ async function benchmark(payload: string, width: number, fixture: Record<string,
       htmlBytes,
       rowCount,
       budgetMs: 50,
-      qualified: sorted[28]! <= 50,
+      p95WithinBudget: sorted[28]! <= 50,
+      maximumMs: sorted.at(-1),
+      maximumWithinBudget: sorted.at(-1)! <= 50,
+      longTaskObserverAvailable: observerAvailable,
+      longTasks,
+      experiment: true,
     },
     payload,
   )
@@ -393,7 +441,7 @@ it('measures the largest checked-in manual at every required width', async () =>
   const { editor } = mount(largestManual + '\nlast', true, 'Snapshot Serif', false)
   await frames()
   const saved = editor.captureSnapshot({ scope: 'document' })
-  expect(saved.status).toBe('ready')
+  expect(saved.status, JSON.stringify(saved)).toBe('ready')
   if (saved.status !== 'ready') return
   for (const width of [320, 390, 1280])
     await benchmark(saved.paint, width, { fixture: 'largest-manual' })
@@ -403,7 +451,7 @@ it('admits equivalent font serialization and refuses different fonts and palette
   const { editor, options } = mount(code, false, 'Snapshot Mono', false)
   await frames()
   const saved = editor.captureSnapshot({ scope: 'document' })
-  expect(saved.status).toBe('ready')
+  expect(saved.status, JSON.stringify(saved)).toBe('ready')
   if (saved.status !== 'ready') return
   for (const [fontFamily, dark, admitted] of [
     ['"Snapshot Mono"', false, true],
@@ -435,7 +483,7 @@ it('records Chromium CPU slowdown as a restore experiment', async () => {
   const { editor } = mount(largestManual + '\nlast', true, 'Snapshot Serif', false)
   await frames()
   const saved = editor.captureSnapshot({ scope: 'document' })
-  expect(saved.status).toBe('ready')
+  expect(saved.status, JSON.stringify(saved)).toBe('ready')
   if (saved.status !== 'ready') return
   try {
     await commands.proofDocumentPaintThrottle(4)
@@ -466,7 +514,7 @@ it('restores and resizes padded content at its live height and pixels', async ()
     })
   }
   const saved = editor.captureSnapshot({ scope: 'document' })
-  expect(saved.status).toBe('ready')
+  expect(saved.status, JSON.stringify(saved)).toBe('ready')
   if (saved.status !== 'ready') return
   editor.dispose()
   const style = document.createElement('style')
@@ -498,7 +546,7 @@ it('preserves active-line gutter backgrounds in static paint', async () => {
   next.focus()
   await frames()
   const saved = next.captureSnapshot({ scope: 'document' })
-  expect(saved.status).toBe('ready')
+  expect(saved.status, JSON.stringify(saved)).toBe('ready')
   if (saved.status !== 'ready') return
   const live = await pixels('active-gutter-live')
   const overlay = document.createElement('div')
@@ -515,7 +563,7 @@ it('waits for an unloaded document font before the first standalone paint', asyn
   const { host, editor } = mount(code, false, 'Snapshot Mono', false)
   await frames()
   const saved = editor.captureSnapshot({ scope: 'document' })
-  expect(saved.status).toBe('ready')
+  expect(saved.status, JSON.stringify(saved)).toBe('ready')
   if (saved.status !== 'ready') return
   const decoded = decodePaintSnapshot(saved.paint)!
   if (decoded.format !== 6) return
@@ -549,4 +597,129 @@ it('waits for an unloaded document font before the first standalone paint', asyn
     document.fonts.delete(face)
     target.remove()
   }
+})
+
+it('paints in a cold standalone context without editor, parser or worker requests', async () => {
+  const { host, editor } = mount(code, false, 'Snapshot Mono', false)
+  host.style.width = '390px'
+  await frames()
+  const saved = editor.captureSnapshot({ scope: 'document' })
+  expect(saved.status, JSON.stringify(saved)).toBe('ready')
+  if (saved.status !== 'ready') return
+  const live = await pixels('cold-entry-live')
+  const result = await commands.proofDocumentPaintCold(
+    saved.paint,
+    new URL('../src/paint.ts', import.meta.url).href,
+    [
+      ['Snapshot Mono', monoUrl],
+      ['Snapshot Serif', serifUrl],
+    ],
+    390,
+  )
+  expect(result.height).toBe(editor.getContentHeight())
+  expect(
+    result.requests.filter((path) =>
+      /(?:Editor\.ts|documentSession|worker|tree-sitter|shiki|\.wasm)/i.test(path),
+    ),
+  ).toEqual([])
+  expect(changedPixels(live, await imagePixels(result.image))).toBe(0)
+  const { image: _, ...timings } = result
+  await commands.proofDocumentPaintResult(
+    {
+      fixture: 'cold-paint-entry',
+      ...timings,
+      width: 390,
+      dpr: devicePixelRatio,
+      experiment: true,
+    },
+    saved.paint,
+  )
+})
+
+it.each([
+  ['Snapshot Serif', false],
+  ['Snapshot Serif', true],
+  ['Snapshot Sans', false],
+  ['Snapshot Sans', true],
+] as const)(
+  'matches shaped proportional runs and native tabs in %s, dark=%s',
+  async (family, dark) => {
+    const text =
+      'const ' + 'office ffi AV To WA iiii\t'.repeat(16) + '\n' + 'iiii\t'.repeat(24) + '\nlast'
+    const { host, editor } = mount(text, false, family, dark)
+    await frames()
+    const saved = editor.captureSnapshot({ scope: 'document' })
+    expect(saved.status, JSON.stringify(saved)).toBe('ready')
+    if (saved.status !== 'ready') return
+    for (const width of [320, 390, 1280]) {
+      host.style.width = `${width}px`
+      await frames()
+      const live = await pixels(`shaped-${family}-${dark}-${width}-live`)
+      const overlay = document.createElement('div')
+      overlay.style.cssText = 'position:absolute;inset:0'
+      host.append(overlay)
+      const restored = mountPaintSnapshot(overlay, decodePaintSnapshot(saved.paint)!, { width })!
+      expect(restored.height).toBe(editor.getContentHeight())
+      host.querySelector<HTMLElement>('.editor-virtualized')!.style.visibility = 'hidden'
+      expect(changedPixels(live, await pixels(`shaped-${family}-${dark}-${width}-static`))).toBe(0)
+      restored.dispose()
+      overlay.remove()
+      host.querySelector<HTMLElement>('.editor-virtualized')!.style.visibility = ''
+    }
+  },
+)
+
+it.each([
+  ['transform', 'translateX(4px)'],
+  ['backgroundImage', 'linear-gradient(red, blue)'],
+  ['opacity', '0.5'],
+  ['textShadow', '1px 1px red'],
+] as const)(
+  'refuses supported-looking fragments with unrepresented %s paint',
+  async (property, value) => {
+    const { editor } = mount('abc\nlast', false, 'Snapshot Mono', false)
+    editor.setInlineReplacementProvider(() => [
+      {
+        id: 'styled-fragment',
+        startIndex: 0,
+        endIndex: 3,
+        text: 'abc',
+        kind: 'link',
+        className: 'editor-markdown-text',
+        render(container) {
+          container.style[property] = value
+          const text = document.createElement('span')
+          text.textContent = 'abc'
+          container.append(text)
+        },
+      },
+    ])
+    await frames()
+    expect(editor.captureSnapshot({ scope: 'document' })).toMatchObject({ status: 'unsupported' })
+  },
+)
+
+it('captures expanded fold candidates and refuses collapsed document paint', async () => {
+  const text = 'root\n  child\nlast'
+  const { editor } = mount(text, false, 'Snapshot Mono', false)
+  editor.setSyntaxFolds([{ startLine: 0, endLine: 1, startIndex: 0, endIndex: 12, type: 'block' }])
+  await frames()
+  expect(editor.captureSnapshot({ scope: 'document' })).toMatchObject({ status: 'ready' })
+  expect(editor.fold(0)).toBe(true)
+  await frames()
+  expect(editor.captureSnapshot({ scope: 'document' })).toMatchObject({ status: 'unsupported' })
+  expect(editor.unfold(0)).toBe(true)
+  await frames()
+  expect(editor.captureSnapshot({ scope: 'document' })).toMatchObject({ status: 'ready' })
+})
+
+it('refuses noncollapsed selection highlights without dropping their paint', async () => {
+  const { editor } = mount('alpha beta\nlast', false, 'Snapshot Mono', false)
+  editor.focus()
+  editor.setSelection(0, 5)
+  await frames()
+  expect(editor.captureSnapshot({ scope: 'document' })).toMatchObject({
+    status: 'unsupported',
+    reason: 'unsafe-or-unsupported-fragment',
+  })
 })

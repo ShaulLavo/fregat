@@ -51,6 +51,7 @@ export type SavedDocumentPaint = {
   readonly style: DocumentPaintStyle
   readonly rowGap: number
   readonly characterWidth: number
+  readonly monospace: boolean
   readonly gutterWidth: number
   readonly gutterBackgroundColor: string
   readonly tabSize: number
@@ -219,6 +220,7 @@ function documentPaint(value: unknown): value is SavedDocumentPaint {
     !finite(value.rowGap, 1024) ||
     !finite(value.characterWidth, 1024) ||
     value.characterWidth <= 0 ||
+    typeof value.monospace !== 'boolean' ||
     !finite(value.gutterWidth, 4096) ||
     !color(value.gutterBackgroundColor) ||
     !finite(value.tabSize, 64) ||

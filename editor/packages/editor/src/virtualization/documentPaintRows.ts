@@ -64,6 +64,8 @@ export function mountDocumentPaint(
     tabSize: paint.tabSize,
     words: paint.wrap === 'word',
     advance: glyphs ? (codePoint: number) => glyphs.advance(codePoint) : null,
+    measure: paint.monospace ? undefined : glyphs?.measure,
+    minimumTabAdvance: paint.monospace ? undefined : glyphs?.minimumTabAdvance,
   }
   for (const row of paint.rows) {
     const text = row.runs.map((run) => run.text).join('')
@@ -181,7 +183,8 @@ function appendGutter(
   const element = parent.ownerDocument.createElement('div')
   Object.assign(element.style, {
     position: 'absolute',
-    top: `${top}px`,
+    top: '0',
+    transform: `translateY(${top}px)`,
     left: '0',
     height: `${row.height}px`,
     width: `${width}px`,
@@ -215,10 +218,10 @@ function appendGutter(
       backgroundColor: cell.backgroundColor,
       width: `${cell.width}px`,
       paddingRight: `${cell.paddingRight}px`,
-      textAlign: 'right',
       boxSizing: 'border-box',
       fontVariantNumeric: 'tabular-nums',
       display: 'inline-flex',
+      alignItems: 'center',
       flex: '0 0 auto',
       height: `${row.height}px`,
       justifyContent: 'flex-end',
