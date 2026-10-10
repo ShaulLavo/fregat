@@ -1054,7 +1054,10 @@ describe('terminal scrollbar in Chromium', () => {
   )
 
   it('keeps actual terminal geometry aligned through font, grid and parent-height changes', async () => {
-    const { host, terminal } = await createObservedRendererHarness({}, 'webgl2')
+    const { host, terminal } = await createObservedRendererHarness(
+      { scrollbar: { clock: new FakeScrollbarClock() } },
+      'webgl2',
+    )
     terminal.write(Array.from({ length: 100 }, (_, index) => `row ${index}\r\n`).join(''))
     await settleTerminal(terminal)
     const element = host.querySelector<HTMLDivElement>('[role="scrollbar"]')!
