@@ -18,13 +18,10 @@ export async function withTerminalCheck<T>(
   } finally {
     try {
       await cleanup()
+      if (directory) await rm(directory, { recursive: true, force: true })
     } finally {
-      try {
-        if (directory) await rm(directory, { recursive: true, force: true })
-      } finally {
-        process.off('SIGINT', stop)
-        process.off('SIGTERM', stop)
-      }
+      process.off('SIGINT', stop)
+      process.off('SIGTERM', stop)
     }
   }
 }

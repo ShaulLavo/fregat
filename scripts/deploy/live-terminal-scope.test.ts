@@ -5,7 +5,7 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 import { withTerminalCheck } from './live-terminal-scope'
 
-test('removes the outer directory even when resource cleanup rejects', async () => {
+test('preserves the owned directory when resource cleanup rejects', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'live-terminal-cleanup-'))
   let owned = ''
   try {
@@ -20,7 +20,7 @@ test('removes the outer directory even when resource cleanup rejects', async () 
         },
       ),
     ).rejects.toThrow('Cleanup failed')
-    expect(existsSync(owned)).toBe(false)
+    expect(existsSync(owned)).toBe(true)
     expect(existsSync(directory)).toBe(true)
   } finally {
     await rm(directory, { recursive: true, force: true })

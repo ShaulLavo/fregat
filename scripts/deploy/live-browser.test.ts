@@ -31,3 +31,19 @@ test.each(['linux', 'darwin', 'win32'] as const)(
     expect(context.newPage).toHaveBeenCalledExactlyOnceWith()
   },
 )
+
+test.each(['newContext', 'newPage'])('closes an acquired browser when %s fails', async (stage) => {
+  const failure = new DOMException('Browser setup failed', 'OperationError')
+  const context = { newPage: vi.fn().mockRejectedValue(failure) }
+  const browser = {
+    close: vi.fn().mockResolvedValue(undefined),
+    newContext: vi
+      .fn()
+      .mockImplementation(() =>
+        stage === 'newContext' ? Promise.reject(failure) : Promise.resolve(context),
+      ),
+  }
+  const chromium = { launch: vi.fn().mockResolvedValue(browser) }
+  await expect(openLiveBrowser(chromium, 'darwin')).rejects.toBe(failure)
+  expect(browser.close).toHaveBeenCalledOnce()
+})

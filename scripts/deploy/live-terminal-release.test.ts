@@ -5,7 +5,7 @@ const build = { release: 'release-a', commit: 'a'.repeat(40), dirtyFiles: 0 }
 const deployed = {
   ...build,
   server: build,
-  terminalHost: { type: 'hello', version: 1, pid: 100, build },
+  terminalHostProbe: { type: 'hello', version: 1, pid: 100, build },
 }
 
 test('accepts deployed assets and a live host with the expected protocol', () => {
@@ -13,11 +13,14 @@ test('accepts deployed assets and a live host with the expected protocol', () =>
 })
 
 test.each(['deployed', 'isolated'])('rejects an incompatible %s terminal host protocol', (name) => {
-  const incompatible = { ...deployed, terminalHost: { ...deployed.terminalHost, version: 2 } }
+  const incompatible = {
+    ...deployed,
+    terminalHostProbe: { ...deployed.terminalHostProbe, version: 2 },
+  }
   const target = name === 'deployed' ? incompatible : deployed
   const backend = name === 'isolated' ? incompatible : deployed
   expect(terminalReleaseFailures(target, backend, 1)).toContain(
-    `terminal check: ${name} terminal host hello is missing or invalid`,
+    `terminal check: ${name} fresh terminal host reply is missing or invalid`,
   )
 })
 
@@ -48,13 +51,13 @@ test('rejects dirty backend artifacts even when the commit matches', () => {
 
 test.each([
   null,
-  { ...deployed.terminalHost, type: 'starting' },
-  { ...deployed.terminalHost, version: 2 },
-  { ...deployed.terminalHost, pid: 0 },
-  { ...deployed.terminalHost, pid: '100' },
-])('rejects an absent or invalid deployed terminal host %j', (terminalHost) => {
-  expect(terminalReleaseFailures({ ...deployed, terminalHost }, deployed, 1)).toContain(
-    'terminal check: deployed terminal host hello is missing or invalid',
+  { ...deployed.terminalHostProbe, type: 'starting' },
+  { ...deployed.terminalHostProbe, version: 2 },
+  { ...deployed.terminalHostProbe, pid: 0 },
+  { ...deployed.terminalHostProbe, pid: '100' },
+])('rejects an absent or invalid deployed terminal host %j', (terminalHostProbe) => {
+  expect(terminalReleaseFailures({ ...deployed, terminalHostProbe }, deployed, 1)).toContain(
+    'terminal check: deployed fresh terminal host reply is missing or invalid',
   )
 })
 
@@ -66,7 +69,7 @@ test.each([
 ])('accepts a retained terminal host build as informational %j', (hostBuild) => {
   expect(
     terminalReleaseFailures(
-      { ...deployed, terminalHost: { ...deployed.terminalHost, build: hostBuild } },
+      { ...deployed, terminalHostProbe: { ...deployed.terminalHostProbe, build: hostBuild } },
       deployed,
       1,
     ),
@@ -97,4 +100,11 @@ test.each([
   expect(foreignTerminalRequests([url], ['https://example.com', 'http://localhost:5123'])).toEqual([
     url,
   ])
+})
+
+test('rejects cached identity without a fresh round-trip', () => {
+  const { terminalHostProbe, ...release } = deployed
+  expect(
+    terminalReleaseFailures({ ...release, terminalHost: terminalHostProbe }, deployed, 1),
+  ).toContain('terminal check: deployed fresh terminal host reply is missing or invalid')
 })

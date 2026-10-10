@@ -341,3 +341,47 @@ it('sends no readiness mutation when the owned child exits during a matching hea
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+it('removes an allocated server directory when the bundled runtime cannot execute', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'isolated-spawn-failure-'))
+  const release = path.join(root, 'release')
+  mkdirSync(path.join(release, 'server'), { recursive: true })
+  mkdirSync(path.join(release, 'bin'))
+  writeFileSync(path.join(release, 'server', 'index.js'), '')
+  writeFileSync(path.join(release, 'build-config.json'), '{}')
+  writeFileSync(path.join(release, 'bin', 'bun'), 'not executable', { mode: 0o600 })
+  try {
+    await expect(
+      startIsolatedServer(undefined, { releaseRoot: release, scratchRoot: root }),
+    ).rejects.toThrow()
+    expect((await import('node:fs')).readdirSync(root)).toEqual(['release'])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+it.skipIf(process.platform === 'win32')(
+  'preserves identity and state after failed host shutdown and permits another stop',
+  async () => {
+    const server = await startIsolatedServer(undefined, { handleSignals: false })
+    const client = new TerminalHostClient({ stateRoot: server.home })
+    const host = await client.host()
+    process.kill(host.pid, 'SIGSTOP')
+    try {
+      await expect(server.stop()).rejects.toMatchObject({ code: 'terminal.HOST_UNREACHABLE' })
+      expect(existsSync(server.home)).toBe(true)
+      expect(alive(host.pid)).toBe(true)
+      const { hostPaths } = await import('../../apps/server/src/terminal-host/protocol')
+      expect(existsSync(hostPaths(server.home).manifest)).toBe(true)
+      process.kill(host.pid, 'SIGCONT')
+      await server.stop()
+      expect(existsSync(server.directory)).toBe(false)
+      expect(alive(host.pid)).toBe(false)
+    } finally {
+      client.close()
+      if (alive(host.pid)) process.kill(host.pid, 'SIGCONT')
+      await server.stop()
+    }
+  },
+  20_000,
+)

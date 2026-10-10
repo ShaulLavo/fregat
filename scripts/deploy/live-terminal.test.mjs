@@ -58,6 +58,13 @@ test
   .skipIf(!browserAvailable)
   .each([
     '',
+    '<div style="opacity:0.1" data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas class="ghostty-webgpu-canvas" style="opacity:0.1"></canvas><div aria-label="Terminal screen">check$</div></div></div>',
+    '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas class="ghostty-webgpu-canvas"></canvas><div aria-label="Terminal screen">check$</div></div></div>',
+    '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><div aria-label="Terminal screen">check$</div></div></div>',
+    ...['opacity:0', 'visibility:hidden', 'display:none'].map(
+      (style) =>
+        `<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas class="ghostty-webgpu-canvas" style="${style}"></canvas><div aria-label="Terminal screen">check$</div></div></div>`,
+    ),
     '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas></canvas></div></div>',
     '<div hidden data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><div aria-label="Terminal screen">check$ </div></div></div>',
     '<div aria-label="Terminal screen">check$ </div>',
@@ -69,6 +76,14 @@ test
   const page = await browser.newPage()
   try {
     await page.setContent(html)
+    if (html.includes('style='))
+      await page.evaluate(() => {
+        const canvas = document.querySelector('canvas')
+        if (!canvas) return
+        const context = canvas.getContext('2d')
+        context.fillStyle = 'black'
+        context.fillText('check$', 0, 15)
+      })
     await expect(waitForTerminalPrompt(page, 'check$', 100)).rejects.toThrow('Timeout')
   } finally {
     await page.close()
@@ -81,8 +96,14 @@ test.skipIf(!browserAvailable)(
     const page = await browser.newPage()
     try {
       await page.setContent(
-        '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><div aria-label="Terminal screen"></div></div></div>',
+        '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas class="ghostty-webgpu-canvas"></canvas><div aria-label="Terminal screen"></div></div></div>',
       )
+      await page.evaluate(() => {
+        const canvas = document.querySelector('canvas')
+        const ctx = canvas.getContext('2d')
+        ctx.fillStyle = 'black'
+        ctx.fillText('check$', 0, 15)
+      })
       const waiting = waitForTerminalPrompt(page, 'check$', 2_000)
       await page.evaluate(() => {
         requestAnimationFrame(() => {
@@ -90,6 +111,24 @@ test.skipIf(!browserAvailable)(
         })
       })
       expect(await waiting).toEqual({ count: 1, promptRendered: true })
+    } finally {
+      await page.close()
+    }
+  },
+)
+
+test.skipIf(!browserAvailable)(
+  'accepts the visible DOM renderer while its pointer canvas is transparent',
+  async () => {
+    const page = await browser.newPage()
+    try {
+      await page.setContent(
+        '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas class="ghostty-webgpu-canvas" style="opacity:0"></canvas><div style="position:absolute;top:0"><div data-row="0"><span>check$</span></div></div><div aria-label="Terminal screen">check$</div></div></div>',
+      )
+      expect(await waitForTerminalPrompt(page, 'check$', 1_000)).toEqual({
+        count: 1,
+        promptRendered: true,
+      })
     } finally {
       await page.close()
     }

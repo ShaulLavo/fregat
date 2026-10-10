@@ -83,132 +83,157 @@ export async function startIsolatedServer(
       'The isolated backend requires a built release with its build descriptor.',
     )
   const directory = mkdtempSync(path.join(scratchRoot, 'fregat-agent-'))
-  const home = path.join(directory, 'home')
-  const logs = path.join(directory, 'logs')
-  const productionRoot = path.join(directory, 'production')
-  mkdirSync(home)
-  mkdirSync(productionRoot)
-  const servedWeb = path.join(directory, 'served', 'web')
-  mkdirSync(servedWeb, { recursive: true })
-  // Keep web and server release descriptors beside each other when promotion updates them.
-  if (webRoot)
-    for (const name of readdirSync(webRoot))
-      symlinkSync(path.resolve(webRoot, name), path.join(servedWeb, name))
-  const entry = releaseRoot
-    ? path.join(path.resolve(releaseRoot), 'server', 'index.js')
-    : isolatedReleaseEntry(directory)
-  if (releaseRoot)
-    copyFileSync(
-      path.join(releaseRoot, 'build-config.json'),
-      path.join(directory, 'served', 'build-config.json'),
-    )
-  // Scenarios install their own fixture drivers; only an owner's --real-providers run keeps the
-  // built-in accounts on.
-  if (!realProviders || Object.keys(settings).length > 0)
-    writeFileSync(
-      path.join(home, 'settings.json'),
-      JSON.stringify({
-        ...settings,
-        'workbench.wallpaper': { enabled: false, source: { kind: 'desktop' } },
-        ...(!realProviders
-          ? {
-              'providers.instances': DEFAULT_PROVIDER_INSTANCES.map((provider) => ({
-                ...provider,
-                enabled: false,
-              })),
-            }
-          : {}),
-      }),
-    )
-  const port = await prepareHome(home).catch((error: unknown) => {
-    rmSync(directory, { recursive: true, force: true })
-    throw error
-  })
-  webOrigin ??= new URL(`http://localhost:${port}`)
-  const env = isolatedServerEnv({
-    home,
-    logs,
-    pathPrefix,
-    port,
-    productionRoot,
-    realProviders,
-    scratchRoot,
-    webOrigin,
-    webRoot: servedWeb,
-  })
-  const spawn = () =>
-    Bun.spawn({
-      cmd: [
-        releaseRoot && existsSync(path.join(releaseRoot, 'bin', 'bun'))
-          ? path.join(releaseRoot, 'bin', 'bun')
-          : process.execPath,
-        '--preload',
-        new URL('./push-boundary.ts', import.meta.url).pathname,
-        entry,
-      ],
-      cwd: SERVER_ROOT,
-      env,
-      stderr: Bun.file(path.join(directory, 'server.stderr')),
-      stdout: Bun.file(path.join(directory, 'server.stdout')),
-    })
-  let child = spawn()
-  const origin = `http://localhost:${port}`
-  let stopping: Promise<void> | undefined
-  // Prod's RestartSec.
-  let restartDelayMs = 250
-  // Plays systemd's part: a Restart exit promotes the approved release and starts the server again.
-  const supervise = async (exited: Bun.Subprocess) => {
-    if ((await exited.exited) !== RESTART_EXIT_CODE || stopping) return
-    const promoted = promote(productionRoot, () => true)
-    if (promoted === 'promoted') {
-      const current = realpathSync(path.join(productionRoot, 'current'))
+  let child: Bun.Subprocess | undefined
+  let cleanupAttempted = false
+  try {
+    const home = path.join(directory, 'home')
+    const logs = path.join(directory, 'logs')
+    const productionRoot = path.join(directory, 'production')
+    mkdirSync(home)
+    mkdirSync(productionRoot)
+    const servedWeb = path.join(directory, 'served', 'web')
+    mkdirSync(servedWeb, { recursive: true })
+    // Keep web and server release descriptors beside each other when promotion updates them.
+    if (webRoot)
+      for (const name of readdirSync(webRoot))
+        symlinkSync(path.resolve(webRoot, name), path.join(servedWeb, name))
+    const entry = releaseRoot
+      ? path.join(path.resolve(releaseRoot), 'server', 'index.js')
+      : isolatedReleaseEntry(directory)
+    if (releaseRoot)
       copyFileSync(
-        path.join(current, 'build-config.json'),
+        path.join(releaseRoot, 'build-config.json'),
         path.join(directory, 'served', 'build-config.json'),
       )
-    }
-    await Bun.sleep(restartDelayMs)
-    if (stopping) return
+    // Scenarios install their own fixture drivers; only an owner's --real-providers run keeps the
+    // built-in accounts on.
+    if (!realProviders || Object.keys(settings).length > 0)
+      writeFileSync(
+        path.join(home, 'settings.json'),
+        JSON.stringify({
+          ...settings,
+          'workbench.wallpaper': { enabled: false, source: { kind: 'desktop' } },
+          ...(!realProviders
+            ? {
+                'providers.instances': DEFAULT_PROVIDER_INSTANCES.map((provider) => ({
+                  ...provider,
+                  enabled: false,
+                })),
+              }
+            : {}),
+        }),
+      )
+    const port = await prepareHome(home)
+    webOrigin ??= new URL(`http://localhost:${port}`)
+    const env = isolatedServerEnv({
+      home,
+      logs,
+      pathPrefix,
+      port,
+      productionRoot,
+      realProviders,
+      scratchRoot,
+      webOrigin,
+      webRoot: servedWeb,
+    })
+    const spawn = () =>
+      Bun.spawn({
+        cmd: [
+          releaseRoot && existsSync(path.join(releaseRoot, 'bin', 'bun'))
+            ? path.join(releaseRoot, 'bin', 'bun')
+            : process.execPath,
+          '--preload',
+          new URL('./push-boundary.ts', import.meta.url).pathname,
+          entry,
+        ],
+        cwd: SERVER_ROOT,
+        env,
+        stderr: Bun.file(path.join(directory, 'server.stderr')),
+        stdout: Bun.file(path.join(directory, 'server.stdout')),
+      })
     child = spawn()
-    void supervise(child)
-  }
-  void supervise(child)
-  const stop: IsolatedServer['stop'] = (options) => {
-    process.off('SIGINT', onSignal)
-    process.off('SIGTERM', onSignal)
-    return (stopping ??= stopServer(child, directory, options?.logs))
-  }
-  const onSignal = (signal: NodeJS.Signals) => {
-    void stop().finally(() => process.kill(process.pid, signal))
-  }
-  if (handleSignals) {
-    process.once('SIGINT', onSignal)
-    process.once('SIGTERM', onSignal)
-  }
-  try {
-    await waitForHealth(child, origin, webOrigin.origin, directory)
+    const origin = `http://localhost:${port}`
+    let stopping: Promise<void> | undefined
+    let stopped = false
+    // Prod's RestartSec.
+    let restartDelayMs = 250
+    // Plays systemd's part: a Restart exit promotes the approved release and starts the server again.
+    const supervisionFailed = (error: unknown) => {
+      console.error(error)
+      void stop().catch((cleanupError: unknown) => {
+        console.error(cleanupError)
+      })
+    }
+    const supervise = async (exited: Bun.Subprocess) => {
+      if ((await exited.exited) !== RESTART_EXIT_CODE || stopped) return
+      const promoted = promote(productionRoot, () => true)
+      if (promoted === 'promoted') {
+        const current = realpathSync(path.join(productionRoot, 'current'))
+        copyFileSync(
+          path.join(current, 'build-config.json'),
+          path.join(directory, 'served', 'build-config.json'),
+        )
+      }
+      await Bun.sleep(restartDelayMs)
+      if (stopped) return
+      child = spawn()
+      void supervise(child).catch(supervisionFailed)
+    }
+    void supervise(child).catch(supervisionFailed)
+    const stop: IsolatedServer['stop'] = (options) => {
+      process.off('SIGINT', onSignal)
+      process.off('SIGTERM', onSignal)
+      stopped = true
+      cleanupAttempted = true
+      return (stopping ??= stopServer(child!, directory, options?.logs).catch((error: unknown) => {
+        stopping = undefined
+        throw error
+      }))
+    }
+    const onSignal = (signal: NodeJS.Signals) => {
+      void stop().then(
+        () => process.kill(process.pid, signal),
+        (error: unknown) => {
+          console.error(error)
+          process.exitCode = 1
+        },
+      )
+    }
+    if (handleSignals) {
+      process.once('SIGINT', onSignal)
+      process.once('SIGTERM', onSignal)
+    }
+    try {
+      await waitForHealth(child, origin, webOrigin.origin, directory)
+    } catch (error) {
+      await stop()
+      throw error
+    }
+    const signal = (name: NodeJS.Signals) => {
+      if (child?.exitCode === null) child.kill(name)
+    }
+    return {
+      port,
+      origin,
+      directory,
+      home,
+      logs,
+      productionRoot,
+      get restartDelayMs() {
+        return restartDelayMs
+      },
+      set restartDelayMs(ms: number) {
+        restartDelayMs = ms
+      },
+      signal,
+      stop,
+    }
   } catch (error) {
-    await stop()
+    if (!cleanupAttempted) {
+      if (child) await stopServer(child, directory)
+      else rmSync(directory, { recursive: true, force: true })
+    }
     throw error
-  }
-  const signal = (name: NodeJS.Signals) => {
-    if (child.exitCode === null) child.kill(name)
-  }
-  return {
-    port,
-    origin,
-    directory,
-    home,
-    logs,
-    productionRoot,
-    get restartDelayMs() {
-      return restartDelayMs
-    },
-    set restartDelayMs(ms: number) {
-      restartDelayMs = ms
-    },
-    signal,
-    stop,
   }
 }
 
@@ -338,15 +363,19 @@ async function stopServer(child: Bun.Subprocess, directory: string, logs?: strin
       Bun.sleep(STOP_TIMEOUT_MS).then(() => false),
     ])
     if (!stopped) child.kill('SIGKILL')
-    await child.exited
+    const killed = await Promise.race([
+      child.exited.then(() => true),
+      Bun.sleep(STOP_TIMEOUT_MS).then(() => false),
+    ])
+    if (!killed)
+      throw createScriptError('The isolated server did not stop.', {
+        internal: { reason: 'shutdown-timeout', pid: child.pid },
+      })
   }
-  try {
-    await stopTerminalHost(path.join(directory, 'home'))
-    if (logs) copyServerLogs(directory, logs)
-  } finally {
-    rmSync(hostPaths(path.join(directory, 'home')).directory, { force: true, recursive: true })
-    rmSync(directory, { force: true, recursive: true })
-  }
+  await stopTerminalHost(path.join(directory, 'home'))
+  if (logs) copyServerLogs(directory, logs)
+  rmSync(hostPaths(path.join(directory, 'home')).directory, { force: true, recursive: true })
+  rmSync(directory, { force: true, recursive: true })
 }
 
 function copyServerLogs(directory: string, destination: string) {

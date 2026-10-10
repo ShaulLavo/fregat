@@ -1,9 +1,8 @@
 // Headless check of the deployed page through the mesh. Run by scripts/install-release.ts, or after a
 // restart by the promotion step; exits non-zero on a failure the previous release's check lacked.
 // --backend-release supplies built terminal artifacts; installation defaults it to --out.
-import { execFile } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
-import { parseArgs, promisify } from 'node:util'
+import { parseArgs } from 'node:util'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
@@ -12,6 +11,7 @@ import { readRefusals, refusalFailures } from './live-refusals.mjs'
 import { liveVerdict } from './live-verdict.mjs'
 import { openLiveBrowser } from './live-browser.mjs'
 import { appearanceFailures, inspectAppearance } from './live-appearance.mjs'
+import { runLiveProcess } from './live-process.mjs'
 import { emptyWorkbenchUrl } from './live-terminal.mjs'
 
 // A third-party image the chat renders; proves cross-origin isolation still lets favicons load.
@@ -54,97 +54,122 @@ const report = { release: values.release, target: base, failures: [], preexistin
 const startedAt = new Date().toISOString()
 // The connection gate and a failed boot both render this frame in place of the workbench.
 const errorFrame = '[data-slot="status-frame"][data-tone="error"]'
-const waitMs = Number(values['wait-for-server'])
-if (waitMs > 0 && !(await serverReports(values.release, waitMs))) {
-  report.failures = [`server did not report ${values.release} within ${waitMs}ms`]
-  await finish([])
+const controller = new AbortController()
+let browser
+const cancel = (signal) => {
+  controller.abort(signal)
+  void browser?.close().catch(() => {})
 }
-
-const { browser, page } = await openLiveBrowser(chromium)
-const observed = attachObserver(page, base)
-
+const onTerm = () => cancel('SIGTERM')
+const onInt = () => cancel('SIGINT')
+process.on('SIGTERM', onTerm)
+process.on('SIGINT', onInt)
 try {
-  // Keep saved owner workspaces and terminals out of the target-page check.
-  await page.goto(emptyWorkbenchUrl(base), { waitUntil: 'domcontentloaded' })
-  await page
-    .locator(`[aria-label="Window toolbar"], ${errorFrame}`)
-    .first()
-    .waitFor({ timeout: 45_000 })
-  await page.waitForTimeout(8_000)
-  const served = await (await page.request.get(`${base}release`)).json()
-  const publicFavicon = await page.evaluate(loadImage, publicFaviconUrl)
-  const rendered = await page.evaluate(
-    (errorFrame) => ({
-      crossOriginIsolated,
-      errorFrame: document.querySelector(errorFrame)?.textContent ?? null,
-      rootChildren: document.querySelector('#root')?.childElementCount ?? 0,
-      clientRelease: document.querySelector('meta[name="platform-release"]')?.content ?? null,
-    }),
-    errorFrame,
-  )
-  rendered.appearance = await page.evaluate(inspectAppearance)
-  await page.screenshot({ path: resolve(values.out, 'live.png') })
-  Object.assign(report, {
-    finalUrl: page.url(),
-    served,
-    rendered,
-    publicFavicon,
-  })
-  report.failures = failures({ served, rendered, publicFavicon, observed })
-} catch (error) {
-  report.failures = [`check aborted: ${error.message}`]
-  report.body = (
+  const waitMs = Number(values['wait-for-server'])
+  if (waitMs > 0 && !(await serverReports(values.release, waitMs))) {
+    report.failures = [`server did not report ${values.release} within ${waitMs}ms`]
+    await finish([])
+  }
+
+  const live = await openLiveBrowser(chromium, process.platform, controller.signal)
+  browser = live.browser
+  controller.signal.throwIfAborted()
+  const { page } = live
+  const observed = attachObserver(page, base)
+
+  try {
+    // Keep saved owner workspaces and terminals out of the target-page check.
+    await page.goto(emptyWorkbenchUrl(base), { waitUntil: 'domcontentloaded' })
     await page
-      .locator('body')
-      .innerText()
-      .catch(() => '')
-  ).slice(0, 1500)
-  await page.screenshot({ path: resolve(values.out, 'live-failure.png') }).catch(() => {})
-} finally {
-  await browser.close()
-}
-Object.assign(report, serializable(observed))
-report.failures.push(
-  ...observedProblems({
-    ...observed,
-    loopbackRequests: observed.loopbackRequests.filter(
-      (url) => new URL(url).origin !== target.origin,
-    ),
-  }),
-)
-
-try {
-  const { stdout } = await promisify(execFile)(
-    'bun',
-    [
-      fileURLToPath(new URL('./live-terminal-check.ts', import.meta.url)),
-      base,
-      values.out,
-      resolve(values['backend-release'] ?? values.out),
-    ],
-    { timeout: 180_000, maxBuffer: 4 * 1024 * 1024 },
+      .locator(`[aria-label="Window toolbar"], ${errorFrame}`)
+      .first()
+      .waitFor({ timeout: 45_000 })
+    await page.waitForTimeout(8_000)
+    const served = await (await page.request.get(`${base}release`)).json()
+    const publicFavicon = await page.evaluate(loadImage, publicFaviconUrl)
+    const rendered = await page.evaluate(
+      (errorFrame) => ({
+        crossOriginIsolated,
+        errorFrame: document.querySelector(errorFrame)?.textContent ?? null,
+        rootChildren: document.querySelector('#root')?.childElementCount ?? 0,
+        clientRelease: document.querySelector('meta[name="platform-release"]')?.content ?? null,
+      }),
+      errorFrame,
+    )
+    rendered.appearance = await page.evaluate(inspectAppearance)
+    await page.screenshot({ path: resolve(values.out, 'live.png') })
+    Object.assign(report, {
+      finalUrl: page.url(),
+      served,
+      rendered,
+      publicFavicon,
+    })
+    report.failures = failures({ served, rendered, publicFavicon, observed })
+  } catch (error) {
+    report.failures = [`check aborted: ${error?.message ?? String(error)}`]
+    report.body = (
+      await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')
+    ).slice(0, 1500)
+    await page.screenshot({ path: resolve(values.out, 'live-failure.png') }).catch(() => {})
+  } finally {
+    await browser.close()
+  }
+  Object.assign(report, serializable(observed))
+  report.failures.push(
+    ...observedProblems({
+      ...observed,
+      loopbackRequests: observed.loopbackRequests.filter(
+        (url) => new URL(url).origin !== target.origin,
+      ),
+    }),
   )
-  report.terminal = JSON.parse(stdout)
-  report.failures.push(...report.terminal.failures)
-} catch (error) {
-  report.failures.push(`terminal check: aborted: ${error.message}`)
-}
 
-report.logNoise = await logNoise(values.logs)
-// Shared logs include old tabs and earlier releases. Retain the census as diagnostics;
-// only evidence from this check decides whether the candidate works.
-for (const warning of report.logNoise.failures) console.log(`[live] diagnostic: ${warning}`)
-try {
-  report.refusals = await readRefusals(values.logs, { release: values.release, since: startedAt })
-  report.failures.push(...refusalFailures(report.refusals, values.release))
+  try {
+    const { stdout } = await runLiveProcess(
+      'bun',
+      [
+        fileURLToPath(new URL('./live-terminal-check.ts', import.meta.url)),
+        base,
+        values.out,
+        resolve(values['backend-release'] ?? values.out),
+      ],
+      { signal: controller.signal, timeout: 180_000, maxBuffer: 4 * 1024 * 1024 },
+    )
+    report.terminal = JSON.parse(stdout)
+    report.failures.push(...report.terminal.failures)
+  } catch (error) {
+    report.failures.push(`terminal check: aborted: ${error?.message ?? String(error)}`)
+  }
+
+  report.logNoise = await logNoise(values.logs)
+  // Shared logs include old tabs and earlier releases. Retain the census as diagnostics;
+  // only evidence from this check decides whether the candidate works.
+  for (const warning of report.logNoise.failures) console.log(`[live] diagnostic: ${warning}`)
+  try {
+    report.refusals = await readRefusals(values.logs, { release: values.release, since: startedAt })
+    report.failures.push(...refusalFailures(report.refusals, values.release))
+  } catch (error) {
+    report.failures.push(`refusal log scan did not run: ${error?.message ?? String(error)}`)
+  }
+  report.preexisting = await baselineFailures(values.baseline)
+  controller.signal.throwIfAborted()
+  await finish(report.preexisting)
 } catch (error) {
-  report.failures.push(`refusal log scan did not run: ${error.message}`)
+  report.failures.push(`check aborted: ${error?.message ?? String(error)}`)
+  await browser?.close()
+  await finish([])
+} finally {
+  process.off('SIGTERM', onTerm)
+  process.off('SIGINT', onInt)
 }
-report.preexisting = await baselineFailures(values.baseline)
-await finish(report.preexisting)
 
 // Writes the report with its verdict; the server reads status, checkedAt and fresh.
 async function finish(preexisting) {
+  if (controller.signal.aborted)
+    report.failures.push(`check cancelled: ${String(controller.signal.reason)}`)
   const verdict = liveVerdict(report, preexisting)
   const { fresh } = verdict
   Object.assign(report, {
@@ -152,6 +177,7 @@ async function finish(preexisting) {
     checkedAt: new Date().toISOString(),
   })
   await writeFile(resolve(values.out, 'live-check.json'), `${JSON.stringify(report, null, 2)}\n`)
+  if (controller.signal.aborted && report.status === 'passed') return finish([])
   for (const failure of report.failures) {
     const tag = fresh.includes(failure) ? 'FAIL' : 'known'
     console.log(`[live] ${tag}: ${failure}`)
@@ -166,6 +192,7 @@ async function finish(preexisting) {
 async function serverReports(release, timeoutMs) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
+    controller.signal.throwIfAborted()
     if ((await servedServerRelease()) === release) return true
     await new Promise((done) => setTimeout(done, 1_000))
   }
@@ -174,7 +201,9 @@ async function serverReports(release, timeoutMs) {
 
 async function servedServerRelease() {
   try {
-    const response = await fetch(`${base}release`, { signal: AbortSignal.timeout(5_000) })
+    const response = await fetch(`${base}release`, {
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5_000)]),
+    })
     if (!response.ok) return null
     return (await response.json()).server?.release ?? null
   } catch {
@@ -220,10 +249,10 @@ async function logNoise(directory) {
   if (!directory) return { failures: [], groups: [] }
   const census = fileURLToPath(new URL('../lint/log-noise-census.ts', import.meta.url))
   try {
-    const { stdout } = await promisify(execFile)(
+    const { stdout } = await runLiveProcess(
       'bun',
       [census, `--dir=${directory}`, '--since=24h', '--json'],
-      { maxBuffer: 64 * 1024 * 1024 },
+      { signal: controller.signal, maxBuffer: 64 * 1024 * 1024 },
     )
     const result = JSON.parse(stdout)
     const groups = result.failures.map(({ key, count, reasons }) => ({ key, count, reasons }))
@@ -234,7 +263,7 @@ async function logNoise(directory) {
       groups,
     }
   } catch (error) {
-    return { failures: [`log census did not run: ${error.message}`], groups: [] }
+    return { failures: [`log census did not run: ${error?.message ?? String(error)}`], groups: [] }
   }
 }
 

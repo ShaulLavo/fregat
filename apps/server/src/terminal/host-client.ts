@@ -77,6 +77,7 @@ export class TerminalHostClient {
   private generation = 0
   private detaches = 0
   private description: HostHello | null = null
+  private retained: Connected | null = null
 
   constructor({
     stateRoot,
@@ -95,6 +96,17 @@ export class TerminalHostClient {
   /** Last authenticated host, without starting one for a release probe. */
   info() {
     return this.description
+  }
+
+  /** A correlated read-only round-trip on the retained connection; never launches or recovers. */
+  async probe() {
+    const retained = this.retained
+    if (!retained)
+      throw terminalHostErrors.HOST_UNREACHABLE({ internal: { reason: 'no-retained-connection' } })
+    await retained.connection.ping()
+    if (retained.hello.version !== PROTOCOL_VERSION)
+      throw protocolError(retained.hello.version, PROTOCOL_VERSION)
+    return retained.hello
   }
 
   /** The host's hello: its pid, cgroup and protocol. */
@@ -136,6 +148,7 @@ export class TerminalHostClient {
     const connecting = this.connecting
     this.connecting = null
     this.description = null
+    this.retained = null
     this.generation += 1
     this.detaches += 1
     void connecting?.then(
@@ -199,6 +212,7 @@ export class TerminalHostClient {
           launched,
           protocol: connected.hello.version,
         })
+        this.retained = connected
         return connected
       }
       if (!socket && !launched) {
@@ -231,6 +245,7 @@ export class TerminalHostClient {
           if (this.generation === generation && this.description) {
             this.connecting = null
             this.description = null
+            this.retained = null
           }
           if (orphans.length > 0) void this.recover(orphans)
         },
@@ -359,6 +374,10 @@ class HostConnection {
     )
     try {
       const hello = await connection.greeting.promise
+      if (hello.version !== PROTOCOL_VERSION) {
+        connection.close()
+        throw protocolError(hello.version, PROTOCOL_VERSION)
+      }
       return { connection, hello }
     } finally {
       clearTimeout(timeout)
@@ -419,6 +438,18 @@ class HostConnection {
     )
   }
 
+  ping() {
+    // The existing list frame supplies a request id; its reply proves fresh responsiveness.
+    return this.request<void>(
+      'probe',
+      (request) => ({ type: 'list', request }),
+      (reply) => {
+        if (reply.type !== 'list') throw protocolError(reply.type, 'list')
+      },
+      { timeoutMs: 1_000, disconnect: false },
+    )
+  }
+
   /** Moves a shell from a lost connection onto this one, replaying from the offset it reached. */
   resume(pty: HostPty) {
     return this.request<void>(
@@ -458,10 +489,11 @@ class HostConnection {
     operation: string,
     control: (request: number) => ClientControl,
     accept: (reply: Reply) => T,
+    { timeoutMs = this.requestTimeoutMs, disconnect = true } = {},
   ) {
     const request = this.nextRequest++
     const { promise, resolve, reject } = Promise.withResolvers<T>()
-    const deadline = setTimeout(() => this.timedOut(request), this.requestTimeoutMs)
+    const deadline = setTimeout(() => this.timedOut(request, timeoutMs, disconnect), timeoutMs)
     this.requests.set(request, {
       operation,
       // Runs inside the frame loop, so a pty is registered before its first output frame.
@@ -483,7 +515,7 @@ class HostConnection {
   }
 
   // A host that stops answering is dropped; its shells resume on the next connection.
-  private timedOut(request: number) {
+  private timedOut(request: number, timeoutMs: number, disconnect: boolean) {
     const pending = this.requests.get(request)
     if (!pending) return
     this.requests.delete(request)
@@ -492,10 +524,11 @@ class HostConnection {
         internal: {
           reason: 'request-timeout',
           operation: pending.operation,
-          timeoutMs: this.requestTimeoutMs,
+          timeoutMs,
         },
       }),
     )
+    if (!disconnect) return
     this.socket.destroy()
     // Now, before the close event: the next request must not reach this dead socket.
     this.closed()

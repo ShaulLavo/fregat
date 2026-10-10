@@ -39,7 +39,7 @@ async function checkLiveTerminal(target: URL, out: string, releaseRoot: string) 
     coverage: {
       client: 'Deployed client rendering with an isolated backend built from the deployed commit.',
       server:
-        'Deployed terminal-host hello and protocol compatibility from read-only /release; host build is informational.',
+        'Fresh deployed terminal-host round-trip through read-only /terminal/health; host build is informational.',
       excluded:
         'Opening a terminal on the deployed server requires durable workspace and project registration.',
     },
@@ -112,7 +112,7 @@ async function checkLiveTerminal(target: URL, out: string, releaseRoot: string) 
         report.isolatedRelease = await readRelease(new URL('/release', server.origin), signal)
         if (report.isolatedRelease.server?.commit !== report.deployedRelease.commit)
           throw createScriptError('The isolated backend commit differs from the deployed client.')
-        const live = await openLiveBrowser(chromium)
+        const live = await openLiveBrowser(chromium, process.platform, signal)
         browser = live.browser
         page = live.page
         signal.throwIfAborted()
@@ -216,8 +216,8 @@ async function checkLiveTerminal(target: URL, out: string, releaseRoot: string) 
           ) ?? null
         await page.keyboard.press('Escape')
         await page.screenshot({ path: path.join(out, 'live-terminal.png') })
-        report.deployedRelease = await readRelease(new URL('release', target), signal)
-        report.isolatedRelease = await readRelease(new URL('/release', server.origin), signal)
+        report.deployedRelease = await readRelease(new URL('release', target), signal, true)
+        report.isolatedRelease = await readRelease(new URL('/release', server.origin), signal, true)
       } catch (error) {
         report.failures.push(
           `terminal check: ${error instanceof Error ? error.message : String(error)}`,
@@ -280,14 +280,28 @@ async function checkLiveTerminal(target: URL, out: string, releaseRoot: string) 
   return report
 }
 
-async function readRelease(url: URL, signal: AbortSignal) {
+async function readRelease(url: URL, signal: AbortSignal, probe = false) {
   const response = await fetch(url, {
     signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
     redirect: 'error',
   })
   if (!response.ok) throw createScriptError(`Terminal release probe returned ${response.status}.`)
   const { release, commit, dirtyFiles, server, terminalHost } = await response.json()
-  return { release, commit, dirtyFiles, server, terminalHost }
+  let terminalHostProbe
+  if (probe) {
+    const endpoint = new URL('terminal/health', url)
+    const response = await fetch(endpoint, {
+      headers: { origin: endpoint.origin },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
+      redirect: 'error',
+    })
+    if (!response.ok)
+      throw createScriptError(`Fresh terminal-host probe returned ${response.status}.`, {
+        internal: { status: response.status },
+      })
+    terminalHostProbe = await response.json()
+  }
+  return { release, commit, dirtyFiles, server, terminalHost, terminalHostProbe }
 }
 
 if (import.meta.main) {

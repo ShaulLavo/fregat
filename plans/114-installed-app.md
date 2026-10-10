@@ -413,11 +413,11 @@ adapter plus the existing server, not another application runtime.
 
 **Status: Approved — implement after the read-only split check in PR #1224.**
 The current check renders deployed client assets against a disposable built backend from the
-same commit and reads the deployed terminal-host hello/build through `GET /release`. It does
+same commit and probes the retained deployed terminal host through `GET /terminal/health`. It does
 not open a terminal on the deployed server. A proxy that rejects deployed `/terminal` requests
-therefore cannot establish deployed PTY spawning or terminal transport health; host hello alone
-establishes the retained host's identity and liveness. Hosts survive deployments to preserve
-running shells, so the check requires a valid hello and compatible protocol and reports the
+therefore cannot establish deployed PTY spawning or terminal transport health. A fresh correlated
+read-only host round-trip establishes responsiveness; cached hello metadata alone cannot. Hosts
+survive deployments to preserve running shells, so the check requires a valid hello and compatible protocol and reports the
 host's build as information. A host from an earlier build passes these checks.
 
 The existing workspace lifecycle cannot leave the owner's state unchanged:
