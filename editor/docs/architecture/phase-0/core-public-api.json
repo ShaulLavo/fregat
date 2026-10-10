@@ -6280,6 +6280,66 @@
       "exports": [
         {
           "kind": "type",
+          "name": "ActivatedPaintSnapshotHighlights",
+          "source": "packages/editor/src/virtualization/documentPaintHighlights.ts",
+          "via": "packages/editor/src/paint.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentPaintCapture",
+          "source": "packages/editor/src/editor/documentPaint.ts",
+          "via": "packages/editor/src/paint.ts"
+        },
+        {
+          "kind": "type",
+          "name": "MountedPaintSnapshot",
+          "source": "packages/editor/src/virtualization/documentPaintRows.ts",
+          "via": "packages/editor/src/paint.ts"
+        },
+        {
+          "kind": "type",
+          "name": "PaintSnapshot",
+          "source": "packages/editor/src/editor/documentPaint.ts",
+          "via": "packages/editor/src/paint.ts"
+        },
+        {
+          "kind": "type",
+          "name": "SavedDocumentPaint",
+          "source": "packages/editor/src/editor/documentPaint.ts",
+          "via": "packages/editor/src/paint.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "decodePaintSnapshot",
+          "source": "packages/editor/src/editor/documentPaint.ts",
+          "via": "packages/editor/src/paint.ts"
+        },
+        {
+          "kind": "value",
+          "name": "activatePaintSnapshotHighlights",
+          "source": "packages/editor/src/paint.ts",
+          "via": "packages/editor/src/paint.ts"
+        },
+        {
+          "kind": "value",
+          "name": "mountPaintSnapshot",
+          "source": "packages/editor/src/paint.ts",
+          "via": "packages/editor/src/paint.ts"
+        },
+        {
+          "kind": "value",
+          "name": "preparePaintSnapshotHighlights",
+          "source": "packages/editor/src/paint.ts",
+          "via": "packages/editor/src/paint.ts"
+        }
+      ],
+      "source": "packages/editor/src/paint.ts",
+      "specifier": "./paint"
+    },
+    {
+      "exports": [
+        {
+          "kind": "type",
           "name": "EditorColorDefaults",
           "source": "packages/editor/src/theme.ts",
           "via": "packages/editor/src/public/rendering.ts"

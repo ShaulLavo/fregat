@@ -160,6 +160,28 @@ export class ConfirmedWindow {
     this.document = document
   }
 
+  /** Retained text edits following every identity, in canonical order. */
+  editsAfter(predecessors: readonly EditId[]): readonly ConcurrentEdit[] {
+    const before = predecessors.flatMap((id) => {
+      const entry = this.byId.get(editKey(id))
+      return entry ? [entry] : []
+    })
+    if (before.length !== predecessors.length) return []
+    const lamport = before.reduce(
+      (latest, entry) => Math.max(latest, entry.envelope.lamport),
+      -Infinity,
+    )
+    const result: ConcurrentEdit[] = []
+    // Every causal successor has a greater Lamport value, even after reordered arrivals.
+    for (let i = this.candidates.length - 1; i >= 0; i--) {
+      const entry = this.candidates[i]!
+      if (entry.envelope.lamport <= lamport) break
+      if (before.every((predecessor) => contains(entry.ancestors, predecessor.position)))
+        result.push(entry.touch!)
+    }
+    return result.reverse()
+  }
+
   /** Whether a retained edit causally follows every supplied identity. Evicted identities are unknown. */
   isAfter(id: EditId, predecessors: readonly EditId[]): boolean {
     const entry = this.byId.get(editKey(id))
