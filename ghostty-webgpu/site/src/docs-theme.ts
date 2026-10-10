@@ -1,5 +1,5 @@
 // Starlight theming that matches the landing page: Mist palette, site fonts, ink-dark code.
-import githubLight from '@shikijs/themes/github-light'
+import githubLight from '@shikijs/themes/github-light-high-contrast'
 import type { StarlightUserConfig } from '@astrojs/starlight/types'
 
 const ink = '#15131f'
