@@ -44,8 +44,10 @@ That boundary change alone does not fix WebKit's unselectable-text behaviour.
 
 Inline widgets use `user-select: text`. The editor's mouse handlers continue to
 own editor selection. Snapshot replay uses the same widget selection style.
-Native ranges start in the first covered text node and end in the last covered
-text node. Source spans that produce no displayed text create no highlight range.
+Native highlight ranges start in the first covered text node and end in the last
+covered text node. Source spans that produce no displayed text create no highlight
+range. Selection and caret geometry retain element-inclusive boundaries so atomic
+widgets keep their full selection background, including padding and adornments.
 Document capture reads those same registered ranges, so link token colours and
 plain-text colours agree with live paint.
 

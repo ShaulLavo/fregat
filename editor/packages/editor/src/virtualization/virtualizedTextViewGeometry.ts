@@ -1455,8 +1455,9 @@ export function createDomRangeForChunkRange(
   chunk: VirtualizedTextChunk,
   start: number,
   end: number,
+  purpose: 'geometry' | 'highlight' = 'geometry',
 ): Range | null {
-  const boundaries = domBoundariesForChunkRange(row, chunk, start, end)
+  const boundaries = domBoundariesForChunkRange(row, chunk, start, end, purpose)
   if (!boundaries) return null
 
   const range = document.createRange()
@@ -1472,7 +1473,7 @@ export function createStaticRangeForChunkRange(
   start: number,
   end: number,
 ): StaticRange | null {
-  const boundaries = domBoundariesForChunkRange(row, chunk, start, end)
+  const boundaries = domBoundariesForChunkRange(row, chunk, start, end, 'highlight')
   const StaticRangeConstructor = document.defaultView?.StaticRange
   if (!boundaries || !StaticRangeConstructor) return null
 
@@ -1489,32 +1490,32 @@ function domBoundariesForChunkRange(
   chunk: VirtualizedTextChunk,
   start: number,
   end: number,
+  purpose: 'geometry' | 'highlight',
 ): { readonly start: DomBoundary; readonly end: DomBoundary } | null {
   if (end <= start) return null
   if (end <= chunk.startOffset || start >= chunk.endOffset) return null
 
   const localStart = clampChunkLocal(chunk, rowLocalIndexForOffset(row, start, 'before'))
   const localEnd = clampChunkLocal(chunk, rowLocalIndexForOffset(row, end, 'after'))
-  if (localEnd <= localStart) return null
-  const startBoundary = normalizedRangeBoundary(
-    domBoundaryForChunkLocalOffset(chunk, localStart),
-    'start',
-  )
-  const endBoundary = normalizedRangeBoundary(
-    domBoundaryForChunkLocalOffset(chunk, localEnd, 'before'),
-    'end',
+  if (purpose === 'highlight' && localEnd <= localStart) return null
+  const startBoundary = domBoundaryForChunkLocalOffset(chunk, localStart)
+  const endBoundary = domBoundaryForChunkLocalOffset(
+    chunk,
+    localEnd,
+    purpose === 'highlight' ? 'before' : 'after',
   )
   if (!startBoundary || !endBoundary) return null
+  if (purpose === 'geometry') return { end: endBoundary, start: startBoundary }
 
-  return { end: endBoundary, start: startBoundary }
+  return {
+    end: normalizedRangeBoundary(endBoundary, 'end'),
+    start: normalizedRangeBoundary(startBoundary, 'start'),
+  }
 }
 
 // Keep native highlights and snapshot capture bounded by the text they cover.
-function normalizedRangeBoundary(
-  boundary: DomBoundary | null,
-  side: 'start' | 'end',
-): DomBoundary | null {
-  if (!boundary || boundary.node.nodeType === 3) return boundary
+function normalizedRangeBoundary(boundary: DomBoundary, side: 'start' | 'end'): DomBoundary {
+  if (boundary.node.nodeType === 3) return boundary
   const child = boundary.node.childNodes[boundary.offset - (side === 'end' ? 1 : 0)]
   if (!child) return boundary
   if (child.nodeType === 3) {

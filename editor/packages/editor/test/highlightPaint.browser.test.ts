@@ -354,7 +354,11 @@ function redInkAfter(image: ImageData, left: number): number {
 }
 
 it.each([
-  ['Range', createDomRangeForChunkRange],
+  [
+    'Range',
+    (...args: Parameters<typeof createStaticRangeForChunkRange>) =>
+      createDomRangeForChunkRange(...args, 'highlight'),
+  ],
   ['StaticRange', createStaticRangeForChunkRange],
 ] as const)(
   'bounds native ranges by their first and last covered text nodes (%s)',
@@ -395,6 +399,61 @@ it.each([
       expect(range.startOffset).toBe(0)
       expect(range.endContainer).toBe(node)
       expect(range.endOffset).toBe(1)
+    }
+  },
+)
+
+it.each([5, 7])(
+  'paints the whole atomic widget selection through source offset %s',
+  async (end) => {
+    const { host, view } = mount()
+    const source = 'A@foo Z'
+    view.setTokens([])
+    host.style.setProperty('--editor-selection-background', '#ff0000')
+    view.setText(source)
+    view.setInlineMap(
+      createInlineMap(createPieceTableSnapshot(source), [
+        {
+          id: 'chip',
+          startIndex: 1,
+          endIndex: 5,
+          text: '@foo',
+          atomic: true,
+          reveal: 'never',
+          render(container) {
+            container.style.cssText = 'width:120px;padding:0 10px;box-sizing:content-box'
+            container.textContent = 'W'
+          },
+        },
+      ]),
+    )
+    view.setSelection(1, end)
+    const row = host.querySelector<HTMLElement>('[data-editor-virtual-row="0"]')!
+    const widget = row.querySelector<HTMLElement>('[data-editor-inline-widget]')!
+    const box = widget.getBoundingClientRect()
+    expect(box.width).toBe(140)
+    const painted = await pixels(host.id, `atomic-selection-${end}`)
+    const rectangles = row.querySelectorAll<HTMLElement>('.editor-virtualized-selection-range')
+    expect(rectangles.length).toBe(1)
+    const selection = rectangles[0]!.getBoundingClientRect()
+    expect(selection.left).toBeCloseTo(box.left, 0)
+    expect(selection.right).toBeGreaterThanOrEqual(box.right - 0.5)
+    if (end > 5) {
+      const nodes = document.createTreeWalker(row, NodeFilter.SHOW_TEXT)
+      let suffixText = nodes.nextNode()
+      while (suffixText && !suffixText.textContent?.endsWith('Z')) suffixText = nodes.nextNode()
+      assert(suffixText)
+      const suffix = document.createRange()
+      suffix.selectNodeContents(suffixText)
+      expect(selection.right).toBeCloseTo(suffix.getBoundingClientRect().right, 0)
+    }
+    const left = Math.ceil(box.left - row.getBoundingClientRect().left) + 1
+    const right = Math.floor(box.right - row.getBoundingClientRect().left) - 1
+    for (let x = left; x < right; x++) {
+      const offset = (29 * painted.width + x) * 4
+      expect(painted.data[offset]).toBe(255)
+      expect(painted.data[offset + 1]).toBe(0)
+      expect(painted.data[offset + 2]).toBe(0)
     }
   },
 )
