@@ -189,11 +189,12 @@ The home height numbers alone do not prove duplicate wrapped rows. Their excesse
 
 ## Snapshot speed budget
 
-Treat restore speed as a landing-page requirement, separate from worker/parser startup. These are acceptance budgets, not achieved product claims:
+First paint is complete editor-produced HTML emitted at build time and remains visible without JavaScript replay. Responsive replay runs at takeover or a toggle, separately from worker/parser startup. These are budgets, not achieved product claims:
 
-- Decode, responsive layout and paint mount at p95 within 8 ms on the reference desktop after the bundled font is ready, 30 independent repetitions per engine and width.
-- Within 16 ms at p95 in Chromium with 4× CPU slowdown, and no restore long task over 50 ms. Chromium slowdown is an experiment, not an iPhone measurement. WebKit runs its own unthrottled qualification.
-- A server-rendered captured article is visible before full editor code or grammars load. The inline bootstrap does not fetch a worker or wasm to paint.
+- Gate: decode, responsive layout, DOM insertion and forced layout at p95 within 50 ms after the bundled font is ready, with 30 independent repetitions per engine and width. This is the takeover response budget.
+- Goal: the same work at p95 within 8 ms on the reference desktop. Preserve exact document pixels while pursuing this goal.
+- Goal: within 16 ms at p95 in Chromium with 4× CPU slowdown. Gate: no individual restore long task over 50 ms. Chromium slowdown is an experiment, not an iPhone measurement. WebKit runs its own unthrottled qualification.
+- A server-rendered captured article is visible before full editor code or grammars load. The captured DOM needs no decode or replay for its first paint; the responsive paint entry has no worker or wasm dependency.
 - No visible blank frame, no toggle-induced layout shift, and zero changed document pixels between static and ready live states at the required widths. Mask only the caret and the toggle label, never text or gutters.
 - Start with at most 32 KiB compressed document paint for the home sample, 96 KiB for a representative manual, and 16 KiB compressed for the paint-only entry. Record raw/decoded sizes and total HTML as well. An oversized page fails qualification and gets a measured compression or representation fix.
 

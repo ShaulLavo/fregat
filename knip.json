@@ -170,6 +170,7 @@
         "src/index.ts",
         "src/logging/evlog.ts",
         "src/logging/index.ts",
+        "src/paint.ts",
         "src/public/document.ts",
         "src/public/extensions.ts",
         "src/public/keymap.ts",
