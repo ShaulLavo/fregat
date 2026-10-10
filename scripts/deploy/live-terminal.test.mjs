@@ -54,25 +54,29 @@ afterAll(async () => {
 })
 
 // Browser-signal tests skip when a fresh contributor checkout has no Playwright browser.
-test
-  .skipIf(!browserAvailable)
-  .each([
+test.skipIf(!browserAvailable).each(
+  [
     '',
     '<div style="opacity:0.1" data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas class="ghostty-webgpu-canvas" style="opacity:0.1"></canvas><div aria-label="Terminal screen">check$</div></div></div>',
     '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas class="ghostty-webgpu-canvas"></canvas><div aria-label="Terminal screen">check$</div></div></div>',
     '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><div aria-label="Terminal screen">check$</div></div></div>',
-    ...['opacity:0', 'visibility:hidden', 'display:none'].map(
+  ].concat(
+    ['opacity:0', 'visibility:hidden', 'display:none'].map(
       (style) =>
         `<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas class="ghostty-webgpu-canvas" style="${style}"></canvas><div aria-label="Terminal screen">check$</div></div></div>`,
     ),
-    '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas></canvas></div></div>',
-    '<div hidden data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><div aria-label="Terminal screen">check$ </div></div></div>',
-    '<div aria-label="Terminal screen">check$ </div>',
-    '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu" style="opacity:0"><div aria-label="Terminal screen">check$</div></div></div>',
-    '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu" style="visibility:hidden"><div aria-label="Terminal screen">check$</div></div></div>',
-    '<div style="opacity:0" data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><div aria-label="Terminal screen">check$</div></div></div>',
-    '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu" style="width:0;height:0;overflow:hidden"><div aria-label="Terminal screen">check$</div></div></div>',
-  ])('bounds the wait when no live terminal prompt renders (%s)', async (html) => {
+    [
+      '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas class="ghostty-webgpu-canvas" style="position:absolute;left:10000px"></canvas><div aria-label="Terminal screen">check$</div></div></div>',
+      '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas></canvas></div></div>',
+      '<div hidden data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><div aria-label="Terminal screen">check$ </div></div></div>',
+      '<div aria-label="Terminal screen">check$ </div>',
+      '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu" style="opacity:0"><div aria-label="Terminal screen">check$</div></div></div>',
+      '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu" style="visibility:hidden"><div aria-label="Terminal screen">check$</div></div></div>',
+      '<div style="opacity:0" data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><div aria-label="Terminal screen">check$</div></div></div>',
+      '<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu" style="width:0;height:0;overflow:hidden"><div aria-label="Terminal screen">check$</div></div></div>',
+    ],
+  ),
+)('bounds the wait when no live terminal prompt renders (%s)', async (html) => {
   const page = await browser.newPage()
   try {
     await page.setContent(html)
@@ -134,3 +138,22 @@ test.skipIf(!browserAvailable)(
     }
   },
 )
+
+test
+  .skipIf(!browserAvailable)
+  .each([
+    'color:transparent',
+    '-webkit-text-fill-color:transparent',
+    'color:white;background:white',
+    'opacity:0.01',
+  ])('rejects unpainted DOM prompt glyphs with %s', async (style) => {
+  const page = await browser.newPage()
+  try {
+    await page.setContent(
+      `<div data-slot="tool-pane" aria-label="Terminal"><div class="ghostty-webgpu"><canvas class="ghostty-webgpu-canvas" style="opacity:0"></canvas><div style="position:absolute;top:0"><div data-row="0"><span style="${style}">check$</span></div></div><div aria-label="Terminal screen">check$</div></div></div>`,
+    )
+    await expect(waitForTerminalPrompt(page, 'check$', 200)).rejects.toThrow('Timeout')
+  } finally {
+    await page.close()
+  }
+})

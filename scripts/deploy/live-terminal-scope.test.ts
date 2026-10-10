@@ -29,7 +29,8 @@ test('preserves the owned directory when resource cleanup rejects', async () => 
   }
 })
 
-test.each(['SIGTERM', 'SIGINT'] as const)(
+// POSIX subprocess signals are unavailable on Windows.
+test.skipIf(process.platform === 'win32').each(['SIGTERM', 'SIGINT'] as const)(
   'awaits cleanup and removes the outer directory on %s',
   async (signal) => {
     const parent = await mkdtemp(path.join(tmpdir(), 'live-terminal-signal-'))
@@ -69,7 +70,7 @@ test.each(['SIGTERM', 'SIGINT'] as const)(
 )
 
 // Playwright's default SIGINT handler exits after closing its browser, ahead of owned cleanup.
-test.skipIf(!existsSync(chromium.executablePath()))(
+test.skipIf(process.platform === 'win32' || !existsSync(chromium.executablePath()))(
   'SIGINT with a live browser waits for owned cleanup before the worker exits',
   async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'live-browser-signal-'))

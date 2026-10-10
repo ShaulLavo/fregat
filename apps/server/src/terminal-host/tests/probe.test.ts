@@ -135,7 +135,7 @@ test.each(['hello-version', 'probe-reply'])('rejects a protocol mismatch in %s',
               : {
                   type: 'attached',
                   request: control.request,
-                  session: 0,
+                  session: 1,
                   key: 'probe',
                   pid: process.pid,
                   replayedBytes: 0,
@@ -186,5 +186,79 @@ test.skipIf(process.platform === 'win32')(
       process.kill(hello.pid, 'SIGCONT')
     }
     expect(await host.client.list()).toEqual([])
+  },
+)
+
+test.each(['reply', 'close'] as const)(
+  'a retired opening cannot replace the reopened connection after late %s',
+  async (mode) => {
+    const { default: net } = await import('node:net')
+    const { writeFile } = await import('node:fs/promises')
+    const { FrameDecoder, encodeControl, ensureSocketDirectory } = await import('../protocol')
+    const { processStart } = await import('../identity')
+    const host = await fixture()
+    ensureSocketDirectory(host.paths)
+    await writeFile(
+      host.paths.manifest,
+      JSON.stringify({ hostPid: process.pid, processStart: processStart(process.pid) }),
+    )
+    const firstList = Promise.withResolvers<() => void>()
+    let connections = 0
+    const sockets = new Set<import('node:net').Socket>()
+    const server = net.createServer((socket) => {
+      const index = ++connections
+      sockets.add(socket)
+      socket.once('close', () => sockets.delete(socket))
+      const decoder = new FrameDecoder()
+      socket.on('data', (bytes) => {
+        for (const frame of decoder.push(bytes)) {
+          if (frame.type !== 'control') continue
+          const control = frame.message as { type: string; request: number }
+          if (control.type === 'hello') {
+            socket.write(
+              encodeControl({
+                type: 'hello',
+                version: 1,
+                capabilities: [],
+                pid: process.pid,
+                cgroup: null,
+                startedAt: new Date().toISOString(),
+                build: { release: `connection-${index}`, commit: null, dirtyFiles: null },
+              }),
+            )
+            continue
+          }
+          if (control.type !== 'list') continue
+          const reply = () => {
+            if (index === 1 && mode === 'close') return socket.destroy()
+            return socket.write(
+              encodeControl({ type: 'list', request: control.request, sessions: [] }),
+            )
+          }
+          if (index === 1) firstList.resolve(reply)
+          else reply()
+        }
+      })
+    })
+    await new Promise<void>((resolve) => server.listen(host.paths.socket, resolve))
+    try {
+      const opening = host.client.host().catch((error: unknown) => error)
+      const completeRetired = await firstList.promise
+      host.client.close()
+      const fresh = await host.client.host()
+      expect(fresh.build.release).toBe('connection-2')
+      expect(await host.client.probe()).toEqual(fresh)
+      completeRetired()
+      const retired = await opening
+      expect(await host.client.probe()).toEqual(fresh)
+      expect(host.client.info()).toEqual(fresh)
+      expect(await host.client.list()).toEqual([])
+      expect(retired).toMatchObject({ code: 'terminal.HOST_UNREACHABLE' })
+      expect(connections).toBe(2)
+    } finally {
+      host.client.close()
+      for (const socket of sockets) socket.destroy()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
   },
 )

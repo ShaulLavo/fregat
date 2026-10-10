@@ -23,6 +23,7 @@ import {
 } from './live-terminal.mjs'
 import { PROTOCOL_VERSION } from '../../apps/server/src/terminal-host/protocol'
 import { withTerminalCheck } from './live-terminal-scope'
+import { liveTerminalEnv } from './live-terminal-env'
 
 const prompt = 'fregat-live-check$'
 
@@ -97,12 +98,14 @@ async function checkLiveTerminal(target: URL, out: string, releaseRoot: string) 
         await writeFile(path.join(webRoot, 'index.html'), template)
         const shell = Bun.which('sh')
         if (!shell) throw createScriptError('The terminal live check requires a POSIX shell.')
+        const environment = liveTerminalEnv(directory, shell)
+        // Chromium also keeps its ancillary user files inside this disposable HOME.
         process.env.HOME = directory
-        process.env.SHELL = shell
-        process.env.PS1 = `${prompt} `
-        delete process.env.ENV
-        delete process.env.BASH_ENV
         server = await startIsolatedServer(undefined, {
+          environment,
+          onCreate: (owned) => {
+            server = owned
+          },
           webRoot,
           releaseRoot,
           handleSignals: false,

@@ -158,8 +158,10 @@ export class TerminalHostClient {
   }
 
   private connection() {
-    this.connecting ??= this.open(++this.generation).catch((error: unknown) => {
-      this.connecting = null
+    if (this.connecting) return this.connecting
+    const generation = ++this.generation
+    this.connecting = this.open(generation).catch((error: unknown) => {
+      if (this.generation === generation) this.connecting = null
       throw error
     })
     return this.connecting
@@ -173,7 +175,9 @@ export class TerminalHostClient {
     let attempts = 0
     for (;;) {
       attempts += 1
+      this.assertOpening(generation)
       const socket = await connectSocket(paths.socket)
+      this.assertOpening(generation, socket)
       const connected = socket
         ? await this.handshake(
             socket,
@@ -182,6 +186,7 @@ export class TerminalHostClient {
             HOST_CONNECT_TIMEOUT_MS - elapsedMs(startedAt),
           )
         : null
+      this.assertOpening(generation, socket)
       if (connected) {
         const identity = readHostIdentity(paths.manifest)
         if (
@@ -199,8 +204,8 @@ export class TerminalHostClient {
             },
           })
         }
-        this.description = connected.hello
         const sessions = await connected.connection.list()
+        this.assertOpening(generation, socket)
         recordProcessInfo(launched ? 'terminal.host.launch' : 'terminal.host.adopt', {
           area: 'terminal',
           attempts,
@@ -212,11 +217,13 @@ export class TerminalHostClient {
           launched,
           protocol: connected.hello.version,
         })
+        this.description = connected.hello
         this.retained = connected
         return connected
       }
       if (!socket && !launched) {
         await this.launch(this.hostArgv(), this.env)
+        this.assertOpening(generation)
         launched = true
       }
       if (elapsedMs(startedAt) > HOST_CONNECT_TIMEOUT_MS)
@@ -233,6 +240,14 @@ export class TerminalHostClient {
     }
   }
 
+  private assertOpening(generation: number, socket?: net.Socket | null) {
+    if (this.generation === generation) return
+    socket?.destroy()
+    throw terminalHostErrors.HOST_UNREACHABLE({
+      internal: { reason: 'retired-opening', generation, currentGeneration: this.generation },
+    })
+  }
+
   private async handshake(
     socket: net.Socket,
     token: string,
@@ -242,7 +257,7 @@ export class TerminalHostClient {
     try {
       return await HostConnection.handshake(socket, token, {
         onClose: (orphans) => {
-          if (this.generation === generation && this.description) {
+          if (this.generation === generation) {
             this.connecting = null
             this.description = null
             this.retained = null

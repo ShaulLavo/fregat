@@ -385,3 +385,77 @@ it.skipIf(process.platform === 'win32')(
   },
   20_000,
 )
+
+it.skipIf(process.platform === 'win32')(
+  'retains the outer HOME and a cleanup handle when startup fails after launching a paused host',
+  async () => {
+    const { withTerminalCheck } = await import('../deploy/live-terminal-scope')
+    const { processStart, stopTerminalHost } =
+      await import('../../apps/server/src/terminal-host/identity')
+    const root = mkdtempSync(path.join(tmpdir(), 'isolated-acquisition-'))
+    const release = path.join(root, 'release')
+    const receipt = path.join(root, 'host.json')
+    mkdirSync(path.join(release, 'server'), { recursive: true })
+    writeFileSync(path.join(release, 'build-config.json'), '{}')
+    writeFileSync(
+      path.join(release, 'server', 'index.js'),
+      `
+      import { TerminalHostClient } from ${JSON.stringify(new URL('../../apps/server/src/terminal/host-client.ts', import.meta.url).href)};
+      import { processStart } from ${JSON.stringify(new URL('../../apps/server/src/terminal-host/identity.ts', import.meta.url).href)};
+      const client = new TerminalHostClient({ stateRoot: process.env.PLATFORM_HOME });
+      const host = await client.host();
+      process.kill(host.pid, 'SIGSTOP');
+      await Bun.write(${JSON.stringify(receipt)}, JSON.stringify({ pid: host.pid, start: processStart(host.pid), stateRoot: process.env.PLATFORM_HOME, runtime: process.env.XDG_RUNTIME_DIR, home: process.env.HOME }));
+      client.close();
+      process.exit(1);
+    `,
+    )
+    let owned: IsolatedServer | undefined
+    let outer = ''
+    try {
+      const result = await withTerminalCheck(
+        root,
+        async (directory) => {
+          outer = directory
+          vi.stubEnv('HOME', directory)
+          try {
+            await startIsolatedServer(undefined, {
+              releaseRoot: release,
+              scratchRoot: root,
+              handleSignals: false,
+              onCreate: (server) => {
+                owned = server
+              },
+            })
+          } catch {}
+        },
+        async () => {
+          await owned?.stop()
+        },
+      ).catch((error: unknown) => error)
+      const record = JSON.parse(readFileSync(receipt, 'utf8'))
+      expect(processStart(record.pid)).toBe(record.start)
+      expect(record.home).toBe(outer)
+      expect(existsSync(outer)).toBe(true)
+      expect(existsSync(record.stateRoot)).toBe(true)
+      expect(owned).toBeDefined()
+      expect(result).toBeInstanceOf(Error)
+      process.kill(record.pid, 'SIGCONT')
+      await owned!.stop()
+      expect(processStart(record.pid)).not.toBe(record.start)
+      expect(existsSync(owned!.directory)).toBe(false)
+    } finally {
+      vi.unstubAllEnvs()
+      if (existsSync(receipt)) {
+        const record = JSON.parse(readFileSync(receipt, 'utf8'))
+        if (processStart(record.pid) === record.start) {
+          process.kill(record.pid, 'SIGCONT')
+          await stopTerminalHost(record.stateRoot, { XDG_RUNTIME_DIR: record.runtime })
+        }
+      }
+      await owned?.stop()
+      rmSync(root, { recursive: true, force: true })
+    }
+  },
+  30_000,
+)
