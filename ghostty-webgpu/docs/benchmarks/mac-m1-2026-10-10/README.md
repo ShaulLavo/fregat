@@ -10,7 +10,7 @@ Published 2026-10-10 from the terminal performance wave's one-build standing. Th
 
 The source is ghostty-webgpu 0.3.21 at Fregat commit `fb67ac08ded224fd6579389a23796e015ee23d5c`, paired with xterm.js 6.0.0, WebGL addon 0.19.0 and, on one Unicode line per tick, Unicode 11 addon 0.9.0. The machine is an Apple M1 MacBook on AC power, running headed Chrome 154.0.8037.93 with hardware ANGLE Metal rendering. All nine cells used the corrected R08 harness, which prepares fixture inputs before the measured window.
 
-Each workload has 17 visible 40 × 12 terminals at DPR 2, 120 warm-up ticks and 900 measured ticks paced at 60 Hz. Each cell has two chronological ghostty and xterm.js pairs, ordered ABBA or BAAB. The result is the median of the two pair ratios, not a ratio of separately calculated medians. A browser session also holds windows of other renderers, so the two windows of a pair need not be adjacent.
+Each workload has 17 visible 40 × 12 terminals at DPR 2, 120 warm-up ticks and 900 measured ticks paced at 60 Hz. Each cell has two chronological ghostty and xterm.js pairs, ordered ABBA or BAAB. The result is the median of the two pair ratios, not a ratio of separately calculated medians. Each workload ran in its own browser session, and a session can also hold windows of other renderers, so the two windows of a pair need not be adjacent.
 
 Energy means macOS's kernel estimate of process CPU energy across the Chrome process family. Instructions are retired CPU instructions across those same processes. GPU-process CPU work is included. GPU-device and display energy are outside the measurement. Cycles, CPU seconds, core placement and effective clocks are diagnostics. CPU seconds are saved for context.
 

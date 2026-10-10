@@ -9,6 +9,8 @@ interface MeasurementScore {
   readonly historyRows: number
   readonly energy: number
   readonly instructions: number
+  readonly energyPairs: readonly number[]
+  readonly instructionPairs: readonly number[]
   readonly status: string
 }
 
@@ -20,6 +22,8 @@ export interface MeasurementRow {
   readonly history: string
   readonly energy: number
   readonly instructions: number
+  readonly energyPairs: readonly number[]
+  readonly instructionPairs: readonly number[]
   readonly verdict: Verdict
 }
 
@@ -80,14 +84,32 @@ export function measurementRows(scores: readonly MeasurementScore[]): Measuremen
       history: historyOf(row),
       energy: row.energy,
       instructions: row.instructions,
+      energyPairs: row.energyPairs,
+      instructionPairs: row.instructionPairs,
       verdict: verdictOf(row),
     }))
 }
 
 export const measurements = measurementRows(snapshot.scores)
 
+function direction(pairs: readonly number[]) {
+  if (pairs.every((value) => value < 1)) return 'lower'
+  if (pairs.every((value) => value >= 1)) return 'higher'
+  return 'mixed'
+}
+
+function evenNote(row: MeasurementRow) {
+  const energy = direction(row.energyPairs)
+  const instructions = direction(row.instructionPairs)
+  if (energy === 'mixed' && instructions === 'mixed')
+    return 'Roughly even. The two pairs disagree on energy and instructions.'
+  if (instructions === 'higher')
+    return `Roughly even. Energy is ${energy} and instructions are higher in both pairs, which the review records as an instruction loss.`
+  return 'Roughly even.'
+}
+
 export function rowNote(row: MeasurementRow) {
-  if (row.verdict === 'even') return 'Roughly even.'
+  if (row.verdict === 'even') return evenNote(row)
   if (row.verdict === 'win') return ''
   return `Loss: about ${Math.round((row.energy - 1) * 100)}% more CPU energy.`
 }

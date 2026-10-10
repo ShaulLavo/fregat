@@ -18,6 +18,8 @@ test('uses all nine reviewed scores, including the near-even workloads', () => {
     history: 'Equal by construction',
     energy: 0.9861,
     instructions: 1.0016,
+    energyPairs: [0.9889, 0.9832],
+    instructionPairs: [1.0002, 1.003],
     verdict: 'even',
   })
   expect(measurements).toContainEqual({
@@ -26,6 +28,8 @@ test('uses all nine reviewed scores, including the near-even workloads', () => {
     history: 'Equal by construction',
     energy: 1.0078,
     instructions: 0.9982,
+    energyPairs: [0.9974, 1.0181],
+    instructionPairs: [0.9843, 1.0122],
     verdict: 'even',
   })
   expect(measurements).toContainEqual({
@@ -34,6 +38,8 @@ test('uses all nine reviewed scores, including the near-even workloads', () => {
     history: '9,572 final rows',
     energy: 0.6107,
     instructions: 0.6146,
+    energyPairs: [0.6024, 0.6191],
+    instructionPairs: [0.6073, 0.6218],
     verdict: 'win',
   })
 })
@@ -47,7 +53,10 @@ test('charts every reviewed row under its renderer tab and names the unavailable
     'One Unicode line per tick',
     'Typing-like edits',
   ])
-  expect(even.map(rowNote)).toEqual(['Roughly even.', 'Roughly even.'])
+  expect(even.map(rowNote)).toEqual([
+    'Roughly even. Energy is lower and instructions are higher in both pairs, which the review records as an instruction loss.',
+    'Roughly even. The two pairs disagree on energy and instructions.',
+  ])
   const dom = benchTabs.find((tab) => tab.id === 'dom')
   expect(dom?.method).toContain('One Unicode line per tick is unavailable')
 })
@@ -93,6 +102,8 @@ test('omits experimental rows and preserves reviewed losses', () => {
       history: '8,841 final rows',
       energy: 2,
       instructions: 3,
+      energyPairs: [0.6228, 0.6015],
+      instructionPairs: [0.6126, 0.6135],
       verdict: 'loss',
     },
   ])

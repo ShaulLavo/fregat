@@ -2,7 +2,7 @@
   "generated": "2026-10-10",
   "status": "Reviewed one-build standing, ghostty-webgpu 0.3.21. Qualified with limits; two balanced pairs per workload.",
   "conditions": {
-    "host": "Apple M1 MacBook, AC power, quiet load",
+    "host": "Apple M1 MacBook, AC power, load-guarded",
     "browser": "headed Google Chrome 154.0.8037.93, hardware GPU (Metal)",
     "setup": "17 terminals, 40x12 cells each, device pixel ratio 2, 120 warm-up ticks then 900 measured ticks paced at 60 Hz, two balanced pairs per workload",
     "pairing": "Two balanced same-session pairs per workload, ordered ABBA or BAAB. Median of the two pair ratios, not ratio of medians.",

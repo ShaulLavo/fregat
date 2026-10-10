@@ -29,7 +29,8 @@ const pairOutcome = (row) => {
   const instructions = direction(row.instructionPairs)
   if (energy === 'mixed' && instructions === 'mixed') return 'Mixed across the two pairs'
   if (energy === instructions) return `${energy[0].toUpperCase()}${energy.slice(1)} in both pairs`
-  return `Energy ${energy}, instructions ${instructions}, in both pairs`
+  const scope = energy === 'mixed' || instructions === 'mixed' ? '' : ', in both pairs'
+  return `Energy ${energy}, instructions ${instructions}${scope}`
 }
 const number = (value) => value.toFixed(3)
 const less = (ratio, digits = 0) => ((1 - ratio) * 100).toFixed(digits)
@@ -68,10 +69,10 @@ const unavailable = data.unavailable
       `${labels[gap.workload]} is unavailable for DOM: ${gap.reason} It is neither a win nor a loss.`,
   )
   .join(' ')
-const sinceRun = `Later builds improve Pi Canvas ([#1248](${fregat}1248)), Pi WebGL ([#1256](${fregat}1256)) and Mac DOM typing-like edits ([#1210](${fregat}1210)). No review covers them yet, so they are not in these tables.`
+const sinceRun = `Later builds have unreviewed changes aimed at Pi Canvas ([#1248](${fregat}1248)), Pi WebGL ([#1256](${fregat}1256)) and Mac DOM typing-like edits ([#1210](${fregat}1210)). No review covers them yet, so they are not in these tables.`
 const report = `# Terminal comparison benchmarks
 
-Reviewed one-build standing, published 2026-10-10. These are instrumented whole-terminal measurements of ghostty-webgpu ${versions['ghostty-webgpu']} (Fregat commit \`${runtimeCommit}\`) with the corrected R08 harness. They measure CPU work and estimated CPU energy while terminals receive paced output, and they show workload-specific results from one Mac session. Later builds are not measured here.
+Reviewed one-build standing, published 2026-10-10. These are instrumented whole-terminal measurements of ghostty-webgpu ${versions['ghostty-webgpu']} (Fregat commit \`${runtimeCommit}\`) with the corrected R08 harness. They measure CPU work and estimated CPU energy while terminals receive paced output, and they show workload-specific results from one Mac on the evening of 2026-10-09 UTC. Later builds are not measured here.
 
 Every ratio is ghostty divided by xterm.js. Below 1 means ghostty uses less. Energy and instructions are the efficiency metrics. CPU seconds appear for context. Apple Silicon changes its clock speed with load, so a run that does less work can take more CPU seconds. See [the counter investigation](https://github.com/ShaulLavo/fregat/issues/925).
 
@@ -79,7 +80,7 @@ Every ratio is ghostty divided by xterm.js. Below 1 means ghostty uses less. Ene
 
 ## WebGL vs xterm.js WebGL
 
-Apple M1 MacBook, AC power, headed Chrome 154.0.8037.93, hardware ANGLE Metal GPU. Acquired 2026-10-09 UTC, reviewed 2026-10-10. ghostty-webgpu ${versions['ghostty-webgpu']}; xterm.js ${versions['@xterm/xterm']} with WebGL addon ${versions['@xterm/addon-webgl']}, plus its Unicode 11 addon ${versions['@xterm/addon-unicode11']} on one Unicode line per tick. 40 × 12 cells, DPR 2, a 560 × 456-pixel drawing buffer for both libraries, 17 visible terminals. Each workload has 120 warm-up ticks and 900 measured ticks paced at 60 Hz. The table reports the median of two balanced pair ratios in one browser session. Counters cover the endpoint-enumerated Chrome process family, including GPU-process CPU work.
+Apple M1 MacBook, AC power, headed Chrome 154.0.8037.93, hardware ANGLE Metal GPU. Acquired 2026-10-09 UTC, reviewed 2026-10-10. ghostty-webgpu ${versions['ghostty-webgpu']}; xterm.js ${versions['@xterm/xterm']} with WebGL addon ${versions['@xterm/addon-webgl']}, plus its Unicode 11 addon ${versions['@xterm/addon-unicode11']} on one Unicode line per tick. 40 × 12 cells, DPR 2, a 560 × 456-pixel drawing buffer for both libraries, 17 visible terminals. Each workload has 120 warm-up ticks and 900 measured ticks paced at 60 Hz. Each row is the median of two balanced pair ratios from one browser session, and every workload ran in its own session. Counters cover the endpoint-enumerated Chrome process family, including GPU-process CPU work.
 
 ${table(gl)}
 
@@ -95,7 +96,7 @@ Same machine, browser, build and dates. ghostty-webgpu ${versions['ghostty-webgp
 
 ${table(dom)}
 
-DOM uses ${less(pick(dom, 'rolling-logs').energy)}% less estimated CPU energy and ${less(pick(dom, 'rolling-logs').instructions)}% fewer instructions on heavy log output. The same two figures are ${lessBoth(dom, 'rolling-unicode-logs')} on heavy Unicode output and ${lessBoth(dom, 'line-scroll')} on one ASCII line per tick. Typing-like edits are even: median energy is ${more(domEdits.energy, 1)}% higher, median instructions are ${less(domEdits.instructions, 1)}% lower, and the two pairs disagree on both.
+DOM uses ${less(pick(dom, 'rolling-logs').energy)}% less estimated CPU energy and ${less(pick(dom, 'rolling-logs').instructions)}% fewer instructions on heavy log output. The same two figures are ${lessBoth(dom, 'rolling-unicode-logs')} on heavy Unicode output and ${lessBoth(dom, 'line-scroll')} on one ASCII line per tick. Typing-like edits are even: median energy is ${more(domEdits.energy, 1)}% higher, median instructions are ${less(domEdits.instructions, 1)}% lower, and the two pairs disagree on both energy and instructions.
 
 ${unavailable}
 

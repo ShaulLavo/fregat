@@ -37,7 +37,7 @@ Each ratio is ghostty divided by xterm.js. Below 1 means ghostty uses less estim
 | One ASCII line per tick   |            0.955 |             0.985 |
 | Typing-like edits         |            0.911 |             0.954 |
 
-Heavy output uses about 39% less energy and fewer instructions. Scrolling and typing-like edits are lower by smaller margins. One Unicode line per tick is even: energy is 1.4% lower and instructions are 0.2% higher in both pairs.
+Heavy output uses about 39% less energy and fewer instructions. Scrolling and typing-like edits are lower by smaller margins. One Unicode line per tick is even: energy is 1.4% lower and instructions are 0.2% higher in both pairs, which the review records as an instruction loss.
 These whole-browser counters measure CPU work and estimated CPU energy. The review marks every row publishable with limits. Two pairs per row, retained-history limits and observer qualifications matter.
 Read the [method and recompute steps](https://github.com/ShaulLavo/fregat/blob/main/ghostty-webgpu/docs/benchmarks/mac-m1-2026-10-10/README.md) before applying the results to your workload.
 

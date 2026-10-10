@@ -1,6 +1,6 @@
 # Terminal comparison benchmarks
 
-Reviewed one-build standing, published 2026-10-10. These are instrumented whole-terminal measurements of ghostty-webgpu 0.3.21 (Fregat commit `fb67ac08ded224fd6579389a23796e015ee23d5c`) with the corrected R08 harness. They measure CPU work and estimated CPU energy while terminals receive paced output, and they show workload-specific results from one Mac session. Later builds are not measured here.
+Reviewed one-build standing, published 2026-10-10. These are instrumented whole-terminal measurements of ghostty-webgpu 0.3.21 (Fregat commit `fb67ac08ded224fd6579389a23796e015ee23d5c`) with the corrected R08 harness. They measure CPU work and estimated CPU energy while terminals receive paced output, and they show workload-specific results from one Mac on the evening of 2026-10-09 UTC. Later builds are not measured here.
 
 Every ratio is ghostty divided by xterm.js. Below 1 means ghostty uses less. Energy and instructions are the efficiency metrics. CPU seconds appear for context. Apple Silicon changes its clock speed with load, so a run that does less work can take more CPU seconds. See [the counter investigation](https://github.com/ShaulLavo/fregat/issues/925).
 
@@ -8,7 +8,7 @@ Every ratio is ghostty divided by xterm.js. Below 1 means ghostty uses less. Ene
 
 ## WebGL vs xterm.js WebGL
 
-Apple M1 MacBook, AC power, headed Chrome 154.0.8037.93, hardware ANGLE Metal GPU. Acquired 2026-10-09 UTC, reviewed 2026-10-10. ghostty-webgpu 0.3.21; xterm.js 6.0.0 with WebGL addon 0.19.0, plus its Unicode 11 addon 0.9.0 on one Unicode line per tick. 40 × 12 cells, DPR 2, a 560 × 456-pixel drawing buffer for both libraries, 17 visible terminals. Each workload has 120 warm-up ticks and 900 measured ticks paced at 60 Hz. The table reports the median of two balanced pair ratios in one browser session. Counters cover the endpoint-enumerated Chrome process family, including GPU-process CPU work.
+Apple M1 MacBook, AC power, headed Chrome 154.0.8037.93, hardware ANGLE Metal GPU. Acquired 2026-10-09 UTC, reviewed 2026-10-10. ghostty-webgpu 0.3.21; xterm.js 6.0.0 with WebGL addon 0.19.0, plus its Unicode 11 addon 0.9.0 on one Unicode line per tick. 40 × 12 cells, DPR 2, a 560 × 456-pixel drawing buffer for both libraries, 17 visible terminals. Each workload has 120 warm-up ticks and 900 measured ticks paced at 60 Hz. Each row is the median of two balanced pair ratios from one browser session, and every workload ran in its own session. Counters cover the endpoint-enumerated Chrome process family, including GPU-process CPU work.
 
 | Workload                  | History          | CPU energy ratio | Instruction ratio | CPU seconds ratio | Pairs                                            | Evidence                                                                                                                                                                                                                                                                       |
 | ------------------------- | ---------------- | ---------------: | ----------------: | ----------------: | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -35,11 +35,11 @@ Same machine, browser, build and dates. ghostty-webgpu 0.3.21 DOM against xterm.
 | One ASCII line per tick | 889 rows         |            0.669 |             0.799 |             0.976 | Lower in both pairs        | [Counters](https://github.com/ShaulLavo/ghostty-webgpu/blob/main/docs/benchmarks/mac-m1-2026-10-10/counters/dom-line-scroll.json) · [Review](https://github.com/ShaulLavo/ghostty-webgpu/blob/main/docs/benchmarks/mac-m1-2026-10-10/reviews/r12-standing-mac.json)          |
 | Typing-like edits       | 0 rows           |            1.008 |             0.998 |             1.022 | Mixed across the two pairs | [Counters](https://github.com/ShaulLavo/ghostty-webgpu/blob/main/docs/benchmarks/mac-m1-2026-10-10/counters/dom-interactive-edits.json) · [Review](https://github.com/ShaulLavo/ghostty-webgpu/blob/main/docs/benchmarks/mac-m1-2026-10-10/reviews/r12-standing-mac.json)    |
 
-DOM uses 47% less estimated CPU energy and 41% fewer instructions on heavy log output. The same two figures are 41% and 38% on heavy Unicode output and 33% and 20% on one ASCII line per tick. Typing-like edits are even: median energy is 0.8% higher, median instructions are 0.2% lower, and the two pairs disagree on both.
+DOM uses 47% less estimated CPU energy and 41% fewer instructions on heavy log output. The same two figures are 41% and 38% on heavy Unicode output and 33% and 20% on one ASCII line per tick. Typing-like edits are even: median energy is 0.8% higher, median instructions are 0.2% lower, and the two pairs disagree on both energy and instructions.
 
 One Unicode line per tick is unavailable for DOM: xterm.js DOM settled to two different images within the same actor in both attempts, so the equal-output check failed. No qualified comparison exists. It is neither a win nor a loss.
 
-Later builds improve Pi Canvas ([#1248](https://github.com/ShaulLavo/fregat/pull/1248)), Pi WebGL ([#1256](https://github.com/ShaulLavo/fregat/pull/1256)) and Mac DOM typing-like edits ([#1210](https://github.com/ShaulLavo/fregat/pull/1210)). No review covers them yet, so they are not in these tables.
+Later builds have unreviewed changes aimed at Pi Canvas ([#1248](https://github.com/ShaulLavo/fregat/pull/1248)), Pi WebGL ([#1256](https://github.com/ShaulLavo/fregat/pull/1256)) and Mac DOM typing-like edits ([#1210](https://github.com/ShaulLavo/fregat/pull/1210)). No review covers them yet, so they are not in these tables.
 
 ## Reviewed in the same standing, not published here
 
