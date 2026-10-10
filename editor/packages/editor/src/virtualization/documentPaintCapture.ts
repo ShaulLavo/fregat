@@ -170,6 +170,7 @@ function captureRuns(
       for (const token of styles) {
         if (token.start > start || token.end < end) continue
         const resolved = resolvedStyles.get(token.style) ?? resolveTokenStyle(parent, token.style)
+        if (!resolved) return null
         resolvedStyles.set(token.style, resolved)
         style = {
           ...style,
@@ -184,22 +185,48 @@ function captureRuns(
   return mergeRuns(runs)
 }
 
-function resolveTokenStyle(parent: HTMLElement, token: EditorTokenStyle): EditorTokenStyle {
-  const probe = parent.ownerDocument.createElement('span')
-  probe.style.display = 'none'
-  if (token.color) probe.style.color = token.color
-  if (token.backgroundColor) probe.style.backgroundColor = token.backgroundColor
-  // Syntax variables inherit from the active editor theme and its surrounding stylesheet.
-  parent.append(probe)
+function resolveTokenStyle(parent: HTMLElement, token: EditorTokenStyle): EditorTokenStyle | null {
+  if (!token.color && !token.backgroundColor) return token
+  const document = parent.ownerDocument
+  const view = document.defaultView!
+  const context = view.getComputedStyle(parent)
+  const host = document.createElement('div')
+  host.style.setProperty('all', 'initial', 'important')
+  host.style.setProperty('display', 'none', 'important')
+  // Shadow isolation prevents page selectors from changing the token's paint context.
+  const probe = document.createElement('span')
+  host.attachShadow({ mode: 'closed' }).append(probe)
+  for (const property of context) {
+    if (!property.startsWith('--')) continue
+    probe.style.setProperty(property, context.getPropertyValue(property) || 'initial')
+  }
+  probe.style.color = context.color
+  probe.style.colorScheme = context.colorScheme
+  // Custom properties expose failed substitution before colour declarations fall back.
+  if (token.color) probe.style.setProperty('--document-paint-color', token.color)
+  if (token.backgroundColor)
+    probe.style.setProperty('--document-paint-background', token.backgroundColor)
+  document.documentElement.append(host)
   try {
-    const computed = parent.ownerDocument.defaultView!.getComputedStyle(probe)
+    const substituted = view.getComputedStyle(probe)
+    const color = substituted.getPropertyValue('--document-paint-color').trim()
+    const background = substituted.getPropertyValue('--document-paint-background').trim()
+    if (token.color && (!color || !view.CSS.supports('color', color))) return null
+    if (
+      token.backgroundColor &&
+      (!background || !view.CSS.supports('background-color', background))
+    )
+      return null
+    if (token.color) probe.style.color = color
+    if (token.backgroundColor) probe.style.backgroundColor = background
+    const computed = view.getComputedStyle(probe)
     return {
       ...token,
       color: token.color ? computed.color : undefined,
       backgroundColor: token.backgroundColor ? computed.backgroundColor : undefined,
     }
   } finally {
-    probe.remove()
+    host.remove()
   }
 }
 

@@ -807,3 +807,71 @@ it('resolves token foreground, background, fallbacks and currentColor in their C
     backgroundColor: 'rgb(23, 45, 67)',
   })
 })
+
+it.each([
+  'url(https://example.com)',
+  'expression(alert(1))',
+  'var(--missing-token)',
+  'var(--cycle-token)',
+  'var(--invalid-token)',
+])('refuses invalid or unresolved token colour %s', async (value) => {
+  const { host, editor } = mount('alpha beta\nlast', false, 'Snapshot Mono', false)
+  host.style.setProperty('--cycle-token', 'var(--cycle-token)')
+  host.style.setProperty('--invalid-token', 'url(https://example.com)')
+  for (const property of ['color', 'backgroundColor'] as const) {
+    editor.setTokens([{ start: 0, end: 5, style: { [property]: value } }])
+    await frames()
+    expect(editor.captureSnapshot({ scope: 'document' }).status).toBe('unsupported')
+  }
+})
+
+it.each(['light', 'dark'] as const)(
+  'resolves colours in the active %s colour scheme',
+  async (scheme) => {
+    const { host, editor } = mount('alpha beta\nlast', false, 'Snapshot Mono', false)
+    host.style.colorScheme = scheme
+    editor.setTokens([
+      { start: 0, end: 5, style: { color: 'light-dark(rgb(12, 34, 56), rgb(78, 90, 12))' } },
+    ])
+    await frames()
+    const saved = editor.captureSnapshot({ scope: 'document' })
+    expect(saved.status, JSON.stringify(saved)).toBe('ready')
+    if (saved.status !== 'ready') return
+    const paint = decodePaintSnapshot(saved.paint)!
+    expect(paint.format).toBe(6)
+    if (paint.format !== 6) return
+    expect(paint.rows[0]!.runs[0]!.style.color).toBe(
+      scheme === 'light' ? 'rgb(12, 34, 56)' : 'rgb(78, 90, 12)',
+    )
+  },
+)
+
+it('isolates token resolution from hostile descendant CSS', async () => {
+  const { host, editor } = mount('alpha beta\nlast', false, 'Snapshot Mono', false)
+  const stylesheet = document.createElement('style')
+  stylesheet.textContent =
+    '#document-paint-proof .editor-virtualized-row > span { color: rgb(0, 0, 255) !important; }'
+  document.head.append(stylesheet)
+  try {
+    editor.setTokens([{ start: 0, end: 5, style: { color: 'rgb(255, 0, 0)' } }])
+    await frames()
+    const live = await pixels('hostile-css-live')
+    const saved = editor.captureSnapshot({ scope: 'document' })
+    expect(saved.status, JSON.stringify(saved)).toBe('ready')
+    if (saved.status !== 'ready') return
+    const paint = decodePaintSnapshot(saved.paint)!
+    expect(paint.format).toBe(6)
+    if (paint.format !== 6) return
+    expect(paint.rows[0]!.runs[0]!.style.color).toBe('rgb(255, 0, 0)')
+    const overlay = document.createElement('div')
+    overlay.style.cssText = 'position:absolute;inset:0'
+    host.append(overlay)
+    const restored = mountPaintSnapshot(overlay, paint, { width: 1280 })!
+    host.querySelector<HTMLElement>('.editor-virtualized')!.style.visibility = 'hidden'
+    expect(changedPixels(live, await pixels('hostile-css-static'))).toBe(0)
+    restored.dispose()
+    overlay.remove()
+  } finally {
+    stylesheet.remove()
+  }
+})
