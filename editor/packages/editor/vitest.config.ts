@@ -6,12 +6,21 @@ import { workspaceRoot } from '../../scripts/workspace-root.ts'
 import { playwright } from '@vitest/browser-playwright'
 import { devices } from '@playwright/test'
 import { defineConfig } from 'vitest/config'
+import type { BrowserCommand } from 'vitest/node'
 
 const crossEngineScrollTests = [
   'test/{virtualizedTextView,virtualizedTextViewGeometry,wheelScrollTarget,gutterScroll,gutterLeadingInset,gutterPointerEvents,wrappedLineGutter,mouseSelectionAutoScroll,navigationReveal,initialViewport,firstPaint,longLineMeasurements,millionLinePaint,codeViewport,renderDisposal,rowPresentation,proportionalRows,proportionalWrap,freeSansShaping,freeSansNativeCarets,wordWrap,defaultLargeDocument,metricProbeScrollExtent,tailGeometry,typography}.browser.test.ts',
 ]
 
 let contentEvidence: string | undefined
+let highlightEvidence: string | undefined
+
+const proofStyledWrapScreenshot: BrowserCommand = async ({ iframe, project }, width: number) => {
+  const directory = mkdtempSync(join(tmpdir(), 'singapore-styled-wrap-'))
+  const path = join(directory, `${project.name}-${width}.png`)
+  await iframe.locator('[data-styled-wrap-proof]').screenshot({ path, animations: 'disabled' })
+  return path
+}
 
 export default defineConfig({
   server: { fs: { allow: [workspaceRoot] } },
@@ -72,6 +81,7 @@ export default defineConfig({
             fileParallelism: false,
             provider: playwright(),
             commands: {
+              proofStyledWrapScreenshot,
               proofClipboardPermissions: async ({ page }) => {
                 await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
               },
@@ -206,8 +216,12 @@ export default defineConfig({
             viewport: { width: 390, height: 844 },
             fileParallelism: false,
             provider: playwright({ contextOptions: devices['iPhone 13'] }),
+            commands: {
+              proofStyledWrapScreenshot,
+            },
             instances: [
               { browser: 'chromium', name: 'wrap-layout-chromium' },
+              { browser: 'firefox', name: 'wrap-layout-firefox', provider: playwright() },
               { browser: 'webkit', name: 'wrap-layout-iphone-webkit' },
             ],
           },
@@ -267,10 +281,22 @@ export default defineConfig({
                 })
                 return image.toString('base64')
               },
-              proofHighlightPaintScreenshot: async ({ iframe }, hostId: string) => {
+              proofHighlightPaintScreenshot: async (
+                { iframe, project },
+                hostId: string,
+                label?: string,
+              ) => {
+                if (label)
+                  highlightEvidence ??= mkdtempSync(join(tmpdir(), 'singapore-highlight-boundary-'))
+                const path = label
+                  ? join(highlightEvidence!, `${project.name}-${label}.png`)
+                  : undefined
                 const image = await iframe
-                  .locator(`#${hostId} [data-editor-virtual-row="0"]`)
-                  .screenshot({ animations: 'disabled' })
+                  .locator(
+                    `#${hostId} [data-editor-virtual-row="0"], #${hostId} [data-editor-document-paint-row="0"]`,
+                  )
+                  .screenshot({ animations: 'disabled', path })
+                if (path) console.info('Highlight boundary evidence', path)
                 return image.toString('base64')
               },
             },
