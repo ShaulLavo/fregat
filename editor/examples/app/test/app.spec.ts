@@ -1,4 +1,150 @@
 import { expect, test } from '@playwright/test'
+import { mockGitHubSourceFiles } from './github-source.ts'
+
+test('shows the tree before source text and reserves downloads for the selected file', async ({
+  page,
+}, testInfo) => {
+  const files = [{ path: 'README.md', text: '# Ready' }].concat(
+    Array.from({ length: 20 }, (_, index) => ({
+      path: `src/file-${index}.ts`,
+      text: `export const value${index} = ${index};`,
+    })),
+  )
+  await mockGitHubSourceFiles(page, files)
+  const requests: string[] = []
+  let release: () => void = () => undefined
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('https://raw.githubusercontent.com/**', async (route) => {
+    requests.push(route.request().url())
+    await blocked
+    await route.fallback()
+  })
+  await page.addInitScript(() => localStorage.clear())
+
+  try {
+    await page.goto('/')
+    await expect(page.locator('#tree .entry')).toHaveCount(2)
+    await expect(page.locator('[data-source-path="README.md"]')).toHaveAttribute(
+      'aria-busy',
+      'true',
+    )
+    expect(requests).toHaveLength(1)
+    expect(requests[0]).toContain('/README.md')
+    await testInfo.attach('tree-before-content', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    })
+    await testInfo.attach('downloads-before-first-file.json', {
+      body: JSON.stringify({ fileCount: files.length, requests }),
+      contentType: 'application/json',
+    })
+    release()
+    await expect(page.locator('.editor-virtualized')).toContainText('# Ready')
+    await expect.poll(() => requests.length).toBe(files.length)
+    await page.locator('[data-source-path="src/"]').click()
+    await expect(page.locator('#tree .entry.file')).toHaveCount(files.length)
+  } finally {
+    release()
+  }
+})
+
+test('deduplicates hover and click, holds the open file, and ignores late selections', async ({
+  page,
+}) => {
+  const files = [
+    { path: 'README.md', text: '# Original' },
+    { path: 'a.md', text: '# Background A' },
+    { path: 'b.md', text: '# Background B' },
+    { path: 'y.md', text: '# Latest selection' },
+    { path: 'z.md', text: '# Slow selection' },
+  ]
+  await mockGitHubSourceFiles(page, files)
+  const requests = new Map<string, number>()
+  let release: () => void = () => undefined
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('https://raw.githubusercontent.com/**', async (route) => {
+    const path = route.request().url().split('/').at(-1) ?? ''
+    requests.set(path, (requests.get(path) ?? 0) + 1)
+    if (['a.md', 'b.md', 'z.md'].includes(path)) await blocked
+    await route.fallback()
+  })
+  await page.addInitScript(() => localStorage.clear())
+
+  try {
+    await page.goto('/')
+    await expect(page.locator('.editor-virtualized')).toContainText('# Original')
+    await expect.poll(() => requests.get('b.md')).toBe(1)
+    expect(requests.has('y.md')).toBe(false)
+    const slow = page.locator('[data-source-path="z.md"]')
+    await slow.hover()
+    await expect.poll(() => requests.get('z.md')).toBe(1)
+    await slow.click()
+    await expect(slow).toHaveAttribute('aria-busy', 'true')
+    await expect(page.locator('#status-file')).toHaveText('README.md')
+    await expect(page.locator('.editor-virtualized')).toContainText('# Original')
+    expect(requests.get('z.md')).toBe(1)
+    await page.locator('[data-source-path="y.md"]').click()
+    await expect(page.locator('.editor-virtualized')).toContainText('# Latest selection')
+    release()
+    await expect(slow).toHaveAttribute('aria-busy', 'false')
+    await expect(page.locator('.editor-virtualized')).toContainText('# Latest selection')
+    await expect(page.locator('#status-file')).toHaveText('y.md')
+    await expect(page.locator('[data-source-path="y.md"]')).toHaveClass(/active/)
+    expect(requests.get('z.md')).toBe(1)
+  } finally {
+    release()
+  }
+})
+
+test('opens cached source while other cached objects are still missing', async ({ page }) => {
+  await mockGitHubSourceFiles(page, [
+    { path: 'README.md', text: '# Cached source' },
+    { path: 'src/missing.ts', text: 'export const missing = true;' },
+  ])
+  let rawReads = 0
+  let selectedReads = 0
+  await page.route('https://raw.githubusercontent.com/**', async (route) => {
+    rawReads += 1
+    if (route.request().url().endsWith('/README.md')) selectedReads += 1
+    if (route.request().url().endsWith('/missing.ts')) {
+      await route.fulfill({ status: 404 })
+      return
+    }
+    await route.fallback()
+  })
+  await page.addInitScript(() => localStorage.clear())
+  await page.goto('/')
+  await expect(page.locator('.editor-virtualized')).toContainText('# Cached source')
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory()
+        const cache = await root.getDirectoryHandle('editor-github-source-cache')
+        const objects = await cache.getDirectoryHandle('objects')
+        try {
+          return (await (await objects.getFileHandle('file-sha-0')).getFile()).text()
+        } catch {
+          return null
+        }
+      }),
+    )
+    .toBe('# Cached source')
+  rawReads = 0
+  selectedReads = 0
+  await page.route('https://api.github.com/**', (route) => route.fulfill({ status: 503 }))
+  await page.reload()
+  await expect(page.locator('.editor-virtualized')).toContainText('# Cached source')
+  await expect(page.locator('#tree .entry')).toHaveCount(2)
+  // Only the missing background object needs a network read after reloading.
+  await expect.poll(() => rawReads).toBeGreaterThan(0)
+  expect(selectedReads).toBe(0)
+  await page.locator('[data-source-path="README.md"]').click()
+  await expect(page.locator('#status-file')).toHaveText('README.md')
+})
 
 test('mounts the editor pane in the real app shell', async ({ page }) => {
   await page.goto('/')
@@ -365,44 +511,4 @@ async function mockGitHubSource(
   text: string,
 ): Promise<void> {
   await mockGitHubSourceFiles(page, [{ path, text }])
-}
-
-async function mockGitHubSourceFiles(
-  page: import('@playwright/test').Page,
-  files: readonly { readonly path: string; readonly text: string }[],
-): Promise<void> {
-  await page.route('https://api.github.com/repos/ShaulLavo/singapore/commits/main', (route) =>
-    route.fulfill({
-      json: {
-        sha: 'mock-commit-sha',
-        commit: { tree: { sha: 'tree-sha' } },
-      },
-    }),
-  )
-  await page.route(
-    'https://api.github.com/repos/ShaulLavo/singapore/git/trees/tree-sha?recursive=1',
-    (route) =>
-      route.fulfill({
-        json: {
-          sha: 'tree-sha',
-          truncated: false,
-          tree: files.map((file, index) => ({
-            path: file.path,
-            type: 'blob',
-            sha: `file-sha-${index}`,
-            size: file.text.length,
-          })),
-        },
-      }),
-  )
-  for (const file of files) {
-    await page.route(
-      `https://raw.githubusercontent.com/ShaulLavo/singapore/mock-commit-sha/${file.path}`,
-      (route) =>
-        route.fulfill({
-          body: file.text,
-          contentType: 'text/plain',
-        }),
-    )
-  }
 }
