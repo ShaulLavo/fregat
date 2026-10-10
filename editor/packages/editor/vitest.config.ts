@@ -6,12 +6,20 @@ import { workspaceRoot } from '../../scripts/workspace-root.ts'
 import { playwright } from '@vitest/browser-playwright'
 import { devices } from '@playwright/test'
 import { defineConfig } from 'vitest/config'
+import type { BrowserCommand } from 'vitest/node'
 
 const crossEngineScrollTests = [
   'test/{virtualizedTextView,virtualizedTextViewGeometry,wheelScrollTarget,gutterScroll,gutterLeadingInset,gutterPointerEvents,wrappedLineGutter,mouseSelectionAutoScroll,navigationReveal,initialViewport,firstPaint,longLineMeasurements,millionLinePaint,codeViewport,renderDisposal,rowPresentation,proportionalRows,proportionalWrap,freeSansShaping,freeSansNativeCarets,wordWrap,defaultLargeDocument,metricProbeScrollExtent,tailGeometry,typography}.browser.test.ts',
 ]
 
 let contentEvidence: string | undefined
+
+const proofStyledWrapScreenshot: BrowserCommand = async ({ iframe, project }, width: number) => {
+  const directory = mkdtempSync(join(tmpdir(), 'singapore-styled-wrap-'))
+  const path = join(directory, `${project.name}-${width}.png`)
+  await iframe.locator('[data-styled-wrap-proof]').screenshot({ path, animations: 'disabled' })
+  return path
+}
 
 export default defineConfig({
   server: { fs: { allow: [workspaceRoot] } },
@@ -72,6 +80,7 @@ export default defineConfig({
             fileParallelism: false,
             provider: playwright(),
             commands: {
+              proofStyledWrapScreenshot,
               proofClipboardPermissions: async ({ page }) => {
                 await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
               },
@@ -207,14 +216,7 @@ export default defineConfig({
             fileParallelism: false,
             provider: playwright({ contextOptions: devices['iPhone 13'] }),
             commands: {
-              proofStyledWrapScreenshot: async ({ iframe, project }, width: number) => {
-                const directory = mkdtempSync(join(tmpdir(), 'singapore-styled-wrap-'))
-                const path = join(directory, `${project.name}-${width}.png`)
-                await iframe
-                  .locator('[data-styled-wrap-proof]')
-                  .screenshot({ path, animations: 'disabled' })
-                return path
-              },
+              proofStyledWrapScreenshot,
             },
             instances: [
               { browser: 'chromium', name: 'wrap-layout-chromium' },
