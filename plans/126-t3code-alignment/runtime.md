@@ -1,3 +1,8 @@
+> Historical Plan 126 source and scope record. [Plan 343](../343-t3code-nightly-orchestration.md)
+> owns the Approved, deferred nightly rewrite at `bd2346eda2e2c380d1844869c7fd16c279d2190f`.
+> Preserve these receipts and remaining requirements. Recheck affected contracts and provider
+> behavior against nightly before implementing them.
+
 # Runtime, providers, persistence, and transport
 
 Baseline: Platform `3c9b88c35784e571e706600b0cee8e95a2656f77`; T3 Code `7445aa733ada33e45289e5aa5055f79142556513`. All upstream citations below refer to the pinned commit, read with `git -C references/t3code show <commit>:<path>`, not its older checkout. The local files cited had no diff from the Platform baseline in this scope. This is a two-pass source audit, not a live-provider equivalence claim. No application code, running process, credentials, or deployment was changed.

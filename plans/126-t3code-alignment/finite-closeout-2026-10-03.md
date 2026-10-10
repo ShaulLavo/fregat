@@ -1,3 +1,8 @@
+> Historical Plan 126 source and scope record. [Plan 343](../343-t3code-nightly-orchestration.md)
+> owns the Approved, deferred nightly rewrite at `bd2346eda2e2c380d1844869c7fd16c279d2190f`.
+> Preserve these receipts and remaining requirements. Recheck affected contracts and provider
+> behavior against nightly before implementing them.
+
 # Plan 126 finite closeout, October 3, 2026
 
 Status: Approved; finite engineering and reconciliation pass complete. The owner requested

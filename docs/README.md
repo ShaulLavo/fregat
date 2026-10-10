@@ -6,6 +6,7 @@ linked checkouts, checks and deployment. [AGENTS.md](../AGENTS.md) is the curren
 ## Work in progress
 
 - [Execution roadmap](../PLAN.md) and [plan index](../plans/README.md)
+- [T3 Code nightly reference](t3code-reference.md) and [deferred orchestration rewrite](../plans/343-t3code-nightly-orchestration.md)
 - [Wave register](../plans/waves.md)
 - [Native client roadmap](../plans/native-plan-of-plans.md)
 - [Remaining defect-audit questions](defect-audit-follow-ups.md)

@@ -50,7 +50,6 @@ test
   .for(['selected', 'cancelled', 'rejected', 'not-local'] as const)(
   'native helper integration: %s (requires POSIX executable helpers)',
   async (outcome, { server, client }) => {
-    void client
     delete window.platformBridge
     const chosen = path.join(server.root, 'chosen')
     await mkdir(chosen)
@@ -58,6 +57,15 @@ test
     if (outcome === 'rejected') paths = null
     if (outcome === 'cancelled') paths = []
     const calls = await installNativePickerHelper(server, paths)
+    if (outcome === 'not-local') {
+      // Exercise native locality independently of the device admission gate.
+      const setting = await client.settings.write.post({
+        mutationId: 'remote-picker-locality',
+        target: 'user',
+        operations: [{ kind: 'set', key: 'environments.devicePairing', value: false }],
+      })
+      expect(setting.status).toBe(200)
+    }
     let posts = 0
     const transport = createObservedInProcessClient(server, (request) => {
       if (new URL(request.url).pathname !== '/fs/native-picker') return

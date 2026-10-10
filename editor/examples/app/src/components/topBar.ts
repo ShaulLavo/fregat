@@ -11,6 +11,7 @@ export type TopBar = {
   readonly element: HTMLDivElement
   setRepositoryName(name: string): void
   setMessage(message: string): void
+  setFileStatus(message: string): void
   setBusyState(isBusy: boolean): void
   setHandlers(handlers: TopBarHandlers): void
   setViewMode(mode: AppViewMode): void
@@ -19,6 +20,7 @@ export type TopBar = {
 class TopBarController implements TopBar {
   readonly element = el('div', { id: 'toolbar' })
   private readonly repositoryName = el('span', { id: 'dir-name' })
+  private readonly fileStatus = el('span', { id: 'source-status', role: 'status' })
   private readonly editButton = toolbarButton('Edit')
   private readonly diffButton = toolbarButton('Diff')
 
@@ -26,7 +28,13 @@ class TopBarController implements TopBar {
     const collaboration = document.createElement('a')
     collaboration.href = './collaboration.html'
     collaboration.textContent = 'Edit together'
-    this.element.append(this.repositoryName, this.editButton, this.diffButton, collaboration)
+    this.element.append(
+      this.repositoryName,
+      this.fileStatus,
+      this.editButton,
+      this.diffButton,
+      collaboration,
+    )
     this.setViewMode('edit')
   }
 
@@ -36,6 +44,11 @@ class TopBarController implements TopBar {
 
   setMessage(message: string): void {
     this.repositoryName.textContent = message
+  }
+
+  setFileStatus(message: string): void {
+    this.fileStatus.textContent = message
+    this.fileStatus.title = message
   }
 
   setBusyState(_isBusy: boolean): void {

@@ -11,7 +11,7 @@ import { readReleaseDescriptor, releaseFileFor } from './release'
 import { webErrors } from './structured-errors'
 import type { AuthConfig } from '../auth'
 import { isCorsOriginAllowed } from '../auth'
-import { headersReader } from '../devices/trust'
+import { requestHeaderReader } from '../devices/trust'
 import type { SettingsStore } from '../settings/store'
 import type { PaletteLibrary } from '../themes/palette-library'
 import {
@@ -146,7 +146,7 @@ async function appearanceFor(
   context: WebBootstrapContext,
   apiBase: string,
 ): Promise<AppearanceBootstrap> {
-  if (context.auth.devices && !context.auth.devices.allows(headersReader(request.headers))) {
+  if (context.auth.devices && !context.auth.devices.allows(requestHeaderReader(request))) {
     return { payload: { version: 1, kind: 'pairing' }, paletteCSS: '' }
   }
   return createAppearanceBootstrap({

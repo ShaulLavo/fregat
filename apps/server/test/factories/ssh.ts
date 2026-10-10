@@ -13,6 +13,7 @@ import { parseDescriptor, type RemoteRecord } from '../../src/machines/records'
 import { reserveForwardPort, type SshChild, type SshSpawner } from '../../src/machines/forward'
 import { MachineService } from '../../src/machines/service'
 import type { ReleaseInstallation, ServerInstallation } from '../../src/installation/descriptor'
+import { relayPairingResponse } from './relay-pairing'
 import {
   IMAGE_WORKER,
   PAIR_COMMAND,
@@ -82,6 +83,7 @@ export async function fakeSsh(
   const events: Array<{ action: string; fields: Record<string, unknown> }> = []
   const forwardChildren: SshChild[] = []
   const requestedPorts: Array<number | undefined> = []
+  const requests: Array<{ url: string; init?: RequestInit }> = []
   let health = options.descriptor ?? descriptorValue
   let serverAvailable = true
   const spawn: SshSpawner = (command) => {
@@ -102,9 +104,10 @@ export async function fakeSsh(
     return child
   }
   const fetcher: typeof fetch = Object.assign(
-    async () => {
+    async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      requests.push({ url: String(input), init })
       if (!serverAvailable) throw new TypeError('The remote server refused the connection.')
-      return Response.json(health)
+      return relayPairingResponse(String(input), clientId) ?? Response.json(health)
     },
     { preconnect: fetch.preconnect },
   )
@@ -133,6 +136,7 @@ export async function fakeSsh(
     events,
     forwardChildren,
     requestedPorts,
+    requests,
     crashServer: () => {
       serverAvailable = false
     },

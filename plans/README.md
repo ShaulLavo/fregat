@@ -31,8 +31,9 @@ and links each retained failure or experiment to its owning execution plan.
 [Wave readiness review](wave-readiness-2026-10-03.md) records the large-program ordering and
 corrected launch dependencies. Upcoming wave order remains in root `PLAN.md`.
 
-[Plan 126 finite closeout](126-t3code-alignment/finite-closeout-2026-10-03.md) reconciles its
-delivered acceptance, monitoring/draft check, named follow-ons and owner-only receipts.
+[Plan 343](343-t3code-nightly-orchestration.md) owns the Approved, deferred T3 Code nightly
+orchestration rewrite. [Plan 126 finite closeout](126-t3code-alignment/finite-closeout-2026-10-03.md)
+retains historical deliveries, named follow-ons, and owner-only receipts.
 
 ## Current plan files
 
@@ -47,7 +48,7 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [112](112-large-file-ceiling.md)                      | The large-file ceiling: what we can actually open, and who gets to decide              |
 | [114](114-installed-app.md)                           | Installed app                                                                          |
 | [122](122-composable-plugins.md)                      | Composable, full-power plugins with selective execution                                |
-| [126](126-t3code-alignment.md)                        | Align Platform behavior with pinned T3 Code                                            |
+| [126](126-t3code-alignment.md)                        | Historical T3 alignment and retained product scope                                     |
 | [132](132-process-and-dev-ownership.md)               | Processes, leases and dev plumbing each get an owner                                   |
 | [139](139-acting-on-agent-diffs.md)                   | Act on the agent's diff                                                                |
 | [140](140-editor-agent-advantage.md)                  | The editor is the agent's advantage                                                    |
@@ -159,7 +160,6 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [285](285-ghostty-site-first-frame-and-real-shell.md) | The ghostty-webgpu site paints before the wasm and runs a real shell                   |
 | [286](286-ghostty-extensions.md)                      | ghostty-webgpu extensions, with a line editor first                                    |
 | [287](287-ghostty-worker-mode.md)                     | ghostty-webgpu worker mode: the terminal on an OffscreenCanvas worker                  |
-| [288](288-pr-preview-environments.md)                 | Preview environments for feature PRs                                                   |
 | [289](289-proxy-usage-feed.md)                        | Historical gateway feed, retired producer, and the Mesh TV panel                       |
 | [290](290-mesh-device-authorization.md)               | Approve devices before Mesh control                                                    |
 | [291](291-mesh-private-services.md)                   | Retire Mesh public hosting and preserve private apps                                   |
@@ -209,12 +209,17 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [340](340-singapore-site-embedding.md)                | Editor-produced first paint, page scrolling and matching static/live Singapore pages   |
 | [341](341-html-bootstrap.md)                          | Named HTML bootstrap, current first-paint appearance and native wallpaper preloads     |
 | [342](342-app-reactivity-and-async-ownership.md)      | Completed repairs: app reactivity, MCP and LSP ownership, site playback, TUI lifetimes |
+| [343](343-t3code-nightly-orchestration.md)            | Rewrite orchestration against published T3 Code nightly; Approved and deferred         |
 
 ## Package and client plans
 
 [PLAN.md](../PLAN.md) schedules all of these plans. Editor IDs and recorded statuses stay
 in the [Editor inventory](editor-backlog.md); its [manifest](editor-backlog.json) supports
 `bun run plans:check`. Source and delivery references remain with their packages.
+
+[Singapore TypeScript engines](singapore-typescript-engines.md) adds an explicit choice between
+Microsoft TypeScript and ts-rust WebAssembly, with Rust as the intended default after browser
+language-service parity is proven. Its first step owns the missing persistent WASM interface.
 
 | Plan                                                                                           | Topic                                                                                  |
 | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -259,7 +264,7 @@ in the [Editor inventory](editor-backlog.md); its [manifest](editor-backlog.json
 | [pane-zoom-plan.md](pane-zoom-plan.md)                                                         | Independent pane zoom implementation plan                                              |
 | [structured-semantic-search-evaluation-plan.md](structured-semantic-search-evaluation-plan.md) | Structured And Semantic Search Evaluation Plan                                         |
 | [t3code-chat-parity-gap-analysis.md](t3code-chat-parity-gap-analysis.md)                       | T3Code Chat Parity — Verified Gap Analysis and Roadmap                                 |
-| [t3code-parity-implementation-plan.md](t3code-parity-implementation-plan.md)                   | Historical T3 architecture phases; current owner 126                                   |
+| [t3code-parity-implementation-plan.md](t3code-parity-implementation-plan.md)                   | Historical T3 architecture phases; nightly owner 343                                   |
 | [tui-plan.md](tui-plan.md)                                                                     | TUI — Strategy                                                                         |
 | [workspace-content-engine-evaluation-plan.md](workspace-content-engine-evaluation-plan.md)     | Workspace Content Engine Evaluation Plan                                               |
 | [workspace-search-next-steps.md](workspace-search-next-steps.md)                               | Workspace search delivery and remaining UI verification                                |

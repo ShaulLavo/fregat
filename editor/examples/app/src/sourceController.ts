@@ -10,22 +10,20 @@ import type { Sidebar } from './components/sidebar.ts'
 import type { StatusBar } from './components/statusBar.ts'
 import type { TopBar } from './components/topBar.ts'
 import {
-  fetchRepositoryRef,
-  fetchRepositorySource,
   REPOSITORY_NAME,
   REPOSITORY_OWNER,
+  type SourceEntry,
   type SourceFile,
   type SourceSnapshot,
 } from './githubSource.ts'
-import { loadCachedSourceSnapshot, saveSourceSnapshotToCache } from './sourceCache.ts'
-import { findSourceFile, firstSourceFile } from './tree.ts'
+import { SourceLoader } from './sourceLoader.ts'
+import { findSourceEntry, firstSourceEntry } from './tree.ts'
 import { applyTextEdits, offsetEdits, type OffsetEdit } from './workspaceEdits.ts'
 
 const SELECTED_FILE_KEY = 'editor-selected-file'
 const DEFAULT_SELECTED_FILE = 'README.md'
 
 type SourceWorkspace = {
-  setWorkspaceFiles(files: readonly Pick<SourceFile, 'path' | 'text'>[]): void
   upsertWorkspaceFiles(files: readonly Pick<SourceFile, 'path' | 'text'>[]): void
   clearWorkspaceFiles(): void
 }
@@ -37,6 +35,9 @@ type SourceViewHosts = {
 
 export class SourceController {
   private currentSnapshot: SourceSnapshot | null = null
+  private readonly loader = new SourceLoader()
+  private readonly loadedFiles = new Map<string, SourceFile>()
+  private selectionRequest = 0
   private currentSelectedPath: string | undefined
   private isRefreshingSource = false
   private readonly topBar: TopBar
@@ -71,9 +72,18 @@ export class SourceController {
   }
 
   start(): void {
+    window.addEventListener('pagehide', this.onPageHide)
     this.statusBar.clear()
     this.topBar.setMessage('Loading cached source')
     void this.loadCachedThenRefresh()
+  }
+
+  private readonly onPageHide = (event: PageTransitionEvent): void => {
+    if (event.persisted) return
+    this.selectionRequest += 1
+    this.currentSnapshot = null
+    this.loader.dispose()
+    window.removeEventListener('pagehide', this.onPageHide)
   }
 
   updateStatus(state = this.editor.getState()): void {
@@ -84,17 +94,15 @@ export class SourceController {
     const snapshot = this.currentSnapshot
     if (!snapshot) return false
 
-    const file = findSourceFile(snapshot.files, target.path)
+    const file = findSourceEntry(snapshot.files, target.path)
     if (!file) return false
 
-    this.displayFile(file, 'auto')
-    const start = offsetForPosition(file.text, target.range.start)
-    const end = offsetForPosition(file.text, target.range.end)
-    this.editor.setSelection(start, end, { revealOffset: start })
-    void this.sidebar.renderSource(snapshot.files, this.displayFile, {
-      selectedPath: file.path,
-      preserveExpandedPaths: true,
-    })
+    void this.displayFile(file, 'auto', target)
+      .then((selected) => {
+        if (selected) this.sidebar.selectPath(file.path)
+      })
+      .catch(() => undefined)
+
     return true
   }
 
@@ -120,13 +128,13 @@ export class SourceController {
         openEdits.push(...offsetEdits(this.editor.getTextSnapshot(), operation.edits))
         continue
       }
-      const file = changed.get(path) ?? findSourceFile(snapshot.files, path)
-      if (!file) return failedEdit('MISSING_FILE', `${path} is not in the source list.`)
+      const file = changed.get(path) ?? this.loadedFiles.get(path)
+      if (!file) return failedEdit('MISSING_FILE', `${path} is still loading. Try the edit again.`)
       changed.set(path, { ...file, text: applyTextEdits(file.text, operation.edits) })
     }
 
     if (openEdits.length > 0) this.editor.edit(openEdits)
-    this.replaceFiles([...changed.values()])
+    this.replaceFiles(Array.from(changed.values()))
     return { status: 'applied' }
   }
 
@@ -138,18 +146,13 @@ export class SourceController {
     this.topBar.setMessage(`Fetching ${REPOSITORY_OWNER}/${REPOSITORY_NAME}`)
 
     try {
-      const sourceRef = await fetchRepositoryRef()
-      if (this.currentSnapshot?.commitSha === sourceRef.commitSha) {
-        this.topBar.setRepositoryName(snapshotLabel(this.currentSnapshot))
-        return
+      const snapshot = await this.loader.refreshSnapshot(this.currentSnapshot)
+      if (this.currentSnapshot?.commitSha !== snapshot.commitSha) {
+        this.displaySnapshot(snapshot, {
+          selectedPath: this.currentSelectedPath ?? storedSelectedPath(),
+          preserveExpandedPaths: Boolean(this.currentSnapshot),
+        })
       }
-
-      const snapshot = await fetchRepositorySource(sourceRef)
-      await persistSnapshot(snapshot)
-      await this.displaySnapshot(snapshot, {
-        selectedPath: this.currentSelectedPath ?? storedSelectedPath(),
-        preserveExpandedPaths: Boolean(this.currentSnapshot),
-      })
       this.topBar.setRepositoryName(snapshotLabel(snapshot))
     } catch {
       this.handleRefreshFailure()
@@ -160,10 +163,10 @@ export class SourceController {
   }
 
   private async loadCachedThenRefresh(): Promise<void> {
-    const cached = await loadCachedSourceSnapshot()
+    const cached = await this.loader.cachedSnapshot()
 
     if (cached) {
-      await this.displaySnapshot(cached, {
+      this.displaySnapshot(cached, {
         selectedPath: storedSelectedPath(),
         preserveExpandedPaths: false,
       })
@@ -173,14 +176,15 @@ export class SourceController {
     await this.refreshSource()
   }
 
-  private async displaySnapshot(
+  private displaySnapshot(
     snapshot: SourceSnapshot,
     options: { readonly selectedPath?: string; readonly preserveExpandedPaths: boolean },
-  ): Promise<void> {
+  ): void {
     const selectedFile = selectedFileForSnapshot(snapshot, options.selectedPath)
+    this.selectionRequest += 1
     this.currentSnapshot = snapshot
-    this.currentSelectedPath = selectedFile?.path
-    this.sourceWorkspace?.setWorkspaceFiles(snapshot.files)
+    this.loadedFiles.clear()
+    this.sourceWorkspace?.clearWorkspaceFiles()
 
     if (!selectedFile) {
       this.clearActiveFile()
@@ -188,26 +192,101 @@ export class SourceController {
       return
     }
 
-    await this.sidebar.renderSource(snapshot.files, this.displayFile, {
-      selectedPath: selectedFile.path,
-      preserveExpandedPaths: options.preserveExpandedPaths,
-    })
+    void this.sidebar
+      .renderSource(snapshot.files, this.displayFile, {
+        selectedPath: selectedFile.path,
+        preserveExpandedPaths: options.preserveExpandedPaths,
+        onFileHover: this.preloadFile,
+      })
+      .then(() => this.fillInBackground(snapshot))
   }
 
-  private readonly displayFile = (listed: SourceFile, reason: 'auto' | 'user'): void => {
-    this.keepActiveFileEdits()
-    // The sidebar holds the file as it was listed; an edit since then lives in the snapshot.
-    const file = findSourceFile(this.currentSnapshot?.files ?? [], listed.path) ?? listed
-    this.currentSelectedPath = file.path
-    localStorage.setItem(SELECTED_FILE_KEY, file.path)
-    this.editor.openDocument({
-      documentId: file.path,
-      text: file.text,
-      languageId: languageIdForFilePath(file.path),
-    })
-    if (this.activeView === 'diff') this.configureCurrentLiveDiff()
-    if (reason === 'user') this.editor.focus()
-    this.updateStatus()
+  private readonly displayFile = async (
+    entry: SourceEntry,
+    reason: 'auto' | 'user',
+    target?: TypeScriptLspDefinitionTarget,
+  ): Promise<boolean> => {
+    const snapshot = this.currentSnapshot
+    if (!snapshot) return false
+    const request = ++this.selectionRequest
+    if (
+      this.loadedFiles.has(entry.path) &&
+      this.currentSelectedPath === entry.path &&
+      this.editor.getState().documentId === entry.path
+    ) {
+      const file = this.currentFile()
+      if (target && file) this.revealDefinition(file, target)
+      if (reason === 'user') this.editor.focus()
+      this.topBar.setFileStatus('')
+      return true
+    }
+    this.topBar.setFileStatus(`Loading ${entry.path}…`)
+    try {
+      const file = await this.loadFile(snapshot, entry)
+      if (request !== this.selectionRequest || this.currentSnapshot !== snapshot) return false
+      this.keepActiveFileEdits()
+      this.currentSelectedPath = file.path
+      localStorage.setItem(SELECTED_FILE_KEY, file.path)
+      this.editor.openDocument({
+        documentId: file.path,
+        text: file.text,
+        languageId: languageIdForFilePath(file.path),
+      })
+      if (target) this.revealDefinition(file, target)
+      if (this.activeView === 'diff') this.configureCurrentLiveDiff()
+      if (reason === 'user') this.editor.focus()
+      this.updateStatus()
+      this.topBar.setFileStatus('')
+      return true
+    } catch (error) {
+      if (request === this.selectionRequest)
+        this.topBar.setFileStatus(`Could not load ${entry.path}. Select it to retry.`)
+      throw error
+    }
+  }
+
+  private revealDefinition(file: SourceFile, target: TypeScriptLspDefinitionTarget): void {
+    const start = offsetForPosition(file.text, target.range.start)
+    const end = offsetForPosition(file.text, target.range.end)
+    this.editor.setSelection(start, end, { revealOffset: start })
+  }
+
+  private async loadFile(snapshot: SourceSnapshot, entry: SourceEntry): Promise<SourceFile> {
+    const loaded = this.loadedFiles.get(entry.path)
+    if (this.currentSnapshot === snapshot && loaded) return loaded
+    const file = await this.loader.loadFile(snapshot, entry)
+    if (this.currentSnapshot !== snapshot) return file
+    // A preload can finish after the same file was opened and edited.
+    const current = this.loadedFiles.get(entry.path)
+    if (current) return current
+    this.loadedFiles.set(file.path, file)
+    this.sourceWorkspace?.upsertWorkspaceFiles([file])
+    return file
+  }
+
+  private readonly preloadFile = (entry: SourceEntry): void => {
+    const snapshot = this.currentSnapshot
+    if (!snapshot || this.loader.preloadsBusy()) return
+    void this.loadFile(snapshot, entry).catch(() => undefined)
+  }
+
+  private async fillInBackground(snapshot: SourceSnapshot): Promise<void> {
+    const entries = snapshot.files.values()
+    await Promise.all([this.fillFiles(snapshot, entries), this.fillFiles(snapshot, entries)])
+  }
+
+  private async fillFiles(
+    snapshot: SourceSnapshot,
+    entries: IterableIterator<SourceEntry>,
+  ): Promise<void> {
+    for (const entry of entries) {
+      if (this.currentSnapshot !== snapshot) return
+      try {
+        await this.loadFile(snapshot, entry)
+      } catch {
+        // A failed preload remains available for an explicit click to retry.
+      }
+    }
   }
 
   /** The file being left keeps its edits, and the worker reads them once the file is closed. */
@@ -223,11 +302,7 @@ export class SourceController {
     const snapshot = this.currentSnapshot
     if (!snapshot || files.length === 0) return
 
-    const byPath = new Map(files.map((file) => [file.path, file]))
-    this.currentSnapshot = {
-      ...snapshot,
-      files: snapshot.files.map((file) => byPath.get(file.path) ?? file),
-    }
+    for (const file of files) this.loadedFiles.set(file.path, file)
     this.sourceWorkspace?.upsertWorkspaceFiles(files)
   }
 
@@ -261,7 +336,7 @@ export class SourceController {
   private currentFile(): SourceFile | null {
     const snapshot = this.currentSnapshot
     if (!snapshot || !this.currentSelectedPath) return null
-    return findSourceFile(snapshot.files, this.currentSelectedPath)
+    return this.loadedFiles.get(this.currentSelectedPath) ?? null
   }
 
   private handleRefreshFailure(): void {
@@ -309,20 +384,12 @@ function diffBaseFile(file: SourceFile): DiffTextFile {
 function selectedFileForSnapshot(
   snapshot: SourceSnapshot,
   selectedPath: string | undefined,
-): SourceFile | null {
+): SourceEntry | null {
   return (
-    findSourceFile(snapshot.files, selectedPath) ??
-    findSourceFile(snapshot.files, DEFAULT_SELECTED_FILE) ??
-    firstSourceFile(snapshot.files)
+    findSourceEntry(snapshot.files, selectedPath) ??
+    findSourceEntry(snapshot.files, DEFAULT_SELECTED_FILE) ??
+    firstSourceEntry(snapshot.files)
   )
-}
-
-async function persistSnapshot(snapshot: SourceSnapshot): Promise<void> {
-  try {
-    await saveSourceSnapshotToCache(snapshot)
-  } catch {
-    return
-  }
 }
 
 function storedSelectedPath(): string | undefined {
