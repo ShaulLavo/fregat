@@ -437,6 +437,11 @@ jobs:
         env:
           CI_SITES: ${{ needs.changes.outputs.sites }}
         run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites" "$CI_SITES"
+      - name: Check deployment config and cache headers
+        run: python3 -m unittest discover -s scripts/product-sites -p 'test_*.py'
+      - name: Check Ghostty font assets
+        if: ${{ contains(needs.changes.outputs.sites, 'ghostty-webgpu') }}
+        run: bun scripts/product-sites/test-font-assets.mjs "$RUNNER_TEMP/product-sites/ghostty-webgpu"
       - name: Test Singapore documentation checks
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
         run: bun run --cwd editor/site test

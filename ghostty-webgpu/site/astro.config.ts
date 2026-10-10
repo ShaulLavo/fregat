@@ -52,6 +52,7 @@ export default defineConfig({
       title: 'ghostty-webgpu',
       description: 'Ghostty’s terminal core in the browser. Guides and API reference.',
       ...docsTheme,
+      components: { Head: './src/components/DocsHead.astro' },
       customCss: docsTheme.customCss.concat(['./src/styles/docs.css']),
       editLink: { baseUrl: 'https://github.com/ShaulLavo/fregat/edit/main/ghostty-webgpu/site/' },
       lastUpdated: true,

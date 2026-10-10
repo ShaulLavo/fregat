@@ -61,6 +61,27 @@ class DeploymentTests(unittest.TestCase):
             self.assertNotIn('apps/site', log.read_text())
 
 
+    def test_only_content_hashed_output_has_immutable_cache_headers(self):
+        source = (Path(__file__).parent / '_headers').read_text()
+        rules = {}
+        path = None
+        for line in source.splitlines():
+            if not line.strip():
+                continue
+            if not line.startswith(' '):
+                path = line
+                rules[path] = {}
+                continue
+            name, value = line.strip().split(':', 1)
+            rules[path][name.lower()] = value.strip()
+        immutable = {path: headers['cache-control'] for path, headers in rules.items()
+                     if 'cache-control' in headers}
+        self.assertEqual(immutable, {
+            '/_astro/*': 'public, max-age=31536000, immutable',
+            '/demo/assets/*': 'public, max-age=31536000, immutable',
+        })
+        self.assertNotIn('cache-control', rules['/*'])
+
     def test_fregat_build_only_builds_the_landing_page(self):
         root = Path(__file__).resolve().parents[2]
         build = (root / 'scripts/build-site.ts').read_text()

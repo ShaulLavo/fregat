@@ -34,7 +34,7 @@ The build also writes a standalone project index; none of these Workers publishe
 To use output built elsewhere, copy its `fregat`, `singapore` and `ghostty-webgpu` directories
 into `scripts/product-sites/dist`. The three native Wrangler configs declare those directories,
 exact Custom Domains, and assets-only serving. Unknown pages and assets return 404.
-There is no SPA fallback. Cloudflare handles static MIME types, caching, DNS and TLS.
+There is no SPA fallback. Cloudflare handles static MIME types, DNS and TLS.
 The build copies `_headers` into each site to preserve HSTS, the referrer policy, `nosniff`
 and same-origin framing. HSTS covers each exact hostname.
 
@@ -48,6 +48,13 @@ Deployment is manual. CI still builds sites and checks mobile layouts through th
 CI workflow. Adding automatic Cloudflare deployment requires an owner-approved API token
 in GitHub; this change adds no GitHub secrets. The same command redeploys Singapore after
 its docs replacement merges.
+
+## Caching
+
+Hashed assets under `/_astro/` and `/demo/assets/` are immutable for one year;
+HTML and unhashed files revalidate. Fonts go through the bundler to get hashed names.
+Static Assets defaults to `max-age=0` for everything, so new hashed asset paths need
+an `_headers` rule. The cache-header and emitted-font regression tests fail if this breaks.
 
 ## Native management and rollback
 
@@ -83,7 +90,12 @@ options include `--engines chromium`, `--shards 2 --shard 0` and `--workers 1`.
 After installing new Playwright WebKit binaries on Arch, run `scripts/playwright-webkit-arch.sh`.
 
 Fetch each root, representative docs pages, JS, CSS, fonts and WASM over HTTPS. Check MIME
-headers and missing-page and missing-asset 404s. Test Singapore search and follow a docs
+headers and missing-page and missing-asset 404s. Confirm immutable caching on emitted
+hashed CSS, JS and fonts, and revalidation on HTML and unhashed public files. In a fresh
+Chromium and WebKit context, visit a landing page followed by two docs pages. Capture
+first text frames and resource timings: warm font requests must have zero transfer bytes
+and no conditional revalidation, and the final faces must be loaded before the first text
+frame. Fregat has one page; use full-page repeat visits for its warm-cache check. Test Singapore search and follow a docs
 cross-link. In Playwright, record landing-page requests through network idle and confirm
 none uses `/demo/` or an example-app JS or CSS bundle. Visit `/demo/` separately and test the
 editor at a phone viewport. Inspect desktop and phone screenshots for all three sites.
