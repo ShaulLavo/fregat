@@ -189,7 +189,7 @@ test.for(['network', 'server', 'schema'] as const)(
     const shown = notices()[0]!
     expect(shown).toMatchObject({
       type: 'error',
-      title: 'Could not check file chooser availability',
+      title: 'Could not check folder chooser availability',
       action: { label: 'Fix with AI' },
       description: expect.any(String),
     })
@@ -262,7 +262,7 @@ test('a successful capability result resets the failure notice', async ({ server
   for (const shown of notices()) {
     expect(shown).toMatchObject({
       type: 'error',
-      title: 'Could not check file chooser availability',
+      title: 'Could not check folder chooser availability',
       action: { label: 'Fix with AI' },
       description: expect.any(String),
     })

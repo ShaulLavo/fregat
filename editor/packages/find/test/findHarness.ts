@@ -151,7 +151,7 @@ export function chunkedTextSnapshot(text: string): TextSnapshot {
   // Filled back to front at offset zero, because an insert landing at the end of
   // the newest piece is folded into it and would leave one piece holding
   // everything.
-  for (const character of Array.from(text).toReversed()) {
+  for (const character of Array.from(text).reverse()) {
     table = insertIntoPieceTable(table, 0, character)
   }
   return createDocumentTextSnapshot(table)

@@ -2,6 +2,7 @@ import { equal, ok } from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Locator, Page, Request } from 'playwright'
+import { isRecord } from '@workspace/utils/objects'
 
 import { createModifiedFileFixture, releaseFixture } from '../fixture-workspace'
 import { selectors } from '../selectors'
@@ -29,6 +30,18 @@ export const phoneShell: Scenario = {
     page.on('request', recordRequest)
     await page.reload({ waitUntil: 'commit' })
     await page.locator(selectors.phoneFirstScreenSelector).waitFor()
+    const viewport = await page.evaluate(selectors.phoneViewportPolicy)
+    ok(
+      isRecord(viewport) &&
+        typeof viewport.resizesContent === 'boolean' &&
+        typeof viewport.virtualKeyboard === 'boolean',
+      'The browser reports its viewport policy',
+    )
+    equal(
+      viewport.resizesContent,
+      viewport.virtualKeyboard,
+      'Viewport hint follows keyboard support',
+    )
     page.off('request', recordRequest)
     const desktopRequests = requests.filter((url) => /workbench-[^/]+[.](js|css)$/.test(url))
     equal(
@@ -409,7 +422,7 @@ async function expectDiffTintAtScreenEdge(page: Page, type: 'addition' | 'deleti
 /** The notes file, long enough that its change sits on a three-digit line. */
 function notesWith(line: string) {
   const filler = Array.from({ length: 118 }, (_, index) => `Note ${index + 1}.`)
-  return ['# Notes', ...filler.slice(0, 108), line, ...filler.slice(108)]
+  return ['# Notes'].concat(filler.slice(0, 108), [line], filler.slice(108))
 }
 
 /** The editor tabs the address records: one token per open tab. */

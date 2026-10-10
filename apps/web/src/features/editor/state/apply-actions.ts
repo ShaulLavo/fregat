@@ -357,7 +357,7 @@ function editorRetention(
     activeRootPath,
     byteBudget,
     documentSizes,
-    slices: [...parked, retainedSlice(activeRootPath, activePanels, Date.now())],
+    slices: parked.concat([retainedSlice(activeRootPath, activePanels, Date.now())]),
     unevictableDocumentKeys,
   })
 }

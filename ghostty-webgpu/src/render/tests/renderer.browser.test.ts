@@ -55,7 +55,7 @@ beforeAll(async () => {
 afterEach(async () => {
   for (const renderer of renderers) renderer.dispose()
   renderers.clear()
-  const losses = [...devices].map((device) => device.lost)
+  const losses = Array.from(devices, (device) => device.lost)
   for (const device of devices) device.destroy()
   await Promise.all(losses)
   devices.clear()
@@ -756,12 +756,14 @@ it('keeps device replacement retryable after acquisition fails', async ({ skip }
     if (calls === 2) return Promise.reject(new Error('replacement unavailable'))
     return createDevice()
   }
+  const errors: unknown[] = []
   const clock = new FakeClock()
   const canvas = createCanvas()
   const renderer = await createRenderer({
     canvas,
     columns: 2,
     deviceFactory: factory,
+    onError: (cause) => errors.push(cause),
     font: fittedFont(),
     renderState: new FakeRenderState(2, 2),
     rows: 2,
@@ -770,12 +772,15 @@ it('keeps device replacement retryable after acquisition fails', async ({ skip }
   clock.flushFrame()
 
   await renderer.simulateDeviceLoss()
+  expect(errors).toHaveLength(1)
+  expect(errors[0]).toMatchObject({ message: 'replacement unavailable' })
   expect(renderer.metrics.deviceRestores).toBe(0)
   expect(clock.frames.size).toBe(0)
   renderer.schedule()
   clock.flushFrame()
   await expect.poll(() => renderer.metrics.deviceRestores).toBe(1)
   expect(clock.frames.size).toBe(1)
+  expect(errors).toHaveLength(1)
 
   renderer.dispose()
   canvas.remove()
@@ -1621,17 +1626,28 @@ it('retains identical GPU records when output scrolls the viewport', async () =>
   try {
     clock.flushFrame()
     const beforePixels = await renderer.capturePixels()
-    const uploadedBytes = renderer.metrics.uploadedBytes
-    const uploadOperations = renderer.metrics.instanceUploadOperations
-    const rebuiltRows = renderer.metrics.rebuiltRows
+    let uploadedBytes = renderer.metrics.uploadedBytes
+    let uploadOperations = renderer.metrics.instanceUploadOperations
+    let rebuiltRows = renderer.metrics.rebuiltRows
     const scrollback = terminal.scrollbackLength
     terminal.write('\r\nsteady')
     expect(terminal.scrollbackLength).toBeGreaterThan(scrollback)
     renderer.notifyScroll()
     renderer.notifyWrite()
     clock.flushFrame()
+    expect(renderer.metrics.rebuiltRows).toBe(rebuiltRows + 3)
+    expect(renderer.metrics.uploadedBytes).toBe(uploadedBytes + 24 * 3 * (64 + 96) + 24)
+    expect(renderer.metrics.instanceUploadOperations).toBe(uploadOperations + 2)
+    expect(await renderer.capturePixels()).toEqual(beforePixels)
+    uploadedBytes = renderer.metrics.uploadedBytes
+    uploadOperations = renderer.metrics.instanceUploadOperations
+    rebuiltRows = renderer.metrics.rebuiltRows
+    terminal.write('\r\nsteady')
+    renderer.notifyScroll()
+    renderer.notifyWrite()
+    clock.flushFrame()
     expect(renderer.metrics.rebuiltRows).toBe(rebuiltRows + 1)
-    expect(renderer.metrics.uploadedBytes).toBe(uploadedBytes)
+    expect(renderer.metrics.uploadedBytes).toBe(uploadedBytes + 24)
     expect(renderer.metrics.instanceUploadOperations).toBe(uploadOperations)
     expect(await renderer.capturePixels()).toEqual(beforePixels)
     expect(renderer.hasPendingFrame).toBe(false)

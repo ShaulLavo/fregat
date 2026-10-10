@@ -63,7 +63,8 @@ describe('diff plugin — rows and expansion (§C3, §C5)', () => {
   it('renders one stacked buffer row per projection row, keeping the §C4 identity', () => {
     const { plugin, host } = mountDiff({ file: prefixSkippedDiff(), side: 'stacked' })
 
-    const indices = [...host.querySelectorAll<HTMLElement>('[data-editor-virtual-row]')].map(
+    const indices = Array.from(
+      host.querySelectorAll<HTMLElement>('[data-editor-virtual-row]'),
       (element) => Number(element.dataset.editorVirtualRow),
     )
     expect(indices).toEqual(plugin.getRows().map((_row, index) => index))
@@ -714,7 +715,8 @@ function gutterCells(host: HTMLElement): HTMLElement[] {
 
 function gutterLaneTexts(host: HTMLElement): string[][] {
   return gutterCells(host).map((cell) =>
-    [...cell.querySelectorAll<HTMLElement>('.editor-diff-gutter-lane')].map(
+    Array.from(
+      cell.querySelectorAll<HTMLElement>('.editor-diff-gutter-lane'),
       (lane) => lane.textContent ?? '',
     ),
   )

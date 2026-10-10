@@ -382,7 +382,7 @@ bar); no regressions on the wins listed above; correctness tests and screenshots
 ## How to run it
 
 Phase 1: one Opus or Sol worker, investigation only. Phase 2: one worker per cause, Sol by default,
-each with an independent reviewer. Measurements run on omarchy through the heavy-job queue with
+each with an independent reviewer. Measurements run on omarchy through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill, with
 `--quiet` and wait for an idle GPU; keep each window under 10 minutes.
 
 ## Done when

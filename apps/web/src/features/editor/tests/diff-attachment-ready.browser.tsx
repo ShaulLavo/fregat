@@ -67,7 +67,7 @@ function liveReadinessObservation(app: RetentionAcceptanceApp) {
       applied: app.read().theme.appliedThemeId,
       hash: app.read().theme.appliedThemeContentHash,
     },
-    controllers: [...app.read().ui.getState().controllersByTabId].map(([tab, controller]) => {
+    controllers: Array.from(app.read().ui.getState().controllersByTabId, ([tab, controller]) => {
       const snapshot = controller.getSnapshot()
       return {
         tab,

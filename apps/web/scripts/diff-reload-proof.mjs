@@ -32,9 +32,7 @@ const apiUrl = new URL(url.port === '5173' ? '/' : 'api/', url)
 if (url.port === '5173') apiUrl.port = '3001'
 const api = apiUrl.href
 const git = (...args) =>
-  execFileSync('git', ['-C', fixture, ...args], { stdio: 'pipe' })
-    .toString()
-    .trim()
+  execFileSync('git', ['-C', fixture].concat(args), { stdio: 'pipe' }).toString().trim()
 git('init', '-q')
 const lines = Array.from(
   { length: values.large ? 6500 : 120 },
@@ -129,7 +127,7 @@ try {
     .last()
     .evaluate((pane) => {
       const bounds = pane.querySelector('.editor-virtualized').getBoundingClientRect()
-      const row = [...pane.querySelectorAll('.editor-virtualized-row')]
+      const row = Array.from(pane.querySelectorAll('.editor-virtualized-row'))
         .filter(
           (row) =>
             row.getBoundingClientRect().top > bounds.top + 50 &&
@@ -327,7 +325,7 @@ try {
   try {
     await page.close()
     await Promise.allSettled(registrations)
-    const terminalCleanup = await Promise.all([...terminalOwners.values()].map(cleanupTerminal))
+    const terminalCleanup = await Promise.all(Array.from(terminalOwners.values(), cleanupTerminal))
     if (terminalCleanup.some((entry) => !entry.confirmed)) process.exitCode = 1
     await writeFile(
       `${values.output}/terminal-cleanup.json`,
@@ -365,7 +363,7 @@ async function cleanupTerminal(owner) {
 async function observe(page) {
   return page.evaluate(() => ({
     selectedText: window.getSelection()?.toString() ?? '',
-    panes: Array.from(document.querySelectorAll('.editor-diff-pane')).map((pane) => {
+    panes: Array.from(document.querySelectorAll('.editor-diff-pane'), (pane) => {
       const scroll = pane.querySelector('.editor-virtualized')
       const bounds = scroll?.getBoundingClientRect()
       const visible = (selector) =>

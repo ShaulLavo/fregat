@@ -14,7 +14,7 @@ export function clientAddressKey(address: string, prefix: number): string | unde
   const [left, right] = expanded.split('::')
   const head = left ? left.split(':').map((word) => parseInt(word, 16)) : []
   const end = right ? right.split(':').map((word) => parseInt(word, 16)) : []
-  const words = [...head, ...Array<number>(8 - head.length - end.length).fill(0), ...end]
+  const words = head.concat(Array<number>(8 - head.length - end.length).fill(0), end)
   if (words.slice(0, 5).every((word) => word === 0) && words[5] === 0xffff)
     return [words[6]! >>> 8, words[6]! & 255, words[7]! >>> 8, words[7]! & 255].join('.')
   return (

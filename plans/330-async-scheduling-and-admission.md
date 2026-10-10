@@ -12,7 +12,7 @@ Reuse one scheduling implementation for common keyed replacement, deadlines, FIF
 
 [EditorWorkScheduler](../editor/packages/editor/src/editor/workScheduler.ts) has five task classes and latest-per-key replacement, bounded debounce, budgets, validity checks and events. [LatestAsyncRequest](../editor/packages/editor/src/editor/latestAsyncRequest.ts) often creates an independent scheduler. Delayed and nondeferred tasks can start directly; current priorities are not a cross-worker CPU allocation contract.
 
-Server [SerialWorker](../apps/server/src/orchestration/serial-worker.ts), [SweepScheduler](../apps/server/src/orchestration/sweep-scheduler.ts) and [ReactorScheduler](../apps/server/src/orchestration/reactor-scheduler.ts) have distinct FIFO, rerun-coalescing and fixed-point-drain behavior. Preserve these observable guarantees. The existing heavy-job runner remains the separate OS/process measurement and build supervisor.
+Server [SerialWorker](../apps/server/src/orchestration/serial-worker.ts), [SweepScheduler](../apps/server/src/orchestration/sweep-scheduler.ts) and [ReactorScheduler](../apps/server/src/orchestration/reactor-scheduler.ts) have distinct FIFO, rerun-coalescing and fixed-point-drain behavior. Preserve these observable guarantees. The host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill, remains the separate OS/process measurement and build supervisor.
 
 [Multithreading research](../docs/async-runtime/multithreading.md) shows why worker count alone is insufficient: every submission is posted, async handlers may overlap, and function-code affinity does not preserve document state. Hardware concurrency is a capability hint, not a memory limit or admission policy.
 

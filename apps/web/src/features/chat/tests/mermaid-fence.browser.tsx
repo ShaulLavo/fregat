@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { settingsSnapshot } from '../../../../test/factories/settings'
-import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
 import { AssistantMarkdown } from '../components/assistant-markdown'
 import { ChatWorkspaceRootContext } from '../providers/workspace-root-context'
 import { loadedMermaid, setMermaidLoader } from '../state/mermaid'
@@ -32,7 +32,7 @@ beforeEach(() => {
   // A settings document fetched mid-test makes AppearanceProvider rewrite the `--font-ui` these
   // tests set, so the diagram reverts to the default face.
   queryClient.setQueryData(settingsKeys.document(), settingsSnapshot())
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   const container = document.createElement('main')
   container.style.width = '720px'
   document.body.append(container)
@@ -92,9 +92,10 @@ describe('mermaid fences', () => {
     async (_name, chart, label) => {
       renderDiagram(false, `\`\`\`mermaid\n${chart}\n\`\`\``)
       await vi.waitFor(() => expect(mermaidDiagram()).not.toBeNull(), { timeout: 15_000 })
-      const labels = [...mermaidDiagram()!.querySelectorAll('text, foreignObject')]
-        .map((node) => node.textContent)
-        .join(' ')
+      const labels = Array.from(
+        mermaidDiagram()!.querySelectorAll('text, foreignObject'),
+        (node) => node.textContent,
+      ).join(' ')
       expect(labels).toContain(label)
       expect(labels).not.toContain('mermaid_user_')
     },
@@ -207,7 +208,7 @@ describe('mermaid fences', () => {
     const startedAt = performance.now()
     renderDiagram(false, chart)
     const painted = () =>
-      [...document.querySelectorAll('[data-markdown="mermaid-block"] [role="img"]')].filter(
+      Array.from(document.querySelectorAll('[data-markdown="mermaid-block"] [role="img"]')).filter(
         (host) => host.shadowRoot?.querySelector('svg'),
       ).length
     await vi.waitFor(() => expect(painted()).toBe(3), { timeout: 15_000 })
@@ -261,7 +262,7 @@ describe('mermaid fences', () => {
         },
         { timeout: 15_000 },
       )
-      const shapes = [...(mermaidDiagram()?.querySelectorAll('rect, polygon, path') ?? [])]
+      const shapes = Array.from(mermaidDiagram()?.querySelectorAll('rect, polygon, path') ?? [])
       expect(
         shapes.map((shape) => getComputedStyle(shape).fill),
         chart,

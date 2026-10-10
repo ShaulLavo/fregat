@@ -1,3 +1,13 @@
+export * from './html-bootstrap'
+export {
+  cssVariableForRole,
+  flattenedAppColors,
+  oppositeMode,
+  paletteStylesheet,
+  resolvePalette,
+  type ResolvedPalette,
+  type TerminalColors,
+} from './themes/palette-rendering'
 export * from './worktree-lifecycle'
 export * from './session-lifecycle'
 export {
@@ -1065,8 +1075,12 @@ export {
 export {
   attachmentUploadInputSchema,
   attachmentUploadTicketSchema,
+  machineFileAttachInputSchema,
+  machineFileAttachmentSchema,
   type AttachmentUploadInput,
   type AttachmentUploadTicket,
+  type MachineFileAttachInput,
+  type MachineFileAttachment,
 } from './attachment-upload'
 export {
   BUNDLED_FONTS,

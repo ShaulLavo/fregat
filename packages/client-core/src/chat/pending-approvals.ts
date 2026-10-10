@@ -98,7 +98,7 @@ export function derivePendingApprovals(
     open.set(parsed.output.requestId, pendingApproval(activity, parsed.output))
   }
 
-  return [...open.values()].filter((approval) => !endedWithTurn(approval, latestTurn))
+  return Array.from(open.values()).filter((approval) => !endedWithTurn(approval, latestTurn))
 }
 
 function markFailed(open: Map<ApprovalRequestId, PendingApproval>, payload: unknown) {

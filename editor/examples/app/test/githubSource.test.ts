@@ -1,22 +1,35 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { fetchRepositorySource, isSourceTextPath, sourceFileRawUrl } from '../src/githubSource.ts'
+import {
+  fetchRepositoryRef,
+  fetchRepositorySource,
+  fetchSourceFile,
+  isSourceTextPath,
+  sourceFileRawUrl,
+} from '../src/githubSource.ts'
 
 describe('githubSource', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  it('fetches the GitHub tree and raw text files', async () => {
+  it('fetches the GitHub tree without downloading file contents', async () => {
     const fetchMock = vi.fn(fetchResponse)
     vi.stubGlobal('fetch', fetchMock)
 
-    const snapshot = await fetchRepositorySource()
+    const snapshot = await fetchRepositorySource(await fetchRepositoryRef())
 
     expect(snapshot.commitSha).toBe('commit-sha')
     expect(snapshot.treeSha).toBe('tree-sha')
     expect(snapshot.files.map((file) => file.path)).toEqual(['README.md', 'src/app.ts'])
-    expect(snapshot.files.map((file) => file.text)).toEqual(['# Editor', 'console.log(1);'])
+    expect(fetchMock.mock.calls).toHaveLength(2)
+    const file = await fetchSourceFile(snapshot.commitSha, {
+      path: 'README.md',
+      sha: 'readme-sha',
+      size: 8,
+    })
+    expect(file.text).toBe('# Editor')
+    expect(fetchMock.mock.calls).toHaveLength(3)
   })
 
   it('rejects truncated GitHub tree responses', async () => {
@@ -29,7 +42,9 @@ describe('githubSource', () => {
       }),
     )
 
-    await expect(fetchRepositorySource()).rejects.toThrow('truncated')
+    await expect(fetchRepositorySource(await fetchRepositoryRef())).rejects.toMatchObject({
+      internal: { truncated: true },
+    })
   })
 
   it('identifies text source paths and encodes raw URLs', () => {

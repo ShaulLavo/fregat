@@ -12,10 +12,9 @@ import { network, randomSource } from './adapter'
 import { randomChange } from './diamond-workload'
 
 const stress = process.env.COLLAB_STRESS === '1'
-const seeds = [
-  10,
-  ...Array.from({ length: stress ? 100 : 16 }, (_, index) => index).filter((seed) => seed !== 10),
-]
+const seeds = [10].concat(
+  Array.from({ length: stress ? 100 : 16 }, (_, index) => index).filter((seed) => seed !== 10),
+)
 
 test.each(seeds)(
   'Diamond Types local rope-oracle workload, seed %i',

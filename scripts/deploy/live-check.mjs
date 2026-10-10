@@ -9,6 +9,8 @@ import { chromium } from 'playwright'
 import { attachObserver, observedProblems, serializable } from '../agent/observe.mjs'
 import { readRefusals, refusalFailures } from './live-refusals.mjs'
 import { liveVerdict } from './live-verdict.mjs'
+import { openLiveBrowser } from './live-browser.mjs'
+import { appearanceFailures, inspectAppearance } from './live-appearance.mjs'
 
 // A third-party image the chat renders; proves cross-origin isolation still lets favicons load.
 const publicFaviconUrl =
@@ -55,12 +57,7 @@ if (waitMs > 0 && !(await serverReports(values.release, waitMs))) {
   await finish([])
 }
 
-const browser = await chromium.launch({ headless: true })
-const page = await browser.newPage({
-  viewport: { width: 1440, height: 1000 },
-  userAgent:
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36',
-})
+const { browser, page } = await openLiveBrowser(chromium)
 const observed = attachObserver(page, base)
 
 try {
@@ -78,13 +75,10 @@ try {
       errorFrame: document.querySelector(errorFrame)?.textContent ?? null,
       rootChildren: document.querySelector('#root')?.childElementCount ?? 0,
       clientRelease: document.querySelector('meta[name="platform-release"]')?.content ?? null,
-      wallpaperPreloads: [...document.querySelectorAll('link[rel="preload"][as="image"]')].map(
-        (link) => link.href,
-      ),
-      wallpaperHandoff: window.platformBootWallpaper ?? null,
     }),
     errorFrame,
   )
+  rendered.appearance = await page.evaluate(inspectAppearance)
   await page.screenshot({ path: resolve(values.out, 'live.png') })
   Object.assign(report, {
     finalUrl: page.url(),
@@ -172,10 +166,7 @@ function failures({ served, rendered, publicFavicon, observed }) {
     )
   if (!rendered.crossOriginIsolated) found.push('page is not cross-origin isolated')
   if (!(publicFavicon.width > 0)) found.push('public favicon did not load')
-  if (rendered.wallpaperPreloads.length !== 1)
-    found.push(`wallpaper preloads: ${rendered.wallpaperPreloads.length}`)
-  if (rendered.wallpaperHandoff?.href !== rendered.wallpaperPreloads[0])
-    found.push('the boot wallpaper record does not name the preloaded image')
+  found.push(...appearanceFailures(rendered.appearance))
   // Plan 106: boot is entry + runtime + stylesheet; everything else loads after first paint.
   if (observed.assets.size < 3) found.push(`only ${observed.assets.size} boot assets loaded`)
   if (!observed.apiResponses.some((item) => item.url === `${base}health` && item.status === 200))
@@ -209,10 +200,9 @@ async function logNoise(directory) {
     const result = JSON.parse(stdout)
     const groups = result.failures.map(({ key, count, reasons }) => ({ key, count, reasons }))
     return {
-      failures: [
-        ...groups.map((group) => `log noise: ${group.key}`),
-        ...result.allowProblems.map((problem) => `log noise allow list: ${problem}`),
-      ],
+      failures: groups
+        .map((group) => `log noise: ${group.key}`)
+        .concat(result.allowProblems.map((problem) => `log noise allow list: ${problem}`)),
       groups,
     }
   } catch (error) {

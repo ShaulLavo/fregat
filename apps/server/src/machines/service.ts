@@ -1,9 +1,17 @@
-import type { MachineConnectionState, Machines, SshMachineDefinition } from '@workspace/contracts'
+import type {
+  MachineConnectionState,
+  MachineEvent,
+  Machines,
+  SshMachineDefinition,
+} from '@workspace/contracts'
 import { createHash } from 'node:crypto'
+import { hostname } from 'node:os'
 import { recordProcessError } from '../observability/runtime'
 import { createSshAuthentication } from './authentication'
 import { MachineEvents } from './events'
 import { createSshLauncher } from './launcher'
+import { pairMachineRelay } from './pairing'
+import type { MachineProxyTarget } from './proxy'
 import { MachinePrompts } from './prompts'
 import { parseMachineName } from './records'
 import { createSshError, sshAuthCancelled } from './structured-errors'
@@ -20,6 +28,7 @@ type Entry = {
   connecting: Promise<MachineConnectionState> | null
   updating: Promise<MachineConnectionState> | null
   cancelledAt: number | null
+  relayDestination: string | null
 }
 
 export type MachineServiceOptions = Pick<
@@ -36,6 +45,7 @@ type Options = MachineServiceOptions & {
 export class MachineService {
   private readonly options: Options
   private readonly entries = new Map<string, Entry>()
+  private readonly relayCredentials = new Map<string, Promise<string>>()
   private readonly pending = new Map<string, Promise<Entry>>()
   private readonly disconnecting = new Map<string, Promise<void>>()
   private readonly retiring = new Map<string, Promise<void>>()
@@ -111,6 +121,7 @@ export class MachineService {
   }
 
   private async disconnectEntry(name: string, entry: Entry, client: string) {
+    this.releaseRelay(entry)
     const connecting = entry.connecting !== null
     if (connecting) entry.authentication?.cancel()
     if (!connecting && !this.closed && entry.cancelledAt === null) {
@@ -128,6 +139,7 @@ export class MachineService {
 
   private connectEntry(name: string, entry: Entry, client: string) {
     if (entry.connecting) return entry.connecting
+    if (entry.launcher.stateFor(name).phase !== 'live') this.releaseRelay(entry)
     const operation = this.authenticated(name, entry, client, () =>
       entry.launcher.connectMachine(name),
     ).finally(() => {
@@ -208,12 +220,12 @@ export class MachineService {
     const initial = [...this.entries.values()].flatMap((entry) =>
       entry.launcher
         .listStates()
-        .map((state) => ({ kind: 'state' as const, state: connectionState(entry, state) })),
+        .map<MachineEvent>((state) => ({ kind: 'state', state: connectionState(entry, state) })),
     )
     try {
       yield* this.events.subscribe(
         client,
-        [...initial, { kind: 'auth', prompt: this.prompts.current(client) }],
+        initial.concat([{ kind: 'auth', prompt: this.prompts.current(client) }]),
         signal,
       )
     } finally {
@@ -221,7 +233,7 @@ export class MachineService {
     }
   }
 
-  async resolve(input: string) {
+  async resolve(input: string): Promise<MachineProxyTarget> {
     const name = await parseMachineName(input)
     const entry = this.entries.get(name)
     const config = this.options.readMachines()[name]
@@ -230,7 +242,53 @@ export class MachineService {
       throw createSshError('settings', 'This SSH machine is no longer configured with that target.')
     if (!state || state.phase !== 'live' || entry.cancelledAt !== null)
       throw createSshError('forward', 'Connect this machine before using it.')
-    return { origin: state.origin, webOrigin: this.options.webOrigin }
+    const destination = state.descriptor.environmentId
+    if (entry.relayDestination !== destination) this.releaseRelay(entry)
+    entry.relayDestination = destination
+    let credential = this.relayCredentials.get(destination)
+    if (!credential) {
+      const pairing = pairMachineRelay(
+        state.origin,
+        this.options.webOrigin,
+        `Fregat relay · ${hostname().slice(0, 64)}`,
+        this.options.environmentId,
+        this.options.fetcher ?? fetch,
+      ).catch((error: unknown) => {
+        if (this.relayCredentials.get(destination) === pairing)
+          this.relayCredentials.delete(destination)
+        throw error
+      })
+      credential = pairing
+      this.relayCredentials.set(destination, credential)
+    }
+    const cookie = await credential
+    if (
+      this.entries.get(name) !== entry ||
+      this.relayCredentials.get(destination) !== credential ||
+      entry.launcher.stateFor(name).phase !== 'live' ||
+      entry.cancelledAt !== null
+    )
+      throw createSshError('forward', 'Connect this machine before using it.')
+    return {
+      origin: state.origin,
+      webOrigin: this.options.webOrigin,
+      cookie,
+      refresh: () => {
+        if (this.relayCredentials.get(destination) === credential)
+          this.relayCredentials.delete(destination)
+        return this.resolve(name)
+      },
+    }
+  }
+
+  private releaseRelay(entry: Entry) {
+    const destination = entry.relayDestination
+    entry.relayDestination = null
+    if (destination === null) return
+    for (const other of this.entries.values()) {
+      if (other.relayDestination === destination) return
+    }
+    this.relayCredentials.delete(destination)
   }
 
   async close() {
@@ -247,6 +305,7 @@ export class MachineService {
     await Promise.allSettled(this.disconnecting.values())
     await Promise.allSettled([...this.entries.values()].map((entry) => this.closeEntry(entry)))
     this.entries.clear()
+    this.relayCredentials.clear()
     this.owners.clear()
   }
 
@@ -321,6 +380,7 @@ export class MachineService {
       connecting: null,
       updating: null,
       cancelledAt: null,
+      relayDestination: null,
     }
     this.entries.set(name, entry)
     return entry
@@ -341,6 +401,7 @@ export class MachineService {
   private retireEntry(name: string, entry: Entry) {
     if (this.entries.get(name) !== entry) return this.retiring.get(name) ?? Promise.resolve()
     this.entries.delete(name)
+    this.releaseRelay(entry)
     entry.authenticationOwner = null
     this.prompts.cancelMachine(name)
     this.events.publish({ kind: 'state', state: { name, phase: 'idle' } })

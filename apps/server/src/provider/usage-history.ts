@@ -121,7 +121,7 @@ export class ProviderUsageHistoryReader {
       if (!row.priceSnapshot) continue
       const key = modelKey(row)
       const { cacheRead, cacheWrite, input, output } = row.priceSnapshot
-      byModel.set(key, [...(byModel.get(key) ?? []), { cacheRead, cacheWrite, input, output }])
+      byModel.set(key, (byModel.get(key) ?? []).concat([{ cacheRead, cacheWrite, input, output }]))
     }
     const rates = new Map<string, ProviderUsageRates>()
     for (const [key, entries] of byModel) {
@@ -241,7 +241,7 @@ function modelRows(groups: readonly UsageGroup[]): ModelTotals[] {
     byModel.set(key, row ? addModelGroup(row, group) : modelRow(group))
   }
 
-  return [...byModel.values()].toSorted(
+  return [...byModel.values()].sort(
     (left, right) =>
       (right.costUsd ?? 0) - (left.costUsd ?? 0) || usageTokenCount(right) - usageTokenCount(left),
   )
@@ -302,7 +302,7 @@ function dailyRows(groups: readonly UsageGroup[]): ProviderUsageDayRow[] {
     })
   }
 
-  return [...byDay.values()].toSorted((left, right) => left.day.localeCompare(right.day))
+  return [...byDay.values()].sort((left, right) => left.day.localeCompare(right.day))
 }
 
 function addDayModel(
@@ -314,10 +314,9 @@ function addDayModel(
     (model) => model.model === group.model && model.driverKind === group.driverKind,
   )
   if (!existing)
-    return [
-      ...models,
+    return models.concat([
       { costUsd: group.costUsd, driverKind: group.driverKind, model: group.model, tokens },
-    ]
+    ])
 
   return models.map((model) =>
     model === existing

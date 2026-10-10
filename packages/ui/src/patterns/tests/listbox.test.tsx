@@ -62,7 +62,7 @@ describe('useListbox', () => {
     const { list } = renderListbox()
     expect(list.tabIndex).toBe(0)
     expect(
-      [...list.querySelectorAll<HTMLElement>('[role="option"]')].every(
+      Array.from(list.querySelectorAll<HTMLElement>('[role="option"]')).every(
         (row) => row.tabIndex === -1,
       ),
     ).toBe(true)
@@ -73,6 +73,45 @@ describe('useListbox', () => {
     expect(list.querySelector('[aria-selected="true"]')?.textContent).toContain('Alpha')
     press(list, 'End')
     expect(list.querySelector('[aria-selected="true"]')?.textContent).toContain('Delta')
+  })
+
+  it('moves onto the first row when the list keeps focus while nothing is active', () => {
+    const onActiveChange = vi.fn()
+    const { list } = renderListbox({ activeId: null, onActiveChange })
+    onActiveChange.mockClear()
+    press(list, 'ArrowDown')
+    expect(onActiveChange).toHaveBeenLastCalledWith('a')
+  })
+
+  it('neither paints nor announces the fallback row after the active row vanishes', () => {
+    const onActiveChange = vi.fn()
+    const onCommit = vi.fn()
+    const mounted = mount(
+      <Listbox activeId='d' onActiveChange={onActiveChange} onCommit={onCommit} typeahead />,
+    )
+    cleanups.push(mounted.unmount)
+    const list = mounted.container.querySelector<HTMLElement>('[role="listbox"]')!
+    act(() => list.focus())
+    expect(list.querySelector('[aria-selected="true"]')?.textContent).toContain('Delta')
+    mounted.render(
+      <Listbox
+        activeId='d'
+        items={items.slice(0, 3)}
+        onActiveChange={onActiveChange}
+        onCommit={onCommit}
+        typeahead
+      />,
+    )
+    expect(list.querySelector('[aria-selected="true"]')).toBeNull()
+    expect(list.querySelector('[data-active]')).toBeNull()
+    expect(list.hasAttribute('aria-activedescendant')).toBe(false)
+    press(list, 'Enter')
+    expect(onCommit).toHaveBeenLastCalledWith('a')
+    press(list, 'c')
+    expect(onActiveChange).toHaveBeenLastCalledWith('c')
+    onActiveChange.mockClear()
+    press(list, 'ArrowDown')
+    expect(onActiveChange).toHaveBeenLastCalledWith('a')
   })
 
   it('preserves nested action focus and lets its keys bubble untouched', () => {
@@ -91,12 +130,36 @@ describe('useListbox', () => {
     ['PageDown', 'Home', 'Delta'],
   ])('moves %s to the enabled boundary when a section occupies the edge', (key, start, label) => {
     const { list } = renderListbox({
-      items: [{ id: 'heading', disabled: true }, ...items, { id: 'footer', disabled: true }],
+      items: Array.of<UseListboxOptions<string>['items'][number]>({
+        id: 'heading',
+        disabled: true,
+      }).concat(items, [{ id: 'footer', disabled: true }]),
       pageSize: 20,
     })
     press(list, start)
     press(list, key)
     expect(list.querySelector('[aria-selected="true"]')?.textContent).toContain(label)
+  })
+
+  it('activates the pressed row without first revealing or activating the top row', () => {
+    const reveal = vi.fn()
+    const onActiveChange = vi.fn()
+    const mounted = mount(
+      <Listbox
+        activeId={null}
+        onActiveChange={onActiveChange}
+        revealOnMount={false}
+        scrollToIndex={reveal}
+      />,
+    )
+    cleanups.push(mounted.unmount)
+    const row = mounted.container.querySelector<HTMLElement>('[title="Delta"]')!
+    act(() => {
+      row.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+      row.click()
+    })
+    expect(reveal).not.toHaveBeenCalled()
+    expect(onActiveChange.mock.calls).toEqual([['d']])
   })
 
   it('preserves restored scroll until focus or a later cursor change requests a reveal', () => {
@@ -168,7 +231,7 @@ describe('useListbox', () => {
       <Listbox
         scrollToIndex={reveal}
         activeId={null}
-        items={[{ id: 'new', label: 'New' }, ...items]}
+        items={[{ id: 'new', label: 'New' }].concat(items)}
       />,
     )
     expect(reveal).not.toHaveBeenCalled()

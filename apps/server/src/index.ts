@@ -51,10 +51,8 @@ const serverReleaseFile = releaseFileFor(import.meta.dirname)
 const serverRelease = readReleaseInfoSync(serverReleaseFile).release
 const configuredOrigins = allowedOriginsFromEnv(Bun.env.SERVER_ALLOWED_ORIGINS)
 // The server serves the page itself, so its own loopback address is a web origin.
-const allowedOrigins = unique([
-  ...(configuredOrigins ?? DEFAULT_ALLOWED_ORIGINS),
-  ...loopbackOrigins(hostname, port),
-])
+const origins: readonly string[] = configuredOrigins ?? DEFAULT_ALLOWED_ORIGINS
+const allowedOrigins = unique(origins.concat(loopbackOrigins(hostname, port)))
 const maxTextFileBytes = numberFromEnv(Bun.env.FS_DEV_MAX_TEXT_FILE_BYTES)
 const treeConcurrency = numberFromEnv(Bun.env.FS_TREE_CONCURRENCY)
 let serverShutdown: Promise<void> | null = null
@@ -108,7 +106,11 @@ export const app = createApp({
     // Behind the relay every request arrives on the private socket; the relay admits loopback only.
     peer: activated ? () => '127.0.0.1' : undefined,
   },
-  web: { root: webRoot, serverReleaseFile },
+  web: {
+    root: webRoot,
+    serverReleaseFile,
+    bootstrapDevelopment: Bun.env.NODE_ENV !== 'production',
+  },
   webOrigin: configuredOrigins?.[0] ?? loopbackOrigins(hostname, port)[0],
   workspaceRoot: configuredWorkspaceRoot,
 })

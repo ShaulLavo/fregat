@@ -28,7 +28,8 @@ function menuOpen() {
 }
 
 function stickyPaths() {
-  return [...treeScope().querySelectorAll<HTMLElement>('[data-file-tree-sticky-row="true"]')].map(
+  return Array.from(
+    treeScope().querySelectorAll<HTMLElement>('[data-file-tree-sticky-row="true"]'),
     (element) => element.dataset.fileTreeStickyPath,
   )
 }
@@ -180,7 +181,7 @@ describe('row menu', () => {
     await clickRow('src/b.ts', { button: 'right' })
     await vi.waitFor(() => expect(menuOpen()).toBe(true))
     expect(events.menus.at(-1)?.item.path).toBe('src/b.ts')
-    expect([...model.getSelectedPaths()].toSorted()).toEqual(['src/a.ts', 'src/b.ts'])
+    expect(model.getSelectedPaths().sort()).toEqual(['src/a.ts', 'src/b.ts'])
   })
 
   it('closes on Escape and gives focus back to the row', async () => {

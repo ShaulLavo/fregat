@@ -16,7 +16,7 @@ import {
   reverseLatestFileOperation,
 } from '@/features/workspace/state/file-operations'
 import { previewEditorTheme } from '@/features/editor/state/color-theme-store'
-import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace'
+import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-recording'
 import { awaitEditorSyntaxWorkerIdleFences } from '@/features/editor/state/syntax-highlighting'
 import { mountRetentionAcceptanceApp } from '../../../../test/factories/retention-acceptance-app'
 import { RetentionIdentityEntry } from '../../../../test/factories/retention-acceptance-identity-entry'

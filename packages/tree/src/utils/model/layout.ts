@@ -183,7 +183,7 @@ function computeExpandedSubtreeEndIndices<Row extends FileTreeLayoutRow>(
 
     const activePaths =
       row.kind === 'directory' && row.isExpanded
-        ? [...row.ancestorPaths, row.path]
+        ? row.ancestorPaths.concat([row.path])
         : row.ancestorPaths
 
     let sharedPrefixLength = 0

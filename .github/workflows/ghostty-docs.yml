@@ -3,7 +3,10 @@ name: ghostty docs
 on:
   pull_request:
     paths:
-      - ghostty-webgpu/**
+      - ghostty-webgpu/site/**
+      - ghostty-webgpu/src/dom/**
+      - ghostty-webgpu/docs/correctness-results.json
+      - ghostty-webgpu/docs/benchmarks/**
       - hotkeys/packages/hotkeys/**
       - package.json
       - scripts/workspace-tooling.mjs
@@ -13,13 +16,18 @@ on:
   push:
     branches: [main]
     paths:
-      - ghostty-webgpu/**
+      - ghostty-webgpu/site/**
+      - ghostty-webgpu/src/dom/**
+      - ghostty-webgpu/docs/correctness-results.json
+      - ghostty-webgpu/docs/benchmarks/**
       - hotkeys/packages/hotkeys/**
       - package.json
       - scripts/workspace-tooling.mjs
       - bun.lock
       - .github/actions/setup/**
       - .github/workflows/ghostty-docs.yml
+  schedule:
+    - cron: '17 3 * * *'
   workflow_dispatch:
 
 permissions:
@@ -33,15 +41,15 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Check samples, generate reference and validate links
         run: bun run --cwd ghostty-webgpu/site build --base /fregat/ghostty-webgpu/
-      - name: Install browser
+      - name: Install Chromium and WebKit
         working-directory: ghostty-webgpu/site
-        run: bunx playwright install --with-deps chromium
-      - name: Verify docs, echo example and search
+        run: bunx playwright install --with-deps chromium webkit
+      - name: Start docs preview
         working-directory: ghostty-webgpu/site
         run: |
           bun run preview --ignore-lock --base /fregat/ghostty-webgpu/ --host 127.0.0.1 --port 4327 > "$RUNNER_TEMP/ghostty-preview.log" 2>&1 &
           preview=$!
-          trap 'kill "$preview" || true' EXIT
+          echo "$preview" > "$RUNNER_TEMP/ghostty-preview.pid"
           ready=0
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:4327/fregat/ghostty-webgpu/docs/ > /dev/null; then
@@ -52,7 +60,26 @@ jobs:
             sleep 1
           done
           test "$ready" = 1 || { cat "$RUNNER_TEMP/ghostty-preview.log"; exit 1; }
-          bun scripts/verify-docs.ts http://127.0.0.1:4327/fregat/ghostty-webgpu/docs/ "$RUNNER_TEMP/ghostty-docs-evidence"
+      - name: Verify docs, echo example and search
+        working-directory: ghostty-webgpu/site
+        run: bun scripts/verify-docs.ts http://127.0.0.1:4327/fregat/ghostty-webgpu/docs/ "$RUNNER_TEMP/ghostty-docs-evidence"
+      - name: Verify mobile terminal input
+        working-directory: ghostty-webgpu/site
+        run: bun scripts/verify-mobile-input.mjs http://127.0.0.1:4327/fregat/ghostty-webgpu/ "$RUNNER_TEMP/ghostty-docs-evidence/mobile-input"
+      - name: Verify migration widths and light/dark contrast
+        working-directory: ghostty-webgpu/site
+        run: bun run verify:migration "$RUNNER_TEMP/ghostty-migration-evidence" http://127.0.0.1:4327/fregat/ghostty-webgpu/
+      - name: Stop docs preview
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/ghostty-preview.pid"; then
+            kill "$(cat "$RUNNER_TEMP/ghostty-preview.pid")" || true
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ghostty-migration-browser
+          path: ${{ runner.temp }}/ghostty-migration-evidence
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -79,7 +79,7 @@ function snippetTokens(
 
 /** For each `const` in the submitted text, the token a painter colours it with, as it slices. */
 function paintedConsts(text: string, tokens: readonly Readonly<EditorToken>[]) {
-  return [...text.matchAll(/const/g)].map(({ index }) => {
+  return Array.from(text.matchAll(/const/g), ({ index }) => {
     const token = tokens.find((candidate) => candidate.start <= index && candidate.end > index)
     return token ? [token.start, text.slice(token.start, token.end)] : null
   })
@@ -94,7 +94,7 @@ function paintedLikeStart(text: string, tokens: readonly Readonly<EditorToken>[]
 }
 
 function constStarts(text: string) {
-  return [...text.matchAll(/const/g)].map(({ index }) => [index, 'const'])
+  return Array.from(text.matchAll(/const/g), ({ index }) => [index, 'const'])
 }
 
 describe.each(Object.entries(TEXTS))('%s text', (_name, text) => {
@@ -127,7 +127,7 @@ describe.each(Object.entries(TEXTS))('%s text', (_name, text) => {
 })
 
 describe.each(Object.entries(PYTHON))('python %s text', (_name, text) => {
-  const comments = [...text.matchAll(/# \w+/g)].map(([comment]) => comment)
+  const comments = Array.from(text.matchAll(/# \w+/g), ([comment]) => comment)
 
   test('highlight under a built-in palette ends each comment at its line break', async () => {
     const result = await service().highlight(text, { language: 'python', theme: PALETTE })

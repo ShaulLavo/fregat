@@ -286,7 +286,7 @@ export function completionApplication(
   if (!primary) return null
 
   const additional = additionalCompletionEdits(request, item.additionalTextEdits ?? [])
-  const edits = [primary.edit, ...additional]
+  const edits = [primary.edit].concat(additional)
   const head = completionSelectionHead(primary.edit, additional)
   const snippet = primary.snippet
   if (!snippet) {

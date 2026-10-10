@@ -169,9 +169,10 @@ const DEFAULT_PRELOAD_GRAMMARS = [
 ] as const
 
 const TREE_SITTER_ALIASES = new Map<string, string>(
-  TREE_SITTER_LANGUAGE_METADATA.flatMap((language) =>
-    [language.id, ...language.aliases].map((alias) => [alias.toLowerCase(), language.id] as const),
-  ),
+  TREE_SITTER_LANGUAGE_METADATA.flatMap((language) => {
+    const ids: string[] = [language.id]
+    return ids.concat(language.aliases).map((alias) => [alias.toLowerCase(), language.id] as const)
+  }),
 )
 
 export function createHighlightingService(

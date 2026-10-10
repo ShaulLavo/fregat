@@ -68,7 +68,7 @@ function mergeByFile(fileChanges: readonly ts.FileTextChanges[]): readonly ts.Fi
     merged.set(change.fileName, {
       ...existing,
       isNewFile: existing.isNewFile === true || change.isNewFile === true,
-      textChanges: [...existing.textChanges, ...change.textChanges],
+      textChanges: existing.textChanges.concat(change.textChanges),
     })
   }
   return Array.from(merged.values())

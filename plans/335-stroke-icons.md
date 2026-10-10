@@ -27,7 +27,7 @@ Comparison evidence: mock sources in `/work/tmp/icons-mock/` (`src/icons.ts` and
 
 ## Phase 1: Registry and the swap
 
-- [ ] Add `@hugeicons/core-free-icons` to `packages/ui`. Confirm per-icon tree-shaking: the web bundle gate (`apps/web/scripts/bundle-gate`) must not grow against the Phosphor baseline; record both numbers here.
+- [ ] Add `@hugeicons/core-free-icons` to `packages/ui`. Confirm per-icon tree-shaking in the production build. Bundle size is not gated; investigate size when it causes a real problem.
 - [ ] `packages/ui/src/icons/registry.ts`: `IconName` union and the name → Hugeicons node map. `packages/ui/src/icons/icon.tsx`: `Icon` renders a node as an inline `<svg>` sized `size-(--icon-size)` by default, `stroke-width` 1.5, `aria-hidden` unless labelled. Export both through the package entry.
 - [ ] Replace every Phosphor import with `Icon`/`IconName`, Phosphor's `type Icon` props with `IconName`. Write the 170-row mapping table into this plan as it is made; pick by drawing, check each at 16px.
 - [ ] Resolve each `fill`/`duotone`/`bold` site by intent (state → token tint such as `text-warning` or `bg-accent` on the control; emphasis → the plain stroke icon). List each site and its resolution here.

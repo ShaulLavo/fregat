@@ -45,6 +45,6 @@ function access(records: Map<string, string>): StorageAccess {
     removeItem: (key) => {
       records.delete(key)
     },
-    keys: (prefix) => [...records.keys()].filter((key) => key.startsWith(prefix)),
+    keys: (prefix) => Array.from(records.keys()).filter((key) => key.startsWith(prefix)),
   }
 }

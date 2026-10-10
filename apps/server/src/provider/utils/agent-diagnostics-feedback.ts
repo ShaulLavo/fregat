@@ -48,9 +48,9 @@ export function diagnosticsFeedback(displayPath: string, errors: readonly AgentD
   const text = [
     '<new-diagnostics>',
     `Your edit to ${displayPath} introduced ${errors.length} ${noun}:`,
-    ...lines,
-    '</new-diagnostics>',
-  ].join('\n')
+  ]
+    .concat(lines, ['</new-diagnostics>'])
+    .join('\n')
   return text.length <= CHARACTER_LIMIT ? text : `${text.slice(0, CHARACTER_LIMIT - 1)}…`
 }
 

@@ -178,7 +178,7 @@ function entryBytes(entry: ProjectionEntry): number {
   if (entry.kind === 'run') return 64
   if (entry.kind === 'wrapped') return 88 + entry.prefixes.byteLength + wrappedBreakBytes(entry)
   let bytes = 112 + wrapBytes(entry.wrap)
-  for (const injected of [...entry.before, ...entry.after]) bytes += 32 + wrapBytes(injected.wrap)
+  for (const injected of entry.before.concat(entry.after)) bytes += 32 + wrapBytes(injected.wrap)
   if (entry.inline)
     bytes += entry.inline.mapping.segments.length * 96 + entry.inline.parts.length * 40
   return bytes

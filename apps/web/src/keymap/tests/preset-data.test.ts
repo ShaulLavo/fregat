@@ -3,7 +3,6 @@ import { expect, test } from '../../../test/fixtures'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { ours, zed, unmappedPresetBindings } from '@/keymap/presets/inventory'
 import control from '@/keymap/tests/preset-control.json'
-import { registeredPresetCommandIds } from '../../../scripts/generate-preset-runtime'
 import { fileURLToPath } from 'node:url'
 import { platformCommands } from '@/keymap/table'
 
@@ -58,27 +57,42 @@ function verifyPreset(
   )
 }
 
-test('the generator derives exactly the live web command authority without loading its handlers', () => {
-  expect([...registeredPresetCommandIds()].toSorted()).toEqual(
-    platformCommands.map(({ id }) => id).toSorted(),
-  )
-}, 20_000)
+const generatorPath = fileURLToPath(
+  new URL('../../../scripts/generate-preset-runtime.ts', import.meta.url),
+)
 
-test('the documented bare Bun CLI checks the exact authoritative projection without browser initialization', async () => {
-  const child = Bun.spawn({
-    cmd: [
-      process.execPath,
-      fileURLToPath(new URL('../../../scripts/generate-preset-runtime.ts', import.meta.url)),
-      '--check',
-    ],
-    cwd: fileURLToPath(new URL('../../../../../', import.meta.url)),
-    stdout: 'pipe',
-    stderr: 'pipe',
-  })
-  const [exitCode, stdout, stderr] = await Promise.all([
-    child.exited,
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-  ])
-  expect({ exitCode, stdout, stderr }).toEqual({ exitCode: 0, stdout: '', stderr: '' })
-}, 20_000)
+// Each compiler starts with the full web type graph; a child releases it before the next check.
+test.each([
+  {
+    name: 'the generator derives exactly the live web command authority without loading its handlers',
+    args: [fileURLToPath(new URL('../../../test/env/preset-command-ids.ts', import.meta.url))],
+    expectedStdout: `${JSON.stringify(platformCommands.map(({ id }) => id).sort())}\n`,
+  },
+  {
+    name: 'the documented bare Bun CLI checks the exact authoritative projection without browser initialization',
+    args: [generatorPath, '--check'],
+    expectedStdout: '',
+  },
+])(
+  '$name',
+  async ({ args, expectedStdout }) => {
+    const child = Bun.spawn({
+      cmd: [process.execPath].concat(args),
+      cwd: fileURLToPath(new URL('../../../../../', import.meta.url)),
+      stdout: 'pipe',
+      stderr: 'pipe',
+      timeout: 50_000,
+    })
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
+    expect({ exitCode, stdout, stderr }).toEqual({
+      exitCode: 0,
+      stdout: expectedStdout,
+      stderr: '',
+    })
+  },
+  60_000,
+)

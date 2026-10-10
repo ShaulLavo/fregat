@@ -21,7 +21,6 @@ function icons(loadState: EntriesLoadState, onRetry = () => {}) {
         entries={[]}
         isBusy={false}
         listRef={createRef()}
-        mode='folder'
         selectedPath={null}
         loadState={loadState}
         onRetry={onRetry}

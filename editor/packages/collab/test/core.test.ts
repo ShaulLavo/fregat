@@ -199,7 +199,7 @@ test('remote-before-ack replays dependent pending edits with unchanged origins',
   const changes: string[] = []
   let projection = a.participant.text()
   a.participant.subscribe((change) => {
-    for (const edit of [...change.edits].reverse())
+    for (const edit of change.edits.toReversed())
       projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
     changes.push(projection)
   })
@@ -229,7 +229,7 @@ test('one batch with remote and local acknowledgments publishes one coherent cha
   const states: string[] = []
   let projection = a.participant.text()
   a.participant.subscribe((change) => {
-    for (const edit of [...change.edits].reverse())
+    for (const edit of change.edits.toReversed())
       projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
     states.push(projection)
   })
@@ -249,7 +249,7 @@ test('host sequence gaps buffer until a contiguous confirmed prefix arrives', ()
   const states: string[] = []
   let projection = a.participant.text()
   a.participant.subscribe((change) => {
-    for (const edit of [...change.edits].reverse())
+    for (const edit of change.edits.toReversed())
       projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
     states.push(projection)
   })
@@ -417,7 +417,7 @@ test('reentrant local edits publish effective edits in order to every subscriber
   let projection = ''
   const states: string[] = []
   a.participant.subscribe((change) => {
-    for (const edit of [...change.edits].reverse())
+    for (const edit of change.edits.toReversed())
       projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
     states.push(projection)
   })
@@ -430,7 +430,7 @@ test('subscriptions created during delivery start at their current projection', 
   let projection = ''
   const states: string[] = []
   const listener = (change: import('../src/index').ParticipantChange) => {
-    for (const edit of [...change.edits].reverse())
+    for (const edit of change.edits.toReversed())
       projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
     states.push(projection)
   }

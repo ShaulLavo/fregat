@@ -1,3 +1,7 @@
+import { scheduleFrame, type ScheduledFrame } from '../editor/scheduleFrame'
+import type { RevealBlock } from './revealBlock'
+import { assertContentLayout, contentReadingBounds, revealContentRow } from './contentLayout'
+import { isElementNode, isTextareaElement } from '../dom'
 import {
   acquireRowPresentation,
   invalidateRowPresentations,
@@ -9,6 +13,13 @@ import { markerAtRowX } from './virtualizedTextViewHiddenCharacters'
 import { ScrollViewport } from './scrollViewport'
 import type { FoldMarkerSource } from './foldMarkerSource'
 import type { SavedPaint } from '../editor/paintSnapshot'
+import type {
+  DocumentPaintCapture,
+  PaintSnapshot,
+  SavedDocumentPaint,
+} from '../editor/documentPaint'
+import { captureDocumentPaint } from './documentPaintCapture'
+import { mountDocumentPaint, type MountedPaintSnapshot } from './documentPaintRows'
 import type { TextContent } from '../textContent'
 import type { FoldMap } from '../foldMap'
 import { nextGraphemeBoundary, previousGraphemeBoundary } from '../graphemes'
@@ -31,7 +42,11 @@ import { EditorTokenStore, type EditorTokenInput } from '../syntax/tokenStore'
 import type { TextEdit } from '../tokens'
 import { applyEditorTheme } from '../theme'
 import { measureBrowserTextFace, type BrowserTextMetrics } from './browserMetrics'
-import { FixedRowVirtualizer, type FixedRowVirtualizerSnapshot } from './fixedRowVirtualizer'
+import {
+  DEFAULT_MAX_SCROLL_HEIGHT,
+  FixedRowVirtualizer,
+  type FixedRowVirtualizerSnapshot,
+} from './fixedRowVirtualizer'
 import {
   DEFAULT_OVERSCAN,
   DEFAULT_SELECTION_HIGHLIGHT,
@@ -79,6 +94,7 @@ import {
   renderSelectionHighlight,
   renderTokenHighlights,
   restoreHighlightsAfterBrowserResume,
+  restoreHighlightsAfterPresentation,
   setRangeHighlight,
   setSelection,
   setSelections,
@@ -103,6 +119,7 @@ import {
   lineStartOffset,
   offsetForViewportColumn,
   refreshDisplayProjection,
+  releaseStyledRowFaces,
   refreshDisplayProjectionForWrapWidth,
   rowForCaretPosition,
   rowForOffset,
@@ -115,6 +132,7 @@ import {
   sourceEditPatch,
   setTextLayoutState,
   setWrapEnabledLayout,
+  assertContentSnapshot,
   updateVirtualizerRows,
   visualColumnForOffset,
 } from './virtualizedTextViewLayout'
@@ -125,11 +143,12 @@ import {
   boundaryPositionXs,
   boundaryPositionXsForAffinity,
   clearRowGeometryCaches,
+  releaseNativeRowGeometry,
   homogeneousRtlCaretAtRowEdge,
   homogeneousRtlCaretMoveInRow,
   isBidiMeasurementRefusalRow,
-  knownRowContentWidth,
-  measureRowContentWidth,
+  knownRowScrollWidth,
+  measureRowScrollWidth,
   offsetFromDomBoundary,
   rowLocalXFromClientPoint,
   rowHasOnlyBidiControls,
@@ -180,7 +199,6 @@ import {
 } from './virtualizedTextViewRows'
 import type {
   CreateRangeOptions,
-  RevealBlock,
   VirtualizedTextHighlightRange,
   VirtualizedTextHighlightStyle,
   VirtualizedTextSelection,
@@ -307,6 +325,8 @@ export class VirtualizedTextView {
   /** Set when typed text arrives through EditContext rather than the textarea. */
   public readonly editContext: EditorEditContext | null
   private readonly view: VirtualizedTextViewInternal
+  private measuredMaxScrollHeight: number | undefined
+  private styledFaceFrame: ScheduledFrame | null = null
   private readonly disposeForegroundHighlightRestore: () => void
   private cancelContentWidthMeasurement: (() => void) | null = null
   private provisionalPaint: { readonly paint: SavedPaint; readonly release: () => void } | null =
@@ -365,9 +385,9 @@ export class VirtualizedTextView {
       longLineChunkSize,
     )
     const tabSize = normalizeTabSize(options.tabSize)
-    const virtualizer = new FixedRowVirtualizer(
-      createVirtualizerOptions(rowHeight, overscan, rowGap, scrollMode, options.scrollPastEnd),
-    )
+    const virtualizer = new FixedRowVirtualizer({
+      ...createVirtualizerOptions(rowHeight, overscan, rowGap, scrollMode, options.scrollPastEnd),
+    })
     const initialTextSnapshot = createStringTextSnapshot('')
     const initialInjectedTextRows = options.injectedTextRows ?? []
     const initialModel = createVirtualizedTextViewModel({
@@ -382,8 +402,7 @@ export class VirtualizedTextView {
     this.scrollElement = scrollElement
     this.contentElement = contentElement
     this.inputElement = inputElement
-    this.editContext =
-      inputElement instanceof HTMLTextAreaElement ? null : createEditContext(inputElement)
+    this.editContext = isTextareaElement(inputElement) ? null : createEditContext(inputElement)
     this.view = {
       disposed: false,
       provisional: false,
@@ -437,6 +456,8 @@ export class VirtualizedTextView {
       wrapEnabled: options.wrap ?? false,
       wrapBreak: options.wrapBreak ?? 'character',
       wrapAdvance: null,
+      styledRowFaces: new Map(),
+      onStyledFaceChange: () => this.scheduleStyledFaceRefresh(),
       glyphs: measuredFace.monospace ? null : glyphAdvancesFor(scrollElement),
       tabSize,
       tokenGroups: new Map(),
@@ -506,6 +527,9 @@ export class VirtualizedTextView {
     const view = this.view
     if (view.disposed) return
     view.disposed = true
+    this.styledFaceFrame?.cancel()
+    this.styledFaceFrame = null
+    releaseStyledRowFaces(view, new Set())
     this.atomicRenderPending = false
     const rows = new Set(view.rowElements.values())
     for (const row of view.rowPool) rows.add(row)
@@ -513,7 +537,10 @@ export class VirtualizedTextView {
     view.rowPool.length = 0
     const releaseWidgets = takeInlineWidgets(view)
     const releaseCells = takeGutterCells(view, rows)
-    for (const row of rows) invalidateRowPresentations(row.element)
+    for (const row of rows) {
+      invalidateRowPresentations(row.element)
+      releaseNativeRowGeometry(row)
+    }
     this.releaseProvisionalPaint()
     this.pendingReveal = null
     this.cancelContentWidthMeasurement?.()
@@ -614,8 +641,76 @@ export class VirtualizedTextView {
     return this.pendingReveal !== null
   }
 
-  public get savedPaint(): SavedPaint | null {
-    return this.provisionalPaint?.paint ?? null
+  public captureDocumentPaint(appearance: string): DocumentPaintCapture {
+    return captureDocumentPaint(this.view, appearance)
+  }
+
+  private provisionalDocumentPaint: {
+    readonly paint: SavedDocumentPaint
+    mounted: MountedPaintSnapshot
+    readonly releaseRows: () => void
+    width: number
+  } | null = null
+
+  public get savedPaint(): PaintSnapshot | null {
+    return this.provisionalDocumentPaint?.paint ?? this.provisionalPaint?.paint ?? null
+  }
+
+  private restoreDocumentPaint(paint: SavedDocumentPaint): boolean {
+    if (this.view.scrollMode !== 'content') return false
+    const width = this.documentPaintWidth()
+    this.releaseProvisionalPaint()
+    const mounted = mountDocumentPaint(this.view.spacer, paint, { width })
+    if (!mounted) return false
+    const rows = getMountedRows(this.view)
+    const visibility = rows.map((row) => row.element.style.visibility)
+    const gutterVisibility = this.view.gutterElement.style.visibility
+    for (const row of rows) row.element.style.visibility = 'hidden'
+    this.view.gutterElement.style.visibility = 'hidden'
+    clearTokenHighlights(this.view)
+    clearSelectionHighlight(this.view)
+    this.view.caretLayerElement.hidden = true
+    this.view.provisional = true
+    this.scrollElement.dataset.editorPresentation = 'provisional'
+    this.scrollElement.setAttribute('aria-busy', 'true')
+    this.setInputEditable(false)
+    this.provisionalDocumentPaint = {
+      paint,
+      mounted,
+      width,
+      releaseRows: () => {
+        rows.forEach((row, index) => {
+          row.element.style.visibility = visibility[index]!
+        })
+        this.view.gutterElement.style.visibility = gutterVisibility
+      },
+    }
+    this.synchronizeDocumentPaint()
+    return true
+  }
+
+  private documentPaintWidth(): number {
+    const padding = scrollElementPadding(this.scrollElement)
+    return Math.max(0, this.scrollElement.clientWidth - padding.left - padding.right)
+  }
+
+  private synchronizeDocumentPaint(): void {
+    const provisional = this.provisionalDocumentPaint
+    if (!provisional) return
+    const width = this.documentPaintWidth()
+    if (width !== provisional.width) {
+      const mounted = mountDocumentPaint(this.view.spacer, provisional.paint, { width })
+      if (!mounted) return
+      provisional.mounted.dispose()
+      provisional.mounted = mounted
+      provisional.width = width
+    }
+    const height = provisional.mounted.height
+    this.view.viewport.setDocumentWidth(width)
+    this.view.viewport.setDocumentHeight(height, 0)
+    this.view.viewport.setViewportSize(width, height)
+    this.view.virtualizer.setProvisionalScrollGeometry({ scrollTop: 0, scrollHeight: height })
+    this.reportContentHeight(height)
   }
 
   public measureInitialViewport(): void {
@@ -643,7 +738,8 @@ export class VirtualizedTextView {
     return paint ? { top: paint.scrollTop, left: paint.scrollLeft } : null
   }
 
-  public restorePaint(paint: SavedPaint): boolean {
+  public restorePaint(paint: PaintSnapshot): boolean {
+    if (paint.format === 6) return this.restoreDocumentPaint(paint)
     const inset = paint.gutterWidth > 0 ? this.view.gutterLeadingInset : 0
     if (paint.gutterLayout.leadingInset !== inset) return false
 
@@ -715,6 +811,9 @@ export class VirtualizedTextView {
   }
 
   private releaseProvisionalPaint(): void {
+    this.provisionalDocumentPaint?.mounted.dispose()
+    this.provisionalDocumentPaint?.releaseRows()
+    this.provisionalDocumentPaint = null
     this.provisionalPaint?.release()
     this.provisionalPaint = null
     this.pendingOverlayWidths = null
@@ -755,6 +854,16 @@ export class VirtualizedTextView {
     return this.atomicRenderDepth > 0 || this.flushingAtomicRender
   }
 
+  get scrollMode(): VirtualizedTextViewScrollMode {
+    return this.view.scrollMode
+  }
+
+  public assertContentSnapshot(text: string | TextSnapshot, replacement = false): void {
+    if (this.view.scrollMode !== 'content') return
+    const snapshot = typeof text === 'string' ? createStringTextSnapshot(text) : text
+    assertContentSnapshot(this.view, snapshot, replacement)
+  }
+
   public setText(
     text: string | TextSnapshot,
     preparedLineStarts?: readonly number[],
@@ -762,6 +871,7 @@ export class VirtualizedTextView {
   ): void {
     const textSnapshot = typeof text === 'string' ? createStringTextSnapshot(text) : text
     const view = this.view
+    assertContentSnapshot(view, textSnapshot)
     this.pendingReveal = null
     view.sameLineTokenEdit = null
     view.tokenProjectionDirtyStartRow = null
@@ -860,6 +970,15 @@ export class VirtualizedTextView {
     updateMountedFoldMarkers(view)
   }
 
+  private scheduleStyledFaceRefresh(): void {
+    if (this.view.disposed || this.styledFaceFrame) return
+    this.styledFaceFrame = scheduleFrame(() => {
+      this.styledFaceFrame = null
+      if (this.view.disposed || this.view.styledRowFaces.size === 0) return
+      this.remeasureMetrics()
+    }, this.scrollElement.ownerDocument.defaultView ?? globalThis)
+  }
+
   public refreshMetrics(): BrowserTextMetrics {
     const view = this.view
     invalidateScrollElementPadding(this.scrollElement)
@@ -884,7 +1003,7 @@ export class VirtualizedTextView {
       face.monospace === view.monospace
     if (unchanged) {
       // A late face can keep the average width and still move single glyphs.
-      if (glyphs !== view.glyphs) this.applyGlyphs(glyphs)
+      if (glyphs !== view.glyphs || view.styledRowFaces.size > 0) this.applyGlyphs(glyphs)
       return null
     }
 
@@ -985,10 +1104,17 @@ export class VirtualizedTextView {
     const nextScrollMode = normalizeScrollMode(scrollMode)
     if (view.scrollMode === nextScrollMode) return false
 
+    if (nextScrollMode === 'content') {
+      const snapshot = view.virtualizer.getSnapshot()
+      assertContentLayout(view.model.textLength, view.model.visibleLineCount, snapshot.totalSize)
+    }
     view.scrollMode = nextScrollMode
     setScrollModeAttribute(view.scrollElement, nextScrollMode)
     view.lastRenderedRowsKey = ''
-    view.virtualizer.updateOptions({ scrollMode: nextScrollMode })
+    view.virtualizer.updateOptions({
+      scrollMode: nextScrollMode,
+      maxScrollHeight: nextScrollMode === 'virtualized' ? this.measuredMaxScrollHeight : undefined,
+    })
     return true
   }
 
@@ -998,6 +1124,8 @@ export class VirtualizedTextView {
     clearRowGeometryCaches(view)
     resetContentWidthScan(view)
     view.lastRenderedRowsKey = ''
+    if (view.styledRowFaces.size > 0)
+      refreshDisplayProjection(view, horizontalViewportColumns(view))
     if (this.refreshWrapWidth()) return
     updateVirtualizerRows(view)
   }
@@ -1013,6 +1141,8 @@ export class VirtualizedTextView {
     updateGutterWidthIfNeeded(view)
     if (view.disposed) return
     view.lastRenderedRowsKey = ''
+    if (view.styledRowFaces.size > 0)
+      refreshDisplayProjection(view, horizontalViewportColumns(view))
     if (this.refreshWrapWidth()) return
     updateVirtualizerRows(view)
   }
@@ -1025,6 +1155,7 @@ export class VirtualizedTextView {
     const view = this.view
     const textSnapshot =
       typeof nextText === 'string' ? createStringTextSnapshot(nextText) : nextText
+    assertContentSnapshot(view, textSnapshot)
     this.applyingEdit = true
     try {
       const sameLinePatch = sameLineEditPatch(view, edit)
@@ -1048,6 +1179,7 @@ export class VirtualizedTextView {
 
   public applyEditBatch(batch: TextEditBatch): void {
     const view = this.view
+    assertContentSnapshot(view, batch.after)
     const previousLineCount = view.model.lineCount
     applyTextLayoutTransition(view, batch)
     projectFoldMarkersThroughBatch(view, batch)
@@ -1071,8 +1203,13 @@ export class VirtualizedTextView {
     adoptViewTokens(this.view, tokens)
   }
 
+  public restorePresentationHighlights(): void {
+    restoreHighlightsAfterPresentation(this.view)
+  }
+
   public setTheme(theme: EditorTheme | null | undefined): void {
     applyEditorTheme(this.scrollElement, theme)
+    this.remeasureMetrics()
   }
 
   public setEditable(editable: boolean): void {
@@ -1083,7 +1220,7 @@ export class VirtualizedTextView {
   /** An EditContext only receives text while attached, so a read-only view detaches it. */
   private setInputEditable(editable: boolean): void {
     const input = this.inputElement
-    if (input instanceof HTMLTextAreaElement) {
+    if (isTextareaElement(input)) {
       input.readOnly = !editable
       return
     }
@@ -1173,9 +1310,10 @@ export class VirtualizedTextView {
   public setRowDecorations(decorations: ReadonlyMap<number, VirtualizedTextRowDecoration>): void {
     const view = this.view
     view.rowDecorations = decorations
+    refreshDisplayProjection(view, horizontalViewportColumns(view))
     clearRowGeometryCaches(view)
     view.lastRenderedRowsKey = ''
-    this.renderSnapshot(view.virtualizer.getSnapshot())
+    updateVirtualizerRows(view)
   }
 
   public setGutterContributions(contributions: readonly EditorGutterContribution[]): boolean {
@@ -1220,6 +1358,10 @@ export class VirtualizedTextView {
       this.pendingReveal = { offset, block: 'nearest' }
       return
     }
+    if (this.view.scrollMode === 'content') {
+      this.reveal(offset, 'nearest')
+      return
+    }
     scrollToRow(this.view, rowForOffset(this.view, offset))
   }
 
@@ -1245,6 +1387,18 @@ export class VirtualizedTextView {
     // Initial navigation can arrive before ResizeObserver measures the viewport.
     if (requested !== 'nearest' && view.virtualizer.getSnapshot().viewportHeight === 0) {
       this.pendingReveal = { offset, block: requested, affinity }
+      return
+    }
+
+    if (view.scrollMode === 'content') {
+      const index = affinity
+        ? rowForCaretPosition(view, offset, affinity)
+        : rowForOffset(view, offset)
+      const row = view.rowElements.get(index)?.element
+      flushDeferredCaret(view)
+      const target =
+        view.selections[0]?.head === offset && !view.caretElement.hidden ? view.caretElement : row
+      if (target) revealContentRow(target, requested)
       return
     }
 
@@ -1614,7 +1768,9 @@ export class VirtualizedTextView {
 
   /** The rows' own height, wrapped rows included, so a host can size itself to its text. */
   public getContentHeight(): number {
-    return this.view.virtualizer.getSnapshot().totalSize
+    return (
+      this.provisionalDocumentPaint?.mounted.height ?? this.view.virtualizer.getSnapshot().totalSize
+    )
   }
 
   private reportContentHeight(height: number): void {
@@ -1626,6 +1782,7 @@ export class VirtualizedTextView {
   private renderSnapshot(snapshot: FixedRowVirtualizerSnapshot): void {
     if (this.view.disposed) return
     if (this.view.provisional) {
+      this.synchronizeDocumentPaint()
       this.freezeProvisionalScroll()
       this.reportViewportChange()
       return
@@ -1636,6 +1793,22 @@ export class VirtualizedTextView {
     }
 
     const view = this.view
+    if (
+      this.measuredMaxScrollHeight === undefined &&
+      view.scrollMode === 'virtualized' &&
+      snapshot.viewportHeight > 0 &&
+      view.model.textLength > 0 &&
+      // Discover before native caps are reached, while ordinary opens remain layout-free.
+      snapshot.totalSize > DEFAULT_MAX_SCROLL_HEIGHT / 4 &&
+      snapshot.scrollHeight > snapshot.viewportHeight
+    ) {
+      this.measuredMaxScrollHeight = view.viewport.maxScrollHeight
+      if (
+        this.measuredMaxScrollHeight !== undefined &&
+        view.virtualizer.updateOptions({ maxScrollHeight: this.measuredMaxScrollHeight })
+      )
+        return
+    }
     this.synchronizeScrollPaint(snapshot)
     this.view.viewport.setViewportSize(snapshot.viewportWidth, snapshot.viewportHeight)
     this.reportContentHeight(snapshot.totalSize)
@@ -1730,7 +1903,7 @@ export class VirtualizedTextView {
     for (const row of view.rowElements.values()) {
       if (row.kind !== 'text') continue
 
-      const width = knownRowContentWidth(view, row)
+      const width = knownRowScrollWidth(view, row)
       if (width === null) {
         unmeasured = true
         continue
@@ -1780,10 +1953,10 @@ export class VirtualizedTextView {
     for (const row of view.rowElements.values()) {
       if (row.kind !== 'text') continue
 
-      raised = raiseVisualColumnsSeen(view, measureRowContentWidth(view, row)) || raised
+      raised = raiseVisualColumnsSeen(view, measureRowScrollWidth(view, row)) || raised
     }
 
-    if (!raised) return
+    if (!raised && !view.wrapEnabled) return
     updateContentWidth(view, view.virtualizer.getSnapshot().virtualItems)
   }
 
@@ -1823,6 +1996,7 @@ export class VirtualizedTextView {
       kind: 'same-line',
     }
     renderHiddenCharacters(view)
+    if (!view.monospace) updateContentWidth(view, snapshot.virtualItems)
   }
 
   private applyMultiLineEdit(
@@ -1926,12 +2100,14 @@ function locatePoint(
 ) {
   if (view.provisional) return null
   const bounds = pointViewport(view.scrollElement)
+  const readingBounds =
+    view.scrollMode === 'content' ? contentReadingBounds(view.scrollElement) : bounds
   if (
     !clamp &&
-    (clientX < bounds.left ||
-      clientX >= bounds.right ||
-      clientY < bounds.top ||
-      clientY >= bounds.bottom)
+    (clientX < readingBounds.left ||
+      clientX >= readingBounds.right ||
+      clientY < Math.max(bounds.top, readingBounds.top) ||
+      clientY >= Math.min(bounds.bottom, readingBounds.bottom))
   )
     return null
   const metrics = viewportPointMetrics(view, clientX, clientY)
@@ -2605,7 +2781,7 @@ function rowOffsetFromCaretHit(
 }
 
 function auxiliaryCaretHitElement(node: Node): HTMLElement | null {
-  const element = node instanceof Element ? node : node.parentElement
+  const element = isElementNode(node) ? node : node.parentElement
   return element?.closest<HTMLElement>(AUXILIARY_CARET_HIT_SELECTOR) ?? null
 }
 

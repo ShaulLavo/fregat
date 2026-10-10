@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url'
 import { expect, it, vi } from 'vitest'
 import { tmpdir } from 'node:os'
 import { readLogs } from './logs'
+import { createScriptError } from '../structured-errors'
 
 import { TerminalHostClient } from '../../apps/server/src/terminal/host-client'
 import { startIsolatedServer, waitForHealth, type IsolatedServer } from './isolated-server'
@@ -71,7 +72,10 @@ it('serves supplied web assets with the isolated promoted release descriptor', a
   const fixture = mkdtempSync(path.join(tmpdir(), 'fregat-built-web-'))
   const web = path.join(fixture, 'web')
   mkdirSync(web)
-  writeFileSync(path.join(web, 'index.html'), '<!doctype html><p>Built fixture</p>')
+  writeFileSync(
+    path.join(web, 'index.html'),
+    '<!doctype html><html><head><style id="platform-palette"></style><script id="fregat-html-bootstrap" type="application/json"></script><link id="fregat-wallpaper-light"><link id="fregat-wallpaper-dark"></head><body><p>Built fixture</p></body></html>',
+  )
   let server: IsolatedServer | undefined
   try {
     server = await startIsolatedServer(new URL('http://localhost:5214'), { webRoot: web })
@@ -172,46 +176,73 @@ it('preserves accepted client events and the shutdown receipt before removing is
   }
 }, 40_000)
 
-it('keeps independent concurrent callers on their own API identities and removes each home', async () => {
-  const entry = new URL('./isolated-server.ts', import.meta.url).href
-  const callers: Bun.Subprocess<'ignore', 'pipe', 'pipe'>[] = []
-  try {
-    for (let index = 0; index < 4; index += 1) {
-      callers.push(
-        Bun.spawn({
-          cmd: [
-            process.execPath,
-            '--eval',
-            `
+it.each([0, 2_000])(
+  'keeps independent concurrent callers on their own API identities and removes each home with a %i ms late caller',
+  async (delay) => {
+    const entry = new URL('./isolated-server.ts', import.meta.url).href
+    const callers: Bun.Subprocess<'ignore', 'pipe', 'pipe'>[] = []
+    const ready: Promise<string>[] = []
+    try {
+      for (let index = 0; index < 4; index += 1) {
+        if (index === 3 && delay > 0) {
+          await Promise.all(ready)
+          await Bun.sleep(delay)
+        }
+        const started = Promise.withResolvers<string>()
+        ready.push(started.promise)
+        callers.push(
+          Bun.spawn({
+            cmd: [
+              process.execPath,
+              '--eval',
+              `
           import { startIsolatedServer } from ${JSON.stringify(entry)};
           const web = new URL('http://localhost:5238');
           const server = await startIsolatedServer(web);
           try {
             const health = await (await fetch(server.origin + '/health', { headers: { origin: web.origin } })).json();
             console.log(JSON.stringify({ origin: server.origin, directory: server.directory, home: server.home, identity: health.environmentId, database: health.metadataDbPath }));
-            await Bun.sleep(1500);
+            const released = new Promise(resolve => process.once('message', resolve));
+            process.send(server.directory);
+            await released;
           } finally { await server.stop(); }
         `,
-          ],
-          stdin: 'ignore',
-          stdout: 'pipe',
-          stderr: 'pipe',
-        }),
-      )
-      await Bun.sleep(100)
+            ],
+            stdin: 'ignore',
+            stdout: 'pipe',
+            stderr: 'pipe',
+            ipc(message) {
+              assert(typeof message === 'string')
+              started.resolve(message)
+            },
+            onExit(_child, exitCode) {
+              started.reject(
+                createScriptError(`Caller exited before readiness with code ${exitCode}`),
+              )
+            },
+          }),
+        )
+      }
+      const directories = await Promise.all(ready)
+      for (const directory of directories) expect(existsSync(directory)).toBe(true)
+      for (const caller of callers) {
+        expect(caller.exitCode).toBe(null)
+        caller.send('stop')
+      }
+      const receipts = await Promise.all(callers.map(readCallerReceipt))
+      expect(new Set(receipts.map((receipt) => receipt.origin)).size).toBe(callers.length)
+      expect(new Set(receipts.map((receipt) => receipt.identity)).size).toBe(callers.length)
+      for (const receipt of receipts) {
+        expect(receipt.database).toBe(path.join(receipt.home, 'fs-metadata.sqlite'))
+        expect(existsSync(receipt.directory)).toBe(false)
+      }
+    } finally {
+      for (const caller of callers) if (caller.exitCode === null) caller.kill('SIGTERM')
+      await Promise.all(callers.map((caller) => caller.exited))
     }
-    const receipts = await Promise.all(callers.map(readCallerReceipt))
-    expect(new Set(receipts.map((receipt) => receipt.origin)).size).toBe(callers.length)
-    expect(new Set(receipts.map((receipt) => receipt.identity)).size).toBe(callers.length)
-    for (const receipt of receipts) {
-      expect(receipt.database).toBe(path.join(receipt.home, 'fs-metadata.sqlite'))
-      expect(existsSync(receipt.directory)).toBe(false)
-    }
-  } finally {
-    for (const caller of callers) if (caller.exitCode === null) caller.kill('SIGTERM')
-    await Promise.all(callers.map((caller) => caller.exited))
-  }
-}, 40_000)
+  },
+  40_000,
+)
 
 async function readCallerReceipt(caller: Bun.Subprocess<'ignore', 'pipe', 'pipe'>) {
   const stdout = new Response(caller.stdout).text()

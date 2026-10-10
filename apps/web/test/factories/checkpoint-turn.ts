@@ -20,13 +20,13 @@ export async function checkpointTurn(
   for (const path of paths) await writeFile(join(root, path), 'before\n')
   runGit(root, ['add', '.'])
   const identity = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com']
-  runGit(root, [...identity, 'commit', '-qm', 'base'])
+  runGit(root, identity.concat(['commit', '-qm', 'base']))
   const harness = await createRailHarness(client, server, ['Checkpoint'], '')
   const sessionId = harness.sessionIds[0]!
   runGit(root, ['update-ref', checkpointRefForSessionTurn(sessionId, 0), 'HEAD'])
   for (const [index, path] of paths.entries())
     await writeFile(join(root, path), after[index] ?? 'after\n')
-  runGit(root, [...identity, 'commit', '-qam', 'turn'])
+  runGit(root, identity.concat(['commit', '-qam', 'turn']))
   const checkpointRef = checkpointRefForSessionTurn(sessionId, 1)
   runGit(root, ['update-ref', checkpointRef, 'HEAD'])
   const summary = turnDiffSummary({

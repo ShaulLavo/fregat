@@ -51,7 +51,7 @@ export const binaryFileOpen: Scenario = {
           await rm(join(fixture, 'missing.bin'), { force: true })
         await route.continue()
       })
-      // A fresh tree open retains recovery actions; restored missing tabs retire.
+      // Missing files keep their tabs and recovery actions.
       await writeFile(join(fixture, 'missing.bin'), Buffer.from([0, 1, 2, 3]))
       await selectors.treeItem(page, 'missing.bin').click()
       await selectors.missingFileMessage(page).waitFor({ timeout: 15_000 })

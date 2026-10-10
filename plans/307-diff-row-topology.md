@@ -46,7 +46,7 @@ Comment targets use git line identity. Raw write actions use the original payloa
 - [ ] Verify stage, revert, and apply with the real in-process server and temporary git repositories. Assert exact resulting blob/file bytes and patch semantics. Use one meaningful operation per action rather than testing a display helper as a proxy for write safety.
 - [ ] Extend the real diff browser regression to assert row geometry, tints, gutters, comment targets, copy content, and language-service lookup on the row below the embedded terminator. Protect both Tree-sitter and Shiki syntax projection where the map is shared.
 - [ ] Run existing narrow diff line-ending, syntax projection, clipboard, and position-map checks. Update invalidated topology assumptions while retaining CRLF/BOM and normal-save regressions. Build affected workspaces before Platform consumer checks.
-- [ ] Verify the actual diff scenario and inspect screenshots. Run browser checks through the heavy-job wrapper. Commit by path, push, deploy, and attach the byte-preservation and visual evidence to this plan.
+- [ ] Verify the actual diff scenario and inspect screenshots. Run browser checks through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill. Commit by path, push, deploy, and attach the byte-preservation and visual evidence to this plan.
 
 ## Acceptance and delivery
 

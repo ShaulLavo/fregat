@@ -1,5 +1,6 @@
-import { AppearancePreviewContext } from '@/features/settings/providers/appearance-preview-context'
-import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { saveSettings } from '@/features/settings/utils/api'
+import { resetSettingsSnapshotAdmission } from '@/features/settings/state/snapshot-admission'
 import { Profiler } from 'react'
 import { act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -7,7 +8,7 @@ import { beforeEach, vi } from 'vitest'
 
 import { ChatInputSubmitButton } from '@/features/chat/components/chat-input-submit-button'
 import { expect, test } from '../../../../../test/fixtures'
-import { renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
 import { TEST_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import {
   resetChatInputDraftStore,
@@ -162,25 +163,35 @@ test('a running turn queues follow-ups by default while Stop remains available',
   )
 })
 
-test('the steer preference labels the running send as a correction', () => {
-  renderWithProviders(
-    <AppearancePreviewContext
-      value={{ ...DEFAULT_SETTING_VALUES, 'chat.followUpBehavior': 'steer' }}
-    >
-      <ChatInputSubmitButton
-        draftTarget={draftTarget}
-        busy
-        disabled={false}
-        disabledReason={null}
-        pendingAction={null}
-        sendDisabled={false}
-        onStop={() => {}}
-        onSubmit={async () => true}
-      />
-    </AppearancePreviewContext>,
+test('the steer preference labels the running send as a correction', async ({ client }) => {
+  const result = await saveSettings(
+    {
+      mutationId: 'submit-button-steer',
+      target: 'user',
+      operations: [{ kind: 'set', key: 'chat.followUpBehavior', value: 'steer' }],
+    },
+    client,
+  )
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(settingsKeys.document(), result.snapshot)
+  const view = renderWithProviders(
+    <ChatInputSubmitButton
+      draftTarget={draftTarget}
+      busy
+      disabled={false}
+      disabledReason={null}
+      pendingAction={null}
+      sendDisabled={false}
+      onStop={() => {}}
+      onSubmit={async () => true}
+    />,
+    { queryClient },
   )
   expect(screen.getByRole('button', { name: 'Send correction' })).not.toHaveAttribute(
     'aria-disabled',
     'true',
   )
+  view.unmount()
+  resetSettingsSnapshotAdmission(queryClient)
+  queryClient.clear()
 })

@@ -3,33 +3,27 @@ import { Spinner } from '@workspace/ui/components/spinner'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 
 import type { FsEntry } from '@/lib/file-system-types'
-import { EntryContent } from '@/features/file-picker/components/entry-content'
 import { EntryFacts } from '@/features/file-picker/components/entry-facts'
+import { FolderPreview } from '@/features/file-picker/components/folder-preview'
 import { NoPreview } from '@/features/file-picker/components/no-preview'
-import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import { PREVIEW_SETTLE_MS } from '@/lib/file-preview/utils/preview'
 import { usePreviewReady } from '@/features/file-picker/hooks/use-preview-ready'
 
 /**
- * The selection's content and facts. It follows the selection only once it rests, so holding an
- * arrow key reads nothing, and the previous entry (content, name and facts) stays up until the
- * next one's content can paint.
+ * The selected folder's first children and facts. It follows the selection only once it rests, so
+ * holding an arrow key reads nothing, and the previous folder stays up until the next one loads.
  */
 export function PreviewPane({
-  accept,
   entry,
   isSearching,
-  mode,
   showHidden,
 }: {
-  accept?: readonly string[]
   entry: FsEntry | null
   isSearching: boolean
-  mode: FilePickerMode
   showHidden: boolean
 }) {
   const [settled] = useDebouncedValue(entry, { wait: PREVIEW_SETTLE_MS })
-  const { shown, fetching } = usePreviewReady(settled, { mode, showHidden })
+  const { shown, fetching } = usePreviewReady(settled, showHidden)
 
   return (
     <ToolPane
@@ -42,27 +36,20 @@ export function PreviewPane({
       {shown ? (
         <div
           className='flex min-h-0 flex-1 flex-col gap-(--density-section-gap)'
-          data-file-preview={shown.entry.path}
+          data-file-preview={shown.path}
         >
           <div className='flex min-h-0 w-full flex-1 flex-col items-center'>
-            <EntryContent
-              accept={accept}
-              entry={shown.entry}
-              mode={mode}
-              showHidden={showHidden}
-              read={shown.read}
-              origin={shown.origin}
-            />
+            <FolderPreview entry={shown} showHidden={showHidden} />
           </div>
           <div className='flex shrink-0 flex-col gap-(--density-control-gap)'>
-            <div className='w-full min-w-0 text-center' title={shown.entry.path}>
-              <div className='truncate text-xs font-medium'>{shown.entry.name}</div>
+            <div className='w-full min-w-0 text-center' title={shown.path}>
+              <div className='truncate text-xs font-medium'>{shown.name}</div>
             </div>
-            <EntryFacts entry={shown.entry} read={shown.read} />
+            <EntryFacts entry={shown} />
           </div>
         </div>
       ) : (
-        <NoPreview isSearching={isSearching} mode={mode} />
+        <NoPreview isSearching={isSearching} />
       )}
     </ToolPane>
   )

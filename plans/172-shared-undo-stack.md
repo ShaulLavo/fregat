@@ -223,8 +223,8 @@ core. The two consumers determine whether the default API needs refinement befor
 
 ## Verification and delivery
 
-For each unit, run the narrow tests that cover its plausible failures through the repository's
-heavy runner. Use real state and domain fixtures. Exercise disposal with retained resources,
+For each unit, run the narrow tests that cover its plausible failures through host-local
+[heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill. Use real state and domain fixtures. Exercise disposal with retained resources,
 not callbacks that merely mirror the implementation.
 
 Use existing lifecycle tests in `packages/client-core/src/chat/rail/tests/` and web session-undo

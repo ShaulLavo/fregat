@@ -13,6 +13,7 @@ import {
   ProviderAdapterRegistry,
   createTestTerminalHost,
   testSettingsOptions,
+  testLoopbackPeer,
   type MetadataDatabaseHandle,
   type AppOptions,
 } from 'server/testing'
@@ -75,6 +76,7 @@ function createServerWithDatabase(
   const buildApp = () =>
     createApp({
       ...appOptions,
+      system: { peer: testLoopbackPeer },
       logs: new LogReaderService({ dir: path.join(root, 'logs') }),
       auth: { allowedOrigins: [TEST_CLIENT_ORIGIN] },
       fonts: new FontCatalogService({

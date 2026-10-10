@@ -1,4 +1,4 @@
-import { editorPerformanceDomSnapshot } from '@/features/editor/state/performance-trace'
+import { editorPerformanceDomSnapshot } from '@/features/editor/state/performance-recording'
 import { expect, test } from '../../../../test/fixtures'
 
 test('DOM counters include the single native row owner during provisional paint', () => {

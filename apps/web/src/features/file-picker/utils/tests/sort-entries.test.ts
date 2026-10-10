@@ -25,14 +25,14 @@ test('sorts names naturally while keeping directories first in both directions',
 
 test('uses names and paths as deterministic tie-breaks for value sorts', () => {
   const entries = [
-    entry('same', 'file', { path: filesystemPath('b/same'), size: 20 }),
-    entry('zeta', 'file', { size: 10 }),
-    entry('alpha', 'file', { size: 10 }),
-    entry('same', 'file', { path: filesystemPath('a/same'), size: 20 }),
+    entry('same', 'file', { path: filesystemPath('b/same'), mtimeMs: 20 }),
+    entry('zeta', 'file', { mtimeMs: 10 }),
+    entry('alpha', 'file', { mtimeMs: 10 }),
+    entry('same', 'file', { path: filesystemPath('a/same'), mtimeMs: 20 }),
   ]
 
   expect(
-    sortFilePickerEntries(entries, { direction: 'ascending', key: 'size' }).map(
+    sortFilePickerEntries(entries, { direction: 'ascending', key: 'modified' }).map(
       (item) => item.path,
     ),
   ).toEqual(['alpha', 'zeta', 'a/same', 'b/same'])

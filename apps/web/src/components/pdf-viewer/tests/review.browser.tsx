@@ -1,12 +1,35 @@
 import '@workspace/ui/globals.css'
-import { test, expect, vi } from 'vitest'
-import { fireEvent } from '@testing-library/react'
+import { test, expect, vi, onTestFinished } from 'vitest'
+import { act, fireEvent } from '@testing-library/react'
+import { notifyManager, type MutationKey, type QueryClient } from '@tanstack/react-query'
+import { pdfMutationKeys } from '@/lib/pdf-viewer/mutation-keys'
 import { makePdf } from '../../../../test/factories/pdf'
 import { renderWithProviders } from '../../../../test/render'
 import * as engine from '@/lib/pdf-viewer/engine'
 import { searchPdf, itemHighlights } from '@/lib/pdf-viewer/search'
 import { PdfPage } from '@/components/pdf-viewer/page'
 import { PdfDocument } from '@/components/pdf-viewer/document'
+
+async function waitForPdfMutation(queryClient: QueryClient, mutationKey: MutationKey) {
+  const cache = queryClient.getMutationCache()
+  const ready = Promise.withResolvers<void>()
+  const settle = () => {
+    const mutation = cache.findAll({ mutationKey, exact: true }).at(-1)
+    if (mutation?.state.status === 'success') ready.resolve()
+    if (mutation?.state.status === 'error') ready.reject(mutation.state.error)
+  }
+  const unsubscribe = cache.subscribe(notifyManager.batchCalls(settle))
+  onTestFinished(unsubscribe)
+  try {
+    notifyManager.schedule(settle)
+    await ready.promise
+    await act(async () => {
+      await new Promise<void>((resolve) => notifyManager.schedule(resolve))
+    })
+  } finally {
+    unsubscribe()
+  }
+}
 
 test.each([
   ['explicit whitespace', 'BT /F1 24 Tf 50 720 Td (hello) Tj 70 0 Td (world) Tj ET', 'hello world'],
@@ -51,6 +74,7 @@ test('a failed page render recovers when a valid replacement reuses page number 
     />,
     { command: false },
   )
+  onTestFinished(view.unmount)
   try {
     await expect.poll(() => view.container.textContent).toContain('This page could not be rendered')
     context.mockRestore()
@@ -83,10 +107,13 @@ test('Next visits two separated matches on one tall page inside its viewport', a
     </div>,
     { command: false },
   )
+  onTestFinished(view.unmount)
   try {
-    await expect.poll(() => view.queryByLabelText('Search PDF')).not.toBeNull()
+    await waitForPdfMutation(view.queryClient, pdfMutationKeys.open)
+    expect(view.getByLabelText('Search PDF')).toBeVisible()
     fireEvent.change(view.getByLabelText('Search PDF'), { target: { value: 'needle' } })
     await expect.poll(() => view.getByRole('status').textContent).toBe('2 matches')
+    await waitForPdfMutation(view.queryClient, pdfMutationKeys.render(1))
     const host = () => view.container.querySelector('[data-pdf-page-content]')!
     await expect.poll(() => host().shadowRoot?.querySelectorAll('.highlight').length).toBe(2)
     fireEvent.click(view.getByRole('button', { name: /^Next$/ }))
@@ -127,8 +154,10 @@ test('navigation waits for a distant page to render before revealing its selecte
     </div>,
     { command: false },
   )
+  onTestFinished(view.unmount)
   try {
-    await expect.poll(() => view.queryByLabelText('Search PDF')).not.toBeNull()
+    await waitForPdfMutation(view.queryClient, pdfMutationKeys.open)
+    expect(view.getByLabelText('Search PDF')).toBeVisible()
     fireEvent.change(view.getByLabelText('Search PDF'), { target: { value: 'needle' } })
     await expect.poll(() => view.getByRole('status').textContent).toBe('1 match')
     await expect
@@ -137,6 +166,7 @@ test('navigation waits for a distant page to render before revealing its selecte
     const host = view.container.querySelector('[data-pdf-page="5"] [data-pdf-page-content]')!
     expect(host.shadowRoot).toBeNull()
     fireEvent.click(view.getByRole('button', { name: /^Next$/ }))
+    await waitForPdfMutation(view.queryClient, pdfMutationKeys.render(5))
     const scroller = view.container.querySelector('[data-pdf-pages]')!
     await expect
       .poll(() => {
@@ -203,8 +233,10 @@ test('navigation stays disabled until measured page placeholders exist', async (
     </div>,
     { command: false },
   )
+  onTestFinished(view.unmount)
   try {
-    await expect.poll(() => view.queryByLabelText('Search PDF')).not.toBeNull()
+    await waitForPdfMutation(view.queryClient, pdfMutationKeys.open)
+    expect(view.getByLabelText('Search PDF')).toBeVisible()
     fireEvent.change(view.getByLabelText('Search PDF'), { target: { value: 'needle' } })
     await expect.poll(() => view.getByRole('status').textContent).toBe('1 match')
     expect(view.container.querySelector('[data-pdf-page="1"]')).toBeNull()
@@ -214,6 +246,7 @@ test('navigation stays disabled until measured page placeholders exist', async (
     pause.mockRestore()
     for (const { observer, target, options } of pending) observe.call(observer, target, options)
     await expect.poll(() => view.container.querySelector('[data-pdf-page="1"]')).not.toBeNull()
+    await waitForPdfMutation(view.queryClient, pdfMutationKeys.render(1))
     const host = view.container.querySelector('[data-pdf-page="1"] [data-pdf-page-content]')!
     await expect.poll(() => host.shadowRoot?.querySelector('.textLayer') ?? null).not.toBeNull()
     expect(host.shadowRoot!.querySelector('.highlight.selected')).toBeNull()

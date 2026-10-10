@@ -27,25 +27,28 @@ export function modelChoiceRows({
   const models = providerModelOptions(providers, preferences).filter((option) =>
     `${option.name} ${option.providerLabel}`.toLowerCase().includes(needle),
   )
-  return [
-    ...models.map((option): Row => ({
+  return models
+    .map((option): Row => ({
       name: `${value?.providerInstanceId === option.providerInstanceId && value.model === option.modelSelection.model ? '✓ ' : ''}${option.label}`,
       description: option.disabledReason?.message ?? modelDescription(option),
       value: { kind: 'model', option },
-    })),
-    ...providers
-      .filter((provider) => provider.displayLabel.toLowerCase().includes(needle))
-      .map((provider): Row => ({
-        name: `${provider.displayLabel} account`,
-        description: provider.auth.status,
-        value: { kind: 'account', provider },
-      })),
-    {
-      name: 'Refresh providers',
-      description: 'Check installed models and account state',
-      value: { kind: 'refresh' },
-    },
-  ]
+    }))
+    .concat(
+      providers
+        .filter((provider) => provider.displayLabel.toLowerCase().includes(needle))
+        .map((provider): Row => ({
+          name: `${provider.displayLabel} account`,
+          description: provider.auth.status,
+          value: { kind: 'account', provider },
+        })),
+      [
+        {
+          name: 'Refresh providers',
+          description: 'Check installed models and account state',
+          value: { kind: 'refresh' },
+        },
+      ],
+    )
 }
 
 /** Retired models trail their provider's list; the web picker folds them, the TUI labels them. */

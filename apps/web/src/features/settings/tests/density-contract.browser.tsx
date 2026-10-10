@@ -41,7 +41,7 @@ import { FilePickerSessionActionsContext } from '@/features/file-picker/provider
 import { DiffBanner } from '@/features/git/components/diff-banner'
 import { LogsToolbar } from '@/features/logs/components/toolbar'
 import { SearchControls } from '@/features/workspace/components/search-controls'
-import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
 
 // Every horizontal bar and every vertical icon rail resolves to --bar-height.
 // Naming it once is the contract: a bar that disagrees is the header-jump bug
@@ -165,7 +165,7 @@ test('full-bleed popovers remain full-bleed in both densities', async () => {
 })
 
 test('persistent app chrome changes compactly and leaves content text unchanged', async () => {
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   mount(
     <TooltipProvider delay={0}>
       {/* The chat header's menu reads the workspace store and navigation, and the submit
@@ -281,7 +281,7 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
 
 test('custom composer, picker, search, and references chrome follows density', async () => {
   setDensity('compact')
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   const commandItems = chatInputMentionCommandItems([
     { id: 'path:app.tsx', label: 'app.tsx', path: 'src/app.tsx', type: 'file' },
   ])

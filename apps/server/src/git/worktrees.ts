@@ -322,7 +322,7 @@ export class GitWorktreeService {
       })
     }
     const force = body.mode === 'discard-changes' ? ['--force'] : []
-    await runner.run(['worktree', 'remove', ...force, '--', target.absolutePath])
+    await runner.run(['worktree', 'remove'].concat(force, ['--', target.absolutePath]))
     return { removed: target, worktrees: await this.worktrees(runner) }
   }
 

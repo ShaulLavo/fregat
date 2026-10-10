@@ -286,7 +286,7 @@ export class FileSystemService {
       readUserPlaces(this.paths, this.placeSources),
       readDrives(this.paths, this.driveSources),
     ])
-    const covered = new Set([this.homePath, ...drives.map((drive) => drive.path)])
+    const covered = new Set([this.homePath].concat(drives.map((drive) => drive.path)))
     const projects = await readProjectFolders(this.paths, this.metadata, covered)
     const projectPaths = new Set(projects.map((folder) => folder.path))
     return { drives, places: places.filter((place) => !projectPaths.has(place.path)), projects }
@@ -627,7 +627,6 @@ export class FileSystemService {
       {
         area: 'fs',
         limit: query.limit,
-        mode: query.mode,
         operation: 'recents',
         showHidden: query.showHidden,
       },
@@ -678,7 +677,7 @@ export class FileSystemService {
 
   private async recordRecentObserved(path: string) {
     const entry = await this.statEntry(path)
-    if (!isPickableEntry(entry)) throw new FsError('INVALID_PATH')
+    if (effectiveEntryType(entry) !== 'directory') throw new FsError('INVALID_PATH')
 
     this.metadata.recordPicked(entry)
     return entry
@@ -811,9 +810,9 @@ export class FileSystemService {
   }
 }
 
+/** Recents list folders only; a recorded file stays recorded but is not shown. */
 function matchesRecentQuery(entry: TreeEntry, query: RecentsQuery) {
   if (!query.showHidden && hasHiddenPathSegment(entry.path)) return false
-  if (query.mode === 'file') return true
 
   return effectiveEntryType(entry) === 'directory'
 }

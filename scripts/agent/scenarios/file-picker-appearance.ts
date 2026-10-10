@@ -26,16 +26,13 @@ async function close(page: Page) {
 export const filePickerAppearance: Scenario = {
   name: 'file-picker-appearance',
   description:
-    'The picker beside the file tree in light and dark, cozy and compact: the workspace folder in columns (same rows as the tree), then a fixture with a long file in the list.',
+    'The picker beside the file tree in light and dark, cozy and compact: the workspace folder in columns (same rows as the tree), then a fixture folder with its preview in the list.',
   async run(page, { step }) {
     const restore = await preserveAppearance(page, ['workbench.colorTheme', 'workbench.density'])
     const root = await mkdtemp(scratchPath('fregat-picker-appearance-'))
-    await mkdir(path.join(root, 'src'))
+    await mkdir(path.join(root, 'src', 'components'), { recursive: true })
+    await mkdir(path.join(root, 'src', 'utils'))
     await writeFile(path.join(root, 'README.md'), '# Fixture\n')
-    await writeFile(
-      path.join(root, 'long.ts'),
-      Array.from({ length: 4000 }, (_, index) => `export const line${index} = ${index}`).join('\n'),
-    )
     try {
       for (const mode of MODES)
         for (const density of DENSITIES) {
@@ -51,10 +48,10 @@ export const filePickerAppearance: Scenario = {
           await selectors.pickerColumn(page, 1).waitFor()
           await step(`picker-${mode}-${density}`)
           await close(page)
-          await openAt(page, root, 'long.ts')
+          await openAt(page, root, 'src')
           await selectors.pickerView(page, 'List').click()
-          await selectors.pickerRow(page, 'long.ts').click()
-          await selectors.pickerPreviewNote(page).waitFor()
+          await selectors.pickerRow(page, 'src').click()
+          await selectors.pickerPreview(page).getByText('components', { exact: true }).waitFor()
           await step(`preview-${mode}-${density}`)
           await close(page)
         }

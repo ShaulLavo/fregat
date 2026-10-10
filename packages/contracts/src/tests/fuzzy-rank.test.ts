@@ -7,7 +7,7 @@ describe('fuzzy ranking', () => {
     const query = 'search'
     const paths = ['src/workspace-search.ts', 'src/search-result.ts', 'src/search.ts']
 
-    const ranked = paths.toSorted((left, right) =>
+    const ranked = paths.sort((left, right) =>
       compareFuzzyRankedTargets(rankTarget(left), rankTarget(right), query),
     )
 
@@ -23,7 +23,7 @@ describe('fuzzy ranking', () => {
 
   it('uses path ordering as a stable final tie-breaker', () => {
     const query = 'search'
-    const ranked = ['b/search.ts', 'a/search.ts'].toSorted((left, right) =>
+    const ranked = ['b/search.ts', 'a/search.ts'].sort((left, right) =>
       compareFuzzyRankedTargets(rankTarget(left), rankTarget(right), query),
     )
 
@@ -51,7 +51,7 @@ describe('fuzzy ranking', () => {
       'apps/web/src/keymap/active-bindings.ts',
     ]
 
-    const ranked = paths.toSorted((left, right) =>
+    const ranked = paths.sort((left, right) =>
       compareFuzzyRankedTargets(rankTarget(left), rankTarget(right), query),
     )
 

@@ -45,10 +45,7 @@ test.beforeEach(() => {
 })
 
 async function seed(operations: readonly SettingsOperation[]) {
-  await saveSettings(
-    { mutationId: crypto.randomUUID(), operations: [...operations], target: 'user' },
-    getClient(),
-  )
+  await saveSettings({ mutationId: crypto.randomUUID(), operations, target: 'user' }, getClient())
 }
 
 function contentSlider() {

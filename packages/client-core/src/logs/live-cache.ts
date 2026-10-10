@@ -78,7 +78,9 @@ export function mergeLiveLogEvents(
   }
   if (uniqueEvents.length === 0) return current
 
-  const mergedEvents = [...uniqueEvents.reverse(), ...current.events]
+  const mergedEvents = uniqueEvents
+    .reverse()
+    .concat(current.events)
     .sort((left, right) => right.timestamp.localeCompare(left.timestamp))
     .slice(0, maxEvents)
 

@@ -6,6 +6,7 @@ linked checkouts, checks and deployment. [AGENTS.md](../AGENTS.md) is the curren
 ## Work in progress
 
 - [Execution roadmap](../PLAN.md) and [plan index](../plans/README.md)
+- [T3 Code nightly reference](t3code-reference.md) and [deferred orchestration rewrite](../plans/343-t3code-nightly-orchestration.md)
 - [Wave register](../plans/waves.md)
 - [Native client roadmap](../plans/native-plan-of-plans.md)
 - [Remaining defect-audit questions](defect-audit-follow-ups.md)
@@ -25,7 +26,7 @@ the revision it inspected; it is not a second implementation queue or proof of t
 | Keyboard                | [Architecture](keymap/architecture.md), [matching and dispatch](vscode-keymap-development.md)                                                                                                        |
 | Terminals               | [Terminal integration](terminal.md), [terminal host](terminal-host.md), [Ghostty package boundary](ghostty-webgpu-brief.md)                                                                          |
 | Settings and appearance | [Settings reference](settings-reference.md), [theme bundles](theme-bundles.md)                                                                                                                       |
-| Runtime and delivery    | [Boot](boot-and-first-load.md), [deployment](../plans/deployment-design.md), [observability](observability-overhead.md), [web push](web-push.md)                                                     |
+| Runtime and delivery    | [Boot](boot-and-first-load.md), [HTML bootstrap](html-bootstrap.md), [deployment](../plans/deployment-design.md), [observability](observability-overhead.md), [web push](web-push.md)                |
 
 ## Clients
 

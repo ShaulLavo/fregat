@@ -18,13 +18,12 @@ const git = (...args) => execFileSync('git', args, { cwd: repository, encoding: 
 
 export async function inputExecutionReceipt(directory = root) {
   const manifest = JSON.parse(await readFile(resolve(directory, 'package.json'), 'utf8'))
-  const seeds = [
-    ...new Set([
-      ...Object.keys(manifest.devDependencies ?? {}),
-      '@shikijs/langs',
-      '@shikijs/themes',
-    ]),
-  ].map((name) => ({ from: directory, name }))
+  const seeds = Array.from(
+    new Set(
+      Object.keys(manifest.devDependencies ?? {}).concat(['@shikijs/langs', '@shikijs/themes']),
+    ),
+    (name) => ({ from: directory, name }),
+  )
   return externalReceipt(dirname(directory), [basename(directory)], seeds, { includePeers: true })
 }
 
@@ -111,9 +110,9 @@ export async function buildInputRuntime(packageSet, directory, fixtures, manifes
     outDir: directory,
     instrumentRoot: buildRoot,
     packageSetDirectory: packageSet.directory,
-    receiptRoots: [...packageSet.manifest.external.packages, ...instrument.receipt.packages].map(
-      (entry) => entry.root,
-    ),
+    receiptRoots: packageSet.manifest.external.packages
+      .concat(instrument.receipt.packages)
+      .map((entry) => entry.root),
   })
   if (runtimeGraph.escaped.length)
     fail(`Bundled runtime code escapes frozen receipts: ${runtimeGraph.escaped.join(', ')}`)

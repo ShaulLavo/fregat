@@ -20,7 +20,8 @@ test(
     const server = createServer((_request, response) =>
       response.end(`<!doctype html><script>
     window.__compare = {
-      prepare: async () => {},
+      initialize: async () => {},
+      createTerminals: async () => {},
       legacyWriteControl: async () => ({ documentedTerminalApi: { accepted: true, calls: 35 } }),
       legacyOriginalUnicode: async () => {
         console.info('legacy-original-unicode', JSON.stringify({ api: 'documentedTerminalApi', call: 22, phase: 'before-write' }));
@@ -114,7 +115,7 @@ test(
         1,
         async () => {
           registeredAtDeadline = contexts.size
-          await Promise.all([...contexts].map((context) => context.close().catch(() => {})))
+          await Promise.all(Array.from(contexts).map((context) => context.close().catch(() => {})))
         },
         { drain: true, drainMilliseconds: 1000 },
       ).then(
@@ -128,7 +129,7 @@ test(
       assert.equal((await pending).status, 'failed')
     } finally {
       await Promise.race([operationEntered, pending])
-      await Promise.all([...contexts].map((context) => context.close().catch(() => {})))
+      await Promise.all(Array.from(contexts).map((context) => context.close().catch(() => {})))
       await pending
     }
   },

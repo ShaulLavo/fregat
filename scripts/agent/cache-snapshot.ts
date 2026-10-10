@@ -17,7 +17,8 @@ export function readCaches() {
     __fregatQueryClients?: Map<string, AnyClient>
     __fregatResourceQueryClient?: AnyClient
   }
-  const clients = [...(registry.__fregatQueryClients ?? new Map<string, AnyClient>())].map(
+  const clients = Array.from(
+    registry.__fregatQueryClients ?? new Map<string, AnyClient>(),
     ([origin, client]) => ({ scope: 'environment', label: origin, origin, client }),
   )
   if (registry.__fregatResourceQueryClient)

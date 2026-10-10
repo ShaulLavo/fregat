@@ -163,7 +163,10 @@ async function prepareFixture(fixture: string) {
       fixture,
     ],
   ]) {
-    const child = Bun.spawn(['git', '-C', fixture, ...args], { stdout: 'ignore', stderr: 'pipe' })
+    const child = Bun.spawn(['git', '-C', fixture].concat(args), {
+      stdout: 'ignore',
+      stderr: 'pipe',
+    })
     if (await child.exited)
       throw createScriptError(`Split fixture failed: ${await new Response(child.stderr).text()}`)
   }

@@ -1,8 +1,6 @@
+/** Options for the native folder chooser. */
 export type PlatformPickOptions = {
-  mode: 'folder' | 'file'
-  accept?: readonly string[]
   startingPath?: string
-  multiple?: boolean
 }
 
 export type WindowAppearance = {

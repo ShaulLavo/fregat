@@ -35,6 +35,7 @@ import { saveSettings } from '@/features/settings/utils/api'
 import { SETTINGS_MUTATION_KEY } from '@/features/settings/utils/mutation-keys'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { runMutation } from '@/lib/mutations/run'
+import { createClientInvariantError } from '@/lib/structured-errors'
 
 const addressKey = 'retention-acceptance-test-address'
 const initial = localStorage.getItem(addressKey) ?? '/'
@@ -103,15 +104,7 @@ function RetentionAcceptanceEntryObserver() {
       ui,
       theme,
       capture: captureRetentionAcceptanceEntry,
-      openFixture: async () => {
-        await application.openEnvironmentWorkspaceRoot(
-          activeEnvironmentId(),
-          filesystemPath('repo'),
-        )
-        return navigation
-          .editorCommands(application.getSnapshot().editor.workspaceStore)
-          .openFileSurface(filesystemPath('repo/src/editor-tab-a.ts'))
-      },
+      openFixture: () => openRetentionFixture(application),
       setSyntaxEnabled: (enabled: boolean) =>
         runMutation(
           settingsOwner,
@@ -144,6 +137,20 @@ function RetentionAcceptanceEntryObserver() {
     }
   }, [application, commands, documents, workspace, ui, theme, settingsOwner])
   return null
+}
+
+async function openRetentionFixture(application: ReturnType<typeof useApplicationRuntime>) {
+  const result = await navigation.openWorkspace({
+    environmentId: activeEnvironmentId(),
+    path: filesystemPath('repo'),
+  })
+  if (result.status !== 'applied')
+    throw createClientInvariantError('Retention fixture workspace navigation did not apply', {
+      status: result.status,
+    })
+  return navigation
+    .editorCommands(application.getSnapshot().editor.workspaceStore)
+    .openFileSurface(filesystemPath('repo/src/editor-tab-a.ts'))
 }
 
 declare global {

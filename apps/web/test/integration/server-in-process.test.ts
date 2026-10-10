@@ -136,7 +136,7 @@ test('reads raw ranges and invalidates a changed file through the client adapter
   try {
     const page = await source.readBytes(0, 8, new AbortController().signal)
     expect(page.revision).toBe(source.revision)
-    expect([...page.bytes]).toEqual([...new TextEncoder().encode('\uFEFFfirst')])
+    expect(Array.from(page.bytes)).toEqual(Array.from(new TextEncoder().encode('\uFEFFfirst')))
     await writeFile(path.join(server.root, 'range.txt'), 'changed')
     await expect(source.readBytes(0, 4, new AbortController().signal)).rejects.toMatchObject({
       code: 'FILE_CHANGED',

@@ -1,3 +1,4 @@
+import type { EditorOpenSampleResetResult } from '@/features/editor/state/performance-trace'
 import { activeEditorTab as selectedGroupTab, allEditorGroups } from '@/lib/documents/utils/groups'
 import { filesystemPath, fileDocumentKey, tabId } from '@/lib/documents/utils/identity'
 import { testTabContent } from '../../../../test/factories/document-targets'
@@ -28,10 +29,7 @@ import {
   resetEditorColorThemeStore,
   syncEditorThemeSelection,
 } from '@/features/editor/state/color-theme-store'
-import {
-  installEditorPerformanceTraceFromUrl,
-  type EditorOpenSampleResetResult,
-} from '@/features/editor/state/performance-trace'
+import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-recording'
 import {
   awaitEditorSyntaxRuntimeSessionIdle,
   awaitEditorSyntaxWorkerIdleFences,
@@ -65,7 +63,7 @@ import {
   type TokenPaintReference,
   type TokenPaintObservation,
 } from '../../../../../../scripts/agent/scenarios/editor-tab-hover-highlights-probe'
-import { AppProviders, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, seedHtmlTheme } from '../../../../test/render'
 import {
   installDelayedFileReadClient,
   type DelayedFileReadClient,
@@ -107,7 +105,7 @@ test(
   'calibrates complete tokens in two known-good real app views',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -153,7 +151,7 @@ test.for([
   '$opening after $delay ms without duplicate worker work',
   { timeout: 30_000 },
   async ({ delay, prepared }) => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -244,7 +242,7 @@ test.for([
 )
 
 test('calibrates complete source token paint against a delayed partial install', async () => {
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   resetEditorColorThemeStore()
   syncEditorThemeSelection('dark', 'dark-plus')
   editorDiagnosticGlobal.__editorPerfTrace = { mark: () => undefined }
@@ -276,7 +274,7 @@ test(
   'keeps complete current tokens on immediate repeated retained revisits',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -308,7 +306,7 @@ test(
   'shares complete current tokens between two app views and preserves the remaining view',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -472,7 +470,7 @@ test(
   'installs a query-ready file before the first browser frame',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     editorDiagnosticGlobal.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = (diagnostic) => {
@@ -506,7 +504,7 @@ test(
   'publishes a miss immediately while the real file read remains delayed',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -546,7 +544,7 @@ test(
   'returns to dirty text and current Undo and Redo tokens with saved paint removed',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     editorDiagnosticGlobal.__editorPerfTrace = { mark: () => undefined }
@@ -646,7 +644,7 @@ test(
   'adopts pending Tree-sitter beside ready Shiki without duplicate worker requests',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -694,7 +692,7 @@ test(
   'joins hover work on click and on a repeated activation without a second session or request',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -737,7 +735,7 @@ test(
   'rejects an invalidated exact lease and lets normal highlighting win',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     editorDiagnosticGlobal.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = (diagnostic) => {
@@ -1089,7 +1087,7 @@ function installEditorWorkerRequestGate(
   Object.defineProperty(Worker.prototype, 'postMessage', { ...descriptor, value: replacement })
 
   return {
-    heldTypes: () => [...new Set(heldRequests.map((request) => request.type))].toSorted(),
+    heldTypes: () => [...new Set(heldRequests.map((request) => request.type))].sort(),
     restore: () => {
       if (restored) return
 

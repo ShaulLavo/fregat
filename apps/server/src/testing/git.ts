@@ -18,7 +18,7 @@ export async function runGit(
   options: GitRunOptions = {},
 ): Promise<GitRunResult> {
   const inside = options.cwdMode === 'option'
-  const command = inside ? ['git', ...args] : ['git', '-C', root, ...args]
+  const command = inside ? ['git'].concat(args) : ['git', '-C', root].concat(args)
   const child = Bun.spawn(command, {
     cwd: inside ? root : undefined,
     stderr: 'pipe',

@@ -6,7 +6,7 @@ import type { Page } from 'playwright'
 
 import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { writeUserSetting } from '../preserve-settings'
-import { selectors } from '../selectors'
+import { openFolderPickerList, selectors } from '../selectors'
 import type { Scenario } from './index'
 
 const LOWERED_LIMIT = 40
@@ -205,11 +205,7 @@ export const filePickerPrefetchBound: Scenario = {
         treeRequests.push(request.url())
     })
     try {
-      await selectors.folderTree(page).waitFor()
-      await selectors.projectMenu(page).click()
-      await selectors.openFolderMenu(page).click()
-      await selectors.pickerDialog(page).waitFor()
-      await selectors.pickerView(page, 'List').click()
+      await openFolderPickerList(page)
       await selectors.pickerGoToFolder(page).click()
       await selectors.pickerFolderPath(page).fill(many)
       await selectors.pickerFolderPath(page).press('Enter')

@@ -134,8 +134,8 @@ function enforceGate(results: readonly BenchmarkResult[]) {
   process.exitCode = 1
 }
 
-function median(values: readonly number[]): number {
-  const sorted = values.toSorted((left, right) => left - right)
+function median(values: number[]): number {
+  const sorted = values.sort((left, right) => left - right)
   const midpoint = Math.floor(sorted.length / 2)
   if (sorted.length % 2 === 1) return sorted[midpoint] ?? 0
 

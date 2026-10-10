@@ -16,7 +16,20 @@ function sourceFiles(directory: string): string[] {
   })
 }
 
+function candidateImports(source: string): ts.FileReference[] {
+  // Escaped paths still need parsing; ordinary paths to this directory contain its name.
+  if (!source.includes(path.basename(removedDirectory)) && !source.includes('\\')) return []
+  return ts.preProcessFile(source, true, true).importedFiles
+}
+
 describe('direct textbuffer imports', () => {
+  test('keeps escaped relative imports in the inventory', () => {
+    const source = String.raw`import { x } from '../src/\u0070ieceTable'`
+    expect(candidateImports(source).map((imported) => imported.fileName)).toEqual([
+      '../src/pieceTable',
+    ])
+  })
+
   test('does not restore an editor-local piece-table facade', () => {
     expect(existsSync(removedDirectory)).toBe(false)
   })
@@ -26,7 +39,7 @@ describe('direct textbuffer imports', () => {
     for (const directory of ['packages', 'examples', 'scripts']) {
       for (const filename of sourceFiles(path.join(root, directory))) {
         const source = readFileSync(filename, 'utf8')
-        for (const imported of ts.preProcessFile(source, true, true).importedFiles) {
+        for (const imported of candidateImports(source)) {
           if (!imported.fileName.startsWith('.')) continue
           const resolved = path.resolve(path.dirname(filename), imported.fileName)
           if (resolved === removedDirectory || resolved.startsWith(removedDirectory + path.sep)) {

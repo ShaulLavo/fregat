@@ -1,8 +1,0 @@
-{
-  "extends": "../tsconfig.json",
-  "compilerOptions": {
-    "paths": {
-      "@fregat/hotkeys": ["../../hotkeys/packages/hotkeys/src/index.ts"]
-    }
-  }
-}

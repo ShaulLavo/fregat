@@ -607,7 +607,7 @@ function latestEventPerAggregate(events: readonly OrchestrationEvent[]) {
     latest.set(`${event.aggregateKind}:${event.aggregateId}`, event)
   }
 
-  return [...latest.values()].toSorted((left, right) => left.sequence - right.sequence)
+  return [...latest.values()].sort((left, right) => left.sequence - right.sequence)
 }
 
 function shellSequence(item: OrchestrationShellStreamItem) {

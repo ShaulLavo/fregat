@@ -14,6 +14,7 @@ const languagePackageDir = resolve(packageDir, '../tree-sitter-languages')
 const servedDependencyRoots = uniqueItems(
   [
     'web-tree-sitter',
+    'tree-sitter-md',
     'tree-sitter-css',
     'tree-sitter-html',
     'tree-sitter-javascript',
@@ -29,11 +30,17 @@ export default defineConfig({
     include: [
       '@singapore-editor/core > @fregat/hotkeys > @tanstack/store',
       '@singapore-editor/core > diff',
+      'tree-sitter-md',
+      'web-tree-sitter',
     ],
   },
   server: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
     fs: {
-      allow: [workspaceRoot, screenshotDirectory, ...servedDependencyRoots],
+      allow: [workspaceRoot, screenshotDirectory].concat(servedDependencyRoots),
     },
   },
   test: {

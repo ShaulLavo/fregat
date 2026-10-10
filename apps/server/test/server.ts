@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { closeApp, createApp, type App, type AppOptions } from '../src/app'
 import { createMetadataDatabase, type MetadataDatabaseHandle } from '../src/db/client'
+import { testLoopbackPeer } from '../src/testing/request'
 
 const openApps: App[] = []
 const openDatabases: MetadataDatabaseHandle[] = []
@@ -35,7 +36,11 @@ export function createTestApp(options: AppOptions = {}): App {
     ...options,
     metadataDatabase: options.metadataDatabase ?? database,
     // Persistent service state stays outside the workspace being inspected by Git and files.
-    system: { ...options.system, stateHome: options.system?.stateHome ?? createTestJournalRoot() },
+    system: {
+      ...options.system,
+      peer: options.system?.peer ?? testLoopbackPeer,
+      stateHome: options.system?.stateHome ?? createTestJournalRoot(),
+    },
     orchestration: { database: database.db, pullRequestLookup: null, ...options.orchestration },
     workspaceEditJournalRoot,
     // Never the real state home: a pairing test writes the device file.

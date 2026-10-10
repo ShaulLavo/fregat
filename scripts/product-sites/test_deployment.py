@@ -63,6 +63,15 @@ class DeploymentTests(unittest.TestCase):
             self.assertIn('run --cwd editor/site build --base /singapore/', commands)
             self.assertEqual((output / 'singapore/index.html').read_text(), 'editor/site')
             self.assertEqual((output / 'singapore/demo/index.html').read_text(), 'editor/examples/app')
+            log.write_text('')
+            selected = root / 'terminal-only'
+            subprocess.run(['bash', str(scripts / 'build.sh'), str(selected), 'ghostty-webgpu'], env=env, check=True)
+            self.assertEqual((selected / 'ghostty-webgpu/index.html').read_text(), 'ghostty-webgpu/site')
+            self.assertFalse((selected / 'singapore').exists())
+            self.assertFalse((selected / 'fregat').exists())
+            self.assertNotIn('editor/site', log.read_text())
+            self.assertNotIn('apps/site', log.read_text())
+
 
     def test_fregat_build_only_builds_the_landing_page(self):
         root = Path(__file__).resolve().parents[2]

@@ -11,14 +11,21 @@ import { Kind } from 'tree-sitter-md'
 
 export type MarkdownHeadings = {
   readonly source: TextReadSnapshot
-  readonly rows: ReadonlyMap<number, { readonly level: number; readonly name: string }>
+  readonly rows: ReadonlyMap<
+    number,
+    { readonly level: number; readonly name: string; readonly id: string }
+  >
 }
 
 export function markdownHeadings(
   context: EditorInlineReplacementContext,
   replacements: readonly InlineReplacementSpec[],
 ): MarkdownHeadings {
-  const rows = new Map<number, { readonly level: number; readonly name: string }>()
+  const rows = new Map<
+    number,
+    { readonly level: number; readonly name: string; readonly id: string }
+  >()
+  const ids = new Set<string>()
   const records = context.records?.data
   if (!records) return { source: context.textSnapshot, rows }
   for (let index = 0; index < records.length; index += 4) {
@@ -27,7 +34,18 @@ export function markdownHeadings(
     const start = records[index]!
     const end = records[index + 1]!
     const name = headingName(context.textSnapshot, replacements, start, end)
-    rows.set(context.textSnapshot.lineAt(start), { level, name })
+    const base =
+      name
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}_ -]/gu, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .slice(0, 128) || 'heading'
+    let id = base
+    let suffix = 1
+    while (ids.has(id)) id = `${base}-${suffix++}`
+    ids.add(id)
+    rows.set(context.textSnapshot.lineAt(start), { level, name, id })
   }
   return { source: context.textSnapshot, rows }
 }
@@ -52,6 +70,7 @@ export function headingContribution(
 ): EditorViewContribution {
   const mounted = new Map<number, EditorRowPresentation>()
   const clear = (index: number, presentation: EditorRowPresentation): void => {
+    presentation.element.removeAttribute('id')
     presentation.element.removeAttribute('role')
     presentation.element.removeAttribute('aria-level')
     presentation.element.removeAttribute('aria-label')
@@ -79,6 +98,7 @@ export function headingContribution(
       if (!presentation) continue
       retained.add(row.index)
       const element = presentation.element
+      if (element.id !== heading.id) element.id = heading.id
       if (element.getAttribute('role') !== 'heading') element.setAttribute('role', 'heading')
       if (element.getAttribute('aria-level') !== String(heading.level))
         element.setAttribute('aria-level', String(heading.level))

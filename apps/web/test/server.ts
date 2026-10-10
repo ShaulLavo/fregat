@@ -19,6 +19,7 @@ import {
   releaseSource,
   resolveLspServer,
   testSettingsOptions,
+  testLoopbackPeer,
   type AppOptions,
   type MetadataDatabaseHandle,
 } from 'server/testing'
@@ -106,7 +107,11 @@ export async function makeTestServer({
       auth: { allowedOrigins: [TEST_ORIGIN] },
       homeDirectory: root,
       systemRoot: systemRoot ?? root,
-      system: { ...system, stateHome: system?.stateHome ?? stateHome },
+      system: {
+        ...system,
+        peer: system?.peer ?? testLoopbackPeer,
+        stateHome: system?.stateHome ?? stateHome,
+      },
       // Keep the real parser/cache/route path, but pin its cache inside this
       // fixture. MSW supplies the external downloads page.
       fonts: new FontCatalogService({
@@ -135,7 +140,7 @@ export async function makeTestServer({
         // real CLIs, so any route that touches a provider would spawn a binary,
         // read the developer's own machine, and answer differently per checkout.
         providerAdapterRegistry: new ProviderAdapterRegistry({
-          adapters: [providerAdapter, ...additionalProviderAdapters],
+          adapters: [providerAdapter].concat(additionalProviderAdapters),
           services: { cwd: process.cwd() },
         }),
       },

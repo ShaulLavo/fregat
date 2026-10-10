@@ -17,7 +17,7 @@ describe('renderTree', () => {
       buildSourceTree(files),
       container,
       (file) => {
-        selectedFiles.push(`${file.path}:${file.text}`)
+        selectedFiles.push(file.path)
       },
       {
         selectedPath: 'alpha.ts',
@@ -25,7 +25,7 @@ describe('renderTree', () => {
     )
 
     expect(entryLabels(container)).toEqual(['src', 'alpha.ts', 'zeta.ts'])
-    expect(selectedFiles).toEqual(['alpha.ts:a'])
+    expect(selectedFiles).toEqual(['alpha.ts'])
     expect(container.querySelector('.entry.active')?.textContent).toContain('alpha.ts')
   })
 
@@ -51,7 +51,7 @@ describe('renderTree', () => {
 })
 
 function entryLabels(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll('.entry')).map((entry) =>
+  return Array.from(container.querySelectorAll('.entry'), (entry) =>
     (entry.textContent ?? '').slice(3),
   )
 }

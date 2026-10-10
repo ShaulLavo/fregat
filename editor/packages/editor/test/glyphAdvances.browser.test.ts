@@ -27,7 +27,7 @@ afterEach(() => {
 })
 
 function lines(): readonly string[] {
-  const all = [...prose.split('\n'), ...source.split('\n'), ...CJK]
+  const all = prose.split('\n').concat(source.split('\n'), Array.from(CJK))
   return all
     .map((line) => line.replace(/\t/g, '    ').trimEnd())
     .filter((line) => line.length > 0)

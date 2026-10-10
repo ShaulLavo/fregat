@@ -23,7 +23,7 @@ describe('LSP server registry', () => {
   it('exposes the full built-in server set', () => {
     const ids = lspServersFor(NO_OVERRIDES)
       .map((server) => server.id)
-      .toSorted()
+      .sort()
 
     expect(ids).toEqual(
       [
@@ -66,7 +66,7 @@ describe('LSP server registry', () => {
         'vue',
         'yaml-ls',
         'zls',
-      ].toSorted(),
+      ].sort(),
     )
   })
 

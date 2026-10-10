@@ -11,13 +11,18 @@ import {
 
 const browserOrigin = 'https://platform.example.test'
 const remoteWebOrigin = 'http://localhost:5173'
+const relayCookie = 'relay_device=destination.secret'
 
 test('relays raw HTTP bodies, query strings, statuses, and headers', async () => {
   const requests: Request[] = []
   const redirects: RequestRedirect[] = []
   const proxy = createMachineProxyRoutes({
     auth: createAuthConfig({ allowedOrigins: [browserOrigin] }),
-    resolve: () => ({ origin: 'http://127.0.0.1:9001', webOrigin: remoteWebOrigin }),
+    resolve: () => ({
+      origin: 'http://127.0.0.1:9001',
+      webOrigin: remoteWebOrigin,
+      cookie: relayCookie,
+    }),
     fetcher: async (url, init) => {
       const request = new Request(url, init)
       requests.push(request)
@@ -58,7 +63,7 @@ test('relays raw HTTP bodies, query strings, statuses, and headers', async () =>
   expect(requests[0]?.headers.get('x-client-instance')).toBe('browser-tab')
   expect(requests[0]?.headers.has('x-hop-request')).toBe(false)
   expect(requests[0]?.headers.has('authorization')).toBe(false)
-  expect(requests[0]?.headers.has('cookie')).toBe(false)
+  expect(requests[0]?.headers.get('cookie')).toBe(relayCookie)
   expect(response.headers.get('x-fs-path')).toBe('source.bin')
   expect(response.headers.has('x-hop-response')).toBe(false)
   expect(response.headers.has('access-control-allow-origin')).toBe(false)
@@ -71,7 +76,7 @@ test('rejects HTTP and WebSocket requests before resolving a machine without a t
     auth: createAuthConfig({ allowedOrigins: [browserOrigin] }),
     resolve: (name) => {
       resolved.push(name)
-      return { origin: 'http://127.0.0.1:9001', webOrigin: remoteWebOrigin }
+      return { origin: 'http://127.0.0.1:9001', webOrigin: remoteWebOrigin, cookie: relayCookie }
     },
   })
   for (const upgrade of ['', 'websocket']) {
@@ -90,7 +95,11 @@ test('streams response chunks without waiting for the remote response to finish'
   const writer = stream.writable.getWriter()
   const proxy = createMachineProxyRoutes({
     auth: createAuthConfig({ allowedOrigins: [browserOrigin] }),
-    resolve: () => ({ origin: 'http://127.0.0.1:9001', webOrigin: remoteWebOrigin }),
+    resolve: () => ({
+      origin: 'http://127.0.0.1:9001',
+      webOrigin: remoteWebOrigin,
+      cookie: relayCookie,
+    }),
     fetcher: async () => new Response(stream.readable),
   })
   const response = await proxy.handle(
@@ -117,7 +126,7 @@ test('relays text and binary WebSocket frames exactly, including input sent befo
   })
   const relay = createMachineProxySocket(
     target,
-    machineProxyHeaders(request, remoteWebOrigin),
+    machineProxyHeaders(request, remoteWebOrigin, relayCookie),
     'dev',
     // A host's own socket holds no device.
     () => () => {},
@@ -132,7 +141,7 @@ test('relays text and binary WebSocket frames exactly, including input sent befo
     expect(local.messages[4]).toEqual(new Uint8Array([0, 255, 128]).buffer)
     expect(remote.requests[0]?.url).toContain('/terminal?root=%2Frepo&shell=bash')
     expect(remote.requests[0]?.headers.get('origin')).toBe(remoteWebOrigin)
-    expect(remote.requests[0]?.headers.has('cookie')).toBe(false)
+    expect(remote.requests[0]?.headers.get('cookie')).toBe(relayCookie)
     relay.close(local.client, 1000, 'done')
     expect(local.closes).toEqual([{ code: 1000, reason: 'done' }])
   } finally {
@@ -141,50 +150,79 @@ test('relays text and binary WebSocket frames exactly, including input sent befo
   }
 })
 
-test('upgrades an authenticated prefixed request through Elysia and dispatches raw frames', async () => {
-  const remote = remoteMachineSocket()
-  const local = machineProxyClient()
-  const relay = machineProxyAdapter({
-    auth: createAuthConfig({ allowedOrigins: [browserOrigin] }),
-    resolve: () => ({ origin: remote.server.url.origin, webOrigin: remoteWebOrigin }),
-  })
-  const response = await relay.app.handle(
-    new Request('http://local/platform-api/machines/dev/proxy/orchestration/rpc?client=a%2Fb', {
-      headers: {
-        origin: browserOrigin,
-        upgrade: 'websocket',
-        connection: 'upgrade',
-        'sec-websocket-key': 'browser-key-must-not-reach-remote',
-        'sec-websocket-version': '13',
+test.each([false, true])(
+  'upgrades an authenticated prefixed request with a revoked credential=%s',
+  async (revoked) => {
+    const remote = remoteMachineSocket()
+    const local = machineProxyClient()
+    let renewals = 0
+    const destination = {
+      origin: remote.server.url.origin,
+      webOrigin: remoteWebOrigin,
+      cookie: relayCookie,
+    }
+    const relay = machineProxyAdapter({
+      auth: createAuthConfig({ allowedOrigins: [browserOrigin] }),
+      resolve: () => ({
+        ...destination,
+        cookie: revoked ? 'relay_device=revoked.secret' : relayCookie,
+        refresh: revoked
+          ? async () => {
+              renewals++
+              return destination
+            }
+          : undefined,
+      }),
+      fetcher: async (url, init) => {
+        expect(url.pathname).toBe('/system/capabilities')
+        expect(new Headers(init.headers).get('cookie')).toBe('relay_device=revoked.secret')
+        return Response.json({ error: { code: 'DEVICE_NOT_PAIRED' } }, { status: 401 })
       },
-    }),
-  )
-  expect(response.status).toBeLessThan(400)
-  expect(relay.upgrades).toHaveLength(1)
-  const socket = { ...local.client, data: relay.upgrades[0]?.data }
-  try {
-    dispatchMachineProxySocket('open', socket)
-    dispatchMachineProxySocket('message', socket, '{ "n": 9007199254740993 }')
-    dispatchMachineProxySocket('message', socket, Buffer.from([0, 255, 128]))
-    await expect.poll(() => local.messages.length).toBe(2)
-    expect(local.messages[0]).toBe('{ "n": 9007199254740993 }')
-    expect(local.messages[1]).toEqual(new Uint8Array([0, 255, 128]).buffer)
-    expect(remote.requests[0]?.url).toContain('/orchestration/rpc?client=a%2Fb')
-    expect(remote.requests[0]?.headers.get('sec-websocket-key')).not.toBe(
-      'browser-key-must-not-reach-remote',
+    })
+    const response = await relay.app.handle(
+      new Request('http://local/platform-api/machines/dev/proxy/orchestration/rpc?client=a%2Fb', {
+        headers: {
+          origin: browserOrigin,
+          upgrade: 'websocket',
+          connection: 'upgrade',
+          'sec-websocket-key': 'browser-key-must-not-reach-remote',
+          'sec-websocket-version': '13',
+        },
+      }),
     )
-    expect(remote.requests[0]?.headers.get('origin')).toBe(remoteWebOrigin)
-  } finally {
-    dispatchMachineProxySocket('close', socket, 1000, 'cleanup')
-    await remote.server.stop(true)
-  }
-})
+    expect(response.status).toBeLessThan(400)
+    expect(relay.upgrades).toHaveLength(1)
+    const socket = { ...local.client, data: relay.upgrades[0]?.data }
+    try {
+      dispatchMachineProxySocket('open', socket)
+      dispatchMachineProxySocket('message', socket, '{ "n": 9007199254740993 }')
+      dispatchMachineProxySocket('message', socket, Buffer.from([0, 255, 128]))
+      await expect.poll(() => local.messages.length).toBe(2)
+      expect(local.messages[0]).toBe('{ "n": 9007199254740993 }')
+      expect(local.messages[1]).toEqual(new Uint8Array([0, 255, 128]).buffer)
+      expect(remote.requests[0]?.url).toContain('/orchestration/rpc?client=a%2Fb')
+      expect(remote.requests[0]?.headers.get('sec-websocket-key')).not.toBe(
+        'browser-key-must-not-reach-remote',
+      )
+      expect(remote.requests[0]?.headers.get('origin')).toBe(remoteWebOrigin)
+      expect(remote.requests[0]?.headers.get('cookie')).toBe(relayCookie)
+      expect(renewals).toBe(revoked ? 1 : 0)
+    } finally {
+      dispatchMachineProxySocket('close', socket, 1000, 'cleanup')
+      await remote.server.stop(true)
+    }
+  },
+)
 
 test('wildcard URLs cannot replace the connected machine origin', async () => {
   const targets: URL[] = []
   const proxy = createMachineProxyRoutes({
     auth: createAuthConfig({ allowedOrigins: [browserOrigin] }),
-    resolve: () => ({ origin: 'http://127.0.0.1:9001', webOrigin: remoteWebOrigin }),
+    resolve: () => ({
+      origin: 'http://127.0.0.1:9001',
+      webOrigin: remoteWebOrigin,
+      cookie: relayCookie,
+    }),
     fetcher: async (url) => {
       targets.push(url)
       return new Response(null, { status: 204 })

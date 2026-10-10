@@ -16,7 +16,7 @@ Each run records checkout and dirty paths, dependency release/SHA/tarball, built
 
 Committed fixtures run from a fresh clone using checkout-relative/OS-temp/configured paths. Missing optional runtimes/tools skip with an explicit reason; a supported shipping target cannot silently skip. No hardcoded owner home, /work, hostname or private account. One-off host proofs live outside the repository and their evidence stays with the recorded run.
 
-Use the project's heavy runner for suites/browser/build/bench, quiet admission for measurements, and existing on-demand dev routes. A private server has an explicit free port and declared server accounting; it stops after the run. Each quiet run fits its existing hold bound and records declared servers/pressure. Heavy resource policy remains separate from package admission.
+Use host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill for suites/browser/build/bench, quiet admission for measurements, and existing on-demand dev routes. A private server has an explicit free port and declared server accounting; it stops after the run. Each quiet run fits its existing hold bound and records declared servers/pressure. Heavy resource policy remains separate from package admission.
 
 App verification uses verify-fregat look/scenario/trace/renders/caches for its real surface and claim. Read screenshots and logs. No deployment or UI evidence is required for this planning-only commit; actual consumer changes inherit their shipping gates.
 

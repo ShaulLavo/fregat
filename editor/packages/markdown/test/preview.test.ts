@@ -56,7 +56,10 @@ describe('markdown preview plugin', () => {
 
   // Read the mounted DOM rather than editor state: what the user actually sees is the assertion.
   const rowTexts = (): readonly string[] =>
-    [...container.querySelectorAll('[data-editor-virtual-row]')].map((row) => row.textContent ?? '')
+    Array.from(
+      container.querySelectorAll('[data-editor-virtual-row]'),
+      (row) => row.textContent ?? '',
+    )
 
   const openMarkdown = async (languageId = 'markdown'): Promise<void> => {
     editor.openDocument({ documentId: 'notes.md', text: DOCUMENT, languageId })
@@ -107,6 +110,7 @@ describe('markdown preview plugin', () => {
     const headings = [...container.querySelectorAll('[role="heading"]')]
     expect(headings.map((row) => row.getAttribute('aria-level'))).toEqual(['1', '2', '1'])
     expect(headings.map((row) => row.textContent)).toEqual(['Title', 'Read docs', 'Setext'])
+    expect(headings.map((row) => row.id)).toEqual(['title', 'read-docs', 'setext'])
     expect(container.querySelector('a')?.getAttribute('href')).toBe('https://example.com')
     editor.setText('plain\nsecond', { languageId: 'markdown' })
     await flush()

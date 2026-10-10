@@ -55,10 +55,9 @@ export class EditorOperation {
     const pending = this.changes[index]
     if (!pending) return false
 
-    const timings = [
-      ...change.timings,
-      ...pending.change.timings.filter((timing) => !change.timings.includes(timing)),
-    ]
+    const timings = change.timings.concat(
+      pending.change.timings.filter((timing) => !change.timings.includes(timing)),
+    )
     this.changes[index] = {
       change: withDocumentSessionChangeTimings(pending.change, timings),
       totalName,

@@ -5,6 +5,7 @@ export type TreeSitterLanguageAssets = {
   readonly highlightQuerySource?: string
   readonly foldQuerySource?: string
   readonly injectionQuerySource?: string
+  readonly mergeUnitQuerySource?: string
 }
 
 type TreeSitterLanguageContributionMetadata = {
@@ -224,6 +225,7 @@ const createTreeSitterLanguageDescriptor = (
   highlightQuerySource: assets.highlightQuerySource,
   foldQuerySource: assets.foldQuerySource,
   injectionQuerySource: assets.injectionQuerySource,
+  mergeUnitQuerySource: assets.mergeUnitQuerySource,
 })
 
 const loadTreeSitterLanguageAssets = async (

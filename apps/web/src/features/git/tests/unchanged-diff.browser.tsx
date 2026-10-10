@@ -7,7 +7,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, test } from 'vitest'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
-import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
 
 // A pure rename has no hunks, and for a long time that meant the pane drew a sentence where the
 // file should have been. What replaces it is whole-file context rows, which only a real browser can
@@ -37,7 +37,7 @@ test('a renamed file with no content changes paints its text in both panes', asy
 })
 
 function mountRenameDiff() {
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   const text = `${Array.from({ length: LINE_COUNT }, (_, index) => `line ${index + 1}`).join('\n')}\n`
   const file = createTextDiff({
     newFile: { path: 'repo/renamed.ts', text },

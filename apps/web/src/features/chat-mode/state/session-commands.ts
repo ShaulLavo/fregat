@@ -132,8 +132,10 @@ export function selectAdjacentSession(direction: SessionTraversalDirection) {
   const step = direction === 'next' ? 1 : -1
   return openSessionAt(sessions, (index + step + sessions.length) % sessions.length)
 }
+/** Positions 1–8 open that row; 9 opens the last, as it selects the last tab. */
 export function jumpToSession(position: number) {
-  return openSessionAt(visibleSessions(), position - 1)
+  const sessions = visibleSessions()
+  return openSessionAt(sessions, position === 9 ? sessions.length - 1 : position - 1)
 }
 function openSessionAt(sessions: readonly SessionRailItem[], index: number) {
   const session = sessions[index]

@@ -240,7 +240,7 @@ function rustAnalyzerBinary(): string | null {
   } catch {
     entries = []
   }
-  for (const entry of entries.toSorted()) {
+  for (const entry of entries.sort()) {
     const candidate = path.join(toolchains, entry, 'bin', 'rust-analyzer')
     try {
       accessSync(candidate, constants.X_OK)

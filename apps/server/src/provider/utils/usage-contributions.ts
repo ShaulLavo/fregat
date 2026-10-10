@@ -29,7 +29,7 @@ export function updateUsageContributions(
       (item.after.costUsd === null || after.costUsd !== null) &&
       usageDelta(before, item.after) === null,
   )
-  if (index < 0) return [...contributions, { scope: totals.scope, before, after }]
+  if (index < 0) return contributions.concat([{ scope: totals.scope, before, after }])
   return contributions.map((item, position) => (position === index ? { ...item, after } : item))
 }
 

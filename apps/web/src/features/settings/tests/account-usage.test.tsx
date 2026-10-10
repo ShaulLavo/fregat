@@ -1,7 +1,7 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import { focusManager } from '@tanstack/react-query'
-import { providerInstanceIdSchema } from '@workspace/contracts'
+import { providerInstanceIdSchema, type ProviderUsageWindow } from '@workspace/contracts'
 import * as v from 'valibot'
 import { appUsageCollector } from 'server/testing'
 
@@ -243,7 +243,7 @@ test('unclassified and future-dated observations never acquire a current compose
 test('two windows on one account retain separate ages and freshness', ({ client }) => {
   expect(client).toBeDefined()
   const account = accountUsageFixture(now).accounts[0]!
-  const currentWindow = {
+  const currentWindow: ProviderUsageWindow = {
     ...account.windows[0]!,
     id: 'five-hour',
     label: 'Five-hour',
@@ -254,7 +254,7 @@ test('two windows on one account retain separate ages and freshness', ({ client 
   }
   const view = renderWithProviders(
     <ProviderAccountUsageDetails
-      account={{ ...account, windows: [currentWindow, ...account.windows] }}
+      account={{ ...account, windows: [currentWindow].concat(account.windows) }}
       label='Codex account 1'
       nowMs={now}
     />,

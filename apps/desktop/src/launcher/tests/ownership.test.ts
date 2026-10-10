@@ -162,7 +162,7 @@ test.each(Array.from({ length: 30 }, (_, run) => run))(
   'CDP close releases both owned descriptors run %i',
   async () => {
     const f = await fixture('old-version')
-    const child = Bun.spawn([f.candidate.executable, ...f.candidate.args], {
+    const child = Bun.spawn([f.candidate.executable].concat(f.candidate.args), {
       stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'],
     })
     const writeFd = child.stdio[3] as number

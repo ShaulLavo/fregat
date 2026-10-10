@@ -52,7 +52,6 @@ import { watchAdjacentTabIntents } from '@/features/editor/state/adjacent-tab-in
 import { bindDiffSyntaxPreparer } from '@/lib/intent-prefetch/state/diff-syntax-preparer'
 import { registerEditorOpenBenchmarkControl } from '@/features/editor/state/performance-trace'
 import { watchFileAvailability } from '@/features/editor/state/file-availability'
-import { getNavigation } from '@/state/navigation-binding'
 
 export type EditorRuntime = ReturnType<typeof createEditorRuntime>
 
@@ -118,7 +117,7 @@ export function createEditorRuntime({
   const snapshotComparisonOwner = createSnapshotComparisonOwner(documentStore, queryClient)
   const syncSnapshotComparisons = () => {
     const state = workspaceStore.getState()
-    const workspaces = [...state.parkedWorkspaces].map(([rootPath, slice]) => ({
+    const workspaces = Array.from(state.parkedWorkspaces, ([rootPath, slice]) => ({
       rootPath: filesystemPath(rootPath),
       panels: slice.workbenchPanels,
     }))
@@ -357,10 +356,6 @@ export function createEditorRuntime({
           documentStore,
           workspaceStore,
           queryClient,
-          forgetFile: (document) => {
-            void getNavigation().editorCommands(workspaceStore).discardLiveEditorDocument(document)
-              .settled
-          },
         }),
       ]
       fileOpenIntentOwner.connect()

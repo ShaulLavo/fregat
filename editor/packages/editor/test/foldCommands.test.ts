@@ -69,7 +69,7 @@ const TREE_TEXT = TREE_LINES.join('\n')
 
 const DEEP_LINES = EDITOR_FOLD_LEVELS.map((level) => `open${level} {`).concat(
   'leaf',
-  [...EDITOR_FOLD_LEVELS].reverse().map((level) => `close${level} }`),
+  EDITOR_FOLD_LEVELS.toReversed().map((level) => `close${level} }`),
   'tail',
 )
 const DEEP_TEXT = DEEP_LINES.join('\n')
@@ -89,7 +89,7 @@ const BRACE_TEXT = BRACE_LINES.join('\n')
 const CROSSING_LINES = ['head:', '  one', '  two {', '  three', '}']
 const CROSSING_TEXT = CROSSING_LINES.join('\n')
 
-const FOLD_COMMAND_IDS = [
+const BASE_FOLD_COMMAND_IDS: readonly EditorCommandId[] = [
   'editor.fold',
   'editor.unfold',
   'editor.foldRecursively',
@@ -98,8 +98,10 @@ const FOLD_COMMAND_IDS = [
   'editor.unfoldAll',
   'editor.createFoldingRangeFromSelection',
   'editor.removeManualFoldingRanges',
-  ...EDITOR_FOLD_LEVELS.map((level) => `editor.foldLevel${level}` as const),
-] as const satisfies readonly EditorCommandId[]
+]
+const FOLD_COMMAND_IDS = BASE_FOLD_COMMAND_IDS.concat(
+  EDITOR_FOLD_LEVELS.map((level) => `editor.foldLevel${level}` as const),
+)
 
 const highlightsMap = new Map<string, Highlight>()
 const mockRegistry = {
@@ -172,7 +174,7 @@ function editorRoot(): HTMLElement {
  */
 function visibleText(): string {
   const rows = document.querySelectorAll('.editor-virtualized-row[data-editor-virtual-row]')
-  return [...rows].map((row) => row.textContent ?? '').join('\n')
+  return Array.from(rows, (row) => row.textContent ?? '').join('\n')
 }
 
 function typeText(data: string): void {

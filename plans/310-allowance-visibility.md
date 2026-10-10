@@ -49,7 +49,7 @@ Do not add a cron, allowance threshold that triggers execution, auto-start opt-i
 - [ ] Correlate Send acceptance with the selected work item. Verify failed/retried dispatch, repeated clicks, draft switching, and abandoned drafts without duplicate sessions or lost entries.
 - [ ] Extend `chat-usage-meter` and the relevant project/draft scenario. Open the list and advance the clock through reset without any start command. Then send one selected item and observe exactly one accepted session.
 - [ ] Read back normal/narrow `look` screenshots for current remaining allowance, stale/unknown observations, and the manual preview.
-- [ ] Run the narrow meaningful fixtures and required gates through the heavy runner. Commit and push owned paths, deploy affected server/web code, and verify the served manual flow.
+- [ ] Run the narrow meaningful fixtures and required gates through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill. Commit and push owned paths, deploy affected server/web code, and verify the served manual flow.
 - [ ] Update this checklist and the root roadmap with shipped evidence. Record forecasting as unavailable unless the optional observation-series increment has its own bounded verification.
 
 ## Acceptance and verification

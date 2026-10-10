@@ -64,7 +64,10 @@ describe('indexed long-line geometry', () => {
       const row = view.getState().mountedRows[0]!
       const caret = view.createRange(target, target)!
       const x = caret.getBoundingClientRect().left - row.element.getBoundingClientRect().left
-      expect(x).toBeCloseTo(target * characterWidth + width, 0)
+      expect(x).toBeCloseTo(
+        nativeCaretAdvance(row.element, row.chunks[0]!.startOffset, target, width),
+        0,
+      )
       const internal = Reflect.get(view, 'view') as VirtualizedTextViewInternal
       expect(offsetToX(internal, row, target)).toBeCloseTo(x, 0)
       expect(xToOffset(internal, row, x)).toBe(target)
@@ -204,4 +207,28 @@ function checkCaret(view: VirtualizedTextView, text: string, offset: number): vo
   expect(offsetToX(internal, row, offset)).toBeCloseTo(drawn, 0)
   expect(xToOffset(internal, row, drawn)).toBe(offset)
   expect(view.textOffsetFromDomBoundary(range!.startContainer, range!.startOffset)).toBe(offset)
+}
+
+function nativeCaretAdvance(
+  row: HTMLElement,
+  windowStart: number,
+  characters: number,
+  widgetWidth: number,
+): number {
+  const probe = row.ownerDocument.createElement('span')
+  probe.style.cssText = 'position:absolute;left:0;top:0;font:inherit;white-space:pre'
+  probe.textContent = 'a'.repeat(16)
+  row.append(probe)
+  const advance = probe.getBoundingClientRect().width / 16
+  const spacer = row.ownerDocument.createElement('span')
+  spacer.style.cssText = `display:inline-block;width:${Math.round(windowStart * advance + widgetWidth)}px`
+  const text = row.ownerDocument.createTextNode('a'.repeat(characters - windowStart))
+  probe.replaceChildren(spacer, text)
+  const caret = row.ownerDocument.createRange()
+  caret.setStart(text, text.length)
+  caret.collapse(true)
+  // Match the integer window spacer, then let the native caret box place the visible text.
+  const x = caret.getBoundingClientRect().left - row.getBoundingClientRect().left
+  probe.remove()
+  return x
 }

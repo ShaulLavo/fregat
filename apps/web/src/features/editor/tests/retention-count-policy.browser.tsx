@@ -106,7 +106,7 @@ for (const fixture of collectedRun.fixtures) {
       caseOutcomes.push(outcome)
       await record({ kind: 'fixture-case-complete', cycle: collectedRun.cycles, ...outcome })
     })
-    const flight = runCase(fixture, (host) => {
+    const flight = runCase(fixture, context.signal, (host) => {
       ownedHost = host
       if (context.signal.aborted) abort()
     })
@@ -123,7 +123,7 @@ test(
   'twenty actual view open/close cycles keep entries, worker sessions and packed bytes flat',
   { timeout: 120_000 },
   async (context) => {
-    const host = await retentionCountHost(discoveryRun.fixtures[0]!)
+    const host = await retentionCountHost(discoveryRun.fixtures[0]!, context.signal)
     context.onTestFinished(() => host.dispose())
     const container = document.createElement('div')
     container.style.cssText = 'height: 240px; width: 600px;'
@@ -204,11 +204,53 @@ test(
   },
 )
 
-async function runCase(fixture: RetentionRun['fixtures'][number], ownHost: (host: Host) => void) {
+test(
+  'retention settlement waits for delayed native frame delivery',
+  { timeout: 30_000 },
+  async (context) => {
+    const nativeFrame = globalThis.requestAnimationFrame.bind(globalThis)
+    const timers = new Set<ReturnType<typeof setTimeout>>()
+    const originalFrame = globalThis.requestAnimationFrame
+    globalThis.requestAnimationFrame = (callback) =>
+      nativeFrame((time) => {
+        const timer = setTimeout(() => {
+          timers.delete(timer)
+          callback(time)
+        }, 1_500)
+        timers.add(timer)
+      })
+    let host: Host | null = null
+    context.onTestFinished(async () => {
+      try {
+        await host?.dispose()
+      } finally {
+        globalThis.requestAnimationFrame = originalFrame
+        for (const timer of timers) clearTimeout(timer)
+      }
+    })
+    host = await retentionCountHost(discoveryRun.fixtures[0]!, context.signal)
+    // A frame can publish another frame after the first idle checkpoint.
+    requestAnimationFrame(() => requestAnimationFrame(() => undefined))
+    expect(host.observation.snapshot().frames).toBe(1)
+    await host.settle()
+    expect(host.observation.snapshot().frames).toBe(0)
+    expect(host.observation.snapshot().scheduled).toEqual([])
+    const stopped = new AbortController()
+    const waitingFrame = host.observation.frame(stopped.signal)
+    stopped.abort('verification-stop')
+    await expect(waitingFrame).rejects.toBe('verification-stop')
+  },
+)
+
+async function runCase(
+  fixture: RetentionRun['fixtures'][number],
+  signal: AbortSignal,
+  ownHost: (host: Host) => void,
+) {
   try {
     runRecord ??= recordRun()
     await runRecord
-    await verifyFixture(fixture, collectedRun.cycles, ownHost)
+    await verifyFixture(fixture, collectedRun.cycles, signal, ownHost)
   } catch (error) {
     await record({
       kind: 'failure',
@@ -247,9 +289,10 @@ afterAll(async () => {
 async function verifyFixture(
   fixture: RetentionRun['fixtures'][number],
   cycles: number,
+  signal: AbortSignal,
   ownHost: (host: Host) => void,
 ) {
-  const host = await retentionCountHost(fixture)
+  const host = await retentionCountHost(fixture, signal)
   ownHost(host)
   const b = host.borrow(host.b.analysis)
   let bView: ReturnType<Host['createView']> | null = null

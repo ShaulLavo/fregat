@@ -95,6 +95,10 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the high-level system design: main th
 
 - **Piece** — the fundamental text-slice record. Other editors sometimes call this a "fragment" (e.g., Zed). In this codebase, it's always a Piece.
 
+## Array construction
+
+Follow Fregat's array construction rules: combine arrays with `concat` and use fresh array results directly. Preserve copies needed for ownership, iterable/typed-array conversion, tuple typing, or sparse-array behavior. Performance exceptions require measurements.
+
 ## Build & Test
 
 Monorepo managed by Turborepo with Bun.

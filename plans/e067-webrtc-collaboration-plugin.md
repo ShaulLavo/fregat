@@ -139,3 +139,18 @@ Not in scope: accounts, permissions, persistent rooms, a server peer, and rooms 
   set with E066's identity-compaction decision.
 - A future server peer (Delta DB) sees plaintext as a participant; document secrecy from a host
   is not offered.
+
+## Follow-up verification finding, 2026-10-10
+
+- [ ] Resolve the demo's transport recovery check on Chromium on the Raspberry Pi.
+      Run `bun run --cwd editor/examples/app test:e2e -- --workers=1 --grep 'connection errors are replaced'`.
+      At `editor/examples/app/test/collaboration.spec.ts:179`, after both simulated
+      BroadcastChannel failures are cleared, `#status` still says `Peer connection stopped`
+      after 5 seconds. The expected text is `Session ready. Share the invitation link to add peers.`
+      This occurred twice, including with the original demo source at `917e6da49` restored,
+      so lazy GitHub loading is ruled out. Inspect `failingBroadcastExample` at line 106:
+      it pairs heartbeat callbacks with channel indices and freezes the clock; establish
+      whether that pairing or the demo's transport recovery is wrong before changing it.
+      The adjacent persistent-error, replacement-error and invitation checks passed.
+      Evidence is retained locally in
+      `/work/tmp/fregat-evidence/20261010t110053-heavy-4cb273e69898-cc26f1-pi/playwright/`.

@@ -1,3 +1,10 @@
+export { createTreeSitterInputEdits } from './treeSitter/edits'
+export {
+  createTreeSitterReviewSyntax,
+  type TreeSitterReviewSyntax,
+  type TreeSitterReviewRead,
+  type TreeSitterReviewUnit,
+} from './mergeReview'
 export {
   TreeSitterLanguageRegistry,
   createTreeSitterLanguageRegistry,
@@ -19,6 +26,10 @@ export type {
   TreeSitterError,
   TreeSitterInjectionInfo,
   TreeSitterParseResult,
+  TreeSitterMergeUnit,
+  TreeSitterMergeUnitResult,
+  TreeSitterProjectedMergeUnitsResult,
+  TreeSitterSyntaxRange,
   TreeSitterPoint,
   TreeSitterWorkerRetentionSnapshot,
 } from './treeSitter/types'
@@ -29,6 +40,8 @@ export {
   type TreeSitterWorkerCacheSnapshot,
   type TreeSitterWorkerLifecycleState,
   type TreeSitterWorkerOwnerSnapshot,
+  type TreeSitterMergeUnitPayload,
+  type TreeSitterProjectedMergeUnitsPayload,
 } from './treeSitter/workerClient'
 export {
   expandTreeSitterSelection,
@@ -178,10 +191,9 @@ export const createTreeSitterLanguagePlugin = (
   name: options.name ?? 'tree-sitter-languages',
   activate(context) {
     const registration = defaultProviderRegistration()
-    return [
-      retainSyntaxProvider(context, registration),
-      ...contributions.map((contribution) => retainLanguage(registration, contribution)),
-    ]
+    return [retainSyntaxProvider(context, registration)].concat(
+      contributions.map((contribution) => retainLanguage(registration, contribution)),
+    )
   },
 })
 
@@ -308,6 +320,7 @@ const inlineAssetSignature = (
     foldQuerySource: contribution.foldQuerySource,
     highlightQuerySource: contribution.highlightQuerySource,
     injectionQuerySource: contribution.injectionQuerySource,
+    mergeUnitQuerySource: contribution.mergeUnitQuerySource,
     wasmUrl: contribution.wasmUrl,
   }
 }

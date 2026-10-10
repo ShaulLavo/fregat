@@ -6,11 +6,12 @@ import { renderMarkdownLinks, type MarkdownLink, type MarkdownLinkOptions } from
 
 type Span = { readonly start: number; readonly end: number }
 
+/** Inline replacements returned in a new array owned by the caller. */
 export function markdownInlineReplacements(
   text: TextReadSnapshot,
   records: Uint32Array,
   options: MarkdownLinkOptions = {},
-): readonly InlineReplacementSpec[] {
+): InlineReplacementSpec[] {
   const specs: InlineReplacementSpec[] = []
   const links: (Span & { readonly kind: number })[] = []
   const renderedLinks: MarkdownLink[] = []
@@ -45,7 +46,7 @@ function preserveTableWidths(
   specs: readonly InlineReplacementSpec[],
   source: TextReadSnapshot,
   containers: readonly Container[],
-): readonly InlineReplacementSpec[] {
+): InlineReplacementSpec[] {
   const tables = containers.filter((container) => container.kind === Kind.Table)
   return specs.map((spec) => {
     if (!tables.some((table) => table.start <= spec.startIndex && table.end >= spec.endIndex))
@@ -58,18 +59,20 @@ function preserveTableWidths(
       ...spec,
       text: spec.text + padding,
       className: 'editor-markdown-text',
-      render: paddedRender(render, spec.text, padding),
+      render: paddedRender(render, spec.text.length),
     }
   })
 }
 
 function paddedRender(
   render: InlineReplacementSpec['render'],
-  text: string,
-  padding: string,
+  textLength: number,
 ): InlineReplacementSpec['render'] {
-  return (container) => {
-    const disposable = render?.(container)
+  return (container, displayText, displayStart) => {
+    const labelLength = Math.max(0, Math.min(displayText.length, textLength - displayStart))
+    const text = displayText.slice(0, labelLength)
+    const padding = displayText.slice(labelLength)
+    const disposable = labelLength > 0 ? render?.(container, text, displayStart) : undefined
     if (!render) container.append(text)
     const spacer = container.ownerDocument.createElement('span')
     spacer.className = 'editor-markdown-padding'

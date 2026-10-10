@@ -1,3 +1,5 @@
+import { DisplayProjection } from './displayProjection'
+import { assertContentLayout } from './contentLayout'
 import type { TextContent } from '../textContent'
 import type { MeasuredText } from '../textMeasurements'
 import type { FoldMap } from '../foldMap'
@@ -13,7 +15,8 @@ import type { SelectionAffinity } from '../selections'
 import type { TextEdit } from '../tokens'
 import type { TextEditBatch } from '../textEditBatch'
 import type { DisplayProjectionTransition, WrapAdvance } from './displayProjectionTypes'
-import { PROPORTIONAL_WRAP_MARGIN_PX } from './glyphAdvances'
+import { glyphAdvancesFor, PROPORTIONAL_WRAP_MARGIN_PX } from './glyphAdvances'
+import { observeBrowserTextMetricsInvalidation } from './browserMetrics'
 import { clamp } from '../style-utils'
 import {
   foldMapMatchesText,
@@ -168,6 +171,7 @@ export function refreshDisplayProjection(
     wrapColumn: view.wrapEnabled ? viewportColumns : null,
     wrapBreak: view.wrapBreak,
     wrapAdvance: view.wrapAdvance,
+    rowWrapAdvances: styledRowWrapAdvances(view, viewportWidth),
     tabSize: view.tabSize,
   })
   view.model.wrapColumn = view.wrapEnabled ? viewportColumns : null
@@ -198,13 +202,109 @@ function proportionalWrapAdvance(
   view: VirtualizedTextViewInternal,
   viewportWidth: number,
 ): WrapAdvance | null {
-  const glyphs = view.glyphs
-  if (!view.wrapEnabled || !glyphs || viewportWidth <= 0) return null
-  const width = Math.max(1, viewportWidth - view.currentGutterWidth - PROPORTIONAL_WRAP_MARGIN_PX)
+  if (!view.wrapEnabled || viewportWidth <= 0) return null
+  const glyphs = view.glyphs ?? glyphAdvancesFor(view.scrollElement)
+  if (!glyphs) return null
+  const width = Math.max(
+    1,
+    viewportWidth -
+      view.currentGutterWidth -
+      view.metrics.characterWidth -
+      PROPORTIONAL_WRAP_MARGIN_PX,
+  )
   const current = view.wrapAdvance
   if (current && current.width === width && current.glyphs === glyphs) return current
 
-  return { width, glyphs, advance: (codePoint) => glyphs.advance(codePoint) }
+  return {
+    width,
+    glyphs,
+    advance: (codePoint) => glyphs.advance(codePoint),
+    measure: view.monospace ? undefined : glyphs.measure,
+    minimumTabAdvance: view.monospace ? undefined : glyphs.minimumTabAdvance,
+  }
+}
+
+/** Keep one observed face per presentation class, including rows outside the mounted viewport. */
+function styledRowWrapAdvances(
+  view: VirtualizedTextViewInternal,
+  viewportWidth: number,
+): ReadonlyMap<number, WrapAdvance> | undefined {
+  const base = view.wrapAdvance
+  if (!base) {
+    releaseStyledRowFaces(view, new Set())
+    return undefined
+  }
+  const replacements = view.model.inlineMap?.rowReplacements
+  const rows = new Set(
+    Array.from(replacements?.keys() ?? []).concat(Array.from(view.rowDecorations.keys())),
+  )
+  if (!rows.size) {
+    releaseStyledRowFaces(view, new Set())
+    return undefined
+  }
+  const byClass = new Map<string, WrapAdvance | null>()
+  const advances = new Map<number, WrapAdvance>()
+  for (const row of rows) {
+    const kinds = new Set(
+      (replacements?.get(row) ?? [])
+        .map((replacement) => replacement.kind)
+        .filter((kind): kind is string => Boolean(kind && /^[a-z0-9-]+$/.test(kind))),
+    )
+    const classes = [...kinds]
+      .map((kind) => `editor-inline-${kind}`)
+      .concat(view.rowDecorations.get(row)?.className ?? '')
+      .join(' ')
+    let advance = byClass.get(classes)
+    if (advance === undefined) {
+      const glyphs = glyphAdvancesFor(styledRowFace(view, classes))
+      advance =
+        glyphs && glyphs !== base.glyphs
+          ? {
+              width: Math.max(
+                1,
+                viewportWidth -
+                  view.currentGutterWidth -
+                  glyphs.advance(48) -
+                  PROPORTIONAL_WRAP_MARGIN_PX,
+              ),
+              glyphs,
+              advance: (codePoint: number) => glyphs.advance(codePoint),
+              measure: glyphs.measure,
+              minimumTabAdvance: glyphs.minimumTabAdvance,
+            }
+          : null
+      byClass.set(classes, advance)
+    }
+    if (advance) advances.set(row, advance)
+  }
+  releaseStyledRowFaces(view, new Set(byClass.keys()))
+  return advances
+}
+
+function styledRowFace(view: VirtualizedTextViewInternal, classes: string): HTMLDivElement {
+  const existing = view.styledRowFaces.get(classes)
+  if (existing) return existing.element
+  const element = view.scrollElement.ownerDocument.createElement('div')
+  element.style.cssText =
+    'position:absolute;visibility:hidden;pointer-events:none;left:-10000px;right:auto;width:0'
+  element.ariaHidden = 'true'
+  element.className = `editor-virtualized-row ${classes}`
+  view.spacer.append(element)
+  const observer = observeBrowserTextMetricsInvalidation(element, () => view.onStyledFaceChange())
+  view.styledRowFaces.set(classes, { element, observer })
+  return element
+}
+
+export function releaseStyledRowFaces(
+  view: VirtualizedTextViewInternal,
+  retained: ReadonlySet<string>,
+): void {
+  for (const [classes, face] of view.styledRowFaces) {
+    if (retained.has(classes)) continue
+    face.observer.dispose()
+    face.element.remove()
+    view.styledRowFaces.delete(classes)
+  }
 }
 
 export function setWrapEnabledLayout(
@@ -229,9 +329,36 @@ export function setInjectedTextRowsLayout(
   refreshDisplayProjection(view, viewportColumns)
 }
 
+export function assertContentSnapshot(
+  view: VirtualizedTextViewInternal,
+  textSnapshot: TextSnapshot,
+  replacement = false,
+): void {
+  if (view.scrollMode !== 'content') return
+  assertContentLayout(textSnapshot.length, 0, 0)
+  const projection = new DisplayProjection({
+    ...view.model.projection.config,
+    textSnapshot,
+    ...(replacement ? { foldMap: null, inlineMap: null, injectedTextRows: [] } : {}),
+  })
+  const count = projection.rowCount
+  assertContentLayout(
+    textSnapshot.length,
+    count,
+    count * getRowHeight(view) + Math.max(0, count - 1) * view.rowGap,
+  )
+}
+
 export function updateVirtualizerRows(view: VirtualizedTextViewInternal): void {
+  const count = visibleLineCount(view)
+  if (view.scrollMode === 'content')
+    assertContentLayout(
+      view.model.textLength,
+      count,
+      count * getRowHeight(view) + Math.max(0, count - 1) * view.rowGap,
+    )
   const changed = view.virtualizer.updateOptions({
-    count: visibleLineCount(view),
+    count,
     rowGap: view.rowGap,
     rowHeight: getRowHeight(view),
   })

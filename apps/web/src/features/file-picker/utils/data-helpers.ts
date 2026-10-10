@@ -15,17 +15,12 @@ import { clientLogContext } from '@/lib/environments/state/log-context'
 import { observeClientOperation } from '@/lib/client-logging'
 import { streamWorkspaceSearch } from '@workspace/client-core/files/search-client'
 
-import {
-  basename,
-  joinPaths,
-  type DirectoryFsEntry,
-  type FilePickerMode,
-} from '@/features/file-picker/utils/model'
+import { basename, joinPaths, type DirectoryFsEntry } from '@/features/file-picker/utils/model'
 import { streamPickerSearchEntries } from '@/features/file-picker/state/search'
 
 export type DirectoryLoadData = {
   currentEntry: DirectoryFsEntry | null
-  entries: FsEntry[]
+  entries: readonly FsEntry[]
 }
 
 export type DirectoryLoadOptions = {
@@ -44,7 +39,6 @@ const utf8Encoder = new TextEncoder()
 export async function loadDirectoryData(
   path: string,
   query: string,
-  mode: FilePickerMode,
   signal: AbortSignal,
   onEntries: (entries: FsEntry[]) => void,
   options: DirectoryLoadOptions = {},
@@ -53,7 +47,7 @@ export async function loadDirectoryData(
   const showHidden = options.showHidden ?? false
   const [currentEntry, entries] = await Promise.all([
     fetchCurrentEntry(path, signal, client),
-    loadEntries(path, query, mode, showHidden, signal, onEntries, client),
+    loadEntries(path, query, showHidden, signal, onEntries, client),
   ])
 
   return { currentEntry, entries }
@@ -87,13 +81,8 @@ export function fetchPlaces(signal: AbortSignal, client: Client) {
   )
 }
 
-export function fetchRecentEntries(
-  mode: FilePickerMode,
-  showHidden: boolean,
-  signal: AbortSignal,
-  client: Client,
-) {
-  return fetchSharedRecentEntries({ limit: RECENT_LIMIT, mode, showHidden }, signal, client)
+export function fetchRecentEntries(showHidden: boolean, signal: AbortSignal, client: Client) {
+  return fetchSharedRecentEntries({ limit: RECENT_LIMIT, showHidden }, signal, client)
 }
 
 export async function createPickerFolder(request: CreatePickerFolderRequest, client: Client) {
@@ -141,7 +130,6 @@ function hasHiddenPathSegment(path: string, currentPath: string) {
 async function loadEntries(
   path: string,
   query: string,
-  mode: FilePickerMode,
   showHidden: boolean,
   signal: AbortSignal,
   onEntries: (entries: FsEntry[]) => void,
@@ -153,7 +141,6 @@ async function loadEntries(
   const entries = await streamPickerSearchEntries(
     path,
     trimmedQuery,
-    mode,
     signal,
     (next) => {
       onEntries(visiblePickerEntries(next, path, showHidden))

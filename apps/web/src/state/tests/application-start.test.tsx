@@ -1,6 +1,6 @@
 import { afterEach, vi } from 'vitest'
 
-import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace'
+import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-recording'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
 import { createApplicationRuntime } from '@/state/application-runtime'
 import { expect, test } from '../../../test/fixtures'

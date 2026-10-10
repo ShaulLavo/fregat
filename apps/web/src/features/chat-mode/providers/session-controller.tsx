@@ -49,7 +49,7 @@ export function ChatModeSessionController({
   )
   const sessions = projectSessions
     .filter((session) => !session.archivedAt)
-    .toSorted(comparePinnedSessions)
+    .sort(comparePinnedSessions)
   const sessionIds = sessions.map((session) => session.id)
   const archivedSessionIds = projectSessions
     .filter((session) => Boolean(session.archivedAt))

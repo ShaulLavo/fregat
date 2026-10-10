@@ -136,9 +136,7 @@ const normalizeAnchorFoldRanges = (
     .map((range) => resolveFoldRange(snapshot, range))
     .filter((range) => range !== null)
     .filter((range) => range.endPoint.row > range.startPoint.row)
-    .toSorted(
-      (left, right) => left.startOffset - right.startOffset || right.endOffset - left.endOffset,
-    )
+    .sort((left, right) => left.startOffset - right.startOffset || right.endOffset - left.endOffset)
 
   const normalized: AnchorFoldRange[] = []
   for (const range of resolved) {
@@ -287,9 +285,9 @@ const countLineBreaks = (text: string): number => {
 }
 
 const mergeFoldInvalidations = (
-  invalidations: readonly FoldMapInvalidatedRange[],
+  invalidations: FoldMapInvalidatedRange[],
 ): readonly FoldMapInvalidatedRange[] => {
-  const sorted = invalidations.toSorted(compareInvalidations)
+  const sorted = invalidations.sort(compareInvalidations)
   const merged: FoldMapInvalidatedRange[] = []
 
   for (const invalidation of sorted) {

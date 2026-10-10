@@ -12,7 +12,7 @@ export function toggledModelSelection(
     return additional.filter((entry) => modelRefKey(entry) !== key)
   }
 
-  return [...additional, selection]
+  return additional.concat([selection])
 }
 
 /** Every model a draft goes to, primary first. */
@@ -21,7 +21,7 @@ export function draftSendTargets(
   additional: readonly ModelSelection[],
 ): ModelSelection[] {
   const primaryKey = modelRefKey(primary)
-  return [primary, ...additional.filter((entry) => modelRefKey(entry) !== primaryKey)]
+  return [primary].concat(additional.filter((entry) => modelRefKey(entry) !== primaryKey))
 }
 
 export function backgroundModelError(

@@ -1,3 +1,4 @@
+import { tabAdvance } from './tabAdvance'
 import type { TextContent } from '../textContent'
 import type { GlyphAdvances } from './glyphAdvances'
 
@@ -44,17 +45,20 @@ export function columnAtPixels(
   const prefixes = rowPrefixes(text, glyphs, tabSize, text.length)
   let block = 0
   while (block + 1 < prefixes.length && prefixes[block + 1]! <= pixels) block += 1
-  let column = block * BLOCK
-  let visual = prefixes[block]!
-  const end = Math.min(text.length, column + BLOCK)
-  const slice = text.slice(column, end)
-  for (let index = 0; index < slice.length; index += 1) {
-    const next = visual + unitAdvance(slice, index, visual, glyphs, tabSize)
-    if (next > pixels) return bias === 'after' ? column + 1 : column
-    visual = next
-    column += 1
+  const start = block * BLOCK
+  let low = start
+  let high = Math.min(text.length, start + BLOCK)
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2)
+    const width = advanceAcross(text, start, middle, prefixes[block]!, glyphs, tabSize)
+    if (width <= pixels) low = middle
+    else high = middle - 1
   }
-  return column
+  if (bias === 'after' && low < text.length) {
+    const width = advanceAcross(text, start, low, prefixes[block]!, glyphs, tabSize)
+    if (width < pixels) return low + 1
+  }
+  return low
 }
 
 function rowPrefixes(
@@ -90,6 +94,18 @@ function advanceAcross(
   tabSize: number,
 ): number {
   const slice = text.slice(start, end)
+  if (glyphs.measure) {
+    let total = visual
+    let runStart = 0
+    for (let index = 0; index < slice.length; index += 1) {
+      if (slice.charCodeAt(index) !== 9) continue
+      total += glyphs.measure(slice.slice(runStart, index))
+      const stop = tabSize * glyphs.advance(32)
+      total += tabAdvance(total, stop, glyphs.minimumTabAdvance ?? 0)
+      runStart = index + 1
+    }
+    return total + glyphs.measure(slice.slice(runStart))
+  }
   let total = visual
   for (let index = 0; index < slice.length; index += 1) {
     total += unitAdvance(slice, index, total, glyphs, tabSize)

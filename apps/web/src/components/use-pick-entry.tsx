@@ -2,13 +2,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
 import { entryPickerModuleQueryOptions } from '@/components/utils/entry-picker-query'
-import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 
 export type UsePickEntryOptions = {
-  accept?: readonly string[]
-  mode?: FilePickerMode
   open: boolean
   value: PickedFsEntry | null
   onOpenChange: (open: boolean) => void
