@@ -49,7 +49,7 @@ export async function renderExample(text: string, language: string): Promise<str
           .join('')}</div>`,
     )
     .join('')
-  return `<figure data-example aria-label="${escape(language || 'Text')} code example"><script type="application/json" data-example-source>${payload}</script><div class="example-stage"><div class="example-static">${variants}</div></div><figcaption><span>${escape(language || 'Text')} example</span><button type="button" class="make-live" aria-label="Edit ${escape(language || 'text')} example" hidden>Make live</button><span class="example-status" role="status"></span></figcaption></figure>`
+  return `<figure class="not-content" data-example aria-label="${escape(language || 'Text')} code example"><script type="application/json" data-example-source>${payload}</script><div class="example-stage"><div class="example-static">${variants}</div></div><figcaption><span>${escape(language || 'Text')} example</span><button type="button" class="make-live" aria-label="Edit ${escape(language || 'text')} example" hidden>Make live</button><span class="example-status" role="status"></span></figcaption></figure>`
 }
 export function examplePaint() {
   return async (tree: HtmlRoot) => {

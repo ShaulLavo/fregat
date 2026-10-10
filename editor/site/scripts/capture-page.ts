@@ -1,5 +1,6 @@
 import { decodePaintSnapshot, mountPaintSnapshot } from '@singapore-editor/core/paint'
 import { mountExample } from '../src/manual/example-editor'
+import '../src/manual/example-styles'
 import '../src/styles/manual.css'
 import '../src/styles/examples.css'
 

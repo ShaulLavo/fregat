@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
+    "dev": "bun scripts/dev.ts",
     "build": "bun scripts/build.ts",
     "preview": "astro preview",
     "docs:check": "bun scripts/check-samples.ts && bun scripts/check-samples.ts --packages",

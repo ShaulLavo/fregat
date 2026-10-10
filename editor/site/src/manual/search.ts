@@ -34,6 +34,7 @@ function createDialog() {
     const search = await (await pagefind).debouncedSearch(query, {}, 120)
     if (!search) return
     const results = await Promise.all(search.results.slice(0, 8).map((result) => result.data()))
+    if (input.value.trim() !== query) return
     list.replaceChildren(
       ...results.map((data) => {
         const item = document.createElement('li')
@@ -55,6 +56,7 @@ function createDialog() {
       empty.textContent = 'No matches'
       list.replaceChildren(empty)
     }
+    list.dataset.query = query
   })
   return element
 }

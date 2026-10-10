@@ -1,4 +1,4 @@
-import { build, preview } from 'vite'
+import { build, createServer as createViteServer } from 'vite'
 import { chromium, type Browser } from 'playwright'
 import { createServer as allocateServer } from 'node:net'
 import { createServer } from 'node:http'
@@ -26,18 +26,27 @@ export async function startCapture() {
       rollupOptions: { input: join(root, 'scripts/capture.html') },
     },
   })
-  const assets = await preview({
+  // Middleware mode keeps Vite from installing process-exit signal handlers.
+  const assets = await createViteServer({
     configFile: false,
-    root,
-    build: { outDir: '.capture/assets' },
-    preview: { host: '127.0.0.1', port: await freePort(), strictPort: true },
+    root: join(root, '.capture/assets'),
+    server: { middlewareMode: true },
   })
+  const assetServer = createServer(assets.middlewares)
+  const assetPort = await freePort()
+  await new Promise<void>((resolve) => assetServer.listen(assetPort, '127.0.0.1', resolve))
   let browser: Browser | undefined
   let api: ReturnType<typeof createServer> | undefined
   try {
-    browser = await chromium.launch({ channel: 'chromium' })
+    // The caller owns shutdown; Playwright's signal handlers would exit before its cleanup.
+    browser = await chromium.launch({
+      channel: 'chromium',
+      handleSIGINT: false,
+      handleSIGTERM: false,
+      handleSIGHUP: false,
+    })
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
-    await page.goto(`${assets.resolvedUrls!.local[0]}scripts/capture.html`)
+    await page.goto(`http://127.0.0.1:${assetPort}/scripts/capture.html`)
     await page.waitForFunction(() => 'capture' in window)
     let queue = Promise.resolve()
     const cache = new Map<string, string>()
@@ -84,14 +93,16 @@ export async function startCapture() {
     return async () => {
       await browser!.close()
       await new Promise<void>((resolve) => api!.close(() => resolve()))
-      await new Promise<void>((resolve) => assets.httpServer.close(() => resolve()))
+      await new Promise<void>((resolve) => assetServer.close(() => resolve()))
+      await assets.close()
       await rm(join(root, '.capture/endpoint.json'))
       console.log(`Captured ${cache.size} distinct Singapore examples.`)
     }
   } catch (error) {
     await browser?.close()
     if (api?.listening) await new Promise<void>((resolve) => api!.close(() => resolve()))
-    await new Promise<void>((resolve) => assets.httpServer.close(() => resolve()))
+    await new Promise<void>((resolve) => assetServer.close(() => resolve()))
+    await assets.close()
     await rm(join(root, '.capture/endpoint.json'), { force: true })
     throw error
   }

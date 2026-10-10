@@ -7,6 +7,7 @@ export type LinkTarget = { readonly href: string; readonly md?: string }
 export async function renderMarkdown(text: string, resolveLink: (href: string) => LinkTarget) {
   const links = () => (tree: HtmlRoot) => {
     visit(tree, 'element', (node) => {
+      if (/^h[1-6]$/.test(node.tagName)) node.properties['data-pagefind-weight'] = '10'
       if (node.tagName === 'a' && typeof node.properties.href === 'string')
         node.properties.href = resolveLink(node.properties.href).href
     })

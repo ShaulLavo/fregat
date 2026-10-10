@@ -264,11 +264,23 @@ for (const engine of ['chromium', 'webkit'] as const) {
           await page.getByRole('button', { name: /Search/ }).click()
           const input = page.getByRole('searchbox', { name: 'Search docs' })
           const result = page.locator('.search li a').first()
+          const noMatch = '"qzvxjkwpyqzvxjkwpy"'
+          expect(
+            await page.evaluate(
+              `import(${JSON.stringify(`${preview.base}/pagefind/pagefind.js`)}).then(async index => (await index.search(${JSON.stringify(noMatch)})).results.length)`,
+            ),
+          ).toBe(0)
+          await input.fill(noMatch)
+          await expect
+            .poll(() => page.locator('.search ol').getAttribute('data-query'))
+            .toBe(noMatch)
+          expect(await page.locator('.search ol').innerText()).toBe('No matches')
           for (const query of ['Quick start', 'Open a named document']) {
-            await input.fill('singaporeunmatchedsearchproof')
-            await expect.poll(() => page.locator('.search ol').innerText()).toBe('No matches')
             await input.fill(query)
-            await expect.poll(() => result.innerText()).toContain('Quick start')
+            await expect
+              .poll(() => page.locator('.search ol').getAttribute('data-query'))
+              .toBe(query)
+            expect(await result.innerText()).toContain('Quick start')
             expect(await result.getAttribute('href')).toContain('/docs/start-here/quick-start/')
           }
           await result.click()

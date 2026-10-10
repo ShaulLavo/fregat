@@ -26,3 +26,9 @@ test('renders ordinary paragraphs, nested lists, emphasis and real table cells',
   expect(page.html).toContain('<td>two</td>')
   expect(page.html).not.toContain('data-n=')
 })
+
+test('authored headings carry search weight for title and heading matches', async () => {
+  const page = await renderMarkdown('# Quick start\n\n## Open a named document\n', resolve)
+  expect(page.html).toMatch(/<h1[^>]*data-pagefind-weight="10"/)
+  expect(page.html).toMatch(/<h2[^>]*data-pagefind-weight="10"/)
+})

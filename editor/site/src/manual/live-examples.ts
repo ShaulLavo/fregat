@@ -1,5 +1,6 @@
 import type { ExampleEditor } from './example-editor'
 import type { ExampleCapture } from './examples'
+import runtimeUrl from 'virtual:example-editor-url'
 import { onThemeChange } from './theme-toggle'
 
 type Source = ExampleCapture & { text: string; language: string }
@@ -8,7 +9,20 @@ const states = new Map<
   { ready: Promise<ExampleEditor>; host: HTMLElement; editor?: ExampleEditor }
 >()
 let runtime: Promise<typeof import('./example-editor')> | undefined
-const load = () => (runtime ??= import('./example-editor'))
+let failedLoads = 0
+const load = () => {
+  if (runtime) return runtime
+  const url = failedLoads ? `${runtimeUrl}?retry=${failedLoads}` : runtimeUrl
+  const request = import(/* @vite-ignore */ url) as Promise<typeof import('./example-editor')>
+  runtime = Promise.all([import('./example-styles'), request])
+    .then(([, editor]) => editor)
+    .catch((error: unknown) => {
+      runtime = undefined
+      failedLoads++
+      throw error
+    })
+  return runtime
+}
 function prepare(example: HTMLElement) {
   const previous = states.get(example)
   if (previous) return previous
@@ -112,8 +126,10 @@ const idle = () => {
   )
   for (const example of examples) observer.observe(example)
 }
-if ('requestIdleCallback' in window) requestIdleCallback(idle)
-else setTimeout(idle, 0)
+if (examples.length > 0) {
+  if ('requestIdleCallback' in window) requestIdleCallback(idle)
+  else setTimeout(idle, 0)
+}
 onThemeChange(() => {
   for (const state of states.values()) state.editor?.refreshTheme()
 })

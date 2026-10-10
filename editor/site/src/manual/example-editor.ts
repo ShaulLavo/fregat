@@ -3,8 +3,6 @@ import { createTreeSitterLanguagePlugin } from '@singapore-editor/tree-sitter'
 import { createLineGutterPlugin } from '@singapore-editor/gutters'
 import { fenceLanguage, languageContribution } from './languages'
 import { paletteTheme } from './theme'
-import '@singapore-editor/core/style.css'
-import '@singapore-editor/gutters/style.css'
 
 export type ExampleEditor = ReturnType<typeof mountExample>
 export function mountExample(
