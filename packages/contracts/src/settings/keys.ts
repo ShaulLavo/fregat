@@ -203,6 +203,11 @@ export const SETTINGS_REGISTRY = {
     // Machine scope: it decides who reaches this machine's files, terminals and agents.
     scope: 'machine',
   }),
+  'environments.trustedProxyHosts': defineSetting({
+    schema: v.array(v.pipe(v.string(), v.minLength(1))),
+    default: [],
+    scope: 'machine',
+  }),
   'environments.tailnetOwnerDevices': defineSetting({
     schema: v.boolean(),
     default: true,

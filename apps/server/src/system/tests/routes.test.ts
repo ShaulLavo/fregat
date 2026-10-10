@@ -58,7 +58,12 @@ async function helperScript(body: string) {
 }
 
 async function listening(
-  options: { helper?: string | null; desktop?: boolean; machineId?: () => MachineId } = {},
+  options: {
+    helper?: string | null
+    desktop?: boolean
+    machineId?: () => MachineId
+    pairing?: boolean
+  } = {},
 ) {
   const root = await scratch()
   const stateHome = path.join(root, 'state')
@@ -69,9 +74,15 @@ async function listening(
   // The address is the listener's own origin, as Host and Origin name it.
   const port = await freePort()
   const address = `http://127.0.0.1:${port}`
+  const settings = testSettingsOptions(root)
+  await mkdir(path.dirname(settings.userFilePath!), { recursive: true })
+  await writeFile(
+    settings.userFilePath!,
+    JSON.stringify({ 'environments.devicePairing': options.pairing ?? true }),
+  )
   const app = createTestApp({
     auth: { allowedOrigins: [address, 'http://localhost:5173'] },
-    settings: testSettingsOptions(root),
+    settings,
     system: {
       address,
       webBase: '/',
@@ -155,11 +166,11 @@ describe('system identity', () => {
   })
 
   it.each([
-    ['mesh forwarding of this machine’s own browser', { 'x-forwarded-for': '127.0.0.1' }],
+    ['proxy forwarding of this machine’s own browser', { 'x-forwarded-for': '127.0.0.1' }],
     ['a proxy hop', { via: '1.1 fregat' }],
     ['another allowed origin', { origin: 'http://localhost:5173' }],
   ])('refuses %s', async (_, extra: Record<string, string>) => {
-    const { base } = await listening()
+    const { base } = await listening({ pairing: false })
     const response = await get(base, '/system/identity', { origin: base, ...extra })
     expect(response.status).toBe(403)
     expect(await code(response)).toBe('system.NOT_LOCAL')
@@ -169,7 +180,7 @@ describe('system identity', () => {
 describe('system capabilities', () => {
   it('offers the native chooser only to a local request on a machine with a helper', async () => {
     const { file } = await helperScript(`echo '{"event":"picked","paths":[]}'`)
-    const { base } = await listening({ helper: file })
+    const { base } = await listening({ helper: file, pairing: false })
     const local = v.parse(
       serverCapabilitiesSchema,
       await (await get(base, '/system/capabilities')).json(),
@@ -223,7 +234,7 @@ describe('native picker endpoint', () => {
     const { file, root } = await helperScript(
       `touch "$ROOT/started"\necho '{"event":"picked","paths":[]}'`,
     )
-    const { base } = await listening({ helper: file })
+    const { base } = await listening({ helper: file, pairing: false })
     const response = await pick(base, {}, { 'x-forwarded-for': '127.0.0.1' })
     expect(response.status).toBe(403)
     expect(await code(response)).toBe('system.NATIVE_PICKER_NOT_LOCAL')

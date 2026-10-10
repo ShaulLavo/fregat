@@ -8,6 +8,7 @@ import { reserveForwardPort } from '../src/machines/forward'
 import { shellQuote } from '../src/utils/shell'
 import { installServerLauncher } from '../src/installation/install'
 import { localOpenSsh, sshPassphrase, waitUntil } from './factories/openssh'
+import { relayPairingResponse } from './factories/relay-pairing'
 import { releaseSource } from '../src/machines/update'
 
 const descriptor = {
@@ -49,7 +50,11 @@ const service = new MachineService({
   readMachines: () => ({
     fixture: { kind: 'ssh', target: 'fixture', remotePort: ssh.port },
   }),
-  fetcher: Object.assign(async () => Response.json(descriptor), { preconnect: fetch.preconnect }),
+  fetcher: Object.assign(
+    async (input: Parameters<typeof fetch>[0]) =>
+      relayPairingResponse(String(input), 'relay-fixture') ?? Response.json(descriptor),
+    { preconnect: fetch.preconnect },
+  ),
   releaseSource: releaseSource('/platform-test/no-release/server'),
 })
 const prompts = new Map<string, MachineAuthPrompt | null>()
