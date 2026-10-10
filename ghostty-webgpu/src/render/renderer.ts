@@ -616,12 +616,12 @@ export class WebGpuTerminalRenderer {
     const operations = this.textPass.uploadFrame(builder, updates)
     if (!this.coordinator) {
       try {
-        this.textPass.submit(this.context.getCurrentTexture().createView())
+        this.textPass.submit(this.textPass.attachment(this.context.getCurrentTexture()))
       } catch (cause) {
         this.reportFrameFailure(cause)
         if (this.disposed) return
         // Retry once in this turn; an acquired canvas texture presents empty after an abandoned submit.
-        this.textPass.submit(this.context.getCurrentTexture().createView())
+        this.textPass.submit(this.textPass.attachment(this.context.getCurrentTexture()))
       }
       let rows: readonly RenderRow[] | undefined
       if (this.frames.requiresFullRows) {
@@ -649,11 +649,11 @@ export class WebGpuTerminalRenderer {
     }
     let command: GPUCommandBuffer
     try {
-      command = this.textPass.encode(this.context.getCurrentTexture().createView())
+      command = this.textPass.encode(this.textPass.attachment(this.context.getCurrentTexture()))
     } catch (cause) {
       this.reportFrameFailure(cause)
       if (this.disposed) return
-      command = this.textPass.encode(this.context.getCurrentTexture().createView())
+      command = this.textPass.encode(this.textPass.attachment(this.context.getCurrentTexture()))
     }
     let rows: readonly RenderRow[] | undefined
     if (this.frames.requiresFullRows) {

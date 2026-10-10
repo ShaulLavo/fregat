@@ -10,6 +10,7 @@ import {
 import { CELL_INSTANCE_BYTES, GLYPH_INSTANCE_BYTES } from './instances/layout.js'
 import { cellShader } from './shaders/cell.wgsl.js'
 import { glyphShader } from './shaders/glyph.wgsl.js'
+import { textureAttachment } from './texture-attachment.js'
 
 export interface TextPassMetrics {
   draws: number
@@ -87,6 +88,7 @@ function blendState(): GPUBlendState {
 }
 
 export class WebGpuTextPass {
+  readonly attachment: (texture: GPUTexture) => GPUTexture | GPUTextureView
   private readonly ownedBuffers: GPUBuffer[] = []
   private readonly cellBuffer: GPUBuffer
   private readonly device: GPUDevice
@@ -120,6 +122,7 @@ export class WebGpuTextPass {
     this.device = options.device
     this.instanceCount = options.instanceCount
     const capacity = textPassGlyphCapacity(this.device, this.instanceCount)
+    this.attachment = textureAttachment(this.device)
     try {
       this.cellBuffer = this.createStorageBuffer(this.instanceCount * CELL_INSTANCE_BYTES)
       for (let first = 0; first < this.instanceCount; first += capacity) {
@@ -205,7 +208,7 @@ export class WebGpuTextPass {
     return operations
   }
 
-  submit(view: GPUTextureView, copy?: TextPassCopy): void {
+  submit(view: GPUTexture | GPUTextureView, copy?: TextPassCopy): void {
     this.device.queue.submit([this.encode(view, copy)])
     this.acceptFrame()
   }
@@ -215,7 +218,7 @@ export class WebGpuTextPass {
     this.metrics.submittedFrames += 1
   }
 
-  encode(view: GPUTextureView, copy?: TextPassCopy): GPUCommandBuffer {
+  encode(view: GPUTexture | GPUTextureView, copy?: TextPassCopy): GPUCommandBuffer {
     if (!this.glyphBindGroup) throw new Error('Atlas textures must be synchronized before drawing')
     const encoder = this.device.createCommandEncoder()
     const pass = encoder.beginRenderPass({
