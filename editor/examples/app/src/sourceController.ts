@@ -72,9 +72,18 @@ export class SourceController {
   }
 
   start(): void {
+    window.addEventListener('pagehide', this.onPageHide)
     this.statusBar.clear()
     this.topBar.setMessage('Loading cached source')
     void this.loadCachedThenRefresh()
+  }
+
+  private readonly onPageHide = (event: PageTransitionEvent): void => {
+    if (event.persisted) return
+    this.selectionRequest += 1
+    this.currentSnapshot = null
+    this.loader.dispose()
+    window.removeEventListener('pagehide', this.onPageHide)
   }
 
   updateStatus(state = this.editor.getState()): void {

@@ -20,6 +20,15 @@ const fileKey = (sha: string) => ['demo', 'source', 'file', sha] as const
 export class SourceLoader {
   private readonly client = new QueryClient()
 
+  constructor() {
+    this.client.mount()
+  }
+
+  dispose(): void {
+    this.client.unmount()
+    this.client.clear()
+  }
+
   cachedSnapshot(): Promise<SourceSnapshot | null> {
     return this.client.query({
       queryKey: snapshotKey,
