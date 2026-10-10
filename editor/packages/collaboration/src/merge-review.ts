@@ -26,13 +26,58 @@ export type MergeReviewUnit = MergeReviewRange & {
   readonly contentKey?: string
   readonly parent: (MergeReviewRange & { readonly commutative: boolean }) | null
 }
-export type MergeReviewSyntax = (
+type SyntaxRead = (
   snapshot: PieceTableSnapshot,
   ranges: readonly MergeReviewRange[],
   contentKey?: boolean,
   selection?: 'enclosing' | 'touching',
   baseSnapshot?: PieceTableSnapshot,
 ) => Promise<readonly (readonly MergeReviewUnit[])[] | null>
+export type MergeReviewSyntax = SyntaxRead & {
+  batch?(
+    reads: readonly {
+      readonly snapshot: PieceTableSnapshot
+      readonly ranges: readonly MergeReviewRange[]
+      readonly contentKey?: boolean
+      readonly selection?: 'enclosing' | 'touching'
+      readonly baseSnapshot?: PieceTableSnapshot
+    }[],
+  ): Promise<readonly (readonly (readonly MergeReviewUnit[])[] | null)[]>
+}
+
+function batchedSyntax(syntax: MergeReviewSyntax): SyntaxRead {
+  if (!syntax.batch) return syntax
+  type Pending = {
+    readonly args: Parameters<SyntaxRead>
+    readonly resolve: (result: Awaited<ReturnType<SyntaxRead>>) => void
+    readonly reject: (reason: unknown) => void
+  }
+  let pending: Pending[] = []
+  return (...args) =>
+    new Promise((resolve, reject) => {
+      pending.push({ args, resolve, reject })
+      if (pending.length !== 1) return
+      void Promise.resolve().then(async () => {
+        const reads = pending
+        pending = []
+        try {
+          const results = await syntax.batch!(
+            reads.map(({ args: [snapshot, ranges, contentKey, selection, baseSnapshot] }) => ({
+              snapshot,
+              ranges,
+              contentKey,
+              selection,
+              baseSnapshot,
+            })),
+          )
+          reads.forEach((read, index) => read.resolve(results[index] ?? null))
+        } catch (error) {
+          for (const read of reads) read.reject(error)
+        }
+      })
+    })
+}
+
 export type MergeReviewMark = {
   readonly kind: 'overlap' | 'parse' | 'signature' | 'orphan'
   readonly unitId: string
@@ -51,7 +96,7 @@ type ReviewState = {
   readonly engine: TextbufferEngine
   readonly current: PieceTableSnapshot
   readonly before: Map<string, PieceTableSnapshot>
-  readonly formatting: Map<string, boolean>
+  readonly formatting: Map<string, Promise<boolean | null>>
 }
 type Candidate = { readonly unit: MergeReviewUnit; readonly pairs: ConcurrentPair[] }
 type MarkAccumulator = Pick<MergeReviewMark, 'kind' | 'unitId' | 'unit'> & {
@@ -61,7 +106,10 @@ const keyOf = (id: EditId) => JSON.stringify([id.actor, id.seq])
 
 /** Demand-only review over a confirmed snapshot. Pending editor state is never an input. */
 export class MergeReviewDetector {
-  constructor(private readonly syntax: MergeReviewSyntax) {}
+  private readonly syntax: SyntaxRead
+  constructor(syntax: MergeReviewSyntax) {
+    this.syntax = batchedSyntax(syntax)
+  }
 
   async detect(
     window: ConfirmedWindow | null,
@@ -120,88 +168,110 @@ export class MergeReviewDetector {
     for (const [edit, entries] of grouped) {
       touches.set(edit, pruneTouches(confirmed.buffer, [...entries.values()]))
     }
-    for (const [key, entries] of touches) {
-      const edit = key
-      if (edit.inserted.length || !edit.deleted.length) continue
-      const base = without(state, [edit])
-      const original = await this.syntax(
-        base,
-        touchedRanges(base, edit),
-        false,
-        'touching',
-        state.current,
-      )
-      if (!original) return { status: 'unavailable', marks: [] }
-      const originalUnits = original.flat()
-      touches.set(
-        key,
-        entries.filter((entry) => {
-          const first = charIdAt(confirmed.buffer, entry.unit.startIndex)
-          const location = first && locateCharId(base, first)
-          return (
-            location &&
-            originalUnits.some(
-              (unit) =>
-                unit.type === entry.unit.type &&
-                unit.startIndex <= location.offset &&
-                location.offset < unit.endIndex,
+    const deletions = await Promise.all(
+      Array.from(touches, async ([key, entries]) => {
+        const edit = key
+        if (edit.inserted.length || !edit.deleted.length) return true
+        const base = without(state, [edit])
+        const original = await this.syntax(
+          base,
+          touchedRanges(base, edit),
+          false,
+          'touching',
+          state.current,
+        )
+        if (!original) return false
+        const originalUnits = original.flat()
+        touches.set(
+          key,
+          entries.filter((entry) => {
+            const first = charIdAt(confirmed.buffer, entry.unit.startIndex)
+            const location = first && locateCharId(base, first)
+            return (
+              location &&
+              originalUnits.some(
+                (unit) =>
+                  unit.type === entry.unit.type &&
+                  unit.startIndex <= location.offset &&
+                  location.offset < unit.endIndex,
+              )
             )
-          )
-        }),
-      )
-    }
+          }),
+        )
+        return true
+      }),
+    )
+    if (deletions.includes(false)) return { status: 'unavailable', marks: [] }
     const candidates = new Map<string, Candidate>()
     const marks = new Map<string, MarkAccumulator>()
     const signatures: { pair: ConcurrentPair; left: MergeReviewUnit; right: MergeReviewUnit }[] = []
-    for (const pair of activePairs) {
-      const left = touches.get(pair[0]) ?? []
-      const right = touches.get(pair[1]) ?? []
-      collectCandidates(confirmed.buffer, pair, left, right, candidates, signatures)
-      if (!sharedDeletion(pair)) continue
-      const combined = left.concat(right).map((touch) => touch.unit)
-      if (!combined.length || combined.every((unit) => sameUnit(unit, combined[0]!))) continue
-      const range = combined.reduce(
-        (range, unit) => ({
-          startIndex: Math.min(range.startIndex, unit.startIndex),
-          endIndex: Math.max(range.endIndex, unit.endIndex),
-        }),
-        { startIndex: confirmed.buffer.length, endIndex: 0 },
-      )
-      const unit = (await this.syntax(confirmed.buffer, [range]))?.[0]?.[0]
-      if (!unit) return { status: 'unavailable', marks: [] }
-      const unitId = unitIdentity(confirmed.buffer, unit)
-      const candidate = candidates.get(unitId) ?? { unit, pairs: [] }
-      candidate.pairs.push(pair)
-      candidates.set(unitId, candidate)
-    }
-    for (const [unitId, candidate] of candidates) {
-      const meaningful = await this.meaningful(state, candidate.unit, candidate.pairs)
-      if (!meaningful) return { status: 'unavailable', marks: [] }
-      if (!meaningful.length) continue
-      addMark(marks, 'overlap', unitId, candidate.unit, meaningful)
-      if (!candidate.unit.hasErrors) continue
-      const clean = await this.cleanVersions(state, { ...candidate, pairs: meaningful })
-      if (clean === null) return { status: 'unavailable', marks: [] }
-      if (clean) addMark(marks, 'parse', unitId, candidate.unit, meaningful)
-    }
-    for (const { pair, left, right } of signatures) {
-      const a = await this.formattingEdit(state, pair[0], left)
-      const b = await this.formattingEdit(state, pair[1], right)
-      if (a === null || b === null) return { status: 'unavailable', marks: [] }
-      if (a || b) continue
-      const introduced = await this.introducedSignature(state, pair, left, right)
-      if (introduced === null) return { status: 'unavailable', marks: [] }
-      if (!introduced) continue
-      addMark(marks, 'signature', unitIdentity(state.current, left), left, [pair])
-      addMark(marks, 'signature', unitIdentity(state.current, right), right, [pair])
-    }
-    for (const pair of activePairs) {
-      if (!orphanPair(pair)) continue
-      const orphan = await this.orphan(state, pair)
-      if (orphan === null) return { status: 'unavailable', marks: [] }
-      for (const unit of orphan)
-        addMark(marks, 'orphan', unitIdentity(confirmed.buffer, unit), unit, [pair])
-    }
+    const shared = await Promise.all(
+      activePairs.map(async (pair) => {
+        const left = touches.get(pair[0]) ?? []
+        const right = touches.get(pair[1]) ?? []
+        collectCandidates(confirmed.buffer, pair, left, right, candidates, signatures)
+        if (!sharedDeletion(pair)) return true
+        const combined = left.concat(right).map((touch) => touch.unit)
+        if (!combined.length || combined.every((unit) => sameUnit(unit, combined[0]!))) return true
+        const range = combined.reduce(
+          (range, unit) => ({
+            startIndex: Math.min(range.startIndex, unit.startIndex),
+            endIndex: Math.max(range.endIndex, unit.endIndex),
+          }),
+          { startIndex: confirmed.buffer.length, endIndex: 0 },
+        )
+        const unit = (await this.syntax(confirmed.buffer, [range]))?.[0]?.[0]
+        if (!unit) return false
+        const unitId = unitIdentity(confirmed.buffer, unit)
+        const candidate = candidates.get(unitId) ?? { unit, pairs: [] }
+        candidate.pairs.push(pair)
+        candidates.set(unitId, candidate)
+        return true
+      }),
+    )
+    if (shared.includes(false)) return { status: 'unavailable', marks: [] }
+    const overlaps = await Promise.all(
+      Array.from(candidates, async ([unitId, candidate]) => {
+        const meaningful = await this.meaningful(state, candidate.unit, candidate.pairs)
+        if (!meaningful) return false
+        if (!meaningful.length) return true
+        addMark(marks, 'overlap', unitId, candidate.unit, meaningful)
+        if (!candidate.unit.hasErrors) return true
+        const clean = await this.cleanVersions(state, { ...candidate, pairs: meaningful })
+        if (clean === null) return false
+        if (clean) addMark(marks, 'parse', unitId, candidate.unit, meaningful)
+        return true
+      }),
+    )
+    if (overlaps.includes(false)) return { status: 'unavailable', marks: [] }
+    const signatureChecks = await Promise.all(
+      signatures.map(async ({ pair, left, right }) => {
+        const [a, b] = await Promise.all([
+          this.formattingEdit(state, pair[0], left),
+          this.formattingEdit(state, pair[1], right),
+        ])
+        if (a === null || b === null) return false
+        if (a || b) return true
+        const introduced = await this.introducedSignature(state, pair, left, right)
+        if (introduced === null) return false
+        if (!introduced) return true
+        addMark(marks, 'signature', unitIdentity(state.current, left), left, [pair])
+        addMark(marks, 'signature', unitIdentity(state.current, right), right, [pair])
+        return true
+      }),
+    )
+    if (signatureChecks.includes(false)) return { status: 'unavailable', marks: [] }
+    const orphans = await Promise.all(
+      activePairs.map(async (pair) => {
+        if (!orphanPair(pair)) return true
+        const orphan = await this.orphan(state, pair)
+        if (orphan === null) return false
+        for (const unit of orphan)
+          addMark(marks, 'orphan', unitIdentity(confirmed.buffer, unit), unit, [pair])
+        return true
+      }),
+    )
+    if (orphans.includes(false)) return { status: 'unavailable', marks: [] }
     return {
       status: 'complete',
       marks: Array.from(marks.values(), finalizeMark).sort(
@@ -215,17 +285,11 @@ export class MergeReviewDetector {
     unit: MergeReviewUnit,
     pairs: readonly ConcurrentPair[],
   ) {
-    const meaningful: ConcurrentPair[] = []
-    for (const pair of pairs) {
-      let keep = true
-      for (const edit of pair) {
-        const formatting = await this.formattingEdit(state, edit, unit)
-        if (formatting === null) return null
-        keep &&= !formatting
-      }
-      if (keep) meaningful.push(pair)
-    }
-    return meaningful
+    const formatting = await Promise.all(
+      pairs.map((pair) => Promise.all(pair.map((edit) => this.formattingEdit(state, edit, unit)))),
+    )
+    if (formatting.some((pair) => pair.includes(null))) return null
+    return pairs.filter((_, index) => formatting[index]!.every((value) => !value))
   }
 
   private async formattingEdit(
@@ -239,43 +303,47 @@ export class MergeReviewDetector {
     if (cached !== undefined) return cached
     const before = without(state, [edit])
     if (!whitespaceEdit(edit, before)) return false
-    const afterUnit = (await this.syntax(state.current, [unit], true))?.[0]?.[0]
-    const beforeUnit = (
-      await this.syntax(
+    const comparison = Promise.all([
+      this.syntax(state.current, [unit], true),
+      this.syntax(
         before,
         [projectedRange(state.current, before, unit)],
         true,
         'enclosing',
         state.current,
-      )
-    )?.[0]?.[0]
-    if (!afterUnit || !beforeUnit) return null
-    const formatting =
-      afterUnit.contentKey !== undefined && afterUnit.contentKey === beforeUnit.contentKey
-    state.formatting.set(key, formatting)
-    return formatting
+      ),
+    ]).then(([after, before]) => {
+      const afterUnit = after?.[0]?.[0]
+      const beforeUnit = before?.[0]?.[0]
+      if (!afterUnit || !beforeUnit) return null
+      return afterUnit.contentKey !== undefined && afterUnit.contentKey === beforeUnit.contentKey
+    })
+    state.formatting.set(key, comparison)
+    return comparison
   }
 
   private async cleanVersions(state: ReviewState, candidate: Candidate) {
     const edits = new Set(candidate.pairs.flatMap((pair) => pair))
     const authors = new Set(Array.from(edits, (edit) => edit.envelope.id.actor))
-    for (const actor of authors) {
-      const projected = without(
-        state,
-        [...edits].filter((edit) => edit.envelope.id.actor !== actor),
-      )
-      const unit = (
-        await this.syntax(
-          projected,
-          [projectedRange(state.current, projected, candidate.unit)],
-          false,
-          'enclosing',
-          state.current,
+    const versions = await Promise.all(
+      Array.from(authors, async (actor) => {
+        const projected = without(
+          state,
+          [...edits].filter((edit) => edit.envelope.id.actor !== actor),
         )
-      )?.[0]?.[0]
-      if (!unit) return null
-      if (unit.hasErrors) return false
-    }
+        const unit = (
+          await this.syntax(
+            projected,
+            [projectedRange(state.current, projected, candidate.unit)],
+            false,
+            'enclosing',
+            state.current,
+          )
+        )?.[0]?.[0]
+        return unit ? !unit.hasErrors : null
+      }),
+    )
+    for (const clean of versions) if (clean !== true) return clean
     return true
   }
 
