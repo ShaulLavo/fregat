@@ -112,6 +112,7 @@ export async function startReader(home: boolean) {
       host.style.position = 'absolute'
       host.style.top = '0'
       host.style.opacity = '0'
+      host.inert = true
       article.hidden = false
       const decoded = decodePaintSnapshot(saved.paint)
       const frozen = decoded && mountPaintSnapshot(article, decoded)
@@ -132,6 +133,7 @@ export async function startReader(home: boolean) {
       article.hidden = true
       host.style.position = 'relative'
       host.style.opacity = '1'
+      host.inert = false
       throw error
     } finally {
       host.style.colorScheme = ''
@@ -146,7 +148,8 @@ export async function startReader(home: boolean) {
     const saved = tabs.get(target)!
     const host = document.createElement('div')
     host.className = 'editor-host'
-    // Keep the current paint in flow while the admitted snapshot prepares its replacement.
+    host.inert = true
+    // Keep the current paint interactive while the admitted snapshot prepares its replacement.
     host.style.position = 'absolute'
     host.style.top = '0'
     host.style.width = '100%'
@@ -171,6 +174,7 @@ export async function startReader(home: boolean) {
       host.style.position = 'relative'
       live.editor.setPresentationReady(false)
       host.style.opacity = '1'
+      host.inert = false
       article.hidden = true
       live.editor.setPresentationReady(true)
       setMode(true)

@@ -297,21 +297,23 @@ A queued theme change reproduced an additional site bug in both engines: the old
 
 The first full site matrix passed 80 of 88 cases. Its emitted-first-paint controls exposed a capture-browser difference: the headless shell measures a loaded 14 px JetBrains Mono `m` at 8 px, while full Chromium measures 8.399963 px. At 752 px, the shell captures 77 rows / 1,694 px and full Chromium captures 79 rows / 1,738 px; runtime replay in full Chromium matches the latter. The same-shell isolated capture comparisons therefore did not qualify emitted HTML in the browser. Build capture now launches full Chromium, retaining the native-extent and exact-pixel gates. The raw two-browser experiment is `final-qualification/font-capture-diagnostic.json`. A fresh full-Chromium capture passes all original/provisional/restored/emitted comparisons for 22 documents in both palettes and all three widths; the complete site matrix rerun remains required. The four page-wheel/caret/find checks now pass: WebKit's user agent selects the editor's Mac keymap even when `navigator.platform` reports Linux, so the test must include both properties when choosing its shortcut. No core reveal bug was established.
 
+After the capture correction, the full site matrix passes 86 of 88 cases, including every emitted-first-paint and caret/find reveal check. The blocked-parser controls now reproduce another site issue in both engines: the opacity-zero pending editor intercepts hit testing over the visible captured article. A before-takeover hit-test control passes. Pending hosts and the temporarily hidden palette-capture host are now inert; the live host becomes interactive when it replaces the article. Fresh captures, measurements and the complete matrix are rerunning after this fix.
+
 Remaining acceptance runs the complete browser suite and all four selected-route mobile shards, reviews `look`/scenario screenshots, then completes the Phase 3/4 checklist, opens the focused site PR and refreshes the existing private preview app. Do not publish the interim cropped capture or count scheduler queue time as build time.
 
 #### Site build and transfer measurements (2026-10-10)
 
-The original local build baseline was 30 seconds for 3,142 pages. The first integrated build, before correcting the headless-shell capture metrics, takes 82.415 seconds with the document-capture cache removed and 25.559 seconds with all 22 qualified captures cached, producing 3,146 pages and validating 204,005 rendered links and anchors. Full-Chromium measurements are being rerun separately under `final-measurements/full-chromium/`. These are single wall-clock runs on the shared Linux host, with dependencies already built; queue time is excluded. They are build observations, not a product-performance win or a quiet paired benchmark.
+The original local build baseline was 30 seconds for 3,142 pages. The final full-Chromium build takes 88.960 seconds with the document-capture cache removed and 26.800 seconds with all 22 qualified captures cached, producing 3,146 pages and validating 204,007 rendered links and anchors. These are single wall-clock runs on the shared Linux host, with dependencies already built; queue time is excluded. They are build observations, not a product-performance win or a quiet paired benchmark. Final artifacts are under `final-measurements/full-chromium/`; the earlier headless-shell measurements remain preserved separately.
 
 The preserved accepted-preview archive supplies the paired page-weight baseline. Both sides use gzip level 9; its manual pages differ from the earlier local-build artifacts, so their measurements are kept separate. Values are bytes:
 
 | Page         | Before raw / gzip | After raw / gzip |
 | ------------ | ----------------: | ---------------: |
-| Home         |    10,885 / 2,822 | 373,079 / 17,699 |
-| Introduction |    15,807 / 3,924 | 619,019 / 36,771 |
-| Quick start  |    20,801 / 4,335 | 938,970 / 42,318 |
+| Home         |    10,885 / 2,822 | 381,719 / 18,198 |
+| Introduction |    15,807 / 3,924 | 634,482 / 37,084 |
+| Quick start  |    20,801 / 4,335 | 957,167 / 42,818 |
 
-The six emitted DOM variants (three widths and two palettes), source and two replay paints substantially increase HTML weight. The home external eager JavaScript graph grows from 7,929 / 3,994 bytes to 35,774 / 13,722 bytes, excluding dynamic imports and the inline activation bundle. Activation is 10,123 / 3,864 bytes and is already counted in page HTML. The largest runtime document payload is `guides/frameworks.md`: 405,803 / 10,321 bytes for 97 captured rows. The full Editor and grammars remain behind Go live. Raw measurements, timing logs, source revision and runtime versions are retained under `final-measurements/` in the existing site-embed evidence directory.
+The six emitted DOM variants (three widths and two palettes), source and two replay paints substantially increase HTML weight. The home external eager JavaScript graph grows from 7,929 / 3,994 bytes to 35,774 / 13,722 bytes, excluding dynamic imports and the inline activation bundle. Activation is 10,123 / 3,864 bytes and is already counted in page HTML. The largest runtime document payload is `guides/frameworks.md`: 408,379 / 10,449 bytes for 99 captured rows. The full Editor and grammars remain behind Go live. Raw measurements, timing logs, source revision and runtime versions are retained under `final-measurements/` in the existing site-embed evidence directory.
 
 ### Phase 4: Acceptance and closeout
 
