@@ -191,5 +191,6 @@ CSS before scripts.
       the pending-font opacity, width switching or theme switching did not fix it.
       Hiding the prepared editor as one opacity group fixes the overlay without
       changing font timing. The warm-reload test now requires every engine to pass
-      and compares the initial, prepared and activated frames. See
-      `editor/docs/display/browser-quirks.md` for the reduced visibility case.
+      and compares the initial, prepared and activated frames. The reduced case
+      (`visibility: hidden` parent with a `visibility: visible` child) paints the
+      child in every engine; this was an application hiding error.

@@ -16,45 +16,6 @@ Related inline workarounds already documented at their call sites:
   (WebKit re-resolves registered CSS Highlight ranges when a painted row's
   transform changes).
 
-## Prepared site examples can paint through a hidden wrapper
-
-Verified 2026-10-10 with Playwright 1.63.0 in Chromium, WebKit and Firefox.
-This was an application visibility error exposed by WebKit's warm-reload timing,
-not a WebKit colour-invalidation bug. No upstream report is needed.
-
-### Symptom and cause
-
-Quick start's first static example briefly appears black on a warm reload even
-though its inline spans compute the correct colours. The black text belongs to
-an overlapping prepared editor. Its replayed snapshot has explicit
-`visibility: visible`, which overrides the prepared wrapper's inherited
-`visibility: hidden`. The snapshot can paint before its CSS highlights settle;
-once the live rows replace it, the wrapper hides those rows and the coloured
-static example is visible again.
-
-Removing static row `will-change`, containment, pending-font opacity, container
-width switching or theme switching individually leaves the flash. Blocking the
-editor runtime or forcing every prepared descendant hidden removes it. The
-reduced visibility case paints the child in all three engines:
-
-```html
-<div style="visibility: hidden">
-  <div style="visibility: visible">This child is painted.</div>
-</div>
-```
-
-### Fix and regression coverage
-
-`site/src/styles/examples.css` gives the prepared wrapper `opacity: 0` and sets
-it to `1` on activation. Opacity applies to the entire painted group, including
-descendants with explicit visibility, while preserving layout for preparation.
-The wrapper remains inert until activation. Font selection, row containment,
-compositor hints and variant switching are unchanged; no wait was added.
-
-`site/tests/review.browser.ts` requires the warm-reload test to pass in every
-engine. It compares initial static ink with ink after preparation and activation,
-and asserts that the prepared group's opacity is zero.
-
 ## WebKit moves highlights from unselectable inline text onto following text
 
 Verified 2026-10-10 on Linux with Playwright 1.63.0. WebKit 26.6 paints the wrong
