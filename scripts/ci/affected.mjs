@@ -4,6 +4,18 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 
 const generatedDocs = ['docs/settings-reference.md', 'docs/native-syntax-coverage.*']
+const editorHealthInputs = [
+  'editor/docs/architecture/**/*.json',
+  'editor/docs/commands.md',
+  'editor/scripts/architecture-health.mjs',
+  'editor/scripts/check-full-text-boundary.mjs',
+  'editor/scripts/full-text-boundary-allow.json',
+  'editor/scripts/command-reference.ts',
+  'editor/scripts/workspace-root.ts',
+  'editor/package.json',
+  'package.json',
+  '.github/workflows/workspace-libraries.yml',
+]
 
 function readJson(file) {
   return JSON.parse(readFileSync(file, 'utf8'))
@@ -177,6 +189,7 @@ export function selectAffected(graph, files, full = false) {
     site: sites.length > 0,
     sites: sites.join(','),
     editor:
+      files.some((file) => matches(file, editorHealthInputs)) ||
       familyChanged('editor') ||
       packages.some((name) => graph.packages.get(name).directory.startsWith('editor/examples/')),
     ghostty: selected.has('ghostty-webgpu') || selected.has('ghostty-webgpu-line-editor'),
