@@ -45,6 +45,7 @@ async function runLane(
     directory?: string
     stdin?: Stdin
     limits?: Partial<LaneLimits>
+    delayedCleanup?: boolean
   } = {},
 ) {
   const root = mkdtempSync(path.join(tmpdir(), 'lane-command-'))
@@ -60,11 +61,21 @@ async function runLane(
     directory: options.directory,
   }
   const started = performance.now()
-  const child = Bun.spawn(['bash', '-c', laneJobCommand(job)], {
-    stdin: 'pipe',
-    stdout: 'ignore',
-    stderr: 'pipe',
-  })
+  const shell = laneJobCommand(job)
+  const child = Bun.spawn(
+    [
+      'bash',
+      '-c',
+      options.delayedCleanup
+        ? shell.replace('sleep 0.1', `printf '[cleanup-poll]\\n' >&2; sleep 0.6`)
+        : shell,
+    ],
+    {
+      stdin: 'pipe',
+      stdout: 'ignore',
+      stderr: 'pipe',
+    },
+  )
   const stdin = options.stdin ?? 'heartbeat'
   const run = laneRunDirectory(job)
   let open = true
@@ -428,6 +439,20 @@ describe.skipIf(!userScopes || !laneTools)('a lane job', () => {
     })
     expect(ms).toBeLessThan(10_000)
     expect(status).not.toBe(0)
+    expect(unloaded(unit)).toBe(true)
+  }, 40_000)
+
+  test('delayed cleanup polls consume the TERM grace before KILL', async () => {
+    const { status, unit, stderr } = await runLane(
+      'delayed-cleanup',
+      'trap "" TERM; touch "$LANE_RUN/ready"; sleep 30',
+      { stdin: 'ready', limits: { graceSec: 1 }, delayedCleanup: true },
+    )
+    expect(status).not.toBe(0)
+    expect(stderr).toContain('sending KILL')
+    const polls = stderr.match(/\[cleanup-poll\]/g) ?? []
+    expect(polls.length).toBeGreaterThan(0)
+    expect(polls.length).toBeLessThanOrEqual(2)
     expect(unloaded(unit)).toBe(true)
   }, 40_000)
 
