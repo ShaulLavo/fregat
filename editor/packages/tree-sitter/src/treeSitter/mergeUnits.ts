@@ -182,13 +182,13 @@ function mergeRangeHasErrors(
     root.startIndex <= range.endIndex
   )
     return true
-  // Indexed cursor descent ignores its goal offset; point descent finds the starting sibling.
-  let first = root.descendantForIndex(
-    range.startIndex,
-    Math.min(root.endIndex, range.startIndex + 1),
-  )
-  while (first?.parent && first.parent.id !== root.id) first = first.parent
-  if (!first || first.id === root.id) first = root.firstChild
+  const cursor = root.walk()
+  let first: Node | null
+  try {
+    first = cursor.gotoFirstChildForIndex(range.startIndex) ? cursor.currentNode : root.lastChild
+  } finally {
+    cursor.delete()
+  }
   if (first?.previousSibling && first.previousSibling.endIndex >= range.startIndex)
     first = first.previousSibling
   for (let node = first; node && node.startIndex <= range.endIndex; node = node.nextSibling) {

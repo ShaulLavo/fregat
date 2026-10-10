@@ -71,7 +71,8 @@
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:server": "bun --bun vitest run --config vitest.server.config.ts",
     "test:editor": "vitest run --config vitest.editor.config.ts",
-    "bench:merge-review": "vitest run --config vitest.cost.config.ts"
+    "bench:merge-review": "vitest run --config vitest.cost.config.ts",
+    "bench:review-runtime": "vitest run --config vitest.review-cost.config.ts"
   },
   "dependencies": {
     "@noble/hashes": "2.4.0",

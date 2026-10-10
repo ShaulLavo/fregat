@@ -625,6 +625,35 @@ node editor/bench/compare/run.mjs --sizes 1,10,200 --repetitions 3 --condition n
 Retained trial directories contain `experiment.json.gz`; the summarizer also reads gzip directly.
 The original 200 MiB geometry failure remains a blocker for publishing a full comparison result.
 
+## Approved follow-up: explicit FreeSans geometry
+
+An exploratory DPR-1 run on 2026-10-09 exposed additional proportional-font failures with
+Ubuntu `fonts-freefont-ttf_20211204+svn4273-2`, explicitly loaded as the test face. This is
+separate from the five CI-runner assertions: DejaVu Serif reproduces the Firefox runner's
+exact word-wrap values, and DejaVu Sans Mono reproduces the four WebKit runner failures.
+
+- Firefox and WebKit fail the unchanged proportional-row hit-test assertion in
+  `editor/packages/editor/test/proportionalRows.browser.test.ts`: the character under a native
+  viewport point falls outside the expected adjacent-character set.
+- For 20,000 `i` characters, the face-change extent checks miss the native width by
+  `2010.234375` pixels in Firefox and `2100.5` pixels in WebKit. Their existing 1% bounds are
+  `556.66765625` and `556.3050000000001` pixels.
+- Character wrapping also stops early: whole-candidate native widths are `306.54998779296875`
+  and `306.5`, against the existing minimum-fill bounds `307.4499969482422` and `307.4375`.
+
+Reproduce with the retained explicit-font harness before changing production code. Copy its
+setup/config inputs into `editor/packages/editor/` and its `reviewCi*` fixtures into `test/`,
+then run `bun --bun vitest run --config .ci-free-fixed.config.ts` from that package. The
+owner-host archive is `/work/reports/virtualizer-cross-engine-2026-10-09/ci-fonts/`;
+`harness/` contains the inputs, `virtualizer-ci-free-all-fixed.log` records the eight failing
+assertions, and `provenance.json` records the font packages and successful runner-font controls.
+Keep these machine-specific inputs out of committed tests.
+
+The likely boundary is summed single-glyph canvas advances in
+`editor/packages/editor/src/virtualization/glyphAdvances.ts` versus native shaped runs; this
+attribution remains unconfirmed. Investigate native caret reachability and shaping/hinting before
+choosing a fix. Preserve the existing bounds and add a portable failing-first font fixture.
+
 ## Kickoff prompt for an executing coordinator
 
 > Execute Plan 336 (`plans/336-packages-as-products.md`) in fregat. Load the `orchestrate` and

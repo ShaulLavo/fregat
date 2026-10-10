@@ -1129,6 +1129,7 @@
     "@vitest/mocker@5.0.2": "patches/@vitest%2Fmocker@5.0.2.patch",
     "evlog@2.29.0": "patches/evlog@2.29.0.patch",
     "vitest@5.0.2": "patches/vitest@5.0.2.patch",
+    "@vitest/browser-playwright@5.0.2": "patches/@vitest%2Fbrowser-playwright@5.0.2.patch",
     "lefthook@2.1.15": "patches/lefthook@2.1.15.patch",
   },
   "overrides": {

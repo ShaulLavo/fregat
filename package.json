@@ -152,6 +152,7 @@
   },
   "packageManager": "bun@1.4.2",
   "patchedDependencies": {
+    "@vitest/browser-playwright@5.0.2": "patches/@vitest%2Fbrowser-playwright@5.0.2.patch",
     "vitest@5.0.2": "patches/vitest@5.0.2.patch",
     "evlog@2.29.0": "patches/evlog@2.29.0.patch",
     "@vitest/mocker@5.0.2": "patches/@vitest%2Fmocker@5.0.2.patch",
