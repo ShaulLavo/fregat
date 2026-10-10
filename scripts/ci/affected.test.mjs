@@ -200,6 +200,69 @@ test('unknown build targets fail instead of silently omitting checks', () => {
 const gitAvailable = Bun.which('git') !== null
 if (!gitAvailable) console.info('Skipping affected CI git proof. Git is required.')
 
+test.skipIf(!gitAvailable).each([
+  [[], ''],
+  [['apps/site/index.html'], 'fregat'],
+  [['apps/site/index.html', 'editor/site/index.html'], 'fregat,singapore'],
+])('CLI exports raw sites %s and JSON arrays', (files, sites) => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'ci-affected-output-'))
+  const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim()
+  try {
+    for (const folder of ['apps/site', 'editor/site', 'docs'])
+      mkdirSync(path.join(directory, folder), { recursive: true })
+    writeFileSync(
+      path.join(directory, 'package.json'),
+      JSON.stringify({
+        workspaces: { packages: ['apps/*', 'editor/site'] },
+        scripts: { 'build:workspaces': 'turbo run build --filter=site' },
+      }),
+    )
+    writeFileSync(path.join(directory, 'turbo.json'), '{"globalDependencies":[],"tasks":{}}')
+    writeFileSync(path.join(directory, 'apps/site/package.json'), '{"name":"site"}')
+    writeFileSync(
+      path.join(directory, 'editor/site/package.json'),
+      '{"name":"singapore-editor-site"}',
+    )
+    git('init', '-q')
+    git('config', 'user.name', 'CI fixture')
+    git('config', 'user.email', 'ci@example.test')
+    git('add', '.')
+    git('commit', '-qm', 'base')
+    const base = git('rev-parse', 'HEAD')
+    writeFileSync(path.join(directory, 'docs/Review note.md'), '# Changed\n')
+    for (const file of files) writeFileSync(path.join(directory, file), '<main>Changed</main>\n')
+    git('add', '.')
+    git('commit', '-qm', 'changed')
+    const output = path.join(directory, 'outputs')
+    const result = Bun.spawnSync(
+      [
+        'bun',
+        path.join(root, 'scripts/ci/affected.mjs'),
+        'changed',
+        base,
+        git('rev-parse', 'HEAD'),
+      ],
+      { cwd: directory, env: { ...process.env, GITHUB_OUTPUT: output } },
+    )
+    expect(result.exitCode, result.stderr.toString()).toBe(0)
+    const selection = JSON.parse(result.stdout.toString())
+    const exported = Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .trimEnd()
+        .split('\n')
+        .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]),
+    )
+    expect(exported.sites).toBe(sites)
+    expect(JSON.parse(exported.packages)).toEqual(selection.packages)
+    expect(JSON.parse(exported.docs_files)).toEqual(['docs/Review note.md'])
+    expect(exported.site).toBe(String(files.length > 0))
+    expect(exported.docs).toBe('true')
+    expect(exported.exhaustive).toBe('false')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test.skipIf(!gitAvailable)('CLI includes both paths of a rename and the entire PR diff', () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'ci-affected-git-'))
   const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim()
