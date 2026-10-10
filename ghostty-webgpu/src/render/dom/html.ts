@@ -156,6 +156,10 @@ export function defaultCellStyle(font: TerminalFittedFont, theme: CanonicalRende
   )
 }
 
+function rowRunStyle(style: string, width: number, font: TerminalFittedFont): string {
+  return `${style}width:calc(${width} * var(--ghostty-cell-width, ${font.cssCellWidth}px));`
+}
+
 export interface DefaultRowStyle {
   readonly cell: string
   readonly run: string
