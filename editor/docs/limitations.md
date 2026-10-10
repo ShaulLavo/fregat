@@ -16,16 +16,17 @@ Each entry names its source and any work that owns changing it. "No lifting plan
 - Source. `BIDI_LINE_MEASUREMENT_CEILING`, `MAX_ROW_TEXT_NODE_LENGTH`, `bidiMeasurementRefusal`, `hasOversizedGrapheme` and `setUnmeasurableBidiRowText` in [virtualizedTextViewRows.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/virtualization/virtualizedTextViewRows.ts#L109).
 - What you see. The row becomes an endpoint-only placeholder. Its label reports the line or grapheme geometry ceiling. Interior text and interior caret geometry are unavailable in that row. The document text remains in the buffer.
 - Why. BiDi needs the browser's visual ordering. Splitting its text into independently positioned horizontal chunks would lose that ordering. The ceiling bounds native layout and geometry work; the 50-unit node bound also limits range measurement within a text node.
-- Ownership. No lifting plan identified. The proportional-text work below shares this ceiling but preserves a different behavior beyond it.
+- Ownership. No lifting plan identified. Proportional text below has an independent ceiling and remains editable beyond it.
 
-### Rich and proportional row measurement, pending
+### Proportional row measurement
 
-- Status. Pending [PR #1186](https://github.com/ShaulLavo/fregat/pull/1186). This entry records the agreed behavior, not a released implementation.
-- Limit. Native intact-row measurement will share the **32,000-code-unit** BiDi ceiling. Within the ceiling, a proportional row is measured natively once, intact.
-- Source. The pending changes belong to [the virtualization implementation](https://github.com/ShaulLavo/fregat/tree/main/editor/packages/editor/src/virtualization), including `proportionalRows.ts` and `virtualizedTextViewRows.ts`. The exact symbol, boundary operator and degraded-state name are **TBD** until #1186 lands.
-- What you see. Above the ceiling, editing keeps working. Geometry falls back to a bounded shaped-run approximation and the editor records a structured degraded state. Caret, selection and wrapping geometry can be approximate.
-- Why. Native whole-row measurement retains shaping context within the budget. The fallback bounds work on longer rows.
-- Ownership. #1186 owns adding and naming the limit. No lifting plan identified. That PR must fill in the source symbol, boundary operator and state name here when it lands.
+- Status. Implemented in [PR #1186](https://github.com/ShaulLavo/fregat/pull/1186), awaiting merge and release.
+- Limit. Native intact-row geometry applies strictly below **5,000 UTF-16 code units**. At **5,000 or more**, proportional rows use bounded shaped-run approximation. The independent `BIDI_LINE_MEASUREMENT_CEILING` remains **32,000**.
+- Source. `PROPORTIONAL_INTACT_NODE_CEILING = 5_000` in [nativeCarets.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/virtualization/nativeCarets.ts), `nativeRowCarets` in [virtualizedTextViewGeometry.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/virtualization/virtualizedTextViewGeometry.ts), and `shouldChunkLine` and `updateRowTextChunks` in [virtualizedTextViewRows.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/virtualization/virtualizedTextViewRows.ts).
+- DOM budget. A mounted plain left-to-right proportional row (printable ASCII and tabs) below the ceiling retains one intact text node. Its horizontal window starts at zero and includes the complete rendered row. Monospace and inline replacements retain their horizontal text windows. Native geometry is measured lazily on mounted rows; canvas shaping still owns document-wide projection and wrapping.
+- What you see. Longer proportional rows remain editable with approximate caret, selection and wrapping geometry. The row reports `data-editor-shaping-geometry="approximate"` and `data-editor-shaping-ceiling="5000"`. The diagnostic `view.nativeShaping.degraded` records `reason: "line-length"`, `length`, `ceiling` and `path: "bounded-shaped-runs"`. The existing oversized-BiDi placeholder behavior above still applies to right-to-left rows. Inline replacements and rendered control characters keep their existing geometry owners.
+- Why. An intact text node preserves kerning, ligatures and native insertion positions within the mounted-row budget. Splitting a native shaping run can change the painted text. The longer-row fallback bounds retained text and geometry work.
+- Ownership. #1186 owns this implementation and its cost evidence. No lifting plan identified. The ceiling was selected from three-engine 2k, 5k, 10k and 15k cost experiments: 5k was the largest tested candidate with edits below 8.3 ms and WebKit scroll frames near 16 ms. It bounds intact-row work; these experiments do not establish key-to-paint latency or a budget on every device.
 
 ### Native scroll height
 

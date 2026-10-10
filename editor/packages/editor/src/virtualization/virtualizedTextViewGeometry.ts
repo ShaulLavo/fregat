@@ -1,4 +1,9 @@
 import { isHtmlElement } from '../dom'
+import {
+  createNativeCarets,
+  PROPORTIONAL_INTACT_NODE_CEILING,
+  type NativeCarets,
+} from './nativeCarets'
 import type { TextContent } from '../textContent'
 import type { MeasuredText } from '../textMeasurements'
 import {
@@ -37,6 +42,7 @@ import type {
 } from './virtualizedTextViewTypes'
 import type { VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
 import { bidiVisualRunIndexAt, memoizedContainsRTL } from './virtualizedTextViewBidi'
+import { pixelsBeforeColumn } from './proportionalRows'
 
 const CONTROL_CHARACTER_CLASS = 'editor-virtualized-control-character'
 // These are exactly the code units the renderer replaces with visible labels or fixed-width boxes.
@@ -466,11 +472,64 @@ export function clearRowGeometryCaches(view: VirtualizedTextViewInternal): void 
   for (const row of view.rowPool) clearRowGeometryCache(row)
 }
 
+type NativeRowCache = {
+  readonly carets: NativeCarets
+  readonly glyphs: VirtualizedTextViewInternal['glyphs']
+  readonly tabSize: number
+  readonly styles: string
+  readonly text: string
+  readonly node: Text
+}
+
+const nativeRows = new WeakMap<MountedVirtualizedTextRow, NativeRowCache>()
+
+export function releaseNativeRowGeometry(row: MountedVirtualizedTextRow): void {
+  nativeRows.delete(row)
+}
+
+function nativeRowCarets(
+  view: VirtualizedTextViewInternal,
+  row: MountedVirtualizedTextRow,
+): NativeCarets | null {
+  if (view.monospace || row.inlineMapping || row.text.length >= PROPORTIONAL_INTACT_NODE_CEILING)
+    return null
+  if (!isSimpleRowText(row) || row.textRenderMode !== 'simple') return null
+  if (row.chunks[0]?.localStart !== 0 || row.chunks.at(-1)?.localEnd !== row.text.length)
+    return null
+  const styles = `${row.inlineKindsClassName}:${row.rowDecorationKey}`
+  const cached = nativeRows.get(row)
+  if (
+    cached?.glyphs === view.glyphs &&
+    cached.tabSize === view.tabSize &&
+    cached.styles === styles &&
+    cached.text === row.textNode.data &&
+    cached.node === row.textNode
+  )
+    return cached.carets
+  const carets = createNativeCarets(row.element, row.textNode, () => rowClientRectScale(row))
+  nativeRows.set(row, {
+    carets,
+    glyphs: view.glyphs,
+    tabSize: view.tabSize,
+    styles,
+    text: row.textNode.data,
+    node: row.textNode,
+  })
+  recordEditorPerformanceDiagnostic('view.nativeShaping', () => ({
+    length: row.text.length,
+    ceiling: PROPORTIONAL_INTACT_NODE_CEILING,
+    path: 'mounted-intact',
+  }))
+  return carets
+}
+
 export function offsetToX(
   view: VirtualizedTextViewInternal,
   row: MountedVirtualizedTextRow,
   offset: number,
 ): number {
+  const native = nativeRowCarets(view, row)
+  if (native) return native.position(clamp(offset - row.startOffset, 0, row.text.length))
   const geometry = ensureRowGeometry(view, row)
   const clamped = clamp(offset, row.startOffset, row.endOffset)
   return xForOffset(geometry, clamped)
@@ -482,17 +541,35 @@ export function xToOffset(
   x: number,
   scale?: number,
 ): number {
+  const native = nativeRowCarets(view, row)
+  if (native) {
+    const before = native.columnAt(x, 'before')
+    const after = Math.min(row.text.length, before + 1)
+    const column = x - native.position(before) < native.position(after) - x ? before : after
+    return row.startOffset + column
+  }
   if (rowUsesCalculatedGeometry(view, row)) return calculatedXToOffset(view, row, x, scale)
 
   const geometry = ensureRowGeometry(view, row)
   return offsetForX(geometry, Math.max(0, x))
 }
 
-/** Null when the row's rendered width is only available for the price of a layout read. */
+/** Intact proportional rows settle their native end once; other measured paths can return null. */
 export function knownRowContentWidth(
   view: VirtualizedTextViewInternal,
   row: MountedVirtualizedTextRow,
 ): number | null {
+  const native = nativeRowCarets(view, row)
+  if (native) return native.position(row.text.length)
+  // A mounted window cannot supply the complete scroll extent of an approximate source row.
+  if (
+    !view.monospace &&
+    !row.inlineMapping &&
+    view.glyphs &&
+    row.text.length >= PROPORTIONAL_INTACT_NODE_CEILING &&
+    isSimpleRowText(row)
+  )
+    return pixelsBeforeColumn(row.text, row.text.length, view.glyphs, view.tabSize)
   const key = rowGeometryCacheKey(view, row)
   const cached = row.geometryCache as RowGeometryCache | null
   if (cached?.key === key && !cached.geometry.plan && Number.isFinite(cached.geometry.width))
