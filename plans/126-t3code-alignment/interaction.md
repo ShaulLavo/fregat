@@ -1,3 +1,8 @@
+> Historical Plan 126 source and scope record. [Plan 343](../343-t3code-nightly-orchestration.md)
+> owns the Approved, deferred nightly rewrite at `bd2346eda2e2c380d1844869c7fd16c279d2190f`.
+> Preserve these receipts and remaining requirements. Recheck affected contracts and provider
+> behavior against nightly before implementing them.
+
 # Composer and timeline alignment
 
 Compared Platform `3c9b88c35784e571e706600b0cee8e95a2656f77` with T3 Code `7445aa733ada33e45289e5aa5055f79142556513`. All upstream citations below refer to the pinned Git object, **not** its older working tree. Read it with `git -C references/t3code show 7445aa733ada33e45289e5aa5055f79142556513:<path> | nl -ba`. Protocol and audit-playbook correctness, coverage, architecture, and finding-format sections were read before comparison. INTERACTION-13/14 and the mobile Enter case in INTERACTION-11 come from the [2026-09-24 upstream delta](delta-2026-09-24.md).

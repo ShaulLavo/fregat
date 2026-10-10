@@ -1,6 +1,6 @@
 # Alignment records and executable comparisons
 
-These manual checks compare Fregat with the pinned T3 Code checkout at
+These historical manual checks compare Fregat with September Git objects in the T3 Code checkout at
 `references/t3code`. The default test suites, CI and pre-commit checks run Fregat
 checks independently of this reference checkout.
 
@@ -39,6 +39,19 @@ a server. The source checker reads Git objects at the inventory's exact upstream
 checks contract blob hashes and RPC membership, and loads local command schemas with Bun.
 The old type-discriminant inventory mixes commands, events and data variants; it is not
 command coverage.
+
+## Nightly planning baseline
+
+[Plan 343](../../plans/343-t3code-nightly-orchestration.md) and the
+[current reference guide](../../docs/t3code-reference.md) use published nightly
+`v0.0.46-nightly.20261010.2922`, commit `bd2346eda2e2c380d1844869c7fd16c279d2190f`.
+The rewrite is Approved and deferred. This directory's acceptance pin, inventory, and reports
+retain September provenance. A newer reference checkout can retain both Git objects. These
+checks use `git show` at their recorded pin and cannot establish nightly conformance.
+
+Create a separate nightly operation inventory and new evidence during Plan 343. Review changed
+extractors and source anchors against nightly before reusing a comparison runner. Do not change
+a pin on an existing report to promote its result.
 
 ## Operation review states
 

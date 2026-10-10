@@ -1,0 +1,26 @@
+{
+  "repository": "https://github.com/pingdotgg/t3code",
+  "channel": "nightly",
+  "tag": "v0.0.46-nightly.20261010.2922",
+  "commit": "bd2346eda2e2c380d1844869c7fd16c279d2190f",
+  "published_at": "2026-10-10T08:44:21Z",
+  "resolved_on": "2026-10-10",
+  "release_url": "https://github.com/pingdotgg/t3code/releases/tag/v0.0.46-nightly.20261010.2922",
+  "local_planned_at": "917e6da49",
+  "historical_comparison_commit": "7445aa733ada33e45289e5aa5055f79142556513",
+  "source_objects": {
+    "apps/server/src/orchestration-v2": "e8579e9049e44b36ad6115efe5b197d4fac4bdae",
+    "packages/contracts/src/orchestrationV2.ts": "7aa8c74fd80a5e69c67d5503cf9496dd427fe18a",
+    "packages/contracts/src/orchestrationDispatch.ts": "0dec60e48a85e1435eae963d9952577250b11c3f",
+    "apps/web/src/state/orchestration.ts": "8c6e1738857a72af6c3b684fcb516755e006c4a6",
+    "apps/web/src/lib/orchestrationV2Timeline.ts": "8be8b77b8c9fb5a56be9a3cb0cb94cd135666a8d",
+    "apps/server/src/ws.ts": "c1a01b963a508deb760a32649f8018340a4510fd",
+    ".github/workflows/release.yml": "fb4927a86bdb097d484f30256894270c6dba3da8",
+    "scripts/resolve-nightly-release.ts": "c3ae72484e2d4aee9b84b8f87d7ef929cc0e5f8b",
+    "packages/provider-core/src/server/ProviderAdapter.ts": "086300e21878eac4471d4b18f435aae853b587d7",
+    "apps/server/src/persistence/OrchestrationEventStore.ts": "ef8b49c2c53f2fcabda7c4ed92af800cb3dfab41",
+    "packages/client-runtime/src/state": "1d10f8092709d18ff75516aa2983eda1674588a1",
+    "packages/client-runtime/src/connection": "fa20299b0ffc8f0ee67dc5994967ce0a482d0820",
+    "apps/server/src/serverRuntimeStartup.ts": "88aa4298c5961411a64b67ca82a3ff03591a57ea"
+  }
+}

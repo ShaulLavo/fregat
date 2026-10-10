@@ -1,3 +1,8 @@
+> Historical Plan 126 source and scope record. [Plan 343](../343-t3code-nightly-orchestration.md)
+> owns the Approved, deferred nightly rewrite at `bd2346eda2e2c380d1844869c7fd16c279d2190f`.
+> Preserve these receipts and remaining requirements. Recheck affected contracts and provider
+> behavior against nightly before implementing them.
+
 # Lifecycle, sidebar, and navigation alignment
 
 Compared Platform `3c9b88c35784e571e706600b0cee8e95a2656f77` with T3 Code `7445aa733ada33e45289e5aa5055f79142556513` on 2026-09-20. Upstream citations below refer to that Git object, **not** the older reference checkout. Read the audit protocol and audit-playbook correctness, coverage, architecture, and finding-format sections before auditing. This is a source audit; no application code, tests, live sessions, or deployment were changed. LIFE-13/14 were added from the [2026-09-24 upstream delta](delta-2026-09-24.md).

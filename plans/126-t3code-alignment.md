@@ -1,9 +1,25 @@
-# Plan 126: Align Platform behavior with pinned T3 Code
+# Plan 126: T3 Code alignment history and retained product scope
+
+Status: **Approved. Nightly architecture execution moves to [Plan 343](343-t3code-nightly-orchestration.md), deferred at the owner's request on 2026-10-10.**
+
+The active source reference is published nightly `v0.0.46-nightly.20261010.2922`, commit
+`bd2346eda2e2c380d1844869c7fd16c279d2190f`. [The reference guide](../docs/t3code-reference.md)
+and [pin manifest](343-t3code-nightly/reference-pin.json) own source selection. Plan 343 owns
+the orchestration rewrite, its new acceptance matrix, and the transfer of affected follow-ons.
+
+This plan keeps earlier deliveries, evidence limits, and remaining product work. Its September
+`7445aa73` inventory and comparisons remain historical. Do not retarget those artifacts or
+interpret their row states as nightly conformance. The lifecycle, runtime, interaction, adjacent,
+provider, and finite-closeout records below remain evidence and scope inputs. Reconcile affected
+work through Plan 343 before implementation. Existing account, pairing, device, and state-loss
+gates continue to apply.
+
+## Historical baseline and delivered work
 
 Status: **Approved; bounded Wave 2 scope and finite closeout complete, alignment follow-ons remain open.** The owner
 requested a [finite pre-keymap pass](126-t3code-alignment/finite-closeout-2026-10-03.md) on
 2026-10-03 to reconcile the ledger, attempt the monitoring/draft report and place follow-ons.
-That record owns the current remaining-work list. The 2026-10-02 reconciliation below is a
+That record owned the remaining-work list at the October 3 snapshot. The 2026-10-02 reconciliation below is a
 bounded delivery snapshot including root corrective deployment, while residual integration work remains open. It does
 not mark the whole plan, provider batch G or forge batch I complete. See the
 [current source reconciliation](126-t3code-alignment/status-2026-09-28.md) for merged,
