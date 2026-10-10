@@ -2,113 +2,167 @@ export function emptyWorkbenchUrl(base) {
   return new URL('~-/workbench?tabs=-', base).href
 }
 
-function inspectTerminal(prompt) {
+function inspectTerminal({ prompt, index, suffix, text }) {
   const hosts = Array.from(
     document.querySelectorAll('[data-slot="tool-pane"][aria-label="Terminal"] .ghostty-webgpu'),
   )
-  for (let index = 0; index < hosts.length; index++) {
-    const host = hosts[index]
+  for (let candidate = 0; candidate < hosts.length; candidate++) {
+    if (index !== undefined && candidate !== index) continue
+    const host = hosts[candidate]
     const mirror = host.querySelector('[aria-label="Terminal screen"]')
-    if (!mirror?.textContent.includes(prompt)) continue
+    const rows = Array.from(mirror?.children ?? [])
+    const row = rows.findIndex((element) => element.textContent.includes(prompt))
+    if (row < 0) continue
+    const value = rows[row].textContent
+    if (suffix && !value.endsWith(suffix)) continue
+    if (text !== undefined && value !== text) continue
     const canvas = host.querySelector('canvas.ghostty-webgpu-canvas')
-    if (!canvas) continue
-    const domRows = Array.from(canvas.nextElementSibling?.querySelectorAll('[data-row]') ?? [])
-    const domRow = domRows.findIndex((row) => row.textContent.includes(prompt))
-    if (domRow >= 0)
-      return {
-        count: hosts.length,
-        index,
-        selector: '[data-row]',
-        surfaceIndex: domRow,
-        row: 0,
-        rows: 1,
-      }
-    const rows = Array.from(mirror.children)
+    const input = host.querySelector('textarea[aria-label="Terminal input"]')
+    if (!canvas || !input) continue
+    const surface = canvas.getBoundingClientRect()
+    const style = getComputedStyle(canvas)
+    const left = parseFloat(style.paddingLeft) || 0
+    const top = parseFloat(style.paddingTop) || 0
+    const bounds = {
+      x: surface.x + left,
+      y: surface.y + top,
+      width: surface.width - left - (parseFloat(style.paddingRight) || 0),
+      height: surface.height - top - (parseFloat(style.paddingBottom) || 0),
+    }
+    const x = Math.max(0, bounds.x)
+    const y = Math.max(0, bounds.y)
+    const clip = {
+      x,
+      y,
+      width: Math.min(innerWidth, bounds.x + bounds.width) - x,
+      height: Math.min(innerHeight, bounds.y + bounds.height) - y,
+    }
+    if (clip.width <= 0 || clip.height <= 0) continue
+    const caret = input.getBoundingClientRect()
     return {
       count: hosts.length,
-      index,
-      selector: 'canvas.ghostty-webgpu-canvas',
-      surfaceIndex: 0,
-      row: Math.max(
-        0,
-        rows.findIndex((row) => row.textContent.includes(prompt)),
-      ),
-      rows: Math.max(1, rows.length),
+      index: candidate,
+      row,
+      text: value,
+      bounds,
+      clip,
+      rowHeight: bounds.height / rows.length,
+      caret: { x: caret.x, y: caret.y },
     }
   }
   return null
 }
 
-async function promptPixels({ png, bounds, row, rows, characters }) {
-  const bytes = Uint8Array.from(atob(png), (character) => character.charCodeAt(0))
-  const blob = new Blob([bytes], { type: 'image/png' })
-  const bitmap = await createImageBitmap(blob)
-  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
-  const context = canvas.getContext('2d')
-  context.drawImage(bitmap, 0, 0)
-  bitmap.close()
-  const rowHeight = bounds.height / rows
-  const top = bounds.y + row * rowHeight
-  const x = Math.max(0, Math.floor(bounds.x))
-  const y = Math.max(0, Math.floor(top))
-  const width = Math.floor(
-    Math.min(canvas.width, bounds.x + Math.min(bounds.width, characters * rowHeight)) - x,
-  )
-  const height = Math.floor(Math.min(canvas.height, top + Math.min(40, rowHeight)) - y)
-  if (height < 1 || width < 1) return false
-  const pixels = context.getImageData(x, y, width, height).data
-  const frequencies = new Map()
-  const colors = []
-  for (let offset = 0; offset < pixels.length; offset += 4) {
-    const color = `${pixels[offset]},${pixels[offset + 1]},${pixels[offset + 2]}`
-    colors.push(color)
-    frequencies.set(color, (frequencies.get(color) ?? 0) + 1)
+async function changedInputPixels({ before, after, first, second, characters }) {
+  if (first.row !== second.row || Math.abs(first.caret.y - second.caret.y) > 1) return false
+  if (Object.keys(first.bounds).some((key) => first.bounds[key] !== second.bounds[key]))
+    return false
+  const cellWidth = (second.caret.x - first.caret.x) / characters
+  if (!(cellWidth > 0) || !(first.rowHeight > 0)) return false
+  if (Math.abs(first.caret.y - first.bounds.y - first.row * first.rowHeight) > 1) return false
+  const left = first.caret.x - first.clip.x
+  const top = first.caret.y - first.clip.y
+  const right = left + cellWidth * (characters + 1)
+  const bottom = top + first.rowHeight
+  if (left < 0 || top < 0 || right > first.clip.width || bottom > first.clip.height) return false
+  const decode = async (png) => {
+    const bytes = Uint8Array.from(atob(png), (character) => character.charCodeAt(0))
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+    const context = canvas.getContext('2d')
+    context.drawImage(bitmap, 0, 0)
+    bitmap.close()
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      pixels: context.getImageData(0, 0, canvas.width, canvas.height).data,
+    }
   }
-  const background = Array.from(frequencies).sort((a, b) => b[1] - a[1])[0]?.[0]
-  const base = background.split(',').map(Number)
-  const columns = new Set()
-  for (let index = 0; index < colors.length; index++) {
-    const color = colors[index].split(',').map(Number)
-    const contrast = Math.max(...color.map((value, channel) => Math.abs(value - base[channel])))
-    if (contrast >= 32) columns.add(index % width)
+  const [baseline, echoed] = await Promise.all([decode(before), decode(after)])
+  if (baseline.width !== echoed.width || baseline.height !== echoed.height) return false
+  if (right > baseline.width || bottom > baseline.height) return false
+  for (let cell = 0; cell < characters; cell++) {
+    let changed = 0
+    const columns = new Set()
+    for (let y = Math.floor(top); y < Math.ceil(bottom); y++) {
+      for (
+        let x = Math.floor(left + cell * cellWidth);
+        x < Math.ceil(left + (cell + 1) * cellWidth);
+        x++
+      ) {
+        const offset = (y * baseline.width + x) * 4
+        const difference = Math.max(
+          Math.abs(baseline.pixels[offset] - echoed.pixels[offset]),
+          Math.abs(baseline.pixels[offset + 1] - echoed.pixels[offset + 1]),
+          Math.abs(baseline.pixels[offset + 2] - echoed.pixels[offset + 2]),
+        )
+        if (difference < 16) continue
+        changed++
+        columns.add(x)
+      }
+    }
+    // Each typed character must change its cells; cursor movement alone cannot satisfy the proof.
+    if (changed < Math.max(6, cellWidth * first.rowHeight * 0.02) || columns.size < 2) return false
   }
-  // An empty canvas or the cursor alone cannot account for a prompt's glyph columns.
-  return columns.size >= characters * 2
+  return true
+}
+
+function focusInput(element) {
+  element.focus({ preventScroll: true })
+  return element.ownerDocument.activeElement === element
+}
+
+async function eraseInput(page, input, options) {
+  if (!(await input.evaluate(focusInput, undefined, { timeout: 5_000 })))
+    throw new DOMException('Timeout restoring the terminal input focus.', 'TimeoutError')
+  await page.keyboard.press('Control+u')
+  const cleared = await page.waitForFunction(inspectTerminal, options, { timeout: 5_000 })
+  await cleared.dispose()
 }
 
 export async function waitForTerminalPrompt(page, prompt, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const handle = await page.waitForFunction(inspectTerminal, prompt, {
-      timeout: Math.max(1, deadline - Date.now()),
-    })
-    let rendered
+  const remaining = () => Math.max(1, deadline - Date.now())
+  const read = async (options) => {
+    const handle = await page.waitForFunction(inspectTerminal, options, { timeout: remaining() })
     try {
-      rendered = await handle.jsonValue()
+      return await handle.jsonValue()
     } finally {
       await handle.dispose()
     }
-    const surface = page
-      .locator('[data-slot="tool-pane"][aria-label="Terminal"] .ghostty-webgpu')
-      .nth(rendered.index)
-      .locator(rendered.selector)
-      .nth(rendered.surfaceIndex)
-    const bounds = await surface.boundingBox({ timeout: Math.max(1, deadline - Date.now()) })
-    if (bounds) {
-      // Viewport capture proves presented pixels without scrolling a hidden surface into view.
-      const png = await page.screenshot({ timeout: Math.max(1, deadline - Date.now()) })
-      const painted = await page.evaluate(promptPixels, {
-        png: png.toString('base64'),
-        bounds,
-        row: rendered.row,
-        rows: rendered.rows,
-        characters: prompt.length,
-      })
-      if (painted) return { count: rendered.count, promptRendered: true }
-    }
-    await page.waitForTimeout(Math.min(50, Math.max(1, deadline - Date.now())))
   }
-  throw new DOMException('Timeout waiting for visible shell prompt pixels.', 'TimeoutError')
+  const first = await read({ prompt })
+  const input = page
+    .locator('[data-slot="tool-pane"][aria-label="Terminal"] .ghostty-webgpu')
+    .nth(first.index)
+    .getByRole('textbox', { name: 'Terminal input', exact: true })
+  if (!(await input.evaluate(focusInput, undefined, { timeout: remaining() })))
+    throw new DOMException('Timeout focusing the terminal input.', 'TimeoutError')
+  // Clip a viewport capture without scrolling an offscreen terminal into view.
+  const before = await page.screenshot({ clip: first.clip, scale: 'css', timeout: remaining() })
+  const marker = 'xyz'
+  try {
+    await page.keyboard.type(marker)
+    const options = { prompt, index: first.index, suffix: marker }
+    await read(options)
+    while (Date.now() < deadline) {
+      const second = await page.evaluate(inspectTerminal, options)
+      if (!second) break
+      const after = await page.screenshot({ clip: first.clip, scale: 'css', timeout: remaining() })
+      const painted = await page.evaluate(changedInputPixels, {
+        before: before.toString('base64'),
+        after: after.toString('base64'),
+        first,
+        second,
+        characters: marker.length,
+      })
+      if (painted) return { count: first.count, promptRendered: true }
+      await page.waitForTimeout(Math.min(50, remaining()))
+    }
+    throw new DOMException('Timeout waiting for rendered terminal input pixels.', 'TimeoutError')
+  } finally {
+    await eraseInput(page, input, { prompt, index: first.index, text: first.text })
+  }
 }
 
 export function terminalFailures(terminal) {
