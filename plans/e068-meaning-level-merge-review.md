@@ -725,9 +725,9 @@ under `/work/reports/e068-i-20261010/profile-mac/` and the before/after Linux pr
 
 #### Immutable snapshot ownership correction
 
-Retained `ParsedDocument` records now preserve their immutable intent. Reuse requires the
-same intent as the incoming parse; a same-version mutable parse retires an immutable
-snapshot and builds a fresh mutable tree. An edit whose previous version is immutable
+Retained `ParsedDocument` records now preserve their immutable intent. A read-only request
+can reuse a mutable tree without changing its intent. A same-version mutable parse retires
+an immutable snapshot and builds a fresh mutable tree. An edit whose previous version is immutable
 also retires that base and parses the complete edited source under the edit's cancellation
 context. It never passes the immutable root or its injected layers to live incremental
 reuse. Ordinary mutable edits retain the existing incremental path. Projected snapshots
@@ -749,9 +749,27 @@ The package's default node suite subsequently reproduced one reuse failure: its 
 The fixture now supplies the complete document and request contracts, with the native
 fake tree as the only cast boundary. Node controls cover mutable reuse with omitted and
 explicit `false` intent, immutable reuse with `true`, and immutable-to-mutable retirement
-with both mutable request forms. Production reuse remains unchanged. The full package
-script passes all 146 node tests across 18 files and 165 browser tests across eight files;
-package typecheck, lint and editor health also pass.
+with both mutable request forms. That fixture-only correction left production reuse
+unchanged and passed 146 node tests across 18 files and 165 browser tests across eight
+files, plus package typecheck, lint and editor health.
+
+A follow-up node and real-worker regression reproduced the reverse intent transition:
+a read-only request dropped an already mutable tree and its next edit took the full
+parse path. Refusal now applies only to immutable-to-mutable promotion. Mutable reuse
+preserves the cached object's `readOnly: false` intent. The browser regression compares
+the next edit's highlighting and phase names against a known-good ordinary incremental
+edit and a fresh full parse, then proves zero retained trees and source reads on disposal.
+Ordinary incremental edits also report `treeSitter.parseRoot`, so its absence is not a
+valid incremental-edit predicate; `treeSitter.edit` distinguishes the edit path. The
+read-only request itself has no root-parse phase.
+
+`createTreeSitterReviewSyntax` allocates dedicated `merge-review-${UUID}-${batch}` runtime
+sessions, and the example creates that reader separately from the live editor. Those
+review reads do not currently share live runtime identities. The one-way reuse rule
+also preserves mutable trees for callers that explicitly share a backend runtime.
+The final full suites pass 147 node tests, 166 browser tests (including 44 merge-unit
+regressions) and 226 collaboration tests. Workspace builds, parser types/lint, editor
+health and plan checks also pass. No new timing experiment or claim accompanies this fix.
 
 Remaining Approved work:
 

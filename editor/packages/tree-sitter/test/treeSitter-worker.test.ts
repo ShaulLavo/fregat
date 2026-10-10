@@ -602,8 +602,9 @@ describe('parse document reuse', () => {
   it.each([
     { cachedReadOnly: false, requestedReadOnly: undefined },
     { cachedReadOnly: false, requestedReadOnly: false },
+    { cachedReadOnly: false, requestedReadOnly: true },
     { cachedReadOnly: true, requestedReadOnly: true },
-  ])('reuses an identical version with matching intent: %j', async (intent) => {
+  ])('reuses an identical version with compatible intent: %j', async (intent) => {
     const runtimeSessionId = 'runtime-reuse'
     const deleted: string[] = []
     const document = fakeParsedDocument(10, deleted, intent.cachedReadOnly)
@@ -620,6 +621,7 @@ describe('parse document reuse', () => {
         },
       ),
     ).toBe(document)
+    expect(document.readOnly).toBe(intent.cachedReadOnly)
     expect(deleted).toEqual([])
     disposeDocument(runtimeSessionId)
   })

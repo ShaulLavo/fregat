@@ -710,7 +710,7 @@ const reusableParsedDocument = async (
     request.snapshotVersion,
   )
   if (!cached) return null
-  if (cached.readOnly !== (request.readOnly === true)) {
+  if (cached.readOnly && request.readOnly !== true) {
     dropCachedDocument(request.runtimeSessionId, cached)
     return null
   }
