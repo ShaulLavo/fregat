@@ -27,7 +27,7 @@ export function mountExample(
     wordWrapBreak: 'word',
     fontFamily: options.fallbackFont
       ? '"Singapore Mono Fallback", monospace'
-      : '"JetBrains Mono", "Singapore Mono Fallback", monospace',
+      : '"JetBrains Mono"',
     fontSize: 14,
     lineHeight: 22,
     tabSize: 2,

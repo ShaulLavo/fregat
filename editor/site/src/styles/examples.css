@@ -153,3 +153,14 @@
 [data-example] [data-editor-document-paint-row] span {
   margin: 0 !important;
 }
+
+/* One page-wide choice also covers examples that enter the viewport after Mono downloads. */
+:root[data-example-font='pending'] [data-example] [data-editor-document-paint] {
+  opacity: 0;
+}
+:root:not([data-example-font='mono']) [data-example] [data-editor-document-paint] {
+  font-family: 'Singapore Mono Fallback', monospace !important;
+}
+:root[data-example-font='mono'] [data-example] [data-editor-document-paint] {
+  font-family: 'JetBrains Mono' !important;
+}

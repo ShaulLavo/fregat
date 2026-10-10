@@ -23,6 +23,19 @@ const load = () => {
     })
   return runtime
 }
+function exampleFontChosen() {
+  const root = document.documentElement
+  if (root.dataset.exampleFont !== 'pending') return Promise.resolve()
+  return new Promise<void>((resolve) => {
+    const observer = new MutationObserver(() => {
+      if (root.dataset.exampleFont === 'pending') return
+      observer.disconnect()
+      resolve()
+    })
+    observer.observe(root, { attributes: true, attributeFilter: ['data-example-font'] })
+  })
+}
+
 function prepare(example: HTMLElement) {
   const previous = states.get(example)
   if (previous) return previous
@@ -35,17 +48,8 @@ function prepare(example: HTMLElement) {
   const state: { ready: Promise<ExampleEditor>; host: HTMLElement; editor?: ExampleEditor } = {
     host,
     ready: load().then(async ({ mountExample }) => {
-      let fallbackFont = !Array.from(document.fonts).some(
-        (face) => face.family === 'JetBrains Mono' && face.status === 'loaded',
-      )
-      // Optional faces can expire; keep live measurements on the static view's rendered face.
-      await document.fonts.load('14px "JetBrains Mono"').catch(() => {
-        fallbackFont = true
-      })
-      if (fallbackFont) {
-        for (const paint of example.querySelectorAll<HTMLElement>('[data-editor-document-paint]'))
-          paint.style.fontFamily = '"Singapore Mono Fallback", monospace'
-      }
+      await exampleFontChosen()
+      const fallbackFont = document.documentElement.dataset.exampleFont !== 'mono'
       const theme = example.querySelector<HTMLElement>('[data-example-theme="dark"]')!
       const dark = getComputedStyle(theme).display !== 'none'
       const editor = mountExample(host, {

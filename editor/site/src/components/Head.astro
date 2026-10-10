@@ -1,4 +1,5 @@
 ---
+import ExampleFont from './ExampleFont.astro'
 import Head from '@astrojs/starlight/components/Head.astro'
 import mono from '../fonts/jetbrains-mono.woff2?url'
 import serif from '../fonts/source-serif-4.woff2?url'
@@ -7,4 +8,5 @@ import '../styles/examples.css'
 <Head {...Astro.props} />
 <link rel="preload" href={mono} as="font" type="font/woff2" crossorigin />
 <link rel="preload" href={serif} as="font" type="font/woff2" crossorigin />
+<ExampleFont />
 <script>import '../manual/live-examples'</script>
