@@ -491,7 +491,7 @@ fn reuseFrameRow(comptime stable: bool, frame: *Frame, y: u32) c.GhosttyResult {
     for (0..frame.columns) |x| {
         const row = cache.next[y];
         const selected = row.selected and x >= row.selection_start and x <= row.selection_end;
-        if (reuseRenderedCell(stable, false, frame, previous, start + @as(u32, @intCast(x)), row.cells[x].raw, @intCast(x), y, selected)) continue;
+        if (reuseRenderedCell(stable, frame, previous, start + @as(u32, @intCast(x)), row.cells[x].raw, @intCast(x), y, selected)) continue;
         rememberRenderedCell(cache, start + x, cache.next[y].cells[x]);
         var next_cell = source_cells[source_start + x];
         var next_glyph = source_glyphs[source_start + x];
@@ -719,7 +719,7 @@ fn rememberRenderedCell(cache: *FrameCache, slot: usize, input: CachedCell) void
     };
 }
 
-fn reuseRenderedCell(comptime stable: bool, comptime update_input: bool, frame: *Frame, owner: *const CachedRow, address: u32, raw: c.GhosttyCell, x: u32, y: u32, selected: bool) bool {
+fn reuseRenderedCell(comptime stable: bool, frame: *Frame, owner: *const CachedRow, address: u32, raw: c.GhosttyCell, x: u32, y: u32, selected: bool) bool {
     const cache = frame.row_cache.?;
     const previous = if (stable) owner else &cache.previous[y];
     const slot = if (stable) address else y * frame.columns + x;
@@ -733,8 +733,6 @@ fn reuseRenderedCell(comptime stable: bool, comptime update_input: bool, frame: 
     const cursor = frame.cursor_visible != 0 and frame.cursor_x == x and frame.cursor_y == y;
     const old_cursor = (@as(u32, @intFromFloat(frame.cell_data[slot][12])) & 1) != 0;
     if (cursor != old_cursor or (cursor and frame.cell_data[slot][14] != @as(f32, @floatFromInt(frame.cursor_style)))) return false;
-    // A validated reused row already owns these cached inputs.
-    if (!update_input) return true;
     cache.next[y].cells[x] = .{
         .raw = raw,
         .foreground = 0xffffffff,
@@ -775,7 +773,7 @@ fn buildRow(comptime stable: bool, frame: *Frame, iterator: c.GhosttyRenderState
     for (0..raw.len) |x| {
         const selected = has_selection and x >= selection.start_x and x <= selection.end_x;
         const slot = start + @as(u32, @intCast(x));
-        if (!force and reuseRenderedCell(stable, true, frame, previous, slot, raw.ptr[x], @intCast(x), y, selected)) continue;
+        if (!force and reuseRenderedCell(stable, frame, previous, slot, raw.ptr[x], @intCast(x), y, selected)) continue;
         const previous_cell = frame.cell_data[slot];
         const previous_glyph = frame.glyph_data[slot];
         result = buildCell(stable, frame, raw.ptr[0..raw.len], cells.*, slot, @intCast(x), y, selected);
