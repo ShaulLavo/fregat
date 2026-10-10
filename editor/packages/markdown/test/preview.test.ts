@@ -110,6 +110,7 @@ describe('markdown preview plugin', () => {
     const headings = [...container.querySelectorAll('[role="heading"]')]
     expect(headings.map((row) => row.getAttribute('aria-level'))).toEqual(['1', '2', '1'])
     expect(headings.map((row) => row.textContent)).toEqual(['Title', 'Read docs', 'Setext'])
+    expect(headings.map((row) => row.id)).toEqual(['title', 'read-docs', 'setext'])
     expect(container.querySelector('a')?.getAttribute('href')).toBe('https://example.com')
     editor.setText('plain\nsecond', { languageId: 'markdown' })
     await flush()

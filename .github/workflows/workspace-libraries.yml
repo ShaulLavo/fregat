@@ -88,6 +88,14 @@ jobs:
         env:
           CI_PACKAGES: ${{ inputs.packages || 'all' }}
         run: bun scripts/ci/packages.mjs editor-tests "$CI_PACKAGES"
+      - name: Test complete document snapshot paint
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/core"') }}
+        run: |
+          for engine in chromium webkit; do
+            for dpr in 1 2 3; do
+              bun run --cwd editor/packages/editor bench:paint --project "snapshot-${engine}-dpr${dpr}"
+            done
+          done
       - name: Test collaboration signaling broker
         if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/collaboration"') }}
         run: bun run --cwd editor/packages/collaboration test:server

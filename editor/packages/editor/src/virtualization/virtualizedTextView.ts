@@ -12,6 +12,13 @@ import { markerAtRowX } from './virtualizedTextViewHiddenCharacters'
 import { ScrollViewport } from './scrollViewport'
 import type { FoldMarkerSource } from './foldMarkerSource'
 import type { SavedPaint } from '../editor/paintSnapshot'
+import type {
+  DocumentPaintCapture,
+  PaintSnapshot,
+  SavedDocumentPaint,
+} from '../editor/documentPaint'
+import { captureDocumentPaint } from './documentPaintCapture'
+import { mountDocumentPaint, type MountedPaintSnapshot } from './documentPaintRows'
 import type { TextContent } from '../textContent'
 import type { FoldMap } from '../foldMap'
 import { nextGraphemeBoundary, previousGraphemeBoundary } from '../graphemes'
@@ -626,8 +633,76 @@ export class VirtualizedTextView {
     return this.pendingReveal !== null
   }
 
-  public get savedPaint(): SavedPaint | null {
-    return this.provisionalPaint?.paint ?? null
+  public captureDocumentPaint(appearance: string): DocumentPaintCapture {
+    return captureDocumentPaint(this.view, appearance)
+  }
+
+  private provisionalDocumentPaint: {
+    readonly paint: SavedDocumentPaint
+    mounted: MountedPaintSnapshot
+    readonly releaseRows: () => void
+    width: number
+  } | null = null
+
+  public get savedPaint(): PaintSnapshot | null {
+    return this.provisionalDocumentPaint?.paint ?? this.provisionalPaint?.paint ?? null
+  }
+
+  private restoreDocumentPaint(paint: SavedDocumentPaint): boolean {
+    if (this.view.scrollMode !== 'content') return false
+    const width = this.documentPaintWidth()
+    this.releaseProvisionalPaint()
+    const mounted = mountDocumentPaint(this.view.spacer, paint, { width })
+    if (!mounted) return false
+    const rows = getMountedRows(this.view)
+    const visibility = rows.map((row) => row.element.style.visibility)
+    const gutterVisibility = this.view.gutterElement.style.visibility
+    for (const row of rows) row.element.style.visibility = 'hidden'
+    this.view.gutterElement.style.visibility = 'hidden'
+    clearTokenHighlights(this.view)
+    clearSelectionHighlight(this.view)
+    this.view.caretLayerElement.hidden = true
+    this.view.provisional = true
+    this.scrollElement.dataset.editorPresentation = 'provisional'
+    this.scrollElement.setAttribute('aria-busy', 'true')
+    this.setInputEditable(false)
+    this.provisionalDocumentPaint = {
+      paint,
+      mounted,
+      width,
+      releaseRows: () => {
+        rows.forEach((row, index) => {
+          row.element.style.visibility = visibility[index]!
+        })
+        this.view.gutterElement.style.visibility = gutterVisibility
+      },
+    }
+    this.synchronizeDocumentPaint()
+    return true
+  }
+
+  private documentPaintWidth(): number {
+    const padding = scrollElementPadding(this.scrollElement)
+    return Math.max(0, this.scrollElement.clientWidth - padding.left - padding.right)
+  }
+
+  private synchronizeDocumentPaint(): void {
+    const provisional = this.provisionalDocumentPaint
+    if (!provisional) return
+    const width = this.documentPaintWidth()
+    if (width !== provisional.width) {
+      const mounted = mountDocumentPaint(this.view.spacer, provisional.paint, { width })
+      if (!mounted) return
+      provisional.mounted.dispose()
+      provisional.mounted = mounted
+      provisional.width = width
+    }
+    const height = provisional.mounted.height
+    this.view.viewport.setDocumentWidth(width)
+    this.view.viewport.setDocumentHeight(height, 0)
+    this.view.viewport.setViewportSize(width, height)
+    this.view.virtualizer.setProvisionalScrollGeometry({ scrollTop: 0, scrollHeight: height })
+    this.reportContentHeight(height)
   }
 
   public measureInitialViewport(): void {
@@ -655,7 +730,8 @@ export class VirtualizedTextView {
     return paint ? { top: paint.scrollTop, left: paint.scrollLeft } : null
   }
 
-  public restorePaint(paint: SavedPaint): boolean {
+  public restorePaint(paint: PaintSnapshot): boolean {
+    if (paint.format === 6) return this.restoreDocumentPaint(paint)
     const inset = paint.gutterWidth > 0 ? this.view.gutterLeadingInset : 0
     if (paint.gutterLayout.leadingInset !== inset) return false
 
@@ -727,6 +803,9 @@ export class VirtualizedTextView {
   }
 
   private releaseProvisionalPaint(): void {
+    this.provisionalDocumentPaint?.mounted.dispose()
+    this.provisionalDocumentPaint?.releaseRows()
+    this.provisionalDocumentPaint = null
     this.provisionalPaint?.release()
     this.provisionalPaint = null
     this.pendingOverlayWidths = null
@@ -1666,7 +1745,9 @@ export class VirtualizedTextView {
 
   /** The rows' own height, wrapped rows included, so a host can size itself to its text. */
   public getContentHeight(): number {
-    return this.view.virtualizer.getSnapshot().totalSize
+    return (
+      this.provisionalDocumentPaint?.mounted.height ?? this.view.virtualizer.getSnapshot().totalSize
+    )
   }
 
   private reportContentHeight(height: number): void {
@@ -1678,6 +1759,7 @@ export class VirtualizedTextView {
   private renderSnapshot(snapshot: FixedRowVirtualizerSnapshot): void {
     if (this.view.disposed) return
     if (this.view.provisional) {
+      this.synchronizeDocumentPaint()
       this.freezeProvisionalScroll()
       this.reportViewportChange()
       return

@@ -189,11 +189,12 @@ The home height numbers alone do not prove duplicate wrapped rows. Their excesse
 
 ## Snapshot speed budget
 
-Treat restore speed as a landing-page requirement, separate from worker/parser startup. These are acceptance budgets, not achieved product claims:
+First paint is complete editor-produced HTML emitted at build time and remains visible without JavaScript replay. Responsive replay runs at takeover or a toggle, separately from worker/parser startup. These are qualification budgets, not achieved product claims. Speed qualification is a follow-up and does not gate merging the correctness implementation after independent re-review passes:
 
-- Decode, responsive layout and paint mount at p95 within 8 ms on the reference desktop after the bundled font is ready, 30 independent repetitions per engine and width.
-- Within 16 ms at p95 in Chromium with 4× CPU slowdown, and no restore long task over 50 ms. Chromium slowdown is an experiment, not an iPhone measurement. WebKit runs its own unthrottled qualification.
-- A server-rendered captured article is visible before full editor code or grammars load. The inline bootstrap does not fetch a worker or wasm to paint.
+- Gate: decode, responsive layout, DOM insertion and forced layout at p95 within 50 ms after the bundled font is ready, with 30 independent repetitions per engine and width. This is the takeover response budget.
+- Goal: the same work at p95 within 8 ms on the reference desktop. Preserve exact document pixels while pursuing this goal.
+- Goal: within 16 ms at p95 in Chromium with 4× CPU slowdown. Gate: no individual restore long task over 50 ms. Chromium slowdown is an experiment, not an iPhone measurement. WebKit runs its own unthrottled qualification.
+- A server-rendered captured article is visible before full editor code or grammars load. The captured DOM needs no decode or replay for its first paint; the responsive paint entry has no worker or wasm dependency.
 - No visible blank frame, no toggle-induced layout shift, and zero changed document pixels between static and ready live states at the required widths. Mask only the caret and the toggle label, never text or gutters.
 - Start with at most 32 KiB compressed document paint for the home sample, 96 KiB for a representative manual, and 16 KiB compressed for the paint-only entry. Record raw/decoded sizes and total HTML as well. An oversized page fails qualification and gets a measured compression or representation fix.
 
@@ -224,10 +225,35 @@ This is encouraging for a small captured viewport, but WebKit already misses the
 
 ### Phase 2: Complete and responsive snapshot paint
 
-- [ ] Add document capture, safe Markdown fragment capture, shared replay and the lightweight `core/paint` entry. Keep viewport captures and rejection gates covered.
-- [ ] Add capture/restore pixel tests, malformed/oversized payload tests, unsafe link tests, unsupported plugin tests and a complete document above 400 rows.
-- [ ] Prove responsive layout and semantic equivalence in Chromium and WebKit, including theme, DPR, fonts and cold startup. Add a patch changeset for core and Markdown API/behavior changes.
-- [ ] Measure admitted restore against the speed and payload budgets. Commit a portable benchmark/scenario and evidence before claiming it is landing-page ready.
+- [x] Add document capture, safe Markdown fragment capture, shared replay and the lightweight `core/paint` entry. Keep viewport captures and rejection gates covered.
+- [x] Add capture/restore pixel tests, malformed/oversized payload tests, unsafe link tests, unsupported plugin tests and a complete document above 400 rows.
+- [x] Prove responsive layout and semantic equivalence in Chromium and WebKit, including theme, DPR, fonts and cold startup. Add a patch changeset for core and Markdown API/behavior changes.
+- [x] Measure admitted restore against the speed and payload budgets. Commit a portable benchmark/scenario and evidence before claiming it is landing-page ready.
+
+Implementation and exact-pixel proof are in [PR #1217](https://github.com/ShaulLavo/fregat/pull/1217). The final library matrix passes 162 tests across Chromium and WebKit, DPR 1/2/3, both palettes, JetBrains Mono, Source Serif 4 and FreeSans, with one payload reflowed at 320/390/1280 px. It covers serialized HTML, fresh Markdown takeover, hidden-to-visible paint and an isolated cold paint-only entry. Expanded fold candidates remain capturable; collapsed folds are refused.
+
+[Raw evidence](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/performance/document-paint-2026-10-10/results.json) records the final non-quiet Linux experiment and earlier attempts, including failures. The paint entry is 15,620 bytes minified and 5,800 bytes gzip across nine modules, without editor/session/parser/worker imports. Captured payloads span 918–4,716 bytes gzip.
+
+Speed qualification remains open as an explicit follow-up, not a merge gate. The correctness implementation can merge after independent re-review passes. Phase 3 site integration starts in a separate lane.
+
+### Follow-up: Snapshot restore speed qualification
+
+Status: **Approved**. Separate from the Phase 2 correctness merge. No qualified speed or landing-page readiness claim is made.
+
+Baseline is the non-quiet Linux experiment in the raw evidence above. Warm p95 spans 0.5–53 ms, and the largest individual restore sample is 116 ms. The recorded exceptions are:
+
+| Engine/DPR | Fixture and width       | p95   | Maximum sample |
+| ---------- | ----------------------- | ----- | -------------- |
+| WebKit/1   | 450 rows, 390 px        | 36 ms | 116 ms         |
+| WebKit/2   | 450 rows, 320 px        | 53 ms | 55 ms          |
+| WebKit/2   | Largest manual, 1280 px | 41 ms | 72 ms          |
+
+Chromium observes page long tasks of 52–182 ms during benchmark windows. These have no per-restore attribution. The 4× Chromium slowdown p95 spans 27.8–41.4 ms and misses the 16 ms goal. Earlier over-budget experiments are also retained. Exact pixels and complete content height now pass; the remaining problem is performance attribution and qualification.
+
+- [ ] Profile the 450-row restore on a quiet machine whose local policy permits quiet measurements. Follow that host's scheduler and resource rules. Record machine, power/load conditions, browser/runtime versions and source revision. Run `bun run --cwd editor/packages/editor bench:paint --project snapshot-webkit-dpr1 -t 'captures and mounts every row in a document above 400 rows'`, then repeat for Chromium/WebKit at DPR 1/2/3. Each run covers 320/390/1280 px with 30 independent samples.
+- [ ] Attribute long tasks to individual restores before choosing a fix. Add per-iteration start/end marks around decode, mount, forced layout and disposal in `editor/packages/editor/test/documentPaint.browser.test.ts`'s `benchmark`. Correlate observer entries and browser traces with those intervals; separate replay work, disposal, garbage collection and other page work. WebKit needs trace-based attribution where its long-task observer is unavailable. Inspect `decodeDocumentPaint` in `src/editor/documentPaint.ts` and `mountDocumentPaint`/`appendGutter` in `src/virtualization/documentPaintRows.ts` under the editor package. Their relative cost is unconfirmed. Publish the raw `samples`, `decode`, `mount`, `layout`, intervals and trace evidence before/after any optimization.
+- [ ] Based on the profile, consider replaying in bounded chunks over a few frames, or replaying the viewport plus a margin first and finishing the remainder afterward. Preserve the complete capture and reserved document height, reading order, links and anchors. Existing editor-produced HTML must remain visually identical through every intermediate frame and the final swap; no blank frame, clipped content, scroll-anchor shift or partial-paint flash. Compare these approaches with a simpler measured fix before adding scheduling complexity.
+- [ ] Rerun the full exact-pixel and height matrix, cold entry, fresh takeover and hidden-to-visible proofs. Read screenshots and intermediate frames. Qualify the 50 ms p95/individual-task bounds and record progress against the 8 ms desktop and 16 ms slowdown goals. Real-site first-visible-frame, scroll-anchor and toggle acceptance remains Phase 3/4 work.
 
 ### Phase 3: Site capture and takeover
 

@@ -143,6 +143,8 @@ export default defineConfig({
           },
           include: ['test/**/*.browser.test.ts'],
           exclude: [
+            // Full-document pixels and restore timings use vitest.snapshot.config.ts.
+            'test/documentPaint.browser.test.ts',
             'test/highlightPaint.browser.test.ts',
             'test/markdownFencePaint.browser.test.ts',
             'test/paintOrigin.browser.test.ts',

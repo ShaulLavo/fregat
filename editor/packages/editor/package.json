@@ -101,6 +101,11 @@
       "types": "./dist/public/keymap.d.ts",
       "import": "./dist/public/keymap.js",
       "default": "./dist/public/keymap.js"
+    },
+    "./paint": {
+      "types": "./dist/paint.d.ts",
+      "import": "./dist/paint.js",
+      "default": "./dist/paint.js"
     }
   },
   "publishConfig": {
@@ -109,6 +114,7 @@
   },
   "scripts": {
     "build": "bun ../../scripts/build-package.ts",
+    "bench:paint": "bun --bun vitest run --config vitest.snapshot.config.ts",
     "bench:inspection": "bun bench/pieceTable-inspection.ts",
     "bench:reclamation": "bun bench/reclamation-run.ts",
     "bench:reclamation-text": "bun bench/reclamation-compare.ts",
