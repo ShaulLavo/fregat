@@ -162,6 +162,31 @@ it('keys colors, selection, continuation and every packed style bit', () => {
   }
 })
 
+it('bounds identity metadata while preserving all visual word bits', () => {
+  const packed = new PackedCells(
+    new Uint32Array([65, 0x563412, 0xabcdef, 0x8000700d, 0, 0]),
+    new Uint32Array(),
+  )
+  const identity = packed.identity()
+  expect(identity).toHaveLength(9)
+  expect(Array.from({ length: 8 }, (_, index) => identity.charCodeAt(index))).toEqual([
+    1, 0, 0x3412, 0x56, 0xcdef, 0xab, 0x700d, 0x8000,
+  ])
+  expect(identity.slice(8)).toBe('A')
+})
+
+it('preserves text lengths beyond one UTF-16 unit in identity metadata', () => {
+  const packed = new PackedCells(
+    new Uint32Array([0, 0xffffffff, 0xffffffff, 1, 0, 0x10000]),
+    new Uint32Array(0x10000).fill(65),
+  )
+  const identity = packed.identity()
+  expect(identity).toHaveLength(0x10000 + 8)
+  expect(identity.charCodeAt(0)).toBe(0)
+  expect(identity.charCodeAt(1)).toBe(1)
+  expect(identity.slice(8)).toBe('A'.repeat(0x10000))
+})
+
 it('keeps text boundaries and row lengths distinct without decoding cells', () => {
   const split = new PackedCells(
     new Uint32Array([65, 0xffffffff, 0xffffffff, 1, 0, 0, 66, 0xffffffff, 0xffffffff, 1, 0, 0]),

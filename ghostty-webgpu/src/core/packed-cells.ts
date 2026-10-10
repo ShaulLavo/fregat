@@ -108,10 +108,19 @@ export class PackedCells {
       const text = this.textAt(offset)
       const foreground = this.words[offset + 1]!
       const background = this.words[offset + 2]!
-      const fg = foreground === 0xffffffff ? '-' : foreground.toString(16)
-      const bg = background === 0xffffffff ? '-' : background.toString(16)
-      // Grapheme offsets are frame-local; length-prefixed text keeps cell boundaries distinct.
-      identity += `${text.length}:${text}:${fg}:${bg}:${this.words[offset + 3]!.toString(16)};`
+      const flags = this.words[offset + 3]!
+      // Frame-local grapheme offsets are excluded; fixed-width lengths preserve cell boundaries.
+      identity +=
+        String.fromCharCode(
+          text.length & 0xffff,
+          text.length >>> 16,
+          foreground & 0xffff,
+          foreground >>> 16,
+          background & 0xffff,
+          background >>> 16,
+          flags & 0xffff,
+          flags >>> 16,
+        ) + text
     }
     return identity
   }
