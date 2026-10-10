@@ -40,8 +40,8 @@ describe('retained native displayed frame', () => {
     displayed.accept()
     expect(serialized(displayed.readTextRows())).toBe(pushed)
     expect(serialized(displayed.readRows().map(({ dirty: _dirty, ...row }) => row))).toBe(styles)
-    expect(displayed.readTextRows({ rows: new Set([1]) })).toEqual(
-      state.readTextRows({ rows: new Set([1]) }),
+    expect(serialized(displayed.readTextRows({ rows: new Set([1]) }))).toBe(
+      serialized(state.readTextRows({ rows: new Set([1]) })),
     )
   })
 
