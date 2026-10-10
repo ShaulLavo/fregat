@@ -184,7 +184,7 @@ it.each([0, 2_000])(
     const ready: Promise<string>[] = []
     try {
       for (let index = 0; index < 4; index += 1) {
-        if (index === 3) {
+        if (index === 3 && delay > 0) {
           await Promise.all(ready)
           await Bun.sleep(delay)
         }
@@ -202,8 +202,9 @@ it.each([0, 2_000])(
           try {
             const health = await (await fetch(server.origin + '/health', { headers: { origin: web.origin } })).json();
             console.log(JSON.stringify({ origin: server.origin, directory: server.directory, home: server.home, identity: health.environmentId, database: health.metadataDbPath }));
+            const released = new Promise(resolve => process.once('message', resolve));
             process.send(server.directory);
-            await Bun.sleep(1500);
+            await released;
           } finally { await server.stop(); }
         `,
             ],
@@ -224,6 +225,10 @@ it.each([0, 2_000])(
       }
       const directories = await Promise.all(ready)
       for (const directory of directories) expect(existsSync(directory)).toBe(true)
+      for (const caller of callers) {
+        expect(caller.exitCode).toBe(null)
+        caller.send('stop')
+      }
       const receipts = await Promise.all(callers.map(readCallerReceipt))
       expect(new Set(receipts.map((receipt) => receipt.origin)).size).toBe(callers.length)
       expect(new Set(receipts.map((receipt) => receipt.identity)).size).toBe(callers.length)
