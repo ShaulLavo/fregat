@@ -18,6 +18,7 @@ import {
 import { CanvasRowPainter, plainRowText, type Canvas2dContext } from './painter.js'
 import type { PixelTarget, PixelMetrics, PixelTargetFactory } from './pixel-target.js'
 import { canvasScrollPlan, type CanvasScrollPlan } from './scroll.js'
+import { retainDisplayedFrame, type DisplayedFrameSource } from '../displayed-frame.js'
 
 export interface CanvasRendererMetrics
   extends RowRendererMetrics, CanvasReuseMetrics, PixelMetrics {}
@@ -60,6 +61,7 @@ function cursorKey(cursor: CursorState | undefined, y: number): string {
 }
 
 class CanvasSurface implements RowRendererSurface {
+  readonly retainsDisplayedText = true
   private readonly context: Canvas2dContext
   private readonly painter: CanvasRowPainter
   private readonly pixelTarget?: PixelTarget
@@ -105,8 +107,9 @@ class CanvasSurface implements RowRendererSurface {
     if (this.pixelTarget) this.pixelTarget.metrics = this.reuseMetrics
   }
 
-  source(source: RenderStateSource): RenderStateSource {
+  source(source: RenderStateSource): RenderStateSource & DisplayedFrameSource {
     return {
+      [retainDisplayedFrame]: (source as DisplayedFrameSource)[retainDisplayedFrame]?.bind(source),
       get snapshotVersion() {
         return source.snapshotVersion
       },
