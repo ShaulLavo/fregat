@@ -1454,6 +1454,7 @@ export const selectors = {
   pagedGo: (page: Page) => page.getByRole('button', { name: 'Go to line', exact: true }),
   pagedCopy: (page: Page) => page.getByRole('button', { name: 'Copy displayed text', exact: true }),
   createMissingFile: (page: Page) => page.getByRole('button', { name: 'Create File', exact: true }),
+  saveMissingFile: (page: Page) => page.getByRole('button', { name: 'Save file', exact: true }),
   editorTabs: (page: Page) => page.locator('[data-editor-tab-id]'),
   gitPanel: (page: Page) => page.getByRole('region', { name: 'Git panel' }),
   gitChangeRow: (page: Page, name: string) =>

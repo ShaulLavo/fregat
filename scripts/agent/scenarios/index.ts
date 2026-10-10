@@ -471,6 +471,7 @@ import { treeParity } from './tree-parity'
 import { fileIconHues } from './file-icon-hues'
 import { filterFields } from './filter-fields'
 import { inlineRenameTree } from './inline-rename-tree'
+import { editorMissingFile } from './editor-missing-file'
 import { treeParityBehaviour } from './tree-parity-behaviour'
 
 import { devPackageUpdates } from './dev-package-updates'
@@ -928,6 +929,7 @@ export const scenarios: readonly Scenario[] = [
   fileIconHues,
   treeParityBehaviour,
   inlineRenameTree,
+  editorMissingFile,
   filterFields,
   treeFileClicks,
 ])
