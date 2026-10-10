@@ -88,7 +88,7 @@ directions, cycles/focuses indexed and geometric targets, swaps, moves to an edg
 Terminal fixture process identity and chat state survive layout changes; NewFileSplitHorizontal
 creates an unsaved buffer. Focus reaches an adjacent available dock/sidebar through its owner.
 
-Run heavy checks through the current heavy wrapper in [AGENTS.md](../AGENTS.md#dev-gates-verification).
+Run heavy checks through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill.
 Use fixture providers and fixture language servers. Add scenario selectors in
 `scripts/agent/selectors.ts`, run `bun run agent:browser scenario <name>` for the named scenario above, then
 `bun run agent:browser look`; read screenshots back and record the evidence directory. Run `bun run gates`

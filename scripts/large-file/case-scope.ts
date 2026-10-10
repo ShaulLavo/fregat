@@ -1,4 +1,7 @@
-import { readAccounting, SCOPE_SHIM, type JobAccounting } from '../heavy/job'
+import path from 'node:path'
+import { readAccounting, type JobAccounting } from './accounting'
+
+const SCOPE_SHIM = path.join(import.meta.dirname, 'scope.sh')
 
 export type CaseScope = {
   readonly unit: string

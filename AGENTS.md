@@ -121,7 +121,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 - Bundle size is not gated; deal with it when it's a real problem (owner, 2026-10-09).
 - Follow `README.md` and `docs/development.md` for development setup; Mesh is an optional integration. Browser verification uses an isolated state home. `/dev` is the component gallery; add a tab for anything worth eyeballing.
 - A private dev server takes an explicit free `--port` on a known loopback address, and stops after verification.
-- Run the narrowest checks that can catch the change's plausible failures. Heavy-job scheduling and resource limits belong to the execution host's local instructions (on the owner's machine, the `fregat-local` skill).
+- Run the narrowest checks that can catch the change's plausible failures. Heavy-job scheduling and resource limits belong to the execution host's local instructions. The owner uses the private `ShaulLavo/heavy-runner` tool documented in the local `fregat-local` skill; contributor commands and CI run independently of it.
 - `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`, `query:check`, `unused:check`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
 - Prove changes with the `verify-fregat` skill (`bun run agent:browser look|scenario|trace|renders|caches`); use the evidence directory the command reports. Read the screenshot back and name the directory. Performance claims cite `trace --compare`, render claims `renders` before and after, settlement claims `caches`. Reproduce a bug on its surface before fixing it. A surface with no scenario gets one in `scripts/agent/scenarios/`, selectors in `scripts/agent/selectors.ts`.
 

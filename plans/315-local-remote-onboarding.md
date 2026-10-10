@@ -76,4 +76,4 @@ Acceptance means both paths end in the chosen project's chat on the advertised m
 
 ## Delivery
 
-Use `typescript-best-practices`, `tanstack-query-best-practices`, and `verify-fregat`. Run narrow tests and required gates through the heavy wrapper. Commit owned paths, push, and deploy through the mesh. Any server change needs dev verification and `bun run install-release --server --restart`; web-only work uses `bun run install-release`. Record evidence links, shipped commit, and remaining platform limitations in this plan and root roadmap.
+Use `typescript-best-practices`, `tanstack-query-best-practices`, and `verify-fregat`. Run narrow tests and required gates through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill. Commit owned paths, push, and deploy through the mesh. Any server change needs dev verification and `bun run install-release --server --restart`; web-only work uses `bun run install-release`. Record evidence links, shipped commit, and remaining platform limitations in this plan and root roadmap.

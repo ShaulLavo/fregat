@@ -45,4 +45,4 @@ Run the browser scenario and `look` with `verify-fregat`. Read screenshots for c
 
 ## Delivery
 
-Apply `typescript-best-practices`, `tanstack-query-best-practices`, and the shared design rules. Run the narrow checks and required gates through the heavy wrapper. Commit by path, push, and deploy through the mesh. Server changes, if required by verified removal behavior, need dev verification and a server restart deployment. Record the shipped commit and read-back screenshots in this plan and root roadmap.
+Apply `typescript-best-practices`, `tanstack-query-best-practices`, and the shared design rules. Run the narrow checks and required gates through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill. Commit by path, push, and deploy through the mesh. Server changes, if required by verified removal behavior, need dev verification and a server restart deployment. Record the shipped commit and read-back screenshots in this plan and root roadmap.

@@ -61,7 +61,7 @@ Upgrade stored state containing former public routes, cached replies, and pendin
 
 Coordinate registry, origin, renewer, and gateway deployment. Preserve the installed wildcard certificate when moving its purpose to private-service, keep terminal workers running, and verify private HTTPS and app lifecycle recovery after daemon restarts.
 
-Run narrow app, pill, routing, and CLI tests, followed by Mesh's required integration gates through the heavy runner. Apply Subtract Before You Add by removing sharing before introducing further app features. Commit, push, release with a patch version, and verify private apps, private named services, and terminal continuity on the installed fleet. Closure of #81 transfers execution to this plan.
+Run narrow app, pill, routing, and CLI tests, followed by Mesh's required integration gates through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill. Apply Subtract Before You Add by removing sharing before introducing further app features. Commit, push, release with a patch version, and verify private apps, private named services, and terminal continuity on the installed fleet. Closure of #81 transfers execution to this plan.
 
 ## Delivered on October 9, 2026
 
