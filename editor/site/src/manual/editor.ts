@@ -136,7 +136,7 @@ export function mountDocsEditor(host: HTMLElement, options: DocsEditorOptions) {
       const started = performance.now()
       while (
         editor.getPresentationState() !== 'live' ||
-        !(editor.getSyntaxRecords() && element.querySelector('[class*="editor-inline-"]'))
+        (editor.getTextSnapshot().length > 0 && !editor.getSyntaxRecords())
       ) {
         const waited = performance.now() - started
         if (waited >= timeoutMs)

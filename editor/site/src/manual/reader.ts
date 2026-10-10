@@ -21,7 +21,6 @@ export async function startReader(home: boolean) {
   const body = document.body
   const container = document.querySelector<HTMLElement>(home ? '.hero-box' : '#doc')!
   const article = container.querySelector<HTMLElement>('.paint-article')!
-  const mode = document.querySelector<HTMLElement>(home ? '.hero-mode' : '.mode')!
   const pages = new Map<string, ManualPage>(
     (JSON.parse(document.getElementById('manual-pages')?.textContent ?? '[]') as ManualPage[]).map(
       (page) => [page.file, page],
@@ -52,15 +51,9 @@ export async function startReader(home: boolean) {
   let docs: DocsEditor | null = null
   let mounted: MountedPaintSnapshot | null = null
   let queue = Promise.resolve()
-  const button = document.createElement('button')
-  button.type = 'button'
-  button.disabled = true
-  button.textContent = 'Go live'
-  mode.replaceChildren(button)
   const setMode = (live: boolean) => {
     body.dataset.mode = live ? 'editor' : 'static'
     if (home) container.dataset.mode = live ? 'editor' : 'static'
-    button.textContent = live ? 'Go static' : 'Go live'
   }
   const paint = () => {
     if (docs) return
@@ -94,54 +87,7 @@ export async function startReader(home: boolean) {
   }
   paintInstall()
 
-  const capture = async () => {
-    if (!docs) return
-    const text = docs.text()
-    const chosen = palette()
-    const other = chosen === 'light' ? 'dark' : 'light'
-    const host = docs.element.parentElement!
-    try {
-      // Theme controls can change the page while this queued capture is settling.
-      host.style.colorScheme = chosen
-      docs.refreshTheme()
-      // The unfocused preview is the reading paint. A caret on a mark reveals its source.
-      docs.editor.setSelection(text.length, text.length, { reveal: false })
-      await frame()
-      await document.fonts.ready
-      const saved = await docs.capturePaint()
-      host.style.position = 'absolute'
-      host.style.top = '0'
-      host.style.opacity = '0'
-      host.inert = true
-      article.hidden = false
-      const decoded = decodePaintSnapshot(saved.paint)
-      const frozen = decoded && mountPaintSnapshot(article, decoded)
-      if (!frozen) throw new TypeError(`${current}: paint mount refused`)
-      mounted?.dispose()
-      mounted = frozen
-      host.style.colorScheme = other
-      docs.refreshTheme()
-      await frame()
-      await document.fonts.ready
-      const alternate = await docs.capturePaint()
-      tabs.set(current, {
-        text,
-        [chosen]: { ...tabs.get(current)![chosen], paint: saved.paint },
-        [other]: { ...tabs.get(current)![other], paint: alternate.paint },
-      } as ReaderDocument)
-    } catch (error) {
-      article.hidden = true
-      host.style.position = 'relative'
-      host.style.opacity = '1'
-      host.inert = false
-      throw error
-    } finally {
-      host.style.colorScheme = ''
-      docs.refreshTheme()
-    }
-  }
-
-  const goLive = async () => {
+  const takeOver = async () => {
     if (docs) return
     const target = current
     const { mountDocsEditor } = await import('./editor')
@@ -170,6 +116,7 @@ export async function startReader(home: boolean) {
       if (target.endsWith('.md')) await live.ready()
       else await live.highlighted()
       docs = live
+      docs.refreshTheme()
       updateDirty()
       host.style.position = 'relative'
       live.editor.setPresentationReady(false)
@@ -187,47 +134,28 @@ export async function startReader(home: boolean) {
       throw error
     }
   }
-  const goStatic = async () => {
-    if (!docs) return
-    await capture()
-    const host = docs.element.parentElement!
-    docs.dispose()
-    docs = null
-    host.remove()
-    article.hidden = false
-    setMode(false)
-  }
   const run = (operation: () => Promise<void>) => {
-    queue = queue.then(async () => {
-      const focused = document.activeElement
-      button.disabled = true
-      try {
-        await operation()
-      } catch (error) {
-        console.error('The editor mode could not change.', error)
-      } finally {
-        button.disabled = false
-        if (focused === button && document.activeElement === body)
-          button.focus({ preventScroll: true })
-      }
+    queue = queue.then(operation).catch((error) => {
+      console.error('The live editor could not load.', error)
     })
     return queue
   }
-  button.addEventListener('click', () => void run(docs ? goStatic : goLive))
 
   function reveal(hash: string, place = 0) {
     const id = decodeURIComponent(hash.replace(/^#/, ''))
-    const heading = [...container.querySelectorAll<HTMLElement>('[id]')].find(
-      (element) => element.id === id && element.getClientRects().length,
-    )
+    const heading =
+      id === container.id
+        ? container
+        : Array.from(container.querySelectorAll<HTMLElement>('[id]')).find(
+            (element) => element.id === id && element.getClientRects().length,
+          )
     if (heading) heading.scrollIntoView({ block: 'start' })
     else scrollTo(0, place)
   }
   async function openFile(file: string, push: boolean, hash = '', place = 0) {
     const page = pages.get(file)
-    if (!page) return
+    if (!page || !docs) return
     const outgoingPlace = scrollY
-    const live = Boolean(docs)
     if (file !== current && !tabs.has(file)) {
       const response = await fetch(page.paint)
       if (!response.ok) throw new TypeError(`Cannot load captured page ${file}`)
@@ -236,8 +164,16 @@ export async function startReader(home: boolean) {
       originals.set(file, loaded.text)
     }
     if (file !== current) {
-      await goStatic()
+      tabs.set(current, { ...tabs.get(current)!, text: docs.text() })
       current = file
+      docs.editor.openDocument({
+        documentId: file,
+        text: tabs.get(file)!.text,
+        languageId: 'markdown',
+      })
+      docs.editor.setSelection(tabs.get(file)!.text.length, tabs.get(file)!.text.length, {
+        reveal: false,
+      })
       body.dataset.file = file
       document.title = `${page.title} · Singapore docs`
       const path = document.querySelector('.path')!
@@ -247,11 +183,9 @@ export async function startReader(home: boolean) {
         if (link.dataset.md === file) link.setAttribute('aria-current', 'page')
         else link.removeAttribute('aria-current')
       }
-      paint()
-      if (live)
-        await goLive().catch((error) => {
-          console.error('The captured page is ready. Live editing could not start.', error)
-        })
+      await docs.ready().catch((error) => {
+        console.warn('The page is editable. Syntax preview could not finish.', error)
+      })
     }
     if (push) {
       history.replaceState({ ...history.state, place: outgoingPlace }, '')
@@ -270,6 +204,7 @@ export async function startReader(home: boolean) {
   document.addEventListener('click', (event) => {
     if (
       home ||
+      !docs ||
       event.defaultPrevented ||
       event.button !== 0 ||
       event.metaKey ||
@@ -281,7 +216,7 @@ export async function startReader(home: boolean) {
     const link = (event.target as Element).closest<HTMLAnchorElement>('a[href]')
     if (!link || link.origin !== location.origin) return
     const file = byPath.get(link.pathname)
-    if (!file) return
+    if (!file || (file === current && link.hash === '#doc')) return
     event.preventDefault()
     link.closest('dialog')?.close()
     link.closest('details')?.removeAttribute('open')
@@ -293,8 +228,7 @@ export async function startReader(home: boolean) {
       hash?: string
       place?: number
     } | null
-    if (state?.file)
-      void run(() => openFile(state.file!, false, state.hash ?? location.hash, state.place))
+    if (state?.file) void run(() => openFile(state.file!, false, location.hash, state.place))
   })
   if (!home) history.replaceState({ file: current, hash: location.hash }, '')
   onThemeChange(() => {
@@ -318,7 +252,24 @@ export async function startReader(home: boolean) {
     })
   }).observe(container)
   setUpSearch(byPath)
-  button.disabled = false
   if (location.hash) reveal(location.hash)
-  if (new URLSearchParams(location.search).get('editor') === 'on') void run(goLive)
+  const activate = () => void run(takeOver)
+  const idle = () => {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(activate)
+      return
+    }
+    // A task after the frame yields first paint on browsers without an idle callback.
+    requestAnimationFrame(() => {
+      const task = new MessageChannel()
+      task.port1.onmessage = () => {
+        task.port1.close()
+        task.port2.close()
+        activate()
+      }
+      task.port2.postMessage(null)
+    })
+  }
+  if (document.readyState === 'complete') idle()
+  else window.addEventListener('load', idle, { once: true })
 }

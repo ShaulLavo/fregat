@@ -232,9 +232,7 @@ async function checkPage(page, engine, url) {
 }
 
 async function checkLive(page, engine, url) {
-  const toggle = page.getByRole('button', { name: 'Go live', exact: true })
-  if (!(await toggle.count())) return
-  await toggle.click()
+  if (!(await page.locator('#document-paint').count())) return
   await page.locator('body[data-mode="editor"]').waitFor({ timeout: 20000 })
   for (const width of widths) {
     await record(page, engine, url, width, 'live')
@@ -257,9 +255,6 @@ async function checkLive(page, engine, url) {
     }))
     assert.deepEqual(extents, { x: 0, y: 0 }, `${url}: live editor owns scrolling`)
   }
-  await page.getByRole('button', { name: 'Go static', exact: true }).click()
-  await page.locator('body[data-mode="static"]').waitFor()
-  for (const width of widths) await record(page, engine, url, width, 'returned-static')
 }
 
 async function checkSearch(page, engine, url) {

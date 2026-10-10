@@ -13,8 +13,6 @@ export const singaporeSiteSelectors = {
   manual: (page: Page) => page.locator('#doc'),
   static: (page: Page) => page.locator('body[data-mode="static"]'),
   live: (page: Page) => page.locator('body[data-mode="editor"]'),
-  goLive: (page: Page) => page.getByRole('button', { name: 'Go live', exact: true }),
-  goStatic: (page: Page) => page.getByRole('button', { name: 'Go static', exact: true }),
 }
 
 export const siteReplicaSelectors = {

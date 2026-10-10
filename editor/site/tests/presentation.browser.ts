@@ -1,3 +1,4 @@
+import { holdEditor } from '../../../scripts/agent/site-takeover'
 import { existsSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { devices, webkit, type Browser, type Page } from 'playwright'
@@ -63,10 +64,12 @@ for (const engine of ['chromium', 'webkit', 'phone-webkit', 'iphone-webkit'] as 
               ? devices['iPhone 15']
               : { viewport: { width: engine === 'phone-webkit' ? 390 : 1280, height: 900 } }),
             serviceWorkers: 'block',
+            colorScheme: theme as 'light' | 'dark',
           })
           // Routing disables HTTP caching, so reload exercises a cold network path too.
           await context.route('**/*', (route) => route.continue())
           const page = await context.newPage()
+          let release = await holdEditor(page)
           const problems: string[] = []
           page.on('pageerror', (error) => problems.push(error.message))
           page.on('console', (message) => {
@@ -77,14 +80,18 @@ for (const engine of ['chromium', 'webkit', 'phone-webkit', 'iphone-webkit'] as 
             if (response.status() >= 400) problems.push(`${response.status()} ${response.url()}`)
           })
           try {
-            await page.goto(`${preview.base}${path}?editor=off`)
-            if (reload) await page.reload()
+            await page.goto(`${preview.base}${path}`)
+            if (reload) {
+              release()
+              await page.locator(liveSelector).waitFor()
+              release = await holdEditor(page)
+              await page.reload()
+            }
             await page.evaluate(() => document.fonts.ready)
-            if (theme === 'dark') await page.locator('.theme-toggle').first().click()
             const control = await page
               .locator(surface === 'home' ? '.hero-box' : '#doc')
               .screenshot()
-            await page.getByRole('button', { name: 'Go live', exact: true }).click()
+            release()
             await page.locator(liveSelector).waitFor()
             await page.evaluate(async () => {
               await new Promise((resolve) => requestAnimationFrame(resolve))
@@ -111,6 +118,7 @@ for (const engine of ['chromium', 'webkit', 'phone-webkit', 'iphone-webkit'] as 
             expect(await syntaxInk(page, control.toString('base64'), surface)).toBeGreaterThan(20)
             expect(await syntaxInk(page, painted.toString('base64'), surface)).toBeGreaterThan(20)
           } finally {
+            release()
             await context.close()
           }
         },

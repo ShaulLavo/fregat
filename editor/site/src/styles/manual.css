@@ -213,24 +213,7 @@ kbd {
   color: var(--sg-caret);
   margin-left: 6px;
 }
-.mode {
-  min-width: calc(9ch + 20px);
-  margin-left: auto;
-  padding: 0 8px 0 12px;
-  flex-shrink: 0;
-}
-.mode button {
-  min-width: 9ch;
-  text-align: right;
-  font: inherit;
-  color: var(--sg-link);
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-}
-
-/* The document owns scrolling in both reading modes. */
+/* The document owns scrolling through takeover. */
 .viewport {
   position: relative;
   padding-bottom: 48px;
@@ -522,18 +505,6 @@ kbd {
   font-style: italic;
   color: var(--muted);
 }
-.hero-mode {
-  margin-left: auto;
-  font-style: normal;
-}
-.hero-mode button {
-  font: inherit;
-  color: var(--sg-link);
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-}
 .install {
   container-type: inline-size;
   padding: 0;
@@ -548,8 +519,5 @@ kbd {
   .hero figcaption {
     flex-direction: column;
     gap: 4px;
-  }
-  .hero-mode {
-    margin-left: 0;
   }
 }
