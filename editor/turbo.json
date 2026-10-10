@@ -36,7 +36,8 @@
         "$TURBO_ROOT$/examples/stress/src/fixtures.ts",
         "$TURBO_ROOT$/bench/compare/fixture.mjs",
         "$TURBO_ROOT$/bench/compare/protocol.mjs",
-        "$TURBO_ROOT$/site/src/fonts/jetbrains-mono.woff2"
+        "$TURBO_ROOT$/site/src/fonts/jetbrains-mono.woff2",
+        "$TURBO_ROOT$/site/src/fonts/source-serif-4.woff2"
       ]
     },
     "@singapore-editor/react#typecheck": {
@@ -213,6 +214,10 @@
         "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/reuse.ts",
         "$TURBO_ROOT$/packages/tree-sitter-languages/languages.json"
       ]
+    },
+    "@singapore-editor/core#bench:paint": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"]
     }
   },
   "agentGuidance": false
