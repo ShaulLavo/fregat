@@ -8,6 +8,16 @@
   white-space: pre;
 }
 
+:root[data-theme='light'] .migration-comparison .astro-code,
+:root[data-theme='light'] .migration-comparison .astro-code span {
+  color: var(--shiki-light) !important;
+}
+
+:root[data-theme='dark'] .migration-comparison .astro-code,
+:root[data-theme='dark'] .migration-comparison .astro-code span {
+  color: var(--shiki-dark) !important;
+}
+
 @media (max-width: 600px) {
   .sl-markdown-content .migration-comparison {
     width: 100%;

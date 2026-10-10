@@ -6,7 +6,7 @@ description: Map xterm.js APIs and capabilities to the native Ghostty API.
 Creation is asynchronous, input events carry bytes, and the main entry writes synchronously. Begin with [the quick start](https://shaullavo.github.io/ghostty-webgpu/docs/start/quick-start/), then replace your transport and appearance wiring.
 
 import { Code } from 'astro:components'
-import { docsTheme } from '../../../../docs-theme.js'
+import { docsCodeThemes } from '../../../../docs-theme.js'
 import {
   migrationComparison,
   migrationRendererOption,
@@ -30,11 +30,12 @@ These are the same checked examples shown on the landing page. `opts` holds `Gho
           <Code
             code={from}
             lang={from.startsWith('@') ? 'text' : 'ts'}
-            theme={docsTheme.expressiveCode.themes[0]}
+            themes={docsCodeThemes}
+            defaultColor={false}
           />
         </td>
         <td data-label='ghostty-webgpu'>
-          <Code code={to} lang='ts' theme={docsTheme.expressiveCode.themes[0]} />
+          <Code code={to} lang='ts' themes={docsCodeThemes} defaultColor={false} />
         </td>
       </tr>
     ))}

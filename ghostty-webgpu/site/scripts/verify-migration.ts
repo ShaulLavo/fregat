@@ -4,17 +4,84 @@ import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, webkit } from 'playwright'
+import { chromium, webkit, type Page } from 'playwright'
 import { migrationComparison, migrationRendererOption } from '../src/examples/migration-comparison'
 
 const dist = fileURLToPath(new URL('../dist/', import.meta.url))
 const evidence = process.argv[2]
 if (evidence) await mkdir(evidence, { recursive: true })
+const widths = Array.from(
+  new Set(
+    Array.from({ length: 23 }, (_, index) => 320 + index * 50).concat([390, 600, 601, 768, 1440]),
+  ),
+)
+widths.sort((first, second) => first - second)
+const screenshotWidths = new Set([320, 390, 768, 1440])
+
+function luminance(color: string): number {
+  const channels = color
+    .match(/[\d.]+/g)!
+    .slice(0, 3)
+    .map((value) => {
+      const channel = Number(value) / 255
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+    })
+  return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722
+}
+
+async function verifyGuide(page: Page, engine: string, width: number, expected: string[]) {
+  await page.goto('http://migration.test/ghostty-webgpu/docs/start/xterm/')
+  await page.evaluate(() => document.fonts.ready)
+  const table = page.getByRole('table', { name: 'xterm.js to ghostty-webgpu' })
+  assert.deepEqual(await table.locator('pre code').allTextContents(), expected)
+  assert.equal(await table.locator('td pre').count(), migrationComparison.length * 2)
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((theme) => {
+      document.documentElement.dataset.theme = theme
+    }, theme)
+    const layout = await table.evaluate((element) => ({
+      documentWidth: document.documentElement.scrollWidth,
+      tableWidth: element.getBoundingClientRect().width,
+      tableScrollWidth: element.scrollWidth,
+      background: getComputedStyle(document.body).backgroundColor,
+      colors: Array.from(
+        new Set(
+          Array.from(
+            element.querySelectorAll('pre code span[style]'),
+            (span) => getComputedStyle(span).color,
+          ),
+        ),
+      ),
+    }))
+    assert.ok(layout.documentWidth <= width, `${engine} ${width} ${theme}: guide page fits`)
+    assert.ok(
+      layout.tableScrollWidth <= Math.ceil(layout.tableWidth),
+      `${engine} ${width} ${theme}: guide comparison fits`,
+    )
+    const background = luminance(layout.background)
+    for (const color of layout.colors) {
+      const foreground = luminance(color)
+      const contrast =
+        (Math.max(background, foreground) + 0.05) / (Math.min(background, foreground) + 0.05)
+      assert.ok(
+        contrast >= 4.5,
+        `${engine} ${width} ${theme}: ${color} contrast ${contrast} is readable`,
+      )
+    }
+    if (evidence)
+      await Bun.write(
+        join(evidence, `${engine}-${width}-guide-${theme}.json`),
+        JSON.stringify(layout, null, 2),
+      )
+    if (evidence && screenshotWidths.has(width))
+      await table.screenshot({ path: join(evidence, `${engine}-${width}-guide-${theme}.png`) })
+  }
+}
 
 for (const [engine, launcher] of Object.entries({ chromium, webkit })) {
   const browser = await launcher.launch()
   try {
-    for (const width of [320, 390, 1440]) {
+    for (const width of widths) {
       const page = await browser.newPage({
         javaScriptEnabled: false,
         viewport: { width, height: 1000 },
@@ -85,31 +152,14 @@ for (const [engine, launcher] of Object.entries({ chromium, webkit })) {
       }
       if (evidence) {
         await Bun.write(join(evidence, `${engine}-${width}.json`), JSON.stringify(layout, null, 2))
-        await page
-          .locator('.callout')
-          .screenshot({ path: join(evidence, `${engine}-${width}.png`) })
+        if (screenshotWidths.has(width))
+          await page
+            .locator('.callout')
+            .screenshot({ path: join(evidence, `${engine}-${width}.png`) })
       }
-      await page.goto('http://migration.test/ghostty-webgpu/docs/start/xterm/')
-      await page.evaluate(() => document.fonts.ready)
-      const guideTable = page.getByRole('table', { name: 'xterm.js to ghostty-webgpu' })
-      assert.deepEqual(await guideTable.locator('pre code').allTextContents(), expected)
-      assert.equal(await guideTable.locator('td pre').count(), migrationComparison.length * 2)
-      const guideLayout = await guideTable.evaluate((element) => ({
-        viewport: innerWidth,
-        documentWidth: document.documentElement.scrollWidth,
-        tableWidth: element.getBoundingClientRect().width,
-        tableScrollWidth: element.scrollWidth,
-      }))
-      assert.ok(guideLayout.documentWidth <= width, `${engine} ${width}: guide page fits`)
-      assert.ok(
-        guideLayout.tableScrollWidth <= Math.ceil(guideLayout.tableWidth),
-        `${engine} ${width}: guide comparison fits`,
-      )
-      if (evidence) {
-        await guideTable.screenshot({ path: join(evidence, `${engine}-${width}-guide.png`) })
-      }
+      await verifyGuide(page, engine, width, expected)
       console.log(
-        `${engine} ${width}: matching guide, highlighted static API snippets and unbroken landing expressions pass`,
+        `${engine} ${width}: light/dark guide contrast, container fit and unbroken static snippets pass`,
       )
       await page.close()
     }

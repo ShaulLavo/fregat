@@ -376,6 +376,10 @@
   color: var(--ink);
 }
 
+.migration-map {
+  container-type: inline-size;
+}
+
 .map {
   display: block;
   width: 100%;
@@ -594,7 +598,7 @@
   }
 }
 
-@media (max-width: 600px) {
+@container (max-width: 600px) {
   .map thead {
     position: absolute;
     width: 1px;

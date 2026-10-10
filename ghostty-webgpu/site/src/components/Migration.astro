@@ -14,7 +14,7 @@ const theme = docsTheme.expressiveCode.themes[0]
     <p>Opening fits the host automatically. For an explicit resize, <code>grid</code> holds <code>columns</code> and <code>rows</code>; <code>send</code> is your PTY transport.</p>
     <a href={docsHref('start/xterm')}>Read the migration guide</a>
   </div>
-  <div>
+  <div class="migration-map">
   <table class="map" aria-label="xterm.js to ghostty-webgpu">
     <thead><tr><th scope="col">xterm.js</th><th scope="col">ghostty-webgpu</th></tr></thead>
     <tbody>{migrationComparison.map(({ from, to }) => (
