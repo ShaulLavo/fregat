@@ -20,7 +20,7 @@ test('paints row-local tab stops inside a wrapped viewport', async () => {
     const rows = () =>
       [...container.querySelectorAll<HTMLElement>('[data-editor-virtual-row]')]
         .filter((row) => row.style.display !== 'none')
-        .toSorted(
+        .sort(
           (left, right) =>
             Number(left.dataset.editorVirtualRow) - Number(right.dataset.editorVirtualRow),
         )

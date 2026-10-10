@@ -15,11 +15,10 @@ const EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'
 const REASON = /^(?:shared → lib|shared → contracts|owner|couple):\s*\S.+/
 
 function existingModule(filename) {
-  const candidates = [
-    filename,
-    ...EXTENSIONS.map((extension) => filename + extension),
-    ...EXTENSIONS.map((extension) => path.join(filename, `index${extension}`)),
-  ]
+  const candidates = [filename].concat(
+    EXTENSIONS.map((extension) => filename + extension),
+    EXTENSIONS.map((extension) => path.join(filename, `index${extension}`)),
+  )
   return candidates.find((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile())
 }
 

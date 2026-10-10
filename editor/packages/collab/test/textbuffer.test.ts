@@ -27,9 +27,9 @@ function envelope(change: Envelope['change']): Envelope {
 function compare(reference: ReferenceEngine, buffer: TextbufferEngine): void {
   expect(buffer.text()).toBe(reference.text())
   expect(liveIds(buffer)).toEqual(liveIds(reference))
-  const expected = characters(reference)
-    .slice()
-    .sort((a, b) => a.id.bunch.localeCompare(b.id.bunch) || a.id.counter - b.id.counter)
+  const expected = characters(reference).toSorted(
+    (a, b) => a.id.bunch.localeCompare(b.id.bunch) || a.id.counter - b.id.counter,
+  )
   expect(characters(buffer)).toEqual(expected)
   for (const { id } of expected) expect(buffer.visibleOffset(id)).toBe(reference.visibleOffset(id))
 }

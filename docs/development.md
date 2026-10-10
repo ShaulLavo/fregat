@@ -66,7 +66,11 @@ The family folders are mirrored to their standalone repositories. Make library c
 
 ## CI turnaround
 
-PR library checks follow the changed family and shared build inputs. Root configuration, patches, workflow actions, scripts, and Turbo global dependencies select every family. Changes confined to app or shared app-package sources leave library checks skipped. Main and manual CI runs validate every family.
+Normal PR and main CI select only packages whose files changed. A web change runs web tests; a server change runs server tests; a terminal change runs terminal verification. Dependencies are built as prerequisites, while their tests remain with their owning package. Root configuration and script changes select root tooling checks. Plans, root documentation, agent Markdown and changesets select formatting.
+
+Each selected package runs its own formatting, lint, types and tests. Terminal verification owns its complete check; Editor browser regressions run when their own package changes. Website builds and mobile smoke checks are limited to the selected sites. Main uses the last successful main run as its comparison point so replaced queued runs remain covered.
+
+Scheduled and manual runs select every package, shared structural checks, standalone packaging, full mobile crawls and benchmark/endurance probes. The selector controls run with `bun --bun vitest run --config vitest.scripts.config.mjs scripts/ci/affected.test.mjs scripts/ci/packages.test.mjs scripts/ci/events.test.mjs`.
 
 Standalone families share one runner. Each uses a fresh `git archive` export and independent install outside the checkout. Editor also installs a second export with hoisted dependencies and checks tree-sitter runtime identity.
 

@@ -31,9 +31,7 @@ export function proposedPlanTitle(planMarkdown: string) {
 export function stripDisplayedPlanMarkdown(planMarkdown: string) {
   const sourceLines = planMarkdown.trimEnd().split(/\r?\n/)
   const lines =
-    sourceLines[0] && /^\s{0,3}#{1,6}\s+/.test(sourceLines[0])
-      ? sourceLines.slice(1)
-      : [...sourceLines]
+    sourceLines[0] && /^\s{0,3}#{1,6}\s+/.test(sourceLines[0]) ? sourceLines.slice(1) : sourceLines
 
   removeBlankPrefix(lines)
   if (summaryHeading(lines[0])) {

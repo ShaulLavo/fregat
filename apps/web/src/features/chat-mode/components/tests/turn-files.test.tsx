@@ -19,7 +19,7 @@ import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-c
 import { activeServerOrigin } from '@/lib/client'
 import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
 
-const IDENTITY = ['-c', 'user.email=t@example.com', '-c', 'user.name=T'] as const
+const IDENTITY: readonly string[] = ['-c', 'user.email=t@example.com', '-c', 'user.name=T']
 const before = Array.from({ length: 20 }, (_, index) => `line ${index + 1}`)
 const after = before.map((line, index) => (index === 1 || index === 17 ? `${line} changed` : line))
 const time = '2026-09-25T00:00:00.000Z'
@@ -35,14 +35,14 @@ test('undoes and reapplies changes, then retains the turn until an empty session
   await runGit(root, ['init', '--quiet'], { cwdMode: 'option' })
   await writeFile(file, `${before.join('\n')}\n`)
   await runGit(root, ['add', 'app.txt'], { cwdMode: 'option' })
-  await runGit(root, [...IDENTITY, 'commit', '-qm', 'zero'], { cwdMode: 'option' })
+  await runGit(root, IDENTITY.concat(['commit', '-qm', 'zero']), { cwdMode: 'option' })
   const h = await createRailHarness(client, server, ['Turn session', 'Empty session'], '')
   const sessionId = h.sessionIds[0]!
   await runGit(root, ['update-ref', checkpointRefForSessionTurn(sessionId, 0), 'HEAD'], {
     cwdMode: 'option',
   })
   await writeFile(file, `${after.join('\n')}\n`)
-  await runGit(root, [...IDENTITY, 'commit', '-qam', 'one'], { cwdMode: 'option' })
+  await runGit(root, IDENTITY.concat(['commit', '-qam', 'one']), { cwdMode: 'option' })
   const checkpointRef = checkpointRefForSessionTurn(sessionId, 1)
   await runGit(root, ['update-ref', checkpointRef, 'HEAD'], { cwdMode: 'option' })
   await orchestrationForApp(server.app).dispatch(

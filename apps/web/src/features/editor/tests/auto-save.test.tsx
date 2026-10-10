@@ -187,8 +187,7 @@ test.for(['afterDelay', 'onWindowChange'] as const)(
     const excludedIds = [
       documentKey(settingsJsonDocument('user')),
       documentKey(settingsJsonDocument('workspace')),
-      ...unsyncedTargets.map(documentKey),
-    ]
+    ].concat(unsyncedTargets.map(documentKey))
     createEditorBufferSession(recovery.buffer).applyText(' dirty')
     documentStore.getState().markWorkspaceDocumentRecoveryConflict([recoveryPath], 'partial')
     const hook = renderHook(() => useAutoSave(), { wrapper })
@@ -201,7 +200,7 @@ test.for(['afterDelay', 'onWindowChange'] as const)(
       expect(await readFile(join(server.root, path), 'utf8')).toBe('saved edited')
       expect(await readFile(join(server.root, recoveryPath), 'utf8')).toBe('recovering')
       expect(documentStore.getState().dirtyDocumentKeys).toEqual(
-        new Set([...excludedIds, testDocumentKey(recoveryPath)]),
+        new Set(excludedIds.concat([testDocumentKey(recoveryPath)])),
       )
     } finally {
       hook.unmount()

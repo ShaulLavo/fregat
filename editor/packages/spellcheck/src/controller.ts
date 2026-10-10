@@ -155,13 +155,9 @@ export class SpellcheckController {
   ): readonly SpellWord[] | null {
     const captures = context.getSyntaxCaptures()
     const replacements = context.getInlineReplacementRanges()
-    const key = [
-      snapshot.languageId,
-      snapshot.textVersion,
-      window.start,
-      window.end,
-      ...replacements.flatMap((range) => [range.start, range.end]),
-    ].join(',')
+    const key = [snapshot.languageId, snapshot.textVersion, window.start, window.end]
+      .concat(replacements.flatMap((range) => [range.start, range.end]))
+      .join(',')
     if (key === this.wordsKey && captures === this.wordsCaptures) return this.cachedWords
 
     const regions = spellcheckRegions({
@@ -184,7 +180,7 @@ export class SpellcheckController {
     replacements: readonly SpellTextRange[],
   ): readonly SpellWord[] {
     const text = snapshot.textSnapshot
-    const excluded = [...regions.excluded, ...replacements]
+    const excluded = regions.excluded.concat(replacements)
     const words: SpellWord[] = []
     for (const region of regions.prose) this.proseWords(text, region, excluded, words)
     for (const region of regions.code) {

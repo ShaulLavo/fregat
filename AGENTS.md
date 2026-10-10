@@ -54,6 +54,16 @@ Read the applicable skills before writing or reviewing code, or running their wo
 - Measure performance before and after. Identify whether data layout or design is the bottleneck before tuning.
 - Before debugging, prove the observation works on a known-good case. A theory needing a second special case must be re-derived from raw evidence.
 
+## Array construction
+
+- Combine arrays with `concat`: `first.concat(second, third)`. Use it for append/prepend constructions too; group literal items into array arguments. Do not concatenate arrays with multiple spreads in an array literal.
+- When converting an iterable and mapping its elements, prefer `Array.from(iterable, mapper)` over `[...iterable].map(mapper)` or `Array.from(iterable).map(mapper)`. Preserve a deliberate snapshot when the mapper can mutate or reenter the iterable; `Array.from` maps while consuming it.
+- Sort or reverse owned arrays in place when their original order is no longer needed. Use `toSorted` or `toReversed` for borrowed ordinary arrays, replacing `[...items].sort()` / `[...items].reverse()` and unmapped `Array.from(items).sort()` / `.reverse()`. Ownership and later use decide whether a copy is needed.
+- Use fresh array results directly. `map`, `filter`, `flatMap`, array `slice`, `concat`, `Array.from`, and `toSorted` already allocate: no `[...items.map(fn)]`, `[...items].map(fn)`, or another copy around them.
+- Keep a copy only for a real ownership or representation requirement. Copying borrowed arrays before mutation can be necessary; converting Sets, iterators, strings, DOM collections, or typed arrays to ordinary arrays can be necessary. Typed-array `map`/`filter`/`slice` results still need conversion when an ordinary array is required. Preserve tuple types, sparse-array behavior, and evaluation order.
+- Readonly input is a callee contract: widen internal read-only parameters to `readonly` instead of copying to satisfy TypeScript. Give heterogeneous concatenations the destination element type; do not add casts or extra copies to satisfy `concat` overloads.
+- A performance exception needs measurements on the affected path and a short explanation at the call site.
+
 ## Copy
 
 - Every string the app shows (labels, setting descriptions, tooltips, toasts, empty states, error `message`/`why`/`fix`) says what a thing is and does. Never what it is not: no "rather than", "instead of", "…, not X". Plain negative facts ("No sessions", "Off") are fine. Ellipsis is `…`.
@@ -108,6 +118,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 
 ## Dev, Gates, Verification
 
+- Bundle size is not gated; deal with it when it's a real problem (owner, 2026-10-09).
 - Follow `README.md` and `docs/development.md` for development setup; Mesh is an optional integration. Browser verification uses an isolated state home. `/dev` is the component gallery; add a tab for anything worth eyeballing.
 - A private dev server takes an explicit free `--port` on a known loopback address, and stops after verification.
 - Run the narrowest checks that can catch the change's plausible failures. Heavy-job scheduling and resource limits belong to the execution host's local instructions (on the owner's machine, the `fregat-local` skill).

@@ -174,7 +174,7 @@ export function createMatchedLanguageServerPlugin({
         onDidNavigateDiagnostic,
         getDiagnosticActions,
       })
-      return [...pluginDisposables(plugin.activate(context)), { dispose: unsubscribe }]
+      return pluginDisposables(plugin.activate(context)).concat([{ dispose: unsubscribe }])
     },
   }
 }
@@ -407,7 +407,7 @@ function rankedMatches(
 ): readonly LanguageServerMatch[] {
   return matches
     .filter((match) => match.features[feature] !== undefined)
-    .toSorted(
+    .sort(
       (left, right) =>
         (left.features[feature] ?? 0) - (right.features[feature] ?? 0) ||
         matches.indexOf(left) - matches.indexOf(right),

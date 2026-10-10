@@ -42,7 +42,7 @@ const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
 function commonPrefix(values: readonly string[]): string {
   const candidates = values.map((value) =>
-    [...segmenter.segment(value)].map(({ segment }) => segment),
+    Array.from(segmenter.segment(value), ({ segment }) => segment),
   )
   let prefix = ''
   for (const [index, segment] of (candidates[0] ?? []).entries()) {

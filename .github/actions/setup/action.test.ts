@@ -347,7 +347,7 @@ async function lifecycleFixture(mode: 'cold' | 'healthy' | 'warm' | 'workspace' 
       `import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 const args = process.argv.slice(2)
 if (args[0] === 'install') appendFileSync(${JSON.stringify(path.join(root, 'calls'))}, args.join(' ').replaceAll(${JSON.stringify(root)}, '<fixture>') + '\\n')
-const child = Bun.spawn([${JSON.stringify(process.execPath)}, ...args], { stdout: 'pipe', stderr: 'pipe' })
+const child = Bun.spawn([${JSON.stringify(process.execPath)}].concat(args), { stdout: 'pipe', stderr: 'pipe' })
 const [status, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
 const output = stdout + stderr
 if (args.includes('--ignore-scripts')) {
@@ -425,12 +425,11 @@ process.exit(status)
       readFileSync(path.join(seed, 'bun.lock'), 'utf8'),
     )
     expect(readdirSync(root).filter((name) => /^bun-(prepare|install)\./.test(name))).toEqual([])
-    expect(readFileSync(path.join(root, 'calls'), 'utf8').trim().split('\n')).toEqual([
-      ...Array(preparationCount).fill(
-        'install --frozen-lockfile --ignore-scripts --cache-dir <fixture>/install-cache',
-      ),
-      'install --frozen-lockfile',
-    ])
+    expect(readFileSync(path.join(root, 'calls'), 'utf8').trim().split('\n')).toEqual(
+      Array(preparationCount)
+        .fill('install --frozen-lockfile --ignore-scripts --cache-dir <fixture>/install-cache')
+        .concat(['install --frozen-lockfile']),
+    )
   } finally {
     server.stop(true)
     rmSync(root, { recursive: true, force: true })
@@ -491,7 +490,7 @@ function trackFixture(root: string) {
     ],
   ]
   for (const args of commands) {
-    const result = Bun.spawnSync(['git', ...args], { cwd: root })
+    const result = Bun.spawnSync(['git'].concat(args), { cwd: root })
     expect(result.exitCode, result.stderr.toString()).toBe(0)
   }
 }

@@ -36,7 +36,8 @@ export function fileHashes(root, accept = () => true) {
 export function statistics(values) {
   if (values.length === 0 || values.some((value) => !Number.isFinite(value)))
     throw new Error('Invalid samples')
-  const sorted = values.slice().sort((a, b) => a - b)
+  const mean = values.reduce((total, value) => total + value, 0) / values.length
+  const sorted = values.sort((a, b) => a - b)
   const middle = Math.floor(sorted.length / 2)
   return {
     count: values.length,
@@ -44,7 +45,7 @@ export function statistics(values) {
     median: sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2,
     p95: sorted[Math.ceil(sorted.length * 0.95) - 1],
     max: sorted[sorted.length - 1],
-    mean: values.reduce((total, value) => total + value, 0) / values.length,
+    mean,
   }
 }
 

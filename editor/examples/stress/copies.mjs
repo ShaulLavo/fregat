@@ -22,7 +22,7 @@ const { values } = parseArgs({
 if (!values.output) fail('--output is required')
 const sizes = values.sizes.split(',').map(Number)
 const repetitions = Number(values.repetitions)
-if (![...sizes, repetitions].every((value) => Number.isSafeInteger(value) && value > 0))
+if (!sizes.concat([repetitions]).every((value) => Number.isSafeInteger(value) && value > 0))
   fail('Invalid sizes/repetitions')
 // NOT-PORTABLE: Scratch creation requires /work/tmp.
 await mkdir('/work/tmp', { recursive: true })

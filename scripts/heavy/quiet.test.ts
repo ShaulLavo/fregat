@@ -1488,11 +1488,7 @@ test.each([
       box.proc,
       '--slice-root',
       box.sliceRoot,
-      ...flags,
-      'invalid-lifecycle',
-      '--',
-      'true',
-    ],
+    ].concat(flags, ['invalid-lifecycle', '--', 'true']),
     // A validation regression must stay inside the fixture and cannot launch host tools.
     { encoding: 'utf8', env: { ...process.env, PATH: box.root }, timeout: 10_000 },
   )

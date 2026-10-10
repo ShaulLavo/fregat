@@ -70,16 +70,16 @@ function build(source: string, root: string, commit: string) {
   mkdirSync(staging, { recursive: true })
   const heavy = path.join(source, 'scripts', 'heavy')
   const result = Bun.spawnSync(
-    [
-      'bun',
-      'build',
-      ...ENTRIES.map((entry) => path.join(heavy, entry)),
-      '--target=bun',
-      '--tsconfig-override',
-      path.join(heavy, 'tsconfig.install.json'),
-      '--outdir',
-      staging,
-    ],
+    ['bun', 'build'].concat(
+      ENTRIES.map((entry) => path.join(heavy, entry)),
+      [
+        '--target=bun',
+        '--tsconfig-override',
+        path.join(heavy, 'tsconfig.install.json'),
+        '--outdir',
+        staging,
+      ],
+    ),
     { cwd: source, stderr: 'pipe', stdout: 'pipe' },
   )
   if (result.exitCode !== 0) {
@@ -104,7 +104,7 @@ function pointCurrent(root: string, commit: string) {
 }
 
 function git(cwd: string, args: readonly string[]) {
-  const result = Bun.spawnSync(['git', '-C', cwd, ...args], { stderr: 'pipe', stdout: 'pipe' })
+  const result = Bun.spawnSync(['git', '-C', cwd].concat(args), { stderr: 'pipe', stdout: 'pipe' })
   if (result.exitCode !== 0) {
     throw createScriptError(
       `git ${args.join(' ')} failed in ${cwd}: ${result.stderr.toString().trim()}. ${USAGE}`,

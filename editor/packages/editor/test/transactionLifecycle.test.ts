@@ -31,8 +31,7 @@ function mount(text = 'abc', options: ConstructorParameters<typeof Editor>[1] = 
   const editor = new Editor(host, {
     defaultText: text,
     ...options,
-    plugins: [
-      ...(options.plugins ?? []),
+    plugins: (options.plugins ?? []).concat([
       createPlugin({
         name: 'review',
         view(api) {
@@ -40,7 +39,7 @@ function mount(text = 'abc', options: ConstructorParameters<typeof Editor>[1] = 
           recording = api.onDidTransaction((e) => events.push(e))
         },
       }),
-    ],
+    ]),
   })
   editors.push(editor)
   return { editor, scope, events, recording }

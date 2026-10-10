@@ -30,7 +30,7 @@ export function BreadcrumbFolderPicker({
 }) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
   const [activeId, setActiveId] = useState<string | null>(selectedPath)
-  const paths = [directoryPath, ...expanded]
+  const paths = [directoryPath].concat(Array.from(expanded))
   const queries = useQueries({
     queries: paths.map((path) => ({
       queryKey: fileSystemKeys.treeDirectory(rootPath, toTreePath(path, rootPath), path),

@@ -259,12 +259,13 @@ try {
       { urlPattern: `${api}git/*`, requestStage: 'Response' },
       { urlPattern: `${api}_log/dashboard/*`, requestStage: 'Response' },
       { urlPattern: `${api}fs/read*`, requestStage: 'Response' },
-      ...(scenarioConfig[values.scenario]?.holdPaths ?? []).map((path) => ({
+    ].concat(
+      (scenarioConfig[values.scenario]?.holdPaths ?? []).map((path) => ({
         urlPattern: `${api.replace(/\/$/, '')}${path}*`,
         requestStage: 'Response',
       })),
-      ...(values['hold-health'] ? [{ urlPattern: `${api}health*`, requestStage: 'Response' }] : []),
-    ],
+      values['hold-health'] ? [{ urlPattern: `${api}health*`, requestStage: 'Response' }] : [],
+    ),
   })
   await page.addInitScript(recordFrames, {
     scenario: values.scenario,

@@ -407,7 +407,7 @@ function transferDouble(values: Map<string, string>, files: readonly File[]): Da
     },
     // The capitalised entry is the one a browser adds for the files beside the MIME types.
     get types(): readonly string[] {
-      return [...values.keys(), ...(files.length > 0 ? ['Files'] : [])]
+      return Array.from(values.keys()).concat(files.length > 0 ? ['Files'] : [])
     },
   } as unknown as DataTransfer
 }

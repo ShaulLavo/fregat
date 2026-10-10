@@ -402,7 +402,7 @@ export class VisibleProjection {
 
     const parentIndex = this.#getParentIndex(index)
     const ancestorIndices =
-      parentIndex < 0 ? [] : [...this.#getAncestorIndices(parentIndex), parentIndex]
+      parentIndex < 0 ? [] : this.#getAncestorIndices(parentIndex).concat([parentIndex])
     this.#ancestorIndicesByIndex.set(index, ancestorIndices)
     return ancestorIndices
   }

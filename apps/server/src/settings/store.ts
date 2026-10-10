@@ -16,6 +16,7 @@ import {
   type SettingsEvent,
   type SettingsLayer,
   type SettingsLayerId,
+  type SettingsLayerSnapshot,
   type SettingsMutationRequest,
   type SettingsMutationResult,
   type SettingsOperation,
@@ -271,7 +272,7 @@ export class SettingsStore {
 
     return {
       ...snapshot,
-      diagnostics: [...snapshot.diagnostics, ...this.pendingRemovedDiagnostics.splice(0)],
+      diagnostics: snapshot.diagnostics.concat(this.pendingRemovedDiagnostics.splice(0)),
     }
   }
 
@@ -1186,10 +1187,10 @@ export class SettingsStore {
   }
 
   private layerSnapshots() {
-    const files = this.fileLayers().map((layer) => layerSnapshot(layer))
+    const files = this.fileLayers().map<SettingsLayerSnapshot>((layer) => layerSnapshot(layer))
     if (Object.keys(this.policy).length === 0) return files
 
-    return [...files, { id: 'policy' as SettingsLayerId, present: true, raw: this.policy }]
+    return files.concat([{ id: 'policy' as SettingsLayerId, present: true, raw: this.policy }])
   }
 
   private serverVersion(): SettingsServerVersion {
@@ -1258,7 +1259,7 @@ function mergeSettingIds(
   second: readonly SettingId[],
 ): readonly SettingId[] {
   if (second.length === 0) return first
-  const included = new Set([...first, ...second])
+  const included = new Set(first.concat(second))
 
   return SETTING_IDS.filter((id) => included.has(id))
 }

@@ -31,10 +31,11 @@ export function nestWorktrees(
     group.worktrees.push({ ...entry, worktree: { branch: parent.branch } })
   }
 
-  return [...groups].flatMap(([rootPath, group]) => [
-    group.head ?? { qualifier: null, rootPath, title: basename(rootPath) },
-    ...group.worktrees,
-  ])
+  return [...groups].flatMap(([rootPath, group]) =>
+    [group.head ?? { qualifier: null, rootPath, title: basename(rootPath) }].concat(
+      group.worktrees,
+    ),
+  )
 }
 
 function groupFor(groups: Map<string, Group>, rootPath: string) {

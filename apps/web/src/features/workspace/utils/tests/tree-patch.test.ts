@@ -80,7 +80,7 @@ test('a move is confirmed once the source is gone and the destination is visible
 })
 
 function fileTreeModel(entries: readonly TreeEntry[]) {
-  return treeModel({ entries: [...entries], path: root }, '/repo')
+  return treeModel({ entries, path: root }, '/repo')
 }
 
 function file(path: string): TreeEntry {

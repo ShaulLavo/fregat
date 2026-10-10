@@ -77,29 +77,40 @@ async function create(mode: 'main' | 'webgpu' | 'webgl', enableAccessibility = f
   return terminal
 }
 
-it.each([
-  ...rendererPlatforms.map((platform) => ({
-    name: platform.name,
-    platform: platform.name,
-    backend: 'auto' as const,
-    expected: platform.backend,
-    unavailableWebGl: false,
-  })),
-  {
-    name: 'Linux without WebGL',
-    platform: 'Linux legacy platform',
-    backend: 'auto' as const,
-    expected: 'webgpu',
-    unavailableWebGl: true,
-  },
-  {
-    name: 'explicit WebGPU on Linux',
-    platform: 'Linux legacy platform',
-    backend: 'webgpu' as const,
-    expected: 'webgpu',
-    unavailableWebGl: false,
-  },
-])('selects the worker renderer for $name', async (test) => {
+interface WorkerPlatformCase {
+  name: string
+  platform: string
+  backend: 'auto' | 'webgpu'
+  expected: 'webgl2' | 'webgpu'
+  unavailableWebGl: boolean
+}
+
+it.each(
+  rendererPlatforms
+    .map<WorkerPlatformCase>((platform) => ({
+      name: platform.name,
+      platform: platform.name,
+      backend: 'auto',
+      expected: platform.backend,
+      unavailableWebGl: false,
+    }))
+    .concat([
+      {
+        name: 'Linux without WebGL',
+        platform: 'Linux legacy platform',
+        backend: 'auto',
+        expected: 'webgpu',
+        unavailableWebGl: true,
+      },
+      {
+        name: 'explicit WebGPU on Linux',
+        platform: 'Linux legacy platform',
+        backend: 'webgpu',
+        expected: 'webgpu',
+        unavailableWebGl: false,
+      },
+    ]),
+)('selects the worker renderer for $name', async (test) => {
   const url = new URL('./tests/platform-backend.worker.ts', import.meta.url)
   url.searchParams.set('platform', test.platform)
   if (test.unavailableWebGl) url.searchParams.set('unavailableWebGl', '1')

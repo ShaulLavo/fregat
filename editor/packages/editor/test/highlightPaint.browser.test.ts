@@ -53,7 +53,9 @@ it('keeps a plain-text overlay range after an atomic text update', async () => {
   await pixels(host.id)
   const ranges = [...CSS.highlights]
     .filter(([name]) => name.includes('-overlay-base-'))
-    .flatMap(([, highlight]) => [...highlight].map((range) => [range.startOffset, range.endOffset]))
+    .flatMap(([, highlight]) =>
+      Array.from(highlight, (range) => [range.startOffset, range.endOffset]),
+    )
   expect(ranges).toEqual([[4, 9]])
 })
 

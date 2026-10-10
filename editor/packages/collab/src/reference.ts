@@ -238,7 +238,7 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
       throw new CollabFailure('invalid-insert')
     const left = this.get(insert.originLeft)
     const right = insert.originRight === 'end' ? null : this.get(insert.originRight)
-    const order = [this.root, ...this.ordered()]
+    const order = [this.root].concat(this.ordered())
     if (right && order.indexOf(left) >= order.indexOf(right))
       throw new CollabFailure('reversed-origins')
     for (let i = 0; i < insert.text.length; i++) {

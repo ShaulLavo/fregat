@@ -60,7 +60,7 @@ export function createSearchWorkbench(client: Client) {
     try {
       for await (const event of streamWorkspaceSearch(query, controller.signal, client)) {
         if (controller.signal.aborted) return
-        if (event.type === 'match') run = { ...run, matches: [...run.matches, event.match] }
+        if (event.type === 'match') run = { ...run, matches: run.matches.concat([event.match]) }
         if (event.type === 'warning') run = { ...run, message: event.message }
         if (event.type === 'done') run = { ...run, kind: 'ready', truncated: event.truncated }
         publish(run)

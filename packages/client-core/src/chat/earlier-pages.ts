@@ -57,7 +57,8 @@ export function createSessionEarlierPages(host: EarlierPageHost) {
   let disposed = false
 
   function idleOptions(sessionId: SessionId | null) {
-    return { queryKey: [...prefix, sessionId, generation, 'idle'], enabled: false, gcTime: 0 }
+    const idlePrefix: readonly (string | number | null)[] = prefix
+    return { queryKey: idlePrefix.concat(sessionId, generation, 'idle'), enabled: false, gcTime: 0 }
   }
 
   function observer(sessionId: SessionId | null) {

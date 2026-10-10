@@ -21,25 +21,26 @@ export function PromptInbox({
 }) {
   const { focus } = useCommands()
   const [selected, setSelected] = useState(0)
-  const items = [
-    ...(draft.terminalContexts ?? []).map((context, index) => ({
+  const items = (draft.terminalContexts ?? [])
+    .map((context, index) => ({
       name: `Terminal: ${formatTerminalContextLabel(context)}`,
       description: context.text,
       remove: () =>
         onChange({ terminalContexts: draft.terminalContexts?.filter((_, item) => item !== index) }),
-    })),
-    ...(draft.elements ?? []).map((element) => ({
-      name: element.label,
-      description: element.text,
-      remove: () => onChange(removePromptElement(draft, element)),
-    })),
-    ...draft.attachments.map((attachment) => ({
-      name: `Image: ${attachment.name}`,
-      description: `${attachment.mimeType} · ${attachment.sizeBytes} bytes`,
-      remove: () =>
-        onChange({ attachments: draft.attachments.filter((item) => item.id !== attachment.id) }),
-    })),
-  ]
+    }))
+    .concat(
+      (draft.elements ?? []).map((element) => ({
+        name: element.label,
+        description: element.text,
+        remove: () => onChange(removePromptElement(draft, element)),
+      })),
+      draft.attachments.map((attachment) => ({
+        name: `Image: ${attachment.name}`,
+        description: `${attachment.mimeType} · ${attachment.sizeBytes} bytes`,
+        remove: () =>
+          onChange({ attachments: draft.attachments.filter((item) => item.id !== attachment.id) }),
+      })),
+    )
   useCommandFocus(
     {
       ...focus.getSnapshot().scope,

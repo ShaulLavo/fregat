@@ -1,3 +1,4 @@
+export { createEditorSnapshotBuffer } from '../documentSession'
 import {
   applyBatchToPieceTable,
   createPieceTableSnapshot,
@@ -8,6 +9,7 @@ import {
 import { createDocumentTextSnapshot, type DocumentTextSnapshot } from '../documentTextSnapshot'
 import type { TextEdit } from '../tokens'
 import { createError } from '../logging/errors'
+export { DocumentDelivery } from '../editor/documentDelivery'
 export type {
   DocumentContributionSource,
   DocumentRead,

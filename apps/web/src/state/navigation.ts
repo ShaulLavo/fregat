@@ -223,7 +223,7 @@ export function createNavigation(
     if (token.kind !== 'token') return null
     const tabs = address.tabs?.includes(token.token)
       ? address.tabs
-      : [...(address.tabs ?? []), token.token]
+      : (address.tabs ?? []).concat([token.token])
     const selected =
       address.mode === 'chat' ? { editor: token.token, tool: 'editor' } : { document: token.token }
     // On the phone, opening a document pushes its screen, in either mode.
@@ -516,18 +516,17 @@ export function createNavigation(
             if (!current) return false
             publishGroups(editor, current)
             const workspace = owner.getState()
-            editor.uiStore
-              .getState()
-              .retainTabPresentation(
-                new Set(
-                  [
-                    ...allEditorTabs(current),
-                    ...Array.from(workspace.parkedWorkspaces.values()).flatMap((slice) =>
+            editor.uiStore.getState().retainTabPresentation(
+              new Set(
+                allEditorTabs(current)
+                  .concat(
+                    Array.from(workspace.parkedWorkspaces.values()).flatMap((slice) =>
                       allEditorTabs(slice.workbenchPanels.editorGroups),
                     ),
-                  ].map((tab) => tab.id),
-                ),
-              )
+                  )
+                  .map((tab) => tab.id),
+              ),
+            )
             captureEditorScrollPositions(owner, editor.documentStore)
             committed = true
             return true
@@ -567,10 +566,11 @@ export function createNavigation(
         (entry) => entry.tabId === placement.copiedFromTabId,
       )
       if (sourcePosition)
-        workspace.setViewScrollPositions([
-          ...workspace.viewScrollPositions,
-          { tabId: placement.tabId, position: sourcePosition.position },
-        ])
+        workspace.setViewScrollPositions(
+          workspace.viewScrollPositions.concat([
+            { tabId: placement.tabId, position: sourcePosition.position },
+          ]),
+        )
       editor.documentStore.getState().copyEditorView(placement.copiedFromTabId, placement.tabId)
       editor.uiStore.getState().copyTabPresentation(placement.copiedFromTabId, placement.tabId)
     }

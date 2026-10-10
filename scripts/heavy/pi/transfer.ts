@@ -13,7 +13,7 @@ export type ShipPlan = {
 }
 
 function git(root: string, args: readonly string[]) {
-  return run(['git', '-C', root, ...args])
+  return run(['git', '-C', root].concat(args))
 }
 
 function refuseInclude(root: string, file: string) {

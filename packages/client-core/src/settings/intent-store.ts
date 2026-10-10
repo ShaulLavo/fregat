@@ -88,7 +88,8 @@ export function submitSettingsIntent(
   return { entry: intent, supersededMutationIds: supersededIntentIds }
 }
 
-export function activeSettingsIntentsFor(owner: QueryClient): readonly ActiveSettingsIntent[] {
+/** Returns a fresh array owned by the caller. */
+export function activeSettingsIntentsFor(owner: QueryClient): ActiveSettingsIntent[] {
   return settingsIntentStore.getState().active.filter((entry) => entry.patch.owner === owner)
 }
 

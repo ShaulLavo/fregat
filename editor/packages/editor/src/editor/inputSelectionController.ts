@@ -913,7 +913,7 @@ export class InputSelectionController {
     const selections = session
       .getSelections()
       .selections.map((selection) => resolveSelection(snapshot, selection))
-      .toSorted((left, right) => left.startOffset - right.startOffset)
+      .sort((left, right) => left.startOffset - right.startOffset)
     if (selections.length === 0) return null
 
     const wraps = selections.every((selection) => {
@@ -1380,13 +1380,12 @@ export class InputSelectionController {
     if (next.start === query.range.start && next.end === query.range.end) return false
 
     const movedSelection = selectionRangeWithAffinity(source, next.start, next.end)
-    const selections = [
-      ...keptSelections.map((selection) => ({
+    const selections = keptSelections
+      .map<DocumentSessionSelectionRange>((selection) => ({
         ...selectionOffsetsWithAffinity(selection, selection.anchorOffset, selection.headOffset),
         goal: selection.goal,
-      })),
-      movedSelection,
-    ]
+      }))
+      .concat([movedSelection])
     const start = context.event ? eventStartMs(context.event) : nowMs()
     const change = session.setSelections(selections)
     this.syncSessionSelectionHighlight()
@@ -3215,7 +3214,7 @@ export class InputSelectionController {
     const resolved = session
       .getSelections()
       .selections.map((selection) => resolveSelection(snapshot, selection))
-      .toSorted((left, right) => left.startOffset - right.startOffset)
+      .sort((left, right) => left.startOffset - right.startOffset)
     const edits: TextEdit[] = []
     const selections: DocumentSessionSelectionRange[] = []
     // Same accounting as a multi-caret paste: every range is expressed against the document as it
@@ -3416,13 +3415,12 @@ export class InputSelectionController {
     )
     if (!range) return null
 
-    const selections = [
-      ...resolved.map((selection) => ({
+    const selections = resolved
+      .map<DocumentSessionSelectionRange>((selection) => ({
         ...selectionOffsetsWithAffinity(selection, selection.anchorOffset, selection.headOffset),
         goal: selection.goal,
-      })),
-      generatedSelectionForRange(range),
-    ]
+      }))
+      .concat([generatedSelectionForRange(range)])
     return {
       change: session.setSelections(selections),
       revealOffset: range.end,

@@ -71,7 +71,7 @@ function chunkExclusions(
 }
 
 function tokenizeChunk(text: string, options: SpellTokenizeOptions): readonly SpellWord[] {
-  const skipped = sortedRanges([...(options.excluded ?? []), ...structuredRanges(text)])
+  const skipped = sortedRanges((options.excluded ?? []).concat(structuredRanges(text)))
   const mode = options.mode ?? 'prose'
   const words: SpellWord[] = []
   let cursor = 0
@@ -143,7 +143,7 @@ function structuredRanges(text: string): readonly SpellTextRange[] {
 }
 
 function sortedRanges(ranges: readonly SpellTextRange[]): readonly SpellTextRange[] {
-  return ranges.filter((range) => range.end > range.start).toSorted((a, b) => a.start - b.start)
+  return ranges.filter((range) => range.end > range.start).sort((a, b) => a.start - b.start)
 }
 
 /** Runs arrive in order, so ranges that end before one can never overlap a later one. */

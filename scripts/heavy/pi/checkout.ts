@@ -15,7 +15,7 @@ export const FREGAT: RepositoryIdentity = {
 }
 
 function git(cwd: string, args: readonly string[]) {
-  const result = run(['git', '-C', cwd, ...args])
+  const result = run(['git', '-C', cwd].concat(args))
   return result.exitCode === 0 ? result.stdout.toString().trim() : null
 }
 

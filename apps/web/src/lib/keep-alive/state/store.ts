@@ -45,7 +45,7 @@ export function createKeepAliveStore() {
       }
       const element = document.createElement('div')
       element.className = 'size-full min-h-0 min-w-0'
-      commit([...entries.getState(), { id, scope, element, attached: false, render }])
+      commit(entries.getState().concat([{ id, scope, element, attached: false, render }]))
     },
     attach(id: string, container: HTMLElement) {
       const entry = find(id)

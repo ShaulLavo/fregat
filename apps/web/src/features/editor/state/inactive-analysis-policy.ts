@@ -106,7 +106,7 @@ function selectCandidate(
       order,
       disposition: classify(candidate.analysis, candidate.entry),
     }))
-    .toSorted(
+    .sort(
       (a, b) =>
         Number(a.disposition === 'warm') - Number(b.disposition === 'warm') ||
         (a.entry.lastLeaseReleasedAt ?? 0) - (b.entry.lastLeaseReleasedAt ?? 0) ||

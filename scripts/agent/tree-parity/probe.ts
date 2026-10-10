@@ -220,9 +220,9 @@ export function diffProbes(
   baseline: Record<string, string>,
   actual: Record<string, string>,
 ): readonly string[] {
-  const keys = new Set([...Object.keys(baseline), ...Object.keys(actual)])
+  const keys = new Set(Object.keys(baseline).concat(Object.keys(actual)))
   const lines: string[] = []
-  for (const key of [...keys].toSorted()) {
+  for (const key of Array.from(keys).sort()) {
     const before = baseline[key]
     const after = actual[key]
     if (before === after) continue

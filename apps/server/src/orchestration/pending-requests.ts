@@ -95,10 +95,9 @@ const BLOCKING_REQUEST_CLOSE_KINDS = new Set([
  * the whole-history read produce the same counts by construction rather than by
  * two lists agreeing.
  */
-export const PENDING_REQUEST_ACTIVITY_KINDS: readonly string[] = [
-  ...OPENED_REQUEST_KINDS.keys(),
-  ...BLOCKING_REQUEST_CLOSE_KINDS,
-]
+export const PENDING_REQUEST_ACTIVITY_KINDS: readonly string[] = Array.from(
+  OPENED_REQUEST_KINDS.keys(),
+).concat(Array.from(BLOCKING_REQUEST_CLOSE_KINDS))
 
 function openedRequestKind(kind: string) {
   return OPENED_REQUEST_KINDS.get(kind) ?? null

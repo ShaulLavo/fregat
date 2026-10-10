@@ -107,7 +107,7 @@ describe('benchmark source identity', () => {
       await put(resolve(directory, path), text)
     const expected = createHash('sha256')
     for (const path of Object.keys(content).sort()) expected.update(path).update(content[path])
-    const files = [...Object.keys(content), ...Object.keys(excluded), ...Object.keys(content)]
+    const files = Object.keys(content).concat(Object.keys(excluded), Object.keys(content))
     const frozenSource = resolve(directory, 'frozen/src')
     await cp(resolve(coreDirectory, 'src'), frozenSource, { recursive: true })
     expect(await hashBenchmarkSource(directory, files, frozenSource)).toBe(expected.digest('hex'))

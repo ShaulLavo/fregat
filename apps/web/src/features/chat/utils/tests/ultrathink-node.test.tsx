@@ -13,7 +13,7 @@ test('the word becomes one rainbow span and the prompt text is unchanged', async
   registerUltrathinkEntity(editor, true)
   await write(editor, 'Please ultrathink about ultrathinking.')
 
-  const painted = [...root.querySelectorAll('.rainbow-text')].map((span) => span.textContent)
+  const painted = Array.from(root.querySelectorAll('.rainbow-text'), (span) => span.textContent)
   expect(painted).toEqual(['ultrathink'])
   expect(editor.read(() => $readChatInputTextSnapshot().text)).toBe(
     'Please ultrathink about ultrathinking.',

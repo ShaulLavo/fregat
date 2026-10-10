@@ -70,6 +70,8 @@
     },
     "scripts": {
       "entry": [
+        "ci/affected.mjs",
+        "ci/packages.mjs",
         "check-editor-backlog.mjs",
         "check-package-pages.mjs",
         "agent/browser.ts",
@@ -133,7 +135,7 @@
       "entry": ["hotkeys/scripts/check-samples.mjs"],
       "ignoreDependencies": ["typescript-api"],
       "vitest": {
-        "config": ["vitest.scripts.config.mjs"]
+        "config": ["vitest.scripts.config.mjs", "vitest.t3code.config.mjs"]
       }
     },
     "apps/tui": {

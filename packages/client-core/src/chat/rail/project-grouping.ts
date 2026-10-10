@@ -53,7 +53,7 @@ export function projectGroups(
     }
   }
   return Array.from(groups, ([key, members]) => {
-    const ordered = members.toSorted(
+    const ordered = members.sort(
       (left, right) =>
         Number(right.primary) - Number(left.primary) ||
         left.physicalKey.localeCompare(right.physicalKey),

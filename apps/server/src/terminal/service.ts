@@ -474,7 +474,7 @@ export class TerminalService {
   /** Detaches every session so its shell keeps running in the host; a user close still kills it. */
   async dispose() {
     this.disposed = true
-    await Promise.allSettled([this.recovery, ...this.starts.values()])
+    await Promise.allSettled([this.recovery].concat(Array.from(this.starts.values())))
     for (const session of this.persistentSessions.values()) session.detachFromHost()
     this.persistentSessions.clear()
     this.host?.close()

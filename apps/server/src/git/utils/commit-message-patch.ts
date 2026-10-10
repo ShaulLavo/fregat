@@ -18,9 +18,12 @@ export function budgetCommitMessagePatch(
   const total = patches.reduce((sum, patch) => sum + patch.length, 0)
   if (total <= budget) return patches.join(SEPARATOR)
 
-  const header = [`Changed files (${files.length}):`, ...files.map((file) => file.path), ''].join(
-    '\n',
-  )
+  const header = [`Changed files (${files.length}):`]
+    .concat(
+      files.map((file) => file.path),
+      [''],
+    )
+    .join('\n')
   const separators = SEPARATOR.length * files.length
   const allowances = patchAllowances(patches, Math.max(0, budget - header.length - separators))
   const bodies = patches.map((patch, position) => clipPatch(patch, allowances[position] ?? 0))

@@ -68,7 +68,7 @@ test('ties keep input order rather than reshuffling', () => {
   ]
 
   expect(names(searchComposerCommands(tied, 'format'))).toEqual(['zzz-one', 'zzz-two'])
-  expect(names(searchComposerCommands(tied.toReversed(), 'format'))).toEqual(['zzz-two', 'zzz-one'])
+  expect(names(searchComposerCommands(tied.reverse(), 'format'))).toEqual(['zzz-two', 'zzz-one'])
 })
 
 test('the limit cuts the ranked list, not the input', () => {

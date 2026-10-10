@@ -30,6 +30,18 @@ export const HOVER_COLORS = {
     'hover.secondaryForeground',
     transparentEditorColor(editorColorReference('foreground'), 0.72),
   ),
+  controlBackground: registerEditorColor(
+    'hover.controlBackground',
+    transparentEditorColor(editorColorReference('foreground'), 0.1),
+  ),
+  controlHover: registerEditorColor(
+    'hover.controlHover',
+    transparentEditorColor(editorColorReference('foreground'), 0.16),
+  ),
+  controlPressed: registerEditorColor(
+    'hover.controlPressed',
+    transparentEditorColor(editorColorReference('foreground'), 0.22),
+  ),
   actionSuccess: registerEditorColor('hover.actionSuccess', {
     dark: '#86efac',
     light: '#15803d',
@@ -48,6 +60,9 @@ export const HOVER_THEME_VARIABLES = [
   '--editor-hover-shadow',
   '--editor-hover-separator',
   '--editor-hover-secondary-foreground',
+  '--editor-hover-control-background',
+  '--editor-hover-control-hover',
+  '--editor-hover-control-pressed',
   '--editor-hover-action-success',
   '--editor-hover-action-failure',
 ] as const

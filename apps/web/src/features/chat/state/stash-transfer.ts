@@ -84,25 +84,27 @@ export async function transferStash(
         ...comment,
         destination: { environmentId: target.environmentId, rootPath: target.rootPath },
       })
-    await releaseUnusedDraftAttachments(target.environmentId, [
-      ...expected.attachments,
-      ...(incoming?.attachments ?? []),
-      ...evicted.flatMap((item) => item.attachments),
-    ])
+    await releaseUnusedDraftAttachments(
+      target.environmentId,
+      expected.attachments.concat(
+        incoming?.attachments ?? [],
+        evicted.flatMap((item) => item.attachments),
+      ),
+    )
     return content
   } finally {
     if (!committed)
-      await releaseStashAttachments(target.environmentId, [
-        ...outgoingAttachments,
-        ...incomingAttachments,
-      ])
+      await releaseStashAttachments(
+        target.environmentId,
+        outgoingAttachments.concat(incomingAttachments),
+      )
   }
 }
 
 function composerReviewComments(target: ChatInputDraftTarget, aliasRoots: readonly string[]) {
   const composer = {
     environmentId: target.environmentId,
-    rootPaths: [target.rootPath, ...aliasRoots],
+    rootPaths: [target.rootPath].concat(aliasRoots),
   }
   return useReviewDraftStore
     .getState()
@@ -124,9 +126,11 @@ export async function releaseUnusedDraftAttachments(
     .filter((entry) => entry.target.environmentId === environmentId)
     .flatMap((entry) => entry.content.attachments)
   const used = new Set(
-    [...draftAttachments, ...stashed, ...queued].flatMap((item) =>
-      item.upload?.status === 'ready' ? [item.id, item.upload.attachment.id] : [item.id],
-    ),
+    draftAttachments
+      .concat(stashed, queued)
+      .flatMap((item) =>
+        item.upload?.status === 'ready' ? [item.id, item.upload.attachment.id] : [item.id],
+      ),
   )
   await releaseStashAttachments(
     environmentId,

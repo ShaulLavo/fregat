@@ -13,7 +13,7 @@ function lead(node: Parameters<typeof mount>[0]) {
 
 it('indents one step per level and draws one guide per level at its own offset', () => {
   const element = lead(<TreeRowLead depth={2} expanded guides />)
-  const guides = [...element.querySelectorAll<HTMLElement>('[data-slot="tree-row-guide"]')]
+  const guides = Array.from(element.querySelectorAll<HTMLElement>('[data-slot="tree-row-guide"]'))
 
   expect(element.style.paddingInlineStart).toBe('calc(2 * var(--tree-indent))')
   expect(guides.map((guide) => guide.style.left)).toEqual([
@@ -24,7 +24,7 @@ it('indents one step per level and draws one guide per level at its own offset',
 
 it('lights only the active guide and draws none without guides', () => {
   const element = lead(<TreeRowLead activeGuide={1} depth={3} guides />)
-  const guides = [...element.querySelectorAll('[data-slot="tree-row-guide"]')]
+  const guides = Array.from(element.querySelectorAll('[data-slot="tree-row-guide"]'))
 
   expect(guides.map((guide) => guide.className.includes('--tree-guide-active-opacity'))).toEqual([
     false,

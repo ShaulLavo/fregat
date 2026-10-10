@@ -4,7 +4,7 @@ import { checkInternalLinks } from './links'
 const root = fileURLToPath(new URL('../', import.meta.url))
 for (const command of [
   ['bun', 'run', 'typecheck'],
-  ['bun', 'run', 'astro', 'build', ...process.argv.slice(2)],
+  ['bun', 'run', 'astro', 'build'].concat(process.argv.slice(2)),
 ]) {
   const child = Bun.spawn(command, { cwd: root, stdout: 'inherit', stderr: 'inherit' })
   const code = await child.exited

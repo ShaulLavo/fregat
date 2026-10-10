@@ -134,11 +134,14 @@ test('compares every changed painted decoration property and extra token range',
   ]
   for (const changed of changes)
     expect(
-      tokenPaintMismatch({ ...complete, runs: [changed, ...complete.runs.slice(1)] }, reference),
+      tokenPaintMismatch(
+        { ...complete, runs: [changed].concat(complete.runs.slice(1)) },
+        reference,
+      ),
     ).toBe('token offsets or styles')
   expect(
     tokenPaintMismatch(
-      { ...complete, runs: [...complete.runs, { ...run, start: 6, end: 10, text: 'text' }] },
+      { ...complete, runs: complete.runs.concat([{ ...run, start: 6, end: 10, text: 'text' }]) },
       reference,
     ),
   ).toBe('token offsets or styles')

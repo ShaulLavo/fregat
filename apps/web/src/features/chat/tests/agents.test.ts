@@ -179,7 +179,7 @@ test('joins early child requests only to explicit ownership of the same child th
     turnId: null,
     payload: { agent: { threadId: 'proof-child', status: 'waiting' }, requestId: 'child-request' },
   })
-  const groups = chatAgentGroups([approval, ...snapshot.activities])
+  const groups = chatAgentGroups([approval].concat(snapshot.activities))
   expect(groups).toHaveLength(1)
   expect(groups[0]?.turnId).toBe(snapshot.latestTurn!.turnId)
   expect(groups[0]?.agents[0]?.activities[0]).toMatchObject({

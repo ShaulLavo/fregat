@@ -144,10 +144,9 @@ function machineOperations(previous: unknown, next: unknown) {
   const changed = Object.entries(values).filter(
     ([key, value]) => JSON.stringify(current[key]) !== JSON.stringify(value),
   )
-  return [
-    ...removed.map((name) => operation({ kind: 'machine.remove', name })),
-    ...changed.map(([name, machine]) => operation({ kind: 'machine.set', name, machine })),
-  ]
+  return removed
+    .map((name) => operation({ kind: 'machine.remove', name }))
+    .concat(changed.map(([name, machine]) => operation({ kind: 'machine.set', name, machine })))
 }
 
 function modelMembershipOperations(previous: unknown, next: unknown, list: 'favorite' | 'hidden') {
@@ -165,7 +164,7 @@ function modelMembershipOperations(previous: unknown, next: unknown, list: 'favo
         ? { kind: 'model.setHidden', ref, hidden: member }
         : { kind: 'model.setFavorite', ref, favorite: member },
     )
-  return [...removed.map((ref) => set(ref, false)), ...added.map((ref) => set(ref, true))]
+  return removed.map((ref) => set(ref, false)).concat(added.map((ref) => set(ref, true)))
 }
 
 function providerOperations(next: unknown, snapshot: SettingsSnapshot) {

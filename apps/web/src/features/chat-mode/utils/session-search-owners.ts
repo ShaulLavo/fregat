@@ -23,5 +23,5 @@ export function sessionSearchOwners(
       connected: entry.phase === 'live',
     })
   }
-  return [...owners.values()]
+  return Array.from(owners.values())
 }

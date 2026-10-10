@@ -42,7 +42,7 @@ export function branchLanes(branches: readonly GitBranch[], worktrees: readonly 
     parent: string | null
     last: boolean
   }[] = roots
-    .toReversed()
+    .reverse()
     .map((branch) => ({ branch, depth: 0, through: [], parent: null, last: true }))
   const visited = new Set<string>()
   while (stack.length) {
@@ -59,14 +59,14 @@ export function branchLanes(branches: readonly GitBranch[], worktrees: readonly 
       parent,
       lane,
       parentLane,
-      above: parentLane === null ? through : [...through, parentLane],
-      below: descendants.length ? [...below, lane] : below,
+      above: parentLane === null ? through : through.concat([parentLane]),
+      below: descendants.length ? below.concat([lane]) : below,
     })
     for (let index = descendants.length - 1; index >= 0; index -= 1) {
       stack.push({
         branch: descendants[index]!,
         depth: depth + 1,
-        through: [...new Set(below)],
+        through: Array.from(new Set(below)),
         parent: branch.name,
         last: index === descendants.length - 1,
       })

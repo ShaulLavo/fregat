@@ -35,7 +35,7 @@ const rows = index
       .map((cell) => cell.trim()),
   )
 const source = readFileSync(resolve(directory, manifest.source), 'utf8')
-const topics = new Set([...source.matchAll(/^## (.+)$/gm)].map((match) => match[1]))
+const topics = new Set(Array.from(source.matchAll(/^## (.+)$/gm), (match) => match[1]))
 
 function check(condition, message) {
   if (!condition) problems.push(message)
@@ -139,7 +139,7 @@ function checkExecutablePlan(plan) {
     ...new Set(metadata(markdown, 'Dependencies').match(/E\d{3}/g) ?? []),
   ].sort()
   check(
-    JSON.stringify(dependencies) === JSON.stringify([...plan.dependsOn].sort()),
+    JSON.stringify(dependencies) === JSON.stringify(plan.dependsOn.toSorted()),
     `${plan.id}: dependency metadata differs`,
   )
   checkLinks(path, markdown)
@@ -155,19 +155,19 @@ function checkIndex(plan, target) {
   )
   const indexDependencies = [...new Set(row?.[5]?.match(/E\d{3}/g) ?? [])].sort()
   check(
-    JSON.stringify(indexDependencies) === JSON.stringify([...plan.dependsOn].sort()),
+    JSON.stringify(indexDependencies) === JSON.stringify(plan.dependsOn.toSorted()),
     `${plan.id}: index dependencies differ`,
   )
 }
 
 function visit(id, trail, complete) {
-  check(!trail.includes(id), `Dependency cycle: ${[...trail, id].join(' -> ')}`)
+  check(!trail.includes(id), `Dependency cycle: ${trail.concat([id]).join(' -> ')}`)
   if (trail.includes(id) || complete.has(id)) return
   const plan = plans.get(id)
   if (!plan) return
   for (const dependency of plan.dependsOn) {
     check(plans.has(dependency), `${id}: unknown dependency ${dependency}`)
-    visit(dependency, [...trail, id], complete)
+    visit(dependency, trail.concat([id]), complete)
   }
   complete.add(id)
 }

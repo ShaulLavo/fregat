@@ -142,7 +142,7 @@ const settingsFiles = {
   projectSettings: join(cwd, '.claude', 'settings.json'),
   localSettings: join(cwd, '.claude', 'settings.local.json'),
 }
-const allSettings = () => [...Object.values(settingsFiles).map(readJson), flagSettings]
+const allSettings = () => Object.values(settingsFiles).map(readJson).concat([flagSettings])
 const sessionRules = new Set()
 
 function allowedByRule(rule) {
@@ -165,7 +165,7 @@ function applyPermissionUpdates(updates) {
     const file = settingsFiles[update.destination]
     if (!file) continue
     const settings = readJson(file)
-    const allow = new Set([...(settings.permissions?.allow ?? []), ...rules])
+    const allow = new Set((settings.permissions?.allow ?? []).concat(rules))
     mkdirSync(dirname(file), { recursive: true })
     writeFileSync(
       file,
@@ -276,7 +276,7 @@ const mcpReady = Promise.all(
   projectMcpDefinitions().map(([name, config]) => connectMcp(name, config)),
 )
 const mcpStatus = () =>
-  [...mcp.values()].map((server) => ({
+  Array.from(mcp.values(), (server) => ({
     name: server.name,
     status: server.status,
     ...(server.error ? { error: server.error } : {}),
@@ -397,9 +397,12 @@ const marker = (text, pattern) => pattern.exec(text)?.[1] ?? null
 function answerFor(prompt, earlier) {
   const recall = marker(prompt, /\bend with ([A-Z0-9_]+)/)
   const text = recall
-    ? ['Earlier prompts in this conversation:', ...earlier.map((line) => `- ${line}`), recall].join(
-        '\n',
-      )
+    ? ['Earlier prompts in this conversation:']
+        .concat(
+          earlier.map((line) => `- ${line}`),
+          [recall],
+        )
+        .join('\n')
     : (marker(prompt, /reply with exactly ([A-Za-z0-9_]+)/i) ??
       marker(prompt, /reply with ([A-Z0-9_]+)/) ??
       'FIXTURE_REPLY')
@@ -529,7 +532,7 @@ async function runBash(toolUseId, input) {
 
 const roster = () =>
   system('background_tasks_changed', {
-    tasks: [...tasks.entries()].map(([taskId, task]) => ({
+    tasks: Array.from(tasks.entries(), ([taskId, task]) => ({
       task_id: taskId,
       task_type: 'local_bash',
       description: task.description,
@@ -567,7 +570,7 @@ function stopTask(taskId) {
 function toolCalls(prompt) {
   if (!/\bBash tool\b/.test(prompt)) return []
   const background = /run_in_background set to true/.test(prompt)
-  return [...prompt.matchAll(/`([^`]+)`/g)].map(([, command]) => ({
+  return Array.from(prompt.matchAll(/`([^`]+)`/g), ([, command]) => ({
     command,
     description: `Run ${command}`,
     ...(background ? { run_in_background: true } : {}),

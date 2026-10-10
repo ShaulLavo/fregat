@@ -33,7 +33,7 @@ export function groupActivityDiscussions(
     groups.set(key, {
       id: key,
       path: group?.path ?? comment.context.path,
-      comments: [...(group?.comments ?? []), comment],
+      comments: (group?.comments ?? []).concat([comment]),
     })
   }
   return activityPage([...groups.values()], truncated)

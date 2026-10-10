@@ -189,7 +189,7 @@ class BufferHistoryViewer<TResult> implements HistoryViewer<TResult> {
     const selected = this.state.selectedIds
     const next = selected.includes(id)
       ? selected.filter((candidate) => candidate !== id)
-      : [...selected.slice(-1), id]
+      : selected.slice(-1).concat([id])
     this.publish({ ...this.state, selectedIds: next, lostIds: [] })
     this.syncComparison()
     return true
@@ -232,9 +232,9 @@ class BufferHistoryViewer<TResult> implements HistoryViewer<TResult> {
     if (graph.revision === this.state.graph.revision) return
 
     this.indexGraph(graph)
-    const lostIds = [this.state.focusedId, ...this.state.selectedIds].filter(
-      (id): id is HistoryNodeId => id !== null && !this.nodesById.has(id),
-    )
+    const lostIds = [this.state.focusedId]
+      .concat(this.state.selectedIds)
+      .filter((id): id is HistoryNodeId => id !== null && !this.nodesById.has(id))
     // Focus rides along with the current state until the user moves it elsewhere.
     const following = this.state.focusedId === this.state.graph.currentId
     const retained = this.state.focusedId !== null && this.nodesById.has(this.state.focusedId)

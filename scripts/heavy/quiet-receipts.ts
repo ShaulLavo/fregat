@@ -83,17 +83,20 @@ export function quietFailureReceipt({ box, jobs, units = [], manager, launcher }
     clientVersion: query(['systemd-run', '--version']),
     managerVersion: query(['systemctl', '--user', 'show', '--property=Version,SystemState']),
     managerCommand: manager ? resultReceipt(manager) : null,
-    managerUnits: query([
-      'systemctl',
-      '--user',
-      'show',
-      '--all',
-      '--property=Id,LoadState,ActiveState,SubState,Result,RuntimeMaxUSec,TimeoutStopUSec,ControlGroup,InvocationID',
-      `${box.sliceRoot}*`,
-      ...units.filter(
-        (unit) => unit.startsWith(`${box.sliceRoot}-`) || unit === `${box.sliceRoot}.slice`,
+    managerUnits: query(
+      [
+        'systemctl',
+        '--user',
+        'show',
+        '--all',
+        '--property=Id,LoadState,ActiveState,SubState,Result,RuntimeMaxUSec,TimeoutStopUSec,ControlGroup,InvocationID',
+        `${box.sliceRoot}*`,
+      ].concat(
+        units.filter(
+          (unit) => unit.startsWith(`${box.sliceRoot}-`) || unit === `${box.sliceRoot}.slice`,
+        ),
       ),
-    ]),
+    ),
     managerJournal: query([
       'journalctl',
       '--user',
@@ -108,7 +111,7 @@ export function quietFailureReceipt({ box, jobs, units = [], manager, launcher }
 function files(directory: string, ownership = false) {
   return capture(() =>
     readdirSync(directory)
-      .toSorted()
+      .sort()
       .map((name) => {
         const file = path.join(directory, name)
         return {

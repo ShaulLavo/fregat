@@ -76,7 +76,8 @@ function resourceRows(resource: MarkerResource, collapsedUris: ReadonlySet<strin
       target: diagnosticTarget(resource.path, uri, diagnostic),
     }
   })
-  return [group, ...items]
+  const rows: DiagnosticRow[] = [group]
+  return rows.concat(items)
 }
 
 /** Location, severity and text; an exact repeat is told apart by its occurrence. */

@@ -123,7 +123,7 @@ test('drops views whose tab is gone even when the document is kept', () => {
     tabIds: new Set(['tab:kept'].map(tabId)),
   })
 
-  expect(evictedTabIds.toSorted()).toEqual(['tab:clean', 'tab:dirty', 'tab:unsynced'])
+  expect(evictedTabIds.sort()).toEqual(['tab:clean', 'tab:dirty', 'tab:unsynced'])
   expect(service.hasLiveDocument(testDocumentKey('/repo/clean.ts'))).toBe(true)
 })
 

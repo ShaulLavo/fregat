@@ -142,7 +142,7 @@ test('restart catches up before readiness, imports terminal history, and converg
     const slice = useChatProjectionStore.getState().slices[fixture.descriptor.environmentId]
     expect(slice?.lastAppliedShellSequence).toBe(snapshot.snapshotSequence)
     expect(slice?.sessionIds.toSorted()).toEqual(
-      snapshot.sessions.map((session) => session.id).toSorted(),
+      snapshot.sessions.map((session) => session.id).sort(),
     )
 
     await fixture.internal({
@@ -241,7 +241,7 @@ test('restart catches up before readiness, imports terminal history, and converg
       rail.sessions
         .filter((session) => session.id === DOMAIN_SESSION)
         .map((session) => session.machineLabel)
-        .toSorted(),
+        .sort(),
     ).toEqual(['Desktop', 'Laptop'])
     expect(
       rail.sections

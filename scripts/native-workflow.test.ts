@@ -33,11 +33,14 @@ test('release rebuild paths work with two nested family checkouts', () => {
         '.'
       const cwd = path.resolve(root, directory.replace('${{ github.workspace }}', root))
       expect(existsSync(cwd), `${step.name}: ${directory}`).toBe(true)
-      const commands = [
-        ...step.run.matchAll(/shasum -a 256 ((?:native|package)-source\/[^\s]+)/g),
-        ...step.run.matchAll(/cmp native-source\/[^\s]+ \\\n\s+package-source\/[^\s]+/g),
-        ...step.run.matchAll(/cd ((?:native|package)-source[^\s]*) && bun ([^\s]+)/g),
-      ].map((match) => `(${match[0]})`)
+      const commands = Array.from(
+        step.run.matchAll(/shasum -a 256 ((?:native|package)-source\/[^\s]+)/g),
+      )
+        .concat(
+          Array.from(step.run.matchAll(/cmp native-source\/[^\s]+ \\\n\s+package-source\/[^\s]+/g)),
+          Array.from(step.run.matchAll(/cd ((?:native|package)-source[^\s]*) && bun ([^\s]+)/g)),
+        )
+        .map((match) => `(${match[0]})`)
       const result = Bun.spawnSync(['bash', '-ec', 'pwd\n' + commands.join('\n')], {
         cwd,
         stdout: 'pipe',

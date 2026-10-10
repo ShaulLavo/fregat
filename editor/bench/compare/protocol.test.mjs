@@ -20,7 +20,7 @@ test('fixtures are exact MiB, ASCII and deterministic', () => {
 })
 test('rotation gives every editor each run position', () => {
   for (let position = 0; position < 3; position++)
-    assert.deepEqual([0, 1, 2].map((rep) => order(rep)[position]).sort(), [...editors].sort())
+    assert.deepEqual([0, 1, 2].map((rep) => order(rep)[position]).sort(), editors.toSorted())
 })
 test('percentiles use nearest rank and preserve slow samples', () => {
   assert.deepEqual(summarize([4, 1, 2, 100]), { n: 4, p50: 2, p95: 100, max: 100 })

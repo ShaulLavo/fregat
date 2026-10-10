@@ -318,9 +318,7 @@ export class GitService {
       '--dst-prefix=b/',
       '--find-renames',
       '--unified=3',
-      ...(staged ? ['--cached'] : []),
-      ...pathspecs,
-    ]
+    ].concat(staged ? ['--cached'] : [], pathspecs)
     const tracked = await this.boundedDiff(repository, args, staged)
     const untracked = staged ? [] : await this.untrackedDiffs(repository)
     const diffs = tracked.concat(untracked)
@@ -392,14 +390,14 @@ export class GitService {
         '--dst-prefix=b/',
         '--find-renames',
         '--unified=3',
-        ...(input.ignoreWhitespace ? ['--ignore-all-space'] : []),
+      ].concat(input.ignoreWhitespace ? ['--ignore-all-space'] : [], [
         // Peel to a commit and close the revision list, exactly like the `hasRef`
         // gate does. Without both, a checkpoint ref that `hasRef` accepts can
         // still be read as a pathspec here and resolve to a different thing.
         `${input.oldRef}^{commit}`,
         `${input.newRef}^{commit}`,
         '--',
-      ],
+      ]),
       false,
     )
     const results = await mapWithConcurrency(diffs, this.diffConcurrency, async (diff) =>
@@ -492,7 +490,10 @@ export class GitService {
       pathCount: mutationPaths(body).length,
     })
     const target = await this.resolveMutationTarget(body)
-    await this.git(target.repository.rootAbsolutePath, ['add', '--all', '--', ...target.pathspecs])
+    await this.git(
+      target.repository.rootAbsolutePath,
+      ['add', '--all', '--'].concat(target.pathspecs),
+    )
     return this.status(target.repository.rootPath)
   }
 
@@ -501,12 +502,10 @@ export class GitService {
       pathCount: mutationPaths(body).length,
     })
     const target = await this.resolveMutationTarget(body)
-    await this.git(target.repository.rootAbsolutePath, [
-      'restore',
-      '--staged',
-      '--',
-      ...target.pathspecs,
-    ])
+    await this.git(
+      target.repository.rootAbsolutePath,
+      ['restore', '--staged', '--'].concat(target.pathspecs),
+    )
     return this.status(target.repository.rootPath)
   }
 
@@ -1130,14 +1129,12 @@ export class GitService {
   }
 
   private async readStatus(repository: GitRepositoryLocation): Promise<GitStatusResult> {
-    const result = await this.git(repository.rootAbsolutePath, [
-      'status',
-      '--porcelain=v2',
-      '--branch',
-      '-z',
-      '--untracked-files=all',
-      ...pathspecArgs(repository.pathspec),
-    ])
+    const result = await this.git(
+      repository.rootAbsolutePath,
+      ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all'].concat(
+        pathspecArgs(repository.pathspec),
+      ),
+    )
     void this.upstreamFetch.schedule(repository.rootAbsolutePath, result.stdout)
     const files = parseStatus(result.stdout, repository.rootPath)
     const [withLines, uninitializedSubmodules, autoPull] = await Promise.all([
@@ -1293,13 +1290,13 @@ export class GitService {
     args: readonly string[],
     staged: boolean,
   ): Promise<GitFileDiff[]> {
-    const raw = await this.git(repository.rootAbsolutePath, [
-      ...args.slice(0, 1),
-      '--raw',
-      '-z',
-      '--no-abbrev',
-      ...args.slice(1).filter((argument) => !argument.startsWith('--unified=')),
-    ])
+    const raw = await this.git(
+      repository.rootAbsolutePath,
+      args.slice(0, 1).concat(
+        ['--raw', '-z', '--no-abbrev'],
+        args.slice(1).filter((argument) => !argument.startsWith('--unified=')),
+      ),
+    )
     const entries = parseRawDiff(raw.stdout, repository.rootPath, staged)
     const checked = await mapWithConcurrency(entries, this.diffConcurrency, async (entry) => {
       const [oldSize, newSize] = await Promise.all([
@@ -1316,7 +1313,7 @@ export class GitService {
     const excludes = omitted
       .flatMap((entry) => [entry.path, entry.oldPath].filter(isString))
       .map((file) => `:(exclude,literal)${repositoryRelativePath(repository.rootPath, file)}`)
-    const patchArgs = args.includes('--') ? [...args, ...excludes] : [...args, '--', ...excludes]
+    const patchArgs = args.includes('--') ? args.concat(excludes) : args.concat(['--'], excludes)
     const result =
       omitted.length === entries.length
         ? ''
@@ -1325,23 +1322,22 @@ export class GitService {
               maxOutputBytes: this.maxPatchOutputBytes(),
             })
           ).stdout
-    return [
-      ...parseDiff(result, repository.rootPath, staged),
-      ...omitted.map((entry) => ({
+    return parseDiff(result, repository.rootPath, staged).concat(
+      omitted.map((entry) => ({
         ...entry,
         omitted: 'size' as const,
         lineStats: stats.get(entry.path),
       })),
-    ]
+    )
   }
 
   private async diffLineStats(repository: GitRepositoryLocation, args: readonly string[]) {
-    const result = await this.git(repository.rootAbsolutePath, [
-      args[0]!,
-      '--numstat',
-      '-z',
-      ...args.slice(1).filter((argument) => !argument.startsWith('--unified=')),
-    ])
+    const result = await this.git(
+      repository.rootAbsolutePath,
+      [args[0]!, '--numstat', '-z'].concat(
+        args.slice(1).filter((argument) => !argument.startsWith('--unified=')),
+      ),
+    )
     return parseNumstat(result.stdout, repository.rootPath)
   }
 
@@ -1522,13 +1518,10 @@ export class GitService {
 
   private async untrackedFiles(repository: GitRepositoryLocation) {
     const pathspec = repository.pathspec ? ['--', repository.pathspec] : []
-    const result = await this.git(repository.rootAbsolutePath, [
-      'ls-files',
-      '--others',
-      '--exclude-standard',
-      '-z',
-      ...pathspec,
-    ])
+    const result = await this.git(
+      repository.rootAbsolutePath,
+      ['ls-files', '--others', '--exclude-standard', '-z'].concat(pathspec),
+    )
 
     return result.stdout.split('\0').filter(Boolean)
   }

@@ -227,7 +227,7 @@ test('a rejected file set is not retried until the set changes', async ({ server
     expect(interruptions).toEqual([])
     expect(errors).toEqual([expect.objectContaining({ status: 403 })])
 
-    streams.setFiles([...rejected].reverse())
+    streams.setFiles(rejected.reverse())
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(fileRequests).toHaveLength(1)
 

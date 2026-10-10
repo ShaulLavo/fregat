@@ -111,10 +111,10 @@ test.for([false, true])(
         onInitialPaint: (event) => paints.push(event),
         plugins: [
           {
-            activate: (context) => [
-              ...(!overlap ? [context.registerSyntaxProvider(structural)] : []),
-              context.registerHighlighter(provider),
-            ],
+            activate: (context) =>
+              (!overlap ? [context.registerSyntaxProvider(structural)] : []).concat([
+                context.registerHighlighter(provider),
+              ]),
           },
         ],
       })

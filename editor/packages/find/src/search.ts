@@ -591,7 +591,7 @@ function searchRanges(
       end: clampSourceOffset(source, range.end),
     }))
     .filter((range) => range.start <= range.end)
-    .toSorted(compareTextOffsetRanges)
+    .sort(compareTextOffsetRanges)
 
   // Scopes are followed through edits, and an edit spanning the seam between two
   // of them leaves them overlapping. Searching both would report the text they

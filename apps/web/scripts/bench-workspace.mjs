@@ -265,7 +265,7 @@ export function maximum(values) {
 }
 
 export function median(values) {
-  const sorted = [...values].sort((left, right) => left - right)
+  const sorted = values.sort((left, right) => left - right)
   const midpoint = Math.floor(sorted.length / 2)
   if (sorted.length % 2 === 1) return round(sorted[midpoint])
 
@@ -275,7 +275,7 @@ export function median(values) {
 export function percentile(values, fraction) {
   if (values.length === 0) return 0
 
-  const sorted = [...values].sort((left, right) => left - right)
+  const sorted = values.sort((left, right) => left - right)
   const index = Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1)
   return round(sorted[Math.max(0, index)])
 }

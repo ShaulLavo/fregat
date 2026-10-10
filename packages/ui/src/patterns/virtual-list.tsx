@@ -134,7 +134,7 @@ export function VirtualList<T>({
         indices.includes(activeIndex)
       )
         return indices
-      return [...indices, activeIndex].sort((left, right) => left - right)
+      return indices.concat([activeIndex]).sort((left, right) => left - right)
     },
   })
   const tail = useTailFollow({

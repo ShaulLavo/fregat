@@ -350,7 +350,7 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
       )
         return undefined
       const pc = new RTCPeerConnection({
-        iceServers: [...this.options.iceServers, ...credentials],
+        iceServers: this.options.iceServers.concat(credentials),
         iceTransportPolicy: this.options.transportPolicy,
       })
       const link: Link = {
