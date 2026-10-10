@@ -8,7 +8,7 @@ import { Spinner } from '@workspace/ui/components/spinner'
 import { McpAddDialog } from '@/features/settings/components/mcp-add-dialog'
 import { McpConfigRow } from '@/features/settings/components/mcp-config-row'
 import { McpListLoading } from '@/features/settings/components/mcp-list-loading'
-import { useInstanceMcp } from '@/features/settings/hooks/use-instance-mcp'
+import type { useInstanceMcp } from '@/features/settings/hooks/use-instance-mcp'
 import { groupMcpServers } from '@/features/settings/utils/mcp'
 import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 
@@ -16,12 +16,13 @@ export function McpServerList({
   folder,
   instance,
   instances,
+  mcp,
 }: {
   readonly folder: string | null
   readonly instance: ProviderSnapshot
   readonly instances: readonly ProviderSnapshot[]
+  readonly mcp: ReturnType<typeof useInstanceMcp>
 }) {
-  const mcp = useInstanceMcp(instance.providerInstanceId, folder)
   const [adding, setAdding] = useState(false)
   const applies =
     instance.driverKind === 'codex'

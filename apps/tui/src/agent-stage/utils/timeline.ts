@@ -42,7 +42,7 @@ export function timelineRows(session: ChatSession): readonly TimelineRow[] {
     time: plan.createdAt,
     plan,
   }))
-  return [...messages, ...activities, ...plans].sort((a, b) => a.time.localeCompare(b.time))
+  return messages.concat(activities, plans).sort((a, b) => a.time.localeCompare(b.time))
 }
 
 export function activityText(activity: OrchestrationSessionActivity) {

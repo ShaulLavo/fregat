@@ -61,7 +61,10 @@ describe('built-in palettes color through Tree-sitter captures', () => {
 
   test('languages Tree-sitter lacks keep their Shiki grammar under a palette', async () => {
     const structural = new Set<string>(
-      TREE_SITTER_LANGUAGE_METADATA.flatMap((l) => [l.id, ...l.aliases]),
+      TREE_SITTER_LANGUAGE_METADATA.flatMap((language) => {
+        const ids: string[] = [language.id]
+        return ids.concat(language.aliases)
+      }),
     )
     const language = ['fsharp', 'haskell', 'clojure', 'elixir', 'ocaml'].find(
       (id) => !structural.has(id),

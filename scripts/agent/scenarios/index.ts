@@ -1,3 +1,4 @@
+import { reactiveOwnerSnapshots } from './reactive-owner-snapshots'
 import { overlayAlignment } from './overlay-alignment'
 import { commandFoundation } from './command-foundation'
 import { clientLogDelivery } from './client-log-delivery'
@@ -10,6 +11,7 @@ import { cursorModelCatalog } from './cursor-model-catalog'
 import { machineBalancing } from './machine-balancing'
 import { binaryFileOpen, binaryFileRemote } from './binary-file-open'
 import { ghosttySiteFit } from './ghostty-site-fit'
+import { siteReplicaPlayback } from './site-replica-playback'
 import { editorPagedReadonly } from './editor-paged-readonly'
 import { editorFeatureTiers } from './editor-feature-tiers'
 import { editorSavedSnapshot } from './editor-saved-snapshot'
@@ -337,6 +339,7 @@ import { wallpaperPalette } from './wallpaper-palette'
 import { themeBundlePalette } from './theme-bundle-palette'
 import { settingsColdLoad } from './settings-cold-load'
 import { settingsOpen, settingsOpenNavigation } from './settings-open'
+import { deviceTrustSettings } from './device-trust-settings'
 import { serverRestart, serverRestartRecovery } from './server-restart'
 import { serverUpdateDeadline } from './server-update-deadline'
 import { watcherRestart } from './watcher-restart'
@@ -468,11 +471,17 @@ import { treeParity } from './tree-parity'
 import { fileIconHues } from './file-icon-hues'
 import { filterFields } from './filter-fields'
 import { inlineRenameTree } from './inline-rename-tree'
+import { editorMissingFile } from './editor-missing-file'
 import { treeParityBehaviour } from './tree-parity-behaviour'
 
 import { devPackageUpdates } from './dev-package-updates'
 
+import { collaborationMergeReview } from './collaboration-merge-review'
+
 export const scenarios: readonly Scenario[] = [
+  siteReplicaPlayback,
+  reactiveOwnerSnapshots,
+  collaborationMergeReview,
   overlayAlignment,
   unknownWorkspaceSettings,
   releaseInstallationSettings,
@@ -763,7 +772,7 @@ export const scenarios: readonly Scenario[] = [
   fileIcons,
   searchInputUndo,
   visualSearchPerformance,
-  ...visualSearchTiers,
+].concat(visualSearchTiers, [
   searchViewAllMatches,
   visualSearchHeaders,
   visualSearchScrollContent,
@@ -799,6 +808,7 @@ export const scenarios: readonly Scenario[] = [
   settingsColdLoad,
   settingsOpen,
   settingsOpenNavigation,
+  deviceTrustSettings,
   settingsRoutePreparation,
   textFieldFkeys,
   settingsModuleFailure,
@@ -919,9 +929,10 @@ export const scenarios: readonly Scenario[] = [
   fileIconHues,
   treeParityBehaviour,
   inlineRenameTree,
+  editorMissingFile,
   filterFields,
   treeFileClicks,
-]
+])
 
 export function scenarioNamed(name: string): Scenario {
   const scenario = scenarios.find((entry) => entry.name === name)

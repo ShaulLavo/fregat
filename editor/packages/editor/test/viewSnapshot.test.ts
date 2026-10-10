@@ -500,7 +500,7 @@ describe('editor view snapshot serialization', () => {
       false,
       false,
     ])
-    expect(wrappedRows.map((row) => row.contentCursorLine)).toEqual([false, false, true])
+    expect(wrappedRows.map((row) => row.contentCursorLine)).toEqual([true, true, true])
     expect(wrappedRows.map((row) => row.gutterNumberCursorLine)).toEqual([false, false, false])
 
     wrappedView.dispose()

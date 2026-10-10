@@ -261,7 +261,7 @@ export class LspWatchedFiles {
       if (isOutsideRoot(relative)) return []
       return [{ ...change, path: relative ? path.join(link.link, relative) : link.link }]
     })
-    return [change, ...aliases]
+    return [change].concat(aliases)
   }
 
   private flush(): void {
@@ -396,7 +396,7 @@ function globMatches(watcher: Watcher, file: string) {
 }
 
 function watchesOf(watcher: Watcher): TreeWatch[] {
-  return [watcher.watch, ...watcher.linked]
+  return [watcher.watch].concat(watcher.linked)
 }
 
 function watchKey(watch: TreeWatch) {

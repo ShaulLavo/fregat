@@ -17,7 +17,9 @@ test('switching between chats in one worktree registers its address once', async
   await navigation.openChat({ environmentId, sessionId: DOMAIN_SESSION, surface: 'main' })
 
   const cache = queryClientFor(confirmedEnvironmentOrigin(environmentId)).getQueryCache()
-  const addresses = cache.findAll({ queryKey: [...fileSystemKeys.all, 'workspace-address'] })
+  const addresses = cache.findAll({
+    queryKey: [...fileSystemKeys.all, 'workspace-address'] as const,
+  })
   expect(addresses).toHaveLength(1)
   expect(addresses[0]?.state.dataUpdateCount).toBe(1)
 })

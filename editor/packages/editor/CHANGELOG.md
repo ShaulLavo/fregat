@@ -1,5 +1,69 @@
 # @singapore-editor/core
 
+## 0.2.8
+
+### Patch Changes
+
+- [#1105](https://github.com/ShaulLavo/fregat/pull/1105) [`01157ea`](https://github.com/ShaulLavo/fregat/commit/01157ea95298f194a8fa8e9f67a17fb6b3cab89d) - Fixed `Editor` font changes reporting ResizeObserver loop errors when an overlay adjusts the text viewport.
+
+- [#1130](https://github.com/ShaulLavo/fregat/pull/1130) [`2efacca`](https://github.com/ShaulLavo/fregat/commit/2efacca2529252417548ede3694d58f520c782bd) - Fixed fractional row, caret, and gutter positioning when scrolling large documents beyond the browser's native height limit.
+
+- [#1107](https://github.com/ShaulLavo/fregat/pull/1107) [`f88c132`](https://github.com/ShaulLavo/fregat/commit/f88c1329594cc6d6e1e64a711727e319c7709c88) - Added `scrollMode: 'content'` and `setScrollMode('content')` for editors that grow with their content and use page scrolling. Caret and search reveal scroll outside ancestors, and oversized content layouts report a bounded refusal. Fixed wrapped row heights after a web font loads.
+
+- [#1225](https://github.com/ShaulLavo/fregat/pull/1225) [`eb6bbed`](https://github.com/ShaulLavo/fregat/commit/eb6bbed11023d2c59a281a5772bb649976bbf5a8) - Fixed document snapshot syntax colours changing text shaping across token boundaries, and preserved captured kerning and ligature settings. Added `preparePaintSnapshotHighlights` and `activatePaintSnapshotHighlights` to `@singapore-editor/core/paint`: prepare visibility in an inline head bundle before streamed markup, then activate each root synchronously; failures reveal readable content and `mountPaintSnapshot` activates automatically. Emitted text and layout remain readable with JavaScript disabled, while malformed or repeated source slices are refused before allocating highlights.
+
+- [#1223](https://github.com/ShaulLavo/fregat/pull/1223) [`85cc87e`](https://github.com/ShaulLavo/fregat/commit/85cc87ed98a35c21ff430e757a75f2d2721604a8) - Fixed `Editor.captureSnapshot({ scope: 'document' })` refusing syntax colours supplied through CSS variables. Capture now saves foreground and background colours resolved against the editor's active theme, isolated from unrelated page selectors. Invalid colours and unresolved variables return an unsupported capture.
+
+- [#1117](https://github.com/ShaulLavo/fregat/pull/1117) [`0c1b7fb`](https://github.com/ShaulLavo/fregat/commit/0c1b7fb03285785082f4d7b62ce991fbd487dcf4) - Fixed syntax colours disappearing in WebKit when an editor mounted under a hidden host becomes visible. Create hidden editors with `presentationReady: false` and call `setPresentationReady(true)` after revealing their host to restore the existing syntax paint.
+
+- [#1176](https://github.com/ShaulLavo/fregat/pull/1176) [`f0e5906`](https://github.com/ShaulLavo/fregat/commit/f0e59061c8d2b189d82f9bc8e52590ba98668da1) - Added `mergeReview` to `createCollaborationPlugin` for confirmed concurrent-edit highlights, author-version hovers, local dismissal and bounded resolutions that reach every peer. Added `onMergeReview(unit, versions)` for host actions.
+
+  Added `createTreeSitterReviewSyntax` for demand-only review reads from immutable document snapshots, and `mergeUnit` touching selection for intersected syntax units. Author projections reuse the confirmed syntax tree through `projectMergeUnits` and preserve nested injected languages, including code fences. Added `createEditorSnapshotBuffer` and `DocumentDelivery` to the internal document-worker entry point for snapshot reader integrations.
+
+  Fixed completed merge resolutions reappearing as new review actions. Added `ConfirmedWindow.isAfter` for retained causal ancestry, and restricted review detection to remote confirmations with deferred demand for concurrent pending acknowledgements.
+
+  Added `TooltipPart.presentation: 'controls'` for content-sized shared hovers with pane-bounded placement and a visible button footer. Review actions remain visible while long version comparisons scroll. Fixed host focus outlines appearing around comparison content; keyboard focus remains visible on buttons, and content sections use tone-only separation.
+
+- [#1227](https://github.com/ShaulLavo/fregat/pull/1227) [`60d3c72`](https://github.com/ShaulLavo/fregat/commit/60d3c723c842180fd3fa3c6e8f8f7970f1330307) - Fixed syntax colours on inline widgets in WebKit so plain text beside Markdown links keeps its foreground colour. Fixed `captureSnapshot({ scope: 'document' })` to preserve inline widget token colours and capture editors with no gutter.
+
+- [#1154](https://github.com/ShaulLavo/fregat/pull/1154) [`31010b1`](https://github.com/ShaulLavo/fregat/commit/31010b183be61ad044eb57438a58c91dd1c8de79) - Fixed editors mounted in same-origin iframes so `setText()`, native selection reconciliation, and textarea input work in the editor's own document. Row boundary checks, caret hit testing, embedded control checks, and `dispose()` also work after the iframe is removed.
+
+- [#1217](https://github.com/ShaulLavo/fregat/pull/1217) [`590379e`](https://github.com/ShaulLavo/fregat/commit/590379e72a231dc9cdca814c84a3eba64cedb1a6) - Added `Editor.captureSnapshot({ scope: 'document' })` and the `@singapore-editor/core/paint` entry to capture complete content-layout documents and replay their text, styles, links and gutters at a new width. Unsupported preview content returns an explicit refusal.
+
+  Added stable heading anchors to Markdown preview and preserved heading names and anchors in document paint.
+
+- [#1186](https://github.com/ShaulLavo/fregat/pull/1186) [`2b9aeac`](https://github.com/ShaulLavo/fregat/commit/2b9aeaceb70c88c77ff0bc85b4bf3fbef3d52b9b) - Fixed wrapping, horizontal scrolling and text extents for proportional `fontFamily` values such as FreeSans. Mounted plain ASCII/tab rows below 5,000 UTF-16 code units retain native kerning, ligatures and insertion positions; longer rows stay editable with bounded approximate geometry. Tab stops now follow the current browser’s native half-character minimum, including editors initialized while hidden.
+
+- [#1123](https://github.com/ShaulLavo/fregat/pull/1123) [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390) - Fixed character wrapping without glyph measurements to restart tab stops on each displayed row. Rows containing tabs now fit column widths that fall between tab stops.
+
+- [#1123](https://github.com/ShaulLavo/fregat/pull/1123) [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390) - Fixed wrapped text overflowing narrow containers with gutters, wide fallback glyphs or fractional widths. Wrapping reserves space for the caret and hanging trailing spaces preserve their source positions without widening the scrolling area.
+
+- [#1123](https://github.com/ShaulLavo/fregat/pull/1123) [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390) - Fixed word wrapping to keep emoji and combining sequences together. Wrapped row breaks now stay the same when text arrives in separate storage chunks.
+
+- [#1123](https://github.com/ShaulLavo/fregat/pull/1123) [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390) - Fixed measured word wrapping to split an oversized word after moving it to a fresh row. Words now stay within the wrapping width when the preceding row ends at a space.
+
+- [#1123](https://github.com/ShaulLavo/fregat/pull/1123) [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390) - Fixed source offsets when rewrapping keeps a row's text unchanged. Trailing whitespace markers now include spaces split across wrapped rows while leaving interior spaces unmarked.
+
+- [#1123](https://github.com/ShaulLavo/fregat/pull/1123) [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390) - Fixed tab advances after a soft wrap to use the tab stops of the displayed row. Word-wrapped text containing tabs now fits the same width as its painted rows.
+
+- [#1123](https://github.com/ShaulLavo/fregat/pull/1123) [`ad3b61f`](https://github.com/ShaulLavo/fregat/commit/ad3b61f41df9e3ce05d0a888fed2485ef77ff390) - Breaking: `InlineReplacementRender` receives the display text and its starting offset within the replacement. Update direct renderer calls to pass that text and `0` for a complete replacement. Added `wrap: 'text'` to split textual replacements into independently rendered row fragments while ordinary widgets keep their existing wrapping behavior.
+
+- [#1119](https://github.com/ShaulLavo/fregat/pull/1119) [`c254ada`](https://github.com/ShaulLavo/fregat/commit/c254ada9561d41b3696d41ec3e6dd599892bf079) - Fixed deep scrolling and gutter alignment in Firefox for documents taller than the browser's sticky-position limit, including when content loads or grows after switching to virtualized mode. The editor discovers the browser limit when visible virtualized content exceeds four million pixels, preserving measurement-free construction with supplied `textMetrics` and layout-free unfocused opens of ordinary documents and retrying discovery after temporarily unmeasurable layout becomes available.
+
+- [#1226](https://github.com/ShaulLavo/fregat/pull/1226) [`5ca1d34`](https://github.com/ShaulLavo/fregat/commit/5ca1d349ab0ec22a1951cc3ba1048b028b7f8f5a) - Breaking: Added `characterWidth` to each row in `SavedDocumentPaint`; include the effective font's zero-glyph advance when constructing document paint, and regenerate saved document snapshots. Fixed word wrapping for larger headings and other presentation-styled rows, with matching document snapshot replay and support for editors with no gutter. Styled rows rewrap after theme changes, stylesheet changes and late font loads, with a caret-width reserve measured in the row's font.
+
+- [#1097](https://github.com/ShaulLavo/fregat/pull/1097) [`671416f`](https://github.com/ShaulLavo/fregat/commit/671416f1c1f3fd150b4bb797b915933ceb7f9cfb) - Added `tokenStoreBackingBytes` to `documentAnalysis.inspectRetention()` and its entry reports to count shared packed buffers once, including lazy token end indexes after allocation; worker heaps and WASM remain unmeasured.
+
+  Added `documentAnalysis.inspectLeases()` for count-based cleanup that reads lease metadata without inspecting token results.
+
+- [#1103](https://github.com/ShaulLavo/fregat/pull/1103) [`9488cc4`](https://github.com/ShaulLavo/fregat/commit/9488cc4dba071e4e995de4cb3fd0485f6e8c510a) - Fixed `changesSinceDocumentSyncPoint` and `changesBetweenDocumentSyncPoints` returning `null` edits when a later deletion or replacement overlapped an earlier edit. They now return the combined edits, so consumers keep updating incrementally.
+
+- [#1116](https://github.com/ShaulLavo/fregat/pull/1116) [`7b04e6e`](https://github.com/ShaulLavo/fregat/commit/7b04e6e32d054a9045ba5a7f9108cd0db354f56e) - Fixed the editor's hidden font measurement probe extending the native scroll height in Firefox. The retained probe now stays at the top of the scroll container.
+
+- [#1245](https://github.com/ShaulLavo/fregat/pull/1245) [`67c4603`](https://github.com/ShaulLavo/fregat/commit/67c4603448625f31c59175738df0eae89132c869) - Fixed the current-line background to cover every wrapped row of the logical line in both the text and gutter, including when the caret is on a continuation row.
+- Updated dependencies []:
+  - @singapore-editor/textbuffer@0.2.8
+
 ## 0.2.7
 
 ### Patch Changes

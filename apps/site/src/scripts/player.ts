@@ -6,26 +6,13 @@ const reduce = matchMedia('(prefers-reduced-motion: reduce)')
 
 for (const stage of document.querySelectorAll<HTMLElement>('[data-replica]')) setup(stage)
 
-// Section plates load their wallpaper shortly before they scroll into view.
-const lighter = new IntersectionObserver(
-  (entries) => {
-    for (const entry of entries) {
-      if (!entry.isIntersecting) continue
-      entry.target.classList.add('lit')
-      lighter.unobserve(entry.target)
-    }
-  },
-  { rootMargin: '600px 0px' },
-)
-for (const plate of document.querySelectorAll('.plate:not(.lit)')) lighter.observe(plate)
-
 function setup(stage: HTMLElement): void {
   const rep = stage.querySelector<HTMLElement>('.rep')
   if (!rep) return
   const times = (rep.dataset.timeline ?? '').split(',').filter(Boolean).map(Number)
   const last = times.length
-  const narrowAt = Number(stage.dataset.narrowAt ?? 640)
   const pointer = rep.querySelector<HTMLElement>('.pointer')
+  const childTimers = new Set<number>()
   let step = 0
   let timer = 0
   let visible = false
@@ -33,14 +20,23 @@ function setup(stage: HTMLElement): void {
   let elapsedAt = 0
   let clock = 0
 
-  function fit(): void {
-    const width = stage.clientWidth
-    const narrow = width < narrowAt
-    rep!.classList.toggle('narrow', narrow)
-    const base = narrow ? 440 : Number(stage.dataset.base ?? 1280)
-    // Below data-min-k the window keeps its size and the plate crops it.
-    const k = Math.max(width / base, Number(stage.dataset.minK ?? 0))
-    rep!.style.setProperty('--k', String(k))
+  function later(callback: () => void, delay: number): void {
+    const child = window.setTimeout(() => {
+      childTimers.delete(child)
+      callback()
+    }, delay)
+    childTimers.add(child)
+  }
+
+  function cancelPlayback(): void {
+    clearTimeout(timer)
+    timer = 0
+    for (const child of childTimers) clearTimeout(child)
+    childTimers.clear()
+    for (const element of rep!.querySelectorAll('.caret, .pressed')) {
+      element.classList.remove('caret', 'pressed')
+    }
+    pointer?.classList.remove('press')
   }
 
   function type(element: HTMLElement): void {
@@ -51,16 +47,10 @@ function setup(stage: HTMLElement): void {
     element.textContent = ''
     element.classList.add('caret')
     const tick = (): void => {
-      if (rep!.classList.contains('paused')) {
-        setTimeout(tick, 30)
-        return
-      }
+      if (rep!.classList.contains('paused')) return later(tick, 30)
       shown += Math.max(1, Math.round(text.length / (duration / 30)))
       element.textContent = text.slice(0, shown)
-      if (shown < text.length) {
-        setTimeout(tick, 30)
-        return
-      }
+      if (shown < text.length) return later(tick, 30)
       element.classList.remove('caret')
     }
     tick()
@@ -68,7 +58,7 @@ function setup(stage: HTMLElement): void {
 
   function point(target: HTMLElement, press: boolean): void {
     if (!pointer) return
-    const k = Number(rep!.style.getPropertyValue('--k')) || 1
+    const k = Number(getComputedStyle(rep!).zoom) || 1
     const frame = rep!.getBoundingClientRect()
     const box = target.getBoundingClientRect()
     const x = (box.left - frame.left + box.width * 0.62) / k
@@ -76,13 +66,14 @@ function setup(stage: HTMLElement): void {
     pointer.style.opacity = '1'
     pointer.style.transform = `translate(${x}px, ${y}px)`
     if (!press) return
-    setTimeout(() => {
+    const release = (): void => {
+      pointer.classList.remove('press')
+      target.classList.remove('pressed')
+    }
+    later(() => {
       pointer.classList.add('press')
       target.classList.add('pressed')
-      setTimeout(() => {
-        pointer.classList.remove('press')
-        target.classList.remove('pressed')
-      }, 160)
+      later(release, 160)
     }, 720)
   }
 
@@ -145,16 +136,14 @@ function setup(stage: HTMLElement): void {
   }
 
   function end(): void {
-    clearTimeout(timer)
-    timer = 0
+    cancelPlayback()
     held = false
     rep!.classList.remove('paused')
     apply(last, false)
   }
 
   function replay(): void {
-    clearTimeout(timer)
-    timer = 0
+    cancelPlayback()
     held = false
     for (const element of rep!.querySelectorAll<HTMLElement>('[data-full]')) {
       element.textContent = element.dataset.full ?? ''
@@ -185,8 +174,6 @@ function setup(stage: HTMLElement): void {
 
   const buttons = document.querySelectorAll<HTMLButtonElement>(`[data-motion-for="${stage.id}"]`)
   for (const button of buttons) button.addEventListener('click', toggle)
-  fit()
-  new ResizeObserver(fit).observe(stage)
   apply(0, false)
   if (reduce.matches) end()
 

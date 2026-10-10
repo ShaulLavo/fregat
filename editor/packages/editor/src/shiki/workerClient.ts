@@ -692,7 +692,7 @@ function shikiThemeRequestKey(theme: string, registrations: ShikiResolvedRegistr
   return JSON.stringify({
     theme,
     themeRegistration: themeRegistrationKey(registrations.themeRegistration),
-    themeRegistrations: registrations.themeRegistrations.map(themeRegistrationKey).toSorted(),
+    themeRegistrations: registrations.themeRegistrations.map(themeRegistrationKey).sort(),
   })
 }
 

@@ -459,7 +459,7 @@ export class MinimapWorkerRenderer {
     const state = this.requireState()
     const decorations = state.document.decorations
       .filter((decoration) => !decoration.sectionHeaderStyle)
-      .toSorted((left, right) => (left.zIndex ?? 0) - (right.zIndex ?? 0))
+      .sort((left, right) => (left.zIndex ?? 0) - (right.zIndex ?? 0))
 
     for (const decoration of decorations) {
       const color = parseCssColor(decoration.color, state.styles.selection)

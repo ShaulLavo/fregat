@@ -1,3 +1,4 @@
+import type { EditorDisposable } from '../editor/disposables'
 import type { ScheduledFrame } from '../editor/scheduleFrame'
 import type { WrapAdvance, WrapBreak } from './displayProjectionTypes'
 import type { GlyphAdvances } from './glyphAdvances'
@@ -24,10 +25,6 @@ import type {
   VirtualizedTextRowDecoration,
   VirtualizedTextHighlightStyle,
 } from './virtualizedTextViewTypes'
-
-// 'center-if-outside' leaves a target already on screen where the reader is looking
-// at it, and centres one that is not: a jump lands with context on both sides.
-export type RevealBlock = 'nearest' | 'center' | 'end' | 'center-if-outside'
 
 export type CreateRangeOptions = {
   readonly scrollIntoView?: boolean
@@ -132,6 +129,11 @@ export interface VirtualizedTextViewInternal {
   wrapBreak: WrapBreak
   /** The measured-width wrap in the projection's config, when the face is proportional. */
   wrapAdvance: WrapAdvance | null
+  readonly styledRowFaces: Map<
+    string,
+    { readonly element: HTMLDivElement; readonly observer: EditorDisposable }
+  >
+  readonly onStyledFaceChange: () => void
   /** The face's glyph advances while it is proportional; null keeps every estimate on columns. */
   glyphs: GlyphAdvances | null
   tabSize: number

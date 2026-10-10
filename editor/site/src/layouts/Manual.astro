@@ -3,7 +3,7 @@ import '../styles/manual.css'
 import mono from '../fonts/jetbrains-mono.woff2?url'
 import serif from '../fonts/source-serif-4.woff2?url'
 import { NAV } from '../manual/content'
-import { syntaxStyles } from '../manual/theme'
+import '../styles/examples.css'
 
 type Props = {
   readonly title: string
@@ -36,7 +36,6 @@ const github = 'https://github.com/ShaulLavo/fregat/tree/main/editor'
         if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme
       } catch {}
     </script>
-    <style is:inline set:html={syntaxStyles}></style>
   </head>
   <body class={bodyClass} data-file={file}>
     <a class="skip" href="#doc">Skip to content</a>
@@ -55,7 +54,6 @@ const github = 'https://github.com/ShaulLavo/fregat/tree/main/editor'
                       <li>
                         <a
                           href={page.href}
-                          data-md={page.md}
                           aria-current={page.md === file ? 'page' : undefined}
                         >
                           {page.label}
@@ -81,5 +79,10 @@ const github = 'https://github.com/ShaulLavo/fregat/tree/main/editor'
       </div>
     </header>
     <slot />
+    <script>
+      document.querySelector<HTMLAnchorElement>('.skip')?.addEventListener('click', () => {
+        document.getElementById('doc')?.focus({ preventScroll: true })
+      })
+    </script>
   </body>
 </html>

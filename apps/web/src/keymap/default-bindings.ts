@@ -49,10 +49,12 @@ export function defaultPlatformKeyBindings(
   const shell = shellKeys
     ? terminalShellKeysPack.map((entry) => presetBinding(entry, platform))
     : []
-  const appWidgets = applicationBindings.map(({ firesWhileTyping, ...entry }) => ({
-    ...presetBinding(entry, platform),
-    firesWhileTyping,
-  }))
+  const appWidgets = applicationBindings.map<PlatformKeyBinding>(
+    ({ firesWhileTyping, ...entry }) => ({
+      ...presetBinding(entry, platform),
+      firesWhileTyping,
+    }),
+  )
   const widgets = baseEditorKeymap[platform].map((entry) => presetBinding(entry, platform))
   const readOnly = readonlyDiffPack[platform].map((entry) => presetBinding(entry, platform))
   if (preset === 'vscode') {
@@ -61,7 +63,7 @@ export function defaultPlatformKeyBindings(
       pack[platform].map((entry) => presetBinding(entry, platform)),
     )
     const terminal = terminalDefaultPack[platform].map((entry) => presetBinding(entry, platform))
-    return [...app, ...appWidgets, ...widgets, ...editor, ...terminal, ...readOnly, ...shell]
+    return app.concat(appWidgets, widgets, editor, terminal, readOnly, shell)
   }
   const current = presetRuntimeRows.filter(
     (row) => row[1] === (platform === 'mac' ? 'mac' : 'linux'),
@@ -84,16 +86,12 @@ export function defaultPlatformKeyBindings(
   })
   const fregat = preset === 'ours' ? fregatBindings(platform, bindings) : []
   const cancel = editorCancelRows(platform).map((entry) => presetBinding(entry, platform))
-  return [...appWidgets, ...widgets, ...bindings, ...fregat, ...cancel, ...readOnly, ...shell].map(
-    itemKeyTyping,
-  )
+  return appWidgets.concat(widgets, bindings, fregat, cancel, readOnly, shell).map(itemKeyTyping)
 }
 
-const ITEM_COMMANDS: ReadonlySet<string> = new Set([
-  ...ITEM_POSITIONS.map(selectItemCommandId),
-  'workspace.nextItem',
-  'workspace.previousItem',
-])
+const ITEM_COMMANDS: ReadonlySet<string> = new Set<string>(ITEM_POSITIONS.map(selectItemCommandId))
+  .add('workspace.nextItem')
+  .add('workspace.previousItem')
 
 /**
  * Zed's tab keys act in every pane, the terminal and the chat composer included, so the Zed-based
@@ -117,9 +115,13 @@ const EDITOR_CANCEL_COMMANDS: ReadonlySet<string> = new Set([
  * layouts take their Escape rows from the VS Code packs; later rows win ties.
  */
 function editorCancelRows(platform: PlatformName) {
-  return [...vscodeFindPack[platform], ...suggestPack[platform]].filter(
-    (entry) => isEscape(entry.keys) && EDITOR_CANCEL_COMMANDS.has(entry.command),
-  )
+  const find: EditorKeymapPack[PlatformName] = vscodeFindPack[platform]
+  return find
+    .concat(suggestPack[platform])
+    .filter(
+      (entry) =>
+        isEscape(entry.keys) && entry.command !== null && EDITOR_CANCEL_COMMANDS.has(entry.command),
+    )
 }
 
 function isEscape(keys: KeymapEntry['keys']) {

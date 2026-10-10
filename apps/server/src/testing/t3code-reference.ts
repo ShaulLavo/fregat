@@ -9,8 +9,8 @@ const REFERENCE = path.resolve(import.meta.dirname, '../../../../references/t3co
 const SETUP = `git clone https://github.com/pingdotgg/t3code references/t3code && git -C references/t3code checkout ${T3CODE_PIN}`
 
 /**
- * Alignment tests compare against the pinned t3code checkout, which exists only on a developer
- * machine (CI does not fetch it). Without it the test is skipped and says how to get it.
+ * Manual alignment tests compare against the pinned t3code checkout.
+ * Without it the test is skipped and says how to get it.
  */
 export function requireT3codeReference(skip: TestContext['skip']) {
   if (!existsSync(REFERENCE)) skip(`references/t3code is absent; from the repo root run: ${SETUP}`)

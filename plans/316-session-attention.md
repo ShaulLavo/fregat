@@ -34,7 +34,7 @@ Keep the derived presentation rule local to the session rail. The existing item 
 
 Run the focused presentation tests and the relevant `apps/web/src/features/chat-mode/components/tests/session-rail.test.tsx` cases. Use actual session projections from the existing fixtures. An approval or error that arrives while a session is running immediately restores full weight. An unread completion remains prominent until the existing read action acknowledges it.
 
-Run `bun run agent:browser scenario session-rail-attention` and `look` through the heavy wrapper. Read the screenshots back in light and dark themes. The finished unread row must be the clear focal point among working rows. Arrow-key navigation, selection, marking, hover, and dragging must remain readable. On touch, selecting a row restores full weight without requiring hover. Check the receded row's usable contrast and adjust the approved shared treatment if the measured theme combination fails.
+Run `bun run agent:browser scenario session-rail-attention` and `look` through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill. Read the screenshots back in light and dark themes. The finished unread row must be the clear focal point among working rows. Arrow-key navigation, selection, marking, hover, and dragging must remain readable. On touch, selecting a row restores full weight without requiring hover. Check the receded row's usable contrast and adjust the approved shared treatment if the measured theme combination fails.
 
 ## Delivery
 

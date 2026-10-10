@@ -31,7 +31,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 ## Reference Clones
 
 - Upstream clones (vscode, t3code, opencode, codex, …) belong in gitignored root `references/`. Check there before cloning. Tests and `scripts/parity` resolve `references/t3code` relatively; CI skips these checks because it does not fetch the clone.
-- Pull outdated clones before use. For pinned upstream commits (Plan 126), record the new head and changes in the plan.
+- Pull outdated clones before use. T3 Code architecture uses the published nightly pinned in `plans/343-t3code-nightly/reference-pin.json`; follow `docs/t3code-reference.md`. Plan 126 comparison records retain their historical pin. Record a reviewed nightly delta before changing the active pin.
 
 ## Code Organization
 
@@ -53,6 +53,16 @@ Read the applicable skills before writing or reviewing code, or running their wo
 - No version-skew code. Web app, server, desktop launcher, native hosts and remote machines ship together; when versions differ, things may break until a refresh or restart. Write no fallback, timeout, error path or test whose only purpose is one particular mismatch, and treat review findings that only matter across versions as out of scope. Generic handling that also serves future changes and bugs stays: a bridge that answers every request it cannot read with a structured error is fine.
 - Measure performance before and after. Identify whether data layout or design is the bottleneck before tuning.
 - Before debugging, prove the observation works on a known-good case. A theory needing a second special case must be re-derived from raw evidence.
+
+## Array construction
+
+- Combine arrays with `concat`: `first.concat(second, third)`. Use it for append/prepend constructions too; group literal items into array arguments. Do not concatenate arrays with multiple spreads in an array literal.
+- When converting an iterable and mapping its elements, prefer `Array.from(iterable, mapper)` over `[...iterable].map(mapper)` or `Array.from(iterable).map(mapper)`. Preserve a deliberate snapshot when the mapper can mutate or reenter the iterable; `Array.from` maps while consuming it.
+- Sort or reverse owned arrays in place when their original order is no longer needed. Use `toSorted` or `toReversed` for borrowed ordinary arrays, replacing `[...items].sort()` / `[...items].reverse()` and unmapped `Array.from(items).sort()` / `.reverse()`. Ownership and later use decide whether a copy is needed.
+- Use fresh array results directly. `map`, `filter`, `flatMap`, array `slice`, `concat`, `Array.from`, and `toSorted` already allocate: no `[...items.map(fn)]`, `[...items].map(fn)`, or another copy around them.
+- Keep a copy only for a real ownership or representation requirement. Copying borrowed arrays before mutation can be necessary; converting Sets, iterators, strings, DOM collections, or typed arrays to ordinary arrays can be necessary. Typed-array `map`/`filter`/`slice` results still need conversion when an ordinary array is required. Preserve tuple types, sparse-array behavior, and evaluation order.
+- Readonly input is a callee contract: widen internal read-only parameters to `readonly` instead of copying to satisfy TypeScript. Give heterogeneous concatenations the destination element type; do not add casts or extra copies to satisfy `concat` overloads.
+- A performance exception needs measurements on the affected path and a short explanation at the call site.
 
 ## Copy
 
@@ -108,9 +118,10 @@ Read the applicable skills before writing or reviewing code, or running their wo
 
 ## Dev, Gates, Verification
 
+- Bundle size is not gated; deal with it when it's a real problem (owner, 2026-10-09).
 - Follow `README.md` and `docs/development.md` for development setup; Mesh is an optional integration. Browser verification uses an isolated state home. `/dev` is the component gallery; add a tab for anything worth eyeballing.
 - A private dev server takes an explicit free `--port` on a known loopback address, and stops after verification.
-- Run the narrowest checks that can catch the change's plausible failures. Heavy-job scheduling and resource limits belong to the execution host's local instructions (on the owner's machine, the `fregat-local` skill).
+- Run the narrowest checks that can catch the change's plausible failures. Heavy-job scheduling and resource limits belong to the execution host's local instructions. The owner uses the private `ShaulLavo/heavy-runner` tool documented in the local `fregat-local` skill; contributor commands and CI run independently of it.
 - `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`, `query:check`, `unused:check`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
 - Prove changes with the `verify-fregat` skill (`bun run agent:browser look|scenario|trace|renders|caches`); use the evidence directory the command reports. Read the screenshot back and name the directory. Performance claims cite `trace --compare`, render claims `renders` before and after, settlement claims `caches`. Reproduce a bug on its surface before fixing it. A surface with no scenario gets one in `scripts/agent/scenarios/`, selectors in `scripts/agent/selectors.ts`.
 

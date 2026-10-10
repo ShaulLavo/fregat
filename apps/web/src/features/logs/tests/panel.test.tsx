@@ -27,7 +27,7 @@ test.each(['summary', 'events', 'both'])(
     act(() => {
       if (failedQuery === 'summary') {
         queryClient.setQueriesData(
-          { queryKey: [...logsKeys.all, 'events'] },
+          { queryKey: [...logsKeys.all, 'events'] as const },
           { detailsById: {}, events: [], nextCursor: null, total: 0 },
         )
       }
@@ -50,7 +50,7 @@ test('shows loading before declaring an empty log result', async () => {
 
   act(() => {
     queryClient.setQueriesData(
-      { queryKey: [...logsKeys.all, 'events'] },
+      { queryKey: [...logsKeys.all, 'events'] as const },
       { detailsById: {}, events: [], nextCursor: null, total: 0 },
     )
   })

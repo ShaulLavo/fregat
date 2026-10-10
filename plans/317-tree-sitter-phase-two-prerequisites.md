@@ -46,4 +46,4 @@ Run the fixture loader/registry tests, `npm run fixtures:check`, and the relevan
 
 ## Delivery
 
-Use a tree-sitter-x worktree and its repository instructions. Run heavy checks through Fregat's installed heavy wrapper. Commit owned paths, push a reviewed PR, and link its evidence from this central plan and the fork's compatibility plan. Update root scheduling with preparation completion and the remaining owner-controlled stop before Phase 2. No application deployment, pilot, mapping optimization, or new oracle campaign is part of this preparation.
+Use a tree-sitter-x worktree and its repository instructions. Run heavy checks through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill. Commit owned paths, push a reviewed PR, and link its evidence from this central plan and the fork's compatibility plan. Update root scheduling with preparation completion and the remaining owner-controlled stop before Phase 2. No application deployment, pilot, mapping optimization, or new oracle campaign is part of this preparation.

@@ -1,8 +1,8 @@
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
-// NOT-PORTABLE: Prerequisite guard omits ssh, which the integration fixture requires.
-const available = process.platform === 'linux' && Bun.which('sshd') && Bun.which('ssh-keygen')
+const available =
+  process.platform === 'linux' && Bun.which('sshd') && Bun.which('ssh-keygen') && Bun.which('ssh')
 const scenario = path.join(import.meta.dirname, '../../../test/service-openssh-scenario.ts')
 
 test.skipIf(!available).each([

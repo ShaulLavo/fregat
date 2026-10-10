@@ -1,3 +1,5 @@
+import { recordEditorPerformanceDiagnostic } from '../editor/performanceDiagnostics'
+import { contentReadingBounds } from './contentLayout'
 import { completeRowPresentation, invalidateRowPresentations } from '../rowPresentation'
 import { createError } from '../logging/errors'
 import { pointViewport } from './pointViewport'
@@ -71,7 +73,8 @@ import type {
   VirtualizedCaretPosition,
   VirtualizedCaretPositions,
 } from './virtualizedTextViewTypes'
-import type { RevealBlock, VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
+import type { RevealBlock } from './revealBlock'
+import type { VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
 import {
   type RowInlineMapping,
   offsetForLocalIndex,
@@ -82,6 +85,7 @@ import {
   type RenderedChunkParts,
   boundaryPositionXsForAffinity,
   clearRowGeometryCaches,
+  releaseNativeRowGeometry,
   createRenderedChunkParts,
   createTextChunkParts,
   domBoundaryForOffset,
@@ -99,6 +103,7 @@ import {
 import { memoizedContainsRTL } from './virtualizedTextViewBidi'
 import type { GlyphAdvances } from './glyphAdvances'
 import { columnAtPixels, pixelsBeforeColumn } from './proportionalRows'
+import { PROPORTIONAL_INTACT_NODE_CEILING } from './nativeCarets'
 
 const GUTTER_CELL_CLASS = 'editor-virtualized-gutter-cell'
 const CURSOR_LINE_ROW_CLASS = 'editor-virtualized-cursor-line-row'
@@ -118,7 +123,6 @@ const pendingInlineWidgetRepaints = new WeakMap<VirtualizedTextViewInternal, () 
 
 type RowUpdatePass = {
   readonly cursorBufferRow: number | null
-  readonly cursorVirtualRow: number | null
   readonly cursorLineHighlight: VirtualizedTextViewInternal['cursorLineHighlight']
   readonly foldMarkers: ReadonlyMap<number, VirtualizedFoldMarker>
   readonly lineCount: number
@@ -127,7 +131,6 @@ type RowUpdatePass = {
 
 type RowUpdateState = EditorGutterRowContext &
   MeasuredText & {
-    readonly cursorVirtualLine: boolean
     readonly inlineMapping: RowInlineMapping | null
   }
 
@@ -204,6 +207,7 @@ export function renderRows(
   reconcileRows(view, snapshot.virtualItems, snapshot, updatePass, onRemoveSlot)
   if (view.disposed) return
   renderHiddenCharacters(view)
+  if (!view.monospace) updateContentWidth(view, snapshot.virtualItems)
 }
 
 function reconcileRows(
@@ -573,7 +577,6 @@ function createRowUpdatePass(
 ): RowUpdatePass {
   return {
     cursorBufferRow: cursorLineBufferRow(view),
-    cursorVirtualRow: cursorLineVirtualRow(view),
     cursorLineHighlight: view.cursorLineHighlight,
     foldMarkers: foldMarkersForPass(view, rows),
     lineCount: view.model.lineCount,
@@ -635,9 +638,8 @@ function rowUpdateState(
     inlineMapping: rowInlineMappingForDisplayRow(displayRow),
     kind: displayRow?.kind ?? 'text',
     primaryText,
-    cursorLine: primaryText && bufferRow === updatePass.cursorBufferRow,
+    cursorLine: isDocumentTextDisplayRow(displayRow) && bufferRow === updatePass.cursorBufferRow,
     cursorLineHighlight: updatePass.cursorLineHighlight,
-    cursorVirtualLine: index === updatePass.cursorVirtualRow,
     foldMarker: primaryText ? (updatePass.foldMarkers.get(bufferRow) ?? null) : null,
     lineCount: updatePass.lineCount,
     toggleFold: updatePass.toggleFold,
@@ -663,9 +665,8 @@ function mountedRowUpdateState(
     inlineMapping: row.inlineMapping ?? null,
     kind: row.kind,
     primaryText,
-    cursorLine: primaryText && row.bufferRow === updatePass.cursorBufferRow,
+    cursorLine: row.source === 'document' && row.bufferRow === updatePass.cursorBufferRow,
     cursorLineHighlight: updatePass.cursorLineHighlight,
-    cursorVirtualLine: row.index === updatePass.cursorVirtualRow,
     foldMarker: primaryText ? (updatePass.foldMarkers.get(row.bufferRow) ?? null) : null,
     lineCount: updatePass.lineCount,
     toggleFold: updatePass.toggleFold,
@@ -713,7 +714,7 @@ function updateRow(
 ): void {
   if (isRowCurrent(view, row, item, snapshot, updatePass)) {
     const state = mountedRowUpdateState(view, row, updatePass)
-    updateCursorLineContentClass(view, row, state.cursorVirtualLine)
+    updateCursorLineContentClass(view, row, state.cursorLine)
     updateGutterRowElement(view, row, item, state)
     if (view.disposed) return
     updateMountedRowPaintFacts(row, state)
@@ -773,7 +774,7 @@ function updateRowElement(
 ): void {
   updateRowFrame(view, row, item)
   applyRowDecoration(view, row, item.index)
-  updateCursorLineContentClass(view, row, state.cursorVirtualLine)
+  updateCursorLineContentClass(view, row, state.cursorLine)
   updateRowInlineKindClasses(row, state.kind === 'text' ? state.inlineMapping : null)
   updateGutterRowElement(view, row, item, state)
   if (view.disposed) return
@@ -966,6 +967,27 @@ function updateRowTextChunks(
 ): void {
   const { text } = content
   setCoreBidiRefusal(row, false)
+  if (!view.monospace) {
+    const rtl = memoizedContainsRTL(view, content)
+    const ceiling = rtl ? BIDI_LINE_MEASUREMENT_CEILING : PROPORTIONAL_INTACT_NODE_CEILING
+    let geometry = 'native'
+    if (!isSimpleRowText(content)) geometry = 'rendered'
+    if (mapping) geometry = 'inline'
+    if (!rtl && text.length >= ceiling) {
+      geometry = 'approximate'
+      recordEditorPerformanceDiagnostic('view.nativeShaping.degraded', () => ({
+        reason: 'line-length',
+        length: text.length,
+        ceiling,
+        path: 'bounded-shaped-runs',
+      }))
+    }
+    row.element.dataset.editorShapingGeometry = geometry
+    row.element.dataset.editorShapingCeiling = String(ceiling)
+  } else {
+    delete row.element.dataset.editorShapingGeometry
+    delete row.element.dataset.editorShapingCeiling
+  }
   const runs = inlineRowRuns(mapping, text)
   const refusal = bidiMeasurementRefusal(view, content)
   if (refusal) {
@@ -999,7 +1021,7 @@ function setDirectRowText(
 
   // Splitting costs the row the in-place `Text.data` patch it lives on while the user types, so a
   // row short enough to be scanned cheaply keeps its single node and pays nothing.
-  if (!isSimpleRowText(content) || text.length > MAX_SINGLE_NODE_ROW_LENGTH) {
+  if (!isSimpleRowText(content) || (view.monospace && text.length > MAX_SINGLE_NODE_ROW_LENGTH)) {
     setRenderedDirectRowText(view, row, content, startOffset, mapping)
     return
   }
@@ -1318,7 +1340,7 @@ function inlineRowWindow(
   widgets: readonly InlineWidgetRun[],
   snapshot = view.virtualizer.getSnapshot(),
 ): HorizontalChunkWindow {
-  if (!shouldChunkLine(view, content)) return { start: 0, end: content.text.length }
+  if (!shouldChunkLine(view, content, true)) return { start: 0, end: content.text.length }
   measureUnobservedInlineWidgets(view, widgets)
   const window = horizontalChunkWindow(view, content, snapshot, widgets)
   let start = window.start
@@ -2025,8 +2047,16 @@ function createSplitTextChunkParts(
   return { nodes, parts, textNode: nodes[0]!, oversizedGrapheme: false }
 }
 
-function shouldChunkLine(view: VirtualizedTextViewInternal, content: MeasuredText): boolean {
+function shouldChunkLine(
+  view: VirtualizedTextViewInternal,
+  content: MeasuredText,
+  inline = false,
+): boolean {
   const { text } = content
+  if (!view.monospace) {
+    if (text.length >= PROPORTIONAL_INTACT_NODE_CEILING) return !memoizedContainsRTL(view, content)
+    if (!inline) return false
+  }
   if (typeof text !== 'string') return !memoizedContainsRTL(view, content)
   if (view.wrapEnabled) return false
   if (text.length <= view.longLineChunkThreshold) return false
@@ -2124,7 +2154,7 @@ function rowChunkKey(
   snapshot = view.virtualizer.getSnapshot(),
   mapping: RowInlineMapping | null = null,
 ): string {
-  if (!shouldChunkLine(view, content)) return 'direct'
+  if (!shouldChunkLine(view, content, mapping !== null)) return 'direct'
 
   // Only the aligned window bounds describe what the row rendered. Folding the raw scroll position
   // or viewport width in would invalidate the row — and the geometry measured for it — on every
@@ -2150,6 +2180,7 @@ function horizontalChunkWindow(
   snapshot = view.virtualizer.getSnapshot(),
   widgets: readonly InlineWidgetRun[] = [],
 ): HorizontalChunkWindow {
+  if (view.scrollMode === 'content') return { start: 0, end: content.text.length }
   if (view.glyphs) {
     return proportionalChunkWindow(view, content, snapshot, view.glyphs, widgets)
   }
@@ -2257,9 +2288,8 @@ function horizontalWindowKey(
   let key = ''
   for (const item of items) {
     const content = lineContent(view, item.index)
-    if (!shouldChunkLine(view, content)) continue
-
     const mapping = rowInlineMappingForDisplayRow(view.model.projection.getRow(item.index))
+    if (!shouldChunkLine(view, content, mapping !== null)) continue
     const widgets = inlineRowRuns(mapping, content.text).widgets
     const window = inlineRowWindow(view, content, widgets, snapshot)
     key += `${item.index}:${window.start}:${window.end}|`
@@ -2318,7 +2348,8 @@ function updateMountedGutterFacts(
     gutterNumberCursorLine: boolean
     gutterCursorLineBackgroundLaneIds: readonly string[]
   }
-  mutable.gutterNumberCursorLine = state.cursorLine && view.cursorLineHighlight.gutterNumber
+  mutable.gutterNumberCursorLine =
+    state.primaryText && state.cursorLine && view.cursorLineHighlight.gutterNumber
   setCursorLineGutterBand(
     row.gutterElement,
     state.cursorLine &&
@@ -2387,13 +2418,6 @@ export function cursorLineBufferRow(view: VirtualizedTextViewInternal): number |
   return bufferRowForOffset(view, view.selectionHead!)
 }
 
-export function cursorLineVirtualRow(view: VirtualizedTextViewInternal): number | null {
-  const selection = view.selections[0]
-  if (!selection || selection.start !== selection.end) return null
-
-  return rowForCaretPosition(view, selection.head, selection.affinity)
-}
-
 function hasCollapsedSelection(view: VirtualizedTextViewInternal): boolean {
   if (view.selectionHead === null) return false
   if (view.selectionStart === null || view.selectionEnd === null) return false
@@ -2404,50 +2428,21 @@ function hasCollapsedSelection(view: VirtualizedTextViewInternal): boolean {
 export function refreshCursorLineRows(
   view: VirtualizedTextViewInternal,
   previousBufferRow: number | null,
-  previousVirtualRow: number | null,
 ): void {
   const nextBufferRow = cursorLineBufferRow(view)
-  const nextVirtualRow = cursorLineVirtualRow(view)
-  if (previousBufferRow === nextBufferRow && previousVirtualRow === nextVirtualRow) return
+  if (previousBufferRow === nextBufferRow) return
 
-  const rows = [...view.rowElements.values()].filter((row) =>
-    shouldRefreshCursorLineRow(
-      row,
-      previousBufferRow,
-      nextBufferRow,
-      previousVirtualRow,
-      nextVirtualRow,
-    ),
+  const rows = Array.from(view.rowElements.values()).filter(
+    (row) => row.bufferRow === previousBufferRow || row.bufferRow === nextBufferRow,
   )
   const updatePass = createRowUpdatePass(view, rows)
   for (const row of rows) {
-    updateCursorLineContentClass(view, row, row.index === nextVirtualRow)
-    refreshCursorLineGutterCells(view, row, updatePass)
+    const state = mountedRowUpdateState(view, row, updatePass)
+    updateCursorLineContentClass(view, row, state.cursorLine)
+    updateMountedGutterFacts(view, row, state)
+    if (view.gutterContributions.length === 0) continue
+    updateGutterContributionCells(view, row, state)
   }
-}
-
-function shouldRefreshCursorLineRow(
-  row: MountedVirtualizedTextRow,
-  previousBufferRow: number | null,
-  nextBufferRow: number | null,
-  previousVirtualRow: number | null,
-  nextVirtualRow: number | null,
-): boolean {
-  if (row.index === previousVirtualRow || row.index === nextVirtualRow) return true
-
-  return row.bufferRow === previousBufferRow || row.bufferRow === nextBufferRow
-}
-
-function refreshCursorLineGutterCells(
-  view: VirtualizedTextViewInternal,
-  row: MountedVirtualizedTextRow,
-  updatePass: RowUpdatePass,
-): void {
-  const state = mountedRowUpdateState(view, row, updatePass)
-  updateMountedGutterFacts(view, row, state)
-  if (view.gutterContributions.length === 0) return
-
-  updateGutterContributionCells(view, row, state)
 }
 
 function updateCursorLineContentClass(
@@ -2757,6 +2752,7 @@ function releaseRowsOutside(
     if (index >= start && index < end) continue
     invalidateRowPresentations(row.element)
     view.rowElements.delete(index)
+    releaseNativeRowGeometry(row)
     markRowRetired(row)
     reusableRows.push(row)
   }
@@ -2913,7 +2909,7 @@ export function updateContentWidth(
     return
   }
 
-  if (view.wrapEnabled) scanVisualColumns(view, first.index, last.index)
+  if (view.wrapEnabled || !view.monospace) scanVisualColumns(view, first.index, last.index)
   else scanVisualWidthRange(view, first.index, last.index)
   applyContentWidth(view, view.maxVisualColumnsSeen)
 }
@@ -2964,7 +2960,7 @@ function scanVisualColumns(
 // once they mount. A proportional row counts in average-width columns of its measured advances.
 function estimatedDisplayRowColumns(view: VirtualizedTextViewInternal, rowIndex: number): number {
   const mounted = view.rowElements.get(rowIndex)
-  if (view.wrapEnabled && mounted?.kind === 'text') {
+  if (mounted?.kind === 'text' && (view.wrapEnabled || !view.monospace)) {
     const width = knownRowScrollWidth(view, mounted)
     if (width !== null) return width / characterWidth(view)
   }
@@ -3023,7 +3019,9 @@ export function visibleGutterWidth(
 }
 
 export function spacerWidth(view: VirtualizedTextViewInternal, viewportWidth: number): number {
-  return Math.max(viewportWidth, view.contentWidth + gutterWidth(view) + characterWidth(view))
+  if (view.scrollMode === 'content') return viewportWidth
+  const width = view.contentWidth + gutterWidth(view) + characterWidth(view)
+  return Math.max(viewportWidth, view.monospace ? width : Math.ceil(width))
 }
 
 export function applyRowHeight(view: VirtualizedTextViewInternal, rowHeight: number): void {
@@ -3051,7 +3049,7 @@ function applyTotalHeight(
 export function getMountedRows(
   view: VirtualizedTextViewInternal,
 ): readonly MountedVirtualizedTextRow[] {
-  return Array.from(view.rowElements.values()).toSorted((a, b) => a.index - b.index)
+  return Array.from(view.rowElements.values()).sort((a, b) => a.index - b.index)
 }
 
 export function textOffsetFromDomBoundary(
@@ -3369,7 +3367,7 @@ function viewportTextX(
   right: number,
   scrollLeft: number,
 ): number {
-  const viewportX = clamp(clientX, left, right) - left
+  const viewportX = (view.scrollMode === 'content' ? clientX : clamp(clientX, left, right)) - left
   const scrolledX = viewportX + scrollLeft
   return Math.max(0, scrolledX - gutterWidth(view))
 }
@@ -3423,7 +3421,12 @@ function caretPositionAtX(
 }
 
 export function pageRowDelta(view: VirtualizedTextViewInternal): number {
-  const { viewportHeight } = view.virtualizer.getSnapshot()
+  let viewportHeight = view.virtualizer.getSnapshot().viewportHeight
+  if (view.scrollMode === 'content') {
+    const bounds = contentReadingBounds(view.scrollElement)
+    viewportHeight =
+      Math.max(0, bounds.bottom - bounds.top) / pointViewport(view.scrollElement).scale
+  }
   return Math.max(1, Math.floor(viewportHeight / rowStride(view)) - 1)
 }
 
@@ -3439,6 +3442,7 @@ export function paintProvisionalRows(
   const slots: MountedVirtualizedTextRow[] = []
   for (const row of view.rowElements.values()) {
     invalidateRowPresentations(row.element)
+    releaseNativeRowGeometry(row)
     markRowRetired(row)
     row.element.remove()
     row.gutterElement.remove()

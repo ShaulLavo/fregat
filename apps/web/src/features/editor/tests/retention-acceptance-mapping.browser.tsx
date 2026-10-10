@@ -202,10 +202,9 @@ test.for(['folded', 'wrapped'] as const)(
     if (!first) return
     const wrongStyle = {
       ...frame,
-      runs: [
-        { ...first, style: { ...first.style, color: 'deliberately wrong color' } },
-        ...frame.runs.slice(1),
-      ],
+      runs: [{ ...first, style: { ...first.style, color: 'deliberately wrong color' } }].concat(
+        frame.runs.slice(1),
+      ),
     }
     expect(retentionAcceptanceProjectionMismatch(wrongStyle, projection)).not.toBeNull()
     const shifted = {

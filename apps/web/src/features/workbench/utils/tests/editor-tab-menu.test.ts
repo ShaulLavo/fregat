@@ -88,8 +88,8 @@ test('the copy items stay enabled for a tab that is no longer open', () => {
 })
 
 test('each close item asks for exactly the tabs its name promises', () => {
-  const closed: string[][] = []
-  const menu = items(menuContext({ closeTabs: (tabIds) => closed.push([...tabIds]) }))
+  const closed: (readonly string[])[] = []
+  const menu = items(menuContext({ closeTabs: (tabIds) => closed.push(tabIds) }))
 
   byId(menu, 'close').run()
   byId(menu, 'closeOthers').run()

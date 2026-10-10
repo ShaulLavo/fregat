@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/lsp",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "A Language Server Protocol client with WebSocket and worker transports.",
   "keywords": [
     "browser",

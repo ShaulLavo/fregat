@@ -66,21 +66,22 @@ export function transcriptFilename(title: string, format: TranscriptFormat) {
 }
 
 function transcriptParts(transcript: OrchestrationSessionTranscript): TranscriptPart[] {
-  const parts: TranscriptPart[] = [
-    ...transcript.session.messages.map((message) => ({
+  const parts: TranscriptPart[] = transcript.session.messages
+    .map<TranscriptPart>((message) => ({
       kind: 'message' as const,
       createdAt: message.createdAt,
       message,
-    })),
-    ...chatWorkLogEntries({ activities: transcript.session.activities })
-      .filter((entry) => !entry.plan)
-      .map((entry) => ({ kind: 'step' as const, createdAt: entry.createdAt, entry })),
-    ...transcript.proposedPlans.map((plan) => ({
-      kind: 'plan' as const,
-      createdAt: plan.createdAt,
-      plan,
-    })),
-  ]
+    }))
+    .concat(
+      chatWorkLogEntries({ activities: transcript.session.activities })
+        .filter((entry) => !entry.plan)
+        .map((entry) => ({ kind: 'step' as const, createdAt: entry.createdAt, entry })),
+      transcript.proposedPlans.map((plan) => ({
+        kind: 'plan' as const,
+        createdAt: plan.createdAt,
+        plan,
+      })),
+    )
   // A stable sort keeps each source's own order for rows stamped the same instant.
   return parts.sort((left, right) => left.createdAt.localeCompare(right.createdAt))
 }
@@ -94,8 +95,7 @@ function partLines(part: Exclude<TranscriptPart, { kind: 'step' }>) {
     `## ${ROLE_HEADINGS[message.role]}`,
     '',
     messageMarkdown(message).trim() || '_(no text)_',
-    ...(attachments.length > 0 ? ['', `Attachments: ${attachments.join(', ')}`] : []),
-  ]
+  ].concat(attachments.length > 0 ? ['', `Attachments: ${attachments.join(', ')}`] : [])
 }
 
 function stepLine(entry: ChatWorkLogEntry) {
@@ -112,5 +112,5 @@ function inlineCode(value: string) {
 }
 
 function flushSteps(steps: readonly string[]) {
-  return steps.length > 0 ? ['', ...steps] : []
+  return steps.length > 0 ? [''].concat(steps) : []
 }

@@ -114,7 +114,7 @@ export function createBrowserDispatcher(options: BrowserDispatcherOptions = {}):
     return () => void observers.delete(registration)
   }
   function notifyObservers(notify: (observer: BrowserKeyObserver) => void) {
-    for (const registration of [...observers]) {
+    for (const registration of Array.from(observers)) {
       if (observers.has(registration)) notify(registration.observer)
     }
   }

@@ -96,3 +96,19 @@ Deploy verified implementation with `bun run install-release`, or
 
 A second native input engine, Vim/Helix modes, untitled document lifecycle, and
 completion acceptance extensions from Plan 223.
+
+## Follow-up verification finding, 2026-10-10
+
+- [ ] Resolve the demo's newline event assertion on Chromium on the Raspberry Pi.
+      Run `bun run --cwd editor/examples/app test:e2e -- --workers=1 --grep 'routes native line break'`.
+      `editor/examples/app/test/editor-input.spec.ts:208` expects
+      `beforeinput:insertLineBreak:` in the captured input events but receives an empty
+      array after 5 seconds. The preceding assertion confirms that Enter inserts
+      `abc\ndef` at the intended caret. This occurred twice, including with the original
+      demo source at `917e6da49` restored, ruling out lazy GitHub loading. The test creates
+      a standalone editor from source and replaces the demo shell. Inspect
+      `installInputEventProbe` at line 17 and the textarea/EditContext input dispatch in
+      `editor/packages/editor/src/editor/inputSelectionController.ts` before changing
+      the event expectation. Typing, Space, Tab, focus, history and live diff checks passed.
+      Evidence is retained locally in
+      `/work/tmp/fregat-evidence/20261010t110053-heavy-4cb273e69898-cc26f1-pi/playwright/`.

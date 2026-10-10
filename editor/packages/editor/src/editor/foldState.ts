@@ -85,7 +85,7 @@ export class EditorFoldState {
 
   public get folds(): readonly FoldRange[] {
     if (!this.indexedFolds) return this.projectedFolds
-    return [...this.indexedFolds.all(), ...this.projectedFolds]
+    return this.indexedFolds.all().concat(this.projectedFolds)
   }
 
   public ranges(startRow: number, endRow: number): readonly FoldRange[] {
@@ -93,7 +93,7 @@ export class EditorFoldState {
       (fold) => fold.startLine <= endRow && fold.endLine >= startRow,
     )
     if (!this.indexedFolds) return contributed
-    return [...this.indexedFolds.ranges(startRow, endRow), ...contributed]
+    return this.indexedFolds.ranges(startRow, endRow).concat(contributed)
   }
 
   public get collapsedFoldCount(): number {
@@ -288,7 +288,8 @@ export class EditorFoldState {
       size: (index?.count ?? 0) + contributed.length,
       readRows: (rows) => indexedMarkersForRows(index, contributed, collapsedKeys, rows),
       all: () => {
-        markers ??= [...(index?.all() ?? EMPTY_FOLDS), ...contributed]
+        markers ??= (index?.all() ?? EMPTY_FOLDS)
+          .concat(contributed)
           .map((fold) => foldMarkerFromRange(fold, collapsedKeys.has(foldRangeKey(fold))))
           .sort((left, right) => left.startRow - right.startRow || left.endRow - right.endRow)
         return markers
@@ -484,7 +485,7 @@ function pairedByNearestRowSpan(
   const paired: CollapseInheritance[] = []
   const takenFolds = new Set<FoldRange>()
   const takenRegions = new Set<ResolvedCollapsedRegion>()
-  for (const candidate of candidates.toSorted((a, b) => a.rowSpanDelta - b.rowSpanDelta)) {
+  for (const candidate of candidates.sort((a, b) => a.rowSpanDelta - b.rowSpanDelta)) {
     if (takenFolds.has(candidate.fold) || takenRegions.has(candidate.entry)) continue
 
     takenFolds.add(candidate.fold)

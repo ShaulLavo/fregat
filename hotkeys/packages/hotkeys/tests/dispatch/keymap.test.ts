@@ -65,10 +65,9 @@ describe('Zed keymap resolution', () => {
     })
     expect(lookup(disabled, 'space w w', editor)).toEqual({ commands: [], pending: false })
 
-    const after: KeymapEntry[] = [
-      ...disabled,
+    const after: KeymapEntry[] = disabled.concat([
       { keys: 'Space W X', command: 'alpha', context: 'editor' },
-    ]
+    ])
     expect(lookup(after, 'space', editor).pending).toBe(true)
     const before: KeymapEntry[] = [
       disabled[0]!,

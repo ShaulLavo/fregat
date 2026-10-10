@@ -11,8 +11,7 @@ export async function launchHost(argv: readonly string[], env: NodeJS.ProcessEnv
         '--quiet',
         `--unit=platform-pty-${crypto.randomUUID()}`,
         '--',
-        ...argv,
-      ]
+      ].concat(argv)
     : [...argv]
   const child = Bun.spawn(command, { env, detached: true, stdio: ['ignore', 'ignore', 'ignore'] })
   child.unref()

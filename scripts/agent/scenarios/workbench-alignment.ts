@@ -17,20 +17,18 @@ const files = [
   'editor/a.ts',
   'editor/packages/collaboration/a.ts',
   'editor/packages/editor/a.ts',
-  ...Array.from(
+].concat(
+  Array.from(
     { length: 70 },
     (_, index) => `editor/packages/editor/item-${String(index).padStart(2, '0')}.ts`,
   ),
-]
+)
 const orderedRows = [
   'editor/',
   'editor/packages/',
   'editor/packages/collaboration/',
   'editor/packages/editor/',
-  ...files.slice(2),
-  'editor/a.ts',
-  'a.txt',
-]
+].concat(files.slice(2), ['editor/a.ts', 'a.txt'])
 type Measure = {
   record: (value: unknown) => void
   check: (condition: boolean, message: string) => void

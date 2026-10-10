@@ -1723,7 +1723,10 @@ describe('replacing the document an editor owns', () => {
   }
 
   function rowTexts(): readonly (string | null)[] {
-    return [...container.querySelectorAll('.editor-virtualized-row')].map((row) => row.textContent)
+    return Array.from(
+      container.querySelectorAll('.editor-virtualized-row'),
+      (row) => row.textContent,
+    )
   }
 
   async function flushEditor(): Promise<void> {

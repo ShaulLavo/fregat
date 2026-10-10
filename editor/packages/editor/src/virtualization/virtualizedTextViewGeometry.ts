@@ -1,4 +1,9 @@
 import { isHtmlElement } from '../dom'
+import {
+  createNativeCarets,
+  PROPORTIONAL_INTACT_NODE_CEILING,
+  type NativeCarets,
+} from './nativeCarets'
 import type { TextContent } from '../textContent'
 import type { MeasuredText } from '../textMeasurements'
 import {
@@ -37,6 +42,7 @@ import type {
 } from './virtualizedTextViewTypes'
 import type { VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
 import { bidiVisualRunIndexAt, memoizedContainsRTL } from './virtualizedTextViewBidi'
+import { pixelsBeforeColumn } from './proportionalRows'
 
 const CONTROL_CHARACTER_CLASS = 'editor-virtualized-control-character'
 // These are exactly the code units the renderer replaces with visible labels or fixed-width boxes.
@@ -466,11 +472,64 @@ export function clearRowGeometryCaches(view: VirtualizedTextViewInternal): void 
   for (const row of view.rowPool) clearRowGeometryCache(row)
 }
 
+type NativeRowCache = {
+  readonly carets: NativeCarets
+  readonly glyphs: VirtualizedTextViewInternal['glyphs']
+  readonly tabSize: number
+  readonly styles: string
+  readonly text: string
+  readonly node: Text
+}
+
+const nativeRows = new WeakMap<MountedVirtualizedTextRow, NativeRowCache>()
+
+export function releaseNativeRowGeometry(row: MountedVirtualizedTextRow): void {
+  nativeRows.delete(row)
+}
+
+function nativeRowCarets(
+  view: VirtualizedTextViewInternal,
+  row: MountedVirtualizedTextRow,
+): NativeCarets | null {
+  if (view.monospace || row.inlineMapping || row.text.length >= PROPORTIONAL_INTACT_NODE_CEILING)
+    return null
+  if (!isSimpleRowText(row) || row.textRenderMode !== 'simple') return null
+  if (row.chunks[0]?.localStart !== 0 || row.chunks.at(-1)?.localEnd !== row.text.length)
+    return null
+  const styles = `${row.inlineKindsClassName}:${row.rowDecorationKey}`
+  const cached = nativeRows.get(row)
+  if (
+    cached?.glyphs === view.glyphs &&
+    cached.tabSize === view.tabSize &&
+    cached.styles === styles &&
+    cached.text === row.textNode.data &&
+    cached.node === row.textNode
+  )
+    return cached.carets
+  const carets = createNativeCarets(row.element, row.textNode, () => rowClientRectScale(row))
+  nativeRows.set(row, {
+    carets,
+    glyphs: view.glyphs,
+    tabSize: view.tabSize,
+    styles,
+    text: row.textNode.data,
+    node: row.textNode,
+  })
+  recordEditorPerformanceDiagnostic('view.nativeShaping', () => ({
+    length: row.text.length,
+    ceiling: PROPORTIONAL_INTACT_NODE_CEILING,
+    path: 'mounted-intact',
+  }))
+  return carets
+}
+
 export function offsetToX(
   view: VirtualizedTextViewInternal,
   row: MountedVirtualizedTextRow,
   offset: number,
 ): number {
+  const native = nativeRowCarets(view, row)
+  if (native) return native.position(clamp(offset - row.startOffset, 0, row.text.length))
   const geometry = ensureRowGeometry(view, row)
   const clamped = clamp(offset, row.startOffset, row.endOffset)
   return xForOffset(geometry, clamped)
@@ -482,17 +541,35 @@ export function xToOffset(
   x: number,
   scale?: number,
 ): number {
+  const native = nativeRowCarets(view, row)
+  if (native) {
+    const before = native.columnAt(x, 'before')
+    const after = Math.min(row.text.length, before + 1)
+    const column = x - native.position(before) < native.position(after) - x ? before : after
+    return row.startOffset + column
+  }
   if (rowUsesCalculatedGeometry(view, row)) return calculatedXToOffset(view, row, x, scale)
 
   const geometry = ensureRowGeometry(view, row)
   return offsetForX(geometry, Math.max(0, x))
 }
 
-/** Null when the row's rendered width is only available for the price of a layout read. */
+/** Intact proportional rows settle their native end once; other measured paths can return null. */
 export function knownRowContentWidth(
   view: VirtualizedTextViewInternal,
   row: MountedVirtualizedTextRow,
 ): number | null {
+  const native = nativeRowCarets(view, row)
+  if (native) return native.position(row.text.length)
+  // A mounted window cannot supply the complete scroll extent of an approximate source row.
+  if (
+    !view.monospace &&
+    !row.inlineMapping &&
+    view.glyphs &&
+    row.text.length >= PROPORTIONAL_INTACT_NODE_CEILING &&
+    isSimpleRowText(row)
+  )
+    return pixelsBeforeColumn(row.text, row.text.length, view.glyphs, view.tabSize)
   const key = rowGeometryCacheKey(view, row)
   const cached = row.geometryCache as RowGeometryCache | null
   if (cached?.key === key && !cached.geometry.plan && Number.isFinite(cached.geometry.width))
@@ -1378,8 +1455,9 @@ export function createDomRangeForChunkRange(
   chunk: VirtualizedTextChunk,
   start: number,
   end: number,
+  purpose: 'geometry' | 'highlight' = 'geometry',
 ): Range | null {
-  const boundaries = domBoundariesForChunkRange(row, chunk, start, end)
+  const boundaries = domBoundariesForChunkRange(row, chunk, start, end, purpose)
   if (!boundaries) return null
 
   const range = document.createRange()
@@ -1395,7 +1473,7 @@ export function createStaticRangeForChunkRange(
   start: number,
   end: number,
 ): StaticRange | null {
-  const boundaries = domBoundariesForChunkRange(row, chunk, start, end)
+  const boundaries = domBoundariesForChunkRange(row, chunk, start, end, 'highlight')
   const StaticRangeConstructor = document.defaultView?.StaticRange
   if (!boundaries || !StaticRangeConstructor) return null
 
@@ -1412,17 +1490,47 @@ function domBoundariesForChunkRange(
   chunk: VirtualizedTextChunk,
   start: number,
   end: number,
+  purpose: 'geometry' | 'highlight',
 ): { readonly start: DomBoundary; readonly end: DomBoundary } | null {
   if (end <= start) return null
   if (end <= chunk.startOffset || start >= chunk.endOffset) return null
 
   const localStart = clampChunkLocal(chunk, rowLocalIndexForOffset(row, start, 'before'))
   const localEnd = clampChunkLocal(chunk, rowLocalIndexForOffset(row, end, 'after'))
+  if (purpose === 'highlight' && localEnd <= localStart) return null
   const startBoundary = domBoundaryForChunkLocalOffset(chunk, localStart)
-  const endBoundary = domBoundaryForChunkLocalOffset(chunk, localEnd)
+  const endBoundary = domBoundaryForChunkLocalOffset(
+    chunk,
+    localEnd,
+    purpose === 'highlight' ? 'before' : 'after',
+  )
   if (!startBoundary || !endBoundary) return null
+  if (purpose === 'geometry') return { end: endBoundary, start: startBoundary }
 
-  return { end: endBoundary, start: startBoundary }
+  return {
+    end: normalizedRangeBoundary(endBoundary, 'end'),
+    start: normalizedRangeBoundary(startBoundary, 'start'),
+  }
+}
+
+// Keep native highlights and snapshot capture bounded by the text they cover.
+function normalizedRangeBoundary(boundary: DomBoundary, side: 'start' | 'end'): DomBoundary {
+  if (boundary.node.nodeType === 3) return boundary
+  const child = boundary.node.childNodes[boundary.offset - (side === 'end' ? 1 : 0)]
+  if (!child) return boundary
+  if (child.nodeType === 3) {
+    const text = child as Text
+    return { node: text, offset: side === 'start' ? 0 : text.length }
+  }
+  const walker = child.ownerDocument!.createTreeWalker(child, 4)
+  let covered: Text | null = null
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!(node as Text).length) continue
+    covered = node as Text
+    if (side === 'start') break
+  }
+  if (!covered) return boundary
+  return { node: covered, offset: side === 'start' ? 0 : covered.length }
 }
 
 export function domBoundaryForOffset(
@@ -2034,7 +2142,7 @@ function collapsedBoundaryPositionXs(
   for (const boundary of boundaries) {
     appendDistinctBoundaryPositions(positions, collapsedBoundaryXs(measurement, boundary))
   }
-  return positions.toSorted((left, right) => left - right)
+  return positions.sort((left, right) => left - right)
 }
 
 function appendDistinctBoundaryPositions(positions: number[], candidates: readonly number[]): void {
@@ -2079,7 +2187,7 @@ function recoveredBidiBoundaryPositionXs(
   if (recoveredEdgesShareSeam(preceding, following, positions)) {
     return recoveredSameDirectionSeamXs(positions, collapsedXs)
   }
-  return positions.toSorted((left, right) => left - right)
+  return positions.sort((left, right) => left - right)
 }
 
 function recoveredEdgesShareSeam(
@@ -2757,11 +2865,9 @@ function appendUnmeasuredRangeSegment(
 }
 
 function mergeGeometryRangeSegments(
-  segments: readonly GeometryRangeSegment[],
+  segments: GeometryRangeSegment[],
 ): readonly GeometryRangeSegment[] {
-  const sorted = segments.toSorted(
-    (left, right) => left.left - right.left || left.width - right.width,
-  )
+  const sorted = segments.sort((left, right) => left.left - right.left || left.width - right.width)
   const merged: GeometryRangeSegment[] = []
   for (const segment of sorted) appendMergedGeometrySegment(merged, segment)
   return merged
@@ -3263,7 +3369,12 @@ function chunkForLocalOffset(
 function domBoundaryForChunkLocalOffset(
   chunk: VirtualizedTextChunk,
   local: number,
+  bias: 'before' | 'after' = 'after',
 ): DomBoundary | null {
+  if (bias === 'before') {
+    const previous = chunk.parts.find((part) => part.localEnd === local && part.localStart < local)
+    if (previous) return boundaryAfterPart(previous)
+  }
   for (const part of chunk.parts) {
     if (part.localStart !== local) continue
     return boundaryBeforePart(part)

@@ -455,19 +455,17 @@ describe('commandProgramName', () => {
   })
 
   it('does not spend the shell nesting budget on setup commands', () => {
-    const command = [
-      ...Array.from({ length: 10 }, (_, index) => `export VALUE_${index}=configured`),
-      'npm test',
-    ].join('\n')
+    const command = Array.from({ length: 10 }, (_, index) => `export VALUE_${index}=configured`)
+      .concat(['npm test'])
+      .join('\n')
 
     expect(commandProgramName(command)).toBe('npm')
   })
 
   it('bounds the number of top-level setup segments', () => {
-    const command = [
-      ...Array.from({ length: 2_000 }, (_, index) => `export VALUE_${index}=configured`),
-      'npm test',
-    ].join(';')
+    const command = Array.from({ length: 2_000 }, (_, index) => `export VALUE_${index}=configured`)
+      .concat(['npm test'])
+      .join(';')
 
     expect(commandProgramName(command)).toBeNull()
   })

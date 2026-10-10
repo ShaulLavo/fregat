@@ -397,7 +397,7 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
     const at = this.boundary(parent, side, siblings, position)
     this.setChildren(parent, {
       ...this.children(parent),
-      [side]: [...siblings.slice(0, position), start, ...siblings.slice(position)],
+      [side]: siblings.slice(0, position).concat([start], siblings.slice(position)),
     })
     this.saveRun({
       start,

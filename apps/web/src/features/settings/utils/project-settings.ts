@@ -34,7 +34,7 @@ export type ProjectSettingRow = {
   ) => ProjectOverrideWrite
 }
 
-const SETTLE_DAYS = [0, 1, 3, 7, 14, 30] as const
+const SETTLE_DAYS: readonly number[] = [0, 1, 3, 7, 14, 30]
 
 export const PROJECT_SETTING_ROWS: readonly ProjectSettingRow[] = [
   {
@@ -169,9 +169,9 @@ function daysLabel(days: number) {
 // A value set in settings.json outside the presets stays selectable.
 function dayChoices(values: SettingsValues): readonly ProjectChoice[] {
   const set = Object.values(values['chat.projectAutoSettle']).map((entry) => entry.afterDays)
-  const days = new Set<number>([...SETTLE_DAYS, ...set.filter((day) => day !== undefined)])
+  const days = new Set<number>(SETTLE_DAYS.concat(set.filter((day) => day !== undefined)))
   return [...days]
-    .toSorted((left, right) => left - right)
+    .sort((left, right) => left - right)
     .map((day) => ({ value: String(day), label: daysLabel(day) }))
 }
 

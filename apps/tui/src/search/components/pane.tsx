@@ -70,8 +70,8 @@ export function SearchPane({ session, rootPath, theme, enabled, onOpenFile }: Wo
       matches: (target) => target.widgetId === 'search-query',
     })
   }
-  function open(index = latestSelected.current) {
-    const match = rows[index]?.value
+  function open(index?: number) {
+    const match = rows[index ?? latestSelected.current]?.value
     if (match) onOpenFile(match.path, match.line)
   }
   function run() {

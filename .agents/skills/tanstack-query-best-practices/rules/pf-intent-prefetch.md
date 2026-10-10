@@ -3,6 +3,12 @@
 Use the same query options and owning client as the destination. Choose freshness in
 those options so a consumer does not immediately refetch a successful warmup.
 
+Sharing a factory still allows its callers' arguments to drift. For parameterized route
+data, construct the options once from validated params and `loaderDeps` in the route's
+`context` function, then consume that value in both the loader and the view. Include
+result-changing filters, sort order, and environment identity. Consumer-only projection
+or enablement may differ deliberately. Remove the warmup when its consumer is removed.
+
 ```tsx
 const queryClient = useQueryClient()
 const warm = () => {
@@ -24,3 +30,5 @@ state. Measure the path before adding prefetch everywhere. Let Router/Pacer own 
 intent delay instead of duplicating timers without cleanup.
 
 [Official prefetching guidance](https://tanstack.com/query/latest/docs/framework/react/guides/prefetching)
+
+[Reliable Query Prefetching with TanStack Router](https://tkdodo.eu/blog/reliable-query-prefetching-with-tanstack-router)

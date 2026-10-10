@@ -27,7 +27,7 @@ export function bootAppearancePlugin(webRoot: string): Plugin {
       order: 'pre',
       async handler(_html, context): Promise<HtmlTagDescriptor[]> {
         const { code, moduleIds } = await bootScript()
-        context.server?.watcher.add([...moduleIds])
+        context.server?.watcher.add(Array.from(moduleIds))
         const css = readFileSync(stylesheet, 'utf8')
         return [
           { tag: 'style', attrs: { id: 'fregat-boot-style' }, children: css, injectTo: 'head' },

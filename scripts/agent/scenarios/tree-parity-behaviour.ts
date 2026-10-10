@@ -212,7 +212,7 @@ async function treeSnapshot(page: Page) {
       expanded: rows
         .filter((row) => row.getAttribute('aria-expanded') === 'true')
         .map((row) => row.dataset.itemPath)
-        .toSorted(),
+        .sort(),
       selected: rows
         .filter((row) => row.getAttribute('aria-selected') === 'true')
         .map((row) => row.dataset.itemPath),

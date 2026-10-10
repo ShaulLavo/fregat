@@ -1,8 +1,15 @@
+import { editReusableTree } from './reuse'
+import { REVIEW_BATCH_YIELD_RANGES } from './reviewBatch'
+import { parseProjectedTree } from './projection'
 import { TREE_SITTER_BOOTSTRAP_UNITS } from './source'
-import { analyzeLineMergeUnit, enclosingMergeUnit, lineMergeUnit } from './mergeUnits'
+import {
+  analyzeLineMergeUnit,
+  enclosingMergeUnit,
+  touchingMergeUnits,
+  lineMergeUnit,
+} from './mergeUnits'
 import type { EditorSyntaxAnalysis } from '@singapore-editor/core/syntax'
 import {
-  Edit,
   Language,
   Parser,
   Query,
@@ -57,7 +64,12 @@ import type {
   TreeSitterSelectionRange,
   TreeSitterSelectionRequest,
   TreeSitterMergeUnitRequest,
+  TreeSitterReviewBatchRequest,
+  TreeSitterReviewBatchResult,
   TreeSitterMergeUnitResult,
+  TreeSitterMergeUnit,
+  TreeSitterProjectedMergeUnitsRequest,
+  TreeSitterProjectedMergeUnitsResult,
   TreeSitterSelectionResult,
   TreeSitterSyntaxRange,
   TreeSitterWorkerRequest,
@@ -93,10 +105,12 @@ type ParsedLayer = {
 }
 
 type ParsedDocument = {
+  readonly readOnly: boolean
   readonly markdown?: MarkdownDocument
   markdownDefinitions?: Uint32Array
   mergeUnitTree?: Tree
   mergeUnitParents?: WeakMap<Query, Map<number, boolean>>
+  projections?: Set<ProjectedDocument>
   readonly snapshotVersion: number
   readonly languageId: TreeSitterLanguageId
   readonly source: TreeSitterPieceTableInput
@@ -106,6 +120,16 @@ type ParsedDocument = {
   readonly size: number
   lastUsed: number
 }
+
+type ProjectedDocument = {
+  readonly entries: Map<number, ProjectedDocument>
+  readonly runtimeSessionId: string
+  readonly base: ParsedDocument
+  readonly document: ParsedDocument
+  readonly parentRange?: TreeSitterSyntaxRange
+}
+const projectedDocuments = new Map<string, Map<number, ProjectedDocument>>()
+let projectionCleanupVisits = 0
 
 type BootstrapPreview = Omit<ParsedDocument, 'layers'> & {
   readonly layers: readonly [ParsedLayer]
@@ -119,6 +143,7 @@ type DocumentCache = {
 type CancellationContext = {
   readonly startedAt: number
   readonly budgetMs: number
+  readonly parent?: CancellationContext
   readonly isStale?: () => boolean
   readonly yieldParsing?: boolean
   readonly flag: Int32Array | null
@@ -341,7 +366,7 @@ const ensureInjectionQuery = (runtime: Runtime): Query | null => {
 
 // Capture before any parser await; later source deliveries may advance the same document.
 const resolveRequestSource = (
-  request: TreeSitterParseRequest | TreeSitterEditRequest,
+  request: TreeSitterParseRequest | TreeSitterEditRequest | TreeSitterProjectedMergeUnitsRequest,
 ): TreeSitterPieceTableInput => {
   const read = sourceReader.acquire(request.source)
   if (!read) throw new DOMException('Document source read is unavailable', 'AbortError')
@@ -380,6 +405,7 @@ const parseMarkdownDocument = async (
     snapshotVersion: request.snapshotVersion,
   })
   const parsed: ParsedDocument = {
+    readOnly: request.type === 'parse' && request.readOnly === true,
     markdown: document,
     snapshotVersion: request.snapshotVersion,
     languageId: request.languageId,
@@ -399,10 +425,9 @@ const parseMarkdownDocument = async (
   assertRuntimeSessionActive(request.runtimeSessionId)
   assertNotCancelled(context)
   replaceCachedDocument(request.runtimeSessionId, prepared)
-  const timings = [
-    { name: 'treeSitter.parse', durationMs: nowMs() - start },
-    ...phaseTimings(context),
-  ]
+  const timings = [{ name: 'treeSitter.parse', durationMs: nowMs() - start }].concat(
+    phaseTimings(context),
+  )
   if (request.resultMode === 'parseOnly')
     return parseAckResult(
       request,
@@ -474,6 +499,7 @@ const parseMarkdownFences = async (
       )
       layers.push(layer)
       await appendInjectionLayers(layers, layer, {
+        readOnly: document.readOnly,
         documentId: '',
         snapshotVersion: document.snapshotVersion,
         languageId: 'markdown',
@@ -585,85 +611,88 @@ const parseDocument = async (
   request: TreeSitterParseRequest,
   source: TreeSitterPieceTableInput,
 ): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined> =>
-  runCancellableRequest(request, async (context) => {
-    if (request.resultMode === 'bootstrap') {
-      viewportFirstSessions.add(request.runtimeSessionId)
-      disposeBootstrap(request.runtimeSessionId)
-      bootstrapDocuments.set(request.runtimeSessionId, {
-        request,
-        source: source.retain(),
-        preview: null,
-      })
-      return {
-        ...parseAckResult(request, [], phaseTimings(context)),
-        analysis: { kind: 'partial', coveredRange: { startIndex: 0, endIndex: 0 } },
-      }
-    }
-    if (request.languageId === 'markdown') return parseMarkdownDocument(request, source, context)
-    if (
-      request.languageId === 'mdx' &&
-      (markdownDocuments.get(request.runtimeSessionId)?.snapshotVersion ?? 0) >
-        request.snapshotVersion
-    )
-      return undefined
-    const runtime = await runAsyncWorkerPhase('load runtime', () =>
-      ensureRuntime(request.languageId),
-    )
-    const parseStart = nowMs()
-    const parsedDocument =
-      (await reusableParsedDocument(request, source, context)) ??
-      (await parseFullDocument(request, runtime, source, context))
-    const parseMs = nowMs() - parseStart
-    if (request.resultMode === 'parseOnly') {
-      return {
-        ...parseAckResult(
-          request,
-          [],
-          [{ name: 'treeSitter.parse', durationMs: parseMs }, ...phaseTimings(context)],
-          parsedDocument.degraded,
-          parsedDocument.missingLanguages,
-        ),
-        analysis: { kind: 'full', coveredRange: { startIndex: 0, endIndex: source.length } },
-        statistics: { parseSlices: context.counts?.get('parseSlices') ?? 1 },
-      }
-    }
+  runCancellableRequest(request, (context) => parseRequestedDocument(request, source, context))
 
-    const queryStart = nowMs()
-    const result = await runAsyncWorkerPhase('flatten', () =>
-      flattenDocument(
-        parsedDocument,
-        context,
-        request.includeHighlights,
-        request.includeCaptures ?? true,
-      ),
-    )
-    assertNotCancelled(context)
-    const queryMs = nowMs() - queryStart
-
+const parseRequestedDocument = async (
+  request: TreeSitterParseRequest,
+  source: TreeSitterPieceTableInput,
+  context: CancellationContext,
+): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined> => {
+  if (request.resultMode === 'bootstrap') {
+    viewportFirstSessions.add(request.runtimeSessionId)
+    disposeBootstrap(request.runtimeSessionId)
+    bootstrapDocuments.set(request.runtimeSessionId, {
+      request,
+      source: source.retain(),
+      preview: null,
+    })
     return {
-      documentId: request.documentId,
-      snapshotVersion: request.snapshotVersion,
-      languageId: request.languageId,
-      source: sourceTag(source),
-      analysis: { kind: 'full', coveredRange: { startIndex: 0, endIndex: source.length } },
-      statistics: resultStatistics(parsedDocument, result, context),
-      missingLanguages: parsedDocument.missingLanguages,
-      captures: result.captures,
-      folds: result.folds,
-      brackets: result.brackets,
-      errors: result.errors,
-      injections: result.injections,
-      degraded: result.degraded,
-      tokens: result.tokens,
-      tokensPacked: result.tokensPacked,
-      records: result.records,
-      timings: [
-        ...phaseTimings(context),
-        { name: 'treeSitter.parse', durationMs: parseMs },
-        { name: 'treeSitter.query', durationMs: queryMs },
-      ],
+      ...parseAckResult(request, [], phaseTimings(context)),
+      analysis: { kind: 'partial', coveredRange: { startIndex: 0, endIndex: 0 } },
     }
-  })
+  }
+  if (request.languageId === 'markdown') return parseMarkdownDocument(request, source, context)
+  if (
+    request.languageId === 'mdx' &&
+    (markdownDocuments.get(request.runtimeSessionId)?.snapshotVersion ?? 0) >
+      request.snapshotVersion
+  )
+    return undefined
+  const runtime = await runAsyncWorkerPhase('load runtime', () => ensureRuntime(request.languageId))
+  const parseStart = nowMs()
+  const parsedDocument =
+    (await reusableParsedDocument(request, source, context)) ??
+    (await parseFullDocument(request, runtime, source, context))
+  const parseMs = nowMs() - parseStart
+  if (request.resultMode === 'parseOnly') {
+    return {
+      ...parseAckResult(
+        request,
+        [],
+        [{ name: 'treeSitter.parse', durationMs: parseMs }].concat(phaseTimings(context)),
+        parsedDocument.degraded,
+        parsedDocument.missingLanguages,
+      ),
+      analysis: { kind: 'full', coveredRange: { startIndex: 0, endIndex: source.length } },
+      statistics: { parseSlices: context.counts?.get('parseSlices') ?? 1 },
+    }
+  }
+
+  const queryStart = nowMs()
+  const result = await runAsyncWorkerPhase('flatten', () =>
+    flattenDocument(
+      parsedDocument,
+      context,
+      request.includeHighlights,
+      request.includeCaptures ?? true,
+    ),
+  )
+  assertNotCancelled(context)
+  const queryMs = nowMs() - queryStart
+
+  return {
+    documentId: request.documentId,
+    snapshotVersion: request.snapshotVersion,
+    languageId: request.languageId,
+    source: sourceTag(source),
+    analysis: { kind: 'full', coveredRange: { startIndex: 0, endIndex: source.length } },
+    statistics: resultStatistics(parsedDocument, result, context),
+    missingLanguages: parsedDocument.missingLanguages,
+    captures: result.captures,
+    folds: result.folds,
+    brackets: result.brackets,
+    errors: result.errors,
+    injections: result.injections,
+    degraded: result.degraded,
+    tokens: result.tokens,
+    tokensPacked: result.tokensPacked,
+    records: result.records,
+    timings: phaseTimings(context).concat([
+      { name: 'treeSitter.parse', durationMs: parseMs },
+      { name: 'treeSitter.query', durationMs: queryMs },
+    ]),
+  }
+}
 
 // One document state exists per runtime session, so a cached snapshot with the
 // same language and snapshotVersion is the same content (the source length
@@ -681,6 +710,10 @@ const reusableParsedDocument = async (
     request.snapshotVersion,
   )
   if (!cached) return null
+  if (cached.readOnly && request.readOnly !== true) {
+    dropCachedDocument(request.runtimeSessionId, cached)
+    return null
+  }
   if (cached.size === source.length) {
     if (!cached.missingLanguages.some((id) => resolveRegisteredLanguageAlias(id))) return cached
     return reloadInjections(request, cached, context)
@@ -699,6 +732,7 @@ const reloadInjections = async (
 ): Promise<ParsedDocument> => {
   const root = cached.layers[0]!
   const document = await parseParsedDocument({
+    readOnly: cached.readOnly,
     documentId: request.documentId,
     snapshotVersion: request.snapshotVersion,
     languageId: request.languageId,
@@ -745,6 +779,7 @@ const parseFullDocument = async (
     const degraded: TreeSitterDegradedState[] = []
     const markdown = await prepareMdxMarkdown(request, source, rootLayer)
     parsedDocument = await parseParsedDocument({
+      readOnly: request.readOnly === true,
       documentId: request.documentId,
       snapshotVersion: request.snapshotVersion,
       languageId: request.languageId,
@@ -761,7 +796,8 @@ const parseFullDocument = async (
     assertRuntimeSessionActive(request.runtimeSessionId)
     replaceCachedDocument(request.runtimeSessionId, parsedDocument)
     disposeBootstrap(request.runtimeSessionId)
-    if (!viewportFirst) scheduleIdleReparse(request.runtimeSessionId, parsedDocument, runtime)
+    if (!viewportFirst && !parsedDocument.readOnly)
+      scheduleIdleReparse(request.runtimeSessionId, parsedDocument, runtime)
     return parsedDocument
   } catch (error) {
     if (parsedDocument) disposeCachedSnapshot(parsedDocument)
@@ -799,7 +835,7 @@ const reparseIdleDocument = (
   const context = createCancellationContext(undefined, PARSE_BUDGET_MS)
   try {
     const tree = parseSource(runtime.parser, document.source, root.tree, context)
-    cache.snapshots[index] = { ...document, layers: [{ ...root, tree }, ...injections] }
+    cache.snapshots[index] = { ...document, layers: [{ ...root, tree }].concat(injections) }
     root.tree.delete()
   } catch (error) {
     recordOptionalWorkerPhaseFailure('idle reparse', error, [], 'optional-phase-failed')
@@ -811,6 +847,16 @@ const editDocument = async (
   source: TreeSitterPieceTableInput,
 ): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined> =>
   runCancellableRequest(request, async (context) => {
+    const cached = cachedDocumentForVersion(
+      request.runtimeSessionId,
+      request.languageId,
+      request.previousSnapshotVersion,
+    )
+    if (cached?.readOnly) {
+      assertNotCancelled(context)
+      dropCachedDocument(request.runtimeSessionId, cached)
+      return parseRequestedDocument({ ...request, type: 'parse', readOnly: false }, source, context)
+    }
     if (request.languageId === 'markdown') return parseMarkdownDocument(request, source, context)
     if (
       request.languageId === 'mdx' &&
@@ -820,11 +866,6 @@ const editDocument = async (
       return undefined
     const runtime = await runAsyncWorkerPhase('load runtime', () =>
       ensureRuntime(request.languageId),
-    )
-    const cached = cachedDocumentForVersion(
-      request.runtimeSessionId,
-      request.languageId,
-      request.previousSnapshotVersion,
     )
     if (!cached) return undefined
 
@@ -846,13 +887,14 @@ const editDocument = async (
     // A delimiter edit that moves structure outside the edited range shows up in the root's
     // changed ranges; an edit inside an injection's text may change no root structure at all.
     const injectionRanges = enclosingRanges(
-      [...changedRanges, ...editedRanges(request.inputEdits, source.length)],
+      changedRanges.concat(editedRanges(request.inputEdits, source.length)),
       [reusableTree, rootLayer.tree],
     )
     const degraded: TreeSitterDegradedState[] = []
     const markdown = await prepareMdxMarkdown(request, source, rootLayer)
     const parsedDocument = await runAsyncWorkerPhase('parse injections', () =>
       parseParsedDocument({
+        readOnly: false,
         documentId: request.documentId,
         snapshotVersion: request.snapshotVersion,
         languageId: request.languageId,
@@ -875,11 +917,10 @@ const editDocument = async (
       return parseAckResult(
         request,
         changedRanges,
-        [
-          ...phaseTimings(context),
+        phaseTimings(context).concat([
           { name: 'treeSitter.edit', durationMs: editMs },
           { name: 'treeSitter.parse', durationMs: parseMs },
-        ],
+        ]),
         degraded,
         parsedDocument.missingLanguages,
       )
@@ -912,12 +953,11 @@ const editDocument = async (
       tokens: result.tokens,
       tokensPacked: result.tokensPacked,
       records: result.records,
-      timings: [
-        ...phaseTimings(context),
+      timings: phaseTimings(context).concat([
         { name: 'treeSitter.edit', durationMs: editMs },
         { name: 'treeSitter.parse', durationMs: parseMs },
         { name: 'treeSitter.query', durationMs: queryMs },
-      ],
+      ]),
     }
   })
 
@@ -987,10 +1027,9 @@ const queryDocumentRangeWithContext = async (
     tokensPacked: result.tokensPacked,
     records: result.records,
     statistics: resultStatistics(cached, result, context, range),
-    timings: [
-      { name: 'treeSitter.queryRange', durationMs: nowMs() - queryStart },
-      ...phaseTimings(context),
-    ],
+    timings: [{ name: 'treeSitter.queryRange', durationMs: nowMs() - queryStart }].concat(
+      phaseTimings(context),
+    ),
   }
 }
 
@@ -1111,7 +1150,7 @@ const measurePhase = <T>(context: CancellationContext, name: string, run: () => 
 }
 
 const phaseTimings = (context: CancellationContext): TreeSitterParseResult['timings'] =>
-  [...(context.measurements ?? [])].map(([name, durationMs]) => ({
+  Array.from(context.measurements ?? [], ([name, durationMs]) => ({
     name: `treeSitter.${name}`,
     durationMs,
   }))
@@ -1286,6 +1325,7 @@ const parseBootstrapPreview = (
       parseRootLayer(runtime, source, null, context),
     )
     return {
+      readOnly: true,
       snapshotVersion: request.snapshotVersion,
       languageId: request.languageId,
       source: source.retain(),
@@ -1380,19 +1420,8 @@ const parseSource = (
   throw new Error('Tree-sitter parse returned no tree')
 }
 
-const editReusableTree = (
-  tree: Tree,
-  edits: readonly TreeSitterEditRequest['inputEdits'][number][],
-): Tree => {
-  const reusableTree = tree.copy()
-  for (const inputEdit of edits) {
-    reusableTree.edit(new Edit(inputEdit))
-  }
-
-  return reusableTree
-}
-
 type ParseParsedDocumentOptions = {
+  readonly readOnly: boolean
   readonly markdown?: MarkdownDocument
   readonly documentId: string
   readonly snapshotVersion: number
@@ -1469,6 +1498,7 @@ const parseParsedDocument = async (
     const layers = orderParsedLayers(options.rootLayer, parsedLayers)
 
     return {
+      readOnly: options.readOnly,
       markdown: options.markdown,
       snapshotVersion: options.snapshotVersion,
       languageId: options.languageId,
@@ -1832,7 +1862,7 @@ const appendCarriedLayers = async (
     // Its reparse may have grown children its old tree did not have.
     const firstChild = layers.length
     await appendInjectionLayers(layers, carried, options)
-    for (const layer of [carried, ...layers.slice(firstChild)]) availableParentIds.add(layer.id)
+    for (const layer of [carried].concat(layers.slice(firstChild))) availableParentIds.add(layer.id)
   }
 }
 
@@ -1932,7 +1962,7 @@ const appendOrderedChildren = (
   parentId: string,
   children: ReadonlyMap<string, ParsedLayer[]>,
 ): void => {
-  const childLayers = children.get(parentId)?.toSorted(compareParsedLayers) ?? []
+  const childLayers = children.get(parentId)?.sort(compareParsedLayers) ?? []
   for (const layer of childLayers) {
     ordered.push(layer)
     appendOrderedChildren(ordered, layer.id, children)
@@ -2118,7 +2148,7 @@ const groupsToPlans = (
   groups: Map<string, InjectionGroup>,
   source: TreeSitterPieceTableInput,
 ): InjectionPlan[] =>
-  [...groups.entries()].map(([key, group]) => {
+  Array.from(groups.entries(), ([key, group]) => {
     const ranges = rangesWithBridgeNewlines(sortRanges(group.ranges), source)
     return {
       parentId: group.parentId,
@@ -2610,10 +2640,8 @@ const rangeForNode = (node: Node): TreeSitterRange => ({
   endPosition: node.endPosition,
 })
 
-const sortRanges = (ranges: readonly TreeSitterRange[]): TreeSitterRange[] =>
-  ranges.toSorted(
-    (left, right) => left.startIndex - right.startIndex || left.endIndex - right.endIndex,
-  )
+const sortRanges = (ranges: TreeSitterRange[]): TreeSitterRange[] =>
+  ranges.sort((left, right) => left.startIndex - right.startIndex || left.endIndex - right.endIndex)
 
 const rangeSpan = (
   ranges: readonly TreeSitterRange[],
@@ -2714,22 +2742,20 @@ const bridgeNewlineRange = (
   return null
 }
 
-const sortCaptures = (captures: readonly TreeSitterCapture[]): TreeSitterCapture[] =>
-  captures.toSorted((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
+const sortCaptures = (captures: TreeSitterCapture[]): TreeSitterCapture[] =>
+  captures.sort((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
 
-const sortFolds = (folds: readonly FoldRange[]): FoldRange[] =>
-  folds.toSorted((a, b) => a.startLine - b.startLine || a.endLine - b.endLine)
+const sortFolds = (folds: FoldRange[]): FoldRange[] =>
+  folds.sort((a, b) => a.startLine - b.startLine || a.endLine - b.endLine)
 
-const sortBrackets = (brackets: readonly BracketInfo[]): BracketInfo[] =>
-  brackets.toSorted((a, b) => a.index - b.index || a.depth - b.depth)
+const sortBrackets = (brackets: BracketInfo[]): BracketInfo[] =>
+  brackets.sort((a, b) => a.index - b.index || a.depth - b.depth)
 
-const sortErrors = (errors: readonly TreeSitterError[]): TreeSitterError[] =>
-  errors.toSorted((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
+const sortErrors = (errors: TreeSitterError[]): TreeSitterError[] =>
+  errors.sort((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
 
-const sortInjections = (
-  injections: readonly TreeSitterInjectionInfo[],
-): TreeSitterInjectionInfo[] =>
-  injections.toSorted((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
+const sortInjections = (injections: TreeSitterInjectionInfo[]): TreeSitterInjectionInfo[] =>
+  injections.sort((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
 
 const collectTreeData = (
   tree: Tree | null,
@@ -2890,8 +2916,340 @@ const collectError = (node: Node): TreeSitterError | null => {
   }
 }
 
+const queryReviewBatch = async (
+  request: TreeSitterReviewBatchRequest,
+): Promise<TreeSitterReviewBatchResult> => {
+  const results: TreeSitterProjectedMergeUnitsResult[] = []
+  const context = createCancellationContext(request.cancellationBuffer, PARSE_BUDGET_MS)
+  let selections = 0
+  for (const query of request.queries) {
+    if (isCancelled(context)) {
+      results.push({
+        documentId: query.documentId,
+        snapshotVersion: query.snapshotVersion,
+        languageId: query.languageId,
+        status: 'cancelled',
+        units: [],
+      })
+      continue
+    }
+    if (query.type === 'projectMergeUnits') {
+      const source = resolveRequestSource(query)
+      try {
+        results.push(await queryProjectedMergeUnits(query, source, context))
+      } finally {
+        source.dispose()
+      }
+      await yieldWorker()
+      continue
+    }
+    const identity = {
+      documentId: query.documentId,
+      snapshotVersion: query.snapshotVersion,
+      languageId: query.languageId,
+    }
+    const units: (TreeSitterMergeUnit & { readonly languageId: string })[][] = []
+    let status: 'ok' | 'stale' | 'cancelled' = 'ok'
+    for (const range of query.ranges) {
+      if (selections && selections % REVIEW_BATCH_YIELD_RANGES === 0) await yieldWorker()
+      selections++
+      const result = await queryMergeUnit({ ...query, type: 'mergeUnit', range }, context)
+      if (result.status !== 'ok') {
+        status = result.status
+        break
+      }
+      units.push(
+        (result.units ?? [result.unit]).map((unit) => ({ ...unit, languageId: result.languageId })),
+      )
+    }
+    results.push(
+      status === 'ok' ? { ...identity, status, units } : { ...identity, status, units: [] },
+    )
+  }
+  return { results }
+}
+
+const queryProjectedMergeUnits = async (
+  request: TreeSitterProjectedMergeUnitsRequest,
+  source: TreeSitterPieceTableInput,
+  parent?: CancellationContext,
+): Promise<TreeSitterProjectedMergeUnitsResult> => {
+  const identity = {
+    documentId: request.documentId,
+    snapshotVersion: request.snapshotVersion,
+    languageId: request.languageId,
+  }
+  const base = cachedDocumentForVersion(
+    request.runtimeSessionId,
+    request.languageId,
+    request.baseSnapshotVersion,
+  )
+  if (!base) return { ...identity, status: 'stale', units: [] }
+  const context: CancellationContext = {
+    ...createCancellationContext(request.cancellationBuffer, PARSE_BUDGET_MS),
+    parent,
+    isStale: () =>
+      cachedDocumentForVersion(
+        request.runtimeSessionId,
+        request.languageId,
+        request.baseSnapshotVersion,
+      ) !== base,
+  }
+  let prepared: { readonly entry: ProjectedDocument; readonly retained: boolean } | undefined
+  let committed = false
+  try {
+    assertNotCancelled(context)
+    const runtime = await ensureRuntime(request.languageId)
+    assertNotCancelled(context)
+    prepared = await projectedDocument(request, source, base, runtime, context)
+    assertNotCancelled(context)
+    const units = await projectedUnits(request, prepared.entry, context)
+    assertNotCancelled(context)
+    if (!prepared.retained) retainProjectedDocument(prepared.entry)
+    committed = true
+    return { ...identity, status: 'ok', units }
+  } catch (error) {
+    if (error instanceof SyntaxRequestCancelled)
+      return { ...identity, status: 'cancelled', units: [] }
+    throw error
+  } finally {
+    if (prepared && !prepared.retained && !committed)
+      disposeProjectedSnapshot(prepared.entry.document)
+  }
+}
+
+const projectedDocument = async (
+  request: TreeSitterProjectedMergeUnitsRequest,
+  source: TreeSitterPieceTableInput,
+  base: ParsedDocument,
+  runtime: Runtime,
+  context: CancellationContext,
+): Promise<{ readonly entry: ProjectedDocument; readonly retained: boolean }> => {
+  const entries =
+    projectedDocuments.get(request.runtimeSessionId) ?? new Map<number, ProjectedDocument>()
+  const existing = entries.get(request.snapshotVersion)
+  const expanded =
+    existing?.parentRange &&
+    request.ranges.some((range) => {
+      const root = existing.document.layers[0]!.tree.rootNode
+      return range.startIndex < root.startIndex || range.endIndex > root.endIndex
+    })
+  if (existing && existing.base === base && existing.document.size === source.length && !expanded) {
+    return { entry: existing, retained: true }
+  }
+  let baseTree = base.layers.find((layer) => layer.kind === 'root')?.tree ?? base.mergeUnitTree
+  if (!baseTree) {
+    baseTree = await parseTreeSlices(runtime, base.source, context, { phase: 'parseRoot' })
+    base.mergeUnitTree = baseTree
+  }
+  assertNotCancelled(context)
+  const parser = new Parser().setLanguage(runtime.language)
+  let projected
+  try {
+    projected = parseProjectedTree(
+      parser,
+      baseTree,
+      (index, _position, end) => readTreeSitterPieceTableInput(source, index, end),
+      source.read.text,
+      request.inputEdits,
+      {
+        ranges: request.ranges,
+        cancelled: () => isCancelled(context),
+        bounded: !expanded && base.layers.every((layer) => layer.kind === 'root'),
+      },
+    )
+  } finally {
+    parser.delete()
+  }
+  if (isCancelled(context)) {
+    projected?.tree.delete()
+    throw new SyntaxRequestCancelled()
+  }
+  if (!projected) throw new SyntaxRequestCancelled()
+  const rootLayer = rootLayerForTree(runtime, projected.tree)
+  let document: ParsedDocument
+  try {
+    document = await parseProjectedDocument({
+      readOnly: true,
+      documentId: request.documentId,
+      snapshotVersion: request.snapshotVersion,
+      languageId: request.languageId,
+      source,
+      rootLayer,
+      context,
+      oldDocument: base,
+      inputEdits: request.inputEdits,
+      injectionRanges: null,
+      degraded: [],
+    })
+  } catch (error) {
+    rootLayer.tree.delete()
+    throw error
+  }
+  if (isCancelled(context)) {
+    disposeProjectedSnapshot(document)
+    throw new SyntaxRequestCancelled()
+  }
+  return {
+    entry: {
+      base,
+      document,
+      entries,
+      runtimeSessionId: request.runtimeSessionId,
+      parentRange: projected.parentRange,
+    },
+    retained: false,
+  }
+}
+
+const parseProjectedDocument = async (
+  options: ParseParsedDocumentOptions,
+): Promise<ParsedDocument> => {
+  if (options.languageId !== 'markdown') return parseParsedDocument(options)
+  await initializeMarkdown()
+  // Native Markdown takes a string; the projection owns this separate document and its fences.
+  const markdown = new MarkdownDocument({ frontmatter: true })
+  const source = options.source.retain()
+  try {
+    markdown.setText(readTreeSitterInputRange(source, 0, source.length))
+    const document = await parseMarkdownFences(
+      {
+        readOnly: true,
+        markdown,
+        source,
+        snapshotVersion: options.snapshotVersion,
+        languageId: options.languageId,
+        layers: [],
+        degraded: [],
+        missingLanguages: [],
+        size: source.length,
+        lastUsed: nextUse++,
+      },
+      options.context,
+      options.oldDocument,
+      options.inputEdits,
+    )
+    return { ...document, layers: [options.rootLayer, ...document.layers] }
+  } catch (error) {
+    markdown.dispose()
+    source.dispose()
+    throw error
+  }
+}
+
+const disposeProjectedSnapshot = (snapshot: ParsedDocument): void => {
+  snapshot.markdown?.dispose()
+  disposeCachedSnapshot(snapshot)
+}
+
+const projectedUnits = async (
+  request: TreeSitterProjectedMergeUnitsRequest,
+  projected: ProjectedDocument,
+  context: CancellationContext,
+): Promise<TreeSitterProjectedMergeUnitsResult['units']> => {
+  const result: Array<TreeSitterProjectedMergeUnitsResult['units'][number]> = []
+  let selections = 0
+  for (const requested of request.ranges) {
+    if (selections && selections % REVIEW_BATCH_YIELD_RANGES === 0) await yieldWorker()
+    selections++
+    assertNotCancelled(context)
+    const range = normalizedSyntaxRange(requested, projected.document.size)
+    const layer =
+      deepestLayerForSelection(projected.document, range) ?? projected.document.layers[0]!
+    const runtime = await ensureRuntime(layer.languageId)
+    assertNotCancelled(context)
+    const source = runtime.descriptor.mergeUnitQuerySource
+    const query = source?.trim()
+      ? (runtime.mergeUnitQuery ??= new Query(runtime.language, source))
+      : null
+    const parents = (projected.document.mergeUnitParents ??= new WeakMap())
+    const eligibility = query ? (parents.get(query) ?? new Map<number, boolean>()) : undefined
+    if (query && eligibility) parents.set(query, eligibility)
+    const queryContext = {
+      analysis: request.analysis,
+      contentKey: request.contentKey,
+      parents: eligibility,
+      parentRange: layer.kind === 'root' ? projected.parentRange : undefined,
+      parentRoot: projected.parentRange
+        ? (projected.base.layers[0]?.tree.rootNode ?? projected.base.mergeUnitTree?.rootNode)
+        : undefined,
+      progressCallback: () => isCancelled(context),
+    }
+    const units = selectProjectedUnits(
+      layer.tree.rootNode,
+      query,
+      range,
+      request.selection,
+      queryContext,
+    )
+    const selected = units.length
+      ? units
+      : [
+          analyzeLineMergeUnit(
+            layer.tree.rootNode,
+            lineMergeUnit(projected.document.source.read.text, range),
+            queryContext,
+          ),
+        ]
+    result.push(selected.map((unit) => ({ ...unit, languageId: layer.languageId })))
+  }
+  return result
+}
+
+const selectProjectedUnits = (
+  root: Node,
+  query: Query | null,
+  range: TreeSitterSyntaxRange,
+  selection: 'enclosing' | 'touching' | undefined,
+  context: import('./mergeUnits').MergeUnitQueryContext,
+): readonly TreeSitterMergeUnit[] => {
+  if (!query) return []
+  if (selection === 'touching') return touchingMergeUnits(root, query, range, context)
+  const unit = enclosingMergeUnit(root, query, range, context)
+  return unit ? [unit] : []
+}
+
+const retainProjectedDocument = (entry: ProjectedDocument): void => {
+  const existing = entry.entries.get(entry.document.snapshotVersion)
+  if (existing) releaseProjectedDocument(existing)
+  entry.entries.set(entry.document.snapshotVersion, entry)
+  const dependencies = (entry.base.projections ??= new Set())
+  dependencies.add(entry)
+  projectedDocuments.set(entry.runtimeSessionId, entry.entries)
+  evictProjectedDocuments(entry.entries)
+}
+
+const releaseProjectedDocument = (entry: ProjectedDocument): void => {
+  entry.entries.delete(entry.document.snapshotVersion)
+  entry.base.projections!.delete(entry)
+  if (entry.base.projections!.size === 0) entry.base.projections = undefined
+  if (entry.entries.size === 0) projectedDocuments.delete(entry.runtimeSessionId)
+  disposeProjectedSnapshot(entry.document)
+}
+
+const evictProjectedDocuments = (entries: Map<number, ProjectedDocument>): void => {
+  const units = () =>
+    Array.from(entries.values()).reduce((sum, entry) => sum + entry.document.size, 0)
+  while (
+    entries.size > MAX_RETAINED_SNAPSHOTS ||
+    (entries.size > 1 && units() > MAX_RETAINED_SOURCE_UNITS)
+  ) {
+    const oldest = entries.entries().next().value
+    if (!oldest) return
+    releaseProjectedDocument(oldest[1])
+  }
+}
+
+const dropProjectedDocuments = (entries: Set<ProjectedDocument>): void => {
+  for (const entry of entries) {
+    projectionCleanupVisits++
+    releaseProjectedDocument(entry)
+  }
+}
+
 const queryMergeUnit = async (
   request: TreeSitterMergeUnitRequest,
+  parent?: CancellationContext,
 ): Promise<TreeSitterMergeUnitResult> => {
   const identity = {
     documentId: request.documentId,
@@ -2927,6 +3285,7 @@ const queryMergeUnit = async (
     return { ...identity, status: 'stale', unit: null }
   const context: CancellationContext = {
     ...createCancellationContext(request.cancellationBuffer, PARSE_BUDGET_MS),
+    parent,
     isStale: () =>
       cachedDocumentForVersion(
         request.runtimeSessionId,
@@ -2968,7 +3327,12 @@ const queryMergeUnit = async (
       parents: eligibility,
       progressCallback: () => isCancelled(context),
     }
-    const unit = query ? enclosingMergeUnit(tree.rootNode, query, range, queryContext) : null
+    const units =
+      query && request.selection === 'touching'
+        ? touchingMergeUnits(tree.rootNode, query, range, queryContext)
+        : []
+    const unit =
+      units[0] ?? (query ? enclosingMergeUnit(tree.rootNode, query, range, queryContext) : null)
     assertNotCancelled(context)
     const selected =
       unit ??
@@ -2978,7 +3342,13 @@ const queryMergeUnit = async (
         queryContext,
       )
     assertNotCancelled(context)
-    return { ...identity, languageId, status: 'ok', unit: selected }
+    return {
+      ...identity,
+      languageId,
+      status: 'ok',
+      unit: selected,
+      ...(request.selection === 'touching' ? { units: units.length ? units : [selected] } : {}),
+    }
   } catch (error) {
     if (error instanceof SyntaxRequestCancelled)
       return { ...identity, status: 'cancelled', unit: null }
@@ -3238,6 +3608,7 @@ const disposeLayer = (layer: ParsedLayer): void => {
 }
 
 const disposeCachedSnapshot = (snapshot: ParsedDocument): void => {
+  if (snapshot.projections) dropProjectedDocuments(snapshot.projections)
   snapshot.mergeUnitTree?.delete()
   for (const layer of snapshot.layers) disposeLayer(layer)
   snapshot.source.dispose()
@@ -3255,6 +3626,7 @@ const disposeDocument = (runtimeSessionId: string): void => {
 
   for (const snapshot of cache.snapshots) disposeCachedSnapshot(snapshot)
   documentCaches.delete(runtimeSessionId)
+  projectedDocuments.delete(runtimeSessionId)
 }
 
 const markRuntimeSessionDisposed = (runtimeSessionId: string): void => {
@@ -3299,6 +3671,7 @@ const disposeAll = (): void => {
   }
 
   documentCaches.clear()
+  projectedDocuments.clear()
   for (const state of markdownDocuments.values()) state.document.dispose()
   markdownDocuments.clear()
   sourceReader.dispose()
@@ -3398,6 +3771,7 @@ const normalizeAlias = (alias: string): string => {
 const uniqueItems = <T>(items: readonly T[]): readonly T[] => Array.from(new Set(items))
 
 const isCancelled = (context: CancellationContext): boolean => {
+  if (context.parent && isCancelled(context.parent)) return true
   if (context.isStale?.()) return true
   if (context.flag && Atomics.load(context.flag, 0) === 1) return true
   return nowMs() - context.startedAt > context.budgetMs
@@ -3456,7 +3830,9 @@ const handleRequest = async (
   if (payload.type === 'edit') return editDocument(payload, source!)
   if (payload.type === 'queryRange') return queryDocumentRange(payload)
   if (payload.type === 'selection') return selectDocument(payload)
+  if (payload.type === 'reviewBatch') return queryReviewBatch(payload)
   if (payload.type === 'mergeUnit') return queryMergeUnit(payload)
+  if (payload.type === 'projectMergeUnits') return queryProjectedMergeUnits(payload, source!)
 
   disposeAll()
   return undefined
@@ -3493,11 +3869,14 @@ const executeRequest = async (
       Math.max(latestSnapshotVersions.get(payload.runtimeSessionId) ?? 0, payload.snapshotVersion),
     )
   const source =
-    payload.type === 'parse' || payload.type === 'edit' ? resolveRequestSource(payload) : undefined
+    payload.type === 'parse' || payload.type === 'edit' || payload.type === 'projectMergeUnits'
+      ? resolveRequestSource(payload)
+      : undefined
   const markdown =
     'languageId' in payload && (payload.languageId === 'markdown' || payload.languageId === 'mdx')
   const task =
-    markdown && runtimeSessionId
+    (markdown || payload.type === 'projectMergeUnits' || payload.type === 'reviewBatch') &&
+    runtimeSessionId
       ? awaitRuntimeTasks(runtimeSessionId).then(() => handleRequest(request, source))
       : handleRequest(request, source)
   const completed = task.finally(() => source?.dispose())
@@ -3646,7 +4025,14 @@ const inspectRetention = async (): Promise<{
   for (const state of markdownDocuments.values()) resources.markdown.add(state.document)
   const documents = Array.from(documentCaches, ([runtimeSessionId, cache]) => ({
     runtimeSessionId,
-    snapshots: cache.snapshots.map((snapshot) => inspectSnapshotRetention(snapshot, resources)),
+    snapshots: cache.snapshots
+      .concat(
+        Array.from(
+          projectedDocuments.get(runtimeSessionId)?.values() ?? [],
+          (entry) => entry.document,
+        ),
+      )
+      .map((snapshot) => inspectSnapshotRetention(snapshot, resources)),
   }))
   const previews = Array.from(bootstrapDocuments, ([runtimeSessionId, staged]) => ({
     runtimeSessionId,
@@ -3654,28 +4040,30 @@ const inspectRetention = async (): Promise<{
   }))
   const unmeasuredWasm: readonly 'wasm-committed'[] =
     shared.wasmMemory.kind === 'uninitialized' ? ['wasm-committed'] : []
+  const unmeasuredBytes: TreeSitterWorkerRetentionSnapshot['unmeasuredBytes'] = [
+    'javascript-objects',
+    'source-strings',
+    'grammars-parsers-queries',
+    'trees',
+    'markdown-documents',
+    'worker-heap',
+  ]
   return {
     retention: {
-      documentCount: new Set([...documentCaches.keys(), ...bootstrapDocuments.keys()]).size,
+      documentCount: new Set(
+        Array.from(documentCaches.keys()).concat(Array.from(bootstrapDocuments.keys())),
+      ).size,
       snapshotCount: resources.snapshots.size,
+      projectionCleanupVisits,
       treeCount: resources.trees.size,
       markdownDocumentEntries: markdownDocuments.size,
       markdownDocumentCount: resources.markdown.size,
       injectedMarkdownDocumentCount: resources.injectedMarkdown.size,
-      documents: [...documents, ...previews],
+      documents: documents.concat(previews),
       source: inspectSourceRetention(),
       shared,
       unmeasuredResources: ['markdown-parser-language-query-handles', 'markdown-tree-handles'],
-      unmeasuredBytes: [
-        'javascript-objects',
-        'source-strings',
-        'grammars-parsers-queries',
-        'trees',
-        'markdown-documents',
-        'worker-heap',
-        ...unmeasuredWasm,
-        'wasm-allocator-live',
-      ],
+      unmeasuredBytes: unmeasuredBytes.concat(unmeasuredWasm, ['wasm-allocator-live']),
     },
   }
 }

@@ -127,7 +127,7 @@ async function encodeUnderByteLimit(
   const baseDimension = Math.min(MAX_IMAGE_DIMENSION, Math.max(bitmap.width, bitmap.height))
   let producedBytes = false
 
-  for (const dimensionScale of [1, ...FALLBACK_SCALE_STEPS]) {
+  for (const dimensionScale of [1].concat(FALLBACK_SCALE_STEPS)) {
     const dimension = Math.max(1, Math.round(baseDimension * dimensionScale))
     const outcome = await encodeAtDimension(bitmap, dimension, maxBytes)
     if (outcome.status === 'encoded') return outcome

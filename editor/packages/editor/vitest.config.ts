@@ -1,8 +1,26 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { browserTestResponses } from '../../scripts/browser-test-responses.ts'
 import { workspaceRoot } from '../../scripts/workspace-root.ts'
 import { playwright } from '@vitest/browser-playwright'
 import { devices } from '@playwright/test'
 import { defineConfig } from 'vitest/config'
+import type { BrowserCommand } from 'vitest/node'
+
+const crossEngineScrollTests = [
+  'test/{virtualizedTextView,virtualizedTextViewGeometry,wheelScrollTarget,gutterScroll,gutterLeadingInset,gutterPointerEvents,wrappedLineGutter,wrappedLineHighlight,mouseSelectionAutoScroll,navigationReveal,initialViewport,firstPaint,longLineMeasurements,millionLinePaint,codeViewport,renderDisposal,rowPresentation,proportionalRows,proportionalWrap,freeSansShaping,freeSansNativeCarets,wordWrap,defaultLargeDocument,metricProbeScrollExtent,tailGeometry,typography}.browser.test.ts',
+]
+
+let contentEvidence: string | undefined
+let highlightEvidence: string | undefined
+
+const proofStyledWrapScreenshot: BrowserCommand = async ({ iframe, project }, width: number) => {
+  const directory = mkdtempSync(join(tmpdir(), 'singapore-styled-wrap-'))
+  const path = join(directory, `${project.name}-${width}.png`)
+  await iframe.locator('[data-styled-wrap-proof]').screenshot({ path, animations: 'disabled' })
+  return path
+}
 
 export default defineConfig({
   server: { fs: { allow: [workspaceRoot] } },
@@ -43,6 +61,7 @@ export default defineConfig({
             'micromark-util-normalize-identifier',
           ],
           include: [
+            'evlog/client',
             '@fregat/hotkeys',
             'diff',
             '@shikijs/engine-oniguruma',
@@ -62,6 +81,7 @@ export default defineConfig({
             fileParallelism: false,
             provider: playwright(),
             commands: {
+              proofStyledWrapScreenshot,
               proofClipboardPermissions: async ({ page }) => {
                 await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
               },
@@ -125,14 +145,55 @@ export default defineConfig({
                 return image.toString('base64')
               },
             },
-            instances: [{ browser: 'chromium' }],
+            instances: [
+              { browser: 'chromium' },
+              { browser: 'firefox', name: 'scroll-firefox', include: crossEngineScrollTests },
+              { browser: 'webkit', name: 'scroll-webkit', include: crossEngineScrollTests },
+            ],
           },
           include: ['test/**/*.browser.test.ts'],
           exclude: [
+            // Full-document pixels and restore timings use vitest.snapshot.config.ts.
+            'test/documentPaint.browser.test.ts',
             'test/highlightPaint.browser.test.ts',
             'test/markdownFencePaint.browser.test.ts',
             'test/paintOrigin.browser.test.ts',
           ],
+        },
+      },
+      {
+        plugins: [browserTestResponses()],
+        server: { fs: { allow: [workspaceRoot] } },
+        test: {
+          name: 'content-layout',
+          include: ['test/contentHeight.browser.test.ts'],
+          browser: {
+            enabled: true,
+            headless: true,
+            viewport: { width: 800, height: 600 },
+            provider: playwright(),
+            commands: {
+              proofContentLayoutScreenshot: async ({ iframe, project }, width: number) => {
+                contentEvidence ??= mkdtempSync(join(tmpdir(), 'singapore-content-layout-'))
+                const path = join(contentEvidence, `${project.name}-${width}.png`)
+                await iframe
+                  .locator('#content-height-proof')
+                  .screenshot({ path, animations: 'disabled' })
+                return path
+              },
+            },
+            instances: [
+              { browser: 'chromium', name: 'content-layout-chromium' },
+              { browser: 'firefox', name: 'content-layout-firefox' },
+              { browser: 'webkit', name: 'content-layout-webkit' },
+              {
+                browser: 'webkit',
+                name: 'content-layout-iphone',
+                viewport: devices['iPhone 15'].viewport,
+                provider: playwright({ contextOptions: devices['iPhone 15'] }),
+              },
+            ],
+          },
         },
       },
       {
@@ -155,8 +216,12 @@ export default defineConfig({
             viewport: { width: 390, height: 844 },
             fileParallelism: false,
             provider: playwright({ contextOptions: devices['iPhone 13'] }),
+            commands: {
+              proofStyledWrapScreenshot,
+            },
             instances: [
               { browser: 'chromium', name: 'wrap-layout-chromium' },
+              { browser: 'firefox', name: 'wrap-layout-firefox', provider: playwright() },
               { browser: 'webkit', name: 'wrap-layout-iphone-webkit' },
             ],
           },
@@ -216,10 +281,22 @@ export default defineConfig({
                 })
                 return image.toString('base64')
               },
-              proofHighlightPaintScreenshot: async ({ iframe }, hostId: string) => {
+              proofHighlightPaintScreenshot: async (
+                { iframe, project },
+                hostId: string,
+                label?: string,
+              ) => {
+                if (label)
+                  highlightEvidence ??= mkdtempSync(join(tmpdir(), 'singapore-highlight-boundary-'))
+                const path = label
+                  ? join(highlightEvidence!, `${project.name}-${label}.png`)
+                  : undefined
                 const image = await iframe
-                  .locator(`#${hostId} [data-editor-virtual-row="0"]`)
-                  .screenshot({ animations: 'disabled' })
+                  .locator(
+                    `#${hostId} [data-editor-virtual-row="0"], #${hostId} [data-editor-document-paint-row="0"]`,
+                  )
+                  .screenshot({ animations: 'disabled', path })
+                if (path) console.info('Highlight boundary evidence', path)
                 return image.toString('base64')
               },
             },

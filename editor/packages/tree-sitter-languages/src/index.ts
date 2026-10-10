@@ -196,11 +196,9 @@ async function loadTypeScriptAssets(tsx: boolean): Promise<TreeSitterLanguageAss
     highlightQuerySource,
     foldQuerySource,
     injectionQuerySource,
-    mergeUnitQuerySource: [
-      jsMergeUnitQuerySource,
-      tsMergeUnitQuerySource,
-      ...(tsx ? [await loadDefault(import('./queries/tsx-merge-units.scm?raw'))] : []),
-    ].join('\n'),
+    mergeUnitQuerySource: [jsMergeUnitQuerySource, tsMergeUnitQuerySource]
+      .concat(tsx ? [await loadDefault(import('./queries/tsx-merge-units.scm?raw'))] : [])
+      .join('\n'),
   }
 }
 
@@ -213,7 +211,7 @@ async function typeScriptHighlightQuerySource(
   const jsxHighlightQuerySource = await loadDefault(
     import('tree-sitter-javascript/queries/highlights-jsx.scm?raw'),
   )
-  return [...sources, jsxHighlightQuerySource].join('\n')
+  return sources.concat([jsxHighlightQuerySource]).join('\n')
 }
 
 async function typeScriptFoldQuerySource(
@@ -223,7 +221,7 @@ async function typeScriptFoldQuerySource(
   if (!tsx) return sources.join('\n')
 
   const jsxFoldQuerySource = await loadDefault(import('./queries/jsx-folds.scm?raw'))
-  return [...sources, jsxFoldQuerySource].join('\n')
+  return sources.concat([jsxFoldQuerySource]).join('\n')
 }
 
 async function loadDefault(module: Promise<{ readonly default: string }>): Promise<string> {

@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/react",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "React components and hooks for mounting and controlling the Singapore editor.",
   "keywords": [
     "browser",

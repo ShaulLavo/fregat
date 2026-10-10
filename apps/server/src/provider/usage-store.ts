@@ -192,7 +192,9 @@ export class ProviderUsageStore {
     this.closed = true
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
-    await Promise.allSettled([...this.probes.values(), this.proxyProbe])
+    await Promise.allSettled(
+      Array.from<Promise<unknown> | null>(this.probes.values()).concat([this.proxyProbe]),
+    )
     this.persist(true)
     this.collectionSkips.clear()
   }
@@ -249,14 +251,13 @@ export class ProviderUsageStore {
         : this.proxyAccounts
     return {
       accounts: mergeProvenUsageAccounts(
-        [
-          ...native,
-          ...(configured
+        native.concat(
+          configured
             ? proxy.map((account) =>
                 this.withFreshness({ ...account, providerInstanceIds: mappings }),
               )
-            : []),
-        ],
+            : [],
+        ),
         identities,
       ),
     }
@@ -312,10 +313,11 @@ export class ProviderUsageStore {
 
   async refresh() {
     if (this.closed) return
-    await Promise.allSettled([
-      ...this.targets().map((target) => this.collect(target, false)),
-      this.refreshProxy(),
-    ])
+    await Promise.allSettled(
+      this.targets()
+        .map<Promise<unknown>>((target) => this.collect(target, false))
+        .concat([this.refreshProxy()]),
+    )
     this.persist()
   }
 
@@ -843,11 +845,10 @@ export class ProviderUsageStore {
     })
     return {
       ...account,
-      windows: [
-        ...account.windows,
-        ...cached.flatMap((entry) => entry.windows),
-        ...native.flatMap((entry) => entry.windows),
-      ],
+      windows: account.windows.concat(
+        cached.flatMap((entry) => entry.windows),
+        native.flatMap((entry) => entry.windows),
+      ),
     }
   }
 

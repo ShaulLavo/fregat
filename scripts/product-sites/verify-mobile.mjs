@@ -51,7 +51,7 @@ async function sitemapPages(url) {
   const response = await fetch(url)
   assert(response.ok, `${url}: HTTP ${response.status}`)
   const xml = await response.text()
-  const links = [...xml.matchAll(/<loc>(.*?)<\/loc>/g)].map((match) =>
+  const links = Array.from(xml.matchAll(/<loc>(.*?)<\/loc>/g), (match) =>
     match[1].replaceAll('&amp;', '&'),
   )
   if (!xml.includes('<sitemapindex')) return links
@@ -97,10 +97,11 @@ if (directory) {
 } else {
   const sitemaps = option('--sitemaps', '').split(',').filter(Boolean)
   const paths = option('--paths', '/').split(',').filter(Boolean)
-  urls = [
-    ...paths.map((path) => new URL(path, origin).href),
-    ...(await Promise.all(sitemaps.map((path) => sitemapPages(new URL(path, origin).href)))).flat(),
-  ]
+  urls = paths
+    .map((path) => new URL(path, origin).href)
+    .concat(
+      (await Promise.all(sitemaps.map((path) => sitemapPages(new URL(path, origin).href)))).flat(),
+    )
 }
 urls = [...new Set(urls)]
   .sort()

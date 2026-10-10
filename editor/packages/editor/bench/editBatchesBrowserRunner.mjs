@@ -328,8 +328,7 @@ async function verifyGuards() {
         expected: 'post-screenshot-fold-guard-rejected',
         observation: folds,
       },
-      ...deferredReads,
-    ],
+    ].concat(deferredReads),
   }
 }
 
@@ -351,6 +350,6 @@ async function serveAsset(route) {
 }
 
 function percentile(samples, proportion) {
-  const sorted = samples.toSorted((a, b) => a - b)
+  const sorted = samples.sort((a, b) => a - b)
   return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * proportion) - 1)]
 }

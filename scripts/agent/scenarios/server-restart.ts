@@ -47,13 +47,12 @@ function sampleRestartDocument() {
   )
   const timer = setInterval(() => {
     const item = document.querySelector<HTMLElement>('[data-server-update]')
-    const alerts = [
-      ...document.querySelectorAll<HTMLElement>(
+    const alerts = Array.from(
+      document.querySelectorAll<HTMLElement>(
         '[role="alert"], [data-sonner-toast], [role="status"].text-warning',
       ),
-    ]
-      .map((element) => element.innerText.trim())
-      .filter(Boolean)
+      (element) => element.innerText.trim(),
+    ).filter(Boolean)
     samples.push({
       at: Date.now() - started,
       documentTimeOrigin: performance.timeOrigin,

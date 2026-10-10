@@ -37,7 +37,7 @@ export function defaultClaudeMcpCli(
   env: NodeJS.ProcessEnv,
 ): ClaudeMcpCli {
   return async (args, options) => {
-    const child = Bun.spawn([await executable(), ...args], {
+    const child = Bun.spawn([await executable()].concat(args), {
       cwd: options.cwd,
       env,
       stderr: 'pipe',
@@ -87,7 +87,7 @@ async function claudeMcpConfigServers(input: {
       ...gatedProjectMcpServer(name),
       ...claudeRowLocation('project', name, globalFile, projectFile, projectNames),
     }))
-  return [...rows, ...gated]
+  return rows.concat(gated)
 }
 
 function claudeRowLocation(

@@ -122,20 +122,20 @@ test('two process writers rotate and prune their own series without losing the o
       'desktop.after_server_rotation',
     ]
     const events = await readLogEvents(directory)
-    expect(events.map((event) => event.action).sort()).toEqual([...expected].sort())
+    expect(events.map((event) => event.action).sort()).toEqual(expected.toSorted())
     const files = (await readdir(directory)).filter((name) => name.endsWith('.jsonl'))
     expect(files.filter((name) => name.startsWith('desktop-'))).toHaveLength(2)
     expect(files.filter((name) => !name.startsWith('desktop-'))).toHaveLength(1)
     const since = new Date(Date.now() - 60_000)
     const history = []
     for await (const event of readFsLogs({ dir: directory, since })) history.push(event.action)
-    expect(history.sort()).toEqual([...expected].sort())
+    expect(history.sort()).toEqual(expected.toSorted())
     const tailed = []
     for await (const event of tailFsLogs({ dir: directory, since })) {
       tailed.push(event.action)
       if (tailed.length === expected.length) break
     }
-    expect(tailed.sort()).toEqual([...expected].sort())
+    expect(tailed.sort()).toEqual(expected.toSorted())
     const cliEvents = await readLogs({ directory, since })
     expect(cliEvents.map((event) => event.action)).toEqual(expected)
     expect(await readLogs({ directory, since, source: 'desktop' })).toHaveLength(2)

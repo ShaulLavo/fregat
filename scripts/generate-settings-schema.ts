@@ -65,7 +65,7 @@ function settingPropertySchema(descriptor: ReturnType<typeof presentSetting>): J
   ].filter((note) => note !== null)
   if (notes.length === 0) return property
 
-  return { ...property, markdownDescription: [descriptor.description, ...notes].join('\n\n') }
+  return { ...property, markdownDescription: [descriptor.description].concat(notes).join('\n\n') }
 }
 
 function withoutRootSchema(schema: JsonObject): JsonObject {
@@ -79,7 +79,7 @@ function normalizeSchema(value: JsonValue, parentKey?: string): JsonValue {
 
   return Object.fromEntries(
     Object.entries(value)
-      .toSorted(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, child]) => [key, normalizeSchema(child, key)]),
   )
 }
@@ -88,7 +88,7 @@ function normalizeArray(value: JsonValue[], parentKey?: string): JsonValue[] {
   const normalized = value.map((item) => normalizeSchema(item))
   if (!parentKey || !ORDER_INSENSITIVE_ARRAY_KEYS.has(parentKey)) return normalized
 
-  return normalized.toSorted((left, right) => stableJson(left).localeCompare(stableJson(right)))
+  return normalized.sort((left, right) => stableJson(left).localeCompare(stableJson(right)))
 }
 
 function stableJson(value: JsonValue): string {

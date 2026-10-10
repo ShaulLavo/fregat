@@ -49,7 +49,8 @@ export async function readDrives(paths: WorkspacePaths, sources: DriveSources) {
   if (drives.some((drive) => drive.path === '')) return drives
 
   const root = paths.workspaceRoot
-  return [{ label: path.basename(root) || root, path: '', ...(await space(root)) }, ...drives]
+  const rootDrive: Drive = { label: path.basename(root) || root, path: '', ...(await space(root)) }
+  return [rootDrive].concat(drives)
 }
 
 async function readMounts(sources: DriveSources): Promise<Mount[]> {
@@ -95,7 +96,7 @@ async function readMacVolumes(volumesDirectory: string): Promise<Mount[]> {
   const names = await readdir(volumesDirectory).catch(() => [])
   const volumes: Mount[] = []
   let rootLabel = 'System'
-  for (const name of names.toSorted()) {
+  for (const name of names.sort()) {
     if (name.startsWith('.')) continue
     const volume = path.join(volumesDirectory, name)
     const info = await lstat(volume).catch(() => null)
@@ -106,7 +107,7 @@ async function readMacVolumes(volumesDirectory: string): Promise<Mount[]> {
     }
     if ((await readlink(volume).catch(() => null)) === '/') rootLabel = name
   }
-  return [{ device: '/', mountPoint: '/', label: rootLabel }, ...volumes]
+  return [{ device: '/', mountPoint: '/', label: rootLabel }].concat(volumes)
 }
 
 function relativeInside(paths: WorkspacePaths, absolute: string) {

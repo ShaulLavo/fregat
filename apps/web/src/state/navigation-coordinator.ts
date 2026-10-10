@@ -7,7 +7,7 @@ import {
 import { defaultLogsFilterState } from '@/features/logs/utils/filter-params'
 import type { Address } from '@workspace/client-core/address/grammar'
 import { formatAddress } from '@workspace/client-core/address/grammar'
-import { parseWorkspaceToken } from '@workspace/client-core/address/workspace'
+import { NO_WORKSPACE_TOKEN, parseWorkspaceToken } from '@workspace/client-core/address/workspace'
 import { applyAddressView } from '@/features/address/state/apply-view'
 import { writeAddressCache } from '@/features/address/state/storage'
 import { addressEnvironments } from '@/features/address/utils/environments'
@@ -485,7 +485,11 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     op.historyIdentity = null
     op.writing = true
     await navigateAddress(router, wire, {
-      replace: destination.replace,
+      replace:
+        destination.replace ||
+        (currentAddress().workspace === NO_WORKSPACE_TOKEN &&
+          address.workspace !== null &&
+          parseWorkspaceToken(address.workspace).kind === 'workspace'),
       historyTarget: destination.historyTarget,
     })
     if (!isCurrent(op)) return
@@ -690,10 +694,10 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
         listeners.delete(listener)
       }
     },
-    permitsRecentRoot: () =>
+    permitsRecentRoot: (snapshot: NavigationStatus) =>
       initial.address.workspace === null &&
       initial.unavailable === null &&
-      status.status === 'applied',
+      snapshot.status === 'applied',
     attach(owner: ApplicationRuntime) {
       const retained = pendingHistory ?? detachedHistory
       const resumed =

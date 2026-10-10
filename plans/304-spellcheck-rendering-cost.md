@@ -32,7 +32,7 @@ The file default remains `off` until the final artifact has a measured input-lat
 
 ## Execution checklist
 
-- [ ] Rerun `bun run bench:typing` from `editor/packages/spellcheck/` before changing code. Record commit, runtime, browser, fixture size, mark count/density, samples, and median/p95 for all four cases. Run a quiet measurement through the heavy-job wrapper.
+- [ ] Rerun `bun run bench:typing` from `editor/packages/spellcheck/` before changing code. Record commit, runtime, browser, fixture size, mark count/density, samples, and median/p95 for all four cases. Run a quiet measurement through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill.
 - [ ] Attribute controller/tokenization, underline updates, token adoption, and total edit work. Identify whether document-wide mask rebuilding or another measured path is the current bottleneck. Profile both text edits and delayed overlay updates so overlapping timings are labeled correctly.
 - [ ] Land the shared overlay work through Plan 201. Compare offscreen-dense documents at fixed mounted-row count. Count the ranges/rows touched so the regression proves that unrelated offscreen marks do not add per-keystroke rebuilding work.
 - [ ] Exercise sparse, dense, and empty marks during edit, scroll, remount, asynchronous verdict arrival, overlapping dim/underline/diagnostic styles, and surrogate-edge changes. Preserve paint on text that has no syntax provider.
@@ -44,6 +44,6 @@ The file default remains `off` until the final artifact has a measured input-lat
 
 ## Verification and acceptance
 
-Use `bun run bench:typing` for the controlled synchronous comparison. Narrow package checks are the existing overlay mask and virtualized overlay integration tests, `test/paint.browser.test.ts` through the spellcheck `engines` project, and the real `editor-spellcheck` scenario. Run browser work through the heavy-job wrapper.
+Use `bun run bench:typing` for the controlled synchronous comparison. Narrow package checks are the existing overlay mask and virtualized overlay integration tests, `test/paint.browser.test.ts` through the spellcheck `engines` project, and the real `editor-spellcheck` scenario. Run browser work through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill.
 
 The final artifact must preserve marks in Chromium, Firefox, and WebKit, and demonstrate removal of the identified redundant work. Keep profiles and measured rows in a delivery report. Do not infer a total input-latency gain from dictionary lookup timings or a benchmark with changed mark density.

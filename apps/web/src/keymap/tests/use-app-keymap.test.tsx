@@ -35,12 +35,11 @@ function mount(keys = 'Mod+K Mod+S', boundPrefix = false) {
       },
     },
   })
-  const bindings = [
-    ...(boundPrefix
+  const bindings = (
+    boundPrefix
       ? [binding('Mod+K', { command: 'workspace.toggleWallpaper', platform: detectPlatform() })]
-      : []),
-    binding(keys, { command: 'workspace.toggleWallpaper', platform: detectPlatform() }),
-  ]
+      : []
+  ).concat([binding(keys, { command: 'workspace.toggleWallpaper', platform: detectPlatform() })])
   const hook = renderHook(() => useAppKeymap({ bindings, bus: runtime.bus, focus }))
   return { ...hook, calls, focus }
 }

@@ -30,7 +30,7 @@ test('keeps the active project plus the most recent others, trimming the oldest'
     slices,
   })
 
-  expect([...retention.documentKeys].toSorted()).toEqual(
+  expect([...retention.documentKeys].sort()).toEqual(
     ['/repo/a/one.ts', '/repo/b/one.ts', '/repo/c/one.ts'].map((path) => testDocumentKey(path)),
   )
   expect(retention.tabIds.has(tabId('tab:/repo/a:/repo/a/one.ts'))).toBe(true)

@@ -8,7 +8,8 @@ import type { Scenario } from './index'
 function hints(page: Page, scope: string) {
   return page.evaluate(
     (selector) =>
-      [...document.querySelectorAll(`${selector} [data-shortcut-hint]`)].map(
+      Array.from(
+        document.querySelectorAll(`${selector} [data-shortcut-hint]`),
         (element) => element.getAttribute('data-shortcut-hint') ?? '',
       ),
     scope,
@@ -17,7 +18,7 @@ function hints(page: Page, scope: string) {
 
 function tabBoxes(page: Page) {
   return page.evaluate(() =>
-    [...document.querySelectorAll('[data-editor-tab-path]')].map((element) => {
+    Array.from(document.querySelectorAll('[data-editor-tab-path]'), (element) => {
       const box = element.getBoundingClientRect()
       return [box.x, box.y, box.width, box.height].map(Math.round)
     }),
@@ -25,7 +26,7 @@ function tabBoxes(page: Page) {
 }
 
 async function release(page: Page, ...keys: string[]) {
-  for (const key of keys.toReversed()) await page.keyboard.up(key)
+  for (const key of keys.reverse()) await page.keyboard.up(key)
 }
 
 export const shortcutHints: Scenario = {

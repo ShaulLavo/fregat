@@ -20,6 +20,7 @@ import type { RenderStateSource, WebGpuTerminalRendererOptions } from '../render
 import { WebGpuUnavailableError } from '../renderer.js'
 import type { RenderSchedulerClock } from '../scheduler.js'
 import { createCompatibleTerminalRenderer } from '../selector.js'
+import { restoreRendererNavigator, stubRendererNavigator } from '../tests/navigator.js'
 import { CanvasTerminalRenderer } from './renderer.js'
 
 const canvases = new Set<HTMLCanvasElement>()
@@ -34,6 +35,7 @@ afterEach(() => {
   resourceCleanups.clear()
   canvases.clear()
   vi.restoreAllMocks()
+  restoreRendererNavigator()
 })
 
 class FakeClock implements RenderSchedulerClock {
@@ -187,7 +189,8 @@ function expectFullRepaint(
   const painter = new CanvasRowPainter(context, font, theme)
   painter.resetContext(font)
   const cursor = renderCursorState(source.readCursor(), true)
-  for (const row of source.readRows()) painter.paint(row, cursor, control.width, false)
+  for (const row of source.readRows())
+    painter.paint({ y: row.y, dirty: row.dirty, cells: row.cells }, cursor, control.width, false)
   const actual = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
   const expected = context.getImageData(0, 0, control.width, control.height).data
   expect([...actual]).toEqual([...expected])
@@ -224,6 +227,63 @@ async function createRenderer(
 }
 
 describe('CanvasTerminalRenderer', () => {
+  it.each([1, 2])(
+    'shares a complete repaint clear while retaining exact row pixels at DPR %s',
+    async (dpr) => {
+      const clock = new FakeClock()
+      const canvas = createCanvas()
+      const base = fittedFont()
+      const font = {
+        ...base,
+        charTop: base.charTop * dpr,
+        deviceBaseline: base.deviceBaseline * dpr,
+        deviceCellHeight: base.deviceCellHeight * dpr,
+        deviceCellWidth: base.deviceCellWidth * dpr,
+        deviceCharHeight: base.deviceCharHeight * dpr,
+        deviceCharWidth: base.deviceCharWidth * dpr,
+        pixelRatio: dpr,
+      }
+      const source = new FakeRenderState([
+        row(0, [cell(0, { text: '日' }), cell(1, { text: 'é', style: styled({ italic: true }) })]),
+        row(1, [cell(0, { text: '🧪' }), cell(1, { text: 'x', style: styled({ faint: true }) })]),
+      ])
+      source.cursor.visible = false
+      const renderer = await createRenderer(options(canvas, source, clock, { font }))
+      const clear = vi.spyOn(canvas.getContext('2d')!, 'clearRect')
+      clock.flushFrame()
+      expect(clear.mock.calls).toEqual([[0, 0, canvas.width, canvas.height]])
+      expectFullRepaint(canvas, source, font)
+
+      source.rows[0] = row(0, [cell(0, { text: 'A' }), cell(1)])
+      source.rows[1] = row(1, [cell(0, { text: 'B', style: styled({ bold: true }) }), cell(1)])
+      source.dirtyRow(0)
+      source.dirtyRow(1)
+      clear.mockClear()
+      renderer.notifyWrite()
+      clock.flushFrame()
+      expect(clear.mock.calls).toEqual([[0, 0, canvas.width, canvas.height]])
+      expectFullRepaint(canvas, source, font)
+
+      source.rows[1] = row(1, [cell(0, { text: 'c', style: styled({ italic: true }) }), cell(1)])
+      source.dirtyRow(1)
+      clear.mockClear()
+      renderer.notifyWrite()
+      clock.flushFrame()
+      expect(clear.mock.calls).toEqual([
+        [0, font.deviceCellHeight, canvas.width, font.deviceCellHeight],
+      ])
+      expectFullRepaint(canvas, source, font)
+
+      source.dirtyRow(0)
+      source.dirtyRow(1)
+      clear.mockClear()
+      renderer.notifyWrite()
+      clock.flushFrame()
+      expect(clear).not.toHaveBeenCalled()
+      expectFullRepaint(canvas, source, font)
+    },
+  )
+
   it('repaints only changed plain-text cells while keeping full-row pixels', async () => {
     const clock = new FakeClock()
     const canvas = createCanvas()
@@ -231,7 +291,7 @@ describe('CanvasTerminalRenderer', () => {
     const source = new FakeRenderState([
       row(
         0,
-        [...text].map((text, x) => cell(x, { text })),
+        Array.from(text, (text, x) => cell(x, { text })),
       ),
     ])
     source.cursor.viewport = { wideTail: false, x: 9, y: 0 }
@@ -400,6 +460,73 @@ describe('CanvasTerminalRenderer', () => {
     expect(decode).toHaveBeenCalledTimes(80)
     expectFullRepaint(canvas, source)
   })
+
+  it('decodes each dense packed row once for identity and painting', async () => {
+    const clock = new FakeClock()
+    const canvas = createCanvas()
+    const source = new FakeRenderState([row(0, [cell(0)]), row(1, [cell(0)])])
+    source.cursor.visible = false
+    const renderer = await createRenderer(options(canvas, source, clock))
+    clock.flushFrame()
+    const decodes = []
+    for (let y = 0; y < 2; y += 1) {
+      const packed = new PackedCells(
+        new Uint32Array([0x754c + y, 0x030201, 0xffffffff, 1, 0, 0]),
+        new Uint32Array(),
+      )
+      decodes.push(vi.spyOn(packed, 'readInto'))
+      let cells: readonly RenderCell[] | undefined
+      source.rows[y] = {
+        y,
+        dirty: true,
+        packed,
+        get cells() {
+          return (cells ??= packed.materialize())
+        },
+      }
+      source.dirtyRow(y)
+    }
+    renderer.notifyWrite()
+    clock.flushFrame()
+    for (const decode of decodes) expect(decode).toHaveBeenCalledTimes(1)
+    expectFullRepaint(canvas, source)
+  })
+
+  it.each([1, 2])(
+    'borrows packed cells only within multi-row frames (%i rows)',
+    async (rowCount) => {
+      const clock = new FakeClock()
+      const canvas = createCanvas()
+      const source = new FakeRenderState(
+        Array.from({ length: rowCount }, (_, y) => row(y, [cell(0, { text: 'A' })])),
+      )
+      source.cursor.visible = false
+      const renderer = await createRenderer(options(canvas, source, clock, { rows: rowCount }))
+      clock.flushFrame()
+      const materializations = []
+      for (let y = 0; y < rowCount; y += 1) {
+        const packed = new PackedCells(
+          new Uint32Array([0x754c + y, 0x030201, 0xffffffff, 1, 0, 0]),
+          new Uint32Array(),
+        )
+        materializations.push(vi.spyOn(packed, 'materialize'))
+        let cells: readonly RenderCell[] | undefined
+        source.rows[y] = {
+          y,
+          dirty: true,
+          packed,
+          get cells() {
+            return (cells ??= packed.materialize())
+          },
+        }
+        source.dirtyRow(y)
+      }
+      renderer.notifyWrite()
+      clock.flushFrame()
+      for (const spy of materializations) expect(spy).toHaveBeenCalledTimes(rowCount === 1 ? 1 : 0)
+      expectFullRepaint(canvas, source)
+    },
+  )
 
   it.each([
     { name: 'plain glyph', style: undefined, method: 'fillText' },
@@ -1150,6 +1277,7 @@ describe('CanvasTerminalRenderer', () => {
 
 describe('compatible renderer selection', () => {
   it('releases an acquired device and falls back when the WebGPU context is unavailable', async () => {
+    stubRendererNavigator({ platform: 'MacIntel', userAgent: '' })
     const canvas = createCanvas()
     const getContext = canvas.getContext.bind(canvas)
     Object.defineProperty(canvas, 'getContext', {
@@ -1195,6 +1323,7 @@ describe('compatible renderer selection', () => {
   })
 
   it('does not hide WebGPU programming failures behind the fallback', async () => {
+    stubRendererNavigator({ platform: 'MacIntel', userAgent: '' })
     const canvas = createCanvas()
     const clock = new FakeClock()
     const source = new FakeRenderState([row(0, [cell(0), cell(1)]), row(1, [cell(0), cell(1)])])
@@ -1206,6 +1335,27 @@ describe('compatible renderer selection', () => {
         deviceFactory: () => Promise.reject(failure),
       }),
     ).rejects.toBe(failure)
+  })
+
+  it('does not hide Linux WebGL programming failures behind the fallback', async () => {
+    stubRendererNavigator({ platform: 'Linux x86_64', userAgent: '' })
+    const canvas = createCanvas()
+    const getContext = vi.spyOn(canvas, 'getContext')
+    const clock = new FakeClock()
+    const source = new FakeRenderState([row(0, [cell(0), cell(1)]), row(1, [cell(0), cell(1)])])
+    const deviceFactory = vi.fn(() =>
+      Promise.reject(new WebGpuUnavailableError('adapter', 'No supported adapter')),
+    )
+    vi.spyOn(WebGL2RenderingContext.prototype, 'getShaderParameter').mockReturnValue(false)
+
+    await expect(
+      createCompatibleTerminalRenderer({
+        ...options(canvas, source, clock),
+        deviceFactory,
+      }),
+    ).rejects.toThrow('WebGL shader compilation failed')
+    expect(deviceFactory).not.toHaveBeenCalled()
+    expect(getContext.mock.calls.map(([type]) => type)).toEqual(['webgl2'])
   })
 })
 

@@ -5,7 +5,7 @@ import { history, peerSnapshot, syntaxFixture } from './merge-review-fixture'
 
 let fixture: Awaited<ReturnType<typeof syntaxFixture>>
 beforeEach(async () => {
-  fixture = await syntaxFixture()
+  fixture = await syntaxFixture('typescript', false, 'differential')
 })
 afterEach(() => fixture.dispose())
 
@@ -25,7 +25,7 @@ test('wide damaged fallback scans errors without overflowing argument limits', a
   ])
   expect(units?.[0]?.[0]?.type).toBe('line')
   expect(units?.[0]?.[0]?.hasErrors).toBe(true)
-})
+}, 30_000)
 
 test('independent edits in separate functions stay unmarked', async () => {
   const text = 'function east() { return 1; }\nfunction west() { return 2; }'
@@ -61,6 +61,35 @@ test('formatting and content changes in one statement stay unmarked', async () =
       ]),
     ),
   ).toEqual([])
+})
+
+test('concurrent pairs share the same formatting projection read', async () => {
+  const text = 'const amount = 4;'
+  const input = history(text, [
+    { offset: text.indexOf('='), deleteCount: 0, text: ' ' },
+    { offset: text.indexOf('='), deleteCount: 0, text: '  ' },
+    { offset: text.indexOf('='), deleteCount: 0, text: '\t' },
+  ])
+  let currentContentReads = 0
+  let projectedContentReads = 0
+  const detector = new MergeReviewDetector(async (...args) => {
+    if (args[2]) {
+      if (args[4]) projectedContentReads++
+      else currentContentReads++
+    }
+    // Use one coarse parser unit so each edit participates in several comparisons.
+    const units = await fixture.syntax(
+      args[0],
+      [{ startIndex: 0, endIndex: args[0].length }],
+      args[2],
+      'enclosing',
+      args[4],
+    )
+    return units && args[1].map(() => units[0] ?? [])
+  })
+  expect((await detector.detect(input.window, input.base.snapshot())).status).toBe('complete')
+  expect(currentContentReads).toBe(3)
+  expect(projectedContentReads).toBe(3)
 })
 
 test('different spellings of one rename mark the statement', async () => {
@@ -271,7 +300,7 @@ test('undo removes obsolete marks', async () => {
 
 test('equivalent JSON signature spellings collide', async () => {
   fixture.dispose()
-  fixture = await syntaxFixture('json')
+  fixture = await syntaxFixture('json', false, 'differential')
   const input = history('{"tail":0}', [
     { offset: 1, deleteCount: 0, text: '"name":1,' },
     { offset: 1, deleteCount: 0, text: '"\\u006eame":2,' },

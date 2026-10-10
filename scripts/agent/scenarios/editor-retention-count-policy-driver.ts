@@ -227,16 +227,15 @@ const run = ${JSON.stringify(run)}
 export default {
   ...base,
   root: ${JSON.stringify(join(repo, 'apps/web'))},
-  optimizeDeps: { ...base.optimizeDeps, include: [...base.optimizeDeps.include,
+  optimizeDeps: { ...base.optimizeDeps, include: base.optimizeDeps.include.concat([
     '@singapore-editor/core > @shikijs/engine-oniguruma',
     '@singapore-editor/core > @shikijs/engine-oniguruma/wasm-inlined', 'shiki/core',
-    '@singapore-editor/tree-sitter > tree-sitter-md', '@singapore-editor/tree-sitter > web-tree-sitter'] },
-  server: { ...base.server, fs: { ...base.server.fs, allow: [...base.server.fs.allow, ${JSON.stringify(dependencyRoot)}] } },
-  resolve: { ...base.resolve, alias: [
-    ...Object.entries(${JSON.stringify(packageAliases)}).map(([find, replacement]) => ({ find: new RegExp('^' + find + '$'), replacement })),
-    { find: /^@singapore-editor\\/textbuffer\\/internal\\/(.+)$/, replacement: ${JSON.stringify(join(repo, 'editor/packages/textbuffer/src/$1.ts'))} },
-    ...Object.entries(base.resolve.alias).map(([find, replacement]) => ({ find, replacement })),
-  ] },
+    '@singapore-editor/tree-sitter > tree-sitter-md', '@singapore-editor/tree-sitter > web-tree-sitter']) },
+  server: { ...base.server, fs: { ...base.server.fs, allow: base.server.fs.allow.concat([${JSON.stringify(dependencyRoot)}]) } },
+  resolve: { ...base.resolve, alias: Object.entries(${JSON.stringify(packageAliases)}).map(([find, replacement]) => ({ find: new RegExp('^' + find + '$'), replacement })).concat([
+    { find: /^@singapore-editor\\/textbuffer\\/internal\\/(.+)$/, replacement: ${JSON.stringify(join(repo, 'editor/packages/textbuffer/src/$1.ts'))} }],
+    Object.entries(base.resolve.alias).map(([find, replacement]) => ({ find, replacement })),
+  ) },
   test: {
     ...base.test,
     provide: { ...base.test.provide, retentionRun: run },

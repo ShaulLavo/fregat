@@ -27,7 +27,7 @@ export const editorThemePreview: Scenario = {
     await page.waitForTimeout(2000)
     await step('ready')
     let lastColors = ''
-    for (const [index, id] of [...ids, ...ids].entries()) {
+    for (const [index, id] of ids.concat(ids).entries()) {
       await page.evaluate(() => performance.mark('theme-preview:hover'))
       await selectors.codeThemeOption(page, id).hover()
       await page.waitForTimeout(1200)

@@ -32,7 +32,7 @@ it('keeps the MCP bearer out of real SDK argv and debug logs, delivering it over
           ...input.options,
           env: { ...process.env, FAKE_CLAUDE_IPC_CAPTURE: capture },
           spawnClaudeCodeProcess: (options) => {
-            expect([options.command, ...options.args].join(' ')).toContain('claude-ipc.cjs')
+            expect([options.command].concat(options.args).join(' ')).toContain('claude-ipc.cjs')
             argv.push(options.args)
             return input.options.spawnClaudeCodeProcess!(options)
           },

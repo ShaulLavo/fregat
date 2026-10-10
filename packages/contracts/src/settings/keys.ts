@@ -58,15 +58,6 @@ import { WORKSPACE_SEARCH_LIMIT_MAX } from '../workspace-search'
  */
 /** Percent, as a whole number, for the surface material knobs. */
 const percentSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100))
-const mebibytesSchema = v.pipe(v.number(), v.integer(), v.minValue(16), v.maxValue(262144))
-const heavyJobBudgetSchema = v.pipe(
-  v.object({ ceilingMiB: mebibytesSchema, estimateMiB: mebibytesSchema }),
-  v.check(
-    (budget) => budget.ceilingMiB >= budget.estimateMiB,
-    'The ceiling is at least the estimate.',
-  ),
-)
-
 export const SETTINGS_REGISTRY = {
   'chat.followUpBehavior': defineSetting({
     schema: v.picklist(['queue', 'steer']),
@@ -210,6 +201,11 @@ export const SETTINGS_REGISTRY = {
     schema: v.boolean(),
     default: true,
     // Machine scope: it decides who reaches this machine's files, terminals and agents.
+    scope: 'machine',
+  }),
+  'environments.trustedProxyHosts': defineSetting({
+    schema: v.array(v.pipe(v.string(), v.minLength(1))),
+    default: [],
     scope: 'machine',
   }),
   'environments.tailnetOwnerDevices': defineSetting({
@@ -720,84 +716,6 @@ export const SETTINGS_REGISTRY = {
     // background work, which the caller should interrupt on purpose.
     default: 30,
     // Machine scope: `bun run install-release --restart` reads it from this machine's production home.
-    scope: 'machine',
-  }),
-  'developer.heavyJobLogDirectory': defineSetting({
-    schema: v.pipe(v.string(), v.minLength(1)),
-    // Beside production's logs, so every checkout's wrapper writes one machine-wide record.
-    default: '/work/platform-production/heavy-jobs',
-    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
-    scope: 'machine',
-  }),
-  'developer.heavyJobClasses': defineSetting({
-    schema: v.object({
-      bench: heavyJobBudgetSchema,
-      browser: heavyJobBudgetSchema,
-      build: heavyJobBudgetSchema,
-      light: heavyJobBudgetSchema,
-      suite: heavyJobBudgetSchema,
-    }),
-    // Estimate: p90 peak of the class's runs that were not OOM-killed, in the 2026-10-01 heavy-job
-    // log, rounded up to 512 MiB: build 2968, light 1368, suite 6158 MiB; browser 3882 from runs
-    // after bounded browser-test memory. Bench keeps 3072 for the large-file bench's 8 GiB case
-    // cap. A job past its estimate is still capped by its ceiling; the reserve and the pressure
-    // gate cover overlaps.
-    default: {
-      bench: { ceilingMiB: 9216, estimateMiB: 3072 },
-      browser: { ceilingMiB: 10240, estimateMiB: 4096 },
-      build: { ceilingMiB: 4096, estimateMiB: 3072 },
-      light: { ceilingMiB: 2048, estimateMiB: 1536 },
-      suite: { ceilingMiB: 8192, estimateMiB: 6656 },
-    },
-    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
-    scope: 'machine',
-  }),
-  'developer.heavyJobQuietPolicy': defineSetting({
-    schema: v.object({
-      allowedClasses: v.array(v.literal('light')),
-      measurementCpus: v.pipe(
-        v.array(v.pipe(v.number(), v.integer(), v.minValue(0))),
-        v.maxLength(0),
-      ),
-      concurrentCpus: v.pipe(
-        v.array(v.pipe(v.number(), v.integer(), v.minValue(0))),
-        v.maxLength(0),
-      ),
-    }),
-    // CPU affinity and additional classes require a separately validated scheduling policy.
-    default: { allowedClasses: ['light'], measurementCpus: [], concurrentCpus: [] },
-    scope: 'machine',
-  }),
-  'developer.heavyJobMemoryReserveMiB': defineSetting({
-    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(65536)),
-    default: 2048,
-    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
-    scope: 'machine',
-  }),
-  'developer.heavyJobMemoryPressureLimit': defineSetting({
-    schema: v.pipe(v.number(), v.minValue(0), v.maxValue(100)),
-    default: 10,
-    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
-    scope: 'machine',
-  }),
-  'developer.heavyJobStopGraceSeconds': defineSetting({
-    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(600)),
-    // Long enough for a test runner to shut its workers down after SIGTERM.
-    default: 10,
-    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
-    scope: 'machine',
-  }),
-  'developer.heavyJobQuietHoldSeconds': defineSetting({
-    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(7200)),
-    // Long enough for one quiet measurement; other sessions' jobs queue behind it meanwhile.
-    default: 600,
-    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
-    scope: 'machine',
-  }),
-  'developer.heavyJobCpuLoadLimit': defineSetting({
-    schema: v.pipe(v.number(), v.minValue(0.1), v.maxValue(16)),
-    default: 1,
-    // Machine scope: `scripts/heavy/run.ts` reads it from this machine's production home.
     scope: 'machine',
   }),
   'window.browser': defineSetting({

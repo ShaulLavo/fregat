@@ -35,7 +35,7 @@ export const chatMultipleModels = isolatedNativeScenario({
       await Bun.sleep(200)
     }
     deepStrictEqual(
-      starts.map((entry) => String(entry.model)).toSorted(),
+      starts.map((entry) => String(entry.model)).sort(),
       ['gpt-5.5', 'gpt-5.5-mini'],
       'Each model got the turn',
     )

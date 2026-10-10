@@ -37,7 +37,9 @@ test('seeded confirmed histories match transitive dependency walks and both engi
     const identities = new Set(reference.characters().map(({ id }) => charKey(id)))
     for (const edit of window.edits) {
       expect(
-        [...expand(edit.inserted), ...expand(edit.deleted)].every((id) => identities.has(id)),
+        expand(edit.inserted)
+          .concat(expand(edit.deleted))
+          .every((id) => identities.has(id)),
       ).toBe(true)
     }
     for (const limit of [0, 1, 7, 16]) {
@@ -154,6 +156,11 @@ test('a bridge dependency and an effect command preserve transitive causality', 
       const fresh = new ConfirmedWindow(history.slice(0, end), limit)
       expect(window.edits).toEqual(fresh.edits)
       expect(window.pairs()).toEqual(fresh.pairs())
+      for (const predecessor of history.slice(0, end)) {
+        expect(window.editsAfter([predecessor.id])).toEqual(
+          window.edits.filter((edit) => window.isAfter(edit.envelope.id, [predecessor.id])),
+        )
+      }
     }
   }
 })
@@ -174,6 +181,25 @@ test('concurrency is represented by exact pairs, not transitive connected groups
         ([a, b]) => selected.has(editKey(a.envelope.id)) || selected.has(editKey(b.envelope.id)),
       ),
   )
+})
+
+test('batch selection preserves exact order for missing, evicted and non-tail edits', () => {
+  for (let seed = 0; seed < 20; seed++) {
+    const history = confirmedHistory(seed)
+    const window = new ConfirmedWindow([], 16)
+    for (const envelope of shuffled(history, randomFor(seed + 400))) window.append([envelope])
+    const all = window.pairs()
+    for (const envelope of history) {
+      const batch = [envelope.id, envelope.id, { actor: 'missing', seq: 1 }]
+      const selected = new Set(batch.map(editKey))
+      expect(window.pairs(batch)).toEqual(
+        all.filter(
+          ([a, b]) => selected.has(editKey(a.envelope.id)) || selected.has(editKey(b.envelope.id)),
+        ),
+      )
+    }
+    expect(window.pairs([])).toEqual([])
+  }
 })
 
 test('the replay cap retains the same canonical suffix regardless of arrival order', () => {
@@ -246,4 +272,40 @@ test('touches preserve exact UTF-16 spans for insert, delete and replace', () =>
         insert.change.kind === 'insert' ? expand([{ start: insert.change.start, count: 1 }]) : [],
     },
   ])
+})
+
+test('causal successors cover every dependency and exclude concurrent or evicted identities', () => {
+  const history = confirmedHistory(23)
+  const window = new ConfirmedWindow(history)
+  const ancestors = new Map<string, Set<string>>()
+  for (const edit of history) {
+    const seen = new Set(edit.deps.flatMap((id) => [editKey(id), ...ancestors.get(editKey(id))!]))
+    ancestors.set(editKey(edit.id), seen)
+    for (const previous of history) {
+      expect(window.isAfter(edit.id, [previous.id])).toBe(seen.has(editKey(previous.id)))
+    }
+  }
+  const suffix = new ConfirmedWindow(history, 2)
+  expect(suffix.isAfter(history.at(-1)!.id, [history[0]!.id])).toBe(false)
+})
+
+test('causal successor reads match identity checks after reordered arrivals and eviction', () => {
+  for (let seed = 0; seed < 10; seed++) {
+    const history = confirmedHistory(seed)
+    for (const limit of [0, 7, 32]) {
+      const window = new ConfirmedWindow(history.slice(0, 16), limit)
+      window.append(history.slice(16))
+      const reordered = new ConfirmedWindow(history.slice(16), limit)
+      reordered.append(history.slice(0, 16))
+      for (const current of [window, reordered]) {
+        const identities = history.map((edit) => edit.id)
+        const selections = identities.map((id, i) => [id, identities[(i + 1) % identities.length]!])
+        for (const predecessors of selections.concat([[], [{ actor: 'unknown', seq: 1 }]])) {
+          expect(current.editsAfter(predecessors)).toEqual(
+            current.edits.filter((edit) => current.isAfter(edit.envelope.id, predecessors)),
+          )
+        }
+      }
+    }
+  }
 })

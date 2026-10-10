@@ -20,16 +20,14 @@ export function readDevSources(webRoot: string): readonly DevPackage[] {
   const editors = Object.keys(dependencies).filter((name) => name.startsWith('@singapore-editor/'))
   if (editors.length === 0) throw createScriptError('No editor dependencies found in the web app.')
 
-  return [
-    ...editors.map((name) => readEditorPackage(webRoot, name)),
-    readHotkeysPackage(webRoot),
-    readGhosttyPackage(webRoot),
-  ]
+  return editors
+    .map((name) => readEditorPackage(webRoot, name))
+    .concat([readHotkeysPackage(webRoot), readGhosttyPackage(webRoot)])
 }
 
 export function sourceAliases(packages: readonly DevPackage[]) {
   return packages.flatMap((pkg) =>
-    [...pkg.entries].map(([id, file]) => {
+    Array.from(pkg.entries, ([id, file]) => {
       const wildcard = id.endsWith('/*')
       const specifier = wildcard ? id.slice(0, -1) : id
       const escaped = specifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -43,7 +41,7 @@ export function sourceAliases(packages: readonly DevPackage[]) {
 
 export function sourcePaths(packages: readonly DevPackage[]): Record<string, string[]> {
   return Object.fromEntries(
-    packages.flatMap((pkg) => [...pkg.entries].map(([id, file]) => [id, [file]])),
+    packages.flatMap((pkg) => Array.from(pkg.entries, ([id, file]) => [id, [file]])),
   )
 }
 

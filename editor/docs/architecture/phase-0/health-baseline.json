@@ -60,6 +60,7 @@
       [
         "packages/editor/src/editor/cursorHistory.ts",
         "packages/editor/src/editor/decorationStore.ts",
+        "packages/editor/src/editor/documentPaint.ts",
         "packages/editor/src/editor/editorUtils.ts",
         "packages/editor/src/editor/folds.ts",
         "packages/editor/src/editor/jumpHistory.ts",
@@ -69,6 +70,9 @@
         "packages/editor/src/editor/syntaxController.ts",
         "packages/editor/src/editor/types.ts",
         "packages/editor/src/plugins.ts",
+        "packages/editor/src/virtualization/documentPaintCapture.ts",
+        "packages/editor/src/virtualization/documentPaintHighlights.ts",
+        "packages/editor/src/virtualization/documentPaintRows.ts",
         "packages/editor/src/virtualization/fixedRowVirtualizer.ts",
         "packages/editor/src/virtualization/foldMarkerSource.ts",
         "packages/editor/src/virtualization/geckoHighlightRepaint.ts",

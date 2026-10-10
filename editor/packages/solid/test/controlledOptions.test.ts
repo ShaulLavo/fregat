@@ -159,7 +159,7 @@ describe('controlled options', () => {
       await flushEffects()
 
       expect(mounted.controller.editor()).toBe(instance)
-      expect(spy.mock.calls).toContainEqual([...sample.applied])
+      expect(spy.mock.calls).toContainEqual(sample.applied)
 
       mounted.dispose()
     })
@@ -217,8 +217,8 @@ describe('controlled options', () => {
     await flushEffects()
 
     expect(mounted.controller.editor()).not.toBe(first)
-    expect(selectionSpy.mock.calls).toContainEqual([...selection.applied])
-    expect(scrollSpy.mock.calls).toContainEqual([...scrollPosition.applied])
+    expect(selectionSpy.mock.calls).toContainEqual(selection.applied)
+    expect(scrollSpy.mock.calls).toContainEqual(scrollPosition.applied)
 
     mounted.dispose()
   })

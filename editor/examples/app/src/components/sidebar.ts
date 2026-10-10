@@ -1,12 +1,13 @@
-import type { SourceFile } from '../githubSource.ts'
+import type { SourceEntry } from '../githubSource.ts'
 import { buildSourceTree, renderTree, type FileSelectHandler } from '../tree.ts'
 import { el } from './dom.ts'
 
 export type Sidebar = {
   readonly element: HTMLDivElement
   clear(): void
+  selectPath(path: string): void
   renderSource(
-    files: readonly SourceFile[],
+    files: readonly SourceEntry[],
     onFileSelect: FileSelectHandler,
     options?: SidebarRenderOptions,
   ): Promise<void>
@@ -15,6 +16,7 @@ export type Sidebar = {
 type SidebarRenderOptions = {
   readonly selectedPath?: string
   readonly preserveExpandedPaths?: boolean
+  readonly onFileHover?: (file: SourceEntry) => void
 }
 
 class SidebarController implements Sidebar {
@@ -26,8 +28,23 @@ class SidebarController implements Sidebar {
     this.element.replaceChildren()
   }
 
+  selectPath(path: string): void {
+    const parts = path.split('/')
+    let directory = ''
+    for (const part of parts.slice(0, -1)) {
+      directory += `${part}/`
+      const entry = Array.from(
+        this.element.querySelectorAll<HTMLButtonElement>('.entry.directory'),
+      ).find((row) => row.dataset.sourcePath === directory)
+      if (entry?.getAttribute('aria-expanded') === 'false') entry.click()
+    }
+    for (const entry of this.element.querySelectorAll<HTMLElement>('.entry.file')) {
+      entry.classList.toggle('active', entry.dataset.sourcePath === path)
+    }
+  }
+
   async renderSource(
-    files: readonly SourceFile[],
+    files: readonly SourceEntry[],
     onFileSelect: FileSelectHandler,
     options?: SidebarRenderOptions,
   ): Promise<void> {
@@ -42,6 +59,7 @@ class SidebarController implements Sidebar {
       selectedPath: options?.selectedPath,
       expandedPaths: expandedPathsToRestore,
       onDirectoryToggle: this.setDirectoryOpen,
+      onFileHover: options?.onFileHover,
     })
   }
 

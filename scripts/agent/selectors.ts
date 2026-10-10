@@ -8,6 +8,19 @@ import type {
 import { createScriptError } from '../structured-errors'
 import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
+export const siteReplicaSelectors = {
+  stage: (page: Page, id: string) => page.locator(`[data-replica][id="${id}"]`),
+  replica: (page: Page, id: string) => siteReplicaSelectors.stage(page, id).locator('.rep'),
+  paused: (page: Page, id: string) => siteReplicaSelectors.stage(page, id).locator('.rep.paused'),
+  playing: (page: Page, id: string) =>
+    siteReplicaSelectors.stage(page, id).locator('.rep:not(.paused)'),
+  typed: (page: Page, id: string) =>
+    siteReplicaSelectors.stage(page, id).locator('[data-type]').first(),
+  pressed: (page: Page, id: string) =>
+    siteReplicaSelectors.stage(page, id).locator('.pressed, .pointer.press'),
+  control: (page: Page, id: string) => page.locator(`[data-motion-for="${id}"]`),
+}
+
 export const overlayAlignmentSelectors = {
   pickerFooter: (page: Page) => selectors.pickerDialog(page).locator('[data-slot="dialog-footer"]'),
   pickerFooterButton: (page: Page) =>
@@ -814,6 +827,7 @@ export const selectors = {
   navigationError: (page: Page) => page.getByRole('alert').filter({ hasText: 'Fix with AI' }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
   mcpSettings: (page: Page) => page.locator('[data-mcp-section]'),
+  mcpSettingsFolder: (page: Page) => page.locator('[data-mcp-folder]'),
   mcpSettingsRow: (page: Page, name: string) => page.locator(`[data-mcp-server="${name}"]`),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
   quickOpenPreviewToggle: (page: Page) =>
@@ -1440,6 +1454,7 @@ export const selectors = {
   pagedGo: (page: Page) => page.getByRole('button', { name: 'Go to line', exact: true }),
   pagedCopy: (page: Page) => page.getByRole('button', { name: 'Copy displayed text', exact: true }),
   createMissingFile: (page: Page) => page.getByRole('button', { name: 'Create File', exact: true }),
+  saveMissingFile: (page: Page) => page.getByRole('button', { name: 'Save file', exact: true }),
   editorTabs: (page: Page) => page.locator('[data-editor-tab-id]'),
   gitPanel: (page: Page) => page.getByRole('region', { name: 'Git panel' }),
   gitChangeRow: (page: Page, name: string) =>
@@ -1842,7 +1857,7 @@ export async function codeThemePickerIds(page: Page): Promise<string[]> {
  */
 export function paintedTokenWords(target: Locator): Promise<[string, string][]> {
   return target.evaluate((element) => {
-    const sheets = [...document.styleSheets, ...document.adoptedStyleSheets]
+    const sheets = Array.from(document.styleSheets).concat(document.adoptedStyleSheets)
     const rules = sheets.flatMap((sheet) => {
       try {
         return [...sheet.cssRules]
@@ -2335,4 +2350,25 @@ export function filePreviewIdentityFacts(
     controllerRetainsInitialNative: initial.controller?.getEditor() === initial.native,
     controllerRetainsCurrentNative: current.controller?.getEditor() === current.native,
   }
+}
+
+export const collaborationReviewSelectors = {
+  css: {
+    editor: '.peer-editor',
+    status: '.peer-header span',
+    row: '.editor-virtualized-row',
+    dot: '.editor-merge-review-dot',
+  },
+  hover: (page: Page) => page.getByRole('dialog', { name: 'Editor hover', exact: true }),
+  start: (page: Page) => page.getByRole('button', { name: 'Start session', exact: true }),
+  invitation: (page: Page) => page.getByRole('textbox', { name: 'Invitation link', exact: true }),
+  connected: (page: Page) =>
+    page.locator('.peer-header span').filter({ hasText: '2 peers' }).nth(1),
+  input: (page: Page, index: number) =>
+    page.locator('.peer-editor').nth(index).getByRole('textbox', { name: 'Editor input' }),
+  rows: (page: Page) => page.locator('.peer-editor .editor-virtualized-row'),
+  dots: (page: Page) => page.getByRole('img', { name: 'Review merged edits' }),
+  action: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
+  base: (page: Page) => page.getByRole('heading', { name: 'Base', exact: true }),
+  yours: (page: Page) => page.getByRole('heading', { name: 'Yours', exact: true }),
 }

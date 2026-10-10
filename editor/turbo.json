@@ -36,7 +36,8 @@
         "$TURBO_ROOT$/examples/stress/src/fixtures.ts",
         "$TURBO_ROOT$/bench/compare/fixture.mjs",
         "$TURBO_ROOT$/bench/compare/protocol.mjs",
-        "$TURBO_ROOT$/site/src/fonts/jetbrains-mono.woff2"
+        "$TURBO_ROOT$/site/src/fonts/jetbrains-mono.woff2",
+        "$TURBO_ROOT$/site/src/fonts/source-serif-4.woff2"
       ]
     },
     "@singapore-editor/react#typecheck": {
@@ -157,6 +158,19 @@
       "dependsOn": ["^build", "build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/package.json"]
     },
+    "@singapore-editor/collaboration#bench:merge-review": {
+      "dependsOn": ["^build", "build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/mergeUnits.ts",
+        "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/edits.ts",
+        "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/projection.ts",
+        "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/reuse.ts",
+        "$TURBO_ROOT$/packages/tree-sitter-languages/languages.json"
+      ],
+      "outputs": [],
+      "cache": false
+    },
     "@singapore-editor/collaboration#test:editor": {
       "dependsOn": ["^build", "@singapore-editor/diff#build"],
       "inputs": [
@@ -179,11 +193,31 @@
     },
     "@singapore-editor/collaboration#test": {
       "dependsOn": ["^build", "build", "@singapore-editor/diff#build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/examples/app/src/**"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/examples/app/src/**",
+        "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/mergeUnits.ts",
+        "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/edits.ts",
+        "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/projection.ts",
+        "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/reuse.ts",
+        "$TURBO_ROOT$/packages/tree-sitter-languages/languages.json"
+      ]
     },
     "@singapore-editor/collaboration#typecheck": {
       "dependsOn": ["^build", "build", "@singapore-editor/diff#build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/examples/app/src/**"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/examples/app/src/**",
+        "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/mergeUnits.ts",
+        "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/edits.ts",
+        "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/projection.ts",
+        "$TURBO_ROOT$/packages/tree-sitter/src/treeSitter/reuse.ts",
+        "$TURBO_ROOT$/packages/tree-sitter-languages/languages.json"
+      ]
+    },
+    "@singapore-editor/core#bench:paint": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"]
     }
   },
   "agentGuidance": false

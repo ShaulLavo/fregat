@@ -1,61 +1,5 @@
-/* The docs manual (design d1): one reading column whose static rows mirror Singapore's Markdown
-   live preview (22 px rows, marks hidden), so the real editor can take the column over in place.
-   Every metric of `.src` and `.r` must match what the editor draws. The --sg-* values are the
-   editor theme: the takeover passes them to Singapore's Editor. */
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: url(../fonts/jetbrains-mono.woff2) format('woff2');
-  font-weight: 400 800;
-  font-style: normal;
-  font-display: block;
-}
-@font-face {
-  font-family: 'Source Serif 4';
-  src: url(../fonts/source-serif-4.woff2) format('woff2');
-  font-weight: 200 900;
-  font-display: swap;
-}
-
-:root {
-  color-scheme: light dark;
-  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-  --chrome: 'Source Serif 4', Georgia, serif;
-  --row: 22px;
-  --size: 14px;
-  --gw: 48px;
-  --gap: 18px;
-  /* Text measure: 88 columns of the 8 px advance. */
-  --measure: 704px;
-  --hh: 52px;
-  --ph: 30px;
-  /* Column start, chosen so the prose (not the gutter) is centred. */
-  --left: max(0px, calc((100vw - var(--measure)) / 2 - var(--gw)));
-
-  /* Light paper and its dark counterpart: the same calm hues, lifted for a dark page. */
-  --muted: light-dark(#7d786e, #8f897e);
-  --sg-bg: light-dark(#fbfaf7, #1a1916);
-  --sg-fg: light-dark(#2b2925, #d6d1c6);
-  --sg-gutter: light-dark(#d3cfc6, #46423b);
-  --sg-selection: light-dark(rgb(44 94 145 / 0.14), rgb(141 180 221 / 0.22));
-  --sg-caret: light-dark(#9c3b2c, #d98a76);
-  --sg-title: light-dark(#141310, #f2eee5);
-  --sg-link: light-dark(#2c5e91, #8db4dd);
-  --sg-code-bg: light-dark(#f3f1ec, #23211d);
-  --sg-kw: light-dark(#9c3b2c, #d98a76);
-  --sg-str: light-dark(#4b7238, #a3c18b);
-  --sg-com: light-dark(#7a756b, #8a8479);
-  --sg-num: light-dark(#8a5a12, #d6a85c);
-  --sg-type: light-dark(#2b2925, #d6d1c6);
-  --sg-fn: light-dark(#2c5e91, #8db4dd);
-  --sg-prop: light-dark(#2c5e91, #8db4dd);
-  --sg-punct: light-dark(#7d786e, #8f897e);
-}
-:root[data-theme='light'] {
-  color-scheme: light;
-}
-:root[data-theme='dark'] {
-  color-scheme: dark;
-}
+@import './fonts.css';
+@import './palette.css';
 
 * {
   box-sizing: border-box;
@@ -70,9 +14,7 @@ body {
   font: 15px/1.5 var(--chrome);
   -webkit-text-size-adjust: 100%;
 }
-body.manual {
-  overflow: hidden;
-}
+
 a {
   color: var(--sg-link);
 }
@@ -134,6 +76,13 @@ a {
 .menu summary:hover,
 .menu[open] summary {
   color: var(--sg-title);
+}
+.top button[hidden] {
+  display: inline-block;
+  visibility: hidden;
+}
+.top .theme-toggle {
+  width: 3.5rem;
 }
 .theme-toggle[aria-pressed='true'] {
   color: var(--sg-title);
@@ -233,44 +182,75 @@ kbd {
   cursor: pointer;
 }
 
-/* The column: the static page and the slot the editor mounts into share one box. */
+/* Prose uses the document's ordinary scroll area. */
 .viewport {
   position: relative;
-  height: calc(100dvh - var(--hh) - var(--ph));
-}
-.pane,
-.editor-host {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--left);
-  width: min(100%, calc(var(--gw) + var(--measure)));
+  max-width: 1180px;
+  margin: 0 auto;
 }
 .pane {
-  overflow: auto;
+  width: min(100% - 64px, 752px);
+  margin: 0 auto;
   outline: none;
-  container-type: inline-size;
-  overflow-x: hidden;
 }
-/* No scrollbar in the middle of the page; the margins forward the wheel to the column. */
-.pane,
-.editor-host .editor-virtualized {
-  scrollbar-width: none;
+.prose {
+  padding: 24px 0 64px;
+  font: 18px/1.7 var(--chrome);
+  overflow-wrap: anywhere;
+}
+.prose h1 {
+  font-size: 36px;
+  line-height: 1.2;
+  color: var(--sg-title);
+  margin: 8px 0 24px;
+}
+.prose :is(h2, h3, h4) {
+  line-height: 1.3;
+  color: var(--sg-title);
+  margin: 36px 0 16px;
+  scroll-margin-top: 16px;
+}
+.prose p {
+  margin: 0 0 20px;
+}
+.prose :is(ul, ol) {
+  padding-left: 24px;
+}
+.prose code {
+  font: 0.8em var(--mono);
+  overflow-wrap: anywhere;
+}
+.prose table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  font-size: 15px;
+}
+.prose th,
+.prose td {
+  padding: 8px;
+  text-align: left;
+}
+.prose blockquote {
+  margin-left: 0;
+  padding: 16px;
+  background: var(--sg-code-bg);
+}
+.editor-host {
+  position: absolute;
+  inset: 0;
 }
 .editor-host[data-state='mounting'] {
   visibility: hidden;
-}
-body[data-mode='editor'] .pane {
-  display: none;
 }
 
 /* The page list in the left margin. */
 .pages {
   position: absolute;
-  top: 8px;
-  left: calc(var(--left) - 220px);
+  top: 24px;
+  left: 0;
   width: 196px;
-  max-height: 100%;
+  max-height: none;
   overflow: auto;
   scrollbar-width: none;
   font: 15px/1.55 var(--chrome);
@@ -301,87 +281,6 @@ body[data-mode='editor'] .pane {
 }
 .pages a[aria-current] {
   color: var(--sg-link);
-}
-
-/* The prerendered rows. */
-.src {
-  font-family: var(--mono);
-  font-size: var(--size);
-  line-height: var(--row);
-  font-variant-ligatures: normal;
-  color: var(--sg-fg);
-  padding: 0 0 40vh;
-}
-.src > *,
-.src pre,
-.src ul,
-.src blockquote {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.r {
-  display: block;
-  position: relative;
-  min-height: var(--row);
-  margin: 0;
-  /* Reserve one measured glyph for the caret and the editor's 1 px shaping margin. */
-  padding: 0 calc(1ch + 1px) 0 var(--gw);
-  font-size: var(--size);
-  line-height: var(--row);
-  font-weight: 400;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  width: 100cqw;
-}
-.r::before {
-  content: attr(data-n) / '';
-  position: absolute;
-  left: 0;
-  width: calc(var(--gw) - var(--gap));
-  text-align: right;
-  font-size: var(--size);
-  font-weight: 400;
-  font-style: normal;
-  color: var(--sg-gutter);
-  font-variant-numeric: tabular-nums;
-  user-select: none;
-}
-.src .h1,
-.src .h2,
-.src .h3,
-.src .h4,
-.src .h5,
-.src .h6 {
-  font-weight: 700;
-}
-.src .h1 {
-  font-size: calc(var(--size) * 1.35);
-}
-.src .h2 {
-  font-size: calc(var(--size) * 1.2);
-}
-.src .h3 {
-  font-size: calc(var(--size) * 1.1);
-}
-.nw {
-  white-space: nowrap;
-}
-.u {
-  text-decoration: underline;
-}
-/* The preview draws a link label as one widget, so it wraps as a unit. */
-.src a {
-  color: var(--sg-link);
-  text-decoration: underline;
-  white-space: nowrap;
-}
-.src pre,
-.src code {
-  font: inherit;
-}
-.src pre .r {
-  background: linear-gradient(to right, transparent var(--gw), var(--sg-code-bg) var(--gw));
 }
 
 /* Search */
@@ -473,9 +372,6 @@ body[data-mode='editor'] .pane {
     --left: 0px;
     --measure: calc(100vw - var(--gw) - 8px);
   }
-  body.manual {
-    overflow: visible;
-  }
   .top {
     padding: 0 8px 0 14px;
     gap: 8px;
@@ -504,19 +400,13 @@ body[data-mode='editor'] .pane {
     white-space: inherit;
   }
   .pane {
-    position: static;
-    overflow: visible;
-    overflow-x: clip;
-    width: auto;
+    width: calc(100% - 32px);
   }
-  .src {
-    padding-bottom: 48px;
+  .prose {
+    font-size: 17px;
   }
-  body[data-mode='editor'] .viewport {
-    height: calc(100dvh - var(--hh) - var(--ph));
-  }
-  .editor-host {
-    width: 100%;
+  .prose h1 {
+    font-size: 30px;
   }
 }
 
@@ -568,62 +458,4 @@ body[data-mode='editor'] .pane {
 }
 .hero {
   margin: 28px 0 0;
-}
-.hero-box {
-  position: relative;
-  container-type: inline-size;
-  padding: 0;
-}
-.hero-box .editor-host {
-  position: absolute;
-  inset: 0;
-  left: 0;
-  width: 100%;
-}
-.hero-box[data-mode='editor'] .hero-static {
-  visibility: hidden;
-}
-.hero figcaption {
-  display: flex;
-  gap: 16px;
-  margin: 10px 8px 0 var(--gw);
-  font-size: 14px;
-  font-style: italic;
-  color: var(--muted);
-}
-.hero-mode {
-  margin-left: auto;
-  font-style: normal;
-}
-.hero-mode button {
-  font: inherit;
-  color: var(--sg-link);
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-}
-.install {
-  container-type: inline-size;
-  padding: 0;
-}
-/* Desktop rows round their width up to whole columns, as the editor does; clip the excess. */
-.hero-box,
-.install {
-  overflow-x: clip;
-}
-@media (max-width: 760px) {
-  .home-column {
-    padding-top: 8px;
-  }
-  .home-column h1 {
-    font-size: 27px;
-  }
-  .hero figcaption {
-    flex-direction: column;
-    gap: 4px;
-  }
-  .hero-mode {
-    margin-left: 0;
-  }
 }

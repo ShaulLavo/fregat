@@ -739,7 +739,7 @@ function sidebarFocusTarget(
   return { kind: 'file-tree', rootPath }
 }
 
-export const workspaceCommands = [
+const baseWorkspaceCommands = [
   defineCommand({
     ...workspaceCommandMetadata['workspace.fixDiagnostic'],
     run: ({ target }) => (target.kind === 'diagnostic' && target.execute() ? handled : declined),
@@ -795,9 +795,6 @@ export const workspaceCommands = [
         runtime.shell.showCommandPalette('>', invocation.origin as FocusTargetToken | null),
       ),
   }),
-  // Settings are machine-wide, so this is the one workspace command that stays
-  // available with no folder open — it is where a provider gets configured in
-  // the first place.
   defineCommand({
     ...workspaceCommandMetadata['workspace.selectAppColors'],
     icon: PaletteIcon,
@@ -1268,9 +1265,6 @@ export const workspaceCommands = [
       return handled
     },
   }),
-  // Chat mode already puts the composer on the stage, so only the workbench has
-  // anything to reveal — and there it is a sidebar tab, not a focus target: the
-  // caller (terminal capture today) is handing over context, not the keyboard.
   defineCommand({
     ...workspaceCommandMetadata['workspace.revealChat'],
     run: ({ runtime, snapshot }) => {
@@ -1287,9 +1281,6 @@ export const workspaceCommands = [
       return chatFocusStart(runtime, snapshot.rootPath, snapshot.uiMode)
     },
   }),
-  // Unlike the chat reveal, this one has somewhere to go from either mode: the
-  // terminal lives in the workbench, so a caller in chat mode has to be taken
-  // there or its command runs somewhere the user cannot see.
   defineCommand({
     ...workspaceCommandMetadata['workspace.revealTerminal'],
     run: ({ runtime, snapshot }) => {
@@ -1519,9 +1510,13 @@ export const workspaceCommands = [
       return toggleSessionRail(context)
     },
   }),
-  ...selectItemCommands(),
-  ...sidebarPanelCommands(),
 ]
+type WorkspaceCommandEntry =
+  | (typeof baseWorkspaceCommands)[number]
+  | ReturnType<typeof selectItemCommands>[number]
+  | ReturnType<typeof sidebarPanelCommands>[number]
+const commandEntries: readonly WorkspaceCommandEntry[] = baseWorkspaceCommands
+export const workspaceCommands = commandEntries.concat(selectItemCommands(), sidebarPanelCommands())
 
 export type WorkspaceCommandId = (typeof workspaceCommands)[number]['id']
 

@@ -105,7 +105,7 @@ export function createWindowKeymap(options: {
     const physical = /^(?:Key|Digit)(.)$/u.exec(event.code)?.[1]
     if (
       event.getModifierState('AltGraph') &&
-      [...event.key].length === 1 &&
+      Array.from(event.key).length === 1 &&
       physical?.toLowerCase() !== event.key.toLowerCase()
     )
       return false

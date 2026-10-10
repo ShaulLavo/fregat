@@ -30,19 +30,12 @@ it.each(TREE_SITTER_LANGUAGE_CONTRIBUTIONS)(
 function admitQuery(language: Language, kind: string, source: string, id: string) {
   expect(source).not.toMatch(/;\s*inherits\s*:/)
   // Only the web-tree-sitter predicates and the injection properties we consume are admitted.
-  const operations = [...source.matchAll(/#([\w-]+[?!])/g)].map((match) => match[1])
+  const operations = Array.from(source.matchAll(/#([\w-]+[?!])/g), (match) => match[1])
   expect(
     operations.every((operation) =>
-      [
-        'eq?',
-        'not-eq?',
-        'match?',
-        'not-match?',
-        'any-of?',
-        'not-any-of?',
-        'set!',
-        ...(['javascript', 'typescript', 'tsx'].includes(id) ? ['is-not?'] : []),
-      ].includes(operation!),
+      ['eq?', 'not-eq?', 'match?', 'not-match?', 'any-of?', 'not-any-of?', 'set!']
+        .concat(['javascript', 'typescript', 'tsx'].includes(id) ? ['is-not?'] : [])
+        .includes(operation!),
     ),
   ).toBe(true)
   const query = new Query(language, source)

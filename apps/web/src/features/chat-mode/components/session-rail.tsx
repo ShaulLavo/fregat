@@ -189,10 +189,11 @@ export function SessionRail({
   const list = useListbox({
     role: 'listbox',
     containerRef: listRef,
-    items: model.groups.flatMap((group) => [
-      { id: group.key, label: group.project.title },
-      ...group.sessions.map((session) => ({ id: session.key, label: session.title })),
-    ]),
+    items: model.groups.flatMap((group) =>
+      [{ id: group.key, label: group.project.title }].concat(
+        group.sessions.map((session) => ({ id: session.key, label: session.title })),
+      ),
+    ),
     activeId: cursor?.owner === activeSessionKey ? cursor.id : activeSessionKey,
     onActiveChange: selectSession,
     onCommit: commitRow,

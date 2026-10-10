@@ -42,22 +42,25 @@ export function filePlaces(
   if (!paths) return []
   const home = absolutePlacePath(paths.homePath, paths.workspaceRoot)
   const start = absolutePlacePath(paths.defaultPath, paths.workspaceRoot)
-  return [
-    ...projects.map((project) => ({
+  return projects
+    .map((project) => ({
       name: project.name,
       description: project.path,
       value: absolutePlacePath(project.path, paths.workspaceRoot),
-    })),
-    { name: 'Home', description: home, value: home },
-    ...(start !== home && start !== paths.workspaceRoot
-      ? [{ name: 'Start folder', description: start, value: start }]
-      : []),
-    {
-      name: paths.workspaceRoot === '/' ? 'Filesystem root' : 'Server root',
-      description: paths.workspaceRoot,
-      value: paths.workspaceRoot,
-    },
-  ]
+    }))
+    .concat(
+      [{ name: 'Home', description: home, value: home }],
+      start !== home && start !== paths.workspaceRoot
+        ? [{ name: 'Start folder', description: start, value: start }]
+        : [],
+      [
+        {
+          name: paths.workspaceRoot === '/' ? 'Filesystem root' : 'Server root',
+          description: paths.workspaceRoot,
+          value: paths.workspaceRoot,
+        },
+      ],
+    )
 }
 
 function absolutePlacePath(path: string, workspaceRoot: string) {

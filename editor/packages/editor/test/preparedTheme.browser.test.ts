@@ -149,7 +149,7 @@ test.each(['typescript', 'markdown'] as const)(
           .inspectRetention()
           .entries.map((entry) => entry.runtimeSessionId)
           .sort(),
-      ).toEqual([...ids.structural, ...ids.highlighter].sort())
+      ).toEqual(ids.structural.concat(ids.highlighter).sort())
       await Promise.resolve()
       await Promise.resolve()
       expect(loads).toBe(1)

@@ -36,7 +36,7 @@ export function dirtySearchRevisionKey(
       const path = document.target.resource.path
       return isPathInWorkspace(path, rootPath) ? [{ document, key, path }] : []
     })
-    .toSorted((left, right) => compareSearchPaths(left.path, right.path))
+    .sort((left, right) => compareSearchPaths(left.path, right.path))
 
   for (const { document, key, path } of dirtyFiles) {
     parts.push(

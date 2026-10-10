@@ -53,7 +53,7 @@ test('keeps phantom diff filenames in unpadded base36', () => {
 
 test('keeps search location separators, missing fields, and duplicate suffixes in DOM ids', () => {
   const group = searchResultGroup()
-  const duplicateGroup = { ...group, count: 2, matches: [...group.matches, ...group.matches] }
+  const duplicateGroup = { ...group, count: 2, matches: group.matches.concat(group.matches) }
   expect(searchResultItems([duplicateGroup]).map((item) => item.id)).toEqual([
     'search-result-group-wffmwi',
     'search-result-match-wffmwi-1qopqh3',

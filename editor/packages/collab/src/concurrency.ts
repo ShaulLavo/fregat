@@ -29,6 +29,7 @@ export class ConfirmedWindow {
   private ordered: readonly Confirmed[] = []
   private candidates: readonly Confirmed[] = []
   private positions: readonly number[] = []
+  private authors = new Map<string, number>()
   private monotone = true
   private contiguous = true
 
@@ -64,9 +65,9 @@ export class ConfirmedWindow {
       this.document = document
       return
     }
-    const additions = [...incoming]
-      .map(([key, envelope]) => ({ key, envelope }))
-      .sort((a, b) => compareEnvelopes(a.envelope, b.envelope))
+    const additions = Array.from(incoming, ([key, envelope]) => ({ key, envelope })).sort((a, b) =>
+      compareEnvelopes(a.envelope, b.envelope),
+    )
     const tail = this.ordered.at(-1)
     const appendOnly = !tail || compareEnvelopes(tail.envelope, additions[0]!.envelope) < 0
     const dropped = Math.min(
@@ -75,9 +76,10 @@ export class ConfirmedWindow {
     )
     const previous = appendOnly ? this.ordered.slice(dropped) : []
     // Increasing Lamport order keeps every path between retained edits inside the suffix.
+    const retained: readonly Pick<Confirmed, 'key' | 'envelope'>[] = this.ordered
     const combined = appendOnly
       ? additions
-      : [...this.ordered, ...additions].sort((a, b) => compareEnvelopes(a.envelope, b.envelope))
+      : retained.concat(additions).sort((a, b) => compareEnvelopes(a.envelope, b.envelope))
     const ordered = this.limit ? combined.slice(-this.limit) : []
     const contiguousLive: Interval[] = previous.length
       ? [[previous[0]!.position, this.sequence]]
@@ -98,10 +100,9 @@ export class ConfirmedWindow {
         const entry = next.get(dependency) ?? this.byId.get(dependency)
         if (!entry || !contains(live, entry.position)) return []
         if (entry.envelope.lamport >= envelope.lamport) throw new CollabFailure('invalid-lamport')
-        return [
-          ...intersectIntervals(entry.ancestors, live),
+        return intersectIntervals(entry.ancestors, live).concat([
           [entry.position, entry.position + 1] as const,
-        ]
+        ])
       })
       const copied = cloneEnvelope(envelope)
       const insertion = insertionOf(copied.change)
@@ -127,10 +128,13 @@ export class ConfirmedWindow {
       for (let i = 0; i < dropped; i++) {
         const entry = this.ordered[i]!
         this.byId.delete(entry.key)
-        if (entry.touch) droppedTouches++
+        if (!entry.touch) continue
+        droppedTouches++
+        countAuthor(this.authors, entry.envelope.id.actor, -1)
       }
       for (const entry of added) this.byId.set(entry.key, entry)
       const candidates = added.filter((entry) => entry.touch !== null)
+      for (const entry of candidates) countAuthor(this.authors, entry.envelope.id.actor, 1)
       this.candidates = this.candidates.slice(droppedTouches).concat(candidates)
       this.positions = this.positions
         .slice(droppedTouches)
@@ -141,6 +145,8 @@ export class ConfirmedWindow {
       this.byId = new Map(this.ordered.map((entry) => [entry.key, entry]))
       this.candidates = this.ordered.filter((entry) => entry.touch !== null)
       this.positions = this.candidates.map((entry) => entry.position)
+      this.authors = new Map()
+      for (const entry of this.candidates) countAuthor(this.authors, entry.envelope.id.actor, 1)
     }
     this.monotone =
       (appendOnly && this.monotone) ||
@@ -154,14 +160,44 @@ export class ConfirmedWindow {
     this.document = document
   }
 
+  /** Retained text edits following every identity, in canonical order. */
+  editsAfter(predecessors: readonly EditId[]): readonly ConcurrentEdit[] {
+    const before = predecessors.flatMap((id) => {
+      const entry = this.byId.get(editKey(id))
+      return entry ? [entry] : []
+    })
+    if (before.length !== predecessors.length) return []
+    const lamport = before.reduce(
+      (latest, entry) => Math.max(latest, entry.envelope.lamport),
+      -Infinity,
+    )
+    const result: ConcurrentEdit[] = []
+    // Every causal successor has a greater Lamport value, even after reordered arrivals.
+    for (let i = this.candidates.length - 1; i >= 0; i--) {
+      const entry = this.candidates[i]!
+      if (entry.envelope.lamport <= lamport) break
+      if (before.every((predecessor) => contains(entry.ancestors, predecessor.position)))
+        result.push(entry.touch!)
+    }
+    return result.reverse()
+  }
+
+  /** Whether a retained edit causally follows every supplied identity. Evicted identities are unknown. */
+  isAfter(id: EditId, predecessors: readonly EditId[]): boolean {
+    const entry = this.byId.get(editKey(id))
+    if (!entry) return false
+    return predecessors.every((predecessor) => {
+      const before = this.byId.get(editKey(predecessor))
+      return before !== undefined && contains(entry.ancestors, before.position)
+    })
+  }
+
   /** Exact pairs; a supplied batch limits results to pairs touching that batch. */
   pairs(batch?: readonly EditId[]): readonly ConcurrentPair[] {
-    const authors = new Set(this.candidates.map((entry) => entry.envelope.id.actor))
-    if (authors.size < 2) return []
+    if (this.authors.size < 2) return []
     const selected = batch ? new Set(batch.map(editKey)) : null
-    const inBatch = this.candidates.map((entry) => selected === null || selected.has(entry.key))
-    const first = inBatch.indexOf(true)
-    if (first === -1) return []
+    const first = this.firstSelected(selected)
+    if (first === this.candidates.length) return []
     const result: ConcurrentPair[] = []
     for (let right = Math.max(1, first); right < this.candidates.length; right++) {
       const later = this.candidates[right]!
@@ -169,9 +205,31 @@ export class ConfirmedWindow {
         ? unseenRanges(later.ancestors, this.positions, right)
         : [[0, right] as const]
       for (const [from, to] of ranges)
-        this.collectPairs(result, later, from, to, inBatch, inBatch[right]!)
+        this.collectPairs(
+          result,
+          later,
+          from,
+          to,
+          selected,
+          selected === null || selected.has(later.key),
+        )
     }
     return result
+  }
+
+  private firstSelected(selected: ReadonlySet<string> | null): number {
+    if (selected === null) return 0
+    if (!this.monotone) {
+      const index = this.candidates.findIndex((entry) => selected.has(entry.key))
+      return index < 0 ? this.candidates.length : index
+    }
+    let first = this.candidates.length
+    for (const key of selected) {
+      const entry = this.byId.get(key)
+      if (!entry?.touch) continue
+      first = Math.min(first, lowerBound(this.positions, entry.position, this.candidates.length))
+    }
+    return first
   }
 
   private collectPairs(
@@ -179,17 +237,23 @@ export class ConfirmedWindow {
     later: Confirmed,
     from: number,
     to: number,
-    inBatch: readonly boolean[],
+    batch: ReadonlySet<string> | null,
     selected: boolean,
   ): void {
     for (let left = from; left < to; left++) {
-      if (!inBatch[left] && !selected) continue
       const earlier = this.candidates[left]!
+      if (!selected && !batch?.has(earlier.key)) continue
       if (earlier.envelope.id.actor === later.envelope.id.actor) continue
       if (!this.monotone && contains(later.ancestors, earlier.position)) continue
       result.push([earlier.touch!, later.touch!])
     }
   }
+}
+
+function countAuthor(authors: Map<string, number>, actor: string, delta: number): void {
+  const count = (authors.get(actor) ?? 0) + delta
+  if (count) authors.set(actor, count)
+  else authors.delete(actor)
 }
 
 function unseenRanges(

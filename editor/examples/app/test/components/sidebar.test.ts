@@ -13,7 +13,7 @@ describe('createSidebar', () => {
     ]
 
     await sidebar.renderSource(files, (file) => {
-      selectedFiles.push(`${file.path}:${file.text}`)
+      selectedFiles.push(file.path)
     })
 
     expect(entryLabels(sidebar.element)).toEqual(['src', 'README.md'])
@@ -24,7 +24,7 @@ describe('createSidebar', () => {
 
     await clickEntry(sidebar.element, 'main.ts')
     await waitForSelectedFile(selectedFiles)
-    expect(selectedFiles).toEqual(['src/main.ts:console.log(1);'])
+    expect(selectedFiles).toEqual(['src/main.ts'])
 
     sidebar.clear()
     expect(sidebar.element.childElementCount).toBe(0)
@@ -35,7 +35,7 @@ describe('createSidebar', () => {
 })
 
 function entryLabels(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll('.entry')).map((entry) =>
+  return Array.from(container.querySelectorAll('.entry'), (entry) =>
     (entry.textContent ?? '').slice(3),
   )
 }

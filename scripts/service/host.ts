@@ -27,7 +27,12 @@ export function realServiceHost(): ServiceHost {
     env: process.env,
     bun: process.execPath,
     run: async (argv) => {
-      const child = Bun.spawn({ cmd: [...argv], stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+      const child = Bun.spawn({
+        cmd: Array.from(argv),
+        stdin: 'ignore',
+        stdout: 'pipe',
+        stderr: 'pipe',
+      })
       const [stdout, stderr, code] = await Promise.all([
         new Response(child.stdout).text(),
         new Response(child.stderr).text(),

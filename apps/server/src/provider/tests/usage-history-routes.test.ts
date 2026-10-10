@@ -45,10 +45,8 @@ test('real app history GET stays passive, picks up lifecycle refresh, and recove
       {
         ...mockDriver,
         driverKind: v.parse(providerDriverKindSchema, 'claude'),
-        environment: (config, id) => [
-          ...mockDriver.environment(config, id),
-          { name: 'CLAUDE_CONFIG_DIR', value: home },
-        ],
+        environment: (config, id) =>
+          mockDriver.environment(config, id).concat([{ name: 'CLAUDE_CONFIG_DIR', value: home }]),
       },
     ],
   }
