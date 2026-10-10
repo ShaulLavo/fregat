@@ -39,8 +39,11 @@ residual. The Zig frame writes only changed ranges and removes those JS stages.
 
 Status: Approved. A real-native proof on 2026-10-10 confirmed that retaining only the latest
 `onFrame` snapshot can retain copied cell storage proportional to columns × rows². This is the
-existing full styled-row path, separate from the text-only ownership change on
-`research/r15-text-cache` at `27c4fe45a6fa9632bb20c83a17e6e6b094ab2ad3`.
+existing packed styled-row path, separate from the native `TextRowReader` ownership change on
+`research/r15-text-cache` at `27c4fe45a6fa9632bb20c83a17e6e6b094ab2ad3`. It also supplies
+text-only publication when a renderer passes packed paint rows: Canvas requests packed rows in
+`src/render/canvas/renderer.ts:122-126`, `RowRenderer.emitFrame` forwards them, and
+`FrameObserver.copiedPaintTextRow` keeps their `PackedCells` through `copiedFrameRow`.
 
 `ghostty-webgpu/src/core/row-reader.ts:27-35` copies a selected packet, then gives every `PackedCells`
 row a subarray of its records and the whole grapheme pool. The lazy getters in
@@ -72,9 +75,26 @@ The probe takes any checkout path; on another host, copy it to a scratch directo
 `bun <probe-path> <checkout-path>`. It uses real `GhosttyRuntime`, only the latest `onFrame`
 snapshot, weak buffer references and exact final text. Forced collection and the absence of held
 historical snapshots rule out those alternative explanations. The text-only retained-buffer
-proof is a separate result and does not certify this full-frame path.
+proof is a separate result and certifies native-extracted text rows, not projections of packed
+paint rows. A separate `onTextFrame`-only variant of the same real-native probe is
+`paint-text-row-retention-probe.ts`; its result and log are
+`paint-text-row-retention-result.json` and `paint-text-row-retention-probe.log`. It supplies
+`state.readRows({ rows: new Set(changed), packed: true })` to the observer, retains only the latest
+text snapshot, and uses the same exact text, weak references and three collection turns. This
+variant also completed with 200 live copied buffers, 4,848,000 retained bytes and the same exact
+text hash: the 50.5× packet-retention result also applies to this supplied-paint-row text-only
+path. These two ownership proofs are unscored. Run:
 
-- [ ] Give copied styled rows independent cell and grapheme storage, preserving lazy reads,
+```sh
+export PATH=$HOME/.local/share/mise/shims:$PATH
+bash /work/tmp/wave-heavy/run.sh --class light \
+  'r15-text-cache packed paint-row text ownership proof' -- env PATH="$PATH" \
+  bun /work/reports/terminal-performance-2026-10-04/wave-20261008/lanes/r15-text-cache/paint-text-row-retention-probe.ts \
+  /work/worktrees/platform/r15-text-cache
+```
+
+- [ ] Give copied styled rows and their text-only projections independent cell and grapheme
+      storage, preserving lazy reads,
       packed style decoding, wide/combining/ZWJ content and immutable held snapshots. Bound retained
       payload by grid records plus live grapheme content; use linear bookkeeping without a second
       identity cache.
