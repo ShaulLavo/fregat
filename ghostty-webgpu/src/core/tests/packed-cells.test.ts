@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { PackedCells } from '../packed-cells.js'
 import type { RenderCell } from '../types.js'
 
@@ -118,4 +118,73 @@ it('reuses private cell buffers without changing independent rows and their seri
   expect(target).toEqual(retained)
   new PackedCells(new Uint32Array(), new Uint32Array()).readInto(target)
   expect(target).toEqual([])
+})
+
+it('keys grapheme text independently of its storage offset and scalar encoding', () => {
+  const direct = new PackedCells(
+    new Uint32Array([65, 0x030201, 0xffffffff, 1, 0, 0]),
+    new Uint32Array(),
+  )
+  const shifted = new PackedCells(
+    new Uint32Array([0, 0x030201, 0xffffffff, 1, 2, 1]),
+    new Uint32Array([90, 91, 65]),
+  )
+  expect(direct.identity()).toBe(shifted.identity())
+  const first = new PackedCells(
+    new Uint32Array([0, 0x030201, 0xffffffff, 1, 0, 2]),
+    new Uint32Array([101, 0x301]),
+  )
+  const second = new PackedCells(
+    new Uint32Array([0, 0x030201, 0xffffffff, 1, 1, 2]),
+    new Uint32Array([90, 101, 0x301]),
+  )
+  expect(first.identity()).toBe(second.identity())
+})
+
+it('keys colors, selection, continuation and every packed style bit', () => {
+  const words = new Uint32Array([65, 0x030201, 0x060504, 1, 0, 0])
+  const original = new PackedCells(words, new Uint32Array()).identity()
+  for (const [offset, value] of [
+    [0, 66],
+    [1, 0x090807],
+    [2, 0xffffffff],
+    [3, 2],
+    [3, 4],
+  ]) {
+    const changed = words.slice()
+    changed[offset!] = value!
+    expect(new PackedCells(changed, new Uint32Array()).identity()).not.toBe(original)
+  }
+  for (let bit = 3; bit < 16; bit += 1) {
+    const changed = words.slice()
+    changed[3] = 1 | 8 | (1 << bit)
+    expect(new PackedCells(changed, new Uint32Array()).identity()).not.toBe(original)
+  }
+})
+
+it('keeps text boundaries and row lengths distinct without decoding cells', () => {
+  const split = new PackedCells(
+    new Uint32Array([65, 0xffffffff, 0xffffffff, 1, 0, 0, 66, 0xffffffff, 0xffffffff, 1, 0, 0]),
+    new Uint32Array(),
+  )
+  const joined = new PackedCells(
+    new Uint32Array([0, 0xffffffff, 0xffffffff, 1, 0, 2, 0, 0xffffffff, 0xffffffff, 1, 0, 0]),
+    new Uint32Array([65, 66]),
+  )
+  const read = vi.spyOn(split, 'read')
+  const materialize = vi.spyOn(split, 'materialize')
+  const borrow = vi.spyOn(split, 'readInto')
+  const identity = split.identity()
+  expect(identity).not.toBe(joined.identity())
+  expect(identity).not.toBe(new PackedCells(new Uint32Array(), new Uint32Array()).identity())
+  expect(read).not.toHaveBeenCalled()
+  expect(materialize).not.toHaveBeenCalled()
+  expect(borrow).not.toHaveBeenCalled()
+  const delimiter = new PackedCells(
+    new Uint32Array([0, 0xffffffff, 0xffffffff, 1, 0, 7]),
+    new Uint32Array([49, 58, 65, 58, 45, 58, 49]),
+  )
+  expect(delimiter.identity()).not.toBe(identity)
+  split.readInto([])
+  expect(split.identity()).toBe(identity)
 })

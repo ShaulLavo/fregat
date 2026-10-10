@@ -102,6 +102,20 @@ export class PackedCells {
     return target
   }
 
+  identity(): string {
+    let identity = ''
+    for (let offset = 0; offset < this.words.length; offset += PACKED_CELL_WORDS) {
+      const text = this.textAt(offset)
+      const foreground = this.words[offset + 1]!
+      const background = this.words[offset + 2]!
+      const fg = foreground === 0xffffffff ? '-' : foreground.toString(16)
+      const bg = background === 0xffffffff ? '-' : background.toString(16)
+      // Grapheme offsets are frame-local; length-prefixed text keeps cell boundaries distinct.
+      identity += `${text.length}:${text}:${fg}:${bg}:${this.words[offset + 3]!.toString(16)};`
+    }
+    return identity
+  }
+
   materialize(): readonly RenderCell[] {
     return Array.from({ length: this.length }, (_, index) => this.read(index, emptyRenderCell()))
   }
