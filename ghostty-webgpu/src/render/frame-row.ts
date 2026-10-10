@@ -1,3 +1,4 @@
+import { rowStorage } from '../core/row-storage.js'
 import type { RenderCell, RenderRow } from '../core/types.js'
 import type { RendererFrameCell, RendererFrameRow } from './renderer.js'
 
@@ -15,11 +16,19 @@ function copiedCells(cells: readonly RenderCell[]): readonly RendererFrameCell[]
 }
 
 export function copiedFrameRow(row: RenderRow): RendererFrameRow {
+  return frameRow(row)
+}
+
+export function compactedFrameRow(row: RenderRow, text: string): RendererFrameRow {
+  return frameRow(row, text)
+}
+
+function frameRow(row: RenderRow, retainedText?: string): RendererFrameRow {
   const packed = row.packed
   const length = packed?.length ?? row.cells.length
   let cells: readonly string[] | undefined
   let continuations: readonly boolean[] | undefined
-  let text = packed?.defaultRunText(true)
+  let text = retainedText ?? packed?.defaultRunText(true)
   if (text === undefined) {
     text = ''
     for (let index = 0; index < length; index += 1) {
@@ -31,6 +40,7 @@ export function copiedFrameRow(row: RenderRow): RendererFrameRow {
   // Packed records own detached storage; styled cells decode only for snapshot consumers.
   let renderCells = packed ? undefined : copiedCells(row.cells)
   return Object.freeze({
+    [rowStorage]: packed?.[rowStorage],
     get renderCells(): readonly RendererFrameCell[] {
       return (renderCells ??= copiedCells(packed!.materialize()))
     },

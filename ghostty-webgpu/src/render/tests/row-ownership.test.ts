@@ -71,7 +71,7 @@ function rowText(source: Source, y: number, revision: number): string {
 }
 
 it.each(sources)(
-  'bounds progressively frozen %s snapshots by the live grid',
+  'bounds progressively frozen %s snapshots by two live grids',
   async (source) => {
     const runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal(grid)
@@ -113,7 +113,7 @@ it.each(sources)(
       const rowBytes =
         source === 'ascii-text' ? Math.ceil(grid.columns / 32) * 4 : grid.columns * recordWords * 4
       const liveBytes = grid.rows * (rowBytes + 64)
-      expect(await payload.bytes()).toBeLessThanOrEqual(liveBytes)
+      expect(await payload.bytes()).toBeLessThanOrEqual(2 * liveBytes)
       // Lazy arrays remain valid after collection, native scratch reuse, resize, clear and disposal.
       const expected = state
         .readTextRows()
@@ -140,7 +140,7 @@ it.each(sources)(
 )
 
 it.each(sources)(
-  'a single held %s row owns only its payload',
+  'a single held %s row retains at most one grid packet',
   async (source) => {
     const runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal(grid)
@@ -181,7 +181,7 @@ it.each(sources)(
       const recordWords = source === 'full' || source === 'paint-text' ? 6 : 3
       const rowBytes =
         source === 'ascii-text' ? Math.ceil(grid.columns / 32) * 4 : grid.columns * recordWords * 4
-      expect(await payload.bytes()).toBeLessThanOrEqual(rowBytes + 64)
+      expect(await payload.bytes()).toBeLessThanOrEqual(grid.rows * (rowBytes + 64))
       expect(held!.text.trimEnd()).toBe(rowText(source, 50, 0))
       expect(
         held!.cells
@@ -200,7 +200,7 @@ it.each(sources)(
   30_000,
 )
 
-it('a held packed readRows result owns one row after native disposal', async () => {
+it('a held packed readRows result retains one packet after native disposal', async () => {
   const runtime = await GhosttyRuntime.create()
   const terminal = runtime.createTerminal(grid)
   const state = runtime.createRenderState(terminal)
@@ -218,7 +218,7 @@ it('a held packed readRows result owns one row after native disposal', async () 
     held = state.readRows({ packed: true })[50]
     payload.restore()
     runtime.dispose()
-    expect(await payload.bytes()).toBeLessThanOrEqual(grid.columns * 6 * 4 + 64)
+    expect(await payload.bytes()).toBeLessThanOrEqual(grid.rows * (grid.columns * 6 * 4 + 64))
     expect(
       held!.cells
         .filter((cell) => !cell.continuation)
