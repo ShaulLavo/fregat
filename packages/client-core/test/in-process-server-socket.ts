@@ -1,5 +1,5 @@
 import { isRecord } from '@workspace/utils/objects'
-import type { createApp } from 'server/testing'
+import { testLoopbackRequest, type createApp } from 'server/testing'
 import { createClientError } from '../src/errors'
 
 type InProcessServer = { readonly app: ReturnType<typeof createApp>; readonly clientOrigin: string }
@@ -24,6 +24,7 @@ export function inProcessServerSocketConstructor(server: InProcessServer) {
     private readonly peer: {
       readonly raw: object
       readonly data: {
+        readonly request: Request
         readonly headers: { readonly origin: string }
         readonly query: Record<string, string>
       }
@@ -36,9 +37,14 @@ export function inProcessServerSocketConstructor(server: InProcessServer) {
       this.url = String(url)
       const parsed = new URL(this.url)
       this.hooks = routeHooks(server.app, parsed.pathname)
+      parsed.protocol = parsed.protocol === 'wss:' ? 'https:' : 'http:'
+      const request = new Request(parsed)
+      request.headers.set('origin', server.clientOrigin)
+      testLoopbackRequest(request)
       this.peer = {
         raw: {},
         data: {
+          request,
           headers: { origin: server.clientOrigin },
           query: Object.fromEntries(parsed.searchParams),
         },

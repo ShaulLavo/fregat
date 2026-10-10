@@ -1,20 +1,23 @@
 import { Elysia } from 'elysia'
 
 import { authGuard, type AuthConfig } from '../auth'
-import { headersReader } from '../devices/trust'
+import { requestHeaderReader } from '../devices/trust'
 import { recordRequestContext } from '../observability'
 import { createMachineProxyError } from './proxy-errors'
 import {
   forwardMachineRequest,
+  isUnpairedResponse,
   machineProxyHeaders,
   machineProxyTarget,
   type MachineProxyFetcher,
 } from './proxy-http'
 import { createMachineProxySocket } from './proxy-socket'
 
-type MachineProxyTarget = {
+export type MachineProxyTarget = {
   readonly origin: string
   readonly webOrigin: string
+  readonly cookie: string
+  readonly refresh?: () => Promise<MachineProxyTarget>
 }
 
 type MachineProxyOptions = {
@@ -31,9 +34,9 @@ const PROXY_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS
 export function createMachineProxyRoutes({ auth, resolve, fetcher = fetch }: MachineProxyOptions) {
   const routes = new Elysia({ name: 'machine-proxy' }).onBeforeHandle(authGuard(auth))
   const handler = async ({ request, params, server }: MachineProxyContext) => {
-    const machine = await resolve(params.name)
+    let machine = await resolve(params.name)
     const target = machineProxyTarget(machine.origin, request, params['*'])
-    const headers = machineProxyHeaders(request, machine.webOrigin)
+    let headers = machineProxyHeaders(request, machine.webOrigin, machine.cookie)
     const websocket = request.headers.get('upgrade')?.toLowerCase() === 'websocket'
     recordRequestContext({
       area: 'machines',
@@ -41,12 +44,29 @@ export function createMachineProxyRoutes({ auth, resolve, fetcher = fetch }: Mac
       operation: 'proxy',
       transport: websocket ? 'websocket' : 'http',
     })
-    if (!websocket) return forwardMachineRequest(request, target, headers, fetcher)
+    const renew = machine.refresh
+    const refresh = renew
+      ? async () => {
+          machine = await renew()
+          return machineProxyHeaders(request, machine.webOrigin, machine.cookie)
+        }
+      : undefined
+    if (!websocket) return forwardMachineRequest(request, target, headers, fetcher, refresh)
+    if (refresh) {
+      // Check admission before a WebSocket upgrade, whose rejection body Bun does not expose.
+      const admission = await fetcher(new URL('/system/capabilities', machine.origin), {
+        headers,
+        redirect: 'error',
+        signal: request.signal,
+      })
+      if (await isUnpairedResponse(admission)) headers = await refresh()
+      await admission.body?.cancel()
+    }
 
     target.protocol = 'ws:'
     // Elysia's .ws() parses JSON before custom parsers. Raw Bun hooks preserve every frame.
     const data = createMachineProxySocket(target, headers, params.name, (close) =>
-      auth.devices ? auth.devices.hold(headersReader(request.headers), close) : noop,
+      auth.devices ? auth.devices.hold(requestHeaderReader(request), close) : noop,
     )
     if (!server?.upgrade(request, { data })) throw createMachineProxyError()
   }

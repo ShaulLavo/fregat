@@ -77,6 +77,7 @@
     "environments.loadPreferences",
     "environments.machines",
     "environments.tailnetOwnerDevices",
+    "environments.trustedProxyHosts",
     "files.autoSave",
     "files.autoSaveDelay",
     "files.picker.hiddenLocations",

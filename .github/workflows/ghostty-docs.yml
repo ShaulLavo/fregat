@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ghostty-webgpu/site/**
+      - ghostty-webgpu/src/dom/**
       - ghostty-webgpu/docs/correctness-results.json
       - ghostty-webgpu/docs/benchmarks/**
       - hotkeys/packages/hotkeys/**
@@ -16,6 +17,7 @@ on:
     branches: [main]
     paths:
       - ghostty-webgpu/site/**
+      - ghostty-webgpu/src/dom/**
       - ghostty-webgpu/docs/correctness-results.json
       - ghostty-webgpu/docs/benchmarks/**
       - hotkeys/packages/hotkeys/**
@@ -61,6 +63,9 @@ jobs:
       - name: Verify docs, echo example and search
         working-directory: ghostty-webgpu/site
         run: bun scripts/verify-docs.ts http://127.0.0.1:4327/fregat/ghostty-webgpu/docs/ "$RUNNER_TEMP/ghostty-docs-evidence"
+      - name: Verify mobile terminal input
+        working-directory: ghostty-webgpu/site
+        run: bun scripts/verify-mobile-input.mjs http://127.0.0.1:4327/fregat/ghostty-webgpu/ "$RUNNER_TEMP/ghostty-docs-evidence/mobile-input"
       - name: Verify migration widths and light/dark contrast
         working-directory: ghostty-webgpu/site
         run: bun run verify:migration "$RUNNER_TEMP/ghostty-migration-evidence" http://127.0.0.1:4327/fregat/ghostty-webgpu/

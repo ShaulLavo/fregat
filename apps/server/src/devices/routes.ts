@@ -13,7 +13,7 @@ import { FsError } from '../fs/errors'
 import { recordRequestContext } from '../observability'
 import type { DevicePairing } from './service'
 import { pairingErrors } from './structured-errors'
-import { headersReader } from './trust'
+import { requestHeaderReader } from './trust'
 
 /**
  * Behind the origin allowlist only: an unpaired device must reach status and claim to pair. The
@@ -21,7 +21,7 @@ import { headersReader } from './trust'
  */
 export function pairingRoutes(pairing: DevicePairing, auth: AuthConfig) {
   function admitted(request: Request) {
-    const admission = pairing.admit(headersReader(request.headers))
+    const admission = pairing.admit(requestHeaderReader(request))
     if (admission.trust === 'unpaired' && pairing.isRequired())
       throw new FsError('DEVICE_NOT_PAIRED')
     return admission
@@ -33,7 +33,7 @@ export function pairingRoutes(pairing: DevicePairing, auth: AuthConfig) {
       '/pairing/status',
       ({ request }) => {
         recordRequestContext({ area: 'pairing', operation: 'status' })
-        const { trust } = pairing.admit(headersReader(request.headers))
+        const { trust } = pairing.admit(requestHeaderReader(request))
         return { trust, required: pairing.isRequired(), machine: hostname() }
       },
       { response: pairingStatusSchema },
@@ -56,7 +56,7 @@ export function pairingRoutes(pairing: DevicePairing, auth: AuthConfig) {
       '/pairing/links',
       ({ request }) => {
         recordRequestContext({ area: 'pairing', operation: 'issue_link' })
-        return pairing.issueLink(headersReader(request.headers))
+        return pairing.issueLink(requestHeaderReader(request))
       },
       { response: pairingLinkSchema },
     )

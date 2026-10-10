@@ -1,11 +1,11 @@
-import type { SourceFile } from './githubSource.ts'
+import type { SourceEntry } from './githubSource.ts'
 
 export type SourceTreeEntry =
   | {
       readonly name: string
       readonly path: string
       readonly kind: 'file'
-      readonly file: SourceFile
+      readonly file: SourceEntry
     }
   | {
       readonly name: string
@@ -15,13 +15,18 @@ export type SourceTreeEntry =
     }
 
 type FileSelectReason = 'auto' | 'user'
-export type FileSelectHandler = (file: SourceFile, reason: FileSelectReason) => Promise<void> | void
+export type FileSelectHandler = (
+  file: SourceEntry,
+  reason: FileSelectReason,
+) => Promise<boolean | void> | boolean | void
 type DirectoryToggleHandler = (directoryPath: string, open: boolean) => void
 
 type RenderTreeOptions = {
   readonly selectedPath?: string
   readonly expandedPaths?: ReadonlySet<string>
   readonly onDirectoryToggle?: DirectoryToggleHandler
+  readonly onFileHover?: (file: SourceEntry) => void
+  readonly selection?: { request: number }
 }
 
 type DirectoryEntryOptions = RenderTreeOptions & {
@@ -32,27 +37,27 @@ type MutableDirectory = {
   readonly name: string
   readonly path: string
   readonly directories: Map<string, MutableDirectory>
-  readonly files: Map<string, SourceFile>
+  readonly files: Map<string, SourceEntry>
 }
 
-export function buildSourceTree(files: readonly SourceFile[]): readonly SourceTreeEntry[] {
+export function buildSourceTree(files: readonly SourceEntry[]): readonly SourceTreeEntry[] {
   const root = createMutableDirectory('', '')
 
   for (const file of files) {
-    addSourceFile(root, file)
+    addSourceEntry(root, file)
   }
 
   return directoryChildren(root)
 }
 
-export function firstSourceFile(files: readonly SourceFile[]): SourceFile | null {
+export function firstSourceEntry(files: readonly SourceEntry[]): SourceEntry | null {
   return files.toSorted((left, right) => left.path.localeCompare(right.path))[0] ?? null
 }
 
-export function findSourceFile(
-  files: readonly SourceFile[],
+export function findSourceEntry(
+  files: readonly SourceEntry[],
   path: string | undefined,
-): SourceFile | null {
+): SourceEntry | null {
   if (!path) return null
   return files.find((file) => file.path === path) ?? null
 }
@@ -64,12 +69,10 @@ export async function renderTree(
   options?: RenderTreeOptions,
 ): Promise<void> {
   const ul = document.createElement('ul')
-
-  for (const entry of entries) {
-    await appendTreeEntry(ul, entry, onFileSelect, options)
-  }
-
   container.appendChild(ul)
+  const sharedOptions = { ...options, selection: options?.selection ?? { request: 0 } }
+  const restores = entries.map((entry) => appendTreeEntry(ul, entry, onFileSelect, sharedOptions))
+  await Promise.all(restores)
 }
 
 function createMutableDirectory(name: string, path: string): MutableDirectory {
@@ -81,7 +84,7 @@ function createMutableDirectory(name: string, path: string): MutableDirectory {
   }
 }
 
-function addSourceFile(root: MutableDirectory, file: SourceFile): void {
+function addSourceEntry(root: MutableDirectory, file: SourceEntry): void {
   const parts = file.path.split('/')
   const fileName = parts.at(-1)
   if (!fileName) return
@@ -130,7 +133,7 @@ function directoryEntry(directory: MutableDirectory): SourceTreeEntry {
   }
 }
 
-function fileEntry(name: string, file: SourceFile): SourceTreeEntry {
+function fileEntry(name: string, file: SourceEntry): SourceTreeEntry {
   return {
     name,
     path: file.path,
@@ -139,18 +142,17 @@ function fileEntry(name: string, file: SourceFile): SourceTreeEntry {
   }
 }
 
-async function appendTreeEntry(
+function appendTreeEntry(
   ul: HTMLUListElement,
   entry: SourceTreeEntry,
   onFileSelect: FileSelectHandler,
   options?: RenderTreeOptions,
 ): Promise<void> {
   if (entry.kind === 'directory') {
-    await appendDirectoryEntry(ul, entry, onFileSelect, options)
-    return
+    return appendDirectoryEntry(ul, entry, onFileSelect, options)
   }
 
-  await appendFileEntry(ul, entry, onFileSelect, options?.selectedPath === entry.path)
+  return appendFileEntry(ul, entry, onFileSelect, options)
 }
 
 function appendDirectoryEntry(
@@ -164,6 +166,8 @@ function appendDirectoryEntry(
     selectedPath: options?.selectedPath,
     expandedPaths: options?.expandedPaths,
     onDirectoryToggle: options?.onDirectoryToggle,
+    onFileHover: options?.onFileHover,
+    selection: options?.selection,
     shouldRestore,
   })
 
@@ -184,9 +188,13 @@ function renderDirectoryEntry(
   options: DirectoryEntryOptions,
 ): { li: HTMLLIElement; restore: Promise<void> | null } {
   const li = document.createElement('li')
-  const label = document.createElement('span')
+  const label = document.createElement('button')
+  label.type = 'button'
+  label.title = entry.path
+  label.dataset.sourcePath = entry.path
   label.className = 'entry directory'
   label.textContent = '📁 ' + entry.name
+  label.setAttribute('aria-expanded', 'false')
 
   let loaded = false
   let open = false
@@ -197,16 +205,15 @@ function renderDirectoryEntry(
     open = nextOpen
     childContainer.style.display = nextOpen ? '' : 'none'
     label.textContent = (nextOpen ? '📂 ' : '📁 ') + entry.name
+    label.setAttribute('aria-expanded', String(nextOpen))
   }
 
   const expand = async () => {
-    if (!loaded) {
-      await renderTree(entry.children, childContainer, onFileSelect, options)
-      loaded = true
-    }
-
     setOpen(true)
     options.onDirectoryToggle?.(entry.path, true)
+    if (loaded) return
+    loaded = true
+    await renderTree(entry.children, childContainer, onFileSelect, options)
   }
 
   const collapse = () => {
@@ -237,34 +244,51 @@ function appendFileEntry(
   ul: HTMLUListElement,
   entry: SourceTreeEntry & { readonly kind: 'file' },
   onFileSelect: FileSelectHandler,
-  autoSelect: boolean,
+  options?: RenderTreeOptions,
 ): Promise<void> {
-  const { li, restore } = renderFileEntry(entry, onFileSelect, autoSelect)
+  const { li, restore } = renderFileEntry(entry, onFileSelect, options)
   return appendRenderedEntry(ul, li, restore)
 }
 
 function renderFileEntry(
   entry: SourceTreeEntry & { readonly kind: 'file' },
   onFileSelect: FileSelectHandler,
-  autoSelect: boolean,
+  options?: RenderTreeOptions,
 ): { li: HTMLLIElement; restore: Promise<void> | null } {
   const li = document.createElement('li')
-  const label = document.createElement('span')
+  const label = document.createElement('button')
+  label.type = 'button'
+  label.title = entry.path
+  label.dataset.sourcePath = entry.path
   label.className = 'entry file'
   label.textContent = '📄 ' + entry.name
 
+  const selection = options?.selection ?? { request: 0 }
   const selectFile = async (reason: FileSelectReason) => {
-    document.querySelectorAll('.entry.active').forEach((el) => el.classList.remove('active'))
-    label.classList.add('active')
-    await onFileSelect(entry.file, reason)
+    const request = ++selection.request
+    label.classList.remove('error')
+    label.setAttribute('aria-busy', 'true')
+    try {
+      const selected = await onFileSelect(entry.file, reason)
+      if (selection.request !== request || selected === false) return
+      containerFor(label)
+        .querySelectorAll('.entry.active')
+        .forEach((el) => el.classList.remove('active'))
+      label.classList.add('active')
+    } finally {
+      label.setAttribute('aria-busy', 'false')
+    }
   }
+  label.addEventListener('pointerenter', () => options?.onFileHover?.(entry.file))
+  label.addEventListener('focus', () => options?.onFileHover?.(entry.file))
 
   label.addEventListener('click', () => {
     void markErrors(label, selectFile('user'))
   })
   li.appendChild(label)
 
-  const restore = autoSelect ? selectFile('auto') : null
+  const restore =
+    options?.selectedPath === entry.path ? markErrors(label, selectFile('auto')) : null
   return { li, restore }
 }
 
@@ -284,4 +308,8 @@ async function appendRenderedEntry(
   ul.appendChild(li)
   if (!restore) return
   await restore
+}
+
+function containerFor(label: HTMLElement): Element {
+  return label.closest('#tree') ?? label.closest('ul')?.parentElement ?? label
 }

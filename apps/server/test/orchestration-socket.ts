@@ -7,6 +7,7 @@ import { isRecord } from '@workspace/utils/objects'
 import * as v from 'valibot'
 import { expect } from 'vitest'
 import type { App } from '../src/app'
+import { testLoopbackRequest } from '../src/testing/request'
 
 export function createInProcessOrchestrationSocket(
   app: App,
@@ -27,9 +28,12 @@ export function createInProcessOrchestrationSocket(
   const closes: { code?: number; reason?: string }[] = []
   const onClose = hooks.close
   let closed = false
+  const request = new Request('http://127.0.0.1/orchestration/rpc')
+  if (origin) request.headers.set('origin', origin)
+  testLoopbackRequest(request)
   const socket = {
     raw: {},
-    data: { headers: { origin }, query },
+    data: { request, headers: { origin }, query },
     send(message: string) {
       messages.push(v.parse(orchestrationWsServerMessageSchema, JSON.parse(message)))
     },

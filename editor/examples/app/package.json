@@ -27,7 +27,9 @@
     "@singapore-editor/textbuffer": "workspace:*",
     "@singapore-editor/tree-sitter": "workspace:*",
     "@singapore-editor/tree-sitter-languages": "workspace:*",
-    "@singapore-editor/typescript-lsp": "workspace:*"
+    "@singapore-editor/typescript-lsp": "workspace:*",
+    "@tanstack/query-core": "^5.104.0",
+    "evlog": "^2.29.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

@@ -9,8 +9,8 @@ export type LocalityFacts = {
 
 /**
  * A request is local when it reached this server over a loopback socket, names this server's own
- * address as Host, and carries no proxy hop. mesh serve always sets X-Forwarded-For, and the
- * machine proxy stamps Via, so a request tunneled from another device to loopback reads as remote.
+ * address as Host, and carries no proxy hop. Reverse proxies must preserve the public Host
+ * or stamp a forwarding header so a tunneled request remains distinguishable from a local one.
  */
 export function localityFacts(
   request: Request,

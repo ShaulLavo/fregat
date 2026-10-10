@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { machine, sshServiceFixture } from '../../../test/factories/ssh'
+import { clientId, machine, sshServiceFixture } from '../../../test/factories/ssh'
 
 test('disconnect cancels a connect that is still preparing its machine entry', async () => {
   const { service, commands } = await sshServiceFixture()
@@ -51,4 +51,48 @@ test('changing an SSH target cancels its pending launch and connects the updated
   expect(commands.at(-1)?.at(-1)).toBe('updated-fixture')
   await service.disconnect('fixture', 'tab-two')
   expect(await service.resolve('fixture')).toMatchObject({ origin: 'http://127.0.0.1:51078' })
+})
+
+test('concurrent relays share a private credential until the SSH connection ends', async () => {
+  const { service, requests } = await sshServiceFixture()
+  await service.connect('fixture', 'tab-one')
+  const targets = await Promise.all([service.resolve('fixture'), service.resolve('fixture')])
+  expect(targets.map((target) => target.cookie)).toEqual([
+    'relay_device=fixture.secret',
+    'relay_device=fixture.secret',
+  ])
+  const claims = () => requests.filter((request) => request.url.endsWith('/pairing/claim'))
+  expect(claims()).toHaveLength(1)
+  expect(JSON.parse(String(claims()[0]?.init?.body))).toMatchObject({
+    relaySourceId: clientId,
+    label: expect.stringMatching(/^Fregat relay · /),
+  })
+  const state = await service.connect('fixture', 'tab-two')
+  expect(JSON.stringify(state)).not.toContain('fixture.secret')
+  await service.disconnect('fixture', 'tab-one')
+  await service.resolve('fixture')
+  expect(claims()).toHaveLength(1)
+  await service.disconnect('fixture', 'tab-two')
+  await service.connect('fixture', 'tab-one')
+  await service.resolve('fixture')
+  expect(claims()).toHaveLength(2)
+})
+
+test('SSH aliases for one destination share renewal and survive another alias disconnecting', async () => {
+  const { service, requests } = await sshServiceFixture({
+    machines: { fixture: machine, alias: machine },
+  })
+  await Promise.all([service.connect('fixture', 'tab-one'), service.connect('alias', 'tab-two')])
+  const [first, alias] = await Promise.all([service.resolve('fixture'), service.resolve('alias')])
+  const claims = () => requests.filter((request) => request.url.endsWith('/pairing/claim'))
+  expect(claims()).toHaveLength(1)
+  expect(first.cookie).toBe(alias.cookie)
+  await Promise.all([first.refresh!(), alias.refresh!()])
+  expect(claims()).toHaveLength(2)
+  await service.disconnect('fixture', 'tab-one')
+  await service.resolve('alias')
+  expect(claims()).toHaveLength(2)
+  await service.connect('fixture', 'tab-one')
+  await service.resolve('fixture')
+  expect(claims()).toHaveLength(2)
 })

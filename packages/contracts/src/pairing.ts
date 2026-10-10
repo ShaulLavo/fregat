@@ -47,6 +47,8 @@ export function pairingLink(appBase: string, code: string) {
 export const pairingClaimSchema = v.object({
   code: pairingCodeSchema,
   label: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80)),
+  /** A relay replaces the previous credential from the same source server. */
+  relaySourceId: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(128))),
 })
 export type PairingClaim = v.InferOutput<typeof pairingClaimSchema>
 
