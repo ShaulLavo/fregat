@@ -1,4 +1,4 @@
-/* A slow font stays on the metric-matched fallback for this visit, keeping text steady. */
+/* Optional Inter keeps a slow load on the native fallback for this visit. */
 @font-face {
   font-family: 'Inter Variable';
   font-style: normal;
@@ -6,25 +6,8 @@
   font-display: optional;
   src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2');
 }
-/* Match Inter's fallback metrics so loading the web font preserves line breaks. */
-@font-face {
-  font-family: 'Inter Fallback';
-  src: local('Arial'), local('Liberation Sans');
-  font-weight: 400;
-  size-adjust: 106.24%;
-  ascent-override: 91.19%;
-  descent-override: 22.72%;
-  line-gap-override: 0%;
-}
-@font-face {
-  font-family: 'Inter Fallback';
-  src: local('Arial Bold'), local('Liberation Sans Bold');
-  font-weight: 700;
-  size-adjust: 107.4%;
-  ascent-override: 90.2%;
-  descent-override: 22.48%;
-  line-gap-override: 0%;
-}
+/* Local @font-face fallbacks can load after optional Inter expires in Firefox.
+   Native families are available on the first frame and select their real weights. */
 /* Page chrome around the plates: a quiet warm near-black (paper in light mode); the plates carry the colour. */
 :root {
   --page: oklch(0.155 0.006 75);
@@ -32,7 +15,7 @@
   --soft: oklch(0.72 0.01 80);
   --faint: oklch(0.62 0.01 80);
   --well-2: oklch(0.2 0.007 75);
-  --sans: 'Inter Variable', 'Inter Fallback', ui-sans-serif, system-ui, sans-serif;
+  --sans: 'Inter Variable', Arial, 'Liberation Sans', ui-sans-serif, system-ui, sans-serif;
   --mono: 'JetBrains Mono Variable', ui-monospace, monospace;
   color-scheme: dark;
 }
