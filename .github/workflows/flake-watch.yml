@@ -25,22 +25,22 @@ jobs:
           - {
               name: web 1/4,
               dir: apps/web,
-              run: 'bun --bun vitest run --project node --project dom --shard=1/4',
+              run: 'bun --bun vitest run --project node --project dom --project compiler --shard=1/4',
             }
           - {
               name: web 2/4,
               dir: apps/web,
-              run: 'bun --bun vitest run --project node --project dom --shard=2/4',
+              run: 'bun --bun vitest run --project node --project dom --project compiler --shard=2/4',
             }
           - {
               name: web 3/4,
               dir: apps/web,
-              run: 'bun --bun vitest run --project node --project dom --shard=3/4',
+              run: 'bun --bun vitest run --project node --project dom --project compiler --shard=3/4',
             }
           - {
               name: web 4/4,
               dir: apps/web,
-              run: 'bun --bun vitest run --project node --project dom --shard=4/4',
+              run: 'bun --bun vitest run --project node --project dom --project compiler --shard=4/4',
             }
           - { name: server, dir: apps/server, run: 'bun --bun vitest run' }
           - { name: tui, dir: apps/tui, run: 'bun --bun vitest run' }

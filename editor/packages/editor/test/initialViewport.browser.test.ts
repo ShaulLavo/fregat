@@ -55,7 +55,10 @@ test.each(['flex', 'grid'] as const)('fills a sized %s host after resizing', asy
   expect(host.querySelectorAll('.editor-virtualized-row').length).toBeLessThan(100)
 })
 
-test('keeps a 10 MiB document windowed while typing in a block host', async () => {
+test.each([
+  ['10 MiB', 10 * 1024 * 1024],
+  ['1,000 character', 1000],
+] as const)('keeps a %s document windowed while typing in a block host', async (size, bytes) => {
   const host = document.createElement('div')
   host.style.cssText = 'display:block;width:600px;height:120px'
   document.body.append(host)
@@ -72,20 +75,41 @@ test('keeps a 10 MiB document windowed while typing in a block host', async () =
   expect(rows()).toBeLessThan(100)
 
   const line = 'export const value: number = 123; // deterministic TypeScript fixture\n'
-  const bytes = 10 * 1024 * 1024
   const text = line.repeat(Math.ceil(bytes / line.length)).slice(0, bytes)
   editor.setText(text)
   await expect.poll(() => editor.getState().length).toBe(bytes)
   expect(scroll.clientHeight).toBe(120)
   expect(rows()).toBeLessThan(100)
 
+  const input = editor.getInputElement()
+  let beforeinputCount = 0
+  input.addEventListener('beforeinput', () => beforeinputCount++)
   for (const where of ['end', 'middle'] as const) {
     const offset = where === 'end' ? editor.getState().length : Math.floor(bytes / 2)
     editor.setSelection(offset, offset, { reveal: true })
     editor.focus()
+    const initialLength = editor.getState().length
+    const initialBeforeinputCount = beforeinputCount
     const letter = where === 'end' ? 'q' : 'z'
     for (let key = 0; key < 20; key++) await commands.proofKeyPress(letter)
-    expect(editor.getTextSnapshot().readRange(offset, offset + 20)).toBe(letter.repeat(20))
+    const diagnostic = JSON.stringify({
+      size,
+      where,
+      inputKind: input.tagName,
+      focused: document.activeElement === input,
+      documentFocused: document.hasFocus(),
+      beforeinputCount: beforeinputCount - initialBeforeinputCount,
+      expectedLength: initialLength + 20,
+      applicationLength: editor.getState().length,
+      snapshotLength: editor.getTextSnapshot().length,
+    })
+    await expect
+      .poll(() => editor.getState().length, { message: diagnostic })
+      .toBe(initialLength + 20)
+    expect(editor.getTextSnapshot().length, diagnostic).toBe(initialLength + 20)
+    expect(editor.getTextSnapshot().readRange(offset, offset + 20), diagnostic).toBe(
+      letter.repeat(20),
+    )
     await expect
       .poll(() =>
         host.querySelector('.editor-virtualized-content')?.textContent?.includes(letter.repeat(20)),

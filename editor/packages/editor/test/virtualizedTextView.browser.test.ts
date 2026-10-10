@@ -405,7 +405,14 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
       expect(state.mountedRows[0]!.text).toBe(text.slice(0, state.mountedRows[0]!.text.length))
       expect(state.mountedRows[0]!.text.length).toBeLessThan(40)
       const range = retained.view.createRange(0, 10, { scrollIntoView: false })!
-      expect(state.metrics.characterWidth).toBeCloseTo(range.getBoundingClientRect().width / 10, 1)
+      const probe = document.createElement('span')
+      probe.style.cssText = 'position:absolute;font:inherit;white-space:pre'
+      probe.textContent = range.toString()
+      state.mountedRows[0]!.element.append(probe)
+      // A selected Range can enclose whole pixels; the element retains the font's advance.
+      const nativeAdvance = probe.getBoundingClientRect().width / probe.textContent.length
+      probe.remove()
+      expect(state.metrics.characterWidth).toBeCloseTo(nativeAdvance, 1)
       expect(tokenRangesIn(retained.host).length).toBeGreaterThan(0)
       assertNativeCaret(retained.view, 7)
 

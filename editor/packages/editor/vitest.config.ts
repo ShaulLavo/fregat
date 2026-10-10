@@ -7,6 +7,10 @@ import { playwright } from '@vitest/browser-playwright'
 import { devices } from '@playwright/test'
 import { defineConfig } from 'vitest/config'
 
+const crossEngineScrollTests = [
+  'test/{virtualizedTextView,virtualizedTextViewGeometry,wheelScrollTarget,gutterScroll,gutterLeadingInset,gutterPointerEvents,wrappedLineGutter,mouseSelectionAutoScroll,navigationReveal,initialViewport,firstPaint,longLineMeasurements,millionLinePaint,codeViewport,renderDisposal,rowPresentation,proportionalRows,proportionalWrap,wordWrap,defaultLargeDocument,metricProbeScrollExtent}.browser.test.ts',
+]
+
 let contentEvidence: string | undefined
 
 export default defineConfig({
@@ -48,6 +52,7 @@ export default defineConfig({
             'micromark-util-normalize-identifier',
           ],
           include: [
+            'evlog/client',
             '@fregat/hotkeys',
             'diff',
             '@shikijs/engine-oniguruma',
@@ -130,7 +135,11 @@ export default defineConfig({
                 return image.toString('base64')
               },
             },
-            instances: [{ browser: 'chromium' }],
+            instances: [
+              { browser: 'chromium' },
+              { browser: 'firefox', name: 'scroll-firefox', include: crossEngineScrollTests },
+              { browser: 'webkit', name: 'scroll-webkit', include: crossEngineScrollTests },
+            ],
           },
           include: ['test/**/*.browser.test.ts'],
           exclude: [

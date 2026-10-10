@@ -22,6 +22,7 @@ declare module 'vitest/browser' {
   interface BrowserCommands {
     proofDocumentPaintScreenshot(label: string): Promise<string>
     proofDocumentPaintResult(result: Record<string, unknown>, payload: string): Promise<void>
+    proofDocumentPaintThrottle(rate: number): Promise<boolean>
   }
 }
 
@@ -268,7 +269,13 @@ it.each([
       scroller.style.visibility = 'hidden'
       const staticPaint = await pixels(`markdown-${family}-${dark}-${width}-static`)
       expect(changedPixels(live, staticPaint)).toBe(0)
+      const markup = restored.element.outerHTML
       restored.dispose()
+      const inert = new DOMParser().parseFromString(markup, 'text/html').body.firstElementChild!
+      overlay.append(inert)
+      const htmlPaint = await pixels(`markdown-${family}-${dark}-${width}-html`)
+      expect(changedPixels(live, htmlPaint)).toBe(0)
+      expect(inert.querySelector('script, iframe, style, img')).toBeNull()
       overlay.remove()
       scroller.style.visibility = ''
       await benchmark(saved.paint, width, { fixture: 'manual', family, dark })
@@ -338,6 +345,8 @@ async function benchmark(payload: string, width: number, fixture: Record<string,
   const decode: number[] = []
   const mount: number[] = []
   const layout: number[] = []
+  let htmlBytes = 0
+  let rowCount = 0
   const target = document.createElement('div')
   target.style.cssText = 'position:absolute;left:0;top:0'
   document.body.append(target)
@@ -353,12 +362,29 @@ async function benchmark(payload: string, width: number, fixture: Record<string,
     mount.push(inserted - decoded)
     layout.push(laidOut - inserted)
     samples.push(laidOut - start)
+    if (iteration === 29) {
+      htmlBytes = new TextEncoder().encode(mounted.element.outerHTML).length
+      rowCount = mounted.rowCount
+    }
     mounted.dispose()
   }
   target.remove()
   const sorted = samples.toSorted((a, b) => a - b)
   await commands.proofDocumentPaintResult(
-    { ...fixture, width, dpr: devicePixelRatio, samples, decode, mount, layout, p95: sorted[28] },
+    {
+      ...fixture,
+      width,
+      dpr: devicePixelRatio,
+      samples,
+      decode,
+      mount,
+      layout,
+      p95: sorted[28],
+      htmlBytes,
+      rowCount,
+      budgetMs: 50,
+      qualified: sorted[28]! <= 50,
+    },
     payload,
   )
 }
@@ -371,4 +397,55 @@ it('measures the largest checked-in manual at every required width', async () =>
   if (saved.status !== 'ready') return
   for (const width of [320, 390, 1280])
     await benchmark(saved.paint, width, { fixture: 'largest-manual' })
+})
+
+it('admits equivalent font serialization and refuses different fonts and palettes', async () => {
+  const { editor, options } = mount(code, false, 'Snapshot Mono', false)
+  await frames()
+  const saved = editor.captureSnapshot({ scope: 'document' })
+  expect(saved.status).toBe('ready')
+  if (saved.status !== 'ready') return
+  for (const [fontFamily, dark, admitted] of [
+    ['"Snapshot Mono"', false, true],
+    ['Snapshot Serif', false, false],
+    ['Snapshot Mono', true, false],
+  ] as const) {
+    const host = document.createElement('div')
+    host.style.width = '390px'
+    document.body.append(host)
+    const restored = new Editor(host, {
+      ...options,
+      fontFamily,
+      theme: {
+        ...options.theme,
+        backgroundColor: dark ? '#202020' : 'rgb(255, 255, 255)',
+        foregroundColor: 'rgb(34, 34, 34)',
+      },
+      snapshot: saved.paint,
+      documentKey: 'font-admission',
+    })
+    mounted.push({ host, editor: restored })
+    expect(restored.getPresentationState()).toBe(admitted ? 'provisional' : 'empty')
+  }
+})
+
+it('records Chromium CPU slowdown as a restore experiment', async () => {
+  const chromium = await commands.proofDocumentPaintThrottle(1)
+  if (!chromium) return
+  const { editor } = mount(largestManual + '\nlast', true, 'Snapshot Serif', false)
+  await frames()
+  const saved = editor.captureSnapshot({ scope: 'document' })
+  expect(saved.status).toBe('ready')
+  if (saved.status !== 'ready') return
+  try {
+    await commands.proofDocumentPaintThrottle(4)
+    for (const width of [320, 390, 1280])
+      await benchmark(saved.paint, width, {
+        fixture: 'largest-manual',
+        cpuSlowdown: 4,
+        experiment: true,
+      })
+  } finally {
+    await commands.proofDocumentPaintThrottle(1)
+  }
 })

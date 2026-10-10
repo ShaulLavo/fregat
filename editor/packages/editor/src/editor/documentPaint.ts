@@ -84,6 +84,8 @@ export function decodeDocumentPaint(serialized: string): SavedDocumentPaint | nu
 }
 
 export function safePaintLink(href: string): boolean {
+  // Browsers strip URL controls before protocol detection; refuse them before normalization.
+  // eslint-disable-next-line no-control-regex
   if (!href || href.length > 4096 || /[\u0000-\u0020\u007f\\]/.test(href)) return false
   if (href.startsWith('//') || href === '#') return false
   try {

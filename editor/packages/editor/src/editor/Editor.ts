@@ -1069,7 +1069,11 @@ export class Editor {
       ],
       ...(scope === 'viewport' ? { devicePixelRatio: window.devicePixelRatio } : {}),
       // Merged from three sources, so key order depends on which arrived first; values decide.
-      theme: withSortedKeys(this.resolvedTheme()),
+      theme: withSortedKeys(
+        scope === 'document'
+          ? normalizePaintTheme(this.resolvedTheme(), this.el)
+          : this.resolvedTheme(),
+      ),
       // Row height only. With the font stack equal, a different cell width means a face is still
       // loading, and that must not veto the paint the loaded face is about to match.
       rowHeight: state.metrics.rowHeight,
@@ -5838,4 +5842,31 @@ function normalizePaintFontFamily(value: string): string {
         .toLowerCase(),
     )
     .join(',')
+}
+
+function normalizePaintTheme(theme: EditorTheme | null, host: HTMLElement): unknown {
+  if (!theme) return null
+  const probe = host.ownerDocument.createElement('span')
+  probe.style.cssText = 'position:absolute;visibility:hidden'
+  host.append(probe)
+  const normalize = (value: string): string => {
+    probe.style.color = ''
+    probe.style.color = value
+    return probe.style.color ? host.ownerDocument.defaultView!.getComputedStyle(probe).color : value
+  }
+  try {
+    return Object.fromEntries(
+      Object.entries(theme).map(([key, value]) => {
+        if (typeof value === 'string' && key.endsWith('Color')) return [key, normalize(value)]
+        if ((key === 'syntax' || key === 'colors') && value && typeof value === 'object')
+          return [
+            key,
+            Object.fromEntries(Object.entries(value).map(([id, color]) => [id, normalize(color)])),
+          ]
+        return [key, value]
+      }),
+    )
+  } finally {
+    probe.remove()
+  }
 }

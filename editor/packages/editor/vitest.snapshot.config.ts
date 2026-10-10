@@ -25,6 +25,12 @@ export default defineConfig({
       viewport: { width: 1400, height: 900 },
       provider: playwright(),
       commands: {
+        proofDocumentPaintThrottle: async ({ page, project }, rate: number) => {
+          if (!project.name.includes('chromium')) return false
+          const session = await page.context().newCDPSession(page)
+          await session.send('Emulation.setCPUThrottlingRate', { rate })
+          return true
+        },
         proofDocumentPaintScreenshot: async ({ iframe, project, page }, label: string) => {
           const target = iframe.locator('#document-paint-proof')
           const bounds = await target.boundingBox()
