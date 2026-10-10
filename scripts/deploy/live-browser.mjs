@@ -12,7 +12,8 @@ export async function openLiveBrowser(chromium, platform = process.platform, sig
           env: swiftShaderEnv(),
         }
       : { headless: true }
-  const browser = await chromium.launch(options)
+  // Playwright's SIGINT handler exits before the check can clean up its backend and PTYs.
+  const browser = await chromium.launch({ ...options, handleSIGINT: false, handleSIGTERM: false })
   const abort = () => {
     void browser.close().catch(() => {})
   }

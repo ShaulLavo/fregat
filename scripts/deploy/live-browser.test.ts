@@ -16,11 +16,13 @@ test.each(['linux', 'darwin', 'win32'] as const)(
     expect(await openLiveBrowser(chromium, platform)).toEqual({ browser, page })
     expect(chromium.launch).toHaveBeenCalledOnce()
     const { env, ...options } = chromium.launch.mock.calls[0]![0]
-    expect(options).toEqual(
-      platform === 'linux'
+    expect(options).toEqual({
+      ...(platform === 'linux'
         ? { headless: true, args: ['--enable-unsafe-webgpu'].concat(swiftShaderArgs) }
-        : { headless: true },
-    )
+        : { headless: true }),
+      handleSIGINT: false,
+      handleSIGTERM: false,
+    })
     if (platform === 'linux') {
       expect(env?.VK_ICD_FILENAMES).toBe(join('chromium', 'vk_swiftshader_icd.json'))
       expect(env?.VK_DRIVER_FILES).toBe(env?.VK_ICD_FILENAMES)
