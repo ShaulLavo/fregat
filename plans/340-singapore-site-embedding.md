@@ -26,7 +26,7 @@ After loading, idle work loads the editor runtime and prepares nearby examples w
 - [x] Verify Chromium and WebKit at 320, 390, 768 and 1280 px: readable prose, no horizontal page overflow, no example inner scroll, Chromium CLS 0 and unchanged WebKit geometry, Chromium phone swipes and WebKit native wheel/touch taps never focusing an editor, and JavaScript-off readability.
 - [x] Prove ready activation is immediate, early activation is announced, and focus/selection/scroll stay scoped to one example.
 - [x] Read `look` screenshots and publish one private preview URL; send its first browsable version before polishing.
-- [ ] Commit and push by path, open the replacement PR. Leave #1233 open for the coordinator. Do not deploy to Cloudflare or watch CI.
+- [x] Commit and push by path, open the replacement PR. Leave #1233 open for the coordinator. Do not deploy to Cloudflare or watch CI.
 
 ## Review lessons retained
 
@@ -39,6 +39,8 @@ Build editor workspaces, then `bun run --cwd editor/site build`. Run `bun run --
 No public editor package changes are needed. The format-6 document-paint API and content-height layout already shipped; their implementation remains in the editor packages.
 
 ## Qualified replacement
+
+Replacement: [PR #1246](https://github.com/ShaulLavo/fregat/pull/1246).
 
 The 2026-10-10 Mac production build generated 3,146 pages, captured 30 distinct
 examples, and validated 203,781 internal links and anchors. All 28 successor
