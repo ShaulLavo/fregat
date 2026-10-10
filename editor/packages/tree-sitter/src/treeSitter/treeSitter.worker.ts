@@ -105,6 +105,7 @@ type ParsedLayer = {
 }
 
 type ParsedDocument = {
+  readonly readOnly: boolean
   readonly markdown?: MarkdownDocument
   markdownDefinitions?: Uint32Array
   mergeUnitTree?: Tree
@@ -404,6 +405,7 @@ const parseMarkdownDocument = async (
     snapshotVersion: request.snapshotVersion,
   })
   const parsed: ParsedDocument = {
+    readOnly: request.type === 'parse' && request.readOnly === true,
     markdown: document,
     snapshotVersion: request.snapshotVersion,
     languageId: request.languageId,
@@ -497,6 +499,7 @@ const parseMarkdownFences = async (
       )
       layers.push(layer)
       await appendInjectionLayers(layers, layer, {
+        readOnly: document.readOnly,
         documentId: '',
         snapshotVersion: document.snapshotVersion,
         languageId: 'markdown',
@@ -608,84 +611,88 @@ const parseDocument = async (
   request: TreeSitterParseRequest,
   source: TreeSitterPieceTableInput,
 ): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined> =>
-  runCancellableRequest(request, async (context) => {
-    if (request.resultMode === 'bootstrap') {
-      viewportFirstSessions.add(request.runtimeSessionId)
-      disposeBootstrap(request.runtimeSessionId)
-      bootstrapDocuments.set(request.runtimeSessionId, {
-        request,
-        source: source.retain(),
-        preview: null,
-      })
-      return {
-        ...parseAckResult(request, [], phaseTimings(context)),
-        analysis: { kind: 'partial', coveredRange: { startIndex: 0, endIndex: 0 } },
-      }
-    }
-    if (request.languageId === 'markdown') return parseMarkdownDocument(request, source, context)
-    if (
-      request.languageId === 'mdx' &&
-      (markdownDocuments.get(request.runtimeSessionId)?.snapshotVersion ?? 0) >
-        request.snapshotVersion
-    )
-      return undefined
-    const runtime = await runAsyncWorkerPhase('load runtime', () =>
-      ensureRuntime(request.languageId),
-    )
-    const parseStart = nowMs()
-    const parsedDocument =
-      (await reusableParsedDocument(request, source, context)) ??
-      (await parseFullDocument(request, runtime, source, context))
-    const parseMs = nowMs() - parseStart
-    if (request.resultMode === 'parseOnly') {
-      return {
-        ...parseAckResult(
-          request,
-          [],
-          [{ name: 'treeSitter.parse', durationMs: parseMs }].concat(phaseTimings(context)),
-          parsedDocument.degraded,
-          parsedDocument.missingLanguages,
-        ),
-        analysis: { kind: 'full', coveredRange: { startIndex: 0, endIndex: source.length } },
-        statistics: { parseSlices: context.counts?.get('parseSlices') ?? 1 },
-      }
-    }
+  runCancellableRequest(request, (context) => parseRequestedDocument(request, source, context))
 
-    const queryStart = nowMs()
-    const result = await runAsyncWorkerPhase('flatten', () =>
-      flattenDocument(
-        parsedDocument,
-        context,
-        request.includeHighlights,
-        request.includeCaptures ?? true,
-      ),
-    )
-    assertNotCancelled(context)
-    const queryMs = nowMs() - queryStart
-
+const parseRequestedDocument = async (
+  request: TreeSitterParseRequest,
+  source: TreeSitterPieceTableInput,
+  context: CancellationContext,
+): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined> => {
+  if (request.resultMode === 'bootstrap') {
+    viewportFirstSessions.add(request.runtimeSessionId)
+    disposeBootstrap(request.runtimeSessionId)
+    bootstrapDocuments.set(request.runtimeSessionId, {
+      request,
+      source: source.retain(),
+      preview: null,
+    })
     return {
-      documentId: request.documentId,
-      snapshotVersion: request.snapshotVersion,
-      languageId: request.languageId,
-      source: sourceTag(source),
-      analysis: { kind: 'full', coveredRange: { startIndex: 0, endIndex: source.length } },
-      statistics: resultStatistics(parsedDocument, result, context),
-      missingLanguages: parsedDocument.missingLanguages,
-      captures: result.captures,
-      folds: result.folds,
-      brackets: result.brackets,
-      errors: result.errors,
-      injections: result.injections,
-      degraded: result.degraded,
-      tokens: result.tokens,
-      tokensPacked: result.tokensPacked,
-      records: result.records,
-      timings: phaseTimings(context).concat([
-        { name: 'treeSitter.parse', durationMs: parseMs },
-        { name: 'treeSitter.query', durationMs: queryMs },
-      ]),
+      ...parseAckResult(request, [], phaseTimings(context)),
+      analysis: { kind: 'partial', coveredRange: { startIndex: 0, endIndex: 0 } },
     }
-  })
+  }
+  if (request.languageId === 'markdown') return parseMarkdownDocument(request, source, context)
+  if (
+    request.languageId === 'mdx' &&
+    (markdownDocuments.get(request.runtimeSessionId)?.snapshotVersion ?? 0) >
+      request.snapshotVersion
+  )
+    return undefined
+  const runtime = await runAsyncWorkerPhase('load runtime', () => ensureRuntime(request.languageId))
+  const parseStart = nowMs()
+  const parsedDocument =
+    (await reusableParsedDocument(request, source, context)) ??
+    (await parseFullDocument(request, runtime, source, context))
+  const parseMs = nowMs() - parseStart
+  if (request.resultMode === 'parseOnly') {
+    return {
+      ...parseAckResult(
+        request,
+        [],
+        [{ name: 'treeSitter.parse', durationMs: parseMs }].concat(phaseTimings(context)),
+        parsedDocument.degraded,
+        parsedDocument.missingLanguages,
+      ),
+      analysis: { kind: 'full', coveredRange: { startIndex: 0, endIndex: source.length } },
+      statistics: { parseSlices: context.counts?.get('parseSlices') ?? 1 },
+    }
+  }
+
+  const queryStart = nowMs()
+  const result = await runAsyncWorkerPhase('flatten', () =>
+    flattenDocument(
+      parsedDocument,
+      context,
+      request.includeHighlights,
+      request.includeCaptures ?? true,
+    ),
+  )
+  assertNotCancelled(context)
+  const queryMs = nowMs() - queryStart
+
+  return {
+    documentId: request.documentId,
+    snapshotVersion: request.snapshotVersion,
+    languageId: request.languageId,
+    source: sourceTag(source),
+    analysis: { kind: 'full', coveredRange: { startIndex: 0, endIndex: source.length } },
+    statistics: resultStatistics(parsedDocument, result, context),
+    missingLanguages: parsedDocument.missingLanguages,
+    captures: result.captures,
+    folds: result.folds,
+    brackets: result.brackets,
+    errors: result.errors,
+    injections: result.injections,
+    degraded: result.degraded,
+    tokens: result.tokens,
+    tokensPacked: result.tokensPacked,
+    records: result.records,
+    timings: phaseTimings(context).concat([
+      { name: 'treeSitter.parse', durationMs: parseMs },
+      { name: 'treeSitter.query', durationMs: queryMs },
+    ]),
+  }
+}
 
 // One document state exists per runtime session, so a cached snapshot with the
 // same language and snapshotVersion is the same content (the source length
@@ -703,6 +710,10 @@ const reusableParsedDocument = async (
     request.snapshotVersion,
   )
   if (!cached) return null
+  if (cached.readOnly !== (request.readOnly === true)) {
+    dropCachedDocument(request.runtimeSessionId, cached)
+    return null
+  }
   if (cached.size === source.length) {
     if (!cached.missingLanguages.some((id) => resolveRegisteredLanguageAlias(id))) return cached
     return reloadInjections(request, cached, context)
@@ -721,6 +732,7 @@ const reloadInjections = async (
 ): Promise<ParsedDocument> => {
   const root = cached.layers[0]!
   const document = await parseParsedDocument({
+    readOnly: cached.readOnly,
     documentId: request.documentId,
     snapshotVersion: request.snapshotVersion,
     languageId: request.languageId,
@@ -767,6 +779,7 @@ const parseFullDocument = async (
     const degraded: TreeSitterDegradedState[] = []
     const markdown = await prepareMdxMarkdown(request, source, rootLayer)
     parsedDocument = await parseParsedDocument({
+      readOnly: request.readOnly === true,
       documentId: request.documentId,
       snapshotVersion: request.snapshotVersion,
       languageId: request.languageId,
@@ -783,7 +796,7 @@ const parseFullDocument = async (
     assertRuntimeSessionActive(request.runtimeSessionId)
     replaceCachedDocument(request.runtimeSessionId, parsedDocument)
     disposeBootstrap(request.runtimeSessionId)
-    if (!viewportFirst && !request.readOnly)
+    if (!viewportFirst && !parsedDocument.readOnly)
       scheduleIdleReparse(request.runtimeSessionId, parsedDocument, runtime)
     return parsedDocument
   } catch (error) {
@@ -834,6 +847,16 @@ const editDocument = async (
   source: TreeSitterPieceTableInput,
 ): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined> =>
   runCancellableRequest(request, async (context) => {
+    const cached = cachedDocumentForVersion(
+      request.runtimeSessionId,
+      request.languageId,
+      request.previousSnapshotVersion,
+    )
+    if (cached?.readOnly) {
+      assertNotCancelled(context)
+      dropCachedDocument(request.runtimeSessionId, cached)
+      return parseRequestedDocument({ ...request, type: 'parse', readOnly: false }, source, context)
+    }
     if (request.languageId === 'markdown') return parseMarkdownDocument(request, source, context)
     if (
       request.languageId === 'mdx' &&
@@ -843,11 +866,6 @@ const editDocument = async (
       return undefined
     const runtime = await runAsyncWorkerPhase('load runtime', () =>
       ensureRuntime(request.languageId),
-    )
-    const cached = cachedDocumentForVersion(
-      request.runtimeSessionId,
-      request.languageId,
-      request.previousSnapshotVersion,
     )
     if (!cached) return undefined
 
@@ -876,6 +894,7 @@ const editDocument = async (
     const markdown = await prepareMdxMarkdown(request, source, rootLayer)
     const parsedDocument = await runAsyncWorkerPhase('parse injections', () =>
       parseParsedDocument({
+        readOnly: false,
         documentId: request.documentId,
         snapshotVersion: request.snapshotVersion,
         languageId: request.languageId,
@@ -1306,6 +1325,7 @@ const parseBootstrapPreview = (
       parseRootLayer(runtime, source, null, context),
     )
     return {
+      readOnly: true,
       snapshotVersion: request.snapshotVersion,
       languageId: request.languageId,
       source: source.retain(),
@@ -1401,6 +1421,7 @@ const parseSource = (
 }
 
 type ParseParsedDocumentOptions = {
+  readonly readOnly: boolean
   readonly markdown?: MarkdownDocument
   readonly documentId: string
   readonly snapshotVersion: number
@@ -1477,6 +1498,7 @@ const parseParsedDocument = async (
     const layers = orderParsedLayers(options.rootLayer, parsedLayers)
 
     return {
+      readOnly: options.readOnly,
       markdown: options.markdown,
       snapshotVersion: options.snapshotVersion,
       languageId: options.languageId,
@@ -3048,6 +3070,7 @@ const projectedDocument = async (
   let document: ParsedDocument
   try {
     document = await parseProjectedDocument({
+      readOnly: true,
       documentId: request.documentId,
       snapshotVersion: request.snapshotVersion,
       languageId: request.languageId,
@@ -3091,6 +3114,7 @@ const parseProjectedDocument = async (
     markdown.setText(readTreeSitterInputRange(source, 0, source.length))
     const document = await parseMarkdownFences(
       {
+        readOnly: true,
         markdown,
         source,
         snapshotVersion: options.snapshotVersion,

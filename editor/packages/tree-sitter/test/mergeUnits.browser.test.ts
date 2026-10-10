@@ -1298,3 +1298,68 @@ it('declares retained review snapshots immutable before parsing them', async () 
     await syntax.dispose()
   }
 })
+
+it.each([false, true])(
+  'immutable bases require fresh mutable parsing before edit, same-version promotion=%s',
+  async (promote) => {
+    const text = 'const value = 0;\nfunction read() { return value; }\n'
+    const editedText = text.replace('= 0', '= 2')
+    const oracle = { ...document, runtimeSessionId: 'mutable-oracle' }
+    try {
+      const full = await parseTreeDocument(client, {
+        ...oracle,
+        snapshotVersion: 1,
+        text: editedText,
+        includeCaptures: true,
+      })
+      expect(full?.timings.some((phase) => phase.name === 'treeSitter.parseRoot')).toBe(true)
+      expect(full?.tokensPacked?.starts.length).toBeGreaterThan(0)
+      await parseTreeDocument(client, {
+        ...document,
+        snapshotVersion: 1,
+        text,
+        readOnly: true,
+        resultMode: 'parseOnly',
+      })
+      let promotedRoot = false
+      if (promote) {
+        const promoted = await parseTreeDocument(client, {
+          ...document,
+          snapshotVersion: 1,
+          text,
+          includeCaptures: true,
+        })
+        promotedRoot =
+          promoted?.timings.some((phase) => phase.name === 'treeSitter.parseRoot') ?? false
+      }
+      const prepared = await prepareTreeEdit(client, {
+        ...document,
+        previousSnapshotVersion: 1,
+        snapshotVersion: 2,
+        edits: [{ from: 14, to: 15, text: '2' }],
+        includeCaptures: true,
+      })
+      const edited = await editTreeDocument(client, prepared!)
+      expect(edited?.captures).toEqual(full?.captures)
+      expect(edited?.tokensPacked).toEqual(full?.tokensPacked)
+      expect(edited?.errors).toEqual(full?.errors)
+      expect(edited?.snapshotVersion).toBe(2)
+      if (promote) {
+        expect(promotedRoot).toBe(true)
+        expect(edited?.timings.some((phase) => phase.name === 'treeSitter.edit')).toBe(true)
+      } else {
+        expect(edited?.timings.some((phase) => phase.name === 'treeSitter.edit')).toBe(false)
+        expect(edited?.timings.some((phase) => phase.name === 'treeSitter.parseRoot')).toBe(true)
+        expect((await client.inspectRetention())?.treeCount).toBe(2)
+      }
+    } finally {
+      for (const runtime of [document.runtimeSessionId, oracle.runtimeSessionId]) {
+        client.disposeDocument(runtime)
+        await client.awaitRuntimeSessionIdle(runtime)
+      }
+      const retained = await client.inspectRetention()
+      expect(retained?.treeCount).toBe(0)
+      expect(retained?.source.readCount).toBe(0)
+    }
+  },
+)

@@ -677,7 +677,7 @@ and 79-message count, separate current/projected cancellation flags, mid-work ca
 and supersession, and sequential/batch equality across seven small snapshots or three
 3,000,000-unit snapshots with mixed projected bases. Final cleanup returns source reads to
 zero. An eighth regression verifies that review admissions declare immutable parse intent.
-The full real-worker corpus has 41 tests. The 226-test collaboration corpus now compares
+The review-revision real-worker corpus has 41 tests. The 226-test collaboration corpus now compares
 coalescing against the plain reader across its differential corpus, 10,000 seeded histories
 and peer-convergence histories.
 
@@ -719,9 +719,30 @@ Delivery and the idle span overlap. The rows are phase observations, not additiv
 costs. Instrumentation and the shared machine limit the comparison; it is not an
 uninstrumented release-speed claim. The ordinary complete median is still above 2 ms,
 and no other optimization was attempted. Portable samples, guards, counts and final
-production source hashes are in
+production source hashes at `9bdfb67152b9928f075287bc04ee2670523f76fe` are in
 `editor/packages/collaboration/bench/worker-phase-evidence.json`. Raw evidence is retained
 under `/work/reports/e068-i-20261010/profile-mac/` and the before/after Linux profile directories.
+
+#### Immutable snapshot ownership correction
+
+Retained `ParsedDocument` records now preserve their immutable intent. Reuse requires the
+same intent as the incoming parse; a same-version mutable parse retires an immutable
+snapshot and builds a fresh mutable tree. An edit whose previous version is immutable
+also retires that base and parses the complete edited source under the edit's cancellation
+context. It never passes the immutable root or its injected layers to live incremental
+reuse. Ordinary mutable edits retain the existing incremental path. Projected snapshots
+and partial bootstrap previews stay immutable, and injection reloads preserve their
+owner's intent.
+
+Two additional real-worker regressions failed at `9bdfb67152b9928f075287bc04ee2670523f76fe`.
+They cover direct editing from an immutable version and same-version immutable-to-mutable
+parsing followed by editing. A fresh mutable control first establishes that the native
+`treeSitter.parseRoot` phase is observable. Both final edits match the full control's
+highlight captures, packed tokens and errors. The direct path has no incremental-edit
+phase; the promoted path has a fresh parse followed by an ordinary incremental edit.
+Disposal returns both tree count and source-read count to zero. The two tests extend the
+merge-unit corpus to 43 tests. The original guarded phase evidence remains pinned to its
+measured source, not to this later ownership correction. No new timing claim is made.
 
 Remaining Approved work:
 
