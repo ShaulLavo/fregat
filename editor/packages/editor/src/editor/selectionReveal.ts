@@ -1,6 +1,6 @@
 import type { JumpCause } from './jumpHistory'
 import type { SelectionAffinity } from '../selections'
-import type { RevealBlock } from '../virtualization/virtualizedTextViewInternals'
+import type { RevealBlock } from '../virtualization/revealBlock'
 
 export type EditorSetSelectionOptions = {
   readonly jumpCause?: JumpCause

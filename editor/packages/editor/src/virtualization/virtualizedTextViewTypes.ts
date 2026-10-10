@@ -121,7 +121,7 @@ export type EditorWrapBreak = WrapBreak
  */
 export type EditorInputRoute = 'textarea' | 'edit-context'
 
-export type VirtualizedTextViewScrollMode = 'virtualized' | 'static'
+export type VirtualizedTextViewScrollMode = 'virtualized' | 'static' | 'content'
 
 export type VirtualizedTextViewRowPositioning = 'transform' | 'top'
 
