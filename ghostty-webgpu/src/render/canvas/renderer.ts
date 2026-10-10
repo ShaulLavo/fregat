@@ -1,5 +1,5 @@
 import { createGhosttyError } from '../../core/error.js'
-import type { RenderRow } from '../../core/types.js'
+import type { RenderCell, RenderRow } from '../../core/types.js'
 import type { TerminalFittedFont } from '../../term/types.js'
 import { canonicalRendererTheme, mergeRendererTheme } from '../config.js'
 import type { CanonicalRendererTheme, CursorState } from '../instances/types.js'
@@ -123,13 +123,19 @@ class CanvasSurface implements RowRendererSurface {
         // Pixel identities and full-row painting share the same decoded cells.
         const rows = source.readRows({ ...options, packed: !this.pixelTarget })
         if (!this.capturing) return rows
-        for (const row of rows) this.captureRow(row, options?.rows)
+        const cells: RenderCell[] | undefined =
+          !this.pixelTarget && rows.length > 1 ? [] : undefined
+        for (const row of rows) this.captureRow(row, options?.rows, cells)
         return rows
       },
     }
   }
 
-  private captureRow(row: RenderRow, requested?: ReadonlySet<number>): void {
+  private captureRow(
+    row: RenderRow,
+    requested?: ReadonlySet<number>,
+    scratch?: RenderCell[],
+  ): void {
     if (row.y < 0 || row.y >= this.rowCount) return
     if (requested && !requested.has(row.y)) return
     const text = plainRowText(row)
@@ -137,7 +143,8 @@ class CanvasSurface implements RowRendererSurface {
       this.pending.set(row.y, `plain:${text}`)
       return
     }
-    this.pending.set(row.y, JSON.stringify(row.cells))
+    const cells = scratch && row.packed ? row.packed.readInto(scratch) : row.cells
+    this.pending.set(row.y, JSON.stringify(cells))
   }
 
   beginFrame(): void {
@@ -183,6 +190,7 @@ class CanvasSurface implements RowRendererSurface {
       }
       this.remaining -= 1
       if (this.remaining === 0) {
+        if (this.pending.size > 1 || this.plan!.offset !== 0) this.painter.finishFrame()
         this.pixelTarget?.present()
         this.image = this.nextImage
       }
