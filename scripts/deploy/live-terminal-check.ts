@@ -116,8 +116,8 @@ async function checkLiveTerminal(target: URL, out: string, releaseRoot: string) 
         })
         signal.throwIfAborted()
         report.isolatedRelease = await readRelease(new URL('/release', server.origin), signal)
-        if (report.isolatedRelease.server?.commit !== report.deployedRelease.commit)
-          throw createScriptError('The isolated backend commit differs from the deployed client.')
+        if (report.isolatedRelease.server?.commit !== report.deployedRelease.server?.commit)
+          throw createScriptError('The isolated backend commit differs from the deployed server.')
         const live = await openLiveBrowser(chromium, process.platform, signal)
         browser = live.browser
         page = live.page
