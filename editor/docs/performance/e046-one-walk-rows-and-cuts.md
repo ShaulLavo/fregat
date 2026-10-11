@@ -104,27 +104,27 @@ Every step moved its lanes beyond run variation, so none was dropped.
 
 Every lane, baseline against the final build, 9 samples:
 
-| Lane                          | 2 warmups    | Change | 8 warmups     | Change |
-| ----------------------------- | ------------ | -----: | ------------- | -----: |
-| load-short-lines              | 2.17 to 2.14 |    −2% | 1.65 to 1.66  |     0% |
-| load-long-line                | 1.08 to 1.08 |     0% | 1.08 to 1.08  |     0% |
-| sequential-typing             | 0.40 to 0.40 |    +1% | 0.37 to 0.37  |    −1% |
-| typing-with-lookups           | 0.62 to 0.60 |    −2% | 0.60 to 0.57  |    −4% |
-| random-insertions             | 1.59 to 1.41 |   −11% | 1.39 to 1.22  |   −12% |
-| random-replacements           | 3.20 to 2.75 |   −14% | 2.32 to 1.87  |   −19% |
-| eight-cursor-batches          | 1.97 to 1.76 |   −10% | 1.78 to 1.60  |   −10% |
-| mixed-edit-churn              | 2.69 to 2.33 |   −14% | 2.31 to 1.89  |   −18% |
-| large-paste-delete            | 4.59 to 4.63 |    +1% | 4.49 to 4.47  |     0% |
-| lines-sequential-after-churn  | 1.27 to 0.69 |   −46% | 1.11 to 0.54  |   −51% |
-| lines-random-after-churn      | 1.92 to 0.92 |   −52% | 1.76 to 0.77  |   −56% |
-| ranges-after-churn            | 1.31 to 1.31 |     0% | 1.14 to 1.15  |     0% |
-| offset-to-position            | 1.28 to 0.77 |   −40% | 1.01 to 0.60  |   −41% |
-| position-to-offset            | 1.09 to 0.59 |   −46% | 0.96 to 0.45  |   −53% |
-| full-read-after-churn         | 2.14 to 2.12 |    −1% | 1.68 to 1.74  |    +4% |
-| persistent-history            | 2.89 to 2.49 |   −14% | 2.48 to 2.02  |   −18% |
-| branch-edits                  | 0.28 to 0.28 |     0% | 0.22 to 0.21  |    −5% |
-| anchor-resolution-after-churn | 0.49 to 0.48 |    −1% | 0.31 to 0.31  |    −2% |
-| anchor-density                | 10.6 to 10.6 |     0% | 10.1 to 11.2  |   +11% |
+| Lane                          | 2 warmups    | Change | 8 warmups    | Change |
+| ----------------------------- | ------------ | -----: | ------------ | -----: |
+| load-short-lines              | 2.17 to 2.14 |    −2% | 1.65 to 1.66 |     0% |
+| load-long-line                | 1.08 to 1.08 |     0% | 1.08 to 1.08 |     0% |
+| sequential-typing             | 0.40 to 0.40 |    +1% | 0.37 to 0.37 |    −1% |
+| typing-with-lookups           | 0.62 to 0.60 |    −2% | 0.60 to 0.57 |    −4% |
+| random-insertions             | 1.59 to 1.41 |   −11% | 1.39 to 1.22 |   −12% |
+| random-replacements           | 3.20 to 2.75 |   −14% | 2.32 to 1.87 |   −19% |
+| eight-cursor-batches          | 1.97 to 1.76 |   −10% | 1.78 to 1.60 |   −10% |
+| mixed-edit-churn              | 2.69 to 2.33 |   −14% | 2.31 to 1.89 |   −18% |
+| large-paste-delete            | 4.59 to 4.63 |    +1% | 4.49 to 4.47 |     0% |
+| lines-sequential-after-churn  | 1.27 to 0.69 |   −46% | 1.11 to 0.54 |   −51% |
+| lines-random-after-churn      | 1.92 to 0.92 |   −52% | 1.76 to 0.77 |   −56% |
+| ranges-after-churn            | 1.31 to 1.31 |     0% | 1.14 to 1.15 |     0% |
+| offset-to-position            | 1.28 to 0.77 |   −40% | 1.01 to 0.60 |   −41% |
+| position-to-offset            | 1.09 to 0.59 |   −46% | 0.96 to 0.45 |   −53% |
+| full-read-after-churn         | 2.14 to 2.12 |    −1% | 1.68 to 1.74 |    +4% |
+| persistent-history            | 2.89 to 2.49 |   −14% | 2.48 to 2.02 |   −18% |
+| branch-edits                  | 0.28 to 0.28 |     0% | 0.22 to 0.21 |    −5% |
+| anchor-resolution-after-churn | 0.49 to 0.48 |    −1% | 0.31 to 0.31 |    −2% |
+| anchor-density                | 10.6 to 10.6 |     0% | 10.1 to 11.2 |   +11% |
 
 Inserts and batches gain from `firstLineBreak` alone: every cut counted the left part's breaks
 with two searches of the whole chunk. `offset-to-position` gains for the same reason, which the
@@ -161,14 +161,14 @@ and the README quotes the lane with that caveat.
 
 Structural counters, standard profile, first replay, before to after:
 
-| Lane                         | Row descents | Range reads  | `splitsSurrogatePair` |
-| ---------------------------- | ------------ | ------------ | --------------------- |
-| position-to-offset           | 6,000 to 3,000 | —          | —                     |
-| lines-random-after-churn     | 6,000 to 3,000 | 3,000 to 412 | —                   |
-| lines-sequential-after-churn | 6,000 to 3,000 | 3,000 to 375 | —                   |
-| random-replacements          | —            | —            | 2,906 to 0            |
-| mixed-edit-churn             | —            | —            | 2,872 to 0            |
-| ascii-replacements           | —            | —            | 0                     |
+| Lane                         | Row descents   | Range reads  | `splitsSurrogatePair` |
+| ---------------------------- | -------------- | ------------ | --------------------- |
+| position-to-offset           | 6,000 to 3,000 | —            | —                     |
+| lines-random-after-churn     | 6,000 to 3,000 | 3,000 to 412 | —                     |
+| lines-sequential-after-churn | 6,000 to 3,000 | 3,000 to 375 | —                     |
+| random-replacements          | —              | —            | 2,906 to 0            |
+| mixed-edit-churn             | —              | —            | 2,872 to 0            |
+| ascii-replacements           | —              | —            | 0                     |
 
 A line read was three descents and is 1.14 on the random lane: one row lookup, and a range read
 for the 14% of rows that span pieces after the churn. `codeUnitAt`, which only the two-piece
@@ -198,15 +198,15 @@ which is where inserts, batches and `offset-to-position` gained; the field stays
 before and after the adoption. The window lanes open unedited documents, one piece, where a
 descent is one node, so the six-to-one reduction shows as a few percent:
 
-| Lane                          | Before (ms) | After (ms) |
-| ----------------------------- | ----------: | ---------: |
-| cold-open-first-window, 100k  |        3.58 |       3.40 |
-| warm-distant-windows, 100k    |        3.97 |       3.77 |
-| top-newline-edit, 100k        |        1.47 |       1.29 |
-| warm-distant-windows, 500k    |        3.50 |       3.35 |
-| top-newline-edit, 500k        |        0.64 |       0.61 |
-| wrap-enable, 500k             |       41.10 |      39.86 |
-| walker, 5,000 random seeks    |        1.52 |       1.52 |
+| Lane                         | Before (ms) | After (ms) |
+| ---------------------------- | ----------: | ---------: |
+| cold-open-first-window, 100k |        3.58 |       3.40 |
+| warm-distant-windows, 100k   |        3.97 |       3.77 |
+| top-newline-edit, 100k       |        1.47 |       1.29 |
+| warm-distant-windows, 500k   |        3.50 |       3.35 |
+| top-newline-edit, 500k       |        0.64 |       0.61 |
+| wrap-enable, 500k            |       41.10 |      39.86 |
+| walker, 5,000 random seeks   |        1.52 |       1.52 |
 
 The other virtualization lanes and the walker lanes are within ±2%, except the two chunk-wise
 walks at 0.06 to 0.08 ms, too short to read anything into.

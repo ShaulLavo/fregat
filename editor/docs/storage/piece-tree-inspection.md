@@ -32,15 +32,15 @@ uses weak keys and does not retain roots.
 
 For raw results `L` and `R` from the children and piece `p`, the equations are:
 
-| Field | Expected value |
-| --- | --- |
+| Field                   | Expected value                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------- |
 | `subtreeOriginalLength` | `L.originalLength + (p.buffer is the original ? p.length : 0) + R.originalLength` |
-| `subtreeVisibleLength` | `L.visibleLength + (p.visible ? p.length : 0) + R.visibleLength` |
-| `subtreePieces` | `L.pieces + 1 + R.pieces` |
-| `subtreeLineBreaks` | `L.lineBreaks + (p.visible ? rawLFCount(p) : 0) + R.lineBreaks` |
-| `subtreeMinBuffer` | minimum of the piece buffer and both raw child minima |
-| snapshot `length` | root's raw visible length |
-| snapshot `pieceCount` | root's raw piece count |
+| `subtreeVisibleLength`  | `L.visibleLength + (p.visible ? p.length : 0) + R.visibleLength`                  |
+| `subtreePieces`         | `L.pieces + 1 + R.pieces`                                                         |
+| `subtreeLineBreaks`     | `L.lineBreaks + (p.visible ? rawLFCount(p) : 0) + R.lineBreaks`                   |
+| `subtreeMinBuffer`      | minimum of the piece buffer and both raw child minima                             |
+| snapshot `length`       | root's raw visible length                                                         |
+| snapshot `pieceCount`   | root's raw piece count                                                            |
 
 Null children contribute zero sums. Nodes store no order bounds; the checker recomputes them to
 verify that orders rise in document order. The checker scans LF characters directly in buffer ranges; it does not call tree
@@ -106,13 +106,13 @@ The deterministic benchmark starts with the same million-LF buffer and runs 10,0
 3,334 deletions with seed 123. The resulting 23,305 piece nodes and 23,305 reverse entries pass all
 invariants. [Raw measurements](inspection/2026-09-06.json) record Bun 1.4.0 on this machine.
 
-| Operation | Wall time | Heap delta after collection |
-| --- | ---: | ---: |
-| Edits with inspection disabled | 146.1 ms | 13.0 MB |
-| Validate | 83.4 ms | 0.2 MB |
-| Capture records | 25.3 ms | 17.4 MB |
-| Compare two roots | 90.4 ms | 33.3 MB |
-| Format 200 rows | 25.8 ms | 0.2 MB |
+| Operation                      | Wall time | Heap delta after collection |
+| ------------------------------ | --------: | --------------------------: |
+| Edits with inspection disabled |  146.1 ms |                     13.0 MB |
+| Validate                       |   83.4 ms |                      0.2 MB |
+| Capture records                |   25.3 ms |                     17.4 MB |
+| Compare two roots              |   90.4 ms |                     33.3 MB |
+| Format 200 rows                |   25.8 ms |                      0.2 MB |
 
 These are single local observations, not budgets. Heap deltas estimate live allocation cost;
 they do not measure cumulative allocation or peak RSS, and GC can move unrelated objects between

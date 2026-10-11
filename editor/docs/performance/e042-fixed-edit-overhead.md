@@ -78,4 +78,4 @@ remaining local tweak: the three walks are about a third of the insert profile b
   for every case they check.
 - Timing: `bun run bench -- --profile standard --seed <s> --only <lanes>` in both trees, under
   `timing/` in the evidence tarball. CPU and counters: `bun run bench:profile -- --modes
-  cpu,counters --repeats 24 --only random-insertions,random-replacements`, under `cpu/`.
+cpu,counters --repeats 24 --only random-insertions,random-replacements`, under `cpu/`.

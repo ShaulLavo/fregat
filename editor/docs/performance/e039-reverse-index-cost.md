@@ -101,14 +101,14 @@ The cause was not chased; both runs are in the evidence.
 Structural counters, standard profile, first replay. Index copies are vector nodes, private
 tails and cut-buffer tree nodes; before, they were index tree nodes cloned and created.
 
-| Lane                 | Index copies    | Appends | Sequence-tree copies |
-| -------------------- | --------------- | ------: | -------------------: |
-| sequential-typing    | 3,002 to 0      |       2 |                1,503 |
-| random-insertions    | 32,949 to 164   |   1,500 |               18,444 |
-| random-replacements  | 36,786 to 212   |   1,500 |               20,296 |
-| eight-cursor-batches | 15,169 to 226   |   1,865 |               14,546 |
-| mixed-edit-churn     | 32,847 to 192   |   1,676 |               21,821 |
-| branch-edits         | 1,614 to 72     |      65 |                  883 |
+| Lane                 | Index copies  | Appends | Sequence-tree copies |
+| -------------------- | ------------- | ------: | -------------------: |
+| sequential-typing    | 3,002 to 0    |       2 |                1,503 |
+| random-insertions    | 32,949 to 164 |   1,500 |               18,444 |
+| random-replacements  | 36,786 to 212 |   1,500 |               20,296 |
+| eight-cursor-batches | 15,169 to 226 |   1,865 |               14,546 |
+| mixed-edit-churn     | 32,847 to 192 |   1,676 |               21,821 |
+| branch-edits         | 1,614 to 72   |      65 |                  883 |
 
 The acceptance bar was index copies at or below sequence-tree copies on both random lanes. They
 are under a hundredth of them. An append is one slot write, not a copy. Batches and churn append
