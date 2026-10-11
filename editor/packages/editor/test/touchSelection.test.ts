@@ -23,7 +23,15 @@ describe('TouchSelectionController hold scheduling', () => {
   let word = vi.fn(() => ({ start: 6, end: 11 }))
 
   beforeEach(() => {
-    vi.useFakeTimers()
+    vi.useFakeTimers({
+      toFake: [
+        'setTimeout',
+        'clearTimeout',
+        'Date',
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+      ],
+    })
     element = document.createElement('div')
     row = document.createElement('div')
     row.className = 'editor-virtualized-row'
@@ -52,6 +60,17 @@ describe('TouchSelectionController hold scheduling', () => {
     vi.useRealTimers()
   })
 
+  it('suppresses native row selection before host touch callbacks and restores it on release', () => {
+    const seen: string[] = []
+    row.addEventListener('touchstart', () => seen.push(element.dataset.editorTouchSelecting ?? ''))
+    dispatchTouch(row, 'touchstart')
+    expect(seen).toEqual(['true'])
+    expect(element.dataset.editorTouchSelecting).toBe('true')
+    vi.advanceTimersByTime(550)
+    dispatchTouch(row, 'touchend', 20, 0)
+    expect(element.hasAttribute('data-editor-touch-selecting')).toBe(false)
+  })
+
   it('selects once at the hold deadline while the finger remains down', () => {
     dispatchTouch(row, 'touchstart')
     vi.advanceTimersByTime(549)
@@ -75,6 +94,7 @@ describe('TouchSelectionController hold scheduling', () => {
       if (action === 'multitouch') dispatchTouch(row, 'touchstart', 20, 2)
       if (action === 'touchend') dispatchTouch(row, action, 20, 0)
       if (action === 'touchcancel') dispatchTouch(row, action)
+      expect(element.hasAttribute('data-editor-touch-selecting')).toBe(false)
       expect(vi.getTimerCount()).toBe(0)
       vi.advanceTimersByTime(1000)
       expect(word).not.toHaveBeenCalled()
@@ -88,6 +108,34 @@ describe('TouchSelectionController hold scheduling', () => {
     dispatchTouch(row, 'touchstart')
     dispatchTouch(row, 'touchmove', 40)
     expect(dispatchTouch(row, 'touchend', 40, 0).defaultPrevented).toBe(false)
+  })
+
+  it('claims visible-row native selection while retaining input selection', () => {
+    dispatchTouch(row, 'touchstart')
+    const selection = new Event('selectstart', { bubbles: true, cancelable: true })
+    row.dispatchEvent(selection)
+    expect(selection.defaultPrevented).toBe(true)
+    const input = document.createElement('textarea')
+    element.append(input)
+    const typing = new Event('selectstart', { bubbles: true, cancelable: true })
+    input.dispatchEvent(typing)
+    expect(typing.defaultPrevented).toBe(false)
+  })
+
+  it('keeps the menu for the same selection and dismisses a changed selection', () => {
+    const session = {},
+      snapshot = {},
+      selections = {}
+    controller.selectionChanged(session, snapshot, selections)
+    dispatchTouch(row, 'touchstart')
+    vi.advanceTimersByTime(550)
+    dispatchTouch(row, 'touchend', 20, 0)
+    vi.advanceTimersByTime(16)
+    expect(document.querySelector('.editor-touch-menu')).not.toBeNull()
+    controller.selectionChanged(session, snapshot, selections)
+    expect(document.querySelector('.editor-touch-menu')).not.toBeNull()
+    controller.selectionChanged(session, snapshot, {})
+    expect(document.querySelector('.editor-touch-menu')).toBeNull()
   })
 
   it('starts a fresh deadline when a pending gesture is replaced', () => {

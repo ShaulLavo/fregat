@@ -215,6 +215,31 @@ investigation below records what was learned, rather than a prerequisite for the
 Evidence: `/work/tmp/custom-touch-evidence/`; the simulator harness and result bundles are
 retained under the owner's Mac scratch directory `~/tmp/editor-custom-touch/`.
 
+### Review corrections and native-selection guard
+
+- Touch Paste uses the shared paste-provider pipeline. Select all refreshes the action context
+  and keeps Cut, Copy and Paste available. Keyboard, host and document selection changes dismiss
+  a stale menu; visual-viewport movement repositions it against fresh selection geometry.
+- Release waits one animation frame before showing actions so the last edge-scroll event settles.
+  A later scroll still dismisses the menu.
+- All 19 initial CI failures were real regressions from globally unselectable rows: 15 WebKit
+  syntax/decoration pixel assertions and four generic Chromium iframe DOM-selection assertions.
+  None were obsolete native-touch tests. They remain intact; all 61 targeted browser checks
+  passed with selectable rows restored.
+- A real-iPhone report confirmed intermittent native long-press selection in the private
+  comparison preview. Trusted simulator traces reproduced a native selectionchange collapsing
+  `[6,41]` to `[0,0]` after release/focus, even when the input range was refreshed at focusin.
+  The touchstart capture listener now suppresses row selection synchronously before recognition
+  and host callbacks. Release/cancellation restores selectable rows; the surface disables native
+  touch callouts, and touch-originated visible-row `selectstart` is cancelled.
+- Final native acceptance checks the first long-press after a fresh load and 20 repeated holds,
+  counts native visible-row selections, and retains a screenshot for each attempt. Cross-row
+  release must retain `[6,41]`, show the custom pill, and support replacement typing and clipboard
+  actions. All four trusted simulator tests passed: 20 repeated holds recorded zero native
+  visible-row selections, cross-row release retained `[6,41]`, edge scrolling reached 990 px
+  with Copy still available, and a fast swipe reached 423 px with `[0,0]` unchanged. Copy,
+  Cut and Paste passed. Result bundle: `~/tmp/editor-custom-touch/native-guard-production.xcresult`.
+
 ### Approved work scheduled later
 
 - Explore optional selection handles behind a registered setting, including whether handles

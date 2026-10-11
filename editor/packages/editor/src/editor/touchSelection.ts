@@ -44,9 +44,28 @@ export class TouchSelectionController {
   private pointerType = 'mouse'
   private pendingMousePress: boolean | null = null
   private scrollFrame: ScheduledFrame | null = null
+  private menuFrame: ScheduledFrame | null = null
+  private selectionState: { session: object; snapshot: object; selections: object } | null = null
 
   constructor(private readonly options: TouchSelectionOptions) {
-    this.menu = new TouchSelectionMenu(options.element, options.menuItems)
+    this.menu = new TouchSelectionMenu(options.element, options.menuItems, options.menuAnchor)
+  }
+
+  selectionChanged(session: object, snapshot: object, selections: object): void {
+    const previous = this.selectionState
+    this.selectionState = { session, snapshot, selections }
+    if (
+      previous?.session === session &&
+      previous.snapshot === snapshot &&
+      previous.selections === selections
+    )
+      return
+    this.hideMenu()
+  }
+
+  showMenu(): void {
+    const anchor = this.options.menuAnchor()
+    if (anchor) this.menu.show(anchor.x, anchor.y, anchor.bottom)
   }
 
   get ownsMouseEvent(): boolean {
@@ -62,24 +81,28 @@ export class TouchSelectionController {
   install(): void {
     const element = this.options.element
     element.ownerDocument.addEventListener('pointerdown', this.pointerDown, { capture: true })
-    element.addEventListener('touchstart', this.start, { passive: false })
+    element.addEventListener('touchstart', this.start, { passive: false, capture: true })
     element.addEventListener('touchmove', this.move, { passive: false })
     element.addEventListener('touchend', this.end, { passive: false })
     element.addEventListener('touchcancel', this.cancel)
     element.addEventListener('contextmenu', this.contextMenu)
-    element.addEventListener('scroll', this.hideMenu)
+    element.addEventListener('selectstart', this.selectStart)
+    element.addEventListener('scroll', this.scrollMenu)
+    element.addEventListener('wheel', this.hideMenu)
     element.addEventListener('beforeinput', this.hideMenu)
   }
 
   dispose(): void {
     const element = this.options.element
     element.ownerDocument.removeEventListener('pointerdown', this.pointerDown, { capture: true })
-    element.removeEventListener('touchstart', this.start)
+    element.removeEventListener('touchstart', this.start, { capture: true })
     element.removeEventListener('touchmove', this.move)
     element.removeEventListener('touchend', this.end)
     element.removeEventListener('touchcancel', this.cancel)
     element.removeEventListener('contextmenu', this.contextMenu)
-    element.removeEventListener('scroll', this.hideMenu)
+    element.removeEventListener('selectstart', this.selectStart)
+    element.removeEventListener('scroll', this.scrollMenu)
+    element.removeEventListener('wheel', this.hideMenu)
     element.removeEventListener('beforeinput', this.hideMenu)
     this.cancel()
     this.menu.dispose()
@@ -87,7 +110,28 @@ export class TouchSelectionController {
     this.pendingMousePress = null
   }
 
-  private hideMenu = (): void => this.menu.hide()
+  private hideMenu = (): void => {
+    this.menuFrame?.cancel()
+    this.menuFrame = null
+    this.menu.hide()
+  }
+
+  private scrollMenu = (): void => {
+    if (!this.menuFrame) this.menu.hide()
+  }
+
+  private selectStart = (event: Event): void => {
+    const Element = this.options.element.ownerDocument.defaultView?.Element
+    if (!this.ownsMouseEvent || !Element) return
+    if (
+      event
+        .composedPath()
+        .some(
+          (node) => node instanceof Element && node.classList.contains('editor-virtualized-row'),
+        )
+    )
+      event.preventDefault()
+  }
 
   private contextMenu = (event: MouseEvent): void => {
     if (this.ownsMouseEvent) event.preventDefault()
@@ -95,16 +139,20 @@ export class TouchSelectionController {
 
   private pointerDown = (event: PointerEvent): void => {
     this.pointerType = event.pointerType
+    if (this.menuFrame) this.hideMenu()
     if (event.pointerType === 'touch') return
     this.pendingMousePress = null
   }
 
   private start = (event: TouchEvent): void => {
+    // Establish native-selection suppression before recognition or host callbacks.
+    this.options.element.dataset.editorTouchSelecting = 'true'
     this.pointerType = 'touch'
     this.stopGesture()
-    this.menu.hide()
+    this.hideMenu()
     this.pendingMousePress = null
     if (event.defaultPrevented || event.touches.length !== 1) {
+      delete this.options.element.dataset.editorTouchSelecting
       this.lastTap = null
       return
     }
@@ -198,6 +246,7 @@ export class TouchSelectionController {
   private end = (event: TouchEvent): void => {
     const gesture = this.gesture
     this.stopGesture()
+    delete this.options.element.dataset.editorTouchSelecting
     if (!gesture) return
     if (event.touches.length > 0) {
       this.lastTap = null
@@ -206,8 +255,12 @@ export class TouchSelectionController {
     if (gesture.range) {
       event.preventDefault()
       this.options.focus()
-      const anchor = this.options.menuAnchor()
-      this.menu.show(anchor?.x ?? gesture.currentX, anchor?.y ?? gesture.currentY, anchor?.bottom)
+      // Scroll events from the last selection frame settle before the menu is displayed.
+      this.menuFrame = scheduleFrame(() => {
+        this.menuFrame = null
+        const anchor = this.options.menuAnchor()
+        this.menu.show(anchor?.x ?? gesture.currentX, anchor?.y ?? gesture.currentY, anchor?.bottom)
+      })
       return
     }
     this.lastTap = { x: gesture.x, y: gesture.y, time: event.timeStamp }
@@ -215,9 +268,10 @@ export class TouchSelectionController {
   }
 
   private cancel = (): void => {
+    delete this.options.element.dataset.editorTouchSelecting
     this.stopGesture()
     this.lastTap = null
-    this.menu.hide()
+    this.hideMenu()
   }
 
   private stopGesture(): void {

@@ -9,7 +9,11 @@ beforeEach(() => {
   editor = document.createElement('div')
   document.body.append(editor)
   items = []
-  menu = new TouchSelectionMenu(editor, () => items)
+  menu = new TouchSelectionMenu(
+    editor,
+    () => items,
+    () => null,
+  )
 })
 afterEach(() => {
   menu.dispose()
@@ -71,4 +75,30 @@ it('hides on an outside press and respects disabled actions', () => {
   expect(run).not.toHaveBeenCalled()
   editor.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
   expect(document.querySelector('.editor-touch-menu')).toBeNull()
+})
+
+it.each(['resize', 'scroll'])('repositions when the visual viewport emits %s', (type) => {
+  const descriptor = Object.getOwnPropertyDescriptor(window, 'visualViewport')
+  const viewport = Object.assign(new EventTarget(), {
+    width: 250,
+    height: 250,
+    offsetLeft: 0,
+    offsetTop: 0,
+  })
+  Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport })
+  try {
+    menu.show(100, 100)
+    expect(document.querySelector('.editor-touch-menu')).not.toBeNull()
+    const element = document.querySelector<HTMLElement>('.editor-touch-menu')!
+    const top = element.style.top
+    if (type === 'resize') viewport.height = 40
+    if (type === 'scroll') viewport.offsetTop = 200
+    viewport.dispatchEvent(new Event(type))
+    expect(document.querySelector('.editor-touch-menu')).toBe(element)
+    expect(element.style.top).not.toBe(top)
+    expect(element.style.top).toBe(type === 'resize' ? '32px' : '208px')
+  } finally {
+    if (descriptor) Object.defineProperty(window, 'visualViewport', descriptor)
+    else Reflect.deleteProperty(window, 'visualViewport')
+  }
 })

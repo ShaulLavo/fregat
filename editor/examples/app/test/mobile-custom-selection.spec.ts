@@ -44,6 +44,26 @@ async function beginHold(page: Page) {
   return point
 }
 
+test('touch claims native row selection immediately and restores selectable text on release', async ({
+  page,
+}) => {
+  const point = await textPoint(page, 0, 8)
+  await finger(page, 'touchstart', point.x, point.y)
+  const row = page.locator('.editor-virtualized-row').first()
+  await expect
+    .poll(() => row.evaluate((element) => getComputedStyle(element).userSelect))
+    .toBe('none')
+  await expect(page.locator('#selection')).toHaveText('Selected: bravo')
+  await expect(page.locator('.editor-virtualized-selection-range').first()).toBeVisible()
+  await expect(page.locator('#native-state')).toHaveText('Native row selections: 0')
+  await finger(page, 'touchend', point.x, point.y)
+  await expect
+    .poll(() => row.evaluate((element) => getComputedStyle(element).userSelect))
+    .toBe('text')
+  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toBeVisible()
+  await expect(page.locator('#native-state')).toHaveText('Native row selections: 0')
+})
+
 test('holding and dragging advances across rows, then typing replaces selection', async ({
   page,
 }) => {
@@ -77,6 +97,93 @@ test('double tap selects a word and menu actions extend through the public optio
   await expect(page.locator('#selection')).toHaveText(
     'Selected: alpha bravo charlie\nsecond line\nthird row',
   )
+})
+
+test('release restores the selected input window after focus collapses its native range', async ({
+  page,
+}) => {
+  await page.locator('textarea').evaluate((input: HTMLTextAreaElement) => {
+    input.blur()
+    input.addEventListener(
+      'focus',
+      () => {
+        input.setSelectionRange(0, 0)
+        input.dispatchEvent(new Event('select', { bubbles: true }))
+      },
+      { once: true },
+    )
+  })
+  const point = await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await expect(page.locator('#selection')).toHaveText('Selected: bravo')
+  await expect
+    .poll(() =>
+      page
+        .locator('textarea')
+        .evaluate((input: HTMLTextAreaElement) => [input.selectionStart, input.selectionEnd]),
+    )
+    .toEqual([6, 11])
+  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toBeVisible()
+})
+
+test('delayed native focus restores the session range before selection events', async ({
+  page,
+}) => {
+  const point = await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toBeVisible()
+  await page.locator('textarea').evaluate((input: HTMLTextAreaElement) => {
+    input.setSelectionRange(0, 0)
+    input.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    input.dispatchEvent(new Event('select', { bubbles: true }))
+  })
+  await expect(page.locator('#selection')).toHaveText('Selected: bravo')
+  await expect
+    .poll(() =>
+      page
+        .locator('textarea')
+        .evaluate((input: HTMLTextAreaElement) => [input.selectionStart, input.selectionEnd]),
+    )
+    .toEqual([6, 11])
+  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toBeVisible()
+})
+
+test('Select all keeps actions and refreshes their selection context', async ({ page }) => {
+  const point = await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Inspect', exact: true }).click()
+  await expect(page.locator('#status')).toContainText('41 characters')
+})
+
+test('keyboard and host selection changes dismiss the touch menu', async ({ page }) => {
+  const point = await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await page.locator('textarea').press('ArrowLeft')
+  await expect(page.getByRole('toolbar')).toHaveCount(0)
+  await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await page.evaluate(() => (window as any).touchEditor.setSelection(0))
+  await expect(page.getByRole('toolbar')).toHaveCount(0)
+})
+
+test('release after edge scrolling preserves the menu until a later scroll', async ({ page }) => {
+  await page.locator('#long').click()
+  await beginHold(page)
+  const bounds = (await page.locator('#host').boundingBox())!
+  const x = bounds.x + 160
+  const y = bounds.y + bounds.height - 2
+  await finger(page, 'touchmove', x, y)
+  const scroller = page.locator('.editor-virtualized')
+  await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(100)
+  await finger(page, 'touchend', x, y)
+  await page.waitForTimeout(150)
+  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toBeVisible()
+  await scroller.evaluate((el) => {
+    el.scrollTop += 24
+  })
+  await expect(page.getByRole('toolbar')).toHaveCount(0)
 })
 
 test('the second tap can drag backward from a word across a row', async ({ page }) => {

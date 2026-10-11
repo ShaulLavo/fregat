@@ -66,6 +66,7 @@
 }
 
 .editor-virtualized {
+  -webkit-touch-callout: none;
   --editor-background: #1e1e1e;
   --editor-foreground: #d4d4d4;
   --editor-gutter-background: var(--editor-background);
@@ -296,14 +297,22 @@
   right: 0;
   top: 0;
   white-space: pre;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
+  /* WebKit requires selectable text for CSS Highlight paint and generic DOM ranges.
+     Touch contacts suppress native selection until release. */
+  -webkit-user-select: text;
+  user-select: text;
   touch-action: manipulation;
   /* Own compositor layer per row: WebKit re-resolves every registered CSS
      Highlight range when a painted row's transform changes, stalling scroll
      remounts 100-300ms. Compositor-only moves skip that invalidation. */
   will-change: transform;
+}
+
+/* A touch contact claims native selection before long-press recognition. Removing
+   this at release restores WebKit syntax Highlight paint on selectable rows. */
+.editor-virtualized[data-editor-touch-selecting='true'] .editor-virtualized-row {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .editor-virtualized-row-chunk {

@@ -345,7 +345,7 @@ export class InputSelectionController {
             options.view.textViewportInsets(),
           ),
         ),
-      focus: () => options.view.focusInput(),
+      focus: () => this.focusInputPreservingSelection(),
       menuAnchor: () => {
         const selection = this.primaryResolvedSelection()
         if (!selection) return null
@@ -373,6 +373,7 @@ export class InputSelectionController {
     el.addEventListener('mousedown', this.handleMouseDown)
     el.addEventListener('beforeinput', this.handleBeforeInput)
     el.addEventListener('select', this.syncHiddenInputSelection)
+    el.addEventListener('focusin', this.syncInputOnFocus)
     el.addEventListener('copy', this.handleCopy)
     el.addEventListener('cut', this.handleCut)
     el.addEventListener('dragover', this.handleDragOver)
@@ -396,6 +397,7 @@ export class InputSelectionController {
     el.removeEventListener('mousedown', this.handleMouseDown)
     el.removeEventListener('beforeinput', this.handleBeforeInput)
     el.removeEventListener('select', this.syncHiddenInputSelection)
+    el.removeEventListener('focusin', this.syncInputOnFocus)
     el.removeEventListener('copy', this.handleCopy)
     el.removeEventListener('cut', this.handleCut)
     el.removeEventListener('dragover', this.handleDragOver)
@@ -1692,6 +1694,7 @@ export class InputSelectionController {
     if (!session) return
 
     const snapshot = session.getSnapshot()
+    this.touchSelection.selectionChanged(session, snapshot, session.getSelections())
     const selections = session.getSelections().selections.map((selection) => {
       const resolved = resolveSelection(snapshot, selection)
       return {
@@ -2054,6 +2057,17 @@ export class InputSelectionController {
     },
   )
 
+  private focusInputPreservingSelection(): void {
+    // Native focus can collapse the input's range before its selection events arrive.
+    this.writingInputWindow = true
+    try {
+      this.options.view.focusInput()
+    } finally {
+      this.writingInputWindow = false
+    }
+    this.refreshHiddenInputContent()
+  }
+
   private placeTouchCaret(position: VirtualizedTextHitPosition): void {
     const session = this.session
     if (!session) return
@@ -2130,6 +2144,7 @@ export class InputSelectionController {
           this.options.runInOperation(() =>
             this.selectTouchRange({ anchorOffset: 0, headOffset: length }, 'before'),
           )
+          this.touchSelection.showMenu()
         },
       },
     ]
@@ -2160,11 +2175,18 @@ export class InputSelectionController {
     )
       return
     if (action === 'copy') return
+    if (pasted !== null) {
+      const window = this.options.el.ownerDocument.defaultView
+      if (!window) return
+      const transfer = new window.DataTransfer()
+      transfer.setData('text/plain', pasted)
+      this.handlePaste(new window.ClipboardEvent('paste', { clipboardData: transfer }))
+      return
+    }
     this.options.runInOperation(() => {
       if (!this.canTypeText()) return
       let change: DocumentSessionChange
-      if (pasted !== null) change = this.applyPaste(session, normalizeLineEndings(pasted), null)
-      else if (payload?.metadata.pasteOnNewLine) change = this.deleteCaretLines(session)
+      if (payload?.metadata.pasteOnNewLine) change = this.deleteCaretLines(session)
       else change = this.mirrorSelectionDelete(session) ?? session.deleteSelection()
       this.markSessionSelectionForNextInput()
       this.applyChange(change, `input.touch${action}`, nowMs())
@@ -3779,6 +3801,11 @@ export class InputSelectionController {
 
     this.markDomSelectionForNextInput()
     return null
+  }
+
+  private syncInputOnFocus = (event: FocusEvent): void => {
+    if (event.target !== this.options.view.inputElement) return
+    this.refreshHiddenInputContent()
   }
 
   private syncHiddenInputSelection = (event: Event): void => {

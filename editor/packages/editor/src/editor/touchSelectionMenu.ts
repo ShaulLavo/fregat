@@ -6,14 +6,18 @@ export type TouchMenuItem = {
   run(): void | Promise<void>
 }
 
+type MenuAnchor = { readonly x: number; readonly y: number; readonly bottom: number }
+
 /** A framework-neutral touch popover; host tokens supply the same surface as app menus. */
 export class TouchSelectionMenu {
   private element: HTMLDivElement | null = null
   private pending = false
+  private anchor: MenuAnchor | null = null
 
   constructor(
     private readonly editor: HTMLElement,
     private readonly items: () => readonly TouchMenuItem[],
+    private readonly selectionAnchor: () => MenuAnchor | null,
   ) {}
 
   show(x: number, y: number, bottom = y + 16): void {
@@ -52,6 +56,34 @@ export class TouchSelectionMenu {
     document.body.append(element)
     this.element = element
     const viewport = document.defaultView?.visualViewport
+    this.anchor = { x, y, bottom }
+    this.position()
+    document.addEventListener('pointerdown', this.outside, { capture: true })
+    viewport?.addEventListener('resize', this.position)
+    viewport?.addEventListener('scroll', this.position)
+  }
+
+  hide = (): void => {
+    const viewport = this.editor.ownerDocument.defaultView?.visualViewport
+    viewport?.removeEventListener('resize', this.position)
+    viewport?.removeEventListener('scroll', this.position)
+    this.editor.ownerDocument.removeEventListener('pointerdown', this.outside, { capture: true })
+    this.element?.remove()
+    this.element = null
+    this.anchor = null
+  }
+
+  dispose(): void {
+    this.hide()
+  }
+
+  private position = (): void => {
+    const element = this.element
+    const anchor = this.selectionAnchor() ?? this.anchor
+    if (!element || !anchor) return
+    const { x, y, bottom } = anchor
+    const document = this.editor.ownerDocument
+    const viewport = document.defaultView?.visualViewport
     const width = viewport?.width ?? document.documentElement.clientWidth
     const left = viewport?.offsetLeft ?? 0
     const top = viewport?.offsetTop ?? 0
@@ -66,17 +98,6 @@ export class TouchSelectionMenu {
       '--editor-touch-arrow-x',
       `${Math.max(16, Math.min(bounds.width - 16, x - Number.parseFloat(element.style.left)))}px`,
     )
-    document.addEventListener('pointerdown', this.outside, { capture: true })
-  }
-
-  hide(): void {
-    this.editor.ownerDocument.removeEventListener('pointerdown', this.outside, { capture: true })
-    this.element?.remove()
-    this.element = null
-  }
-
-  dispose(): void {
-    this.hide()
   }
 
   private outside = (event: PointerEvent): void => {

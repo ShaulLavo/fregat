@@ -54,20 +54,26 @@ document.querySelector('#reset').onclick = () => {
 record()
 
 const gestureEvents = []
+let nativeRowSelections = 0
+let nativeRowSelectionActive = false
+document.addEventListener('selectionchange', () => {
+  const selection = document.getSelection()
+  const node = selection?.anchorNode
+  const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement
+  const active = !selection?.isCollapsed && !!element?.closest('.editor-virtualized-row')
+  if (active && !nativeRowSelectionActive) nativeRowSelections++
+  nativeRowSelectionActive = active
+  document.querySelector('#native-state').textContent =
+    `Native row selections: ${nativeRowSelections}`
+})
 for (const type of ['touchstart', 'touchend', 'touchcancel']) {
   document.addEventListener(
     type,
     (event) => {
-      const touch = event.changedTouches[0]
-      gestureEvents.push({
-        type,
-        time: Math.round(event.timeStamp),
-        x: touch?.clientX,
-        y: touch?.clientY,
-        target: event.target.tagName,
-      })
+      const touch = event.changedTouches?.[0]
+      gestureEvents.push({ type, x: touch?.clientX, y: touch?.clientY })
       document.querySelector('#events').textContent =
-        `Events: ${JSON.stringify(gestureEvents.slice(-8))}`
+        `Events: ${JSON.stringify(gestureEvents.slice(-4))}`
     },
     { capture: true },
   )
