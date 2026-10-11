@@ -394,7 +394,7 @@
       "default": "off",
       "description": "Animate a file as it opens, as if it were being written.",
       "enum": ["autoregressive", "diffusion", "off", "parallel", "token"],
-      "markdownDescription": "Animate a file as it opens, as if it were being written.\n\nAutoregressive types one character at a time, line after line. Parallel types every line at once, staggered. Token streams one token at a time, like a language model. Diffusion settles scrambled glyphs into the text.",
+      "markdownDescription": "Animate a file as it opens, as if it were being written.\n\nAutoregressive writes the file in reading order behind a caret. Parallel writes every line at once from staggered starts. Token stamps one token at a time, like a language model. Diffusion resolves scrambled text in clusters.",
       "type": "string"
     },
     "editor.diff.viewMode": {
@@ -510,6 +510,11 @@
     "editor.minimap.enabled": {
       "default": true,
       "description": "Show the minimap beside the editor.",
+      "type": "boolean"
+    },
+    "editor.morph.enabled": {
+      "default": true,
+      "description": "Animate undo, redo, pasted and generated code: text that stays slides to its new place, removed text fades out, and new text streams in. Typing stays instant.",
       "type": "boolean"
     },
     "editor.retainedTextBudget": {

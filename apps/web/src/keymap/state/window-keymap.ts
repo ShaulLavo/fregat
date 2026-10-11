@@ -109,6 +109,7 @@ export function createWindowKeymap(options: {
       physical?.toLowerCase() !== event.key.toLowerCase()
     )
       return false
+    if (isKeypadAltCode(event)) return false
     if (
       event
         .composedPath()
@@ -187,6 +188,11 @@ export function createWindowKeymap(options: {
       hotkeys.dispose()
     },
   }
+}
+
+/** Windows types a character from Alt plus keypad digits (Alt+0233 is é), so those keys never bind. */
+function isKeypadAltCode(event: KeyboardEvent) {
+  return event.altKey && !event.ctrlKey && !event.metaKey && /^Numpad\d$/u.test(event.code)
 }
 
 function firesWhileTyping(

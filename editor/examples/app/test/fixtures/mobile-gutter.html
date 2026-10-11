@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Singapore touch gutter controls</title>
+    <link rel="stylesheet" href="../../../../packages/editor/src/style.css" />
+    <style>
+      body {
+        margin: 0;
+      }
+      #host {
+        display: flex;
+        height: 300px;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="host"></main>
+    <script type="module">
+      import { Editor } from '../../../../packages/editor/src/editor.ts'
+      import { createFoldGutterPlugin } from '../../../../packages/gutters/src/index.ts'
+      import { createSyntaxPlugin } from '../../../../packages/editor/test/factories/syntaxRuntime.ts'
+      import { createEmptySyntaxResult } from '../../../../packages/editor/src/syntax/session.ts'
+      const result = {
+        ...createEmptySyntaxResult(),
+        folds: [
+          {
+            startIndex: 18,
+            endIndex: 30,
+            startLine: 0,
+            endLine: 2,
+            type: 'statement_block',
+            languageId: 'typescript',
+          },
+        ],
+      }
+      const syntax = createSyntaxPlugin(() => ({
+        analyze: async () => result,
+        getResult: () => result,
+        getTokens: () => [],
+        foldingSupport: 'supported',
+        getSnapshotVersion: () => 0,
+        dispose() {},
+      }))
+      window.gutterActivations = []
+      const controls = ['line-comment', 'breakpoint'].map((id) => ({
+        activate: (context) =>
+          context.registerGutterContribution({
+            id,
+            interactive: true,
+            width: () => 30,
+            createCell(document) {
+              const cell = document.createElement('span')
+              const control = document.createElement(id === 'line-comment' ? 'button' : 'span')
+              if (id === 'breakpoint') {
+                control.setAttribute('role', 'button')
+                control.tabIndex = 0
+              }
+              control.setAttribute('aria-label', id)
+              control.textContent = id === 'line-comment' ? '+' : '●'
+              control.addEventListener('mousedown', (event) => {
+                event.preventDefault()
+                event.stopPropagation()
+              })
+              control.addEventListener('click', () => window.gutterActivations.push(id))
+              cell.append(control)
+              return cell
+            },
+            updateCell() {},
+          }),
+      }))
+      const editor = new Editor(document.querySelector('#host'), {
+        fontSize: 20,
+        plugins: [createFoldGutterPlugin({ width: 30 }), syntax].concat(controls),
+      })
+      editor.setText('function outer() {\n  hello()\n}\ntail')
+      editor.setSelection(32)
+      window.touchEditor = editor
+    </script>
+  </body>
+</html>

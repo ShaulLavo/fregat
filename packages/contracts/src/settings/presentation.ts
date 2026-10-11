@@ -423,8 +423,11 @@ export const SETTINGS_PRESENTATION = {
   'editor.decode.mode': {
     widget: 'enum',
     category: 'Editor',
-    requiresRestart: true,
     visibility: 'advanced',
+  },
+  'editor.morph.enabled': {
+    widget: 'boolean',
+    category: 'Editor',
   },
   'search.defaultMatchMode': {
     widget: 'enum',

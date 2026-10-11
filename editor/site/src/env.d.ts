@@ -3,3 +3,8 @@
 /// <reference types="@astrojs/markdown-remark" />
 
 declare const __SINGAPORE_PACKAGES__: readonly { name: string; entryPointCount: number }[]
+
+declare module 'virtual:example-editor-url' {
+  const url: string
+  export default url
+}

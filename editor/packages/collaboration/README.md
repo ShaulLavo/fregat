@@ -2,7 +2,7 @@
 
 Editor binding, session protocols, transports, and remote cursor presence for host-ordered collaboration.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -52,7 +52,7 @@ presence.dispose()
 - `Presence` tracks remote selections and cursors.
 - `parsePresence()` validates received presence messages.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/collaboration/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/collaboration/overview/)
 
 [Integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collaboration/docs/integration.md)
 
@@ -162,7 +162,7 @@ connect fails the test.
 
 You can use this package on its own. `@singapore-editor/core` owns editor views; optional packages add syntax, search, gutters, and language features.
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

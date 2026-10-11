@@ -2,7 +2,7 @@
 
 Host-ordered text editing with persistent snapshots and character identities for collaboration engines.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -41,7 +41,7 @@ const edit = participant.local({ offset: 5, deleteCount: 0, text: ' world' })
 - `ConfirmedWindow` finds concurrent edits by different authors and their character ID spans.
 - `Engine.projectEffects()` creates local author/base review snapshots while preserving live state.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/collab/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/collab/overview/)
 
 [Integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collab/docs/integration.md)
 
@@ -49,7 +49,7 @@ const edit = participant.local({ offset: 5, deleteCount: 0, text: ' world' })
 
 You can use this package on its own. `@singapore-editor/core` owns editor views; optional packages add syntax, search, gutters, and language features.
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

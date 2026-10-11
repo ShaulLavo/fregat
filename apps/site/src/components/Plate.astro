@@ -11,13 +11,19 @@ type Props = {
 
 const { id, bundle, replica, hero = false } = Astro.props
 const plate = await plateFor(bundle)
-// The hero replica scales from 1280 px and folds to its narrow layout on phones. Section windows
-// are 660 px wide and keep at least 74% of that size, so the plate crops them on phones.
-const stage = hero ? {} : { 'data-base': '660', 'data-narrow-at': '0', 'data-min-k': '0.74' }
 ---
 
-<div class:list={['plate', { 'hero-plate': hero, lit: hero }]} style={plate.style}>
-  <div class="stage" id={id} data-replica {...stage}>
+<div class:list={['plate', { 'hero-plate': hero }]} style={plate.style}>
+  <img
+    class="wallpaper"
+    src={plate.wallpaper}
+    width={plate.wallpaperWidth}
+    height={plate.wallpaperHeight}
+    loading={hero ? 'eager' : 'lazy'}
+    fetchpriority={hero ? 'high' : 'auto'}
+    alt=""
+  />
+  <div class="stage" id={id} data-replica>
     <Fragment set:html={replicaHtml(replica)} />
   </div>
 </div>

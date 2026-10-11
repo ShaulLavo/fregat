@@ -213,3 +213,8 @@ Owner decision 2026-10-09: `ours` gives every Fregat command a key, reusing the 
 
 - [x] `apps/web/src/keymap/tests/ours-fregat.test.ts` fails when an application command has no `ours` key on Linux, macOS or Windows, or when an added key matches a Zed key (mapped, unmapped or reserved) in an overlapping context.
 - [x] Fix with AI on a problem answers Mod+. under the default preset, the row's keyboard action; the button stays out of the Tab order so the Problems tree keeps one stop.
+
+## Open gaps under `ours` (found 2026-10-09, #1184)
+
+- [ ] **A key pressed during a tab switch is dropped.** After a keyboard tab switch, focus sits on the page for a moment before the editor takes it, so a second key pressed in that window reaches no context and does nothing. `scripts/agent/scenarios/item-navigation.ts` waits for focus between keys to stay green, which hides this. Reproduce: default preset, two editor tabs, press Alt+2 then immediately an editor key (Linux), and the second key is lost. Fix at the focus hand-off: keep focus on a target that owns the keys until the editor mounts, or queue the key for the arriving editor.
+- [ ] **Escape leaves extra cursors.** Zed's `editor::Cancel` also collapses multiple cursors to one; `editorCancelRows` in `apps/web/src/keymap/default-bindings.ts` maps only the widget-closing parts (completion list, signature hint, find). Map the cursor-collapse part for `ours` and `zed`, after the widget rows, and extend `editor-widget-keys` with a multi-cursor step.

@@ -6,4 +6,4 @@ Start there when choosing fonts, opening large documents or attaching optional p
 
 The [browser quirks document](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/display/browser-quirks.md) separately records engine bugs and their workarounds.
 
-A successful file open does not establish a universal size guarantee or interactive typing budget. Choose representative files and measure your integration with the [large-file guide](https://shaulavo.dev/singapore/docs/guides/large-files/).
+A successful file open does not establish a universal size guarantee or interactive typing budget. Choose representative files and measure your integration with the [large-file guide](https://singapore.shaulavo.dev/docs/guides/large-files/).

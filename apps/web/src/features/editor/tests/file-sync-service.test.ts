@@ -53,7 +53,6 @@ describe('FileSyncService', () => {
         documentStore: store,
         workspaceStore: createEditorWorkspaceStore(),
         queryClient,
-        forgetFile: vi.fn(),
       })
       try {
         await rm(absolutePath)
@@ -106,7 +105,6 @@ describe('FileSyncService', () => {
       documentStore: store,
       workspaceStore: createEditorWorkspaceStore(),
       queryClient,
-      forgetFile: vi.fn(),
     })
     try {
       await rm(absolutePath)

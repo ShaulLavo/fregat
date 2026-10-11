@@ -529,11 +529,11 @@ export type EditorTrackedPoint = {
 }
 
 /**
- * Asked about a mouse press before the editor turns it into a caret or a selection. Returning true
- * claims it: the editor prevents its default and does nothing else with it, and no later
- * participant is asked. A participant never has to beat the editor's own listener to the event.
+ * Asked about a mouse press or touch start before the editor turns it into a caret or a selection. Returning true
+ * claims caret and selection handling and ends participant dispatch. Mouse defaults are prevented;
+ * touch starts preserve native scrolling. A participant can prevent the touch default itself.
  */
-export type EditorPressParticipant = (event: MouseEvent) => boolean
+export type EditorPressParticipant = (event: MouseEvent | TouchEvent) => boolean
 
 export type EditorViewContributionContext = {
   readonly container: HTMLElement

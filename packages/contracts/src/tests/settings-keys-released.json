@@ -65,6 +65,7 @@
     "editor.markdownView",
     "editor.maxTokenizationLineLength",
     "editor.minimap.enabled",
+    "editor.morph.enabled",
     "editor.retainedTextBudget",
     "editor.spellcheck",
     "editor.syntaxHighlighting.enabled",

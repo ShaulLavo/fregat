@@ -2,7 +2,7 @@
 
 A worker-rendered file overview with scroll controls for the Singapore editor.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -34,14 +34,14 @@ editor.setText('const value = 1\n')
 - `side` chooses its edge.
 - `showSlider` controls the viewport marker.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/minimap/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/minimap/overview/)
 
 ## In the Singapore family
 
 `@singapore-editor/core` owns the editor view. Add this plugin for a file overview beside the text.
-Use a bundler that serves the package worker and data assets. See the [hosting guide](https://shaulavo.dev/singapore/docs/guides/bundling/).
+Use a bundler that serves the package worker and data assets. See the [hosting guide](https://singapore.shaulavo.dev/docs/guides/bundling/).
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

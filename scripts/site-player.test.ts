@@ -16,7 +16,7 @@ async function loadReplica({ page, name = 'agents' }: { page: Page; name?: 'agen
   await page.clock.install({ time: 0 })
   await page.clock.pauseAt(0)
   await page.setContent(
-    `<div id="replica" data-replica data-base="660" style="margin-top:2000px;width:660px;height:500px">${markup}</div><button data-motion-for="replica">Pause</button>`,
+    `<div id="replica" data-replica style="margin-top:2000px;width:660px;height:500px">${markup}</div><button data-motion-for="replica">Pause</button>`,
   )
   await page.addScriptTag({ content: player })
   await page.locator('.rep.paused').waitFor()

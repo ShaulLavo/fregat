@@ -69,3 +69,7 @@ apps/web/bundle-report.json
 # Python bytecode from scripts/parity
 __pycache__/
 *.pyc
+
+# Cloudflare product-site uploads and local runtime state
+scripts/product-sites/dist/
+.wrangler/

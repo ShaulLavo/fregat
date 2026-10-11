@@ -1,6 +1,6 @@
 ---
 import Manual from '../../layouts/Manual.astro'
-import { MANUAL_PAGES, MANUAL_SOURCES, NAV, renderPage } from '../../manual/content'
+import { MANUAL_SOURCES, NAV, renderPage } from '../../manual/content'
 
 export function getStaticPaths() {
   return Array.from(MANUAL_SOURCES.keys(), (file) => ({
@@ -22,7 +22,7 @@ const slash = file.lastIndexOf('/') + 1
 >
   <div class="pathrow">
     <span class="path">docs/{file.slice(0, slash)}<b>{file.slice(slash)}</b></span>
-    <span class="mode"></span>
+
   </div>
   <div class="viewport">
     <nav class="pages" aria-label="Documentation">
@@ -35,7 +35,6 @@ const slash = file.lastIndexOf('/') + 1
                 <li>
                   <a
                     href={entry.href}
-                    data-md={entry.md}
                     aria-current={entry.md === file ? 'page' : undefined}
                   >
                     {entry.label}
@@ -48,11 +47,12 @@ const slash = file.lastIndexOf('/') + 1
       }
     </nav>
     <main id="doc" class="pane" tabindex="-1">
-      <article class="src" data-pagefind-body set:html={page.html} />
+      <article class="prose" data-pagefind-body set:html={page.html} />
     </main>
   </div>
-  <script is:inline type="application/json" id="manual-pages" set:html={JSON.stringify(MANUAL_PAGES)} />
   <script>
-    import '../../manual/takeover'
+    import '../../manual/live-examples'
+    import { setUpSearch } from '../../manual/search'
+    setUpSearch()
   </script>
 </Manual>

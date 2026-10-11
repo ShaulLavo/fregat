@@ -1,3 +1,4 @@
+import { testFontUrl } from '../../tests/fonts.js'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { frameMetricDeltas } from '../../../bench/comparison-metrics.js'
@@ -75,10 +76,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 beforeAll(async () => {
-  const face = new FontFace(
-    'CanvasScrollFixture',
-    `url(${new URL('../../../site/public/fonts/jetbrains-mono-latin-400-normal.woff2', import.meta.url).href})`,
-  )
+  const face = new FontFace('CanvasScrollFixture', `url(${testFontUrl})`)
   document.fonts.add(await face.load())
 })
 
@@ -349,7 +347,7 @@ describe('Canvas scroll reuse on native snapshots', () => {
     expect(f.renderer.metrics.repaintedRows - beforeReset.repaintedRows).toBe(6)
     expect(f.renderer.metrics.copiedRows).toBe(beforeReset.copiedRows)
     expect(f.copy).not.toHaveBeenCalled()
-    expect(f.clear).toHaveBeenCalledTimes(6)
+    expect(f.clear.mock.calls).toEqual([[0, 0, f.canvas.width, f.canvas.height]])
     f.parity('explicit reset')
     f.terminal.resize({ columns: 32, rows: 7 })
     f.renderer.resize({ columns: 32, rows: 7 })
@@ -396,7 +394,7 @@ it.each(['copy', 'paint'])(
     f.renderer.notifyWrite()
     f.clock.flush()
     expect(f.copy).not.toHaveBeenCalled()
-    expect(f.clear).toHaveBeenCalledTimes(6)
+    expect(f.clear.mock.calls).toEqual([[0, 0, f.canvas.width, f.canvas.height]])
     expect(acknowledged).toHaveBeenCalledOnce()
     f.parity('complete repaint after failed frame')
   },

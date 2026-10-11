@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/collaboration",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "description": "Session protocols, transports, and remote cursor presence for host-ordered collaboration.",
   "keywords": [
     "browser",
@@ -10,7 +10,7 @@
     "singapore",
     "typescript"
   ],
-  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/collaboration/overview/",
+  "homepage": "https://singapore.shaulavo.dev/docs/reference/api/collaboration/overview/",
   "bugs": {
     "url": "https://github.com/ShaulLavo/fregat/issues"
   },

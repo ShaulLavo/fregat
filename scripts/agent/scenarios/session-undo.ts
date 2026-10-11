@@ -2,8 +2,7 @@ import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { DEFAULT_PROVIDER_INSTANCE_ID } from '../../../packages/contracts/src/index'
-import { dispatch, openChat, readShell } from './chat-verification'
+import { createSession, dispatch, openChatWorkspace, readShell } from './chat-verification'
 import { isDraftChatUrl } from './draft-sessions'
 
 /** Mod+Z only belongs to the rail while focus sits outside text, editors, terminals and the tree. */
@@ -35,16 +34,8 @@ export const sessionUndo: Scenario = {
   description:
     'Unpin, settle, snooze and archive disposable sessions, then undo each by the notice button and by Mod+Z: pin keys and order return, the archived viewed session reopens, the composer keeps its own undo, Mod+Z does nothing once a notice closes, stacked notices each undo their own action, and repeated Undo/Redo restores rows.',
   async run(page, { step }) {
-    const base = await openChat(page)
-    const shell = await readShell(page, base)
-    const worktree = shell.worktrees.find((item) => item.path.endsWith('/projects/platform'))
-    ok(worktree, 'Platform worktree must be registered')
-    // No turn runs here, so a throwaway owner's project without a default model still works.
-    const modelSelection = shell.projects.find((item) => item.id === worktree.projectId)
-      ?.defaultModelSelection ?? {
-      providerInstanceId: DEFAULT_PROVIDER_INSTANCE_ID,
-      model: 'gpt-5.5',
-    }
+    const workspace = await openChatWorkspace(page)
+    const { base } = workspace
     const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()] as const
     const prefix = `Undo verification ${ids[0].slice(0, 8)}`
     const [alpha, bravo, charlie] = ['alpha', 'bravo', 'charlie'].map((name) => `${prefix} ${name}`)
@@ -61,13 +52,7 @@ export const sessionUndo: Scenario = {
     }
     try {
       for (const [index, title] of [alpha, bravo, charlie].entries())
-        await dispatch(page, base, {
-          type: 'session.create',
-          sessionId: ids[index],
-          title,
-          modelSelection,
-          worktreeTarget: { kind: 'current', worktreeId: worktree.id },
-        })
+        await createSession(page, workspace, ids[index], title)
       await dispatch(page, base, { type: 'session.pin', sessionId: bravoId, orderKey: 'g' })
       await dispatch(page, base, { type: 'session.pin', sessionId: alphaId, orderKey: 'n' })
       await selectors.sessionSearch(page).fill(prefix)

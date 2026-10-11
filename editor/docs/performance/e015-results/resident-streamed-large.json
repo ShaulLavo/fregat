@@ -6,14 +6,8 @@
     "width": 1200,
     "height": 720
   },
-  "sizes": [
-    52428800,
-    209715200
-  ],
-  "modes": [
-    "resident",
-    "streamed"
-  ],
+  "sizes": [52428800, 209715200],
+  "modes": ["resident", "streamed"],
   "samples": [
     {
       "mode": "resident",

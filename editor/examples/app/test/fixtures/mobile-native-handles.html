@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Native selection comparison</title>
+    <link rel="stylesheet" href="../../../../packages/editor/src/style.css" />
+    <style>
+      body {
+        margin: 0;
+      }
+      #host {
+        display: flex;
+        height: 180px;
+        width: 100%;
+      }
+      #native {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        font: 20px/24px monospace;
+        white-space: pre;
+        width: 100%;
+        height: 180px;
+        box-sizing: border-box;
+      }
+      output {
+        display: block;
+        white-space: pre-wrap;
+        font: 12px monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="host"></main>
+    <output id="selection">Selected: </output>
+    <output id="state"></output>
+    <nav>
+      <a href="?mode=editor">Editor</a> <a href="?mode=native">Native</a>
+      <a href="?mode=textarea">Textarea</a> <button onclick="location.reload()">Reset</button>
+    </nav>
+    <script type="module">
+      import { Editor } from '../../../../packages/editor/src/editor.ts'
+      const text = 'alpha bravo charlie\nsecond line\nthird row'
+      const mode = new URL(location.href).searchParams.get('mode') ?? 'editor'
+      let editor
+      const host = document.querySelector('#host')
+      if (mode === 'editor') {
+        editor = new Editor(host, { fontSize: 20, lineHeight: 24 })
+        editor.setText(text)
+        window.touchEditor = editor
+      } else {
+        const native = document.createElement(mode === 'textarea' ? 'textarea' : 'div')
+        native.id = 'native'
+        if (mode === 'textarea') native.value = text
+        else {
+          native.contentEditable = 'true'
+          native.textContent = text
+        }
+        host.append(native)
+      }
+      window.handleEvents = []
+      function record(event) {
+        const selection = document.getSelection()
+        const range = editor?.getSelections()[0]
+        const caret = document.querySelector('.editor-virtualized-caret')
+        const data = {
+          type: event.type,
+          time: Math.round(performance.now()),
+          text: selection?.toString(),
+          anchor: selection?.anchorOffset,
+          focus: selection?.focusOffset,
+          focusRow: selection?.focusNode?.parentElement?.closest('[data-editor-virtual-row]')
+            ?.dataset.editorVirtualRow,
+          session: range && [range.anchorOffset, range.headOffset],
+          caret: caret?.style.transform,
+          touch: event.touches?.[0] && [event.touches[0].clientX, event.touches[0].clientY],
+        }
+        window.handleEvents.push(data)
+        document.querySelector('#selection').textContent =
+          'Selected: ' +
+          (mode === 'textarea'
+            ? text.slice(
+                document.querySelector('#native').selectionStart,
+                document.querySelector('#native').selectionEnd,
+              )
+            : (selection?.toString() ?? ''))
+        document.querySelector('#state').textContent = 'State: ' + JSON.stringify(data)
+      }
+      for (const type of ['selectionchange', 'touchstart', 'touchmove', 'touchend'])
+        document.addEventListener(type, record)
+    </script>
+  </body>
+</html>

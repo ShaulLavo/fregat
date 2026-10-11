@@ -1,3 +1,4 @@
+import { vi } from 'vitest'
 import {
   jumpToSession,
   selectAdjacentSession,
@@ -25,6 +26,9 @@ import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environ
 import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import type { ProjectId } from '@workspace/contracts'
 import { runGit } from 'server/testing'
+import { FocusService } from '@/lib/focus/state/service'
+import { createTestCommandRuntime } from '../../../test/factories/command-runtime'
+import { createTestQueryClient } from '../../../test/render'
 
 test('ours preserves the approved workspace sidebar and document navigation shortcuts', () => {
   const bound = boundCommands('linux', 'ours')
@@ -113,6 +117,49 @@ test('session navigation and new drafts accept the workspace root empty relative
   expect(useSessionSelectionStore.getState().draftWorktreeId).toBe(owner.worktreeId)
   expect(h.application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path).toBe('')
 })
+test.for([false, true])(
+  'a keyboard chat switch focuses the new composer unless another chat is picked first (picked=%s)',
+  async (picked, { client, server }) => {
+    const h = await createRailHarness(client, server, ['First', 'Second', 'Third'])
+    renderWithProviders(<></>, { application: h.application })
+    await waitForNavigation(getNavigation())
+    const focus = new FocusService()
+    const { bus } = createTestCommandRuntime({
+      application: h.application,
+      focus,
+      queryClient: createTestQueryClient(),
+    })
+    const command = bus.dispatch('workspace.selectItem2', {
+      source: { kind: 'programmatic', caller: 'test' },
+    })
+    await vi.waitFor(() => expect(selectedSessionId()).toBe(h.sessionIds[1]))
+    if (picked) expect(await jumpToSession(3)).toBe(true)
+    const root = h.application.getSnapshot().editor.workspaceStore.getState().rootFolder!.path
+    const layout = document.createElement('div')
+    layout.dataset.chatMode = ''
+    const composer = document.createElement('div')
+    layout.append(composer)
+    document.body.append(layout)
+    const intents: string[] = []
+    const registration = focus.register({
+      area: 'chat',
+      element: composer,
+      id: { kind: 'chat-composer', key: root },
+      onIntent: (intent) => {
+        intents.push(intent)
+        return true
+      },
+    })
+    try {
+      if (picked) await command.completion
+      else await vi.waitFor(() => expect(intents).toEqual(['focus']))
+      expect(intents).toEqual(picked ? [] : ['focus'])
+    } finally {
+      registration.unregister()
+      layout.remove()
+    }
+  },
+)
 test('jumping past the end preserves selection', async ({ client, server }) => {
   const h = await createRailHarness(client, server)
   renderWithProviders(<></>, { application: h.application })

@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/plugin-ui",
-  "version": "0.2.7",
+  "version": "0.2.9",
   "description": "Shared hover tooltips and anchored popups for Singapore editor plugins.",
   "keywords": [
     "browser",
@@ -10,7 +10,7 @@
     "tooltip",
     "typescript"
   ],
-  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/plugin-ui/overview/",
+  "homepage": "https://singapore.shaulavo.dev/docs/reference/api/plugin-ui/overview/",
   "bugs": {
     "url": "https://github.com/ShaulLavo/fregat/issues"
   },

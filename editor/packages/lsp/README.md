@@ -2,7 +2,7 @@
 
 A Language Server Protocol client with WebSocket and worker transports.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -40,13 +40,13 @@ await client.shutdown()
 - `request()` sends a request with cancellation and timeout options.
 - `createWorkerLspTransport()` connects a worker.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/lsp/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/lsp/overview/)
 
 ## In the Singapore family
 
 You can use this package on its own. `@singapore-editor/core` owns editor views; optional packages add syntax, search, gutters, and language features.
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

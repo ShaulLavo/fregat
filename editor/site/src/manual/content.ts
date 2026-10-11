@@ -1,5 +1,5 @@
 /** Build-time index of the docs pages written as plain Markdown. */
-import { resolveDocsLink, type ManualPage } from './links'
+import { resolveDocsLink } from './links'
 import { renderMarkdown } from './render'
 import { SECTIONS } from './sections'
 
@@ -18,13 +18,6 @@ export const MANUAL_SOURCES = new Map(
 const files = new Set(MANUAL_SOURCES.keys())
 
 const pageUrl = (slug: string) => `${base}docs/${slug}/`
-
-export const MANUAL_PAGES: readonly ManualPage[] = Array.from(MANUAL_SOURCES, ([file, text]) => ({
-  file,
-  url: pageUrl(file.replace(/\.md$/, '')),
-  source: `${base}docs/${file}`,
-  title: text.match(/^# (.+)$/m)?.[1] ?? file,
-}))
 
 export type NavSection = {
   readonly label: string

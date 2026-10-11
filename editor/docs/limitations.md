@@ -50,7 +50,7 @@ Each entry names its source and any work that owns changing it. "No lifting plan
 - Admission. Emit the complete root produced by `mountPaintSnapshot`. Activation validates the ordered, contiguous source slices and full source coverage before allocating ranges. Repeated, overlapping, missing, reordered, oversized or nested malformed slices are refused; traversal and range work are bounded by the decoded document's text, rows and runs.
 - JavaScript off. Emitted text, links, headings, gutters and captured row layout remain readable. Syntax colours on continuous-text rows require activation; with JavaScript disabled those rows use their base text colour. Font files must still load for the captured font metrics to match.
 - Source. [documentPaintHighlights.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/virtualization/documentPaintHighlights.ts) and [paint.ts](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/src/paint.ts). Dispose the returned handle when removing or replacing emitted roots. Independent bundles allocate names against the document's shared highlight registry.
-- Ownership. [Plan 340](https://github.com/ShaulLavo/fregat/blob/main/plans/340-singapore-site-embedding.md) owns emitted first-frame and live-takeover qualification.
+- Ownership. [Plan 340](https://github.com/ShaulLavo/fregat/blob/main/plans/340-singapore-site-embedding.md) owns emitted first-frame and inline-example activation qualification.
 
 ## Document size and analysis
 
@@ -190,4 +190,4 @@ Each entry names its source and any work that owns changing it. "No lifting plan
 
 This page deliberately leaves out cache-entry counts that only cause recomputation, animation budgets and UI dimensions. Initial worker source synchronization uses chunks; chunk size alone does not establish a document ceiling. The paged viewer and collaboration framing above have explicit rejection or truncation branches, so their limits are listed.
 
-A successful large-file open is also not a hard limit or a promise of interactive typing. Use the [large-file guide](https://shaulavo.dev/singapore/docs/guides/large-files/) and the [retained browser comparison](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/performance/browser-compare-2026-10-08.md) to choose measurements for your integration. Add new confirmed limits here with the exact source and the behavior beyond the boundary.
+A successful large-file open is also not a hard limit or a promise of interactive typing. Use the [large-file guide](https://singapore.shaulavo.dev/docs/guides/large-files/) and the [retained browser comparison](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/performance/browser-compare-2026-10-08.md) to choose measurements for your integration. Add new confirmed limits here with the exact source and the behavior beyond the boundary.

@@ -915,3 +915,23 @@ it('keeps private stacked expansion separate and follows a shared region store',
   expect(left.getStackedRows()).toEqual(collapsed)
   expect(independent.getStackedRows().map((row) => row.text)).toContain('alpha')
 })
+
+for (const gesture of ['tap', 'hold']) {
+  it(`claims a separator touch ${gesture} before caret placement`, async () => {
+    const { editor, host } = mountDiff({ file: prefixSkippedDiff() })
+    const before = editor.getSelections()
+    const row = host.querySelector('[data-editor-virtual-row="0"]')!
+    const finger = { identifier: 0, target: row, clientX: 0, clientY: 0 }
+    const start = new Event('touchstart', { bubbles: true, cancelable: true })
+    Object.defineProperty(start, 'touches', { value: [finger] })
+    row.dispatchEvent(start)
+    if (gesture === 'hold') await new Promise((resolve) => setTimeout(resolve, 750))
+    const end = new Event('touchend', { bubbles: true, cancelable: true })
+    Object.defineProperty(end, 'touches', { value: [] })
+    row.dispatchEvent(end)
+    await flushPromises()
+    expect(editor.getSelections()).toEqual(before)
+    expect(host.contains(document.activeElement)).toBe(false)
+    expect(document.getSelection()?.toString() ?? '').toBe('')
+  })
+}

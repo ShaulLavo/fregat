@@ -16,14 +16,14 @@ export type DecodePluginOptions = {
    */
   readonly speed?: number
   /**
-   * Hard cap on the whole reveal. For the clip family the schedule scales to fit;
-   * for `diffusion` it is the window over which glyphs settle. Defaults to `1400`.
+   * Hard cap on the whole reveal. The typing modes' schedule scales to fit; for
+   * `diffusion` it is the window over which pieces settle. Defaults to `1400`.
    */
   readonly maxDurationMs?: number
   /**
    * `parallel` mode only: width of the random start-time window (ms). Each line
    * starts at a jittered offset in `[0, staggerMs)` so lines type out of phase
-   * (scattered typists) instead of in a uniform wipe. Defaults to `420`.
+   * (scattered typists) instead of in lockstep. Defaults to `420`.
    */
   readonly staggerMs?: number
   /** Safety cap on how many visible rows participate. Defaults to `400`. */
@@ -42,8 +42,7 @@ export type ResolvedDecodeOptions = {
 
 const DEFAULTS: ResolvedDecodeOptions = {
   mode: 'autoregressive',
-  // ~one glyph per frame: fast, but the per-character steps stay visible so it
-  // reads as typing rather than a smooth wipe.
+  // ~one character per frame: fast, but still reads as typing.
   perCharMs: 20,
   // ~15 tokens/sec — brisk LLM streaming cadence.
   perTokenMs: 65,

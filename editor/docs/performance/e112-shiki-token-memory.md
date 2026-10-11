@@ -22,10 +22,10 @@ functions. It changes the theme after tokenization and verifies the first token'
 CDP collects garbage before each heap reading. The tokenizer runs in the page isolate here to
 measure the token representation directly; Platform's integration trace measures its actual worker.
 
-| Text | Tokens | Control retained JS heap | Candidate retained JS heap |
-| --- | ---: | ---: | ---: |
-| 1 MiB | 370080 | 143.1 MiB | 28.8 MiB |
-| 5 MiB | 1850424 | 707.0 MiB | 135.2 MiB |
+| Text  |  Tokens | Control retained JS heap | Candidate retained JS heap |
+| ----- | ------: | -----------------------: | -------------------------: |
+| 1 MiB |  370080 |                143.1 MiB |                   28.8 MiB |
+| 5 MiB | 1850424 |                707.0 MiB |                  135.2 MiB |
 
 The 5 MiB retained heap falls by 81%. Both arms retain about 2 MiB of backing storage. Tokenization
 at 5 MiB took 6.09/6.23s, so this experiment makes no CPU improvement claim. After disposal both

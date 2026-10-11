@@ -169,6 +169,179 @@ A DOM lag number alone cannot tell which composited frame the owner saw. No prod
 fix follows from these controls. A geometry-off control and raw JSON are retained locally
 with the probe evidence; the physical-device protocol remains the next decision gate.
 
+## Native selection handle row advancement (2026-10-11)
+
+Status: Approved implementation follow-up; this investigation delivers a design note.
+Inspected baseline: `c36bb76eff2a4bdba82cd53a9128d3d56c66bd62`.
+This is a separate reproduction from the original shaky-scroll complaint. No production
+renderer change or performance improvement is claimed here.
+
+### Reproduction and decision
+
+Use Mobile Safari in the iPhone 17 Pro simulator, iOS 26.5, on the Apple M1 Mac.
+The fixture has `alpha bravo charlie`, `second line`, and `third row`, with matched
+20 px monospace text and 24 px rows. Long-press `bravo` at text-local `(92, 12)`
+for 0.9 seconds. Require the native selection to equal `bravo` before dragging.
+Press the trailing handle at `(132, 29)` for 0.15 seconds, then drag to `(240, 89)`
+or `(240, 125)`. These are 60 px and 96 px vertical drags, not selection endpoints:
+UIKit applies its own handle-to-text offset. Record DOM selection, focus row, and the
+Editor's document selection after the trusted gesture.
+
+The validated comparison produced these results:
+
+| Surface                                                                                       | 60 px drag                                          | 96 px drag                                     |
+| --------------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------- |
+| Native contenteditable text                                                                   | End of second row                                   | End of third row                               |
+| Minimal absolute, transformed rows                                                            | End of first row                                    | End of first row                               |
+| Minimal normal-flow rows inside one absolute window                                           | End of second row                                   | End of third row                               |
+| Live Singapore, exact first-row accessibility target                                          | End of first row; document selection `[6, 19]`      | End of first row; document selection `[6, 19]` |
+| Inert clone of Singapore's complete DOM                                                       | End of first row                                    | End of first row                               |
+| Clone with only rows made relative, with row transforms removed                               | End of first row                                    | End of first row                               |
+| Same flow rows with their spacer made an absolute, auto-height window                         | End of first row                                    | End of first row                               |
+| Clone with the text ancestor chain made relative and untransformed, retaining row containment | End of first row                                    | End of first row                               |
+| Flow rows with row containment removed                                                        | End of first row                                    | End of first row                               |
+| Flow rows with clip layers relative and explicitly 180 px high                                | End of first row                                    | End of first row                               |
+| Flow rows with content layers relative                                                        | End of first row                                    | End of first row                               |
+| Flow rows with both clip and content layers relative                                          | End of first row                                    | End of first row                               |
+| Broad all-flow clone: containment, transforms and clipping removed throughout                 | End of second row                                   | End of third row                               |
+| CodeMirror view 6.43.14, default contenteditable view                                         | End of second row                                   | End of third row                               |
+| Monaco 0.57.0, default plaintext editor                                                       | No native word selection or native handles appeared | No native handle drag could be started         |
+
+A final clone control also disposes the source Editor, removing both element and document
+handlers before the gestures. The unchanged clone still stops on row one, while the broad
+all-flow clone advances to rows two and three. The failure therefore survives removing
+Editor input handling. An absolute ancestor alone is also insufficient to cause the failure:
+the minimal absolute window works. That minimal contrast changes row positioning,
+containment, and `will-change` together; it does not isolate one CSS property. The full
+Singapore ancestor/row layout still needs more than a row-positioning CSS override.
+Removing row containment, changing clip/content positioning individually or together,
+and simplifying the text ancestor chain each fail. The broad all-flow clone passes at
+unchanged row coordinates, but disables the layout isolation used by virtualization.
+The exact remaining ancestor/containment interaction is unconfirmed; no smallest passing
+Singapore text-window structure has been established. Preserve those limits when implementing.
+The Monaco result describes this configuration and gesture; it does not establish that
+all Monaco mobile selection paths behave identically.
+
+Evidence run: `editor-ios-row-advance-20261011`, in the local verification evidence root
+specified by `verify-fregat`. `matrix-final.log`, `matrix-final-attachments/`, `matrix-dist/`,
+the Swift harness, and `webkit-points.json` preserve the gestures and served fixture.
+`matrix-factors.log`, `matrix-factors-attachments/`, and `factors/` preserve the corrected
+live-Editor target, containment/ancestor controls, and broad positive control.
+`matrix-disposed-explicit.log`, `matrix-disposed-explicit-attachments/`, and `disposed/`
+preserve the listener-free clone pair. That run pins the freshly built `.xctestrun` file
+explicitly, because scheme-based `test-without-building` selected an older harness in one
+intermediate attempt. The accepted listener-free run prints exactly four attempts for
+`clone` and `flow-all`. All accepted XCUITest runs completed successfully; every claimed
+handle result above also required `selectedBravo=true`
+and a validated destination mode. Screenshots of the live Editor, broad all-flow clone,
+inert clone, CodeMirror, and Monaco results were read back. All fifteen desktop WebKit
+modes loaded without page errors; Monaco's row boxes were separately checked at y=0, 24
+and 48 because its markup uses different row class names. Earlier setup
+attempts are excluded: a tree-shaken base stylesheet left rows static, and controls below
+the iOS keyboard caused invalid navigation. The accepted fixture imports the stylesheet
+explicitly, puts navigation above the keyboard, checks each destination mode, and gives
+reload links fresh URLs. In the first comparison, the live Editor's broad accessibility
+text match selected its hidden input; that observation is excluded. The factor run uses
+the exact first-row label and confirms the live failure with matching document selection.
+Use that exact label when targeting the live Editor.
+
+### WebKit mechanism and reference implementations
+
+The inspected upstream WebKit snapshot is `91e8fd1b2f0cec329c19c738cf90d470ac51be40`.
+It explains a concrete mechanism consistent with the CSS controls; it is not a symbol-level
+trace of the simulator's installed engine:
+
+- [`WebPageIOS.mm`, `updateSelectionWithTouches` and `rangeForPointInRootViewCoordinates`](https://github.com/WebKit/WebKit/blob/91e8fd1b2f0cec329c19c738cf90d470ac51be40/Source/WebKit/WebProcess/WebPage/ios/WebPageIOS.mm)
+  map handle movement to a `VisiblePosition`, hit-test the target, and extend the range.
+- [`EventHandler.cpp`, `selectionExtentRespectingEditingBoundary`](https://github.com/WebKit/WebKit/blob/91e8fd1b2f0cec329c19c738cf90d470ac51be40/Source/WebCore/page/EventHandler.cpp)
+  asks the target renderer for its visible text position, adjusting for an editable root.
+- [`RenderBlock.cpp`, `isChildHitTestCandidate` and `positionForPoint`](https://github.com/WebKit/WebKit/blob/91e8fd1b2f0cec329c19c738cf90d470ac51be40/Source/WebCore/rendering/RenderBlock.cpp)
+  explicitly exclude out-of-flow positioned child boxes. The block walk uses sibling order
+  and logical layout bounds, then falls back to `RenderBox::positionForPoint` when no candidate
+  exists. Painted/transformed coordinates alone cannot guarantee a next-row text position.
+
+Playwright 1.63.0 WebKit, at a 390 by 844 viewport, verified the fixture loads without page
+errors and that Singapore's baseline rows are absolute at y=0, 24 and 48. The same checks
+verified flow rows remain aligned. `caretRangeFromPoint(240, y)` reaches the second and third
+rows at y=24 and 48 even in the failing absolute-row control. At y=72 and 96, the minimal
+absolute-row and absolute-window controls both return a container boundary, although their
+native handle outcomes differ. This API is a geometry diagnostic, not an acceptance proxy
+for UIKit handle dragging. Rows-only flow improves its below-content result while still
+failing the simulator gesture. Do not claim a fix from a desktop caret-point assertion.
+
+Reference clones were refreshed before inspection:
+
+- [CodeMirror view `fbff59ba004d80d8c914f64c42586387b08706ac`](https://github.com/codemirror/view/blob/fbff59ba004d80d8c914f64c42586387b08706ac/src/docview.ts)
+  uses normal-flow `.cm-line` blocks and height-bearing `BlockGapWidget` blocks. Its `tile`,
+  `buildtile`, and `docview` paths preserve document order. The three-row simulator control
+  proves native handles on mounted lines, not large-document virtualization performance.
+- [VS Code `eef761e9628e777317a554114f0202a070e98f0b`](https://github.com/microsoft/vscode/blob/eef761e9628e777317a554114f0202a070e98f0b/src/vs/editor/browser/viewParts/viewLines/viewLines.css)
+  positions `.view-line` boxes and their spans absolutely, with an explicit `no-user-select`
+  path. Its textarea edit context owns input separately. It is not a successful native-handle
+  reference for this observed gesture.
+
+### Recommended implementation boundary
+
+Build an ordered, normal-flow selectable text plane with height gaps for unmounted rows,
+using CodeMirror's structure as the control. Keep the fixed-row virtualizer, document-height
+cap, row/chunk budget, and logical document geometry. Prototype one positioned text window
+with flow children; an extra window nested inside the unchanged clip/content stack has not
+passed. Do not convert the whole editor, gutters, caret, composition, or widget layers to flow.
+Do not switch to contenteditable or mount a hidden full-document text mirror to obtain handles.
+
+The renderer currently depends on facts that a CSS-only replacement would invalidate:
+
+- `virtualizedTextViewRows.ts:reconcileRows` reuses row nodes without placing them in DOM
+  document order. `updateReadingOrder` writes `aria-owns`; that affects accessibility, not
+  RenderBlock's sibling walk. A flow renderer must order actual mounted row nodes. Moving
+  selected nodes can disturb the native range, so restore or preserve the mapped selection
+  once per settled render and test both drag directions across a recycling boundary.
+- `positionRowElement` and `ScrollViewport.paintOffsetY` apply the capped-document origin
+  independently to each absolute row. Apply it once to the text window. Derive gap sizes
+  from `FixedRowVirtualItem.start` and `size`, including projected/injected rows; do not assume
+  every item is an adjacent 24 px row. Keep a signed window origin when overscan crosses it.
+- `style.css` documents measured reasons for row layout/size containment and compositor layers:
+  bounded relayout in Blink and avoiding WebKit Highlight invalidation. Removing these as a
+  group can defeat the existing scroll and typing budget. Choose the minimum successful
+  containment and window-layer policy only after measuring it.
+- Provisional paint restoration, saved row mounting, horizontal chunks, gutter position, fold
+  placeholders, native boundary-to-offset mapping, caret/IME placement, and CSS Highlights
+  all consume this layout. They must use the same row-window contract as live rows.
+
+The implementation is consequently a renderer-contract change with native-selection and
+performance gates, not a safe one-rule CSS fix. This note schedules that work under the
+existing scrolling plan rather than shipping the broad normal-flow experiment.
+
+### Execution and acceptance
+
+1. Extend the portable `editor/bench/ios-scroll` probe with the native-handle fixture and an
+   ordered text-window candidate. Keep the current renderer as an explicit baseline. Start
+   with the simple `new Editor(element); setText(text)` path, then the inert clone control.
+2. Find the smallest text-plane ancestor/containment combination that passes both calibrated
+   handle drags. Keep all row bounds at native y=0, 24 and 48. Repeat with the window scrolled
+   into the document, near a capped-height origin, and with horizontal scrolling.
+3. Implement actual DOM ordering and height gaps in `virtualizedTextViewRows.ts` and the text
+   layer in `scrollViewport.ts`; share the contract with saved/provisional row paths. Verify
+   document selection agrees with native anchor/head after recycling, reverse drags, folds,
+   wrapping, injected rows, and disposal. Retain mounted-row limits and gutter/caret alignment.
+4. Re-run the XCUITest gesture on Mobile Safari. Native, candidate, native must all advance to
+   row two at 60 px and row three at 96 px without using application setters to move selection.
+   Playwright WebKit can gate row geometry and mapping, but not synthesize UIKit handles.
+5. Measure the baseline and candidate on the same qualified Mac or Pi, with existing typing
+   and scroll scenarios and raw traces. Use 1 and 10 MiB documents, cold and recycled rows,
+   syntax Highlights, long-line chunks, and wrap/fold cases. Compare the same artifacts and
+   report failed samples. Keep the per-keystroke processing/layout/paint work within 8.3 ms
+   and show no typing or scrolling regression. The comparison benchmark's two-rAF latency
+   proxy is frame-quantized and cannot itself certify an 8.3 ms presentation deadline.
+6. Run the existing portable probe checks and relevant editor browser tests, and capture
+   reviewed `look` evidence before a production PR. Physical-iPhone scrolling remains the
+   original plan's separate acceptance surface; simulator row advancement does not prove
+   steady fling presentation. Add a patch changeset when package behavior changes.
+
+No scroll/typing benchmark was run for a production candidate in this investigation, because
+none was implemented. The one-frame typing bar and scroll regression gate remain mandatory
+before shipping the renderer change.
+
 ## Risks and decisions
 
 The simulator's scripted scrollBy does not reproduce trusted touch momentum. A zero DOM lag can

@@ -141,6 +141,12 @@ export class TerminalService {
     this.ptyFactory = pty.factory
   }
 
+  probeHost() {
+    if (!this.host)
+      throw terminalHostErrors.HOST_UNREACHABLE({ internal: { reason: 'no-retained-host' } })
+    return this.host.probe()
+  }
+
   hostInfo() {
     return this.host?.info() ?? null
   }

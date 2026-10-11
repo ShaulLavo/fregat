@@ -44,6 +44,7 @@ import { editorLspServerExit } from './editor-lsp-server-exit'
 import { editorTypography } from './editor-typography'
 import { editorWrappedGutter } from './editor-wrapped-gutter'
 import { editorDecodeReveal } from './editor-decode-reveal'
+import { devTransitions } from './dev-transitions'
 import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
@@ -471,6 +472,7 @@ import { treeParity } from './tree-parity'
 import { fileIconHues } from './file-icon-hues'
 import { filterFields } from './filter-fields'
 import { inlineRenameTree } from './inline-rename-tree'
+import { editorMissingFile } from './editor-missing-file'
 import { treeParityBehaviour } from './tree-parity-behaviour'
 
 import { devPackageUpdates } from './dev-package-updates'
@@ -708,6 +710,7 @@ export const scenarios: readonly Scenario[] = [
   gitDiscardConfirm,
   baseComponents,
   physicalMode,
+  devTransitions,
   physicalChat,
   connectionFrame,
   settingsValueGrids,
@@ -928,6 +931,7 @@ export const scenarios: readonly Scenario[] = [
   fileIconHues,
   treeParityBehaviour,
   inlineRenameTree,
+  editorMissingFile,
   filterFields,
   treeFileClicks,
 ])

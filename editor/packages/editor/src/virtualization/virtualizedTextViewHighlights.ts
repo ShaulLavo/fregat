@@ -33,7 +33,6 @@ import {
 import {
   caretPosition,
   cursorLineBufferRow,
-  cursorLineVirtualRow,
   getMountedRows,
   positionInputAtCaret,
   refreshCursorLineRows,
@@ -195,23 +194,43 @@ export function setSelection(
   setSelections(view, [{ anchorOffset, headOffset, affinity }])
 }
 
+export function setNativeSelection(
+  view: VirtualizedTextViewInternal,
+  anchorOffset: number,
+  headOffset: number,
+): void {
+  const selection = clampSelection(view, { anchorOffset, headOffset })
+  clearSelectionHighlight(view)
+  const previous = view.selections[0]
+  if (
+    view.selections.length === 1 &&
+    previous?.start === selection.start &&
+    previous.end === selection.end &&
+    previous.head === selection.head &&
+    previous.affinity === selection.affinity
+  )
+    return
+  view.selections = [selection]
+  setPrimarySelection(view, selection)
+  // Native handles own the highlight; only the active endpoint needs editor geometry.
+  deferCaret(view)
+}
+
 export function setSelections(
   view: VirtualizedTextViewInternal,
   selections: readonly VirtualizedTextSelection[],
 ): void {
   const previousCursorLine = cursorLineBufferRow(view)
-  const previousCursorRow = cursorLineVirtualRow(view)
   const stored = selections.map((selection) => clampSelection(view, selection))
   view.selections = stored
   setPrimarySelection(view, stored[0] ?? null)
   renderSelectionHighlight(view)
   renderHiddenCharacters(view)
-  refreshCursorLineRows(view, previousCursorLine, previousCursorRow)
+  refreshCursorLineRows(view, previousCursorLine)
 }
 
 export function clearSelection(view: VirtualizedTextViewInternal): void {
   const previousCursorLine = cursorLineBufferRow(view)
-  const previousCursorRow = cursorLineVirtualRow(view)
   view.selectionStart = null
   view.selectionEnd = null
   view.selectionHead = null
@@ -219,11 +238,16 @@ export function clearSelection(view: VirtualizedTextViewInternal): void {
   clearSelectionHighlight(view)
   renderHiddenCharacters(view)
   renderCaret(view)
-  refreshCursorLineRows(view, previousCursorLine, previousCursorRow)
+  refreshCursorLineRows(view, previousCursorLine)
 }
 
 export function renderSelectionHighlight(view: VirtualizedTextViewInternal): void {
   if (view.provisional) return
+  if (view.scrollElement.hasAttribute('data-editor-touch-selection')) {
+    clearSelectionHighlight(view)
+    deferCaret(view)
+    return
+  }
   renderCaret(view)
   if (!hasSelectionRanges(view.selections)) {
     clearSelectionHighlight(view)

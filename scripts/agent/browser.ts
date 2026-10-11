@@ -15,6 +15,7 @@ import { captureTraceSources } from './trace-source-maps'
 import { captureSize, type CaptureSize } from './capture-options'
 import { routeHtmlBootstrap } from './html-bootstrap'
 import {
+  captureStaticPreview,
   openStaticPreview,
   routeStaticPreview,
   staticPreviewLayout,
@@ -275,10 +276,10 @@ async function look(options: Options) {
     if (options.site) await evidence.json('layout.json', await staticPreviewLayout(page))
     await page.screenshot({ path: evidence.file('page.png'), fullPage: false })
     if (options.selector) {
-      await page
-        .locator(options.selector)
-        .first()
-        .screenshot({ path: evidence.file('selector.png') })
+      const target = page.locator(options.selector).first()
+      const path = evidence.file('selector.png')
+      if (options.site && ready) await captureStaticPreview(page, target, path)
+      else await target.screenshot({ path })
     }
     const health = options.site
       ? { ok: ready, reasons: ready ? [] : ['main, fonts or images did not become ready'] }
@@ -356,7 +357,9 @@ async function runScenario(scenario: Scenario, options: Options) {
       const file = `${String(steps.length + 1).padStart(2, '0')}-${label}.png`
       // A tab indicator or fade caught mid-flight shows a state the page is leaving.
       await settleRunningAnimations(target)
-      await target.screenshot({ path: evidence.file(file) })
+      const path = evidence.file(file)
+      if (scenario.surface === 'site') await captureStaticPreview(target, target, path)
+      else await target.screenshot({ path })
       if (scenario.inspect)
         await evidence.json(file.replace('.png', '.json'), await scenario.inspect(page))
       steps.push(file)

@@ -8,6 +8,7 @@ import {
 } from '@workspace/contracts'
 import type { ImageMetadata } from 'astro'
 import { getImage } from 'astro:assets'
+import sharp from 'sharp'
 import { createScriptError } from '../../../../scripts/structured-errors'
 
 // Every plate is painted from the app's own bundle data: its dark palette, its code theme,
@@ -31,7 +32,9 @@ const CODE_THEMES: Readonly<Record<string, () => Promise<{ default: CodeTheme }>
 
 // Astro emits the original of every image module it sees, so the glob names only the dark
 // wallpapers of the bundles the page shows. plateFor fails the build when one is missing.
-const WALLPAPERS = import.meta.glob<ImageMetadata>(
+// Astro's build-time image loader also supplies the original file for thumbnail generation.
+type WallpaperAsset = ImageMetadata & { readonly fsPath: string }
+const WALLPAPERS = import.meta.glob<WallpaperAsset>(
   [
     '../../../server/src/themes/wallpapers/assets/37746404*', // Tokyo Night
     '../../../server/src/themes/wallpapers/assets/06dfb9fc*', // Rosé Pine
@@ -55,6 +58,8 @@ export type Plate = {
   readonly name: string
   readonly style: string
   readonly wallpaper: string
+  readonly wallpaperWidth: number
+  readonly wallpaperHeight: number
 }
 
 export async function plateFor(id: string): Promise<Plate> {
@@ -64,7 +69,7 @@ export async function plateFor(id: string): Promise<Plate> {
   const palette = bundledPalette(variant.palette)
   if (!palette) throw createScriptError(`Bundle "${id}" names a missing palette`)
   const colors = paletteColorsFor(palette, 'dark')
-  const wallpaper = await wallpaperUrl(bundle)
+  const wallpaper = await wallpaperFor(bundle)
   const vars = {
     ...appVars(colors),
     ...(await syntaxVars(variant.codeTheme)),
@@ -72,12 +77,18 @@ export async function plateFor(id: string): Promise<Plate> {
     '--glass-content-opacity': `${variant.material.contentOpacity}%`,
     '--glass-blur': `${variant.material.blur}px`,
     '--glass-saturation': `${variant.material.saturation}%`,
-    '--wall': `url(${wallpaper})`,
+    '--wall': `url(data:image/webp;base64,${wallpaper.preview})`,
   }
   const style = Object.entries(vars)
     .map(([key, value]) => `${key}:${value}`)
     .join(';')
-  return { name: bundle.name, style, wallpaper }
+  return {
+    name: bundle.name,
+    style,
+    wallpaper: wallpaper.image.src,
+    wallpaperWidth: Number(wallpaper.image.attributes.width),
+    wallpaperHeight: Number(wallpaper.image.attributes.height),
+  }
 }
 
 function appVars(colors: PaletteColors): Record<string, string> {
@@ -135,12 +146,19 @@ function ruleScopes(scope: string | readonly string[] | undefined): readonly str
   return scope.split(',').map((part) => part.trim())
 }
 
-async function wallpaperUrl(bundle: ThemeBundle): Promise<string> {
+async function wallpaperFor(bundle: ThemeBundle) {
   const source = bundle.variants.dark.wallpaper.source
   if (source.kind !== 'library')
     throw createScriptError(`Bundle "${bundle.id}" has no library wallpaper`)
   const file = Object.entries(WALLPAPERS).find(([path]) => path.includes(source.asset))
   if (!file) throw createScriptError(`Wallpaper ${source.asset} is missing from the server assets`)
-  const image = await getImage({ src: await file[1](), width: 1680, format: 'webp', quality: 60 })
-  return image.src
+  const metadata = await file[1]()
+  if (!metadata.fsPath) throw createScriptError('Bundled wallpaper has no filesystem path')
+  const image = await getImage({ src: metadata, width: 1680, format: 'webp', quality: 60 })
+  // Inline a small first-paint wallpaper; the full image keeps native viewport-based loading.
+  const preview = await sharp(metadata.fsPath)
+    .resize({ width: 48 })
+    .webp({ quality: 40 })
+    .toBuffer()
+  return { image, preview: preview.toString('base64') }
 }

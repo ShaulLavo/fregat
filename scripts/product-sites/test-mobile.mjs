@@ -41,6 +41,37 @@ try {
       '<div style="width:100%;overflow-x:hidden"><button style="position:sticky;transform:translateX(-40px);width:80px;height:40px">Off-screen sticky control</button></div>',
     ),
   )
+  for (const shard of ['1', '0']) {
+    const directory = join(root, `single-page-${shard}`)
+    const selected = spawnSync(
+      process.execPath,
+      [
+        script,
+        '--directory',
+        join(root, 'good'),
+        '--engines',
+        'chromium',
+        '--shards',
+        '2',
+        '--shard',
+        shard,
+        '--evidence',
+        directory,
+      ],
+      { encoding: 'utf8' },
+    )
+    assert.equal(selected.status, 0, selected.stdout + selected.stderr)
+    if (shard === '1') {
+      assert.match(selected.stdout, /Mobile layout: 0 pages, 0 checks, 0 failures/)
+      continue
+    }
+    const selectedRows = (await readFile(join(directory, 'results.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map(JSON.parse)
+    assert.equal(selectedRows.length, 3, 'The nonempty shard checks every viewport once')
+    assert(selectedRows.every((row) => new URL(row.url).pathname === '/'))
+  }
   const result = spawnSync(
     process.execPath,
     [script, '--directory', root, '--workers', '1', '--evidence', join(root, 'evidence')],
@@ -136,7 +167,16 @@ try {
     assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr)
     assert.match(rejected.stderr, /AssertionError/, 'Invalid selections must fail before checking')
   }
-  console.log('Mobile checker fixtures: 45 checks passed; 6 invalid selections rejected')
+  const empty = join(root, 'empty')
+  await mkdir(empty)
+  const rejectedEmpty = spawnSync(process.execPath, [script, '--directory', empty], {
+    encoding: 'utf8',
+  })
+  assert.equal(rejectedEmpty.status, 1, rejectedEmpty.stdout + rejectedEmpty.stderr)
+  assert.match(rejectedEmpty.stderr, /No HTML pages selected/)
+  console.log(
+    'Mobile checker fixtures: 48 checks passed; empty shard passed; 7 invalid selections rejected',
+  )
 } finally {
   await rm(root, { recursive: true, force: true })
 }

@@ -51,7 +51,7 @@ export class EditorSaveService {
     await this.saveMany(keys)
   }
 
-  private saveOptions(key: DocumentKey): MutationOptions<boolean, unknown, DocumentKey> {
+  saveOptions(key: DocumentKey): MutationOptions<boolean, unknown, DocumentKey> {
     return {
       mutationFn: (key) => this.performSave(key),
       mutationKey: editorMutationKeys.save(key),

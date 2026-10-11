@@ -6,25 +6,11 @@ const reduce = matchMedia('(prefers-reduced-motion: reduce)')
 
 for (const stage of document.querySelectorAll<HTMLElement>('[data-replica]')) setup(stage)
 
-// Section plates load their wallpaper shortly before they scroll into view.
-const lighter = new IntersectionObserver(
-  (entries) => {
-    for (const entry of entries) {
-      if (!entry.isIntersecting) continue
-      entry.target.classList.add('lit')
-      lighter.unobserve(entry.target)
-    }
-  },
-  { rootMargin: '600px 0px' },
-)
-for (const plate of document.querySelectorAll('.plate:not(.lit)')) lighter.observe(plate)
-
 function setup(stage: HTMLElement): void {
   const rep = stage.querySelector<HTMLElement>('.rep')
   if (!rep) return
   const times = (rep.dataset.timeline ?? '').split(',').filter(Boolean).map(Number)
   const last = times.length
-  const narrowAt = Number(stage.dataset.narrowAt ?? 640)
   const pointer = rep.querySelector<HTMLElement>('.pointer')
   const childTimers = new Set<number>()
   let step = 0
@@ -53,16 +39,6 @@ function setup(stage: HTMLElement): void {
     pointer?.classList.remove('press')
   }
 
-  function fit(): void {
-    const width = stage.clientWidth
-    const narrow = width < narrowAt
-    rep!.classList.toggle('narrow', narrow)
-    const base = narrow ? 440 : Number(stage.dataset.base ?? 1280)
-    // Below data-min-k the window keeps its size and the plate crops it.
-    const k = Math.max(width / base, Number(stage.dataset.minK ?? 0))
-    rep!.style.setProperty('--k', String(k))
-  }
-
   function type(element: HTMLElement): void {
     const text = element.dataset.full ?? element.textContent ?? ''
     element.dataset.full = text
@@ -82,7 +58,7 @@ function setup(stage: HTMLElement): void {
 
   function point(target: HTMLElement, press: boolean): void {
     if (!pointer) return
-    const k = Number(rep!.style.getPropertyValue('--k')) || 1
+    const k = Number(getComputedStyle(rep!).zoom) || 1
     const frame = rep!.getBoundingClientRect()
     const box = target.getBoundingClientRect()
     const x = (box.left - frame.left + box.width * 0.62) / k
@@ -198,8 +174,6 @@ function setup(stage: HTMLElement): void {
 
   const buttons = document.querySelectorAll<HTMLButtonElement>(`[data-motion-for="${stage.id}"]`)
   for (const button of buttons) button.addEventListener('click', toggle)
-  fit()
-  new ResizeObserver(fit).observe(stage)
   apply(0, false)
   if (reduce.matches) end()
 

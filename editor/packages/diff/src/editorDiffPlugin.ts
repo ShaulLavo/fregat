@@ -732,8 +732,8 @@ class DiffViewContribution implements EditorViewContribution {
    * Every click count, not just the first: a second press would select a word of the label, a
    * third its line and a fourth the whole document.
    */
-  private readonly claimSeparatorPress = (event: MouseEvent): boolean =>
-    event.button === 0 && this.hunkRowAt(event) !== null
+  private readonly claimSeparatorPress = (event: MouseEvent | TouchEvent): boolean =>
+    (!('button' in event) || event.button === 0) && this.hunkRowAt(event) !== null
 
   /** The keyboard half of the same rule: arrow keys step over a separator. */
   private readonly isSeparatorRow = (bufferRow: number): boolean => {
@@ -777,7 +777,7 @@ class DiffViewContribution implements EditorViewContribution {
    * patch with no file text behind it — has separators that say how much was skipped and cannot
    * open them, and those are still not somewhere a caret belongs.
    */
-  private hunkRowAt(event: MouseEvent): DiffRenderRow | null {
+  private hunkRowAt(event: MouseEvent | TouchEvent): DiffRenderRow | null {
     if (!this.options.hasHunkRows()) return null
 
     const hit = this.rowHitAt(event)
@@ -786,10 +786,12 @@ class DiffViewContribution implements EditorViewContribution {
   }
 
   /** Only `document` mode has an answer: there a buffer row is an index into `getRows()`. */
-  rowHitAt(event: MouseEvent): DiffRowHit | null {
+  rowHitAt(event: MouseEvent | TouchEvent): DiffRowHit | null {
     if (this.options.mode !== 'document') return null
 
-    const hit = this.context.rowAtPoint(event.clientX, event.clientY)
+    const point = 'touches' in event ? event.touches[0] : event
+    if (!point) return null
+    const hit = this.context.rowAtPoint(point.clientX, point.clientY)
     if (hit?.source !== 'document') return null
     const rowIndex = hit.bufferRow
 

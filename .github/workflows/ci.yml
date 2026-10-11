@@ -433,30 +433,42 @@ jobs:
         with:
           build-packages: '[]'
 
-      - name: Build production sites
-        env:
-          CI_SITES: ${{ needs.changes.outputs.sites }}
-        run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites" "$CI_SITES"
-      - name: Test Singapore documentation checks
-        if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
-        run: bun run --cwd editor/site test
       - name: Install Singapore browser test dependencies
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') || contains(needs.changes.outputs.sites, 'fregat') || needs.changes.outputs.tooling == 'true' }}
         uses: ./.github/actions/install-browsers
         with:
           playwright: editor/site/node_modules/.bin/playwright
-          browsers: chromium webkit
+          browsers: chromium firefox webkit
+      - name: Build production sites
+        env:
+          CI_SITES: ${{ needs.changes.outputs.sites }}
+        run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites" "$CI_SITES"
+      - name: Check deployment config and cache headers
+        run: python3 -m unittest discover -s scripts/product-sites -p 'test_*.py'
+      - name: Check Ghostty font assets
+        if: ${{ contains(needs.changes.outputs.sites, 'ghostty-webgpu') }}
+        run: bun scripts/product-sites/test-font-assets.mjs "$RUNNER_TEMP/product-sites/ghostty-webgpu"
+      - name: Test Singapore documentation checks
+        if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
+        run: bun run --cwd editor/site test
       - name: Test landing page playback
         run: bun run test:scripts scripts/site-player.test.ts
       - name: Test mobile overflow detection
         if: ${{ needs.changes.outputs.tooling == 'true' }}
         run: bun scripts/product-sites/test-mobile.mjs
-      - name: Test Singapore editor history restoration
+      - name: Test Singapore docs browsing and examples at the root base
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
         run: bun run --cwd editor/site test:browser
       - name: Check landing page focus, contrast and motion controls
         if: ${{ contains(needs.changes.outputs.sites, 'fregat') }}
         run: bun run --cwd apps/site verify:a11y
+      - name: Check landing page reload scroll and first-paint layout
+        if: ${{ contains(needs.changes.outputs.sites, 'fregat') }}
+        run: |
+          bun run --cwd apps/site verify:scroll --engine webkit
+          bun run --cwd apps/site verify:scroll --engine chromium
+          bun run --cwd apps/site verify:scroll --engine firefox
+          bun run --cwd apps/site verify:scroll --engine firefox --generic-font monospace
       - name: Share production sites with mobile checks
         uses: actions/upload-artifact@v4
         with:
@@ -509,16 +521,21 @@ jobs:
           EXHAUSTIVE: ${{ needs.changes.outputs.exhaustive }}
           CI_SITES: ${{ needs.changes.outputs.sites }}
         run: |
-          paths=()
-          if [[ ",$CI_SITES," == *",fregat,"* ]]; then paths+=('/fregat/'); fi
-          if [[ ",$CI_SITES," == *",singapore,"* ]]; then paths+=('/singapore/' '/singapore/docs/start-here/introduction/' '/singapore/docs/start-here/playground/'); fi
-          if [[ ",$CI_SITES," == *",demo,"* ]]; then paths+=('/singapore/demo/'); fi
-          if [[ ",$CI_SITES," == *",ghostty-webgpu,"* ]]; then paths+=('/ghostty-webgpu/'); fi
-          selection=(--paths "$(IFS=,; echo "${paths[*]}")")
-          if [[ "$EXHAUSTIVE" == 'true' ]]; then
-            selection=(--shards 2 --shard "${SHARD##*-}")
-          fi
-          bun scripts/product-sites/verify-mobile.mjs --directory "$RUNNER_TEMP/product-sites" --evidence "$RUNNER_TEMP/mobile-layout" --engines "${SHARD%-*}" "${selection[@]}"
+          for site in fregat singapore ghostty-webgpu; do
+            directory="$RUNNER_TEMP/product-sites/$site"
+            if [[ ! -d "$directory" ]]; then continue; fi
+            paths=('/')
+            if [[ "$site" == singapore ]]; then
+              paths=()
+              if [[ ",$CI_SITES," == *",singapore,"* ]]; then paths+=('/' '/docs/start-here/introduction/' '/docs/start-here/playground/'); fi
+              if [[ ",$CI_SITES," == *",demo,"* ]]; then paths+=('/demo/'); fi
+            fi
+            selection=(--paths "$(IFS=,; echo "${paths[*]}")")
+            if [[ "$EXHAUSTIVE" == 'true' ]]; then
+              selection=(--shards 2 --shard "${SHARD##*-}")
+            fi
+            bun scripts/product-sites/verify-mobile.mjs --directory "$directory" --evidence "$RUNNER_TEMP/mobile-layout/$site" --engines "${SHARD%-*}" "${selection[@]}"
+          done
 
       - name: Upload mobile layout evidence
         if: always()

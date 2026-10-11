@@ -2,7 +2,7 @@
 
 A read-only UTF-8 file viewer model with byte-range loading and a bounded page cache.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -41,13 +41,13 @@ document.dispose()
 - `createView()` gives each viewer its own read lifecycle.
 - `readLines()` returns a window of decoded rows.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/paged/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/paged/overview/)
 
 ## In the Singapore family
 
 You can use this package on its own. `@singapore-editor/core` owns editor views; optional packages add syntax, search, gutters, and language features.
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

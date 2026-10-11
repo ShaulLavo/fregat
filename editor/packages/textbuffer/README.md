@@ -2,7 +2,7 @@
 
 A persistent piece-table text buffer with snapshots, stable anchors, and line mapping.
 
-Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
 ## Install
 
@@ -34,13 +34,13 @@ materializePieceTableFullText(branch) // 'say hello'
 - `insertIntoPieceTable()` returns a new snapshot.
 - `anchorAt()` and `resolveAnchor()` track positions through edits.
 
-[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/textbuffer/overview/)
+[Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/textbuffer/overview/)
 
 ## In the Singapore family
 
 You can use this package on its own. `@singapore-editor/core` owns editor views; optional packages add syntax, search, gutters, and language features.
 
-[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://singapore.shaulavo.dev/docs/start-here/introduction/)
 
 ## License
 

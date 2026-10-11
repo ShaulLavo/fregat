@@ -16,10 +16,7 @@ const base = import.meta.env.BASE_URL
 let pagefind: Promise<Pagefind> | null = null
 let dialog: HTMLDialogElement | null = null
 
-/** Docs pages the editor can open, by URL, so results open there too. */
-export type SearchPages = ReadonlyMap<string, string>
-
-function createDialog(pages: SearchPages) {
+function createDialog() {
   const element = document.createElement('dialog')
   element.className = 'search'
   element.setAttribute('aria-label', 'Search the docs')
@@ -37,13 +34,12 @@ function createDialog(pages: SearchPages) {
     const search = await (await pagefind).debouncedSearch(query, {}, 120)
     if (!search) return
     const results = await Promise.all(search.results.slice(0, 8).map((result) => result.data()))
+    if (input.value.trim() !== query) return
     list.replaceChildren(
       ...results.map((data) => {
         const item = document.createElement('li')
         const link = document.createElement('a')
         link.href = data.url
-        const md = pages.get(new URL(data.url, location.href).pathname)
-        if (md) link.dataset.md = md
         const title = document.createElement('b')
         title.textContent = data.meta.title ?? data.url
         const excerpt = document.createElement('span')
@@ -60,13 +56,14 @@ function createDialog(pages: SearchPages) {
       empty.textContent = 'No matches'
       list.replaceChildren(empty)
     }
+    list.dataset.query = query
   })
   return element
 }
 
-export function setUpSearch(pages: SearchPages): void {
+export function setUpSearch(): void {
   const open = () => {
-    dialog ??= createDialog(pages)
+    dialog ??= createDialog()
     dialog.showModal()
   }
   for (const button of document.querySelectorAll<HTMLButtonElement>('.search-open')) {

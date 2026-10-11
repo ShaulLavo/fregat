@@ -24,17 +24,22 @@
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
   font:
     400 13px/1.45 'Inter Variable',
+    Arial,
+    'Liberation Sans',
     ui-sans-serif,
     system-ui,
     sans-serif;
   font-feature-settings: 'cv11', 'ss01';
   letter-spacing: -0.003em;
   overflow: hidden;
+  /* Animated illustration content must not move the page's scroll anchor. */
+  overflow-anchor: none;
   border-radius: 12px;
   text-align: left;
   -webkit-font-smoothing: antialiased;
   user-select: none;
-  zoom: var(--k, 0.5);
+  /* Trigonometric ratios work in engines without typed CSS division. */
+  zoom: tan(atan2(100cqw, 1280px));
   box-shadow:
     0 40px 90px -30px rgb(0 0 0 / 0.55),
     0 0 0 1px color-mix(in oklch, var(--fg) 10%, transparent);
@@ -851,41 +856,56 @@ svg.i.sm {
   animation-play-state: paused !important;
 }
 
+.hero-plate .stage {
+  container: hero-replica / inline-size;
+}
+.sect .stage {
+  container-type: inline-size;
+}
+.sect .rep {
+  /* Section windows keep their readable size and crop inside narrow plates. */
+  zoom: max(tan(atan2(100cqw, 660px)), 0.74);
+}
+
 /* narrow: chat over the editor and terminal, no sidebar */
-.rep.narrow {
-  width: 440px;
-  height: auto;
-  grid-template-rows: 36px auto;
-}
-.rep.narrow .rep-body {
-  grid-template-columns: minmax(0, 1fr);
-}
-.rep.narrow .rep-side,
-.rep.narrow .rep-rail,
-.rep.narrow .rep-title .ic,
-.rep.narrow .hide-narrow {
-  display: none;
-}
-.rep.narrow .rep-chat {
-  min-height: 470px;
-}
-.rep.narrow .rep-pane {
-  grid-template-rows: 36px 220px 36px 170px;
-}
-.rep.narrow .rep-composer {
-  margin: 0 10px 10px;
-}
-.rep.narrow .rep-thread {
-  padding: 10px 12px 8px;
-}
-.rep.narrow .toast {
-  right: 10px;
-  left: 10px;
-  width: auto;
-}
-.rep.narrow .rep-code .hover {
-  left: 60px;
-  width: 290px;
+@container hero-replica (width < 640px) {
+  .rep {
+    width: 440px;
+    height: 968px;
+    grid-template-rows: 36px minmax(0, 1fr);
+    zoom: tan(atan2(100cqw, 440px));
+  }
+  .rep .rep-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 470px 462px;
+  }
+  .rep .rep-side,
+  .rep .rep-rail,
+  .rep .rep-title .ic,
+  .rep .hide-narrow {
+    display: none;
+  }
+  .rep .rep-chat {
+    min-height: 470px;
+  }
+  .rep .rep-pane {
+    grid-template-rows: 36px 220px 36px 170px;
+  }
+  .rep .rep-composer {
+    margin: 0 10px 10px;
+  }
+  .rep .rep-thread {
+    padding: 10px 12px 8px;
+  }
+  .rep .toast {
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+  .rep .rep-code .hover {
+    left: 60px;
+    width: 290px;
+  }
 }
 
 /* static panels that reuse the replica's tokens */

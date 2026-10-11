@@ -49,16 +49,16 @@ for the whole lane, with the range across seeds, and the ratio to the control's 
 `main` is unmodified main timed in a worktree on the same seeds; `always` is this branch in its
 default mode.
 
-| Lane                 | Control | main               | always             | transaction        | history            |
-| -------------------- | ------: | ------------------ | ------------------ | ------------------ | ------------------ |
-| sequential-typing    |    0.61 | 0.64 [0.51–0.64] 1.06x | 0.66 [0.53–0.67] 1.09x | 0.67 [0.54–0.70] 1.10x | 0.64 [0.52–0.65] 1.05x |
-| typing-with-lookups  |    0.94 | 0.89 [0.73–0.89] 0.95x | 0.91 [0.74–0.91] 0.97x | 0.92 [0.75–0.93] 0.97x | 0.89 [0.73–0.90] 0.95x |
-| random-insertions    |    1.09 | 5.39 [5.33–5.56] 4.94x | 5.05 [4.97–5.29] 4.62x | 5.19 [5.09–5.31] 4.75x | 4.76 [4.68–4.90] 4.35x |
+| Lane                 | Control | main                      | always                 | transaction            | history                |
+| -------------------- | ------: | ------------------------- | ---------------------- | ---------------------- | ---------------------- |
+| sequential-typing    |    0.61 | 0.64 [0.51–0.64] 1.06x    | 0.66 [0.53–0.67] 1.09x | 0.67 [0.54–0.70] 1.10x | 0.64 [0.52–0.65] 1.05x |
+| typing-with-lookups  |    0.94 | 0.89 [0.73–0.89] 0.95x    | 0.91 [0.74–0.91] 0.97x | 0.92 [0.75–0.93] 0.97x | 0.89 [0.73–0.90] 0.95x |
+| random-insertions    |    1.09 | 5.39 [5.33–5.56] 4.94x    | 5.05 [4.97–5.29] 4.62x | 5.19 [5.09–5.31] 4.75x | 4.76 [4.68–4.90] 4.35x |
 | random-replacements  |    1.38 | 11.35 [11.23–13.36] 8.25x | 8.76 [8.74–9.42] 6.37x | 8.88 [8.46–8.89] 6.46x | 8.56 [8.45–8.67] 6.23x |
-| eight-cursor-batches |    1.18 | 5.77 [5.48–6.23] 4.88x | 5.32 [5.29–5.47] 4.50x | 5.23 [5.06–5.26] 4.42x | 5.07 [5.03–5.21] 4.29x |
-| mixed-edit-churn     |    1.23 | 8.68 [8.54–9.11] 7.05x | 8.14 [7.99–8.15] 6.61x | 7.65 [7.63–7.81] 6.22x | 7.09 [7.06–7.23] 5.76x |
-| persistent-history   |       — | 9.46 [9.35–10.01]  | 7.92 [7.74–8.46]   | 7.66 [7.60–7.83]   | 7.60 [7.47–7.69]   |
-| branch-edits         |       — | 0.45 [0.44–0.45]   | 0.45 [0.43–0.53]   | 0.45 [0.44–0.48]   | 0.44 [0.44–0.45]   |
+| eight-cursor-batches |    1.18 | 5.77 [5.48–6.23] 4.88x    | 5.32 [5.29–5.47] 4.50x | 5.23 [5.06–5.26] 4.42x | 5.07 [5.03–5.21] 4.29x |
+| mixed-edit-churn     |    1.23 | 8.68 [8.54–9.11] 7.05x    | 8.14 [7.99–8.15] 6.61x | 7.65 [7.63–7.81] 6.22x | 7.09 [7.06–7.23] 5.76x |
+| persistent-history   |       — | 9.46 [9.35–10.01]         | 7.92 [7.74–8.46]       | 7.66 [7.60–7.83]       | 7.60 [7.47–7.69]       |
+| branch-edits         |       — | 0.45 [0.44–0.45]          | 0.45 [0.43–0.53]       | 0.45 [0.44–0.48]       | 0.44 [0.44–0.45]       |
 
 Per random insertion that is 3.6 µs on main, 3.4 µs in `always`, 3.2 µs in `history` and
 0.73 µs for the control. Removing every clone buys 0.4 µs of a 2.9 µs gap.
@@ -130,16 +130,16 @@ Every holder of a previous snapshot after the next edit begins, from `documentSe
 where transient adoption would have to place `retainPieceTableSnapshot` for that holder to keep
 reading correctly.
 
-| Holder                                                                | Needs the old root                                                                                       | Retain point under adoption                                                                                      |
-| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `history.ts` nodes, up to 200                                         | Until pruned: undo restores the node's snapshot                                                          | `commitEditorHistory`. `amendEditorHistory` replaces a typing run's leaf, so a run's intermediates need none.    |
-| `DocumentTransaction.snapshotBefore` on every transaction             | For the transaction's lifetime: `reverseReceipt`, `canReverse` identity checks, `restoreHistoryForReverse`, `Editor.renderSessionChange` | Per transaction. Barrier receipts are external commits, so this is a retain per prepared commit, not per keystroke. |
-| `createTransaction`: `invertTextEdits(this.history.current, edits)`   | Only until the inverse is computed, but it runs after `applyBatchToPieceTable` has already produced the next snapshot | Compute the inverse before applying, or retain. Today's order reads the before-snapshot after the edit.           |
-| `cleanSnapshot` for `isDirty`                                         | Until the next `markClean`: compared by text                                                             | `markClean` and the constructor.                                                                                 |
-| `textSnapshot` and the views' `TextSnapshot`                          | Until every view has swapped: a view may read the previous text snapshot in a later frame, after another keystroke | Per transaction unless every view is shown to drop a superseded text snapshot synchronously on change.           |
-| Highlighter session `this.snapshot` (`shiki/workerClient.ts`)          | Until the next change is processed, and it re-applies `change.edits` to the held snapshot to verify the change | Per transaction, or replace the replay check with a revision check. Editing a consumed snapshot throws here.      |
-| Tree-sitter session snapshot (`syntax/session.ts`, `syntaxController`) | Until the next refresh; range queries read the snapshot it parsed                                        | Per transaction unless range queries are pinned to the current snapshot.                                         |
-| `diffPieceTableSnapshots(from, next.current)` on checkout             | Both are history nodes                                                                                   | Covered by the history retain.                                                                                   |
+| Holder                                                                 | Needs the old root                                                                                                                       | Retain point under adoption                                                                                         |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `history.ts` nodes, up to 200                                          | Until pruned: undo restores the node's snapshot                                                                                          | `commitEditorHistory`. `amendEditorHistory` replaces a typing run's leaf, so a run's intermediates need none.       |
+| `DocumentTransaction.snapshotBefore` on every transaction              | For the transaction's lifetime: `reverseReceipt`, `canReverse` identity checks, `restoreHistoryForReverse`, `Editor.renderSessionChange` | Per transaction. Barrier receipts are external commits, so this is a retain per prepared commit, not per keystroke. |
+| `createTransaction`: `invertTextEdits(this.history.current, edits)`    | Only until the inverse is computed, but it runs after `applyBatchToPieceTable` has already produced the next snapshot                    | Compute the inverse before applying, or retain. Today's order reads the before-snapshot after the edit.             |
+| `cleanSnapshot` for `isDirty`                                          | Until the next `markClean`: compared by text                                                                                             | `markClean` and the constructor.                                                                                    |
+| `textSnapshot` and the views' `TextSnapshot`                           | Until every view has swapped: a view may read the previous text snapshot in a later frame, after another keystroke                       | Per transaction unless every view is shown to drop a superseded text snapshot synchronously on change.              |
+| Highlighter session `this.snapshot` (`shiki/workerClient.ts`)          | Until the next change is processed, and it re-applies `change.edits` to the held snapshot to verify the change                           | Per transaction, or replace the replay check with a revision check. Editing a consumed snapshot throws here.        |
+| Tree-sitter session snapshot (`syntax/session.ts`, `syntaxController`) | Until the next refresh; range queries read the snapshot it parsed                                                                        | Per transaction unless range queries are pinned to the current snapshot.                                            |
+| `diffPieceTableSnapshots(from, next.current)` on checkout              | Both are history nodes                                                                                                                   | Covered by the history retain.                                                                                      |
 
 Four holders force per-transaction retention today: the inverse-edit order, the barrier receipt,
 the highlighter's replay check and the views' text snapshots. The first two are local changes;
@@ -159,5 +159,5 @@ percent, and it is why the decision does not depend on the audit's outcome.
   tarball under `timing/`.
 - Counters: `bun run bench:profile -- --modes counters --retention <mode>`, under `counters/`.
 - CPU: `bun run bench:profile -- --modes cpu --retention <mode> --repeats 24 --only
-  random-insertions,random-replacements`, under `cpu/`. Raw `.cpuprofile` files are not kept;
+random-insertions,random-replacements`, under `cpu/`. Raw `.cpuprofile` files are not kept;
   the command reproduces them.

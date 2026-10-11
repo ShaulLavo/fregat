@@ -69,6 +69,7 @@ const MIRRORED_KEYS = [
   'editor.markdownRenderedPane',
   'environments.machines',
   'editor.decode.mode',
+  'editor.morph.enabled',
   'editor.diff.viewMode',
   'editor.fontFamily',
   'editor.fontSize',

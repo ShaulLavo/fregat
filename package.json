@@ -121,7 +121,8 @@
     "build-release": "bun scripts/build-release.ts",
     "arrays:check": "node scripts/lint/array-construction.mjs --full-types",
     "arrays:inventory": "node scripts/lint/array-construction.mjs --inventory --full-types",
-    "test:t3code": "bun --bun vitest run --config vitest.t3code.config.mjs"
+    "test:t3code": "bun --bun vitest run --config vitest.t3code.config.mjs",
+    "product-sites:deploy": "bun run --cwd scripts product-sites:deploy"
   },
   "devDependencies": {
     "@changesets/changelog-github": "1.0.1",

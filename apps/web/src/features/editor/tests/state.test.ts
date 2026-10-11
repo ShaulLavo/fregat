@@ -43,7 +43,7 @@ import { watchFileAvailability } from '@/features/editor/state/file-availability
 import { createRpcError } from '@/lib/structured-errors'
 
 describe('editor workspace state', () => {
-  test('retires a missing restored file from tabs and reopen history', async () => {
+  test('keeps a missing restored file until explicit discard clears its tabs and reopen history', async () => {
     const path = '/repo/missing.ts'
     const harness = editorHarness({
       workbenchPanels: workbenchPanelsForPaths([path, '/repo/other.ts'], path),
@@ -53,10 +53,18 @@ describe('editor workspace state', () => {
     const stop = watchFileAvailability({
       ...harness,
       queryClient: queries,
-      forgetFile: harness.commands.discardLiveEditorDocument,
     })
     try {
       await missingSnapshot(queries, path)
+      expect(harness.workspaceStore.getState().openTabContents).toEqual(
+        testTabContents([path, '/repo/other.ts']),
+      )
+      expect(harness.workspaceStore.getState().recentlyClosedTabs).toEqual(testTabContents([path]))
+      expect(harness.workspaceStore.getState().selectedTabContent).toEqual(testTabContent(path))
+      expect(
+        harness.documentStore.getState().getLiveEditorDocument(testDocumentKey(path)),
+      ).toBeNull()
+      harness.commands.discardLiveEditorDocument(testDocumentRef(path))
       expect(harness.workspaceStore.getState().openTabContents).toEqual(
         testTabContents(['/repo/other.ts']),
       )
@@ -79,7 +87,6 @@ describe('editor workspace state', () => {
       const stop = watchFileAvailability({
         ...harness,
         queryClient: queries,
-        forgetFile: harness.commands.discardLiveEditorDocument,
       })
       const deferred = Promise.withResolvers<never>()
       try {
@@ -111,7 +118,6 @@ describe('editor workspace state', () => {
     const stop = watchFileAvailability({
       ...harness,
       queryClient: queries,
-      forgetFile: harness.commands.discardLiveEditorDocument,
     })
     try {
       await missingSnapshot(queries, path, code)
@@ -133,7 +139,6 @@ describe('editor workspace state', () => {
     const stop = watchFileAvailability({
       ...harness,
       queryClient: queries,
-      forgetFile: harness.commands.discardLiveEditorDocument,
     })
     try {
       await missingSnapshot(queries, path)
@@ -155,7 +160,6 @@ describe('editor workspace state', () => {
     const stop = watchFileAvailability({
       ...harness,
       queryClient: queries,
-      forgetFile: harness.commands.discardLiveEditorDocument,
     })
     try {
       const path = '/repo/missing.ts'

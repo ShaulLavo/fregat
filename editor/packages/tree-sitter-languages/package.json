@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/tree-sitter-languages",
-  "version": "0.2.7",
+  "version": "0.2.9",
   "description": "Tree-sitter grammars and syntax queries for Singapore language plugins.",
   "keywords": [
     "browser",
@@ -10,7 +10,7 @@
     "tree-sitter",
     "typescript"
   ],
-  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/tree-sitter-languages/overview/",
+  "homepage": "https://singapore.shaulavo.dev/docs/reference/api/tree-sitter-languages/overview/",
   "bugs": {
     "url": "https://github.com/ShaulLavo/fregat/issues"
   },

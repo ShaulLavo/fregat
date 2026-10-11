@@ -109,11 +109,13 @@ function createContribution(context: EditorViewContributionContext, options: Dif
 
   // A modified click is a navigation, so the editor must not also turn it into a caret placement:
   // leaving the selection behind on a read-only pane is the tell that nothing happened.
-  const claimNavigationPress = (event: MouseEvent): boolean => {
-    if (event.button !== 0) return false
+  const claimNavigationPress = (event: MouseEvent | TouchEvent): boolean => {
+    if ('button' in event && event.button !== 0) return false
     if (!isNavigationModifier(event)) return false
 
-    const offset = context.textOffsetFromPoint(event.clientX, event.clientY)
+    const point = 'touches' in event ? event.touches[0] : event
+    if (!point) return false
+    const offset = context.textOffsetFromPoint(point.clientX, point.clientY)
     if (offset === null) return false
 
     const target = options.resolve(offset)

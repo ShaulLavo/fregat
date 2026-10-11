@@ -1,5 +1,6 @@
 import { isTextareaElement } from '../dom'
 import { scheduleFrame, type ScheduledFrame } from './scheduleFrame'
+import { TouchSelectionController } from './touchSelection'
 import type {
   DocumentSession,
   DocumentSessionChange,
@@ -70,6 +71,7 @@ import { capitalize, indentTimingName, type SessionChangeOptions } from './edito
 import {
   EMPTY_HIDDEN_INPUT_STATE,
   deduceHiddenInputEdit,
+  hiddenInputOffsetToDocument,
   isEmptyDeducedInput,
   isIncompleteDeducedInput,
   keyboardFallbackText,
@@ -216,7 +218,7 @@ export type InputSelectionControllerOptions = {
    */
   onDidType(text: string): void
   /** True when a contribution took the press for itself; the editor then leaves it alone. */
-  claimPress(event: MouseEvent): boolean
+  claimPress(event: MouseEvent | TouchEvent): boolean
 }
 
 // A run of occurrence presses owns its search settings, so that widening one to whole words never
@@ -288,6 +290,8 @@ const COLUMN_SELECTION_COMMANDS = new Set<EditorCommandId>([
 export class InputSelectionController {
   private readonly nodeConstructor: typeof Node | undefined
   private readonly elementConstructor: typeof Element | undefined
+  private readonly touchSelection: TouchSelectionController
+  private pressClaimed = false
   private readonly autoClose = new AutoCloseStore()
   private readonly snippet = new SnippetSession()
   private readonly ghostText = new GhostTextSession()
@@ -305,6 +309,7 @@ export class InputSelectionController {
   // advances it — an event the editor decides not to act on leaves the element holding text it can
   // still be diffed against next time.
   private hiddenInputContent: HiddenInputState = EMPTY_HIDDEN_INPUT_STATE
+  private writingInputWindow = false
   /** What a textarea composition replaces in the written window, read when it starts. */
   private compositionRange: { readonly start: number; readonly end: number } | null = null
   /** The window range an EditContext composition replaces, and where its candidate now ends. */
@@ -317,6 +322,18 @@ export class InputSelectionController {
   constructor(private readonly options: InputSelectionControllerOptions) {
     this.nodeConstructor = options.el.ownerDocument.defaultView?.Node
     this.elementConstructor = options.el.ownerDocument.defaultView?.Element
+    this.touchSelection = new TouchSelectionController({
+      element: options.el,
+      positionAt: (x, y) => options.view.textPositionFromPoint(x, y),
+      claimPress: (event) => {
+        this.pressClaimed = event.defaultPrevented || options.claimPress(event)
+        return this.pressClaimed
+      },
+      begin: () => this.markDomSelectionForNextInput(),
+      tap: (position) => this.placeTouchCaret(position),
+      word: (position) => this.selectTouchWord(position),
+      extend: (anchor, position) => this.extendTouchSelection(anchor, position),
+    })
   }
 
   private traceInput<TEvent, TResult>(
@@ -327,9 +344,12 @@ export class InputSelectionController {
   }
 
   install(): void {
+    this.touchSelection.install()
     const { el } = this.options
     el.addEventListener('mousedown', this.handleMouseDown)
+    el.addEventListener('dblclick', this.handleTouchDoubleClick)
     el.addEventListener('beforeinput', this.handleBeforeInput)
+    el.addEventListener('select', this.syncHiddenInputSelection)
     el.addEventListener('copy', this.handleCopy)
     el.addEventListener('cut', this.handleCut)
     el.addEventListener('dragover', this.handleDragOver)
@@ -347,10 +367,14 @@ export class InputSelectionController {
   }
 
   dispose(): void {
+    this.touchSelection.dispose()
     const { el } = this.options
+    delete el.dataset.editorTouchSelection
     this.uninstallNativeInputHandlers()
     el.removeEventListener('mousedown', this.handleMouseDown)
+    el.removeEventListener('dblclick', this.handleTouchDoubleClick)
     el.removeEventListener('beforeinput', this.handleBeforeInput)
+    el.removeEventListener('select', this.syncHiddenInputSelection)
     el.removeEventListener('copy', this.handleCopy)
     el.removeEventListener('cut', this.handleCut)
     el.removeEventListener('dragover', this.handleDragOver)
@@ -1619,9 +1643,7 @@ export class InputSelectionController {
     }
 
     const range = this.options.view.createRange(start, end, { scrollIntoView: false })
-    const domSelection = this.options.el.ownerDocument.getSelection()
-    domSelection?.removeAllRanges()
-    if (range) domSelection?.addRange(range)
+    this.setDomSelectionRange(range, resolved.anchorOffset > resolved.headOffset)
     this.syncSessionSelectionHighlight()
     this.notifySelection(options.notify ?? true)
   }
@@ -1685,7 +1707,13 @@ export class InputSelectionController {
     if (!selection) return
 
     const content = pagedHiddenInputContent(snapshot, resolveSelection(snapshot, selection))
-    this.writeInputWindow(content)
+    // Selection setters may synchronously dispatch select while the window is being written.
+    this.writingInputWindow = true
+    try {
+      this.writeInputWindow(content)
+    } finally {
+      this.writingInputWindow = false
+    }
     this.hiddenInputContent = {
       selectionEnd: content.selectionEnd,
       selectionStart: content.selectionStart,
@@ -1948,15 +1976,24 @@ export class InputSelectionController {
 
   private handleCompositionStart = this.traceInput(
     'input.compositionstart',
-    (_event: CompositionEvent): void => {
+    (event: CompositionEvent): void => {
+      const selectionChange = this.isInputFocused() ? this.selectionChangeBeforeEdit() : null
+      const input = this.options.view.inputElement
+      // Keep the browser's window intact as composition begins, but measure its replacement
+      // against the mapped native selection so omitted display text cannot enter the document.
+      if (selectionChange && isTextareaElement(input)) {
+        this.hiddenInputContent = readHiddenInputState(input)
+      }
       this.transitionInputState({ type: 'composition-start' })
       this.editContextComposition = null
       // A textarea selects what the composition is about to replace, which is how a correction
       // reaching back over a word says so: the event itself carries only the new text.
-      const input = this.options.view.inputElement
       this.compositionRange = isTextareaElement(input)
         ? { start: input.selectionStart, end: input.selectionEnd }
         : null
+      if (selectionChange) {
+        this.applyChange(selectionChange, 'input.compositionstart', eventStartMs(event))
+      }
     },
   )
 
@@ -1996,13 +2033,123 @@ export class InputSelectionController {
     },
   )
 
+  private placeTouchCaret(position: VirtualizedTextHitPosition): void {
+    const session = this.session
+    if (!session) return
+    delete this.options.el.dataset.editorTouchSelection
+    this.markSessionSelectionForNextInput()
+    this.options.el.ownerDocument.getSelection()?.removeAllRanges()
+    this.applyChange(
+      session.setSelection(position.offset, position.offset, { affinity: position.affinity }),
+      'input.touchTap',
+      nowMs(),
+      { syncDomSelection: false },
+    )
+    this.options.view.focusInput()
+  }
+
+  private selectTouchWord(position: VirtualizedTextHitPosition): TextOffsetRange {
+    const range = this.offsetRangeAt(position.offset, 'word')
+    this.selectTouchRange(range.start, range.end)
+    return range
+  }
+
+  private extendTouchSelection(
+    anchor: TextOffsetRange,
+    position: VirtualizedTextHitPosition,
+  ): void {
+    const head = this.offsetRangeAt(position.offset, 'word')
+    if (head.start < anchor.start) {
+      this.selectTouchRange(anchor.end, head.start)
+      return
+    }
+    this.selectTouchRange(anchor.start, Math.max(anchor.end, head.end))
+  }
+
+  /** Rendered text already has DOM ranges; leave them to the platform's handles and copy callout. */
+  private selectTouchRange(anchor: number, head: number): void {
+    const session = this.session
+    if (!session) return
+    this.options.view.inputElement.blur()
+    this.options.el.dataset.editorTouchSelection = ''
+    this.markDomSelectionForNextInput()
+    this.options.view.setNativeSelection(anchor, head)
+    this.transitionInputState({ owner: 'dom', type: 'selection-reconciled' })
+    const current = this.primaryResolvedSelection()
+    if (
+      current?.anchorOffset !== anchor ||
+      current.headOffset !== head ||
+      session.getSelections().selections.length !== 1
+    ) {
+      this.applyChange(session.setSelection(anchor, head), 'input.touchSelection', nowMs(), {
+        syncDomSelection: false,
+      })
+    }
+    this.refreshHiddenInputContent()
+    const range = this.options.view.createRange(Math.min(anchor, head), Math.max(anchor, head), {
+      scrollIntoView: false,
+    })
+    this.setDomSelectionRange(range, anchor > head)
+  }
+
+  private setDomSelectionRange(range: Range | null, backward: boolean): void {
+    const selection = this.options.el.ownerDocument.getSelection()
+    if (!range) {
+      selection?.removeAllRanges()
+      return
+    }
+    if (!backward) {
+      selection?.setBaseAndExtent(
+        range.startContainer,
+        range.startOffset,
+        range.endContainer,
+        range.endOffset,
+      )
+      return
+    }
+    selection?.setBaseAndExtent(
+      range.endContainer,
+      range.endOffset,
+      range.startContainer,
+      range.startOffset,
+    )
+  }
+
+  private handleTouchDoubleClick = (event: MouseEvent): void => {
+    if (!this.session || !this.touchSelection.ownsMouseEvent || event.defaultPrevented) return
+    event.preventDefault()
+    if (this.pressClaimed) return
+    const position = this.textPositionFromMouseEvent(event)
+    if (!position) return
+    this.touchSelection.acceptNativeSelection()
+    const range = this.offsetRangeAt(position.offset, 'word')
+    const current = this.primaryResolvedSelection()
+    if (current?.anchorOffset === range.start && current.headOffset === range.end) return
+    this.selectTouchWord(position)
+  }
+
   private handleMouseDown = (event: MouseEvent): void => {
     if (!this.session) return
-    if (event.defaultPrevented) return
-    if (this.options.claimPress(event)) {
+    const touchPressClaimed = this.touchSelection.consumeMousePress()
+    this.pressClaimed = event.defaultPrevented
+    if (this.pressClaimed) return
+    this.pressClaimed = touchPressClaimed ?? this.options.claimPress(event)
+    if (this.pressClaimed) {
       event.preventDefault()
       return
     }
+    if (this.touchSelection.ownsMouseEvent) {
+      event.preventDefault()
+      // iOS reports the second tap through the compatibility mouse event's click count.
+      if (event.detail >= 2) {
+        const position = this.textPositionFromMouseEvent(event)
+        if (!position) return
+        this.touchSelection.acceptNativeSelection()
+        this.selectTouchWord(position)
+      }
+      return
+    }
+    delete this.options.el.dataset.editorTouchSelection
 
     this.options.view.focusInput()
     if (event.detail >= 4) {
@@ -2725,6 +2872,11 @@ export class InputSelectionController {
     if (inserted === null) return
 
     const start = eventStartMs(event)
+    if (this.inputState.compositionActive) {
+      event.preventDefault()
+      this.commitComposition(inserted, this.compositionRange, start)
+      return
+    }
     const selectionChange = measureEditorPerformance('input.selectionChangeBeforeEdit', () =>
       this.selectionChangeBeforeEdit(),
     )
@@ -3523,6 +3675,7 @@ export class InputSelectionController {
 
   private syncSessionSelectionFromDom = (_event: Event): void => {
     if (!this.session) return
+    if (this.touchSelection.ownsMouseEvent && this.pressClaimed && !this.isInputFocused()) return
     if (!shouldSyncSessionSelectionFromDom(this.inputState, this.domSelectionContext())) return
 
     const start = nowMs()
@@ -3545,6 +3698,13 @@ export class InputSelectionController {
     if (!offsets) return null
 
     this.syncCustomSelectionHighlight(offsets.anchorOffset, offsets.headOffset)
+    const current = this.primaryResolvedSelection()
+    if (
+      current?.anchorOffset === offsets.anchorOffset &&
+      current.headOffset === offsets.headOffset &&
+      session.getSelections().selections.length === 1
+    )
+      return null
     return appendTiming(
       session.setSelection(offsets.anchorOffset, offsets.headOffset),
       'editor.readDomSelection',
@@ -3556,12 +3716,53 @@ export class InputSelectionController {
     const source = selectionBeforeEditSource(this.inputState, this.domSelectionContext())
     if (source === 'hidden-input') {
       this.markHiddenInputSelectionForNextInput()
-      return null
+      return this.updateSessionSelectionFromHiddenInput()
     }
     if (source === 'dom') return this.updateSessionSelectionFromDom()
 
     this.markDomSelectionForNextInput()
     return null
+  }
+
+  private syncHiddenInputSelection = (event: Event): void => {
+    if (this.writingInputWindow || !this.isInputFocused()) return
+    this.handleHiddenInputSelection(event)
+  }
+
+  private handleHiddenInputSelection = this.traceInput('input.nativeSelection', (): void => {
+    const change = this.updateSessionSelectionFromHiddenInput()
+    if (!change) return
+
+    this.markHiddenInputSelectionForNextInput()
+    this.applyChange(change, 'input.nativeSelection', nowMs())
+  })
+
+  private updateSessionSelectionFromHiddenInput(): DocumentSessionChange | null {
+    if (this.writingInputWindow) return null
+    const session = this.session
+    const input = this.options.view.inputElement
+    if (!session || !isTextareaElement(input)) return null
+    // These paths already read the replacement from the old window. The element now holds
+    // the candidate or edited text, so its current caret belongs to the result of that edit.
+    if (this.inputState.compositionActive || this.inputState.pendingTextSource === 'composition')
+      return null
+    const written = this.hiddenInputContent
+    if (input.value !== written.value) return null
+    const primary = session.getSelections().selections[0]
+    if (!primary) return null
+    const snapshot = session.getSnapshot()
+    const selection = resolveSelection(snapshot, primary)
+    const backward = input.selectionDirection === 'backward'
+    if (
+      input.selectionStart === written.selectionStart &&
+      input.selectionEnd === written.selectionEnd &&
+      (input.selectionStart === input.selectionEnd || backward === selection.reversed)
+    )
+      return null
+
+    const start = hiddenInputOffsetToDocument(snapshot, selection, written, input.selectionStart)
+    const end = hiddenInputOffsetToDocument(snapshot, selection, written, input.selectionEnd)
+    return session.setSelection(backward ? end : start, backward ? start : end)
   }
 
   private readDomSelectionOffsets(): { anchorOffset: number; headOffset: number } | null {
@@ -3575,14 +3776,48 @@ export class InputSelectionController {
     return { anchorOffset, headOffset }
   }
 
-  private syncCustomSelectionFromDom = (): void => {
+  private syncCustomSelectionFromDom = (event: Event): void => {
     if (!this.session) return
+    if (this.isInputFocused()) {
+      this.syncHiddenInputSelection(event)
+      return
+    }
+    if (this.touchSelection.ownsMouseEvent && !this.isInputFocused()) {
+      this.syncTouchSelectionFromDom()
+      return
+    }
     if (!shouldSyncCustomSelectionFromDom(this.inputState, this.domSelectionContext())) return
 
     const offsets = this.readDomSelectionOffsets()
     if (!offsets) return
 
     this.syncCustomSelectionHighlight(offsets.anchorOffset, offsets.headOffset)
+  }
+
+  private syncTouchSelectionFromDom(): void {
+    if (this.pressClaimed) return
+    const session = this.session
+    const selection = this.options.el.ownerDocument.getSelection()
+    if (!session || !selection?.anchorNode || !selection.focusNode) return
+    const content = this.options.view.contentElement
+    if (!content.contains(selection.anchorNode) || !content.contains(selection.focusNode)) return
+    const offsets = this.readDomSelectionOffsets()
+    if (!offsets) return
+    this.options.el.dataset.editorTouchSelection = ''
+    this.options.view.setNativeSelection(offsets.anchorOffset, offsets.headOffset)
+    this.transitionInputState({ owner: 'dom', type: 'selection-reconciled' })
+    const current = this.primaryResolvedSelection()
+    if (current?.anchorOffset === offsets.anchorOffset && current.headOffset === offsets.headOffset)
+      return
+    if (offsets.anchorOffset !== offsets.headOffset) this.touchSelection.acceptNativeSelection()
+    this.markDomSelectionForNextInput()
+    this.applyChange(
+      session.setSelection(offsets.anchorOffset, offsets.headOffset),
+      'input.nativeTouchSelection',
+      nowMs(),
+      { syncDomSelection: false },
+    )
+    this.refreshHiddenInputContent()
   }
 
   private syncCustomSelectionHighlight(

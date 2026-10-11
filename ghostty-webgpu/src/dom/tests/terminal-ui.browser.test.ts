@@ -860,6 +860,67 @@ describe('terminal links in Chromium', () => {
 })
 
 describe('terminal scrollbar in Chromium', () => {
+  it('defers hidden thumb writes while keeping ARIA current and restores the latest geometry', () => {
+    const root = appendRoot(48, 200)
+    const clock = new FakeScrollbarClock()
+    const controller = createTerminalScrollbar({
+      actions: scrollbarActions().controller,
+      clock,
+      root,
+      snapshot: scrollbar(20, 100, 20),
+    })
+    cleanups.push(() => controller.dispose())
+    const initialStyle = controller.thumb.getAttribute('style')
+    const observer = new MutationObserver(() => {})
+    observer.observe(controller.thumb, { attributes: true })
+    cleanups.push(() => observer.disconnect())
+
+    controller.update(scrollbar(40, 200, 20))
+    expect(controller.element.getAttribute('aria-valuenow')).toBe('40')
+    expect(controller.element.getAttribute('aria-valuemax')).toBe('180')
+    expect(controller.thumb.getAttribute('style')).toBe(initialStyle)
+    expect(observer.takeRecords()).toHaveLength(0)
+
+    controller.notifyActivity()
+    const track = controller.element.getBoundingClientRect()
+    const thumb = controller.thumb.getBoundingClientRect()
+    expect(thumb.height).toBeCloseTo(20, 1)
+    expect(thumb.top - track.top).toBeCloseTo(40, 1)
+    expect(observer.takeRecords().length).toBeGreaterThan(0)
+    controller.update(scrollbar(120, 200, 20))
+    expect(controller.thumb.getBoundingClientRect().top - track.top).toBeCloseTo(120, 1)
+    observer.takeRecords()
+
+    clock.flush()
+    controller.update(scrollbar(160, 200, 20))
+    root.style.height = '100px'
+    expect(observer.takeRecords()).toHaveLength(0)
+    controller.notifyActivity()
+    const resizedTrack = controller.element.getBoundingClientRect()
+    const resizedThumb = controller.thumb.getBoundingClientRect()
+    expect(resizedThumb.height).toBeCloseTo(20, 1)
+    expect(resizedThumb.top - resizedTrack.top).toBeCloseTo((160 / 180) * 80, 1)
+  })
+
+  it('restores a hidden updated thumb before deciding between paging and dragging', () => {
+    const root = appendRoot(48, 200)
+    const actions = scrollbarActions()
+    const controller = createTerminalScrollbar({
+      actions: actions.controller,
+      clock: new FakeScrollbarClock(),
+      root,
+      snapshot: scrollbar(20, 200, 20),
+    })
+    cleanups.push(() => controller.dispose())
+    const captured = installPointerCapture(controller.element)
+    controller.update(scrollbar(80, 100, 20))
+    const bounds = controller.element.getBoundingClientRect()
+    dispatchPointer(controller.element, 'pointerdown', bounds.left + 2, bounds.bottom - 30)
+    expect(captured.has(7)).toBe(true)
+    expect(actions.calls).toEqual([])
+    expect(controller.visible).toBe(true)
+  })
+
   it('renders changed snapshots and width without reading client geometry', () => {
     const root = appendRoot(48, 200)
     const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
@@ -993,11 +1054,15 @@ describe('terminal scrollbar in Chromium', () => {
   )
 
   it('keeps actual terminal geometry aligned through font, grid and parent-height changes', async () => {
-    const { host, terminal } = await createObservedRendererHarness({}, 'webgl2')
+    const { host, terminal } = await createObservedRendererHarness(
+      { scrollbar: { clock: new FakeScrollbarClock() } },
+      'webgl2',
+    )
     terminal.write(Array.from({ length: 100 }, (_, index) => `row ${index}\r\n`).join(''))
     await settleTerminal(terminal)
     const element = host.querySelector<HTMLDivElement>('[role="scrollbar"]')!
     const thumb = element.firstElementChild as HTMLDivElement
+    element.focus()
     for (const size of [14, 20, 12]) {
       terminal.setFont({ size })
       await animationFrames()
@@ -1343,6 +1408,21 @@ describe('terminal accessibility mirror in Chromium', () => {
     expect(harness.textarea.hasAttribute('aria-controls')).toBe(false)
   })
 
+  it('establishes a silent refresh boundary before the next output announcement', () => {
+    const harness = createAccessibilityHarness()
+    const current = scrollbar(0, 3, 3)
+    harness.controller.update(frame(['base', '', ''], { x: 0, y: 0 }), current)
+    harness.controller.update(frame(['base', 'one', 'two'], { x: 0, y: 2 }), current, false)
+    expect(harness.controller.rowElements.map((row) => row.textContent)).toEqual([
+      'base',
+      'one',
+      'two',
+    ])
+    expect(harness.controller.liveRegion.textContent).toBe('')
+    harness.controller.update(frame(['base', 'one', 'two!'], { x: 0, y: 2 }), current, true)
+    expect(harness.controller.liveRegion.textContent).toBe('!')
+  })
+
   it('maps a wide-tail cursor to the leading cell and clips one oversized announcement', () => {
     const harness = createAccessibilityHarness({
       liveRegionMaxCharacters: 5,
@@ -1416,7 +1496,9 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.renderer.metrics.zigFrames).toBeGreaterThan(0)
       expect(harness.readRowsCalls()).toBe(0)
       expect(harness.readTextRowsCalls()).toBeGreaterThan(0)
-      expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('ABC')
+      await expect
+        .poll(() => harness.host.querySelector('[role="listitem"]')?.textContent)
+        .toBe('ABC')
       expect(harness.snapshots.at(-1)?.rows.every((row) => !('renderCells' in row))).toBe(true)
       const textFrame = harness.snapshots.at(-1)!
       const retainedTextRows = structuredClone(textFrame.rows)
@@ -1435,7 +1517,9 @@ describe('terminal frame consumer demand in Chromium', () => {
 
       harness.terminal.write(`${escape}[2J${escape}[Hnew output`)
       await settleTerminal(harness.terminal)
-      expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('new output')
+      await expect
+        .poll(() => harness.host.querySelector('[role="listitem"]')?.textContent)
+        .toBe('new output')
       expect(harness.readRowsCalls()).toBe(0)
       expect(harness.readRetainedRowsCalls()).toBe(1)
       expect(harness.readTextRowsCalls()).toBeGreaterThan(textReads)
@@ -1459,7 +1543,9 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.renderer.metrics.zigFrames).toBeGreaterThan(0)
       expect(harness.readRowsCalls()).toBe(0)
       expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('A')
-      expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('A')
+      await expect
+        .poll(() => harness.host.querySelector('[role="listitem"]')?.textContent)
+        .toBe('A')
       const retained = harness.terminal.frameSnapshot()!
       const retainedText = harness.snapshots.at(-1)!
       const textFrames = harness.snapshots.length
@@ -1477,7 +1563,9 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.readRowsCalls()).toBe(0)
       expect(harness.readRetainedRowsCalls()).toBe(1)
       expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('B')
-      expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('B')
+      await expect
+        .poll(() => harness.host.querySelector('[role="listitem"]')?.textContent)
+        .toBe('B')
       expect(harness.terminal.frameSnapshot()?.rows[0]?.text.trimEnd()).toBe('B')
       expect(harness.readRetainedRowsCalls()).toBe(2)
       expect(retained.rows[0]?.text.trimEnd()).toBe('A')
@@ -1936,7 +2024,9 @@ describe('terminal frame consumer demand in Chromium', () => {
 
     harness.terminal.write('!')
     await settleTerminal(harness.terminal)
-    expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('accessible now!')
+    await expect
+      .poll(() => harness.host.querySelector('[role="listitem"]')?.textContent)
+      .toBe('accessible now!')
     expect(harness.snapshots.at(-1)?.rows).toHaveLength(4)
     expect(harness.terminal.setAccessibilityEnabled(false)).toBe(true)
     harness.terminal.write('?')
@@ -2564,7 +2654,9 @@ describe('integrated terminal UI host', () => {
     expect(harness.terminal.textarea).toBe(textarea)
 
     harness.renderer.emit(frame(['accessible row']))
-    expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('accessible row')
+    await expect
+      .poll(() => harness.host.querySelector('[role="listitem"]')?.textContent)
+      .toBe('accessible row')
     expect(harness.terminal.setAccessibilityEnabled(true)).toBe(false)
     expect(harness.terminal.setAccessibilityEnabled(false)).toBe(true)
     expect(harness.host.querySelector('.ghostty-webgpu-accessibility')).toBeNull()
@@ -2602,7 +2694,7 @@ describe('integrated terminal UI host', () => {
     await waitForUi(() => providerText !== undefined, 'Wide-cell provider did not run')
 
     expect(providerText?.startsWith('界A')).toBe(true)
-    expect(host.querySelector('[role="listitem"]')?.textContent).toBe('界A')
+    await expect.poll(() => host.querySelector('[role="listitem"]')?.textContent).toBe('界A')
   })
 
   it('emits an error only when an accepted OSC 52 browser completion later fails', async () => {
@@ -2696,7 +2788,7 @@ describe('integrated terminal UI host', () => {
     expect(data).toEqual(apple ? [] : ['\u0003'])
 
     renderer!.emit(frame(['copy me', '', ''], { x: 7, y: 0 }))
-    expect(host.querySelectorAll('[role="listitem"]')).toHaveLength(3)
+    await expect.poll(() => host.querySelectorAll('[role="listitem"]')).toHaveLength(3)
     const scrollbarElement = host.querySelector<HTMLElement>('[role="scrollbar"]')
     expect(scrollbarElement).not.toBeNull()
     scrollbarElement!.focus()

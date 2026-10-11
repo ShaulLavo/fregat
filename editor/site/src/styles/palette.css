@@ -1,0 +1,40 @@
+:root {
+  color-scheme: light dark;
+  --mono: 'JetBrains Mono', 'Singapore Mono Fallback', ui-monospace, 'SF Mono', Menlo, monospace;
+  --chrome: 'Source Serif 4', 'Singapore Serif Fallback', Georgia, serif;
+  --row: 22px;
+  --size: 14px;
+  --gw: 48px;
+  --gap: 18px;
+  /* Text measure: 88 columns of the 8 px advance. */
+  --measure: 704px;
+  --hh: 52px;
+  --ph: 30px;
+  /* Column start, chosen so the prose (not the gutter) is centred. */
+  --left: max(0px, calc((100vw - var(--measure)) / 2 - var(--gw)));
+
+  /* Light paper and its dark counterpart: the same calm hues, lifted for a dark page. */
+  --muted: light-dark(#7d786e, #8f897e);
+  --sg-bg: light-dark(#fbfaf7, #1a1916);
+  --sg-fg: light-dark(#2b2925, #d6d1c6);
+  --sg-gutter: light-dark(#d3cfc6, #46423b);
+  --sg-selection: light-dark(rgb(44 94 145 / 0.14), rgb(141 180 221 / 0.22));
+  --sg-caret: light-dark(#9c3b2c, #d98a76);
+  --sg-title: light-dark(#141310, #f2eee5);
+  --sg-link: light-dark(#2c5e91, #8db4dd);
+  --sg-code-bg: light-dark(#f3f1ec, #23211d);
+  --sg-kw: light-dark(#9c3b2c, #d98a76);
+  --sg-str: light-dark(#4b7238, #a3c18b);
+  --sg-com: light-dark(#7a756b, #8a8479);
+  --sg-num: light-dark(#8a5a12, #d6a85c);
+  --sg-type: light-dark(#2b2925, #d6d1c6);
+  --sg-fn: light-dark(#2c5e91, #8db4dd);
+  --sg-prop: light-dark(#2c5e91, #8db4dd);
+  --sg-punct: light-dark(#7d786e, #8f897e);
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}

@@ -4,7 +4,7 @@ Singapore is a browser code editor. Mount the core on an HTML element, give it t
 
 The core handles editing, selections, undo, folding and virtualized text rows. Optional packages add tree-sitter highlighting, language servers, gutters, find, a minimap, diff views and framework adapters.
 
-This page is a Markdown file open in Singapore. On a desktop browser you can select, search and edit it. Edits stay in this browser tab.
+The guides explain the core and optional packages. Code examples include a Make live button for trying edits in this browser tab.
 
 ## What makes it different
 

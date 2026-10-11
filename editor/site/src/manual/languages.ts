@@ -1,17 +1,8 @@
 import type { TreeSitterLanguageContribution } from '@singapore-editor/tree-sitter'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 
-/**
- * Languages the docs editor loads, besides Markdown itself. The build highlights fences with the
- * same list, and rejects a fence in any other language: the editor would show it uncoloured.
- */
-export const FENCE_LANGUAGE_IDS = [
-  'typescript',
-  'tsx',
-  'javascript',
-  'json',
-  'shellscript',
-] as const
+/** Highlighted fence languages; other labels use readable plain-text snapshots. */
+const FENCE_LANGUAGE_IDS = ['typescript', 'tsx', 'javascript', 'json', 'shellscript'] as const
 
 export type FenceLanguageId = (typeof FENCE_LANGUAGE_IDS)[number]
 

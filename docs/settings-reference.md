@@ -141,7 +141,8 @@ stays safe to read, share and export.
 | `editor.minimap.enabled`                      | `true`                     | window      | Show the minimap beside the editor. _(restart)_                                                                                                                                                                               |
 | `editor.guides.indentation`                   | `true`                     | window      | Draw indentation guides (scope lines). _(restart)_                                                                                                                                                                            |
 | `editor.syntaxHighlighting.enabled`           | `true`                     | window      | Colour code by syntax. Turning this off makes very large files faster. _(restart)_                                                                                                                                            |
-| `editor.decode.mode`                          | `"off"`                    | window      | Animate a file as it opens, as if it were being written. _(restart)_                                                                                                                                                          |
+| `editor.decode.mode`                          | `"off"`                    | window      | Animate a file as it opens, as if it were being written.                                                                                                                                                                      |
+| `editor.morph.enabled`                        | `true`                     | window      | Animate undo, redo, pasted and generated code: text that stays slides to its new place, removed text fades out, and new text streams in. Typing stays instant.                                                                |
 
 ### Details
 
@@ -155,7 +156,7 @@ stays safe to read, share and export.
 - `editor.retainedTextBudget`: Checked at a project switch and at a tab close, so opening two large projects can exceed it until the next switch or close. Counted in UTF-16 code units, which equals bytes for ASCII text. Files of other projects past the limit leave memory and are read from disk again when you switch back.
 - `editor.unicodeHighlight.ambiguousCharacters`: A confusable character looks like an ASCII one, so the Cyrillic а in pаssword names a different identifier from the one you read. Typographic punctuation such as an en dash also counts; add it to Allowed characters to stop highlighting it.
 - `editor.unicodeHighlight.invisibleCharacters`: An invisible character draws nothing. A bidirectional override can reorder a line so the code the compiler reads differs from the line on screen.
-- `editor.decode.mode`: Autoregressive types one character at a time, line after line. Parallel types every line at once, staggered. Token streams one token at a time, like a language model. Diffusion settles scrambled glyphs into the text.
+- `editor.decode.mode`: Autoregressive writes the file in reading order behind a caret. Parallel writes every line at once from staggered starts. Token stamps one token at a time, like a language model. Diffusion resolves scrambled text in clusters.
 
 ## Files
 

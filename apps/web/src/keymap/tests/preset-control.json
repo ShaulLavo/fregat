@@ -10,32 +10,32 @@
       "platform": "linux",
       "preset": "ours",
       "shellKeys": false,
-      "count": 379,
-      "bindings": "0649e599701641642c14a0a44864092551f2f4973d069d43903288732055f723",
+      "count": 382,
+      "bindings": "e31ee377729384df906deca050b93f34e867e0260b4e21612ceb95e8951eb7f1",
       "unmapped": "91c3721a541dc76880237b7b1ba74cd6d31c63e128ff6a2253bb9a4f11888d4d"
     },
     {
       "platform": "linux",
       "preset": "ours",
       "shellKeys": true,
-      "count": 426,
-      "bindings": "5e7c1f48245a1b89a00f6f1be243ac690ca767572284c8361d1827c595a877a7",
+      "count": 429,
+      "bindings": "4ae67a75232dc8e208f76cc3f26b2a922ab0dd4f78489ef075c4e5137bee716c",
       "unmapped": "91c3721a541dc76880237b7b1ba74cd6d31c63e128ff6a2253bb9a4f11888d4d"
     },
     {
       "platform": "linux",
       "preset": "zed",
       "shellKeys": false,
-      "count": 355,
-      "bindings": "ee58b49ee5b3e28b9f5f78bb2c4f0c0e057df1e049bc166d75b851de00106f48",
+      "count": 358,
+      "bindings": "bf94c5af21deaf40ef3497bc0458e4ea5b6111e1cd3ae2fd19740d84ea8efdb3",
       "unmapped": "91c3721a541dc76880237b7b1ba74cd6d31c63e128ff6a2253bb9a4f11888d4d"
     },
     {
       "platform": "linux",
       "preset": "zed",
       "shellKeys": true,
-      "count": 402,
-      "bindings": "2a9a30e33d067b63814e2c8e1a1b48231d8432f0204362c417dfb88c4f8552a2",
+      "count": 405,
+      "bindings": "d97270dd9eec62ff4e9d9f72ada6b84e6bc20db3551453995b992cf7fd3b5a45",
       "unmapped": "91c3721a541dc76880237b7b1ba74cd6d31c63e128ff6a2253bb9a4f11888d4d"
     },
     {
@@ -58,32 +58,32 @@
       "platform": "mac",
       "preset": "ours",
       "shellKeys": false,
-      "count": 397,
-      "bindings": "6b03ce854155c1c0df0dfb6cfcc456aec045c7858523b7b648c498ec88906505",
+      "count": 400,
+      "bindings": "28877093eb2cc7fe0b31f489e7d209294a4c70eda31240cefd30720b45a62001",
       "unmapped": "a0dfabad1d2e0f888c1db4cf3e27b1d0cf2627f6aaa57a3c00b9a0de29e49a34"
     },
     {
       "platform": "mac",
       "preset": "ours",
       "shellKeys": true,
-      "count": 444,
-      "bindings": "ebd4d5dddf6c36e04037fc1682089da04bf9b050d8bde61a030cb0f30daad8f3",
+      "count": 447,
+      "bindings": "57b96ac6b108e08c313b80e533fd1a31ceb0461dfb5288c572b299aa9e844b42",
       "unmapped": "a0dfabad1d2e0f888c1db4cf3e27b1d0cf2627f6aaa57a3c00b9a0de29e49a34"
     },
     {
       "platform": "mac",
       "preset": "zed",
       "shellKeys": false,
-      "count": 373,
-      "bindings": "76adcbbad25a93cc317d3a7b8b6cd349b1a0ed2dd3c38a63b1e9c74ce5bd44a5",
+      "count": 376,
+      "bindings": "02f66b6ef435a41ac9c29809a03d2a2d1dc646391f25c9dae62ab0789f79a31c",
       "unmapped": "a0dfabad1d2e0f888c1db4cf3e27b1d0cf2627f6aaa57a3c00b9a0de29e49a34"
     },
     {
       "platform": "mac",
       "preset": "zed",
       "shellKeys": true,
-      "count": 420,
-      "bindings": "3337deb2790fd521d190767e7cc0cf0f212c866b90122ee9f66020ba3d03b362",
+      "count": 423,
+      "bindings": "3a06287718ad3273d002acdf4fd1acda985b656e7fb7bd750dc3546b1bed4063",
       "unmapped": "a0dfabad1d2e0f888c1db4cf3e27b1d0cf2627f6aaa57a3c00b9a0de29e49a34"
     },
     {
@@ -106,32 +106,32 @@
       "platform": "windows",
       "preset": "ours",
       "shellKeys": false,
-      "count": 379,
-      "bindings": "e3bcd98e5bd2dcb7171e09fcc7759174ae77789db229e56531191b6e16613c94",
+      "count": 382,
+      "bindings": "57702c8fa5683ee12e53d835c72f5d03ce26af153004d5ed6ffdd7250e23ed08",
       "unmapped": "0b2de827bbeef243d901773912956297d36d3f8b6918f4182c152fd8a1e8171b"
     },
     {
       "platform": "windows",
       "preset": "ours",
       "shellKeys": true,
-      "count": 426,
-      "bindings": "f361289f0d916031181f6dcb002efb32e02fdb3bde7584ef03984da045cf98dd",
+      "count": 429,
+      "bindings": "14b59a929d9216d93e65c464359a00f4dd2c00b3bbaefa942b03579c218c41e0",
       "unmapped": "0b2de827bbeef243d901773912956297d36d3f8b6918f4182c152fd8a1e8171b"
     },
     {
       "platform": "windows",
       "preset": "zed",
       "shellKeys": false,
-      "count": 355,
-      "bindings": "527117b0438a44e25a7a7e72bf710e186be3b5b691b39fb253b09cfab8ea7ad7",
+      "count": 358,
+      "bindings": "a59fc0ffe110275cd4830cd96052bf5075af7c60ba248c246aa87632b3c45309",
       "unmapped": "0b2de827bbeef243d901773912956297d36d3f8b6918f4182c152fd8a1e8171b"
     },
     {
       "platform": "windows",
       "preset": "zed",
       "shellKeys": true,
-      "count": 402,
-      "bindings": "44738922dd82462460dbf17b3ab2de70c1129f610f4d473287b616a6d8737d52",
+      "count": 405,
+      "bindings": "6c96cf43fa3174251bf19f052d90aa3f4ac9becae4799382ed62afdb9a3c03d1",
       "unmapped": "0b2de827bbeef243d901773912956297d36d3f8b6918f4182c152fd8a1e8171b"
     },
     {
