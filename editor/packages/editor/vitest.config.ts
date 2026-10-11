@@ -9,6 +9,7 @@ import { defineConfig } from 'vitest/config'
 import type { BrowserCommand } from 'vitest/node'
 
 const crossEngineScrollTests = [
+  'test/hiddenInputSelection.browser.test.ts',
   'test/{virtualizedTextView,virtualizedTextViewGeometry,wheelScrollTarget,gutterScroll,gutterLeadingInset,gutterPointerEvents,wrappedLineGutter,wrappedLineHighlight,mouseSelectionAutoScroll,navigationReveal,initialViewport,firstPaint,longLineMeasurements,millionLinePaint,codeViewport,renderDisposal,rowPresentation,proportionalRows,proportionalWrap,freeSansShaping,freeSansNativeCarets,wordWrap,defaultLargeDocument,metricProbeScrollExtent,tailGeometry,typography}.browser.test.ts',
 ]
 
@@ -81,6 +82,9 @@ export default defineConfig({
             fileParallelism: false,
             provider: playwright(),
             commands: {
+              proofNativeInsertText: async ({ page }, text: string) => {
+                await page.keyboard.insertText(text)
+              },
               proofStyledWrapScreenshot,
               proofClipboardPermissions: async ({ page }) => {
                 await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])

@@ -244,6 +244,42 @@ export function pagedHiddenInputContent(
   }
 }
 
+/** Maps a boundary in the accessible window through its page and character omissions. */
+export function hiddenInputOffsetToDocument(
+  snapshot: PieceTableSnapshot,
+  selection: { readonly startOffset: number; readonly endOffset: number },
+  written: HiddenInputState,
+  offset: number,
+): number {
+  const { startOffset: start, endOffset: end } = selection
+  if (offset <= written.selectionStart) return start + offset - written.selectionStart
+  if (offset >= written.selectionEnd) return end + offset - written.selectionEnd
+
+  const startPage = Math.floor(offsetToPoint(snapshot, start).row / SCREEN_READER_PAGE_ROWS)
+  const endPage = Math.floor(offsetToPoint(snapshot, end).row / SCREEN_READER_PAGE_ROWS)
+  const spliced = endPage - startPage > 1
+  const headEnd = spliced
+    ? clamp(pageStartOffset(snapshot, startPage + 1, SCREEN_READER_PAGE_ROWS), start, end)
+    : end
+  const tailStart = spliced
+    ? clamp(pageStartOffset(snapshot, endPage, SCREEN_READER_PAGE_ROWS), headEnd, end)
+    : end
+  const text = spliced
+    ? spliceAcrossPages(snapshot, { start, end, startPage, endPage }, SCREEN_READER_PAGE_ROWS)
+    : readPieceTableTextRange(snapshot, start, end)
+  let selectedOffset = offset - written.selectionStart
+  if (text.length > 2 * SCREEN_READER_TRIM_CHARS) {
+    const head = sliceWholeCharacters(text, 0, SCREEN_READER_TRIM_CHARS)
+    const tail = sliceWholeCharacters(text, text.length - SCREEN_READER_TRIM_CHARS, text.length)
+    if (selectedOffset > head.length) {
+      selectedOffset += text.length - tail.length - head.length - ELLIPSIS.length
+    }
+  }
+  if (!spliced || selectedOffset <= headEnd - start) return start + selectedOffset
+
+  return tailStart + selectedOffset - (headEnd - start) - ELLIPSIS.length
+}
+
 function pageStartOffset(snapshot: PieceTableSnapshot, page: number, rowsPerPage: number): number {
   return pointToOffset(snapshot, { column: 0, row: page * rowsPerPage })
 }
