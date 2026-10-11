@@ -21,6 +21,7 @@ export function renderSelectionLayer(view: VirtualizedTextViewInternal): void {
 
 export function clearSelectionLayer(view: VirtualizedTextViewInternal): void {
   for (const row of view.rowElements.values()) {
+    if (!row.selectionLayerElement.parentElement) continue
     clearSelectionLayerForRow(row)
   }
 }

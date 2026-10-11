@@ -2073,6 +2073,8 @@ export class InputSelectionController {
     this.options.view.inputElement.blur()
     this.options.el.dataset.editorTouchSelection = ''
     this.markDomSelectionForNextInput()
+    this.options.view.setNativeSelection(anchor, head)
+    this.transitionInputState({ owner: 'dom', type: 'selection-reconciled' })
     const current = this.primaryResolvedSelection()
     if (
       current?.anchorOffset !== anchor ||
@@ -2083,6 +2085,7 @@ export class InputSelectionController {
         syncDomSelection: false,
       })
     }
+    this.refreshHiddenInputContent()
     const range = this.options.view.createRange(Math.min(anchor, head), Math.max(anchor, head), {
       scrollIntoView: false,
     })
@@ -3801,6 +3804,8 @@ export class InputSelectionController {
     const offsets = this.readDomSelectionOffsets()
     if (!offsets) return
     this.options.el.dataset.editorTouchSelection = ''
+    this.options.view.setNativeSelection(offsets.anchorOffset, offsets.headOffset)
+    this.transitionInputState({ owner: 'dom', type: 'selection-reconciled' })
     const current = this.primaryResolvedSelection()
     if (current?.anchorOffset === offsets.anchorOffset && current.headOffset === offsets.headOffset)
       return
@@ -3812,6 +3817,7 @@ export class InputSelectionController {
       nowMs(),
       { syncDomSelection: false },
     )
+    this.refreshHiddenInputContent()
   }
 
   private syncCustomSelectionHighlight(

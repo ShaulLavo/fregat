@@ -453,3 +453,112 @@ for (const boundary of ['host', 'editor-root', 'outer-wrapper']) {
     await expect(page.locator('.editor-virtualized-input')).toBeFocused()
   })
 }
+
+test('native touch selection repaints the caret at each active end', async ({ page }) => {
+  const point = await textPoint(page, 8)
+  await page.touchscreen.tap(point.x, point.y)
+  await page.waitForTimeout(80)
+  await page.touchscreen.tap(point.x, point.y)
+  for (const head of [15, 19, 25, 3]) {
+    const expected = await page.locator('.editor-virtualized').evaluate((content, head) => {
+      const rows = content.querySelectorAll('.editor-virtualized-row')
+      const anchor = document.createTreeWalker(rows[0]!, NodeFilter.SHOW_TEXT).nextNode()!
+      const row = rows[head >= 20 ? 1 : 0]!
+      const focus = document.createTreeWalker(row, NodeFilter.SHOW_TEXT).nextNode()!
+      const offset = head >= 20 ? head - 20 : head
+      document.getSelection()!.setBaseAndExtent(anchor, 6, focus, offset)
+      const range = document.createRange()
+      range.setStart(focus, offset)
+      range.collapse(true)
+      return { x: range.getBoundingClientRect().x, y: row.getBoundingClientRect().y }
+    }, head)
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as TestWindow).touchEditor.getSelections()[0]!.headOffset),
+      )
+      .toBe(head)
+    await expect
+      .poll(async () =>
+        Math.abs(
+          (await page
+            .locator('.editor-virtualized-caret')
+            .evaluate((caret) => caret.getBoundingClientRect().x)) - expected.x,
+        ),
+      )
+      .toBeLessThanOrEqual(1.5)
+    await expect
+      .poll(() =>
+        page
+          .locator('.editor-virtualized-caret')
+          .evaluate((caret) => caret.getBoundingClientRect().y),
+      )
+      .toBeCloseTo(expected.y, 0)
+  }
+  await expect(page.locator('.editor-virtualized-input')).not.toBeFocused()
+})
+
+test('native handle updates skip synchronous highlight work and paint once per frame', async ({
+  page,
+}) => {
+  const point = await textPoint(page, 8)
+  await page.touchscreen.tap(point.x, point.y)
+  await page.waitForTimeout(80)
+  await page.touchscreen.tap(point.x, point.y)
+  await page.waitForTimeout(100)
+  const synchronous = await page.evaluate(() => {
+    const state = window as TestWindow & {
+      nativePaintProbe?: { syncs: number; reads: number; writes: number }
+    }
+    const probe = { syncs: 0, reads: 0, writes: 0 }
+    state.nativePaintProbe = probe
+    const controller = (
+      state.touchEditor as SelectionEditor & {
+        inputSelection: {
+          syncCustomSelectionHighlight(anchor: number, head: number): void
+          syncTouchSelectionFromDom(): void
+        }
+      }
+    ).inputSelection
+    const sync = controller.syncCustomSelectionHighlight.bind(controller)
+    controller.syncCustomSelectionHighlight = (anchor, head) => {
+      probe.syncs++
+      sync(anchor, head)
+    }
+    const boundingRect = Range.prototype.getBoundingClientRect
+    Range.prototype.getBoundingClientRect = function () {
+      probe.reads++
+      return boundingRect.call(this)
+    }
+    const clientRects = Range.prototype.getClientRects
+    Range.prototype.getClientRects = function () {
+      probe.reads++
+      return clientRects.call(this)
+    }
+    const caret = document.querySelector('.editor-virtualized-caret')!
+    new MutationObserver((records) => {
+      probe.writes += records.length
+    }).observe(caret, {
+      attributes: true,
+      attributeFilter: ['style'],
+    })
+    const rows = document.querySelectorAll('.editor-virtualized-row')
+    const anchor = document.createTreeWalker(rows[0]!, NodeFilter.SHOW_TEXT).nextNode()!
+    const focus = document.createTreeWalker(rows[9]!, NodeFilter.SHOW_TEXT).nextNode()!
+    for (let offset = 1; offset <= 5; offset++) {
+      document.getSelection()!.setBaseAndExtent(anchor, 6, focus, offset)
+      controller.syncTouchSelectionFromDom()
+      controller.syncTouchSelectionFromDom()
+    }
+    return { syncs: probe.syncs, reads: probe.reads }
+  })
+  expect(synchronous).toEqual({ syncs: 0, reads: 0 })
+  await page.waitForTimeout(100)
+  const settled = await page.evaluate(() => {
+    const state = window as TestWindow & { nativePaintProbe: { syncs: number; writes: number } }
+    return { ...state.nativePaintProbe, head: state.touchEditor.getSelections()[0]!.headOffset }
+  })
+  expect(settled.syncs).toBe(0)
+  expect(settled.writes).toBe(1)
+  expect(settled.head).toBe(153)
+  await expect(page.locator('.editor-virtualized-selection-range')).toHaveCount(0)
+})
