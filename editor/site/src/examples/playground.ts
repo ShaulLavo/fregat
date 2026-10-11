@@ -1,3 +1,4 @@
+import { createTouchSelectionPlugin } from '@singapore-editor/plugin-ui/touch-selection-plugin'
 import { Editor } from '@singapore-editor/core/editor'
 import { createTreeSitterLanguagePlugin } from '@singapore-editor/tree-sitter'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
@@ -21,6 +22,7 @@ export function mountPlayground(element: HTMLElement): Editor {
       colors: { 'editor.background': '#18202b', 'editor.foreground': '#dce5ef' },
     }),
     plugins: [
+      createTouchSelectionPlugin({ haptics: true }),
       createTreeSitterLanguagePlugin(TREE_SITTER_LANGUAGE_CONTRIBUTIONS),
       createLineGutterPlugin(),
       createEditorFindPlugin(),

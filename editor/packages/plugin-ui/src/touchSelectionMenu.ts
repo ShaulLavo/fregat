@@ -11,13 +11,13 @@ type MenuAnchor = { readonly x: number; readonly y: number; readonly bottom: num
 /** A framework-neutral touch popover; host tokens supply the same surface as app menus. */
 export class TouchSelectionMenu {
   private element: HTMLDivElement | null = null
-  private pending = false
   private anchor: MenuAnchor | null = null
 
   constructor(
     private readonly editor: HTMLElement,
     private readonly items: () => readonly TouchMenuItem[],
     private readonly selectionAnchor: () => MenuAnchor | null,
+    private readonly haptics = false,
   ) {}
 
   show(x: number, y: number, bottom = y + 16): void {
@@ -43,18 +43,45 @@ export class TouchSelectionMenu {
     actions.className = 'editor-touch-menu-actions'
     element.append(actions)
     for (const item of this.items()) {
-      const button = document.createElement('button')
-      button.type = 'button'
+      const switchInput = document.createElement('input')
+      const nativeSwitch =
+        this.haptics && 'switch' in switchInput && !document.defaultView?.navigator.vibrate
+      const button: HTMLElement = document.createElement(nativeSwitch ? 'label' : 'button')
+      button.setAttribute('role', 'button')
+      button.tabIndex = item.disabled ? -1 : 0
       button.textContent = item.label
       button.dataset.action = item.id
-      button.disabled = item.disabled ?? false
-      button.addEventListener('click', () => this.run(item, element))
+      button.setAttribute('aria-disabled', String(item.disabled ?? false))
+      if (button instanceof document.defaultView!.HTMLButtonElement) {
+        button.type = 'button'
+        button.disabled = item.disabled ?? false
+      }
+      if (nativeSwitch && !item.disabled) {
+        // See browser-quirks.md#touch-haptic-availability for trusted label activation only.
+        switchInput.type = 'checkbox'
+        switchInput.setAttribute('switch', '')
+        switchInput.setAttribute('aria-hidden', 'true')
+        switchInput.style.visibility = 'hidden'
+        switchInput.style.position = 'absolute'
+        switchInput.style.pointerEvents = 'none'
+        button.append(switchInput)
+      }
+      button.addEventListener('click', (event) => {
+        if (item.disabled || (nativeSwitch && event.target !== switchInput)) return
+        this.run(item, element)
+      })
+      button.addEventListener('keydown', (event) => {
+        if (button.tagName !== 'LABEL' || (event.key !== 'Enter' && event.key !== ' ')) return
+        event.preventDefault()
+        button.click()
+      })
       actions.append(button)
     }
     element.addEventListener('mousedown', (event) => event.preventDefault())
     element.addEventListener('keydown', this.keyDown)
     document.body.append(element)
     this.element = element
+    // See browser-quirks.md#touch-menu-visual-viewport for keyboard and pinch geometry.
     const viewport = document.defaultView?.visualViewport
     this.anchor = { x, y, bottom }
     this.position()
@@ -113,7 +140,7 @@ export class TouchSelectionMenu {
     }
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
     const buttons = Array.from(
-      this.element?.querySelectorAll<HTMLButtonElement>('button:enabled') ?? [],
+      this.element?.querySelectorAll<HTMLElement>('[data-action][aria-disabled="false"]') ?? [],
     )
     const current = buttons.findIndex(
       (button) => button === this.editor.ownerDocument.activeElement,
@@ -124,10 +151,9 @@ export class TouchSelectionMenu {
   }
 
   private run(item: TouchMenuItem, element: HTMLDivElement): void {
-    if (this.pending) return
-    this.pending = true
+    if (this.element !== element || element.hasAttribute('aria-busy')) return
     element.setAttribute('aria-busy', 'true')
-    // Invoke in the click's activation turn so Safari can authorize clipboard access.
+    // See browser-quirks.md#touch-clipboard-user-activation for synchronous activation.
     let result: void | Promise<void>
     try {
       result = item.run()
@@ -137,7 +163,7 @@ export class TouchSelectionMenu {
     }
     void Promise.resolve(result).then(
       () => {
-        this.pending = false
+        element.removeAttribute('aria-busy')
         if (this.element === element) this.hide()
       },
       () => this.failed(element, item.failureMessage),
@@ -145,7 +171,6 @@ export class TouchSelectionMenu {
   }
 
   private failed(element: HTMLDivElement, message?: string): void {
-    this.pending = false
     element.removeAttribute('aria-busy')
     if (this.element !== element) return
     let status = element.querySelector('[role="status"]')

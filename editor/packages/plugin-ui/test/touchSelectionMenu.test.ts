@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { TouchSelectionMenu, type TouchMenuItem } from '../src/editor/touchSelectionMenu'
+import { TouchSelectionMenu, type TouchMenuItem } from '../src/touchSelectionMenu'
 
 let editor: HTMLDivElement
 let menu: TouchSelectionMenu
@@ -63,6 +63,27 @@ it('blocks repeated actions while one is pending', async () => {
   button.click()
   expect(run).toHaveBeenCalledOnce()
   settle!()
+  await Promise.resolve()
+  expect(document.querySelector('.editor-touch-menu')).toBeNull()
+})
+
+it('keeps pending actions with their own menu after dismissal', async () => {
+  const settlements: (() => void)[] = []
+  const run = vi.fn(() => new Promise<void>((resolve) => settlements.push(resolve)))
+  items.push({ id: 'paste', label: 'Paste', run })
+  menu.show(100, 100)
+  document.querySelector<HTMLButtonElement>('button')!.click()
+  menu.hide()
+  menu.show(120, 120)
+  const next = document.querySelector<HTMLButtonElement>('button')!
+  next.click()
+  expect(run).toHaveBeenCalledTimes(2)
+  settlements[0]!()
+  await Promise.resolve()
+  expect(document.querySelector('.editor-touch-menu')?.getAttribute('aria-busy')).toBe('true')
+  next.click()
+  expect(run).toHaveBeenCalledTimes(2)
+  settlements[1]!()
   await Promise.resolve()
   expect(document.querySelector('.editor-touch-menu')).toBeNull()
 })

@@ -1,3 +1,4 @@
+import type { Editor, EditorPlugin } from '@singapore-editor/core'
 import { expect, test, type Page } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
@@ -40,6 +41,7 @@ async function textPoint(page: Page, row: number, offset: number) {
 async function beginHold(page: Page) {
   const point = await textPoint(page, 0, 8)
   await finger(page, 'touchstart', point.x, point.y)
+  await page.waitForTimeout(575)
   await expect(page.locator('#selection')).toHaveText('Selected: bravo')
   return point
 }
@@ -88,7 +90,7 @@ test('double tap selects a word and menu actions extend through the public optio
   await page.touchscreen.tap(point.x, point.y)
   await page.touchscreen.tap(point.x, point.y)
   await expect(page.locator('#selection')).toHaveText('Selected: bravo')
-  await page.getByRole('button', { name: 'Inspect', exact: true }).click()
+  await page.getByRole('button', { name: 'Demo: count characters', exact: true }).click()
   await expect(page.locator('#status')).toContainText('5 characters')
   await page.locator('#reset').click()
   await beginHold(page)
@@ -97,6 +99,130 @@ test('double tap selects a word and menu actions extend through the public optio
   await expect(page.locator('#selection')).toHaveText(
     'Selected: alpha bravo charlie\nsecond line\nthird row',
   )
+})
+
+test('triple tap selects the same whole line as desktop triple click', async ({ page }) => {
+  const point = await textPoint(page, 0, 8)
+  for (let tap = 0; tap < 3; tap++) {
+    await finger(page, 'touchstart', point.x, point.y)
+    await finger(page, 'touchend', point.x, point.y)
+  }
+  await expect(page.locator('#selection')).toHaveText('Selected: alpha bravo charlie')
+  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toBeVisible()
+})
+
+test('quad tap selects the full document like desktop quad click', async ({ page }) => {
+  const point = await textPoint(page, 0, 8)
+  for (let tap = 0; tap < 4; tap++) {
+    await finger(page, 'touchstart', point.x, point.y)
+    await finger(page, 'touchend', point.x, point.y)
+  }
+  await expect(page.locator('#selection')).toHaveText(
+    'Selected: alpha bravo charlie\nsecond line\nthird row',
+  )
+  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toBeVisible()
+})
+
+test('third tap drag extends by whole lines in both directions', async ({ page }) => {
+  const point = await textPoint(page, 1, 4)
+  for (let tap = 0; tap < 2; tap++) {
+    await finger(page, 'touchstart', point.x, point.y)
+    await finger(page, 'touchend', point.x, point.y)
+  }
+  await finger(page, 'touchstart', point.x, point.y)
+  await expect(page.locator('#selection')).toHaveText('Selected: second line')
+  const first = await textPoint(page, 0, 8)
+  await finger(page, 'touchmove', first.x, first.y + 12)
+  await expect(page.locator('#selection')).toHaveText('Selected: alpha bravo charlie\nsecond line')
+  const last = await textPoint(page, 2, 2)
+  await finger(page, 'touchmove', last.x, last.y + 12)
+  await finger(page, 'touchend', last.x, last.y + 12)
+  await expect(page.locator('#selection')).toHaveText('Selected: second line\nthird row')
+  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toBeVisible()
+})
+
+test('touch Undo and Redo appear only when available and use editor history', async ({ page }) => {
+  let point = await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Redo', exact: true })).toHaveCount(0)
+  await page.locator('textarea').press('ArrowLeft')
+  await page.locator('textarea').press('Home')
+  await page.locator('textarea').press('x')
+  point = await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
+  await expect(page.locator('#host')).toContainText('alpha bravo charlie')
+  point = await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Redo', exact: true }).click()
+  await expect(page.locator('#host')).toContainText('xalpha bravo charlie')
+  point = await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Redo', exact: true })).toHaveCount(0)
+})
+
+test('core alone keeps touch semantics after optional chrome is removed', async ({ page }) => {
+  await page.evaluate(() => {
+    const windowWithPlugin = window as TouchFixtureWindow
+    windowWithPlugin.touchEditor.removePlugin(windowWithPlugin.touchMenuPlugin)
+  })
+  const point = await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await page.waitForTimeout(100)
+  await expect(page.locator('#selection')).toHaveText('Selected: bravo')
+  await expect(page.getByRole('toolbar')).toHaveCount(0)
+  await expect(page.locator('style[data-editor-touch-menu]')).toHaveCount(0)
+  await page.evaluate(() => {
+    const windowWithPlugin = window as TouchFixtureWindow
+    windowWithPlugin.touchEditor.addPlugin(windowWithPlugin.touchMenuPlugin)
+  })
+  await expect(page.locator('style[data-editor-touch-menu]')).toHaveCount(1)
+  await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toBeVisible()
+})
+
+test('trusted menu switch activation keeps actions, typing focus and button accessibility', async ({
+  page,
+}) => {
+  const switchSupported = await page.evaluate(
+    () => 'switch' in document.createElement('input') && !navigator.vibrate,
+  )
+  test.skip(!switchSupported, 'This browser has no native switch haptic path.')
+  await page.evaluate(() => {
+    const observed = window as TouchFixtureWindow
+    observed.hapticClicks = []
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          observed.clipboardWritten = text
+        },
+      },
+    })
+    document.addEventListener('click', (event) => {
+      const target = event.target
+      if (target instanceof HTMLInputElement && target.matches('.editor-touch-menu input[switch]'))
+        observed.hapticClicks.push(event.isTrusted)
+    })
+  })
+  const point = await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  const copy = page.getByRole('button', { name: 'Copy', exact: true })
+  await expect(copy).toBeVisible()
+  await expect(page.getByRole('checkbox')).toHaveCount(1)
+  const bounds = (await copy.boundingBox())!
+  await page.touchscreen.tap(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+  await expect
+    .poll(() => page.evaluate(() => (window as TouchFixtureWindow).clipboardWritten))
+    .toBe('bravo')
+  expect(await page.evaluate(() => (window as TouchFixtureWindow).hapticClicks)).toEqual([true])
+  expect(
+    await page.evaluate(() => document.activeElement === document.querySelector('textarea')),
+  ).toBe(true)
 })
 
 test('release restores the selected input window after focus collapses its native range', async ({
@@ -153,7 +279,7 @@ test('Select all keeps actions and refreshes their selection context', async ({ 
   await finger(page, 'touchend', point.x, point.y)
   await page.getByRole('button', { name: 'Select all', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Copy', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Inspect', exact: true }).click()
+  await page.getByRole('button', { name: 'Demo: count characters', exact: true }).click()
   await expect(page.locator('#status')).toContainText('41 characters')
 })
 
@@ -164,7 +290,7 @@ test('keyboard and host selection changes dismiss the touch menu', async ({ page
   await expect(page.getByRole('toolbar')).toHaveCount(0)
   await beginHold(page)
   await finger(page, 'touchend', point.x, point.y)
-  await page.evaluate(() => (window as any).touchEditor.setSelection(0))
+  await page.evaluate(() => (window as TouchFixtureWindow).touchEditor.setSelection(0))
   await expect(page.getByRole('toolbar')).toHaveCount(0)
 })
 
@@ -227,8 +353,10 @@ test('a swipe cancels selection recognition before its hold deadline', async ({ 
   await expect(page.getByRole('toolbar')).toHaveCount(0)
 })
 
-type ClipboardWindow = Window & {
-  touchEditor: { setSelection(anchor: number, head?: number): void; materializeFullText(): string }
+type TouchFixtureWindow = Window & {
+  touchEditor: Pick<Editor, 'setSelection' | 'materializeFullText' | 'removePlugin' | 'addPlugin'>
+  touchMenuPlugin: EditorPlugin
+  hapticClicks: boolean[]
   clipboardWritten?: string
   finishClipboardRead?: (text: string) => void
 }
@@ -239,7 +367,7 @@ test('Copy, Cut and Paste use the selected document text', async ({ page }) => {
       configurable: true,
       value: {
         writeText: async (text: string) => {
-          ;(window as ClipboardWindow).clipboardWritten = text
+          ;(window as TouchFixtureWindow).clipboardWritten = text
         },
         readText: async () => 'replacement',
       },
@@ -253,7 +381,9 @@ test('Copy, Cut and Paste use the selected document text', async ({ page }) => {
     if (action === 'Paste')
       await expect(page.locator('#host')).toContainText('alpha replacement charlie')
     else
-      expect(await page.evaluate(() => (window as ClipboardWindow).clipboardWritten)).toBe('bravo')
+      expect(await page.evaluate(() => (window as TouchFixtureWindow).clipboardWritten)).toBe(
+        'bravo',
+      )
     if (action === 'Cut') await expect(page.locator('#host')).toContainText('alpha  charlie')
   }
 })
@@ -265,7 +395,7 @@ test('an asynchronous paste keeps a later selection unchanged', async ({ page })
       value: {
         readText: () =>
           new Promise<string>((resolve) => {
-            ;(window as ClipboardWindow).finishClipboardRead = resolve
+            ;(window as TouchFixtureWindow).finishClipboardRead = resolve
           }),
       },
     })
@@ -275,13 +405,13 @@ test('an asynchronous paste keeps a later selection unchanged', async ({ page })
   await page.getByRole('button', { name: 'Paste', exact: true }).click()
   await expect(page.getByRole('toolbar')).toHaveAttribute('aria-busy', 'true')
   await page.evaluate(() => {
-    const state = window as ClipboardWindow
+    const state = window as TouchFixtureWindow
     state.touchEditor.setSelection(0)
     state.finishClipboardRead!('stale paste')
   })
   await expect(page.getByRole('toolbar')).toHaveCount(0)
   expect(
-    await page.evaluate(() => (window as ClipboardWindow).touchEditor.materializeFullText()),
+    await page.evaluate(() => (window as TouchFixtureWindow).touchEditor.materializeFullText()),
   ).toBe('alpha bravo charlie\nsecond line\nthird row')
   await expect(page.locator('#selection')).toHaveText('Selected: ')
 })

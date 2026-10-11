@@ -715,7 +715,6 @@ export class Editor {
       getSyntaxInjections: () => this.syntax.injections,
       getSession: () => this.session,
       getSessionOptions: () => this.sessionOptions,
-      touchSelectionMenuItems: options.touchSelectionMenuItems,
       getPasteHandlers: () => this.languageFeatures.ordered(EDITOR_PASTE_HANDLER, this.languageId),
       getSyntaxTokens: () => this.syntax.copyTokens,
       getEditorTheme: () => this.resolvedTheme(),
@@ -3630,6 +3629,12 @@ export class Editor {
       onDidTransaction: (listener) => this.claimedBy(claims, () => this.onDidTransaction(listener)),
       reconcile: (base, batches, options) => this.reconcile(base, batches, options),
       onDidType: (listener) => this.claimedBy(claims, () => this.addTypedTextListener(listener)),
+      onDidTouchSelection: (listener) =>
+        this.claimedBy(claims, () => this.inputSelection.onDidTouchSelection(listener)),
+      getTouchSelectionAnchor: () => this.inputSelection.touchSelectionAnchor(),
+      getSelectedText: () => this.inputSelection.selectedText(),
+      getInputCommandState: () => this.inputSelection.inputCommandState(),
+      runInputCommand: (command) => this.inputSelection.runInputCommand(command),
       registerPressParticipant: (participant) =>
         this.claimedBy(claims, () => this.registerPressParticipant(participant)),
       registerNonCaretRows: (isNonCaret) =>

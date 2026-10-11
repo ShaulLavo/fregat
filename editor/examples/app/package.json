@@ -22,6 +22,7 @@
     "@singapore-editor/find": "workspace:*",
     "@singapore-editor/gutters": "workspace:*",
     "@singapore-editor/minimap": "workspace:*",
+    "@singapore-editor/plugin-ui": "workspace:*",
     "@singapore-editor/scope-lines": "workspace:*",
     "@singapore-editor/spellcheck": "workspace:*",
     "@singapore-editor/textbuffer": "workspace:*",

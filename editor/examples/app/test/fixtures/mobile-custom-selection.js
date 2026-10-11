@@ -1,20 +1,26 @@
 import { Editor } from '../../../../packages/editor/src/editor.ts'
+import { createTouchSelectionPlugin } from '../../../../packages/plugin-ui/src/touchSelectionPlugin.ts'
 const shortText = 'alpha bravo charlie\nsecond line\nthird row'
 const host = document.querySelector('#host')
-const editor = new Editor(host, {
-  fontSize: 20,
-  lineHeight: 24,
-  onChange: () => record(),
-  touchSelectionMenuItems: ({ selectedText }) => [
+const touchPlugin = createTouchSelectionPlugin({
+  haptics: true,
+  items: ({ selectedText }) => [
     {
       id: 'inspect',
-      label: 'Inspect',
+      label: 'Demo: count characters',
       run() {
         document.querySelector('#status').textContent =
           `Action extension received ${selectedText.length} characters.`
       },
     },
   ],
+})
+window.touchMenuPlugin = touchPlugin
+const editor = new Editor(host, {
+  fontSize: 20,
+  lineHeight: 24,
+  plugins: [touchPlugin],
+  onChange: () => record(),
 })
 window.touchEditor = editor
 function record() {

@@ -52,3 +52,10 @@ export {
   unionOffsetRange,
   type OffsetRange,
 } from './offsetRange'
+
+export {
+  createTouchSelectionPlugin,
+  type TouchSelectionPluginOptions,
+  type TouchSelectionMenuContext,
+  type TouchMenuItem,
+} from './touchSelectionPlugin'

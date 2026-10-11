@@ -36,9 +36,9 @@ Content mode supports up to 10,000 display rows, 1,048,576 UTF-16 source units a
 
 ## Touch selection
 
-Hold a word or double-tap it, keep that contact down, and drag to extend the selection across rows. Ordinary swipes scroll. Releasing a selected range opens the touch edit menu with Cut, Copy, Paste and Select all. Clipboard actions require browser clipboard access.
+Hold a word or double-tap it, keep that contact down, and drag by words across rows. Triple-tap selects a whole line and its held contact drags by lines. Four taps select the document. Ordinary swipes scroll. These gestures use the same document selections and boundaries as desktop clicks.
 
-Append host actions with `touchSelectionMenuItems`. The callback receives the selected text and whether the editor is editable; each action supplies an `id`, a `label`, an optional `disabled` flag and a `run()` callback that may return a promise. Actions run directly from the menu click, so browser APIs can use its user activation. The menu waits for an asynchronous action to settle and shows a retry message if it fails. Desktop context menus are unchanged.
+Touch menu chrome is opt-in through `createTouchSelectionPlugin` from `@singapore-editor/plugin-ui/touch-selection-plugin`. The plugin owns its menu, extension items and optional haptics. Core view contributions expose `onDidTouchSelection`, `getTouchSelectionAnchor`, `getSelectedText`, `getInputCommandState` and `runInputCommand` for input-aware plugins. Clipboard commands retain active paste providers and browser clipboard authorization.
 
 ## API highlights
 

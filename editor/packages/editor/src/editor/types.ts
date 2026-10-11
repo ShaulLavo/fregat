@@ -5,6 +5,7 @@ import type {
   EditorInitialHighlightStatus,
   EditorInitialPaintEvent,
   EditorPlugin,
+  EditorResolvedSelection,
 } from '../plugins'
 import type { EditorTheme } from '../theme'
 import type {
@@ -44,16 +45,25 @@ export type EditorDocumentMode = 'session' | 'static'
 
 export type EditorSelectionSyncMode = 'sync' | 'none'
 
-export type EditorTouchSelectionMenuContext = {
-  readonly selectedText: string
-  readonly editable: boolean
+export type EditorTouchSelectionAnchor = {
+  readonly x: number
+  readonly y: number
+  readonly bottom: number
 }
 
-export type EditorTouchSelectionMenuItem = {
-  readonly id: string
-  readonly label: string
-  readonly disabled?: boolean
-  run(): void | Promise<void>
+export type EditorTouchSelectionEvent = {
+  readonly phase: 'start' | 'update' | 'end' | 'cancel'
+  readonly kind: 'word' | 'line' | 'document' | null
+  readonly selections: readonly EditorResolvedSelection[]
+  readonly anchor: EditorTouchSelectionAnchor | null
+}
+
+export type EditorInputCommand = 'cut' | 'copy' | 'paste' | 'selectAll' | 'undo' | 'redo'
+
+export type EditorInputCommandState = {
+  readonly editable: boolean
+  readonly canUndo: boolean
+  readonly canRedo: boolean
 }
 
 export type EditorScrollMode = VirtualizedTextViewScrollMode
@@ -156,10 +166,6 @@ export type EditorOptions = {
   /** `content` paints every row at natural height; outside ancestors own scrolling. */
   readonly scrollMode?: EditorScrollMode
   readonly selectionSyncMode?: EditorSelectionSyncMode
-  /** Extra actions appended to the touch selection menu's Cut, Copy, Paste and Select all. */
-  readonly touchSelectionMenuItems?: (
-    context: EditorTouchSelectionMenuContext,
-  ) => readonly EditorTouchSelectionMenuItem[]
   /** Confusable and invisible characters to point out; both families report unless turned off. */
   readonly suspiciousCharacters?: EditorSuspiciousCharactersOptions
   /**

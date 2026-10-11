@@ -171,7 +171,7 @@ with the probe evidence; the physical-device protocol remains the next decision 
 
 ## Custom touch selection decision (2026-10-11)
 
-Status: Approved; custom implementation available for comparison, awaiting review.
+Status: Approved; custom touch selection and optional plugin menu are under review.
 
 Touch uses the editor-owned selection shared with desktop mouse input. Double-tap or hold a
 word, keep that contact down, and drag to extend across rows. Keep ordinary swipes available
@@ -181,7 +181,7 @@ selection highlights, wrap geometry and edge-scroll machinery.
 
 The touch actions use a horizontal iOS-like DOM pill with Cut, Copy, Paste and Select all,
 placed above the selection with an arrow and a system font. Light and dark surfaces inherit
-host popover colors. Hosts can append actions through `touchSelectionMenuItems`. Desktop
+host popover colors. Hosts can append actions through `createTouchSelectionPlugin({ items })` in `@singapore-editor/plugin-ui`. Desktop
 keeps its existing menu. The app's Base UI context menu is also DOM-based; a web page cannot
 append arbitrary actions to UIKit's native text-selection callout.
 
@@ -431,3 +431,15 @@ and the measuring code can each confound results. The first probe isolates fixed
 scrolling; later tests must add those factors individually. Keep raw evidence outside the public
 product pages and keep temporary hosting private. Stop short of production changes until the
 physical-device record supports the decision.
+
+### Optional touch chrome and desktop-equivalent tap sequences
+
+Status: Approved. Core retains tap/hold recognition, document selection, whole-word and whole-line drag extension, edge scrolling and native-input guards. The touch menu and optional haptics move to `@singapore-editor/plugin-ui`, the existing owner of editor popup chrome; this avoids introducing a second package for the same UI lifetime. Core alone creates no touch menu. The Singapore site and example app opt into `createTouchSelectionPlugin`; only the comparison fixture adds “Demo: count characters.”
+
+Three taps select the same line range as desktop triple-click; four taps select the document, matching desktop's `detail >= 4`. Repeated taps retain the existing 350 ms interval and 10 CSS px distance thresholds. Triple-tap drag extends by whole lines in both directions. Undo and Redo are available only for editable documents with the corresponding history and use the same input commands as desktop.
+
+Plugin view hooks receive touch start/update/end/cancel events, current selections and anchor geometry. Generic input commands expose the existing paste-provider pipeline, Select all and history. The menu design stays unchanged; the owner withdrew visual variants. There are no selection handles in the current implementation. Optional plugin haptics request 8 ms Vibration API ticks on supported Android browsers. Safari has no Vibration API; a trusted menu label can activate the plugin's hidden native checkbox switch, but physical iPhone feedback from that control remains unverified. Hold-timer and drag-update callbacks cannot request trusted switch haptics. The reviewed WebKit source requires trusted activation; the owner's cited bug 309082 is access-restricted, so its contents and status were not verified. Physical iOS and Android tactile acceptance remains open.
+
+Every browser-specific guard and limitation in this implementation is indexed in [browser quirks](../editor/docs/display/browser-quirks.md), with browser scope, reproduction, source location, and removal criteria. The entries distinguish the observed focus collapse and release-scroll ordering from native-selection ownership and intended viewport, clipboard, and haptic constraints. The haptic entry links the inspected WebKit source and records the access limit on bug 309082. Native row-layout and optional selection handles remain Approved for later.
+
+The recorded native acceptance remains the trusted iOS 26.5 simulator run, including 20 holds with zero native visible-row selections, `[6, 41]` cross-row release, replacement typing, and clipboard actions. Portable synthetic tests check ownership and input synchronization but do not prove UIKit recognition, physical haptics, or pinch behavior. Physical-device haptics and pinch checks remain open; they do not change the approved scope of the current touch-selection work.
