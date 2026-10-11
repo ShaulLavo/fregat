@@ -81,17 +81,24 @@ export function compactRows(
   rows: (RendererTextFrameRow | undefined)[],
 ): (RendererTextFrameRow | undefined)[]
 export function compactRows(rows: (StoredRow | undefined)[]): (StoredRow | undefined)[] {
-  const packets = new Set<RowPacket>()
+  let firstPacket: RowPacket | undefined
+  let packets: Set<RowPacket> | undefined
   let pinnedBytes = 0
   let liveBytes = 0
   for (const row of rows) {
     const storage = row?.[rowStorage]
     if (!storage) continue
     liveBytes += storage.liveBytes
-    if (!packets.has(storage.packet)) {
-      packets.add(storage.packet)
-      pinnedBytes += storage.packet.byteLength
+    if (!firstPacket) {
+      firstPacket = storage.packet
+      pinnedBytes = storage.packet.byteLength
+      continue
     }
+    if (storage.packet === firstPacket) continue
+    packets ??= new Set([firstPacket])
+    if (packets.has(storage.packet)) continue
+    packets.add(storage.packet)
+    pinnedBytes += storage.packet.byteLength
   }
   if (pinnedBytes <= PINNED_GRID_MULTIPLIER * liveBytes) return rows
   let recordsLength = 0
