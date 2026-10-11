@@ -71,6 +71,7 @@ import { capitalize, indentTimingName, type SessionChangeOptions } from './edito
 import {
   EMPTY_HIDDEN_INPUT_STATE,
   deduceHiddenInputEdit,
+  hiddenInputOffsetToDocument,
   isEmptyDeducedInput,
   isIncompleteDeducedInput,
   keyboardFallbackText,
@@ -308,6 +309,7 @@ export class InputSelectionController {
   // advances it — an event the editor decides not to act on leaves the element holding text it can
   // still be diffed against next time.
   private hiddenInputContent: HiddenInputState = EMPTY_HIDDEN_INPUT_STATE
+  private writingInputWindow = false
   /** What a textarea composition replaces in the written window, read when it starts. */
   private compositionRange: { readonly start: number; readonly end: number } | null = null
   /** The window range an EditContext composition replaces, and where its candidate now ends. */
@@ -347,6 +349,7 @@ export class InputSelectionController {
     el.addEventListener('mousedown', this.handleMouseDown)
     el.addEventListener('dblclick', this.handleTouchDoubleClick)
     el.addEventListener('beforeinput', this.handleBeforeInput)
+    el.addEventListener('select', this.syncHiddenInputSelection)
     el.addEventListener('copy', this.handleCopy)
     el.addEventListener('cut', this.handleCut)
     el.addEventListener('dragover', this.handleDragOver)
@@ -371,6 +374,7 @@ export class InputSelectionController {
     el.removeEventListener('mousedown', this.handleMouseDown)
     el.removeEventListener('dblclick', this.handleTouchDoubleClick)
     el.removeEventListener('beforeinput', this.handleBeforeInput)
+    el.removeEventListener('select', this.syncHiddenInputSelection)
     el.removeEventListener('copy', this.handleCopy)
     el.removeEventListener('cut', this.handleCut)
     el.removeEventListener('dragover', this.handleDragOver)
@@ -1703,7 +1707,13 @@ export class InputSelectionController {
     if (!selection) return
 
     const content = pagedHiddenInputContent(snapshot, resolveSelection(snapshot, selection))
-    this.writeInputWindow(content)
+    // Selection setters may synchronously dispatch select while the window is being written.
+    this.writingInputWindow = true
+    try {
+      this.writeInputWindow(content)
+    } finally {
+      this.writingInputWindow = false
+    }
     this.hiddenInputContent = {
       selectionEnd: content.selectionEnd,
       selectionStart: content.selectionStart,
@@ -1966,15 +1976,24 @@ export class InputSelectionController {
 
   private handleCompositionStart = this.traceInput(
     'input.compositionstart',
-    (_event: CompositionEvent): void => {
+    (event: CompositionEvent): void => {
+      const selectionChange = this.isInputFocused() ? this.selectionChangeBeforeEdit() : null
+      const input = this.options.view.inputElement
+      // Keep the browser's window intact as composition begins, but measure its replacement
+      // against the mapped native selection so omitted display text cannot enter the document.
+      if (selectionChange && isTextareaElement(input)) {
+        this.hiddenInputContent = readHiddenInputState(input)
+      }
       this.transitionInputState({ type: 'composition-start' })
       this.editContextComposition = null
       // A textarea selects what the composition is about to replace, which is how a correction
       // reaching back over a word says so: the event itself carries only the new text.
-      const input = this.options.view.inputElement
       this.compositionRange = isTextareaElement(input)
         ? { start: input.selectionStart, end: input.selectionEnd }
         : null
+      if (selectionChange) {
+        this.applyChange(selectionChange, 'input.compositionstart', eventStartMs(event))
+      }
     },
   )
 
@@ -2850,6 +2869,11 @@ export class InputSelectionController {
     if (inserted === null) return
 
     const start = eventStartMs(event)
+    if (this.inputState.compositionActive) {
+      event.preventDefault()
+      this.commitComposition(inserted, this.compositionRange, start)
+      return
+    }
     const selectionChange = measureEditorPerformance('input.selectionChangeBeforeEdit', () =>
       this.selectionChangeBeforeEdit(),
     )
@@ -3689,12 +3713,53 @@ export class InputSelectionController {
     const source = selectionBeforeEditSource(this.inputState, this.domSelectionContext())
     if (source === 'hidden-input') {
       this.markHiddenInputSelectionForNextInput()
-      return null
+      return this.updateSessionSelectionFromHiddenInput()
     }
     if (source === 'dom') return this.updateSessionSelectionFromDom()
 
     this.markDomSelectionForNextInput()
     return null
+  }
+
+  private syncHiddenInputSelection = (event: Event): void => {
+    if (this.writingInputWindow || !this.isInputFocused()) return
+    this.handleHiddenInputSelection(event)
+  }
+
+  private handleHiddenInputSelection = this.traceInput('input.nativeSelection', (): void => {
+    const change = this.updateSessionSelectionFromHiddenInput()
+    if (!change) return
+
+    this.markHiddenInputSelectionForNextInput()
+    this.applyChange(change, 'input.nativeSelection', nowMs())
+  })
+
+  private updateSessionSelectionFromHiddenInput(): DocumentSessionChange | null {
+    if (this.writingInputWindow) return null
+    const session = this.session
+    const input = this.options.view.inputElement
+    if (!session || !isTextareaElement(input)) return null
+    // These paths already read the replacement from the old window. The element now holds
+    // the candidate or edited text, so its current caret belongs to the result of that edit.
+    if (this.inputState.compositionActive || this.inputState.pendingTextSource === 'composition')
+      return null
+    const written = this.hiddenInputContent
+    if (input.value !== written.value) return null
+    const primary = session.getSelections().selections[0]
+    if (!primary) return null
+    const snapshot = session.getSnapshot()
+    const selection = resolveSelection(snapshot, primary)
+    const backward = input.selectionDirection === 'backward'
+    if (
+      input.selectionStart === written.selectionStart &&
+      input.selectionEnd === written.selectionEnd &&
+      (input.selectionStart === input.selectionEnd || backward === selection.reversed)
+    )
+      return null
+
+    const start = hiddenInputOffsetToDocument(snapshot, selection, written, input.selectionStart)
+    const end = hiddenInputOffsetToDocument(snapshot, selection, written, input.selectionEnd)
+    return session.setSelection(backward ? end : start, backward ? start : end)
   }
 
   private readDomSelectionOffsets(): { anchorOffset: number; headOffset: number } | null {
@@ -3708,8 +3773,12 @@ export class InputSelectionController {
     return { anchorOffset, headOffset }
   }
 
-  private syncCustomSelectionFromDom = (): void => {
+  private syncCustomSelectionFromDom = (event: Event): void => {
     if (!this.session) return
+    if (this.isInputFocused()) {
+      this.syncHiddenInputSelection(event)
+      return
+    }
     if (this.touchSelection.ownsMouseEvent && !this.isInputFocused()) {
       this.syncTouchSelectionFromDom()
       return
