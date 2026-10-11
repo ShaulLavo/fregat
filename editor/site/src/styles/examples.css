@@ -142,6 +142,10 @@
 .sg-example-editor > .editor {
   border: 0;
   border-radius: 0;
+  --editor-cursor-line-row-background: color-mix(in srgb, var(--sg-fg) 6%, transparent);
+  --editor-cursor-line-gutter-background: color-mix(in srgb, var(--sg-fg) 6%, transparent);
+}
+.sg-example-editor:not([data-example-interacted]) > .editor {
   --editor-cursor-line-row-background: transparent;
   --editor-cursor-line-gutter-background: transparent;
   --editor-gutter-active-foreground: var(--editor-gutter-foreground);
