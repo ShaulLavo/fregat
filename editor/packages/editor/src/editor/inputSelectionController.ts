@@ -1,6 +1,8 @@
 import { isTextareaElement } from '../dom'
 import { scheduleFrame, type ScheduledFrame } from './scheduleFrame'
 import { TouchSelectionController } from './touchSelection'
+import type { TouchMenuItem } from './touchSelectionMenu'
+import type { EditorOptions } from './types'
 import type {
   DocumentSession,
   DocumentSessionChange,
@@ -180,6 +182,7 @@ export type InputSelectionControllerOptions = {
   readonly autoClosingPairs?: readonly EditorAutoClosingPair[]
   /** What typing an opener over a selection wraps it with; the auto-closing pairs when unset. */
   readonly surroundingPairs?: readonly EditorAutoClosingPair[]
+  readonly touchSelectionMenuItems?: EditorOptions['touchSelectionMenuItems']
   readonly view: VirtualizedTextView
   getLanguageId(): EditorSyntaxLanguageId | null
   getSyntaxInjections(): readonly EditorSyntaxInjection[]
@@ -329,10 +332,31 @@ export class InputSelectionController {
         this.pressClaimed = event.defaultPrevented || options.claimPress(event)
         return this.pressClaimed
       },
-      begin: () => this.markDomSelectionForNextInput(),
+      begin: () => this.markSessionSelectionForNextInput(),
       tap: (position) => this.placeTouchCaret(position),
       word: (position) => this.selectTouchWord(position),
       extend: (anchor, position) => this.extendTouchSelection(anchor, position),
+      scroll: (x, y) =>
+        this.scrollMouseSelection(
+          mouseSelectionAutoScrollDelta(
+            x,
+            y,
+            options.el.getBoundingClientRect(),
+            options.view.textViewportInsets(),
+          ),
+        ),
+      focus: () => options.view.focusInput(),
+      menuAnchor: () => {
+        const selection = this.primaryResolvedSelection()
+        if (!selection) return null
+        const range = options.view.createRange(selection.startOffset, selection.endOffset, {
+          scrollIntoView: false,
+        })
+        const rect = range?.getBoundingClientRect()
+        if (!rect) return null
+        return { x: (rect.left + rect.right) / 2, y: rect.top, bottom: rect.bottom }
+      },
+      menuItems: () => this.touchMenuItems(),
     })
   }
 
@@ -347,7 +371,6 @@ export class InputSelectionController {
     this.touchSelection.install()
     const { el } = this.options
     el.addEventListener('mousedown', this.handleMouseDown)
-    el.addEventListener('dblclick', this.handleTouchDoubleClick)
     el.addEventListener('beforeinput', this.handleBeforeInput)
     el.addEventListener('select', this.syncHiddenInputSelection)
     el.addEventListener('copy', this.handleCopy)
@@ -369,10 +392,8 @@ export class InputSelectionController {
   dispose(): void {
     this.touchSelection.dispose()
     const { el } = this.options
-    delete el.dataset.editorTouchSelection
     this.uninstallNativeInputHandlers()
     el.removeEventListener('mousedown', this.handleMouseDown)
-    el.removeEventListener('dblclick', this.handleTouchDoubleClick)
     el.removeEventListener('beforeinput', this.handleBeforeInput)
     el.removeEventListener('select', this.syncHiddenInputSelection)
     el.removeEventListener('copy', this.handleCopy)
@@ -2036,21 +2057,23 @@ export class InputSelectionController {
   private placeTouchCaret(position: VirtualizedTextHitPosition): void {
     const session = this.session
     if (!session) return
-    delete this.options.el.dataset.editorTouchSelection
-    this.markSessionSelectionForNextInput()
     this.options.el.ownerDocument.getSelection()?.removeAllRanges()
-    this.applyChange(
-      session.setSelection(position.offset, position.offset, { affinity: position.affinity }),
+    this.applyPointerSelection(
+      session,
+      {
+        anchorOffset: position.offset,
+        headOffset: position.offset,
+      },
       'input.touchTap',
       nowMs(),
-      { syncDomSelection: false },
+      position.affinity,
     )
     this.options.view.focusInput()
   }
 
   private selectTouchWord(position: VirtualizedTextHitPosition): TextOffsetRange {
     const range = this.offsetRangeAt(position.offset, 'word')
-    this.selectTouchRange(range.start, range.end)
+    this.selectTouchRange({ anchorOffset: range.start, headOffset: range.end }, 'before')
     return range
   }
 
@@ -2059,37 +2082,93 @@ export class InputSelectionController {
     position: VirtualizedTextHitPosition,
   ): void {
     const head = this.offsetRangeAt(position.offset, 'word')
-    if (head.start < anchor.start) {
-      this.selectTouchRange(anchor.end, head.start)
-      return
-    }
-    this.selectTouchRange(anchor.start, Math.max(anchor.end, head.end))
+    const ends = mouseSelectionEnds(anchor, head)
+    this.selectTouchRange(ends, ends.headOffset < ends.anchorOffset ? 'after' : 'before')
   }
 
-  /** Rendered text already has DOM ranges; leave them to the platform's handles and copy callout. */
-  private selectTouchRange(anchor: number, head: number): void {
+  private selectTouchRange(ends: MouseSelectionEnds, affinity: SelectionAffinity): void {
     const session = this.session
     if (!session) return
-    this.options.view.inputElement.blur()
-    this.options.el.dataset.editorTouchSelection = ''
-    this.markDomSelectionForNextInput()
-    this.options.view.setNativeSelection(anchor, head)
-    this.transitionInputState({ owner: 'dom', type: 'selection-reconciled' })
-    const current = this.primaryResolvedSelection()
+    this.options.el.ownerDocument.getSelection()?.removeAllRanges()
+    this.applyPointerSelection(session, ends, 'input.touchSelection', nowMs(), affinity)
+  }
+
+  private touchMenuItems(): readonly TouchMenuItem[] {
+    const session = this.session
+    if (!session) return []
+    const payload = this.clipboardPayload()
+    const editable = this.canTypeText()
+    const clipboard = this.options.el.ownerDocument.defaultView?.navigator.clipboard
+    const failureMessage = 'Clipboard access is required. Allow access and try again.'
+    const defaults: TouchMenuItem[] = [
+      {
+        id: 'cut',
+        label: 'Cut',
+        disabled: !editable || !clipboard?.writeText,
+        failureMessage,
+        run: () => this.touchClipboard('cut'),
+      },
+      {
+        id: 'copy',
+        label: 'Copy',
+        disabled: !clipboard?.writeText,
+        failureMessage,
+        run: () => this.touchClipboard('copy'),
+      },
+      {
+        id: 'paste',
+        label: 'Paste',
+        disabled: !editable || !clipboard?.readText,
+        failureMessage,
+        run: () => this.touchClipboard('paste'),
+      },
+      {
+        id: 'selectAll',
+        label: 'Select all',
+        run: () => {
+          const length = session.getSnapshot().length
+          this.options.runInOperation(() =>
+            this.selectTouchRange({ anchorOffset: 0, headOffset: length }, 'before'),
+          )
+        },
+      },
+    ]
+    return defaults.concat(
+      this.options.touchSelectionMenuItems?.({
+        selectedText: payload?.text ?? '',
+        editable,
+      }) ?? [],
+    )
+  }
+
+  private async touchClipboard(action: 'copy' | 'cut' | 'paste'): Promise<void> {
+    const session = this.session
+    const clipboard = this.options.el.ownerDocument.defaultView?.navigator.clipboard
+    if (!session || !clipboard) return
+    const snapshot = session.getSnapshot()
+    const selections = session.getSelections()
+    const payload = this.clipboardPayload()
+    if (action !== 'paste' && !payload) return
+    if (action !== 'copy' && !this.canTypeText()) return
+    const pasted = action === 'paste' ? await clipboard.readText() : null
+    if (payload && action !== 'paste') await clipboard.writeText(payload.text)
+    // A permission prompt can outlive this document or its selection; keep the user's new intent.
     if (
-      current?.anchorOffset !== anchor ||
-      current.headOffset !== head ||
-      session.getSelections().selections.length !== 1
-    ) {
-      this.applyChange(session.setSelection(anchor, head), 'input.touchSelection', nowMs(), {
-        syncDomSelection: false,
-      })
-    }
-    this.refreshHiddenInputContent()
-    const range = this.options.view.createRange(Math.min(anchor, head), Math.max(anchor, head), {
-      scrollIntoView: false,
+      this.session !== session ||
+      session.getSnapshot() !== snapshot ||
+      session.getSelections() !== selections
+    )
+      return
+    if (action === 'copy') return
+    this.options.runInOperation(() => {
+      if (!this.canTypeText()) return
+      let change: DocumentSessionChange
+      if (pasted !== null) change = this.applyPaste(session, normalizeLineEndings(pasted), null)
+      else if (payload?.metadata.pasteOnNewLine) change = this.deleteCaretLines(session)
+      else change = this.mirrorSelectionDelete(session) ?? session.deleteSelection()
+      this.markSessionSelectionForNextInput()
+      this.applyChange(change, `input.touch${action}`, nowMs())
     })
-    this.setDomSelectionRange(range, anchor > head)
   }
 
   private setDomSelectionRange(range: Range | null, backward: boolean): void {
@@ -2115,19 +2194,6 @@ export class InputSelectionController {
     )
   }
 
-  private handleTouchDoubleClick = (event: MouseEvent): void => {
-    if (!this.session || !this.touchSelection.ownsMouseEvent || event.defaultPrevented) return
-    event.preventDefault()
-    if (this.pressClaimed) return
-    const position = this.textPositionFromMouseEvent(event)
-    if (!position) return
-    this.touchSelection.acceptNativeSelection()
-    const range = this.offsetRangeAt(position.offset, 'word')
-    const current = this.primaryResolvedSelection()
-    if (current?.anchorOffset === range.start && current.headOffset === range.end) return
-    this.selectTouchWord(position)
-  }
-
   private handleMouseDown = (event: MouseEvent): void => {
     if (!this.session) return
     const touchPressClaimed = this.touchSelection.consumeMousePress()
@@ -2140,16 +2206,8 @@ export class InputSelectionController {
     }
     if (this.touchSelection.ownsMouseEvent) {
       event.preventDefault()
-      // iOS reports the second tap through the compatibility mouse event's click count.
-      if (event.detail >= 2) {
-        const position = this.textPositionFromMouseEvent(event)
-        if (!position) return
-        this.touchSelection.acceptNativeSelection()
-        this.selectTouchWord(position)
-      }
       return
     }
-    delete this.options.el.dataset.editorTouchSelection
 
     this.options.view.focusInput()
     if (event.detail >= 4) {
@@ -2256,7 +2314,7 @@ export class InputSelectionController {
     }
 
     const ends = this.mouseSelectionEndsForDrag(drag)
-    this.applyMouseSelection(
+    this.applyPointerSelection(
       session,
       ends,
       mouseSelectionTimingName(granularity),
@@ -2311,7 +2369,7 @@ export class InputSelectionController {
     }
   }
 
-  private applyMouseSelection(
+  private applyPointerSelection(
     session: DocumentSession,
     ends: MouseSelectionEnds,
     timingName: string,
@@ -3675,7 +3733,6 @@ export class InputSelectionController {
 
   private syncSessionSelectionFromDom = (_event: Event): void => {
     if (!this.session) return
-    if (this.touchSelection.ownsMouseEvent && this.pressClaimed && !this.isInputFocused()) return
     if (!shouldSyncSessionSelectionFromDom(this.inputState, this.domSelectionContext())) return
 
     const start = nowMs()
@@ -3782,42 +3839,12 @@ export class InputSelectionController {
       this.syncHiddenInputSelection(event)
       return
     }
-    if (this.touchSelection.ownsMouseEvent && !this.isInputFocused()) {
-      this.syncTouchSelectionFromDom()
-      return
-    }
     if (!shouldSyncCustomSelectionFromDom(this.inputState, this.domSelectionContext())) return
 
     const offsets = this.readDomSelectionOffsets()
     if (!offsets) return
 
     this.syncCustomSelectionHighlight(offsets.anchorOffset, offsets.headOffset)
-  }
-
-  private syncTouchSelectionFromDom(): void {
-    if (this.pressClaimed) return
-    const session = this.session
-    const selection = this.options.el.ownerDocument.getSelection()
-    if (!session || !selection?.anchorNode || !selection.focusNode) return
-    const content = this.options.view.contentElement
-    if (!content.contains(selection.anchorNode) || !content.contains(selection.focusNode)) return
-    const offsets = this.readDomSelectionOffsets()
-    if (!offsets) return
-    this.options.el.dataset.editorTouchSelection = ''
-    this.options.view.setNativeSelection(offsets.anchorOffset, offsets.headOffset)
-    this.transitionInputState({ owner: 'dom', type: 'selection-reconciled' })
-    const current = this.primaryResolvedSelection()
-    if (current?.anchorOffset === offsets.anchorOffset && current.headOffset === offsets.headOffset)
-      return
-    if (offsets.anchorOffset !== offsets.headOffset) this.touchSelection.acceptNativeSelection()
-    this.markDomSelectionForNextInput()
-    this.applyChange(
-      session.setSelection(offsets.anchorOffset, offsets.headOffset),
-      'input.nativeTouchSelection',
-      nowMs(),
-      { syncDomSelection: false },
-    )
-    this.refreshHiddenInputContent()
   }
 
   private syncCustomSelectionHighlight(

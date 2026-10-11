@@ -1,0 +1,202 @@
+import { expect, test, type Page } from '@playwright/test'
+
+test.beforeEach(async ({ page }) => {
+  await page.goto('/test/fixtures/mobile-custom-selection.html')
+  await expect(page.locator('#state')).toContainText('session')
+})
+
+// WebKit has no portable finger-drag API in Playwright. The simulator proof uses OS gestures.
+async function finger(page: Page, type: string, x: number, y: number) {
+  await page.locator('.editor-virtualized').evaluate(
+    (element, args) => {
+      const touch = { identifier: 1, target: element, clientX: args.x, clientY: args.y }
+      const event = new Event(args.type, { bubbles: true, cancelable: true })
+      const ended = args.type === 'touchend' || args.type === 'touchcancel'
+      Object.defineProperties(event, {
+        touches: { value: ended ? [] : [touch] },
+        targetTouches: { value: ended ? [] : [touch] },
+        changedTouches: { value: [touch] },
+      })
+      element.dispatchEvent(event)
+    },
+    { type, x, y },
+  )
+}
+
+async function textPoint(page: Page, row: number, offset: number) {
+  return page
+    .locator('.editor-virtualized-row')
+    .nth(row)
+    .evaluate((element, at) => {
+      const node = document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode()!
+      const range = document.createRange()
+      range.setStart(node, at)
+      range.setEnd(node, at + 1)
+      const rect = range.getBoundingClientRect()
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+    }, offset)
+}
+
+async function beginHold(page: Page) {
+  const point = await textPoint(page, 0, 8)
+  await finger(page, 'touchstart', point.x, point.y)
+  await expect(page.locator('#selection')).toHaveText('Selected: bravo')
+  return point
+}
+
+test('holding and dragging advances across rows, then typing replaces selection', async ({
+  page,
+}) => {
+  await beginHold(page)
+  const last = await textPoint(page, 2, 7)
+  await finger(page, 'touchmove', last.x, last.y + 12)
+  await finger(page, 'touchend', last.x, last.y + 12)
+  await expect(page.locator('#selection')).toHaveText(
+    'Selected: bravo charlie\nsecond line\nthird row',
+  )
+  await expect(page.getByRole('toolbar', { name: 'Selection actions' })).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath('custom-row-selection.png') })
+  await page.locator('textarea').press('x')
+  await expect(page.locator('#host')).toContainText('alpha x')
+  await expect(page.getByRole('toolbar')).toHaveCount(0)
+})
+
+test('double tap selects a word and menu actions extend through the public option', async ({
+  page,
+}) => {
+  const point = await textPoint(page, 0, 8)
+  await page.touchscreen.tap(point.x, point.y)
+  await page.touchscreen.tap(point.x, point.y)
+  await expect(page.locator('#selection')).toHaveText('Selected: bravo')
+  await page.getByRole('button', { name: 'Inspect', exact: true }).click()
+  await expect(page.locator('#status')).toContainText('5 characters')
+  await page.locator('#reset').click()
+  await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await page.getByRole('button', { name: 'Select all', exact: true }).click()
+  await expect(page.locator('#selection')).toHaveText(
+    'Selected: alpha bravo charlie\nsecond line\nthird row',
+  )
+})
+
+test('the second tap can drag backward from a word across a row', async ({ page }) => {
+  const point = await textPoint(page, 1, 4)
+  await finger(page, 'touchstart', point.x, point.y)
+  await finger(page, 'touchend', point.x, point.y)
+  await finger(page, 'touchstart', point.x, point.y)
+  await expect(page.locator('#selection')).toHaveText('Selected: second')
+  const first = await textPoint(page, 0, 1)
+  await finger(page, 'touchmove', first.x, first.y + 12)
+  await finger(page, 'touchend', first.x, first.y + 12)
+  await expect(page.locator('#selection')).toHaveText('Selected: alpha bravo charlie\nsecond')
+})
+
+test('dragging at the edge scrolls wrapped virtual rows and cancellation stops it', async ({
+  page,
+}) => {
+  await page.locator('#long').click()
+  await page.locator('#wrap').check()
+  await beginHold(page)
+  const bounds = (await page.locator('#host').boundingBox())!
+  const y = bounds.y + bounds.height - 2
+  await finger(page, 'touchmove', bounds.x + 160, y)
+  const scroller = page.locator('.editor-virtualized')
+  await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(100)
+  await finger(page, 'touchcancel', bounds.x + 160, y)
+  const stopped = await scroller.evaluate((el) => el.scrollTop)
+  await page.waitForTimeout(150)
+  expect(await scroller.evaluate((el) => el.scrollTop)).toBe(stopped)
+  await expect(page.getByRole('toolbar')).toHaveCount(0)
+  await page.screenshot({ path: test.info().outputPath('custom-edge-scroll.png') })
+})
+
+test('a swipe cancels selection recognition before its hold deadline', async ({ page }) => {
+  const point = await textPoint(page, 0, 8)
+  await finger(page, 'touchstart', point.x, point.y)
+  await finger(page, 'touchmove', point.x, point.y + 40)
+  await page.waitForTimeout(700)
+  await finger(page, 'touchend', point.x, point.y + 40)
+  await expect(page.locator('#selection')).toHaveText('Selected: ')
+  await expect(page.getByRole('toolbar')).toHaveCount(0)
+})
+
+type ClipboardWindow = Window & {
+  touchEditor: { setSelection(anchor: number, head?: number): void; materializeFullText(): string }
+  clipboardWritten?: string
+  finishClipboardRead?: (text: string) => void
+}
+
+test('Copy, Cut and Paste use the selected document text', async ({ page }) => {
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          ;(window as ClipboardWindow).clipboardWritten = text
+        },
+        readText: async () => 'replacement',
+      },
+    })
+  })
+  for (const action of ['Copy', 'Cut', 'Paste']) {
+    await page.locator('#reset').click()
+    const point = await beginHold(page)
+    await finger(page, 'touchend', point.x, point.y)
+    await page.getByRole('button', { name: action, exact: true }).click()
+    if (action === 'Paste')
+      await expect(page.locator('#host')).toContainText('alpha replacement charlie')
+    else
+      expect(await page.evaluate(() => (window as ClipboardWindow).clipboardWritten)).toBe('bravo')
+    if (action === 'Cut') await expect(page.locator('#host')).toContainText('alpha  charlie')
+  }
+})
+
+test('an asynchronous paste keeps a later selection unchanged', async ({ page }) => {
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        readText: () =>
+          new Promise<string>((resolve) => {
+            ;(window as ClipboardWindow).finishClipboardRead = resolve
+          }),
+      },
+    })
+  })
+  const point = await beginHold(page)
+  await finger(page, 'touchend', point.x, point.y)
+  await page.getByRole('button', { name: 'Paste', exact: true }).click()
+  await expect(page.getByRole('toolbar')).toHaveAttribute('aria-busy', 'true')
+  await page.evaluate(() => {
+    const state = window as ClipboardWindow
+    state.touchEditor.setSelection(0)
+    state.finishClipboardRead!('stale paste')
+  })
+  await expect(page.getByRole('toolbar')).toHaveCount(0)
+  expect(
+    await page.evaluate(() => (window as ClipboardWindow).touchEditor.materializeFullText()),
+  ).toBe('alpha bravo charlie\nsecond line\nthird row')
+  await expect(page.locator('#selection')).toHaveText('Selected: ')
+})
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`the ${colorScheme} touch menu fits a narrow viewport below a top-row selection`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 700 })
+    await page.emulateMedia({ colorScheme })
+    const point = await beginHold(page)
+    await finger(page, 'touchend', point.x, point.y)
+    const menu = page.getByRole('toolbar', { name: 'Selection actions' })
+    await expect(menu).toHaveAttribute('data-side', 'bottom')
+    const bounds = (await menu.boundingBox())!
+    expect(bounds.x).toBeGreaterThanOrEqual(8)
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(312)
+    expect(bounds.y).toBeGreaterThan(point.y + 12)
+    await expect(menu).toHaveCSS(
+      'background-color',
+      colorScheme === 'dark' ? 'rgb(48, 48, 51)' : 'rgb(248, 248, 250)',
+    )
+    await page.screenshot({ path: test.info().outputPath(`custom-menu-${colorScheme}.png`) })
+  })
+}

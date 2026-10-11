@@ -4,6 +4,7 @@ import { TouchSelectionController } from '../src/editor/touchSelection'
 
 function dispatchTouch(element: HTMLElement, type: string, x = 20, count = 1): Event {
   const event = new Event(type, { bubbles: true, cancelable: true })
+  Object.defineProperty(event, 'timeStamp', { value: Date.now() })
   Object.defineProperty(event, 'touches', {
     value: Array.from({ length: count }, (_, identifier) => ({
       identifier,
@@ -37,6 +38,10 @@ describe('TouchSelectionController hold scheduling', () => {
       tap: vi.fn(),
       word,
       extend: vi.fn(),
+      scroll: vi.fn(() => false),
+      focus: vi.fn(),
+      menuAnchor: () => null,
+      menuItems: () => [],
     })
     controller.install()
   })
@@ -49,7 +54,7 @@ describe('TouchSelectionController hold scheduling', () => {
 
   it('selects once at the hold deadline while the finger remains down', () => {
     dispatchTouch(row, 'touchstart')
-    vi.advanceTimersByTime(649)
+    vi.advanceTimersByTime(549)
     expect(word).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
     expect(word).toHaveBeenCalledOnce()
@@ -58,12 +63,11 @@ describe('TouchSelectionController hold scheduling', () => {
     expect(word).toHaveBeenCalledOnce()
   })
 
-  it.each(['touchend', 'touchcancel', 'swipe', 'multitouch', 'native', 'dispose'])(
+  it.each(['touchend', 'touchcancel', 'swipe', 'multitouch', 'dispose'])(
     'cancels pending work on %s',
     (action) => {
       dispatchTouch(row, 'touchstart')
       vi.advanceTimersByTime(300)
-      if (action === 'native') controller.acceptNativeSelection()
       if (action === 'dispose') controller.dispose()
       if (action === 'swipe') {
         expect(dispatchTouch(row, 'touchmove', 40).defaultPrevented).toBe(false)
@@ -77,12 +81,21 @@ describe('TouchSelectionController hold scheduling', () => {
     },
   )
 
+  it('leaves a stationary tap and a swipe release available to the browser', () => {
+    dispatchTouch(row, 'touchstart')
+    expect(dispatchTouch(row, 'touchend', 20, 0).defaultPrevented).toBe(false)
+    vi.advanceTimersByTime(400)
+    dispatchTouch(row, 'touchstart')
+    dispatchTouch(row, 'touchmove', 40)
+    expect(dispatchTouch(row, 'touchend', 40, 0).defaultPrevented).toBe(false)
+  })
+
   it('starts a fresh deadline when a pending gesture is replaced', () => {
     dispatchTouch(row, 'touchstart')
     vi.advanceTimersByTime(300)
     dispatchTouch(row, 'touchstart')
     expect(vi.getTimerCount()).toBe(1)
-    vi.advanceTimersByTime(649)
+    vi.advanceTimersByTime(549)
     expect(word).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
     expect(word).toHaveBeenCalledOnce()

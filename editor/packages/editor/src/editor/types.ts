@@ -44,6 +44,18 @@ export type EditorDocumentMode = 'session' | 'static'
 
 export type EditorSelectionSyncMode = 'sync' | 'none'
 
+export type EditorTouchSelectionMenuContext = {
+  readonly selectedText: string
+  readonly editable: boolean
+}
+
+export type EditorTouchSelectionMenuItem = {
+  readonly id: string
+  readonly label: string
+  readonly disabled?: boolean
+  run(): void | Promise<void>
+}
+
 export type EditorScrollMode = VirtualizedTextViewScrollMode
 
 export type EditorGutterScroll = NonNullable<VirtualizedTextViewOptions['gutterScroll']>
@@ -144,6 +156,10 @@ export type EditorOptions = {
   /** `content` paints every row at natural height; outside ancestors own scrolling. */
   readonly scrollMode?: EditorScrollMode
   readonly selectionSyncMode?: EditorSelectionSyncMode
+  /** Extra actions appended to the touch selection menu's Cut, Copy, Paste and Select all. */
+  readonly touchSelectionMenuItems?: (
+    context: EditorTouchSelectionMenuContext,
+  ) => readonly EditorTouchSelectionMenuItem[]
   /** Confusable and invisible characters to point out; both families report unless turned off. */
   readonly suspiciousCharacters?: EditorSuspiciousCharactersOptions
   /**

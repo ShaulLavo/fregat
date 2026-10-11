@@ -34,6 +34,12 @@ Content mode paints every display row and grows after edits, font changes, previ
 
 Content mode supports up to 10,000 display rows, 1,048,576 UTF-16 source units and 1,000,000 CSS pixels of content height. Exceeding a limit throws an error with code `EDITOR_CONTENT_LAYOUT_LIMIT`. Refused replacements and edits preserve the attached document, selections and undo history. Use `virtualized` for larger documents.
 
+## Touch selection
+
+Hold a word or double-tap it, keep that contact down, and drag to extend the selection across rows. Ordinary swipes scroll. Releasing a selected range opens the touch edit menu with Cut, Copy, Paste and Select all. Clipboard actions require browser clipboard access.
+
+Append host actions with `touchSelectionMenuItems`. The callback receives the selected text and whether the editor is editable; each action supplies an `id`, a `label`, an optional `disabled` flag and a `run()` callback that may return a promise. Actions run directly from the menu click, so browser APIs can use its user activation. The menu waits for an asynchronous action to settle and shows a retry message if it fails. Desktop context menus are unchanged.
+
 ## API highlights
 
 - `Editor.setText()` loads text into a view.

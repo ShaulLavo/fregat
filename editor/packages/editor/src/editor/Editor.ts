@@ -715,6 +715,7 @@ export class Editor {
       getSyntaxInjections: () => this.syntax.injections,
       getSession: () => this.session,
       getSessionOptions: () => this.sessionOptions,
+      touchSelectionMenuItems: options.touchSelectionMenuItems,
       getPasteHandlers: () => this.languageFeatures.ordered(EDITOR_PASTE_HANDLER, this.languageId),
       getSyntaxTokens: () => this.syntax.copyTokens,
       getEditorTheme: () => this.resolvedTheme(),

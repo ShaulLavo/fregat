@@ -1,0 +1,74 @@
+import { Editor } from '../../../../packages/editor/src/editor.ts'
+const shortText = 'alpha bravo charlie\nsecond line\nthird row'
+const host = document.querySelector('#host')
+const editor = new Editor(host, {
+  fontSize: 20,
+  lineHeight: 24,
+  onChange: () => record(),
+  touchSelectionMenuItems: ({ selectedText }) => [
+    {
+      id: 'inspect',
+      label: 'Inspect',
+      run() {
+        document.querySelector('#status').textContent =
+          `Action extension received ${selectedText.length} characters.`
+      },
+    },
+  ],
+})
+window.touchEditor = editor
+function record() {
+  const selection = editor.getSelections()[0]
+  const start = Math.min(selection?.anchorOffset ?? 0, selection?.headOffset ?? 0)
+  const end = Math.max(selection?.anchorOffset ?? 0, selection?.headOffset ?? 0)
+  const value = editor.materializeFullText().slice(start, end)
+  document.querySelector('#selection').textContent = `Selected: ${value}`
+  document.querySelector('#state').textContent =
+    `State: ${JSON.stringify({ session: [start, end], dom: document.getSelection()?.toString(), scrollTop: editor.getScrollPosition().top })}`
+  window.customTouchState = { start, end, value, scrollTop: editor.getScrollPosition().top }
+}
+editor.setText(shortText)
+editor.setSelection(0)
+editor.onDidScroll(record)
+document.querySelector('#wrap').onchange = (event) => {
+  editor.setWordWrap(event.target.checked)
+  record()
+}
+document.querySelector('#long').onclick = () => {
+  editor.setText(
+    shortText +
+      '\n' +
+      Array.from(
+        { length: 80 },
+        (_, i) => `row ${i + 4}: alpha bravo charlie delta echo foxtrot golf hotel`,
+      ).join('\n'),
+  )
+  editor.setSelection(0)
+  record()
+}
+document.querySelector('#reset').onclick = () => {
+  editor.setText(shortText)
+  editor.setSelection(0)
+  record()
+}
+record()
+
+const gestureEvents = []
+for (const type of ['touchstart', 'touchend', 'touchcancel']) {
+  document.addEventListener(
+    type,
+    (event) => {
+      const touch = event.changedTouches[0]
+      gestureEvents.push({
+        type,
+        time: Math.round(event.timeStamp),
+        x: touch?.clientX,
+        y: touch?.clientY,
+        target: event.target.tagName,
+      })
+      document.querySelector('#events').textContent =
+        `Events: ${JSON.stringify(gestureEvents.slice(-8))}`
+    },
+    { capture: true },
+  )
+}

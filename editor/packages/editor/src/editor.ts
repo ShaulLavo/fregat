@@ -74,6 +74,8 @@ export type {
   EditorGutterScroll,
   EditorScrollPosition,
   EditorSelectionSyncMode,
+  EditorTouchSelectionMenuContext,
+  EditorTouchSelectionMenuItem,
   EditorSessionChangeHandler,
   EditorSessionOptions,
   EditorSetTextOptions,
