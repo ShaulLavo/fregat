@@ -309,6 +309,7 @@ export class InputSelectionController {
   // advances it — an event the editor decides not to act on leaves the element holding text it can
   // still be diffed against next time.
   private hiddenInputContent: HiddenInputState = EMPTY_HIDDEN_INPUT_STATE
+  private writingInputWindow = false
   /** What a textarea composition replaces in the written window, read when it starts. */
   private compositionRange: { readonly start: number; readonly end: number } | null = null
   /** The window range an EditContext composition replaces, and where its candidate now ends. */
@@ -1704,7 +1705,13 @@ export class InputSelectionController {
     if (!selection) return
 
     const content = pagedHiddenInputContent(snapshot, resolveSelection(snapshot, selection))
-    this.writeInputWindow(content)
+    // Selection setters may synchronously dispatch select while the window is being written.
+    this.writingInputWindow = true
+    try {
+      this.writeInputWindow(content)
+    } finally {
+      this.writingInputWindow = false
+    }
     this.hiddenInputContent = {
       selectionEnd: content.selectionEnd,
       selectionStart: content.selectionStart,
@@ -3680,8 +3687,12 @@ export class InputSelectionController {
     return null
   }
 
-  private syncHiddenInputSelection = this.traceInput('input.nativeSelection', (): void => {
-    if (!this.isInputFocused()) return
+  private syncHiddenInputSelection = (event: Event): void => {
+    if (this.writingInputWindow || !this.isInputFocused()) return
+    this.handleHiddenInputSelection(event)
+  }
+
+  private handleHiddenInputSelection = this.traceInput('input.nativeSelection', (): void => {
     const change = this.updateSessionSelectionFromHiddenInput()
     if (!change) return
 
@@ -3690,6 +3701,7 @@ export class InputSelectionController {
   })
 
   private updateSessionSelectionFromHiddenInput(): DocumentSessionChange | null {
+    if (this.writingInputWindow) return null
     const session = this.session
     const input = this.options.view.inputElement
     if (!session || !isTextareaElement(input)) return null
