@@ -1,4 +1,8 @@
-import { Editor } from '@singapore-editor/core/editor'
+import {
+  createBracketMatchPlugin,
+  createOccurrenceHighlightPlugin,
+  Editor,
+} from '@singapore-editor/core/editor'
 import { createTreeSitterLanguagePlugin } from '@singapore-editor/tree-sitter'
 import { createLineGutterPlugin } from '@singapore-editor/gutters'
 import { fenceLanguage, languageContribution } from './languages'
@@ -32,6 +36,7 @@ export function mountExample(
     snapshot: options.snapshot,
     theme: paletteTheme(host, 'code-bg'),
     gutterScroll: 'content',
+    cursorLineHighlight: { gutterNumber: true },
     plugins: [createLineGutterPlugin({ minWidth: 36 })].concat(
       language === 'text' ? [] : [createTreeSitterLanguagePlugin([languageContribution(language)])],
     ),
@@ -40,6 +45,16 @@ export function mountExample(
   element.querySelector('textarea')?.setAttribute('aria-label', options.label)
   editor.setTabMovesFocus(true)
   editor.openDocument({ documentId: 'example', text: options.text, languageId: language })
+  const interaction = new AbortController()
+  const interact = () => {
+    // Activation focuses the input; only a deliberate caret or keyboard action changes the ink.
+    interaction.abort()
+    element.dataset.exampleInteracted = ''
+    editor.addPlugin(createBracketMatchPlugin())
+    editor.addPlugin(createOccurrenceHighlightPlugin())
+  }
+  element.addEventListener('pointerdown', interact, { capture: true, signal: interaction.signal })
+  element.addEventListener('keydown', interact, { capture: true, signal: interaction.signal })
   let disposed = false
   return {
     editor,
@@ -61,6 +76,7 @@ export function mountExample(
     dispose() {
       if (disposed) return
       disposed = true
+      interaction.abort()
       editor.dispose()
       element.remove()
     },
