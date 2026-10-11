@@ -5,8 +5,14 @@
     <title>Singapore touch gutter controls</title>
     <link rel="stylesheet" href="../../../../packages/editor/src/style.css" />
     <style>
-      body { margin: 0; }
-      #host { display: flex; height: 300px; width: 100%; }
+      body {
+        margin: 0;
+      }
+      #host {
+        display: flex;
+        height: 300px;
+        width: 100%;
+      }
     </style>
   </head>
   <body>
@@ -18,7 +24,16 @@
       import { createEmptySyntaxResult } from '../../../../packages/editor/src/syntax/session.ts'
       const result = {
         ...createEmptySyntaxResult(),
-        folds: [{ startIndex: 18, endIndex: 30, startLine: 0, endLine: 2, type: 'statement_block', languageId: 'typescript' }],
+        folds: [
+          {
+            startIndex: 18,
+            endIndex: 30,
+            startLine: 0,
+            endLine: 2,
+            type: 'statement_block',
+            languageId: 'typescript',
+          },
+        ],
       }
       const syntax = createSyntaxPlugin(() => ({
         analyze: async () => result,
@@ -30,29 +45,30 @@
       }))
       window.gutterActivations = []
       const controls = ['line-comment', 'breakpoint'].map((id) => ({
-        activate: (context) => context.registerGutterContribution({
-          id,
-          interactive: true,
-          width: () => 30,
-          createCell(document) {
-            const cell = document.createElement('span')
-            const control = document.createElement(id === 'line-comment' ? 'button' : 'span')
-            if (id === 'breakpoint') {
-              control.setAttribute('role', 'button')
-              control.tabIndex = 0
-            }
-            control.setAttribute('aria-label', id)
-            control.textContent = id === 'line-comment' ? '+' : '●'
-            control.addEventListener('mousedown', (event) => {
-              event.preventDefault()
-              event.stopPropagation()
-            })
-            control.addEventListener('click', () => window.gutterActivations.push(id))
-            cell.append(control)
-            return cell
-          },
-          updateCell() {},
-        }),
+        activate: (context) =>
+          context.registerGutterContribution({
+            id,
+            interactive: true,
+            width: () => 30,
+            createCell(document) {
+              const cell = document.createElement('span')
+              const control = document.createElement(id === 'line-comment' ? 'button' : 'span')
+              if (id === 'breakpoint') {
+                control.setAttribute('role', 'button')
+                control.tabIndex = 0
+              }
+              control.setAttribute('aria-label', id)
+              control.textContent = id === 'line-comment' ? '+' : '●'
+              control.addEventListener('mousedown', (event) => {
+                event.preventDefault()
+                event.stopPropagation()
+              })
+              control.addEventListener('click', () => window.gutterActivations.push(id))
+              cell.append(control)
+              return cell
+            },
+            updateCell() {},
+          }),
       }))
       const editor = new Editor(document.querySelector('#host'), {
         fontSize: 20,
