@@ -346,7 +346,11 @@ for (const engine of ['chromium', 'webkit'] as const) {
                 document.querySelectorAll<HTMLElement>(
                   '.example-static [data-editor-document-paint]',
                 ),
-              ).filter((node) => node.getBoundingClientRect().height > 0)
+              ).filter(
+                (node) =>
+                  node.getBoundingClientRect().height > 0 &&
+                  node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }),
+              )
               const missing = roots.filter((node) => {
                 const colours = new Set(
                   Array.from(
