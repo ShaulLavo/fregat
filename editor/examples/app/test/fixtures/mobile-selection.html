@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Singapore touch selection</title>
+    <link rel="stylesheet" href="../../../../packages/editor/src/style.css" />
+    <style>
+      body {
+        margin: 0;
+      }
+      #host {
+        display: flex;
+        height: 300px;
+        width: 100%;
+      }
+      #selection {
+        padding: 12px;
+        font: 16px system-ui;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="host"></main>
+    <output id="selection">Selected: </output>
+    <p id="native-selection-control">Native selection control</p>
+    <script type="module">
+      import { Editor } from '../../../../packages/editor/src/editor.ts'
+      const editor = new Editor(document.querySelector('#host'), {
+        fontSize: 20,
+        onChange() {
+          showSelection()
+        },
+      })
+      editor.setText('alpha bravo charlie\nsecond line\n'.repeat(100))
+      window.touchEditor = editor
+      function showSelection() {
+        const range = editor.getSelections()[0]
+        const text = editor
+          .materializeFullText()
+          .slice(
+            Math.min(range.anchorOffset, range.headOffset),
+            Math.max(range.anchorOffset, range.headOffset),
+          )
+        document.querySelector('#selection').textContent = `Selected: ${text}`
+      }
+      document.addEventListener('selectionchange', showSelection)
+    </script>
+  </body>
+</html>
