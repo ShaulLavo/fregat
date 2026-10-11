@@ -175,6 +175,7 @@ const defaultRendererFactory: GhosttyWebGpuRendererFactory = (options, signal) =
   createCompatibleTerminalRenderer(options, signal)
 
 const defaultScrollbarWidth = 12
+// Batch fast output while keeping foreground readable text responsive.
 const accessibilityRefreshDelayMs = 100
 
 function scrollbarWidth(value: number | undefined): number {
@@ -273,7 +274,8 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private readonly pendingText: TextPublication[] = []
   private deliveringText = false
   private accessibilityTimer?: number
-  private accessibilitySubmittedOutput = false
+  private accessibilityFrame?: TerminalSubmittedSnapshot
+  private documentVisible = true
   private publicFrameSource?: TerminalSubmittedSnapshot
   private publicFrame?: TerminalSubmittedFrame
   private accessibility?: TerminalAccessibilityController
@@ -673,7 +675,6 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.invalidateLinks()
     const geometry = this.execution.writeAndReadGeometry(data)
     if (this.stateValue !== 'open') return this.result(geometry)
-    this.accessibility?.notifyOutput()
     this.updateScrollbar()
     this.renderer?.notifyWrite()
     return this.result(geometry)
@@ -736,7 +737,6 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.invalidateLinks()
     const result = this.execution.write(data)
     if (this.stateValue !== 'open') return this.result(result)
-    this.accessibility?.notifyOutput()
     this.updateScrollbar()
     this.renderer?.notifyWrite()
     return this.result(result)
@@ -747,7 +747,6 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.invalidateLinks()
     const result = this.execution.writeln(data)
     if (this.stateValue !== 'open') return this.result(result)
-    this.accessibility?.notifyOutput()
     this.updateScrollbar()
     this.renderer?.notifyWrite()
     return this.result(result)
@@ -1135,11 +1134,29 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   }
 
   private scheduleAccessibility(): void {
-    if (!this.accessibility) return
-    if (this.execution.kind === 'async' && this.execution.submittedOutput)
-      this.accessibilitySubmittedOutput = true
-    if (this.accessibility.rowElements.length === 0) {
-      this.runUiOperation('frame.accessibility', () => this.refreshAccessibility())
+    if (!this.accessibility || !this.documentVisible) return
+    const summary = this.execution.submittedFrame
+    if (!summary) return
+    const previous = this.accessibilityFrame
+    if (
+      previous?.nativeRevision === summary.nativeRevision &&
+      previous.layout === summary.layout &&
+      previous.cursor.visible === summary.cursor.visible &&
+      previous.cursor.viewport?.x === summary.cursor.viewport?.x &&
+      previous.cursor.viewport?.y === summary.cursor.viewport?.y &&
+      previous.cursor.viewport?.wideTail === summary.cursor.viewport?.wideTail &&
+      previous.scrollbar.offset === summary.scrollbar.offset &&
+      previous.scrollbar.total === summary.scrollbar.total &&
+      previous.scrollbar.length === summary.scrollbar.length
+    )
+      return
+    const movedViewport =
+      previous &&
+      previous.scrollbar.offset !== summary.scrollbar.offset &&
+      (previous.scrollbar.offset !== previous.scrollbar.total - previous.scrollbar.length ||
+        summary.scrollbar.offset !== summary.scrollbar.total - summary.scrollbar.length)
+    if (this.accessibility.rowElements.length === 0 || movedViewport) {
+      this.runUiOperation('frame.accessibility', () => this.refreshAccessibility(!movedViewport))
       return
     }
     if (this.accessibilityTimer !== undefined) return
@@ -1149,19 +1166,18 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     }, accessibilityRefreshDelayMs)
   }
 
-  private refreshAccessibility(): void {
+  private refreshAccessibility(announce = true): void {
     this.cancelAccessibilityTimer()
     const accessibility = this.accessibility
-    if (!accessibility) return
+    if (!accessibility || !this.documentVisible) return
     const summary = this.execution.submittedFrame
     if (!summary) return
-    const submittedOutput =
-      this.execution.kind === 'sync'
-        ? undefined
-        : this.accessibilitySubmittedOutput || this.execution.submittedOutput
-    this.accessibilitySubmittedOutput = false
-    // Pull the latest displayed subject here so intervening paints keep native text lazy.
-    accessibility.update(summary, summary.scrollbar, submittedOutput)
+    const reflow = Boolean(
+      this.accessibilityFrame && this.accessibilityFrame.grid.columns !== summary.grid.columns,
+    )
+    // Only displayed text differences acknowledge output; newer unpainted writes stay independent.
+    accessibility.update(summary, summary.scrollbar, announce, reflow)
+    this.accessibilityFrame = summary
   }
 
   private cancelAccessibilityTimer(): void {
@@ -1191,7 +1207,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     if (!accessibility) return false
     this.accessibility = undefined
     this.cancelAccessibilityTimer()
-    this.accessibilitySubmittedOutput = false
+    this.accessibilityFrame = undefined
     accessibility.dispose()
     return true
   }
@@ -1486,6 +1502,14 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   }
 
   private handleScroll(scroll: GhosttyWebGpuTerminalEventMap['scroll']): void {
+    const displayed = this.accessibility && this.execution.submittedFrame?.scrollbar
+    if (
+      displayed &&
+      displayed.offset !== scroll.scrollbar.offset &&
+      (displayed.offset !== displayed.total - displayed.length ||
+        scroll.scrollbar.offset !== scroll.scrollbar.total - scroll.scrollbar.length)
+    )
+      this.runUiOperation('frame.accessibility', () => this.refreshAccessibility())
     this.invalidateLinks()
     this.renderer?.notifyScroll()
     this.updateScrollbar(scroll.scrollbar)
@@ -1498,6 +1522,9 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   }
 
   private setDocumentVisible(visible: boolean): void {
+    this.documentVisible = visible
+    if (visible) this.runUiOperation('frame.accessibility', () => this.refreshAccessibility())
+    else this.cancelAccessibilityTimer()
     if (this.execution.kind === 'async') {
       void this.execution
         .request('visible', [visible])

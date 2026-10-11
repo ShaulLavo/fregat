@@ -1343,6 +1343,20 @@ describe('terminal accessibility mirror in Chromium', () => {
     expect(harness.textarea.hasAttribute('aria-controls')).toBe(false)
   })
 
+  it.each([
+    { before: ['abcdefghij', 'klmno', ''], after: ['klmno!', '', ''], output: '!' },
+    { before: ['klmno', '', ''], after: ['abcdefghijklmno!', '', ''], output: '!' },
+    { before: ['ababab', '', ''], after: ['abab!', '', ''], output: '!' },
+    { before: ['abc', '', ''], after: ['replacement', '', ''], output: 'replacement' },
+    { before: ['界😀é', '', ''], after: ['界😀', 'é!', ''], output: '!' },
+  ])('compares retained text across a reflow $before → $after', ({ before, after, output }) => {
+    const harness = createAccessibilityHarness()
+    const current = scrollbar(0, 3, 3)
+    harness.controller.update(frame(before, { x: 0, y: 0 }), current)
+    harness.controller.update(frame(after, { x: 0, y: 0 }), current, true, true)
+    expect(harness.controller.liveRegion.textContent).toBe(output)
+  })
+
   it('maps a wide-tail cursor to the leading cell and clips one oversized announcement', () => {
     const harness = createAccessibilityHarness({
       liveRegionMaxCharacters: 5,

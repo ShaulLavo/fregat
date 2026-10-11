@@ -90,11 +90,16 @@ For xterm.js integrations, start with the [API reference](https://github.com/Sha
 Pass `accessibility: {}` when creating a terminal, or call `setAccessibilityEnabled(true)`.
 The accessible row list and cursor position refresh from the latest displayed frame
 after a 100 ms delay under normal foreground scheduling. Enabling accessibility and
-focusing the input refresh that text immediately. The first displayed frame also hydrates
-immediately, so startup output can be announced. Clean terminals have no refresh timer.
+focusing the input refresh that text immediately. The first displayed frame hydrates the
+readable row list immediately and establishes the live region's comparison boundary.
+Subsequent output can be announced, including a prompt after an initial empty frame.
+Settled terminals, including cursor-blink paints, have no accessibility refresh timer.
 
 The polite live region announces recent changes to visible rows at the same cadence,
 within its configured character and entry limits. Intermediate frames are coalesced.
+History navigation refreshes the row list immediately, and returning to current output
+establishes a fresh announcement boundary. Wrapping resizes compare retained text across
+row boundaries. Hidden documents suspend refreshes until they become visible.
 The short delay lets fast output settle into readable text while keeping interactive
 output responsive; visible rendering and public `onText` subscriptions keep their cadence.
 

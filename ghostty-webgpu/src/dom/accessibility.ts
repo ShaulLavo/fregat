@@ -32,6 +32,7 @@ export interface TerminalAccessibilityController {
     snapshot: AccessibilitySnapshot,
     scrollbar: Readonly<TerminalScrollbar>,
     submittedOutput?: boolean,
+    reflow?: boolean,
   ): TerminalAccessibilityUpdate
 }
 
@@ -203,6 +204,30 @@ function changedOutput(previous: PreviousFrame, rows: readonly AccessibilityRow[
   return changed.join('\n')
 }
 
+function reflowOutput(previous: PreviousFrame, rows: readonly AccessibilityRow[]): string {
+  const before = previous.rows.map((row) => row.text).join('')
+  const after = rows.map((row) => row.text).join('')
+  const contained = after.indexOf(before)
+  if (contained >= 0) return after.slice(contained + before.length)
+  if (before.includes(after)) return ''
+  // A narrower viewport can drop leading text. Match its retained suffix in linear time.
+  const prefixes = new Uint32Array(after.length)
+  let matched = 0
+  for (let index = 1; index < after.length; index += 1) {
+    while (matched > 0 && after[index] !== after[matched]) matched = prefixes[matched - 1]!
+    if (after[index] === after[matched]) matched += 1
+    prefixes[index] = matched
+  }
+  matched = 0
+  for (let index = 0; index < before.length; index += 1) {
+    const character = before[index]
+    while (matched > 0 && (matched === after.length || character !== after[matched]))
+      matched = prefixes[matched - 1]!
+    if (character === after[matched]) matched += 1
+  }
+  return after.slice(matched)
+}
+
 function cursorCoordinates(
   snapshot: AccessibilitySnapshot,
   scrollbar: Readonly<TerminalScrollbar>,
@@ -271,6 +296,7 @@ class OwnedTerminalAccessibility implements TerminalAccessibilityController {
     snapshot: AccessibilitySnapshot,
     scrollbar: Readonly<TerminalScrollbar>,
     submittedOutput?: boolean,
+    reflow?: boolean,
   ): TerminalAccessibilityUpdate {
     if (this.disposed) return { announced: false, full: false, updatedRows: 0 }
     validateScrollbar(scrollbar)
@@ -289,7 +315,8 @@ class OwnedTerminalAccessibility implements TerminalAccessibilityController {
     const updatedRows = this.updateRows(rows, scrollbar, full)
     this.updateCursor(snapshot, scrollbar, rows)
     if (submittedOutput === true) this.outputPending = true
-    const announced = submittedOutput !== false && this.announcePendingOutput(rows, scrollbar)
+    const announced =
+      submittedOutput !== false && this.announcePendingOutput(rows, scrollbar, reflow)
     this.previous = previousFrame(snapshot, rows, scrollbar)
     if (submittedOutput !== false) this.outputPending = false
     return { announced, full, updatedRows }
@@ -381,10 +408,11 @@ class OwnedTerminalAccessibility implements TerminalAccessibilityController {
   private announcePendingOutput(
     rows: readonly AccessibilityRow[],
     scrollbar: Readonly<TerminalScrollbar>,
+    reflow: boolean | undefined,
   ): boolean {
     const previous = this.previous
     if (!this.outputPending || !previous || !isAtBottom(scrollbar)) return false
-    const output = changedOutput(previous, rows)
+    const output = reflow ? reflowOutput(previous, rows) : changedOutput(previous, rows)
     if (output.length === 0) return false
     this.appendAnnouncement(output)
     return true
