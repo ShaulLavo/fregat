@@ -5,6 +5,7 @@ import type {
   EditorInitialHighlightStatus,
   EditorInitialPaintEvent,
   EditorPlugin,
+  EditorResolvedSelection,
 } from '../plugins'
 import type { EditorTheme } from '../theme'
 import type {
@@ -43,6 +44,27 @@ export type EditorEditability = 'editable' | 'readonly'
 export type EditorDocumentMode = 'session' | 'static'
 
 export type EditorSelectionSyncMode = 'sync' | 'none'
+
+export type EditorTouchSelectionAnchor = {
+  readonly x: number
+  readonly y: number
+  readonly bottom: number
+}
+
+export type EditorTouchSelectionEvent = {
+  readonly phase: 'start' | 'update' | 'end' | 'cancel'
+  readonly kind: 'word' | 'line' | 'document' | null
+  readonly selections: readonly EditorResolvedSelection[]
+  readonly anchor: EditorTouchSelectionAnchor | null
+}
+
+export type EditorInputCommand = 'cut' | 'copy' | 'paste' | 'selectAll' | 'undo' | 'redo'
+
+export type EditorInputCommandState = {
+  readonly editable: boolean
+  readonly canUndo: boolean
+  readonly canRedo: boolean
+}
 
 export type EditorScrollMode = VirtualizedTextViewScrollMode
 

@@ -34,6 +34,12 @@ Content mode paints every display row and grows after edits, font changes, previ
 
 Content mode supports up to 10,000 display rows, 1,048,576 UTF-16 source units and 1,000,000 CSS pixels of content height. Exceeding a limit throws an error with code `EDITOR_CONTENT_LAYOUT_LIMIT`. Refused replacements and edits preserve the attached document, selections and undo history. Use `virtualized` for larger documents.
 
+## Touch selection
+
+Hold a word or double-tap it, keep that contact down, and drag by words across rows. Triple-tap selects a whole line and its held contact drags by lines. Four taps select the document. Ordinary swipes scroll. These gestures use the same document selections and boundaries as desktop clicks.
+
+Touch menu chrome is opt-in through `createTouchSelectionPlugin` from `@singapore-editor/plugin-ui/touch-selection-plugin`. The plugin owns its menu, extension items and optional haptics. Core view contributions expose `onDidTouchSelection`, `getTouchSelectionAnchor`, `getSelectedText`, `getInputCommandState` and `runInputCommand` for input-aware plugins. Clipboard commands retain active paste providers and browser clipboard authorization.
+
 ## API highlights
 
 - `Editor.setText()` loads text into a view.

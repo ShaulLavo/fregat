@@ -1,3 +1,4 @@
+import { createTouchSelectionPlugin } from '@singapore-editor/plugin-ui/touch-selection-plugin'
 import {
   createBracketMatchPlugin,
   createOccurrenceHighlightPlugin,
@@ -37,7 +38,10 @@ export function mountExample(
     theme: paletteTheme(host, 'code-bg'),
     gutterScroll: 'content',
     cursorLineHighlight: { gutterNumber: true },
-    plugins: [createLineGutterPlugin({ minWidth: 36 })].concat(
+    plugins: [
+      createLineGutterPlugin({ minWidth: 36 }),
+      createTouchSelectionPlugin({ haptics: true }),
+    ].concat(
       language === 'text' ? [] : [createTreeSitterLanguagePlugin([languageContribution(language)])],
     ),
   })

@@ -65,6 +65,50 @@ function open(text: string, languageId: string, plugins: readonly EditorPlugin[]
 }
 
 describe('paste handlers', () => {
+  it('preserves whole-line metadata when copying through an input command', async () => {
+    const opened = open('abc\ndef', 'typescript')
+    opened.select({ anchor: 1, head: 1 })
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    let copied = ''
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          copied = text
+        },
+        readText: async () => copied,
+      },
+    })
+    try {
+      const controller = Reflect.get(editor!, 'inputSelection')
+      await Reflect.get(controller, 'applyClipboardAction').call(controller, 'copy')
+      opened.select({ anchor: 5, head: 5 })
+      await Reflect.get(controller, 'applyClipboardAction').call(controller, 'paste')
+      expect(opened.text()).toBe('abc\nabc\ndef')
+    } finally {
+      if (descriptor) Object.defineProperty(navigator, 'clipboard', descriptor)
+      else Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
+  it('passes touch clipboard text through the active paste providers', async () => {
+    const opened = open('abc', 'typescript', [pasteHandlerPlugin(constantHandler('CLAIMED'))])
+    opened.select({ anchor: 0, head: 0 })
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { readText: async () => 'plain' },
+    })
+    try {
+      const controller = Reflect.get(editor!, 'inputSelection')
+      await Reflect.get(controller, 'applyClipboardAction').call(controller, 'paste')
+      expect(opened.text()).toBe('CLAIMEDabc')
+    } finally {
+      if (descriptor) Object.defineProperty(navigator, 'clipboard', descriptor)
+      else Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
   it('hands a claimed paste to the handler that named the type it arrived under', () => {
     const opened = open('abc', 'typescript', [
       pasteHandlerPlugin({

@@ -96,7 +96,6 @@ import {
   restoreHighlightsAfterBrowserResume,
   restoreHighlightsAfterPresentation,
   setRangeHighlight,
-  setNativeSelection,
   setSelection,
   setSelections,
   setTokens as setViewTokens,
@@ -1743,10 +1742,6 @@ export class VirtualizedTextView {
   ): void {
     setSelection(this.view, anchorOffset, headOffset, affinity)
     this.refreshInlineReveal()
-  }
-
-  public setNativeSelection(anchorOffset: number, headOffset: number): void {
-    setNativeSelection(this.view, anchorOffset, headOffset)
   }
 
   public setSelections(selections: readonly VirtualizedTextSelection[]): void {

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Custom touch selection</title>
+    <link rel="stylesheet" href="../../../../packages/editor/src/style.css" />
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        margin: 0;
+        font: 14px system-ui;
+        background: #f2f2f7;
+        color: #17171b;
+      }
+      #host {
+        display: flex;
+        width: 100%;
+        height: 180px;
+        background: white;
+      }
+      output {
+        display: block;
+        white-space: pre-wrap;
+        font: 12px monospace;
+        overflow-wrap: anywhere;
+      }
+      .controls {
+        padding: 12px;
+        display: grid;
+        gap: 12px;
+      }
+      nav {
+        display: flex;
+        gap: 14px;
+      }
+      select,
+      .controls button {
+        font: inherit;
+        padding: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="host"></main>
+    <div class="controls">
+      <output id="selection">Selected: </output><output id="state"></output>
+      <nav>
+        <a href="./mobile-custom-selection.html">Custom</a
+        ><a href="./mobile-native-text.html">Native text</a>
+      </nav>
+      <label><input id="wrap" type="checkbox" /> Wrap lines</label>
+      <button id="long">Load scroll / wrap sample</button
+      ><button id="reset">Reset short sample</button>
+      <p>
+        Hold or double-tap a word. Triple-tap selects a line; four taps select all text. Keep the
+        second or third tap held to drag by words or lines. Swipe the text to scroll. Tap text to
+        type. Paste may request clipboard access on iOS.
+      </p>
+      <p>
+        “Demo: count characters” shows how a host adds menu actions. It appears only on this
+        comparison page.
+      </p>
+      <output id="status" role="status"></output>
+      <output id="native-state">Native row selections: 0</output><output id="events"></output>
+    </div>
+    <script type="module" src="./mobile-custom-selection.js"></script>
+  </body>
+</html>
