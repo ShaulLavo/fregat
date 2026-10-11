@@ -1974,15 +1974,24 @@ export class InputSelectionController {
 
   private handleCompositionStart = this.traceInput(
     'input.compositionstart',
-    (_event: CompositionEvent): void => {
+    (event: CompositionEvent): void => {
+      const selectionChange = this.isInputFocused() ? this.selectionChangeBeforeEdit() : null
+      const input = this.options.view.inputElement
+      // Keep the browser's window intact as composition begins, but measure its replacement
+      // against the mapped native selection so omitted display text cannot enter the document.
+      if (selectionChange && isTextareaElement(input)) {
+        this.hiddenInputContent = readHiddenInputState(input)
+      }
       this.transitionInputState({ type: 'composition-start' })
       this.editContextComposition = null
       // A textarea selects what the composition is about to replace, which is how a correction
       // reaching back over a word says so: the event itself carries only the new text.
-      const input = this.options.view.inputElement
       this.compositionRange = isTextareaElement(input)
         ? { start: input.selectionStart, end: input.selectionEnd }
         : null
+      if (selectionChange) {
+        this.applyChange(selectionChange, 'input.compositionstart', eventStartMs(event))
+      }
     },
   )
 

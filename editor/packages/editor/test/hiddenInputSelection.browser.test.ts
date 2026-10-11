@@ -145,18 +145,28 @@ describe('platform selections in the bounded textarea', () => {
     expect(editor.materializeFullText()).toBe(prefix + 'alpha DELTA charlie')
   })
 
-  it('keeps editor-driven multiple selections when the native selection is unchanged', async () => {
-    await inputAt()
-    const session = createDocumentSession('alpha bravo charlie')
-    editor.attachSession(session)
-    session.setSelections([
-      { anchor: 0, head: 5 },
-      { anchor: 6, head: 11 },
-    ])
-    await frames()
-    await commands.proofNativeInsertText('X')
-    expect(editor.materializeFullText()).toBe('X X charlie')
-  })
+  it.each(['typing', 'composition'] as const)(
+    'keeps editor-driven multiple selections when the native selection is unchanged (%s)',
+    async (route) => {
+      await inputAt()
+      const session = createDocumentSession('alpha bravo charlie')
+      editor.attachSession(session)
+      session.setSelections([
+        { anchor: 0, head: 5 },
+        { anchor: 6, head: 11 },
+      ])
+      await frames()
+      if (route === 'typing') {
+        await commands.proofNativeInsertText('X')
+      } else {
+        const input = editor.getInputElement() as HTMLTextAreaElement
+        input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+        input.setRangeText('X', input.selectionStart, input.selectionEnd, 'end')
+        input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: 'X' }))
+      }
+      expect(editor.materializeFullText()).toBe('X X charlie')
+    },
+  )
 
   it.skipIf(!navigator.userAgent.includes('Chrome'))(
     'commits an engine IME replacement over a native selection',
@@ -169,6 +179,46 @@ describe('platform selections in the bounded textarea', () => {
       expect(editor.materializeFullText()).toBe('alpha 日本 charlie')
       await commands.proofNativeInsertText('!')
       expect(editor.materializeFullText()).toBe('alpha 日本! charlie')
+    },
+  )
+
+  it.each([
+    { omission: 'character trim', route: 'beforeinput' },
+    { omission: 'character trim', route: 'compositionend' },
+    { omission: 'page gap', route: 'beforeinput' },
+    { omission: 'page gap', route: 'compositionend' },
+  ])(
+    'preserves omitted text when composition starts immediately ($omission, $route)',
+    async ({ omission, route }) => {
+      const prefix =
+        omission === 'character trim'
+          ? 'a'.repeat(2000)
+          : Array.from({ length: 35 }, (_, i) => `row${i}\n`).join('') + 'alpha '
+      const text = prefix + 'bravo charlie'
+      editor.setText(text)
+      const input = await inputAt()
+      editor.setSelection(0, text.length)
+      const start = input.value.indexOf('bravo')
+      expect(start).toBeGreaterThanOrEqual(0)
+      expect(input.value).toContain('…')
+      input.setSelectionRange(start, start + 5)
+      // Start composition before the queued select event can publish the native selection.
+      input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+      input.setRangeText('日本', start, start + 5, 'end')
+      if (route === 'beforeinput') {
+        input.dispatchEvent(
+          new InputEvent('beforeinput', {
+            bubbles: true,
+            cancelable: true,
+            inputType: 'insertFromComposition',
+            data: '日本',
+          }),
+        )
+      }
+      input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '日本' }))
+      expect(editor.materializeFullText()).toBe(prefix + '日本 charlie')
+      await commands.proofNativeInsertText('!')
+      expect(editor.materializeFullText()).toBe(prefix + '日本! charlie')
     },
   )
 
