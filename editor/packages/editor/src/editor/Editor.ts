@@ -4334,7 +4334,13 @@ export class Editor {
     for (const participant of [...this.pressParticipants]) {
       if (this.pressClaimedBy(participant, event)) return true
     }
-    return false
+    // Controls own touch presses before their compatibility mousedown handlers can cancel them.
+    if (!('touches' in event) || !(event.target instanceof Element)) return false
+    return (
+      event.target.closest(
+        'button, input, select, textarea, a[href], [role="button"], [contenteditable="true"]',
+      ) !== null
+    )
   }
 
   private pressClaimedBy(
