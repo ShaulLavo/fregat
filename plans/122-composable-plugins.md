@@ -66,6 +66,15 @@ behavior, not the unit that receives every editor update.
 These are product decisions. The precise primitive names, object shape, dependency mechanism,
 configuration syntax, and loading strategy remain design work.
 
+### Public export naming
+
+- [ ] Rename `TREE_SITTER_LANGUAGE_CONTRIBUTIONS`, exported by
+      `@singapore-editor/tree-sitter-languages`. It is a terrible public name: long, noisy, and vague
+      about what callers receive. Choose a concise name that describes the language catalog and fits
+      the revised editor API. Update the generated catalog, package exports, callers, examples, and
+      docs together; remove the old name without a compatibility alias. Include a patch changeset
+      and verify the built package exports.
+
 ## Current foundations and gaps
 
 | Source                                                                                                    | Existing seam and implication                                                                                                                                                                                   |
