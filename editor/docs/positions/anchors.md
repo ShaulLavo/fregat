@@ -120,10 +120,10 @@ Buffer ids are dense and the newest is always next, so inserted buffers are inde
 
 Snapshot = `(root, reverseIndex)` tuple. Both immutable to their holder. Undo/redo = O(1) swap.
 
-| Structure      | Per-edit cost                      | Memory per delta |
-| -------------- | ---------------------------------- | ---------------- |
-| Sequence tree  | O(log n) nodes (already happening) | ~100 bytes/node  |
-| Reverse index  | One slot per new buffer; a short path per 16 buffers or per cut of inserted text | one slot |
+| Structure     | Per-edit cost                                                                    | Memory per delta |
+| ------------- | -------------------------------------------------------------------------------- | ---------------- |
+| Sequence tree | O(log n) nodes (already happening)                                               | ~100 bytes/node  |
+| Reverse index | One slot per new buffer; a short path per 16 buffers or per cut of inserted text | one slot         |
 
 **GC safety:** The reverse index holds orders, not nodes, and its tail is shared with newer snapshots of the same history. Dropping a snapshot drops its root and its view of the index. **Invariant:** snapshots must be retained/discarded as complete tuples — never expose roots individually.
 

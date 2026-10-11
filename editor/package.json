@@ -34,8 +34,8 @@
     "bench:stress": "bun run stress:build && bun run --cwd examples/stress bench",
     "bench:input": "bun run stress:build && bun run --cwd examples/stress bench:input",
     "lint:root": "oxlint --disable-nested-config scripts knip.ts",
-    "format:root": "oxfmt --write scripts .github .oxfmtrc.json .oxlintrc.json package.json turbo.json tsconfig.json global.d.ts knip.ts",
-    "format:check:root": "oxfmt --check scripts .github .oxfmtrc.json .oxlintrc.json package.json turbo.json tsconfig.json global.d.ts knip.ts"
+    "format:root": "oxfmt --write .",
+    "format:check:root": "oxfmt --check ."
   },
   "devDependencies": {
     "knip": "6.38.0",

@@ -3,19 +3,19 @@
 Completed 2026-09-25. The eleven audited workarounds have public contracts and migrated callers.
 Platform Plan 130 removes the host copies; Editor owns the presentation and interaction ordering.
 
-| Former host obligation | Public contract |
-| --- | --- |
-| Reapply tokens after text replacement | `setText(text, { tokens })` paints both atomically; `syncText` and `openDocument` share the contract. |
-| Remember diff-only options | `createDiffEditorOptions()` supplies the preset, including `folding: false`. |
-| Write private typography variables | `fontSize`, `fontFamily`, `lineHeight` and measured `snapshot.metrics`. |
-| Override private theme selectors | Named selection, inactive selection and popup colors; registered `diff.*` colors. |
-| Register pointer listeners before core | `registerPressParticipant` claims presses; `registerNonCaretRows` handles keyboard navigation. |
-| Race completion and signature-help key listeners | Extensible keymap contexts and commands in the `suggest` pack. |
-| Observe inline style to find reservation changes | `onDidChangeReservedOverlayWidth` reports changes, including reentrant layout. |
-| Read raw scroll before the virtualizer updates | `Editor.onDidScroll` reports the current position; contribution `setScrollPosition` updates both axes. |
-| Punch through gutter pointer-event CSS | Gutter contributions declare `interactive`. |
-| Retain recycled row elements during animation | Contribution `getRowPresentation(displayRow)` returns a disposable element handle with an abort signal. |
-| Guess when syntax highlighting has settled | `initialHighlightStatus` exposes pending, ready and error outcomes. |
+| Former host obligation                           | Public contract                                                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Reapply tokens after text replacement            | `setText(text, { tokens })` paints both atomically; `syncText` and `openDocument` share the contract.   |
+| Remember diff-only options                       | `createDiffEditorOptions()` supplies the preset, including `folding: false`.                            |
+| Write private typography variables               | `fontSize`, `fontFamily`, `lineHeight` and measured `snapshot.metrics`.                                 |
+| Override private theme selectors                 | Named selection, inactive selection and popup colors; registered `diff.*` colors.                       |
+| Register pointer listeners before core           | `registerPressParticipant` claims presses; `registerNonCaretRows` handles keyboard navigation.          |
+| Race completion and signature-help key listeners | Extensible keymap contexts and commands in the `suggest` pack.                                          |
+| Observe inline style to find reservation changes | `onDidChangeReservedOverlayWidth` reports changes, including reentrant layout.                          |
+| Read raw scroll before the virtualizer updates   | `Editor.onDidScroll` reports the current position; contribution `setScrollPosition` updates both axes.  |
+| Punch through gutter pointer-event CSS           | Gutter contributions declare `interactive`.                                                             |
+| Retain recycled row elements during animation    | Contribution `getRowPresentation(displayRow)` returns a disposable element handle with an abort signal. |
+| Guess when syntax highlighting has settled       | `initialHighlightStatus` exposes pending, ready and error outcomes.                                     |
 
 A row presentation handle is invalidated before text replacement, row release, and view disposal.
 Acquisition is blocked during invalidation, including from abort callbacks, until the replacement
