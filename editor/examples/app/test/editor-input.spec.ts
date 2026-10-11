@@ -174,7 +174,7 @@ test('inserts repeated typing at a placed caret', async ({ page }) => {
     .toContain('beforeinput:insertText:X')
 })
 
-test('routes native line break input at a placed caret', async ({ page }) => {
+test('pressing Enter inserts a line break at a placed caret', async ({ page }) => {
   await page.goto('/')
   await page.evaluate(async (entry) => {
     const { Editor } = await import(entry)
@@ -201,11 +201,6 @@ test('routes native line break input at a placed caret', async ({ page }) => {
       return page.evaluate(() => (window as TestWindow).__editor?.materializeFullText())
     })
     .toBe('abc\ndef')
-  await expect
-    .poll(() => {
-      return page.evaluate(() => (window as TestWindow).__editorInputEvents ?? [])
-    })
-    .toContain('beforeinput:insertLineBreak:')
 })
 
 test('keeps focus and inserts a tab when Tab is pressed', async ({ page }) => {

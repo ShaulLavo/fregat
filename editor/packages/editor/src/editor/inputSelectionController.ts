@@ -1,5 +1,6 @@
 import { isTextareaElement } from '../dom'
 import { scheduleFrame, type ScheduledFrame } from './scheduleFrame'
+import { TouchSelectionController } from './touchSelection'
 import type {
   DocumentSession,
   DocumentSessionChange,
@@ -288,6 +289,7 @@ const COLUMN_SELECTION_COMMANDS = new Set<EditorCommandId>([
 export class InputSelectionController {
   private readonly nodeConstructor: typeof Node | undefined
   private readonly elementConstructor: typeof Element | undefined
+  private readonly touchSelection: TouchSelectionController
   private readonly autoClose = new AutoCloseStore()
   private readonly snippet = new SnippetSession()
   private readonly ghostText = new GhostTextSession()
@@ -317,6 +319,14 @@ export class InputSelectionController {
   constructor(private readonly options: InputSelectionControllerOptions) {
     this.nodeConstructor = options.el.ownerDocument.defaultView?.Node
     this.elementConstructor = options.el.ownerDocument.defaultView?.Element
+    this.touchSelection = new TouchSelectionController({
+      element: options.el,
+      positionAt: (x, y) => options.view.textPositionFromPoint(x, y),
+      begin: () => this.markDomSelectionForNextInput(),
+      tap: (position) => this.placeTouchCaret(position),
+      word: (position) => this.selectTouchWord(position),
+      extend: (anchor, position) => this.extendTouchSelection(anchor, position),
+    })
   }
 
   private traceInput<TEvent, TResult>(
@@ -327,6 +337,7 @@ export class InputSelectionController {
   }
 
   install(): void {
+    this.touchSelection.install()
     const { el } = this.options
     el.addEventListener('mousedown', this.handleMouseDown)
     el.addEventListener('beforeinput', this.handleBeforeInput)
@@ -347,7 +358,9 @@ export class InputSelectionController {
   }
 
   dispose(): void {
+    this.touchSelection.dispose()
     const { el } = this.options
+    delete el.dataset.editorTouchSelection
     this.uninstallNativeInputHandlers()
     el.removeEventListener('mousedown', this.handleMouseDown)
     el.removeEventListener('beforeinput', this.handleBeforeInput)
@@ -1996,6 +2009,71 @@ export class InputSelectionController {
     },
   )
 
+  private placeTouchCaret(position: VirtualizedTextHitPosition): void {
+    const session = this.session
+    if (!session) return
+    delete this.options.el.dataset.editorTouchSelection
+    this.markSessionSelectionForNextInput()
+    this.options.el.ownerDocument.getSelection()?.removeAllRanges()
+    this.applyChange(
+      session.setSelection(position.offset, position.offset, { affinity: position.affinity }),
+      'input.touchTap',
+      nowMs(),
+      { syncDomSelection: false },
+    )
+    this.options.view.focusInput()
+  }
+
+  private selectTouchWord(position: VirtualizedTextHitPosition): TextOffsetRange {
+    const range = this.offsetRangeAt(position.offset, 'word')
+    this.selectTouchRange(range.start, range.end)
+    return range
+  }
+
+  private extendTouchSelection(
+    anchor: TextOffsetRange,
+    position: VirtualizedTextHitPosition,
+  ): void {
+    const head = this.offsetRangeAt(position.offset, 'word')
+    if (head.start < anchor.start) {
+      this.selectTouchRange(anchor.end, head.start)
+      return
+    }
+    this.selectTouchRange(anchor.start, Math.max(anchor.end, head.end))
+  }
+
+  /** Rendered text already has DOM ranges; leave them to the platform's handles and copy callout. */
+  private selectTouchRange(anchor: number, head: number): void {
+    const session = this.session
+    if (!session) return
+    this.options.view.inputElement.blur()
+    this.options.el.dataset.editorTouchSelection = ''
+    this.markDomSelectionForNextInput()
+    this.applyChange(session.setSelection(anchor, head), 'input.touchSelection', nowMs(), {
+      syncDomSelection: false,
+    })
+    const range = this.options.view.createRange(Math.min(anchor, head), Math.max(anchor, head), {
+      scrollIntoView: false,
+    })
+    if (!range) return
+    const selection = this.options.el.ownerDocument.getSelection()
+    if (anchor <= head) {
+      selection?.setBaseAndExtent(
+        range.startContainer,
+        range.startOffset,
+        range.endContainer,
+        range.endOffset,
+      )
+      return
+    }
+    selection?.setBaseAndExtent(
+      range.endContainer,
+      range.endOffset,
+      range.startContainer,
+      range.startOffset,
+    )
+  }
+
   private handleMouseDown = (event: MouseEvent): void => {
     if (!this.session) return
     if (event.defaultPrevented) return
@@ -2003,6 +2081,18 @@ export class InputSelectionController {
       event.preventDefault()
       return
     }
+    if (this.touchSelection.ownsMouseEvent) {
+      event.preventDefault()
+      // iOS reports the second tap through the compatibility mouse event's click count.
+      if (event.detail >= 2) {
+        const position = this.textPositionFromMouseEvent(event)
+        if (!position) return
+        this.touchSelection.acceptNativeSelection()
+        this.selectTouchWord(position)
+      }
+      return
+    }
+    delete this.options.el.dataset.editorTouchSelection
 
     this.options.view.focusInput()
     if (event.detail >= 4) {
@@ -3577,12 +3667,38 @@ export class InputSelectionController {
 
   private syncCustomSelectionFromDom = (): void => {
     if (!this.session) return
+    if (this.touchSelection.ownsMouseEvent && !this.isInputFocused()) {
+      this.syncTouchSelectionFromDom()
+      return
+    }
     if (!shouldSyncCustomSelectionFromDom(this.inputState, this.domSelectionContext())) return
 
     const offsets = this.readDomSelectionOffsets()
     if (!offsets) return
 
     this.syncCustomSelectionHighlight(offsets.anchorOffset, offsets.headOffset)
+  }
+
+  private syncTouchSelectionFromDom(): void {
+    const session = this.session
+    const selection = this.options.el.ownerDocument.getSelection()
+    if (!session || !selection?.anchorNode || !selection.focusNode) return
+    const content = this.options.view.contentElement
+    if (!content.contains(selection.anchorNode) || !content.contains(selection.focusNode)) return
+    const offsets = this.readDomSelectionOffsets()
+    if (!offsets) return
+    this.options.el.dataset.editorTouchSelection = ''
+    const current = this.primaryResolvedSelection()
+    if (current?.anchorOffset === offsets.anchorOffset && current.headOffset === offsets.headOffset)
+      return
+    if (offsets.anchorOffset !== offsets.headOffset) this.touchSelection.acceptNativeSelection()
+    this.markDomSelectionForNextInput()
+    this.applyChange(
+      session.setSelection(offsets.anchorOffset, offsets.headOffset),
+      'input.nativeTouchSelection',
+      nowMs(),
+      { syncDomSelection: false },
+    )
   }
 
   private syncCustomSelectionHighlight(
