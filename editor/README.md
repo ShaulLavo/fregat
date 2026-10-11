@@ -27,26 +27,43 @@ You can keep an old snapshot readable while editing the current document.
 - **Workers for derived work.** Tree-sitter parsing and highlighting use worker-side source snapshots. The main thread retains the document. See the [syntax design](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/syntax/tree-sitter.md).
 - **Optional language tools.** Add syntax languages, language-server integration, a minimap, or search as packages. Start with the [core API](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/README.md).
 
-## Proof, including the losses
+## Performance
 
-The [2026-10-08 browser comparison](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/performance/browser-compare-2026-10-08.md) is a noisy experiment, with other jobs on the host.
-It uses repeated TypeScript text, lexical highlighting, and headless Chromium 153 on an Intel Core i7-14700K running Linux.
-Singapore 0.2.6, Monaco 0.57.0, and CodeMirror 6 use the configurations recorded in the report.
+A 10 MiB TypeScript document with lexical highlighting. This was a noisy experiment with other jobs on the host; a quiet rerun is pending.
 
-| 10 MiB experiment                 |  Singapore |   Monaco | CodeMirror |
+| Measurement                       |  Singapore |   Monaco | CodeMirror |
 | --------------------------------- | ---------: | -------: | ---------: |
 | First-frame opportunity           |    29.6 ms |  89.7 ms |    31.5 ms |
 | First detected highlighted text   | 1,517.7 ms | 169.4 ms |    56.1 ms |
 | End typing, p95 frame opportunity |    32.3 ms |  49.0 ms |    32.7 ms |
 | JavaScript heap after open        |   25.2 MiB | 29.5 MiB |   17.4 MiB |
 
-Singapore reaches the first frame sooner than Monaco in this experiment, but highlighted open loses to both competitors.
-Singapore waits for a full-document parse before viewport highlighting. The other editors can highlight the viewport first.
-The clocks observe animation-frame opportunities, so they leave physical display latency unmeasured. Heap leaves WASM, DOM, and GPU memory unmeasured.
+Singapore reaches the first frame sooner than Monaco, but highlighted open is slower than both competitors.
+It waits for a full-document parse before viewport highlighting; the other editors can highlight the viewport first.
 
-All three Singapore repetitions passed through 100 MiB. All three 200 MiB attempts missed the 30-second highlighting deadline.
-Monaco and CodeMirror passed through 200 MiB. Singapore's complete TypeScript deployment also exceeded both competitors' compressed size.
-The [method, raw samples, bundle sizes, and reproduction commands](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/performance/browser-compare-2026-10-08.md#reproduce) stay together. A quiet rerun is pending.
+| Larger files    | Singapore                                                 | Monaco | CodeMirror |
+| --------------- | --------------------------------------------------------- | ------ | ---------- |
+| Through 100 MiB | Passed all 3 repetitions                                  | Passed | Passed     |
+| 200 MiB         | All 3 attempts missed the 30-second highlighting deadline | Passed | Passed     |
+
+<details>
+<summary>Benchmark setup and limits</summary>
+
+| Detail          | Setup                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| Date            | 2026-10-08                                                                                  |
+| Machine         | Intel Core i7-14700K running Linux                                                          |
+| Browser         | Headless Chromium 153                                                                       |
+| Versions        | Singapore 0.2.6, Monaco 0.57.0, CodeMirror 6; configurations recorded in the report         |
+| Fixture         | Repeated TypeScript text with lexical highlighting                                          |
+| Timing          | Animation-frame opportunities; physical display latency remains unmeasured                  |
+| Memory          | JavaScript heap; WASM, DOM, and GPU memory remain unmeasured                                |
+| Run conditions  | Other jobs shared the host. A quiet rerun is pending.                                       |
+| Deployment size | Singapore's complete TypeScript deployment is larger than both competitors when compressed. |
+
+See the [method, raw samples, bundle sizes, and reproduction commands](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/performance/browser-compare-2026-10-08.md#reproduce).
+
+</details>
 
 ## Quick start
 
