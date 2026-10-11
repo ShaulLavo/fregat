@@ -4330,14 +4330,32 @@ export class Editor {
     )
   }
 
-  private claimPress(event: MouseEvent): boolean {
+  private claimPress(event: MouseEvent | TouchEvent): boolean {
     for (const participant of [...this.pressParticipants]) {
       if (this.pressClaimedBy(participant, event)) return true
+    }
+    // Descendant controls own touch presses before compatibility mousedown handlers can cancel them.
+    if (!('touches' in event) || !(event.target instanceof Element)) return false
+    if (!this.el.contains(event.target)) return false
+    for (
+      let target: Element | null = event.target;
+      target && target !== this.el;
+      target = target.parentElement
+    ) {
+      if (
+        target.matches(
+          'button, input, select, textarea, a[href], [role="button"], [contenteditable="true"]',
+        )
+      )
+        return true
     }
     return false
   }
 
-  private pressClaimedBy(participant: EditorPressParticipant, event: MouseEvent): boolean {
+  private pressClaimedBy(
+    participant: EditorPressParticipant,
+    event: MouseEvent | TouchEvent,
+  ): boolean {
     try {
       return participant(event)
     } catch (error) {
