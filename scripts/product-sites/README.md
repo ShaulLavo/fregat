@@ -43,6 +43,7 @@ environment variable. Check `bun run --cwd scripts wrangler whoami` first. The s
 must own `shaulavo.dev` and permit Workers deployment and Custom Domain changes. Inspect DNS,
 Worker routes and Custom Domains before claiming an exact hostname. Preserve existing mail
 records, the apex and private Mesh names.
+For non-interactive shells, supply `CLOUDFLARE_API_TOKEN` from the credential store through a protected child-process environment, keeping its value out of arguments, files and logs.
 
 Deployment is manual. CI still builds sites and checks mobile layouts through the normal
 CI workflow. Adding automatic Cloudflare deployment requires an owner-approved API token
