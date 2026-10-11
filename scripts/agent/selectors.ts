@@ -1381,7 +1381,7 @@ export const selectors = {
       .locator('[role="treeitem"][aria-level="2"]'),
   pendingChord: (page: Page) => page.locator('[data-slot="keymap-pending"]'),
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
-  editorTouchSurface: (page: Page) => page.locator('.editor-virtualized'),
+  editorTouchSurface: (page: Page) => page.locator('.editor-virtualized:visible'),
   editorTouchMenu: (page: Page) => page.getByRole('toolbar', { name: 'Selection actions' }),
   editorTouchAction: (page: Page, name: string) =>
     selectors.editorTouchMenu(page).getByRole('button', { name, exact: true }),

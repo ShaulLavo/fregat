@@ -25,6 +25,7 @@ export const editorTouchSelection: Scenario = {
       const point = await textPoint(page, 'alpha bravo charlie', 'bravo')
       await finger(page, 'touchstart', point)
       await page.waitForTimeout(600)
+      await step('held-word')
       await finger(page, 'touchend', point)
       await selectors.editorTouchMenu(page).waitFor({ state: 'visible' })
       await step('held-word-menu')
@@ -55,14 +56,25 @@ async function finger(
   type: 'touchstart' | 'touchend',
   point: { x: number; y: number },
 ): Promise<void> {
-  await selectors.editorTouchSurface(page).first().evaluate(`(element) => {
-    const touch = { identifier: 1, target: element, clientX: ${point.x}, clientY: ${point.y} }
-    const event = new Event(${JSON.stringify(type)}, { bubbles: true, cancelable: true })
-    Object.defineProperties(event, {
-      touches: { value: ${type === 'touchend' ? '[]' : '[touch]'} },
-      targetTouches: { value: ${type === 'touchend' ? '[]' : '[touch]'} },
-      changedTouches: { value: [touch] },
-    })
-    element.dispatchEvent(event)
-  }`)
+  await selectors
+    .editorTouchSurface(page)
+    .first()
+    .evaluate(
+      (element, args) => {
+        const touch = {
+          identifier: 1,
+          target: element,
+          clientX: args.point.x,
+          clientY: args.point.y,
+        }
+        const event = new Event(args.type, { bubbles: true, cancelable: true })
+        Object.defineProperties(event, {
+          touches: { value: args.type === 'touchend' ? [] : [touch] },
+          targetTouches: { value: args.type === 'touchend' ? [] : [touch] },
+          changedTouches: { value: [touch] },
+        })
+        element.dispatchEvent(event)
+      },
+      { type, point },
+    )
 }

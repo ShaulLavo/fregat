@@ -184,7 +184,7 @@ test.each([false, true])(
 )
 
 test.each([undefined, false, true])(
-  'the mounted terminal applies screen-reader setting %s and releases its subscription',
+  'the mounted terminal applies screen-reader setting %s and releases its mirror',
   { timeout: 20_000 },
   async (enabled) => {
     const savedMirror = localStorage.getItem(BOOT_MIRROR_KEY)
@@ -222,16 +222,22 @@ test.each([undefined, false, true])(
         .toBe(1)
       expect(onFailed).not.toHaveBeenCalled()
       const terminal = onReady.mock.calls[0]![0] as Terminal
-      const textSubscribers = Reflect.get(terminal, 'textSubscribers') as { hasListeners: boolean }
       expect(Boolean(host.querySelector('[aria-label="Terminal screen"]'))).toBe(initiallyEnabled)
-      expect(textSubscribers.hasListeners).toBe(initiallyEnabled)
       expect(terminal.setAccessibilityEnabled(false)).toBe(initiallyEnabled)
       expect(host.querySelector('[aria-label="Terminal screen"]')).toBeNull()
-      expect(textSubscribers.hasListeners).toBe(false)
+      await terminal.write('\x1b[2J\x1b[Hscreen-reader output')
+      await expect.poll(() => terminal.visibleLines().join('\n')).toContain('screen-reader output')
       expect(terminal.setAccessibilityEnabled(true)).toBe(true)
-      expect(textSubscribers.hasListeners).toBe(true)
+      const mirror = host.querySelector('[aria-label="Terminal screen"]')!
+      expect(mirror.textContent).toContain('screen-reader output')
+      await terminal.write(' refreshed')
+      await expect.poll(() => mirror.textContent).toContain('screen-reader output refreshed')
+      const terminalRoot = terminal.element!
       unmount()
-      expect(textSubscribers.hasListeners).toBe(false)
+      expect(terminal.lifecycle).toBe('disposed')
+      expect(terminal.element).toBeUndefined()
+      expect(mirror.isConnected).toBe(false)
+      expect(terminalRoot.isConnected).toBe(false)
       expect(host.children).toHaveLength(0)
     } finally {
       controller.abort()
