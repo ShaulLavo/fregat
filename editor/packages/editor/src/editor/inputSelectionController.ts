@@ -2073,6 +2073,7 @@ export class InputSelectionController {
     this.options.view.inputElement.blur()
     this.options.el.dataset.editorTouchSelection = ''
     this.markDomSelectionForNextInput()
+    this.syncCustomSelectionHighlight(anchor, head)
     const current = this.primaryResolvedSelection()
     if (
       current?.anchorOffset !== anchor ||
@@ -3801,6 +3802,7 @@ export class InputSelectionController {
     const offsets = this.readDomSelectionOffsets()
     if (!offsets) return
     this.options.el.dataset.editorTouchSelection = ''
+    this.syncCustomSelectionHighlight(offsets.anchorOffset, offsets.headOffset)
     const current = this.primaryResolvedSelection()
     if (current?.anchorOffset === offsets.anchorOffset && current.headOffset === offsets.headOffset)
       return

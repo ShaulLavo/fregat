@@ -453,3 +453,46 @@ for (const boundary of ['host', 'editor-root', 'outer-wrapper']) {
     await expect(page.locator('.editor-virtualized-input')).toBeFocused()
   })
 }
+
+test('native touch selection repaints the caret at each active end', async ({ page }) => {
+  const point = await textPoint(page, 8)
+  await page.touchscreen.tap(point.x, point.y)
+  await page.waitForTimeout(80)
+  await page.touchscreen.tap(point.x, point.y)
+  for (const head of [15, 19, 25, 3]) {
+    const expected = await page.locator('.editor-virtualized').evaluate((content, head) => {
+      const rows = content.querySelectorAll('.editor-virtualized-row')
+      const anchor = document.createTreeWalker(rows[0]!, NodeFilter.SHOW_TEXT).nextNode()!
+      const row = rows[head >= 20 ? 1 : 0]!
+      const focus = document.createTreeWalker(row, NodeFilter.SHOW_TEXT).nextNode()!
+      const offset = head >= 20 ? head - 20 : head
+      document.getSelection()!.setBaseAndExtent(anchor, 6, focus, offset)
+      const range = document.createRange()
+      range.setStart(focus, offset)
+      range.collapse(true)
+      return { x: range.getBoundingClientRect().x, y: row.getBoundingClientRect().y }
+    }, head)
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as TestWindow).touchEditor.getSelections()[0]!.headOffset),
+      )
+      .toBe(head)
+    await expect
+      .poll(async () =>
+        Math.abs(
+          (await page
+            .locator('.editor-virtualized-caret')
+            .evaluate((caret) => caret.getBoundingClientRect().x)) - expected.x,
+        ),
+      )
+      .toBeLessThanOrEqual(1.5)
+    await expect
+      .poll(() =>
+        page
+          .locator('.editor-virtualized-caret')
+          .evaluate((caret) => caret.getBoundingClientRect().y),
+      )
+      .toBeCloseTo(expected.y, 0)
+  }
+  await expect(page.locator('.editor-virtualized-input')).not.toBeFocused()
+})
