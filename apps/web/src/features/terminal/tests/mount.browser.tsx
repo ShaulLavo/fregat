@@ -222,6 +222,9 @@ test.each([undefined, false, true])(
         .toBe(1)
       expect(onFailed).not.toHaveBeenCalled()
       const terminal = onReady.mock.calls[0]![0] as Terminal
+      // Stop PTY replay and shell output before this test owns the displayed text.
+      controller.abort()
+      expect(terminal.lifecycle).toBe('open')
       expect(Boolean(host.querySelector('[aria-label="Terminal screen"]'))).toBe(initiallyEnabled)
       expect(terminal.setAccessibilityEnabled(false)).toBe(initiallyEnabled)
       expect(host.querySelector('[aria-label="Terminal screen"]')).toBeNull()
