@@ -4334,13 +4334,22 @@ export class Editor {
     for (const participant of [...this.pressParticipants]) {
       if (this.pressClaimedBy(participant, event)) return true
     }
-    // Controls own touch presses before their compatibility mousedown handlers can cancel them.
+    // Descendant controls own touch presses before compatibility mousedown handlers can cancel them.
     if (!('touches' in event) || !(event.target instanceof Element)) return false
-    return (
-      event.target.closest(
-        'button, input, select, textarea, a[href], [role="button"], [contenteditable="true"]',
-      ) !== null
-    )
+    if (!this.el.contains(event.target)) return false
+    for (
+      let target: Element | null = event.target;
+      target && target !== this.el;
+      target = target.parentElement
+    ) {
+      if (
+        target.matches(
+          'button, input, select, textarea, a[href], [role="button"], [contenteditable="true"]',
+        )
+      )
+        return true
+    }
+    return false
   }
 
   private pressClaimedBy(

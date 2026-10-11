@@ -427,3 +427,29 @@ for (const claimed of [false, true]) {
     expect(selection.headOffset).toBe(0)
   })
 }
+
+for (const boundary of ['host', 'editor-root', 'outer-wrapper']) {
+  test(`a role-button ${boundary} leaves text taps to the editor`, async ({ page }) => {
+    await page.evaluate((boundary) => {
+      const host = document.querySelector<HTMLElement>('#host')!
+      const root = host.querySelector<HTMLElement>('.editor-virtualized')!
+      let target = host
+      if (boundary === 'editor-root') target = root
+      if (boundary === 'outer-wrapper') {
+        target = document.createElement('section')
+        host.before(target)
+        target.append(host)
+      }
+      target.setAttribute('role', 'button')
+      ;(window as TestWindow).touchEditor.setSelection(0)
+    }, boundary)
+    const point = await textPoint(page, 8)
+    await page.touchscreen.tap(point.x, point.y)
+    const current = await page.evaluate(
+      () => (window as TestWindow).touchEditor.getSelections()[0]!,
+    )
+    expect(current.anchorOffset).toBe(current.headOffset)
+    expect(current.headOffset).toBeGreaterThan(0)
+    await expect(page.locator('.editor-virtualized-input')).toBeFocused()
+  })
+}
