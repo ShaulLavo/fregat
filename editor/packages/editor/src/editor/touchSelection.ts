@@ -1,5 +1,6 @@
 import type { TextOffsetRange } from '../textRanges'
 import type { VirtualizedTextHitPosition } from '../virtualization/virtualizedTextViewTypes'
+import { EditorWorkScheduler } from './workScheduler'
 
 // A hold must survive a finger's small jitter, but a swipe must hand back to native scrolling.
 const HOLD_DELAY = 650
@@ -26,7 +27,7 @@ type TouchSelectionOptions = {
 /** Touch owns its gestures; compatibility mouse events must never steal native DOM selection. */
 export class TouchSelectionController {
   private gesture: TouchGesture | null = null
-  private hold: ReturnType<typeof setTimeout> | null = null
+  private readonly scheduler = new EditorWorkScheduler()
   private lastTap: { readonly x: number; readonly y: number; readonly time: number } | null = null
   private pointerType = 'mouse'
 
@@ -53,6 +54,7 @@ export class TouchSelectionController {
     element.removeEventListener('touchend', this.end)
     element.removeEventListener('touchcancel', this.cancel)
     this.cancel()
+    this.scheduler.dispose()
   }
 
   acceptNativeSelection(): void {
@@ -88,12 +90,16 @@ export class TouchSelectionController {
     this.gesture = gesture
     this.options.begin()
     // Leave touchstart unclaimed so the browser can scroll and present its own selection callout.
-    this.hold = setTimeout(() => {
-      this.hold = null
-      if (this.gesture !== gesture) return
-      gesture.range = this.options.word(gesture.position)
-      this.lastTap = null
-    }, HOLD_DELAY)
+    this.scheduler.schedule({
+      key: 'touch-selection-hold',
+      taskClass: 'input-critical',
+      delayMs: HOLD_DELAY,
+      isCurrent: () => this.gesture === gesture,
+      run: () => {
+        gesture.range = this.options.word(gesture.position)
+        this.lastTap = null
+      },
+    })
   }
 
   private move = (event: TouchEvent): void => {
@@ -149,8 +155,6 @@ export class TouchSelectionController {
   }
 
   private clearHold(): void {
-    if (this.hold === null) return
-    clearTimeout(this.hold)
-    this.hold = null
+    this.scheduler.cancel('touch-selection-hold')
   }
 }
