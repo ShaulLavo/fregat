@@ -217,6 +217,7 @@ function reconcileRows(
   updatePass: RowUpdatePass,
   onRemoveSlot: (rowSlotId: number) => void,
 ): void {
+  const nativeSelection = captureNativeWindowSelection(view)
   const contributions = view.gutterContributions
   const reusableRows = releaseRowsOutside(view, items)
   for (const item of items) {
@@ -230,6 +231,67 @@ function reconcileRows(
   }
   removeReusableRows(view, reusableRows, onRemoveSlot)
   updateReadingOrder(view, items)
+  const rows = items.flatMap((item) => {
+    const row = view.rowElements.get(item.index)
+    return row ? [row] : []
+  })
+  layoutTextWindow(view, rows)
+  restoreNativeWindowSelection(view, nativeSelection)
+}
+
+function layoutTextWindow(
+  view: VirtualizedTextViewInternal,
+  rows: readonly {
+    readonly element: HTMLDivElement
+    readonly top: number
+    readonly height: number
+  }[],
+): void {
+  const start = rows[0]?.top ?? 0
+  view.viewport.setTextWindowStart(start)
+  let previousEnd = start
+  let next = view.contentElement.firstChild
+  for (const row of rows) {
+    const gap = `${Math.max(0, row.top - previousEnd)}px`
+    if (row.element.style.marginTop !== gap) row.element.style.marginTop = gap
+    if (row.element !== next) view.contentElement.insertBefore(row.element, next)
+    next = row.element.nextSibling
+    previousEnd = row.top + row.height
+  }
+}
+
+function captureNativeWindowSelection(
+  view: VirtualizedTextViewInternal,
+): { readonly anchor: number; readonly head: number } | null {
+  const selection = view.scrollElement.ownerDocument.getSelection()
+  if (!selection?.anchorNode || !selection.focusNode) return null
+  if (
+    !view.contentElement.contains(selection.anchorNode) ||
+    !view.contentElement.contains(selection.focusNode)
+  )
+    return null
+  const anchor = textOffsetFromDomBoundary(view, selection.anchorNode, selection.anchorOffset)
+  const head = textOffsetFromDomBoundary(view, selection.focusNode, selection.focusOffset)
+  return anchor === null || head === null ? null : { anchor, head }
+}
+
+function restoreNativeWindowSelection(
+  view: VirtualizedTextViewInternal,
+  offsets: { readonly anchor: number; readonly head: number } | null,
+): void {
+  if (!offsets) return
+  const anchor = resolveMountedOffset(view, offsets.anchor)
+  const head = resolveMountedOffset(view, offsets.head)
+  if (!anchor || !head) return
+  const selection = view.scrollElement.ownerDocument.getSelection()
+  if (
+    selection?.anchorNode === anchor.node &&
+    selection.anchorOffset === anchor.offset &&
+    selection.focusNode === head.node &&
+    selection.focusOffset === head.offset
+  )
+    return
+  selection?.setBaseAndExtent(anchor.node, anchor.offset, head.node, head.offset)
 }
 
 // Separate package instances share the page, so each module owns a distinct id namespace.
@@ -247,10 +309,12 @@ function updateReadingOrder(
     if (!row.element.id) row.element.id = `${readingRowPrefix}-${nextReadingRowId++}`
     ids.push(row.element.id)
   }
-  if (view.spacer.getAttribute('role') !== 'group') view.spacer.setAttribute('role', 'group')
+  if (view.contentElement.getAttribute('role') !== 'group')
+    view.contentElement.setAttribute('role', 'group')
   const order = ids.join(' ')
   // Accessibility ownership changes reading order while retained row DOM and paint stay in place.
-  if (view.spacer.getAttribute('aria-owns') !== order) view.spacer.setAttribute('aria-owns', order)
+  if (view.contentElement.getAttribute('aria-owns') !== order)
+    view.contentElement.setAttribute('aria-owns', order)
 }
 
 function mountOrUpdateRow(
@@ -270,7 +334,7 @@ function mountOrUpdateRow(
   if (!row) return
   const contributions = view.gutterContributions
   const gutterParent = view.gutterContributions.length > 0 ? view.gutterElement : null
-  restoreRowElements(row, view.spacer, gutterParent)
+  restoreRowElements(row, view.contentElement, gutterParent)
   updateRow(view, row, item, snapshot, updatePass)
   if (view.disposed) {
     disposeUnownedRow(row, contributions)
@@ -314,7 +378,7 @@ function createRow(view: VirtualizedTextViewInternal): MountedVirtualizedTextRow
   for (const cell of gutterCells.values()) gutterElement.appendChild(cell)
   element.appendChild(textNode)
   if (view.gutterContributions.length > 0) view.gutterElement.appendChild(gutterElement)
-  view.spacer.appendChild(element)
+  view.contentElement.appendChild(element)
 
   return {
     index: -1,
@@ -692,13 +756,9 @@ function displayRowMetadata(row: DisplayRow | undefined): unknown {
   return row.metadata
 }
 
-function updateRowFrame(
-  view: VirtualizedTextViewInternal,
-  row: MountedVirtualizedTextRow,
-  item: FixedRowVirtualItem,
-): void {
-  if (row.index !== item.index) row.element.dataset.editorVirtualRow = String(item.index)
-  if (row.top !== item.start) positionRowElement(view, row.element, item.start)
+function updateRowFrame(row: MountedVirtualizedTextRow, item: FixedRowVirtualItem): void {
+  const index = String(item.index)
+  if (row.element.dataset.editorVirtualRow !== index) row.element.dataset.editorVirtualRow = index
 
   const height = `${item.size}px`
   if (row.element.style.height !== height) row.element.style.height = height
@@ -772,7 +832,7 @@ function updateRowElement(
   state: RowUpdateState,
   snapshot: FixedRowVirtualizerSnapshot,
 ): void {
-  updateRowFrame(view, row, item)
+  updateRowFrame(row, item)
   applyRowDecoration(view, row, item.index)
   updateCursorLineContentClass(view, row, state.cursorLine)
   updateRowInlineKindClasses(row, state.kind === 'text' ? state.inlineMapping : null)
@@ -878,7 +938,7 @@ function updateRowElementForSameLineEdit(
   patch: SameLineEditPatch,
   snapshot: FixedRowVirtualizerSnapshot,
 ): boolean {
-  updateRowFrame(view, row, item)
+  updateRowFrame(row, item)
   applyRowDecoration(view, row, item.index)
   updateGutterRowElement(view, row, item, state)
   if (view.disposed) return false
@@ -3040,7 +3100,6 @@ function applyTotalHeight(
   if (!originChanged) return
 
   for (const row of view.rowElements.values()) {
-    positionRowElement(view, row.element, row.top)
     positionRowElement(view, row.gutterElement, row.top)
   }
   view.lastRenderedRowsKey = ''
@@ -3456,6 +3515,14 @@ export function paintProvisionalRows(
     for (const created of slots) releaseProvisionalSlot(view, created)
     return null
   }
+  layoutTextWindow(
+    view,
+    slots.map((slot, index) => ({
+      element: slot.element,
+      top: paint.rows[index]!.top,
+      height: paint.rows[index]!.height,
+    })),
+  )
   const rectangles = paint.layers.flatMap((layer) =>
     layer.rectangles.map((rectangle) => {
       const element = view.scrollElement.ownerDocument.createElement('div')
@@ -3495,13 +3562,14 @@ function paintProvisionalRow(
   slot.element.removeAttribute('data-editor-virtual-row')
   slot.element.dataset.editorProvisionalRow = ''
   Object.assign(slot.element.style, {
-    top: `${row.top}px`,
+    top: '0px',
     backgroundColor: row.backgroundColor,
     color: row.color,
     transform: '',
     height: `${row.height}px`,
     lineHeight: `${row.height}px`,
-    left: `${paint.gutterWidth}px`,
+    left: '0px',
+    marginLeft: `${paint.gutterWidth}px`,
     minWidth: `${Math.max(0, paint.scrollWidth - paint.gutterWidth)}px`,
   })
   slot.element.replaceChildren()
@@ -3529,7 +3597,7 @@ function paintProvisionalRow(
     slot.element.appendChild(slot.foldPlaceholderElement)
   }
   if (!paintProvisionalGutter(view, slot, row, paint)) return false
-  view.spacer.appendChild(slot.element)
+  view.contentElement.appendChild(slot.element)
   return true
 }
 

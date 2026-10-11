@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Editor native selection handles</title>
+    <style>
+      body {
+        margin: 0;
+      }
+      #host {
+        width: 100%;
+        height: 180px;
+        display: flex;
+      }
+      .native {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        white-space: pre;
+        font: 20px/24px monospace;
+        width: 100%;
+        height: 180px;
+        position: relative;
+      }
+      nav {
+        position: fixed;
+        top: 180px;
+        left: 0;
+        right: 0;
+        z-index: 10000;
+        background: white;
+        white-space: normal;
+      }
+      output {
+        display: block;
+        white-space: pre-wrap;
+        font: 12px monospace;
+      }
+      #selection {
+        margin-top: 80px;
+      }
+      #state {
+        max-height: 240px;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="host"></main>
+    <output id="selection">Selected: </output>
+    <output id="state">State: {}</output>
+    <nav></nav>
+    <script type="module" src="./native-handles.ts"></script>
+  </body>
+</html>

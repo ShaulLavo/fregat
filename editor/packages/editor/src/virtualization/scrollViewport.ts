@@ -18,6 +18,10 @@ export class ScrollViewport {
   private viewportWidth = -1
   private viewportHeight = -1
   private originY = 0
+  private documentOffsetY = 0
+  private windowStart = 0
+  private scrollLeft = 0
+  private scrollTop = 0
   /** Every reservation change passes through here, including the provisional paint's. */
   public onReservedOverlayWidthChange: ((side: 'left' | 'right') => void) | null = null
 
@@ -30,10 +34,11 @@ export class ScrollViewport {
     const text = createScrollLayer(document, 'text')
     const gutter = createScrollLayer(document, 'gutter')
     this.layers = [text, gutter]
-    this.textContent = text.content
+    this.textContent = document.createElement('div')
+    this.textContent.className = 'editor-virtualized-text-window'
     this.textSpacer = text.spacer
     this.gutterSpacer = gutter.spacer
-    this.frame.append(text.clip, gutter.clip)
+    this.frame.append(this.textContent, text.clip, gutter.clip)
     this.extent.append(this.frame)
     scrollElement.append(this.extent)
     // The origin waits for the first viewport size: reading padding here would force a style pass
@@ -82,6 +87,7 @@ export class ScrollViewport {
     if (this.extent.style.width === value) return
 
     this.extent.style.width = value
+    this.textContent.style.width = value
     for (const layer of this.layers) layer.spacer.style.width = value
   }
 
@@ -90,6 +96,9 @@ export class ScrollViewport {
   }
 
   public setScrollPosition(left: number, top: number): void {
+    this.scrollLeft = left
+    this.scrollTop = top
+    this.synchronizeTextWindow()
     const textTransform = `translate(${-left}px, ${-top}px)`
     const gutterLeft = this.gutterScroll === 'content' ? left : 0
     const gutterTransform = `translate(${-gutterLeft}px, ${-top}px)`
@@ -114,6 +123,8 @@ export class ScrollViewport {
     const originY = height > 0 ? Math.floor(scrollTop / originStep) * originStep : 0
     const originChanged = this.originY !== originY
     this.originY = originY
+    this.documentOffsetY = offsetY
+    this.synchronizeTextWindow()
     const value = `${height}px`
     const shiftedOffsetY = offsetY + originY
     const transform = shiftedOffsetY === 0 ? '' : `translateY(${shiftedOffsetY}px)`
@@ -125,6 +136,20 @@ export class ScrollViewport {
       for (const layer of this.layers) layer.spacer.style.transform = transform
     }
     return originChanged
+  }
+
+  public setTextWindowStart(start: number): void {
+    if (this.windowStart === start) return
+    this.windowStart = start
+    this.synchronizeTextWindow()
+  }
+
+  private synchronizeTextWindow(): void {
+    const localStart = this.windowStart - this.originY
+    const shiftedOffset = this.documentOffsetY + this.originY
+    const top = localStart + shiftedOffset - this.scrollTop
+    const transform = `translate(${-this.scrollLeft}px, ${top}px)`
+    if (this.textContent.style.transform !== transform) this.textContent.style.transform = transform
   }
 
   private synchronizeOrigin(): void {

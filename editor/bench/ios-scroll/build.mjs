@@ -57,7 +57,17 @@ await build({
       },
     },
   ],
-  build: { outDir, emptyOutDir: true, target: 'es2022' },
+  build: {
+    outDir,
+    emptyOutDir: true,
+    target: 'es2022',
+    rolldownOptions: {
+      input: {
+        scroll: resolve(root, 'index.html'),
+        handles: resolve(root, 'native-handles.html'),
+      },
+    },
+  },
 })
 await mkdir(outDir, { recursive: true })
 await writeFile(

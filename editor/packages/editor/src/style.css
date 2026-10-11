@@ -145,6 +145,7 @@
 }
 
 .editor-virtualized[data-editor-scroll-mode='content'] .editor-virtualized-text-clip {
+  pointer-events: none;
   clip-path: none;
 }
 
@@ -165,7 +166,23 @@
 }
 
 .editor-virtualized-text-clip {
+  pointer-events: none;
   clip-path: inset(0 0 0 var(--editor-visible-gutter-width));
+}
+
+.editor-virtualized-text-window {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.editor-virtualized-text-window > .editor-virtualized-row {
+  position: relative;
+  left: 0;
+  right: auto;
+  top: 0;
+  margin-left: var(--editor-gutter-width);
 }
 
 .editor-virtualized-gutter-clip {
