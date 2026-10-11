@@ -290,6 +290,7 @@ export class InputSelectionController {
   private readonly nodeConstructor: typeof Node | undefined
   private readonly elementConstructor: typeof Element | undefined
   private readonly touchSelection: TouchSelectionController
+  private pressClaimed = false
   private readonly autoClose = new AutoCloseStore()
   private readonly snippet = new SnippetSession()
   private readonly ghostText = new GhostTextSession()
@@ -340,6 +341,7 @@ export class InputSelectionController {
     this.touchSelection.install()
     const { el } = this.options
     el.addEventListener('mousedown', this.handleMouseDown)
+    el.addEventListener('dblclick', this.handleTouchDoubleClick)
     el.addEventListener('beforeinput', this.handleBeforeInput)
     el.addEventListener('copy', this.handleCopy)
     el.addEventListener('cut', this.handleCut)
@@ -363,6 +365,7 @@ export class InputSelectionController {
     delete el.dataset.editorTouchSelection
     this.uninstallNativeInputHandlers()
     el.removeEventListener('mousedown', this.handleMouseDown)
+    el.removeEventListener('dblclick', this.handleTouchDoubleClick)
     el.removeEventListener('beforeinput', this.handleBeforeInput)
     el.removeEventListener('copy', this.handleCopy)
     el.removeEventListener('cut', this.handleCut)
@@ -2074,10 +2077,25 @@ export class InputSelectionController {
     )
   }
 
+  private handleTouchDoubleClick = (event: MouseEvent): void => {
+    if (!this.session || !this.touchSelection.ownsMouseEvent || event.defaultPrevented) return
+    event.preventDefault()
+    if (this.pressClaimed) return
+    const position = this.textPositionFromMouseEvent(event)
+    if (!position) return
+    this.touchSelection.acceptNativeSelection()
+    const range = this.offsetRangeAt(position.offset, 'word')
+    const current = this.primaryResolvedSelection()
+    if (current?.anchorOffset === range.start && current.headOffset === range.end) return
+    this.selectTouchWord(position)
+  }
+
   private handleMouseDown = (event: MouseEvent): void => {
     if (!this.session) return
-    if (event.defaultPrevented) return
-    if (this.options.claimPress(event)) {
+    this.pressClaimed = event.defaultPrevented
+    if (this.pressClaimed) return
+    this.pressClaimed = this.options.claimPress(event)
+    if (this.pressClaimed) {
       event.preventDefault()
       return
     }

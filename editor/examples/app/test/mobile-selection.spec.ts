@@ -1,10 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
+import type { EditorDisposable, EditorPlugin } from '../../../packages/editor/src/plugins'
 
 type SelectionEditor = {
+  addPlugin(plugin: EditorPlugin): EditorDisposable
   getSelections(): readonly { anchorOffset: number; headOffset: number }[]
   materializeFullText(): string
 }
-type TestWindow = Window & { touchEditor: SelectionEditor }
+type TestWindow = Window & { touchEditor: SelectionEditor; touchPressCounts?: number[] }
 
 async function installEditor(page: Page): Promise<void> {
   await page.goto('/test/fixtures/mobile-selection.html')
@@ -78,7 +80,7 @@ test('double-tap selects a word and a later tap collapses it', async ({ page }) 
   await expect(page.locator('.editor-virtualized-input')).toBeFocused()
 })
 
-test('native compatibility tap counts select words', async ({ page }) => {
+test('native mouse counts select words after a touch tap', async ({ page }) => {
   const point = await textPoint(page, 8)
   await page.touchscreen.tap(point.x, point.y)
   await page
@@ -96,6 +98,92 @@ test('native compatibility tap counts select words', async ({ page }) => {
       )
     }, point)
   await expect.poll(() => selectedText(page)).toBe('bravo')
+})
+
+test('native double-click selects a word after a touch tap', async ({ page }) => {
+  const point = await textPoint(page, 8)
+  await page.touchscreen.tap(point.x, point.y)
+  await page
+    .locator('.editor-virtualized-row')
+    .first()
+    .evaluate((row, point) => {
+      row.dispatchEvent(
+        new MouseEvent('dblclick', {
+          bubbles: true,
+          cancelable: true,
+          detail: 2,
+          clientX: point.x,
+          clientY: point.y,
+        }),
+      )
+    }, point)
+  await expect.poll(() => selectedText(page)).toBe('bravo')
+})
+
+test('a cancelled native touch press keeps its caret on double-click', async ({ page }) => {
+  const point = await textPoint(page, 8)
+  await page.touchscreen.tap(point.x, point.y)
+  await page
+    .locator('.editor-virtualized-row')
+    .first()
+    .evaluate((row, point) => {
+      document.addEventListener('mousedown', (event) => event.preventDefault(), {
+        capture: true,
+        once: true,
+      })
+      for (const type of ['mousedown', 'dblclick']) {
+        row.dispatchEvent(
+          new MouseEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            detail: 2,
+            clientX: point.x,
+            clientY: point.y,
+          }),
+        )
+      }
+    }, point)
+  await expect.poll(() => selectedText(page)).toBe('')
+})
+
+test('a claimed native touch press runs its participant once', async ({ page }) => {
+  const point = await textPoint(page, 8)
+  await page.touchscreen.tap(point.x, point.y)
+  await page.evaluate(() => {
+    const state = window as TestWindow
+    const counts: number[] = []
+    state.touchPressCounts = counts
+    state.touchEditor.addPlugin({
+      activate: (context) =>
+        context.registerViewContribution({
+          createContribution: (view) => {
+            const registration = view.registerPressParticipant((event) => {
+              counts.push(event.detail)
+              return true
+            })
+            return { update() {}, dispose: () => registration.dispose() }
+          },
+        }),
+    })
+  })
+  await page
+    .locator('.editor-virtualized-row')
+    .first()
+    .evaluate((row, point) => {
+      for (const type of ['mousedown', 'click', 'dblclick']) {
+        row.dispatchEvent(
+          new MouseEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            detail: 2,
+            clientX: point.x,
+            clientY: point.y,
+          }),
+        )
+      }
+    }, point)
+  expect(await page.evaluate(() => (window as TestWindow).touchPressCounts)).toEqual([2])
+  await expect.poll(() => selectedText(page)).toBe('')
 })
 
 test('long-press selects a word and dragging extends the selection', async ({ page }, testInfo) => {
