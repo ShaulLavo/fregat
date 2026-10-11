@@ -45,6 +45,7 @@ export const TOUCH_SELECTION_STYLES = `
 }
 
 .editor-touch-menu [data-action] {
+  box-sizing: border-box;
   position: relative;
   z-index: 1;
   min-height: 44px;

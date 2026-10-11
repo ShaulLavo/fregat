@@ -299,7 +299,6 @@ export class TouchSelectionController {
           count: gesture.tapCount,
         }
       event.preventDefault()
-      this.options.focus()
       // See browser-quirks.md#touch-release-scroll-ordering for deferred gesture settlement.
       this.endFrame = scheduleFrame(() => {
         this.endFrame = null
@@ -309,6 +308,7 @@ export class TouchSelectionController {
           bottom: gesture.currentY + 16,
         })
       })
+      this.options.focus()
       return
     }
     this.lastTap = { x: gesture.x, y: gesture.y, time: event.timeStamp, count: 1 }

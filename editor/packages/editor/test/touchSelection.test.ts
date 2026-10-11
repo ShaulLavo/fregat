@@ -21,6 +21,7 @@ describe('TouchSelectionController hold scheduling', () => {
   let row: HTMLElement
   let controller: TouchSelectionController
   let notify = vi.fn()
+  let focus = vi.fn()
   let word = vi.fn((_position?: unknown, _granularity?: string) => ({ start: 6, end: 11 }))
 
   beforeEach(() => {
@@ -39,6 +40,7 @@ describe('TouchSelectionController hold scheduling', () => {
     element.append(row)
     document.body.append(element)
     notify = vi.fn()
+    focus = vi.fn()
     word = vi.fn((_position?: unknown, _granularity?: string) => ({ start: 6, end: 11 }))
     controller = new TouchSelectionController({
       element,
@@ -49,7 +51,7 @@ describe('TouchSelectionController hold scheduling', () => {
       select: word,
       extend: vi.fn(),
       scroll: vi.fn(() => false),
-      focus: vi.fn(),
+      focus,
       notify,
     })
     controller.install()
@@ -223,6 +225,19 @@ describe('TouchSelectionController hold scheduling', () => {
     vi.advanceTimersByTime(550)
     expect(element.hasAttribute('data-editor-touch-selecting')).toBe(false)
     expect(notify).toHaveBeenLastCalledWith('cancel', null)
+    dispatchTouch(row, 'touchend', 20, 0)
+    vi.advanceTimersByTime(16)
+    expect(notify).toHaveBeenLastCalledWith('cancel', null)
+  })
+
+  it('cancels deferred settlement when focusing changes the selection', () => {
+    const session = {},
+      snapshot = {},
+      selections = {}
+    controller.selectionChanged(session, snapshot, selections)
+    focus.mockImplementation(() => controller.selectionChanged(session, snapshot, {}))
+    dispatchTouch(row, 'touchstart')
+    vi.advanceTimersByTime(550)
     dispatchTouch(row, 'touchend', 20, 0)
     vi.advanceTimersByTime(16)
     expect(notify).toHaveBeenLastCalledWith('cancel', null)

@@ -610,6 +610,18 @@
         },
         {
           "kind": "type",
+          "name": "EditorInputCommand",
+          "source": "packages/editor/src/editor.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorInputCommandState",
+          "source": "packages/editor/src/editor.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorInputKind",
           "source": "packages/editor/src/virtualization/index.ts",
           "via": "packages/editor/src/index.ts"
@@ -1192,13 +1204,13 @@
         },
         {
           "kind": "type",
-          "name": "EditorTouchSelectionMenuContext",
+          "name": "EditorTouchSelectionAnchor",
           "source": "packages/editor/src/editor.ts",
           "via": "packages/editor/src/index.ts"
         },
         {
           "kind": "type",
-          "name": "EditorTouchSelectionMenuItem",
+          "name": "EditorTouchSelectionEvent",
           "source": "packages/editor/src/editor.ts",
           "via": "packages/editor/src/index.ts"
         },
@@ -3976,6 +3988,18 @@
         },
         {
           "kind": "type",
+          "name": "EditorInputCommand",
+          "source": "packages/editor/src/editor/types.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorInputCommandState",
+          "source": "packages/editor/src/editor/types.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorKeymapContext",
           "source": "packages/editor/src/editor/hotkeys.ts",
           "via": "packages/editor/src/editor.ts"
@@ -4318,13 +4342,13 @@
         },
         {
           "kind": "type",
-          "name": "EditorTouchSelectionMenuContext",
+          "name": "EditorTouchSelectionAnchor",
           "source": "packages/editor/src/editor/types.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
           "kind": "type",
-          "name": "EditorTouchSelectionMenuItem",
+          "name": "EditorTouchSelectionEvent",
           "source": "packages/editor/src/editor/types.ts",
           "via": "packages/editor/src/editor.ts"
         },
@@ -5098,6 +5122,18 @@
         },
         {
           "kind": "type",
+          "name": "EditorInputCommand",
+          "source": "packages/editor/src/editor/types.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorInputCommandState",
+          "source": "packages/editor/src/editor/types.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorLanguageConfiguration",
           "source": "packages/editor/src/editor/languageConfiguration.ts",
           "via": "packages/editor/src/public/extensions.ts"
@@ -5352,6 +5388,18 @@
           "kind": "type",
           "name": "EditorTokenStyleJSON",
           "source": "packages/editor/src/plugins.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorTouchSelectionAnchor",
+          "source": "packages/editor/src/editor/types.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorTouchSelectionEvent",
+          "source": "packages/editor/src/editor/types.ts",
           "via": "packages/editor/src/public/extensions.ts"
         },
         {
