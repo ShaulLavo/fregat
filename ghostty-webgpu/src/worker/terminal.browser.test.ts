@@ -1560,6 +1560,11 @@ describe.each(['main', 'webgl', 'webgpu'] as const)('%s review atomic host', (mo
     expect(mirror).toBeInstanceOf(HTMLElement)
     expect(live).toBeInstanceOf(HTMLElement)
     await eventually(() => mirror.children.length > 0)
+    // Establish the opening resize boundary before testing independent output intervals.
+    const initial = await terminal.geometry()
+    await eventually(() => (terminal.submittedFrame?.nativeRevision ?? -1) >= initial.revision)
+    terminal.textarea!.focus()
+    expect(live.textContent).toBe('')
     await terminal.write('ordinary ')
     await eventually(() => live.textContent === 'ordinary')
     expect(live.children).toHaveLength(1)

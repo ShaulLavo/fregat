@@ -275,6 +275,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private deliveringText = false
   private accessibilityTimer?: number
   private accessibilityFrame?: TerminalSubmittedSnapshot
+  private accessibilityResizeRevision?: number
   private documentVisible = true
   private publicFrameSource?: TerminalSubmittedSnapshot
   private publicFrame?: TerminalSubmittedFrame
@@ -1172,12 +1173,13 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     if (!accessibility || !this.documentVisible) return
     const summary = this.execution.submittedFrame
     if (!summary) return
-    const reflow = Boolean(
-      this.accessibilityFrame && this.accessibilityFrame.grid.columns !== summary.grid.columns,
-    )
-    // Only displayed text differences acknowledge output; newer unpainted writes stay independent.
-    accessibility.update(summary, summary.scrollbar, announce, reflow)
+    const resizeRevision = this.accessibilityResizeRevision
+    // Resize intervals establish readable text without inferring output across reflowed rows.
+    accessibility.update(summary, summary.scrollbar, announce && resizeRevision === undefined)
     this.accessibilityFrame = summary
+    // Focus can refresh an older displayed frame while the resized frame is waiting to paint.
+    if (resizeRevision !== undefined && summary.nativeRevision >= resizeRevision)
+      this.accessibilityResizeRevision = undefined
   }
 
   private cancelAccessibilityTimer(): void {
@@ -1208,6 +1210,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.accessibility = undefined
     this.cancelAccessibilityTimer()
     this.accessibilityFrame = undefined
+    this.accessibilityResizeRevision = undefined
     accessibility.dispose()
     return true
   }
@@ -1495,6 +1498,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   }
 
   private handleResize(grid: TerminalGrid): void {
+    if (this.accessibility) this.accessibilityResizeRevision = this.execution.revision
     this.invalidateLinks()
     this.renderer?.resize({ columns: grid.columns, rows: grid.rows })
     this.updateScrollbar()

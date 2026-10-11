@@ -98,8 +98,10 @@ Settled terminals, including cursor-blink paints, have no accessibility refresh 
 The polite live region announces recent changes to visible rows at the same cadence,
 within its configured character and entry limits. Intermediate frames are coalesced.
 History navigation refreshes the row list immediately, and returning to current output
-establishes a fresh announcement boundary. Wrapping resizes compare retained text across
-row boundaries. Hidden documents suspend refreshes until they become visible.
+establishes a fresh announcement boundary. A refresh interval containing a resize or font
+reflow updates readable text silently, including output received during that interval. The
+next output-only interval resumes announcements. Hidden documents suspend refreshes until
+they become visible.
 The short delay lets fast output settle into readable text while keeping interactive
 output responsive; visible rendering and public `onText` subscriptions keep their cadence.
 

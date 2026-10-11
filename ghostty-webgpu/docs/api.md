@@ -203,9 +203,11 @@ limits to enable the mirror. `setAccessibilityEnabled(true)` enables it after op
 mirror pulls the latest displayed viewport after a coalesced 100 ms foreground delay;
 public `onText` subscribers still receive every accepted text frame. Enabling accessibility,
 focusing the input, and history navigation refresh the mirror immediately. Its first frame
-establishes the comparison boundary for bounded recent-output announcements. Hidden documents
-suspend refreshes until visible again. Disabling accessibility or disposing the terminal
-cancels scheduled mirror work.
+establishes the comparison boundary for bounded recent-output announcements. A refresh interval
+containing a resize or font reflow updates readable text silently, including output received
+in that interval; the next output-only interval resumes announcements. Hidden documents suspend
+refreshes until visible again. Disabling accessibility or disposing the terminal cancels
+scheduled mirror work.
 
 Styled cells remain an on-demand read through `frameSnapshot()` and `captureViewport()`.
 Canvas resizing and context replacement can invalidate the displayed pixels independently of
