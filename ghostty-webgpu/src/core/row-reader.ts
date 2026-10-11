@@ -27,7 +27,9 @@ export class RowReader {
     const snapshot = this.snapshots.read(state, iterator, cells, grid, options)
     const records = options.packed ? snapshot.cells.slice() : snapshot.cells
     const graphemes = options.packed ? snapshot.graphemes.slice() : snapshot.graphemes
-    const packet = options.packed ? recordPacket(records, graphemes) : undefined
+    const packet = options.packed
+      ? recordPacket(records, graphemes, snapshot.rows.length / PACKED_ROW_WORDS)
+      : undefined
     const rows: RenderRow[] = []
     for (let offset = 0; offset < snapshot.rows.length; offset += PACKED_ROW_WORDS) {
       const y = snapshot.rows[offset]!

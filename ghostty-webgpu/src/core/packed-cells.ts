@@ -1,6 +1,7 @@
 import {
   recordPacket,
   recordRowStorage,
+  rowPacket,
   rowStorage,
   type RecordRowStorage,
   type RowPacket,
@@ -47,9 +48,13 @@ export class PackedCells {
   constructor(
     private readonly words: Uint32Array,
     private readonly graphemes: Uint32Array,
-    private readonly packet?: RowPacket,
+    private packet?: RowPacket,
   ) {
     this.length = words.length / PACKED_CELL_WORDS
+  }
+
+  get [rowPacket](): RowPacket {
+    return (this.packet ??= recordPacket(this.words, this.graphemes))
   }
 
   get [rowStorage](): RecordRowStorage {
@@ -57,7 +62,7 @@ export class PackedCells {
       'packed',
       this.words,
       this.graphemes,
-      this.packet ?? recordPacket(this.words, this.graphemes),
+      this[rowPacket],
     ))
   }
 

@@ -1,7 +1,10 @@
 export const rowStorage = Symbol('rowStorage')
+export const rowPacket = Symbol('rowPacket')
 
 export interface RowPacket {
   readonly byteLength: number
+  // Set only when the packet contains exactly these extracted rows.
+  readonly rowCount?: number
 }
 
 export interface RecordRowStorage {
@@ -24,6 +27,12 @@ interface AsciiRowStorage {
 }
 
 export type RowStorage = RecordRowStorage | AsciiRowStorage
+export type RowStorageSource = RowStorage | { readonly [rowStorage]: RowStorage }
+
+export function readRowStorage(source: RowStorageSource | undefined): RowStorage | undefined {
+  if (!source) return
+  return rowStorage in source ? source[rowStorage] : source
+}
 
 export function recordRowStorage(
   kind: RecordRowStorage['kind'],
@@ -56,9 +65,14 @@ export function recordRowStorage(
   }
 }
 
-export function recordPacket(words: Uint32Array, graphemes: Uint32Array): RowPacket {
+export function recordPacket(
+  words: Uint32Array,
+  graphemes: Uint32Array,
+  rowCount?: number,
+): RowPacket {
   const byteLength = words.buffer.byteLength
   return {
     byteLength: byteLength + (words.buffer === graphemes.buffer ? 0 : graphemes.buffer.byteLength),
+    rowCount,
   }
 }

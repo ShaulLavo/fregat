@@ -1,4 +1,4 @@
-import { rowStorage } from '../core/row-storage.js'
+import { rowPacket, rowStorage } from '../core/row-storage.js'
 import type { RenderCell, RenderRow } from '../core/types.js'
 import type { RendererFrameCell, RendererFrameRow } from './renderer.js'
 
@@ -40,7 +40,8 @@ function frameRow(row: RenderRow, retainedText?: string): RendererFrameRow {
   // Packed records own detached storage; styled cells decode only for snapshot consumers.
   let renderCells = packed ? undefined : copiedCells(row.cells)
   return Object.freeze({
-    [rowStorage]: packed?.[rowStorage],
+    [rowPacket]: packed?.[rowPacket],
+    [rowStorage]: packed,
     get renderCells(): readonly RendererFrameCell[] {
       return (renderCells ??= copiedCells(packed!.materialize()))
     },

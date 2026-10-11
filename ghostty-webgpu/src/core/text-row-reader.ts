@@ -1,4 +1,11 @@
-import { recordPacket, recordRowStorage, rowStorage, type RowPacket } from './row-storage.js'
+import {
+  recordPacket,
+  recordRowStorage,
+  rowPacket,
+  rowStorage,
+  type RowPacket,
+  type RowStorage,
+} from './row-storage.js'
 import { SnapshotReader, type ExtractSnapshot } from './snapshot-reader.js'
 import type { GhosttyRuntime } from './runtime.js'
 import type { ReadTextRowsOptions, RenderTextRow, TerminalSize } from './types.js'
@@ -37,16 +44,20 @@ export function copiedAsciiRow(
 ): RenderTextRow {
   let cells: readonly string[] | undefined
   let continuations: readonly boolean[] | undefined
+  let storage: RowStorage | undefined
   return Object.freeze({
     y,
     text,
-    [rowStorage]: {
-      kind: 'ascii',
-      packet,
-      blanks,
-      start,
-      text,
-      liveBytes: Math.ceil(text.length / 32) * 4 + text.length * 2,
+    [rowPacket]: packet,
+    get [rowStorage]() {
+      return (storage ??= {
+        kind: 'ascii',
+        packet,
+        blanks,
+        start,
+        text,
+        liveBytes: Math.ceil(text.length / 32) * 4 + text.length * 2,
+      })
     },
     get cells() {
       return (cells ??= copiedAsciiCells(text, blanks, start))
@@ -72,7 +83,10 @@ function copiedAsciiRows(
   }
   const text = decoder.decode(bytes.subarray(0, length))
   // Count the decoded packet too: a sliced row string can retain the whole string.
-  const packet = { byteLength: blanks.byteLength + text.length * 2 }
+  const packet = {
+    byteLength: blanks.byteLength + text.length * 2,
+    rowCount: metadata.length / rowWords,
+  }
   const rows: RenderTextRow[] = []
   for (let offset = 0; offset < metadata.length; offset += rowWords) {
     const y = metadata[offset]!
@@ -96,10 +110,14 @@ export function copiedTextRow(
   }
   let cells: readonly string[] | undefined
   let continuations: readonly boolean[] | undefined
+  let storage: ReturnType<typeof recordRowStorage> | undefined
   return Object.freeze({
     y,
     text,
-    [rowStorage]: recordRowStorage('text', words, graphemes, packet),
+    [rowPacket]: packet,
+    get [rowStorage]() {
+      return (storage ??= recordRowStorage('text', words, graphemes, packet))
+    },
     get cells() {
       return (cells ??= Object.freeze(
         Array.from({ length: words.length / cellWords }, (_, index) =>
@@ -149,7 +167,7 @@ export class TextRowReader {
     }
     const records = snapshot.cells.slice()
     const graphemes = snapshot.graphemes.slice()
-    const packet = recordPacket(records, graphemes)
+    const packet = recordPacket(records, graphemes, snapshot.rows.length / rowWords)
     const rows: RenderTextRow[] = []
     for (let offset = 0; offset < snapshot.rows.length; offset += rowWords) {
       const y = snapshot.rows[offset]!

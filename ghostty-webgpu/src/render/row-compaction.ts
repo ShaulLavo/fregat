@@ -1,5 +1,12 @@
 import { PackedCells } from '../core/packed-cells.js'
-import { rowStorage, type RowPacket, type RowStorage } from '../core/row-storage.js'
+import {
+  readRowStorage,
+  rowPacket,
+  rowStorage,
+  type RowPacket,
+  type RowStorage,
+  type RowStorageSource,
+} from '../core/row-storage.js'
 import { copiedAsciiRow, copiedTextRow } from '../core/text-row-reader.js'
 import { compactedFrameRow } from './frame-row.js'
 import type { RendererFrameRow, RendererTextFrameRow } from './renderer.js'
@@ -7,7 +14,10 @@ import type { RendererFrameRow, RendererTextFrameRow } from './renderer.js'
 // Two live grids amortize copies while bounding packets pinned by unchanged rows.
 const PINNED_GRID_MULTIPLIER = 2
 
-type StoredRow = RendererTextFrameRow & { readonly [rowStorage]?: RowStorage }
+type StoredRow = RendererTextFrameRow & {
+  readonly [rowPacket]?: RowPacket
+  readonly [rowStorage]?: RowStorageSource
+}
 
 function recordWords(storage: RowStorage): number {
   return storage.kind === 'ascii' ? Math.ceil(storage.text.length / 32) : storage.words.length
@@ -81,12 +91,26 @@ export function compactRows(
   rows: (RendererTextFrameRow | undefined)[],
 ): (RendererTextFrameRow | undefined)[]
 export function compactRows(rows: (StoredRow | undefined)[]): (StoredRow | undefined)[] {
+  let packet: RowPacket | undefined
+  let rowCount = 0
+  for (const row of rows) {
+    if (!row) continue
+    const owner = row[rowPacket]
+    if (!owner || (packet && owner !== packet)) return compactRetainedRows(rows)
+    packet = owner
+    rowCount += 1
+  }
+  if (packet?.rowCount === rowCount) return rows
+  return compactRetainedRows(rows)
+}
+
+function compactRetainedRows(rows: (StoredRow | undefined)[]): (StoredRow | undefined)[] {
   let firstPacket: RowPacket | undefined
   let packets: Set<RowPacket> | undefined
   let pinnedBytes = 0
   let liveBytes = 0
   for (const row of rows) {
-    const storage = row?.[rowStorage]
+    const storage = readRowStorage(row?.[rowStorage])
     if (!storage) continue
     liveBytes += storage.liveBytes
     if (!firstPacket) {
@@ -105,9 +129,11 @@ export function compactRows(rows: (StoredRow | undefined)[]): (StoredRow | undef
   let graphemesLength = 0
   let asciiCharacters = 0
   let asciiWidth = 0
+  let rowCount = 0
   for (const row of rows) {
-    const storage = row?.[rowStorage]
+    const storage = readRowStorage(row?.[rowStorage])
     if (!storage) continue
+    rowCount += 1
     recordsLength += recordWords(storage)
     if (storage.kind === 'ascii') {
       asciiCharacters += storage.text.length
@@ -118,13 +144,13 @@ export function compactRows(rows: (StoredRow | undefined)[]): (StoredRow | undef
   }
   const owned = new Uint32Array(recordsLength + graphemesLength)
   const graphemes = owned.subarray(recordsLength)
-  const packet = { byteLength: owned.byteLength + asciiCharacters * 2 }
+  const packet = { byteLength: owned.byteLength + asciiCharacters * 2, rowCount }
   const bytes = new Uint8Array(asciiWidth)
   const decoder = new TextDecoder()
   let wordOffset = 0
   let graphemeOffset = 0
   return rows.map((row) => {
-    const storage = row?.[rowStorage]
+    const storage = readRowStorage(row?.[rowStorage])
     if (!row || !storage) return row
     const words = owned.subarray(wordOffset, wordOffset + recordWords(storage))
     wordOffset += words.length

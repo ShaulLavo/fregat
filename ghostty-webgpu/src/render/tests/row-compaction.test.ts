@@ -1,15 +1,20 @@
 import { expect, it } from 'vitest'
 import { GhosttyRuntime } from '../../core/runtime.js'
-import { rowStorage, type RowStorage } from '../../core/row-storage.js'
+import {
+  readRowStorage,
+  rowStorage,
+  type RowStorage,
+  type RowStorageSource,
+} from '../../core/row-storage.js'
 import { copiedFrameRow } from '../frame-row.js'
 import { compactRows } from '../row-compaction.js'
 import { FrameObserver } from '../frame-observer.js'
 import type { RendererFrameSnapshot, RendererTextFrameRow } from '../renderer.js'
 
-type StoredRow = RendererTextFrameRow & { readonly [rowStorage]?: RowStorage }
+type StoredRow = RendererTextFrameRow & { readonly [rowStorage]?: RowStorageSource }
 
 function storage(row: StoredRow): RowStorage {
-  return row[rowStorage]!
+  return readRowStorage(row[rowStorage])!
 }
 
 it('keeps replacement packets unchanged and compacts pinned rows into one buffer without reading lazy cells', async () => {
@@ -19,7 +24,8 @@ it('keeps replacement packets unchanged and compacts pinned rows into one buffer
   try {
     terminal.write('\x1b[?2027h\x1b[1;38;2;10;20;30m👩‍💻界é')
     state.update()
-    const original = state.readRows({ packed: true }).map((row) => copiedFrameRow(row))
+    const originalSource = state.readRows({ packed: true })
+    const original = originalSource.map((row) => copiedFrameRow(row))
     const expected = state.readRows().map(({ cells }) => cells)
     expect(compactRows(original)).toBe(original)
     for (let frame = 0; frame < 20; frame += 1) {
@@ -30,10 +36,13 @@ it('keeps replacement packets unchanged and compacts pinned rows into one buffer
     }
     // Each retained row now pins a different whole packet.
     const pinned = original.slice()
+    const pinnedSource = originalSource.slice()
     for (let y = 1; y < 4; y += 1) {
       terminal.write(`\x1b[${y + 1};1Hchanged${y}`)
       state.update()
-      pinned[y] = copiedFrameRow(state.readRows({ packed: true })[y]!)
+      const replacement = state.readRows({ packed: true })[y]!
+      pinned[y] = copiedFrameRow(replacement)
+      pinnedSource[y] = replacement
     }
     const compacted = compactRows(pinned)
     expect(compacted).not.toBe(pinned)
@@ -51,9 +60,42 @@ it('keeps replacement packets unchanged and compacts pinned rows into one buffer
       expect(typeof Object.getOwnPropertyDescriptor(row, 'cells')?.get).toBe('function')
       expect(typeof Object.getOwnPropertyDescriptor(row, 'renderCells')?.get).toBe('function')
     }
+    let published: RendererFrameSnapshot | undefined
+    const observer = new FrameObserver({
+      rows: 4,
+      onFrame: (frame) => {
+        published = frame
+      },
+    })
+    observer.emit(state, state.readCursor(), undefined, [0, 1, 2, 3], pinnedSource)
+    expect(new Set(published!.rows.map((row) => storage(row).packet)).size).toBe(1)
+    expect(published!.rows.map((row) => row.text)).toEqual(pinned.map((row) => row.text))
     runtime.dispose()
     expect(original.map((row) => row.renderCells)).toEqual(expected)
     expect(compacted[0]!.renderCells).toEqual(original[0]!.renderCells)
+  } finally {
+    runtime.dispose()
+  }
+})
+
+it('compacts a subset of one packet and preserves the complete held snapshot', async () => {
+  const runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 12, rows: 4 })
+  const state = runtime.createRenderState(terminal)
+  try {
+    terminal.write('\x1b[?2027h👩‍💻\r\n界\r\né\r\nλ')
+    state.update()
+    const complete = state.readRows({ packed: true }).map(copiedFrameRow)
+    const held = complete.map((row) => row.renderCells)
+    const subset = [complete[2]!]
+    const compacted = compactRows(subset)
+    expect(compacted).not.toBe(subset)
+    expect(storage(compacted[0]!).packet.byteLength).toBeLessThan(
+      storage(subset[0]!).packet.byteLength,
+    )
+    runtime.dispose()
+    expect(compacted[0]!.renderCells).toEqual(held[2])
+    expect(complete.map((row) => row.renderCells)).toEqual(held)
   } finally {
     runtime.dispose()
   }
