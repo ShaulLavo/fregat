@@ -194,6 +194,28 @@ export function setSelection(
   setSelections(view, [{ anchorOffset, headOffset, affinity }])
 }
 
+export function setNativeSelection(
+  view: VirtualizedTextViewInternal,
+  anchorOffset: number,
+  headOffset: number,
+): void {
+  const selection = clampSelection(view, { anchorOffset, headOffset })
+  clearSelectionHighlight(view)
+  const previous = view.selections[0]
+  if (
+    view.selections.length === 1 &&
+    previous?.start === selection.start &&
+    previous.end === selection.end &&
+    previous.head === selection.head &&
+    previous.affinity === selection.affinity
+  )
+    return
+  view.selections = [selection]
+  setPrimarySelection(view, selection)
+  // Native handles own the highlight; only the active endpoint needs editor geometry.
+  deferCaret(view)
+}
+
 export function setSelections(
   view: VirtualizedTextViewInternal,
   selections: readonly VirtualizedTextSelection[],
@@ -221,6 +243,11 @@ export function clearSelection(view: VirtualizedTextViewInternal): void {
 
 export function renderSelectionHighlight(view: VirtualizedTextViewInternal): void {
   if (view.provisional) return
+  if (view.scrollElement.hasAttribute('data-editor-touch-selection')) {
+    clearSelectionHighlight(view)
+    deferCaret(view)
+    return
+  }
   renderCaret(view)
   if (!hasSelectionRanges(view.selections)) {
     clearSelectionHighlight(view)
