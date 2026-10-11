@@ -21,26 +21,26 @@ Orders rise in document order, so a subtree's bounds are its first and last piec
 The four edit paths that need a neighbour's order walk one spine (`firstOrder`, `lastOrder` in
 `node.ts`) once per edit. Inspection recomputes the bounds to check ordering.
 
-| Measure | Before | After |
-| --- | --- | --- |
-| Boxed numbers per piece | 3 | 1 |
-| Bytes per piece | 252 | 204 |
-| Live heap, 1.2M pieces | 330 MB | 271 MB |
-| Full GC, 1.2M pieces | 62–77 ms | 46–52 ms |
-| Retained history per keystroke | 2,021 B | 1,600 B |
-| Typing at 1.2M pieces | 0.79–0.83 µs/key | 0.64–0.75 µs/key |
+| Measure                        | Before           | After            |
+| ------------------------------ | ---------------- | ---------------- |
+| Boxed numbers per piece        | 3                | 1                |
+| Bytes per piece                | 252              | 204              |
+| Live heap, 1.2M pieces         | 330 MB           | 271 MB           |
+| Full GC, 1.2M pieces           | 62–77 ms         | 46–52 ms         |
+| Retained history per keystroke | 2,021 B          | 1,600 B          |
+| Typing at 1.2M pieces          | 0.79–0.83 µs/key | 0.64–0.75 µs/key |
 
 ## Rejected: fields of `Piece` on the node
 
 Modelled by copying real trees into each layout with sharing preserved, one layout per process
 (field representations are per hidden class and only ever generalise):
 
-| Layout | 1.2M-piece tree | Full GC | History per key | Full GC, 20k keys |
-| --- | --- | --- | --- | --- |
-| Node + `Piece` (shipped) | 200 B | 21–22 ms | 1,337 B | 2.9 ms |
-| Node + `Piece`, integer orders | 200 B | 18–20 ms | 1,337 B | 2.9–3.3 ms |
-| Merged | 168 B | 11–12 ms | 2,051 B | 5.6–5.7 ms |
-| Merged, integer orders | 152 B | 8–9 ms | 1,910 B | 4.2–4.7 ms |
+| Layout                         | 1.2M-piece tree | Full GC  | History per key | Full GC, 20k keys |
+| ------------------------------ | --------------- | -------- | --------------- | ----------------- |
+| Node + `Piece` (shipped)       | 200 B           | 21–22 ms | 1,337 B         | 2.9 ms            |
+| Node + `Piece`, integer orders | 200 B           | 18–20 ms | 1,337 B         | 2.9–3.3 ms        |
+| Merged                         | 168 B           | 11–12 ms | 2,051 B         | 5.6–5.7 ms        |
+| Merged, integer orders         | 152 B           | 8–9 ms   | 1,910 B         | 4.2–4.7 ms        |
 
 Merging halves the collection of a huge fragmented tree but makes every retained undo step half
 again as large and twice the objects: a persistent keystroke clones about 9 nodes, and a merged

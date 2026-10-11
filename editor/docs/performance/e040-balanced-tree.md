@@ -100,8 +100,8 @@ this plan did not touch.
 
 Structural counters, standard profile, from the regenerated budgets against the E044 budgets:
 
-| Lane                | Nodes touched (`own`) | Nodes cloned     | Nodes created |
-| ------------------- | --------------------- | ---------------- | ------------- |
+| Lane                | Nodes touched (`own`) | Nodes cloned     | Nodes created  |
+| ------------------- | --------------------- | ---------------- | -------------- |
 | random-insertions   | 46,069 to 18,629      | 17,265 to 15,758 | 4,580 to 3,055 |
 | random-replacements | 112,832 to 36,775     | 40,529 to 32,066 | 7,520 to 4,525 |
 | mixed-edit-churn    | 92,506 to 31,010      | 31,838 to 26,445 | 6,960 to 3,993 |

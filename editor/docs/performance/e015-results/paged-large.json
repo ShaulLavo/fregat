@@ -6,13 +6,8 @@
     "width": 1200,
     "height": 720
   },
-  "sizes": [
-    314572800,
-    629145600
-  ],
-  "modes": [
-    "paged"
-  ],
+  "sizes": [314572800, 629145600],
+  "modes": ["paged"],
   "samples": [
     {
       "mode": "paged",

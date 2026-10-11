@@ -83,16 +83,16 @@ Two findings the plan did not have:
 `bun run --cwd packages/editor bench:tokens`, 200 keystrokes into one token with the highlighter
 answering each, median per keystroke:
 
-| Stage                           | 500k tokens | 2.5M tokens |
-| ------------------------------- | ----------: | ----------: |
-| project through the edit        |   0.0014 ms |   0.0010 ms |
-| splice the re-tokenized line    |   0.0014 ms |   0.0010 ms |
-| view compares answer and shown  |   0.0004 ms |   0.0002 ms |
-| minimap changed range           |   0.0003 ms |   0.0002 ms |
-| read one row's tokens           |   0.0003 ms |   0.0002 ms |
-| total                           |    0.004 ms |    0.003 ms |
-| one keystroke at each of 200 distant lines, median | 0.025 ms | 0.11 ms |
-| the same, worst keystroke       |     0.69 ms |     0.24 ms |
+| Stage                                              | 500k tokens | 2.5M tokens |
+| -------------------------------------------------- | ----------: | ----------: |
+| project through the edit                           |   0.0014 ms |   0.0010 ms |
+| splice the re-tokenized line                       |   0.0014 ms |   0.0010 ms |
+| view compares answer and shown                     |   0.0004 ms |   0.0002 ms |
+| minimap changed range                              |   0.0003 ms |   0.0002 ms |
+| read one row's tokens                              |   0.0003 ms |   0.0002 ms |
+| total                                              |    0.004 ms |    0.003 ms |
+| one keystroke at each of 200 distant lines, median |    0.025 ms |     0.11 ms |
+| the same, worst keystroke                          |     0.69 ms |     0.24 ms |
 
 The distant-lines rows are the store's bad case: every new place adds two segment boundaries, and
 past the cap each one pays for a pair merge.
