@@ -217,7 +217,7 @@ export type InputSelectionControllerOptions = {
    */
   onDidType(text: string): void
   /** True when a contribution took the press for itself; the editor then leaves it alone. */
-  claimPress(event: MouseEvent): boolean
+  claimPress(event: MouseEvent | TouchEvent): boolean
 }
 
 // A run of occurrence presses owns its search settings, so that widening one to whole words never
@@ -323,6 +323,10 @@ export class InputSelectionController {
     this.touchSelection = new TouchSelectionController({
       element: options.el,
       positionAt: (x, y) => options.view.textPositionFromPoint(x, y),
+      claimPress: (event) => {
+        this.pressClaimed = event.defaultPrevented || options.claimPress(event)
+        return this.pressClaimed
+      },
       begin: () => this.markDomSelectionForNextInput(),
       tap: (position) => this.placeTouchCaret(position),
       word: (position) => this.selectTouchWord(position),
@@ -1635,9 +1639,7 @@ export class InputSelectionController {
     }
 
     const range = this.options.view.createRange(start, end, { scrollIntoView: false })
-    const domSelection = this.options.el.ownerDocument.getSelection()
-    domSelection?.removeAllRanges()
-    if (range) domSelection?.addRange(range)
+    this.setDomSelectionRange(range, resolved.anchorOffset > resolved.headOffset)
     this.syncSessionSelectionHighlight()
     this.notifySelection(options.notify ?? true)
   }
@@ -2052,15 +2054,29 @@ export class InputSelectionController {
     this.options.view.inputElement.blur()
     this.options.el.dataset.editorTouchSelection = ''
     this.markDomSelectionForNextInput()
-    this.applyChange(session.setSelection(anchor, head), 'input.touchSelection', nowMs(), {
-      syncDomSelection: false,
-    })
+    const current = this.primaryResolvedSelection()
+    if (
+      current?.anchorOffset !== anchor ||
+      current.headOffset !== head ||
+      session.getSelections().selections.length !== 1
+    ) {
+      this.applyChange(session.setSelection(anchor, head), 'input.touchSelection', nowMs(), {
+        syncDomSelection: false,
+      })
+    }
     const range = this.options.view.createRange(Math.min(anchor, head), Math.max(anchor, head), {
       scrollIntoView: false,
     })
-    if (!range) return
+    this.setDomSelectionRange(range, anchor > head)
+  }
+
+  private setDomSelectionRange(range: Range | null, backward: boolean): void {
     const selection = this.options.el.ownerDocument.getSelection()
-    if (anchor <= head) {
+    if (!range) {
+      selection?.removeAllRanges()
+      return
+    }
+    if (!backward) {
       selection?.setBaseAndExtent(
         range.startContainer,
         range.startOffset,
@@ -2092,9 +2108,10 @@ export class InputSelectionController {
 
   private handleMouseDown = (event: MouseEvent): void => {
     if (!this.session) return
+    const touchPressClaimed = this.touchSelection.consumeMousePress()
     this.pressClaimed = event.defaultPrevented
     if (this.pressClaimed) return
-    this.pressClaimed = this.options.claimPress(event)
+    this.pressClaimed = touchPressClaimed ?? this.options.claimPress(event)
     if (this.pressClaimed) {
       event.preventDefault()
       return
@@ -3631,6 +3648,7 @@ export class InputSelectionController {
 
   private syncSessionSelectionFromDom = (_event: Event): void => {
     if (!this.session) return
+    if (this.touchSelection.ownsMouseEvent && this.pressClaimed && !this.isInputFocused()) return
     if (!shouldSyncSessionSelectionFromDom(this.inputState, this.domSelectionContext())) return
 
     const start = nowMs()
@@ -3653,6 +3671,13 @@ export class InputSelectionController {
     if (!offsets) return null
 
     this.syncCustomSelectionHighlight(offsets.anchorOffset, offsets.headOffset)
+    const current = this.primaryResolvedSelection()
+    if (
+      current?.anchorOffset === offsets.anchorOffset &&
+      current.headOffset === offsets.headOffset &&
+      session.getSelections().selections.length === 1
+    )
+      return null
     return appendTiming(
       session.setSelection(offsets.anchorOffset, offsets.headOffset),
       'editor.readDomSelection',
@@ -3698,6 +3723,7 @@ export class InputSelectionController {
   }
 
   private syncTouchSelectionFromDom(): void {
+    if (this.pressClaimed) return
     const session = this.session
     const selection = this.options.el.ownerDocument.getSelection()
     if (!session || !selection?.anchorNode || !selection.focusNode) return
