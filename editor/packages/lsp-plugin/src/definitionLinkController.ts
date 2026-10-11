@@ -123,11 +123,13 @@ export class DefinitionLinkController {
     this.clearDefinitionLink()
   }
 
-  private readonly claimNavigationPress = (event: MouseEvent): boolean => {
-    if (event.button !== 0) return false
+  private readonly claimNavigationPress = (event: MouseEvent | TouchEvent): boolean => {
+    if ('button' in event && event.button !== 0) return false
     if (!isNavigationModifier(event)) return false
 
-    const offset = this.context.textOffsetFromPoint(event.clientX, event.clientY)
+    const point = 'touches' in event ? event.touches[0] : event
+    if (!point) return false
+    const offset = this.context.textOffsetFromPoint(point.clientX, point.clientY)
     if (offset === null) return false
 
     this.context.focusEditor()

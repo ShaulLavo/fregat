@@ -4330,14 +4330,17 @@ export class Editor {
     )
   }
 
-  private claimPress(event: MouseEvent): boolean {
+  private claimPress(event: MouseEvent | TouchEvent): boolean {
     for (const participant of [...this.pressParticipants]) {
       if (this.pressClaimedBy(participant, event)) return true
     }
     return false
   }
 
-  private pressClaimedBy(participant: EditorPressParticipant, event: MouseEvent): boolean {
+  private pressClaimedBy(
+    participant: EditorPressParticipant,
+    event: MouseEvent | TouchEvent,
+  ): boolean {
     try {
       return participant(event)
     } catch (error) {

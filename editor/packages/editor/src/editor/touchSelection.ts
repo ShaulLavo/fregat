@@ -18,6 +18,7 @@ type TouchGesture = {
 type TouchSelectionOptions = {
   readonly element: HTMLElement
   positionAt(x: number, y: number): VirtualizedTextHitPosition | null
+  claimPress(event: TouchEvent): boolean
   begin(): void
   tap(position: VirtualizedTextHitPosition): void
   word(position: VirtualizedTextHitPosition): TextOffsetRange
@@ -30,6 +31,7 @@ export class TouchSelectionController {
   private readonly scheduler = new EditorWorkScheduler()
   private lastTap: { readonly x: number; readonly y: number; readonly time: number } | null = null
   private pointerType = 'mouse'
+  private pendingMousePress: boolean | null = null
 
   constructor(private readonly options: TouchSelectionOptions) {}
 
@@ -37,10 +39,16 @@ export class TouchSelectionController {
     return this.pointerType === 'touch'
   }
 
+  consumeMousePress(): boolean | null {
+    const claimed = this.pendingMousePress
+    this.pendingMousePress = null
+    return claimed
+  }
+
   install(): void {
     const element = this.options.element
     element.ownerDocument.addEventListener('pointerdown', this.pointerDown, { capture: true })
-    element.addEventListener('touchstart', this.start, { passive: true })
+    element.addEventListener('touchstart', this.start, { passive: false })
     element.addEventListener('touchmove', this.move, { passive: false })
     element.addEventListener('touchend', this.end)
     element.addEventListener('touchcancel', this.cancel)
@@ -55,6 +63,7 @@ export class TouchSelectionController {
     element.removeEventListener('touchcancel', this.cancel)
     this.cancel()
     this.scheduler.dispose()
+    this.pendingMousePress = null
   }
 
   acceptNativeSelection(): void {
@@ -64,18 +73,23 @@ export class TouchSelectionController {
 
   private pointerDown = (event: PointerEvent): void => {
     this.pointerType = event.pointerType
+    if (event.pointerType !== 'touch') this.pendingMousePress = null
   }
 
   private start = (event: TouchEvent): void => {
     this.pointerType = 'touch'
     this.clearHold()
     this.gesture = null
+    this.pendingMousePress = null
     if (event.defaultPrevented || event.touches.length !== 1) {
       this.lastTap = null
       return
     }
-    const target = event.target as Element | null
-    if (!target?.closest('.editor-virtualized-row')) return
+    this.pendingMousePress = this.options.claimPress(event)
+    if (this.pendingMousePress) {
+      this.lastTap = null
+      return
+    }
     const finger = event.touches[0]
     if (!finger) return
     const position = this.options.positionAt(finger.clientX, finger.clientY)

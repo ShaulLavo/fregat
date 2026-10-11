@@ -32,6 +32,7 @@ describe('TouchSelectionController hold scheduling', () => {
     controller = new TouchSelectionController({
       element,
       positionAt: () => ({ offset: 8, affinity: 'after', displayRow: 0, rowX: 20 }),
+      claimPress: vi.fn(() => false),
       begin: vi.fn(),
       tap: vi.fn(),
       word,
