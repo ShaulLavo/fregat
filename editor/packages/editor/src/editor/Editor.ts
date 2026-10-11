@@ -3629,6 +3629,12 @@ export class Editor {
       onDidTransaction: (listener) => this.claimedBy(claims, () => this.onDidTransaction(listener)),
       reconcile: (base, batches, options) => this.reconcile(base, batches, options),
       onDidType: (listener) => this.claimedBy(claims, () => this.addTypedTextListener(listener)),
+      onDidTouchSelection: (listener) =>
+        this.claimedBy(claims, () => this.inputSelection.onDidTouchSelection(listener)),
+      getTouchSelectionAnchor: () => this.inputSelection.touchSelectionAnchor(),
+      getSelectedText: () => this.inputSelection.selectedText(),
+      getInputCommandState: () => this.inputSelection.inputCommandState(),
+      runInputCommand: (command) => this.inputSelection.runInputCommand(command),
       registerPressParticipant: (participant) =>
         this.claimedBy(claims, () => this.registerPressParticipant(participant)),
       registerNonCaretRows: (isNonCaret) =>

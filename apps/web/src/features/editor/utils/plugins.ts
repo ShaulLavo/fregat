@@ -12,6 +12,7 @@ import { createEditorFindPlugin } from '@singapore-editor/find'
 import { createFoldGutterPlugin } from '@singapore-editor/gutters/fold-gutter'
 import { createLineGutterPlugin } from '@singapore-editor/gutters/line-gutter'
 import { createMinimapPlugin } from '@singapore-editor/minimap'
+import { createTouchSelectionPlugin } from '@singapore-editor/plugin-ui/touch-selection-plugin'
 import {
   createMarkdownAuthoringPlugin,
   createMarkdownPreviewPlugin,
@@ -67,7 +68,7 @@ export function createCriticalEditorCorePlugins(
       : []
   ).concat(
     options.analysisAllowed && languageId === 'markdown' ? [createMarkdownAuthoringPlugin()] : [],
-    [createLineGutterPlugin()],
+    [createLineGutterPlugin(), createTouchSelectionPlugin()],
     options.analysisAllowed
       ? [
           createFoldGutterPlugin({

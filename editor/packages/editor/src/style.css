@@ -66,6 +66,8 @@
 }
 
 .editor-virtualized {
+  /* See browser-quirks.md#ios-native-long-press-selection. */
+  -webkit-touch-callout: none;
   --editor-background: #1e1e1e;
   --editor-foreground: #d4d4d4;
   --editor-gutter-background: var(--editor-background);
@@ -118,6 +120,8 @@
   tab-size: var(--editor-tab-size, 4);
   color: var(--editor-foreground);
   background: var(--editor-background);
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
   contain: layout paint style;
   /* The native scroll extent remains independent of the painted viewport. */
   will-change: transform;
@@ -294,14 +298,21 @@
   right: 0;
   top: 0;
   white-space: pre;
+  /* WebKit requires selectable text for CSS Highlight paint and generic DOM ranges.
+     Touch contacts suppress native selection until release. */
   -webkit-user-select: text;
   user-select: text;
-  -webkit-touch-callout: default;
   touch-action: manipulation;
   /* Own compositor layer per row: WebKit re-resolves every registered CSS
      Highlight range when a painted row's transform changes, stalling scroll
      remounts 100-300ms. Compositor-only moves skip that invalidation. */
   will-change: transform;
+}
+
+/* See browser-quirks.md#ios-native-long-press-selection for scoped row suppression. */
+.editor-virtualized[data-editor-touch-selecting='true'] .editor-virtualized-row {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .editor-virtualized-row-chunk {
@@ -493,13 +504,6 @@
 .editor-virtualized::selection {
   color: inherit;
   background: transparent;
-}
-
-/* Native selection paints above CSS highlights, so touch selection supplies its own background. */
-.editor-virtualized[data-editor-touch-selection]::selection,
-.editor-virtualized[data-editor-touch-selection] ::selection {
-  color: inherit;
-  background: var(--editor-selection-background, rgba(56, 189, 248, 0.35));
 }
 
 /* Inline merge conflicts, after VS Code's merge-conflict extension: the marker lines are the

@@ -2,7 +2,7 @@
 
 [Known limits](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/limitations.md)
 records measurement ceilings, analysis budgets and bounded package behavior.
-This page records browser bugs and their workarounds.
+This page records browser bugs, platform limits, and their workarounds.
 
 Browser-specific workarounds in the editor. Every workaround in the code gets an
 entry here: the user-visible symptom, the root cause, the chosen fix and why, a
@@ -522,3 +522,206 @@ font expired, exact retained-static/live pixels and height, and unchanged live
 pixels after the delayed font finishes. Remove the static-root pin once supported
 WebKit keeps the fallback visible and stable in the standalone reproduction;
 retain nonfatal font preparation and the matching fallback stack.
+
+## iOS native long-press selection
+
+Observed 2026-10-11 in Mobile Safari on the iPhone 17e simulator, iOS 26.5.
+The owner also reported intermittent native selection on a physical iPhone;
+that report did not record the OS version. Desktop Playwright WebKit does not
+reproduce UIKit's native long-press recognition through synthetic TouchEvents.
+
+A long press on selectable rows can start Safari's native DOM selection while
+Singapore selects a word through its document session. Native handles and the
+system callout then compete with the custom selection and plugin menu. Native
+long-press selection is expected browser behavior. The defect is allowing two
+selection owners to handle the same editor contact.
+
+[TouchSelectionController](../../packages/editor/src/editor/touchSelection.ts)
+sets `data-editor-touch-selecting` in the capture-phase `touchstart` listener,
+before recognition and host callbacks. [style.css](../../packages/editor/src/style.css)
+makes visible rows unselectable for that contact and disables native touch
+callouts on the virtualized editor. Touch-originated row `selectstart` and
+`contextmenu` events are cancelled. Release and cancellation restore selectable
+rows, retaining CSS Highlight paint and generic DOM-range behavior. Permanently
+unselectable rows failed 15 WebKit paint assertions and four Chromium iframe
+DOM-selection assertions in the reviewed control.
+
+The portable reproduction is
+[mobile-custom-selection.html](../../examples/app/test/fixtures/mobile-custom-selection.html).
+Serve the example app with an explicit free port, then open
+`/test/fixtures/mobile-custom-selection.html` in Mobile Safari. In a control build,
+remove contact-scoped row suppression and the row `selectstart` cancellation.
+Hold `bravo` for at least 550 ms, drag into the third row, and release. Record the
+session selection and native visible-row selections separately. Repeat after a
+fresh load, then repeat 20 holds. Synthetic events can check listener ordering;
+trusted device gestures are required to reproduce Safari's competing selection.
+
+The accepted guarded simulator run recorded zero native visible-row selections
+across 20 holds, retained `[6, 41]` after cross-row release, and allowed replacement
+typing. The local evidence set is `custom-touch-evidence/native-guard`, including
+`production.log` and the per-attempt screenshots. The upstream CSS property is
+[documented by Apple](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariCSSRef/Articles/StandardCSSProperties.html).
+No upstream browser bug is claimed for normal native long-press selection.
+
+Keep the ownership guard while custom touch selection is active. Remove it only
+with a qualified replacement selection owner. The later native-layout experiment
+and optional handles are recorded in [plan 336](../../../plans/336-singapore-ios-scroll.md).
+Retest native gestures, all-engine highlight paint, and generic DOM selection
+before changing row selectability.
+
+## iOS focus selection collapse
+
+Observed 2026-10-11 in Mobile Safari on the iPhone 17e simulator, iOS 26.5.
+A trusted cross-row drag selected `[6, 41]`; release and input focus then produced
+a native selection update at `[0, 0]`. Reading that update into the document
+session erased the custom range and prevented the plugin menu from opening.
+Restoring the input during `focusin` alone did not protect every observed focus
+write. A dependency-free failing reduction and the exact WebKit cause remain
+unconfirmed, so this record does not classify native focus behavior as a browser bug.
+
+[InputSelectionController](../../packages/editor/src/editor/inputSelectionController.ts)
+uses `focusInputPreservingSelection()` to mark the focus operation as an input-window
+write, then refreshes the hidden input from the document session. The `focusin`
+listener also restores the current input window. Native selection synchronization
+ignores editor-owned writes through the existing `writingInputWindow` guard.
+Unrelated native input-selection changes continue to update the document session.
+
+Use the same three-row touch fixture as the long-press reproduction. Blur the
+textarea, hold `bravo`, extend into `third row`, and release. Record the session
+range and textarea `selectionStart` and `selectionEnd` before focus, during
+`focusin`, and after native `selectionchange`. With the workaround removed, the
+observed failure collapses the session after release. The portable regression in
+[mobile-custom-selection.spec.ts](../../examples/app/test/mobile-custom-selection.spec.ts)
+forces a synchronous focus-time collapse and a `select` event. It verifies the
+editor's ownership rule; it does not independently prove Safari's native trigger.
+
+Remove the protected focus write only after the unguarded path preserves the
+session and input range through repeated trusted holds, cross-row release,
+replacement typing, and clipboard actions on supported iOS Safari versions.
+Keep ordinary focus synchronization. No matching upstream report was verified.
+
+## Touch release scroll ordering
+
+Observed 2026-10-11 in Chromium touch-fixture tests after moving the menu into
+`@singapore-editor/plugin-ui`. Three tests retained their selection but timed out
+waiting for the menu. The release path focused the hidden input, and a subsequent
+scroll notification cancelled the newly opened menu. This is an editor event-ordering
+failure, with no reduced browser bug or engine-specific root cause established.
+
+[TouchSelectionController.end](../../packages/editor/src/editor/touchSelection.ts)
+settles the end notification on the next animation frame. Scroll notifications
+while that frame is pending leave settlement intact. Later scrolling, a new
+contact, cancellation, wheel input, and edits dismiss the menu through the normal
+cancel notification. Core publishes touch events; the plugin owns menu creation.
+
+Reproduce with the portable three-row fixture: hold `bravo`, release, focus the
+hidden textarea, and deliver a scroll event before the next frame. The menu must
+appear after settlement. Deliver another scroll event after settlement; the menu
+must close. A double tap and a hold after removing and reinstalling the plugin
+exercise the same ordering. The example app's mobile-selection browser tests
+cover those paths.
+
+Remove the deferral only when synchronous end notification survives release-time
+focus and scroll notifications in the same checks and trusted mobile gestures.
+Retain menu dismissal for later user scrolling. No upstream report is warranted
+from the current evidence.
+
+## Touch menu visual viewport
+
+Implemented 2026-10-11 for mobile browsers exposing `window.visualViewport`.
+This is normal viewport behavior, not a Safari bug. The on-screen keyboard can
+reduce the visible viewport while layout-viewport dimensions remain unchanged.
+Pinch zoom can also change the visible viewport's size and offsets. A fixed menu
+clamped only to the layout viewport can sit behind the keyboard or outside the
+visible area.
+
+[TouchSelectionMenu.position](../../packages/plugin-ui/src/touchSelectionMenu.ts)
+uses the visual viewport's width, height, and offsets, and repositions on its
+`resize` and `scroll` events. It reads current selection geometry, leaves an 8 px
+margin, and places the menu above or below the selection as space allows.
+Browsers without that API use document viewport dimensions.
+
+A portable reproduction needs one fixed-position toolbar and a focused textarea
+on a page with `width=device-width`. Show the keyboard, then pinch zoom and pan.
+Compare `document.documentElement.clientHeight` with `visualViewport.height`,
+and record `offsetLeft` and `offsetTop`. Clamp the toolbar to each viewport in
+turn. The layout-only control can leave the visible region. Use the three-row
+editor fixture to repeat the same actions with the real selection menu.
+
+The example app's 320 px light and dark checks verify layout bounds; they do not
+prove keyboard or pinch behavior. Trusted simulator evidence verifies menu
+availability with the keyboard, and physical-device pinch acceptance remains
+open. The [VisualViewport API](https://developer.mozilla.org/en-US/docs/Web/API/VisualViewport)
+defines these coordinates and events. Keep this geometry while the menu is fixed
+in document coordinates. Remove it only if the menu's positioning model directly
+tracks the visible viewport, with keyboard and pinch acceptance preserved.
+
+## Touch clipboard user activation
+
+Verified 2026-10-11 through trusted Copy, Cut, and Paste actions in Mobile Safari
+on the iPhone 17e simulator, iOS 26.5. Clipboard access requires a secure context
+and can require user activation or a paste permission prompt. These restrictions
+are intended platform behavior. API presence alone does not establish permission.
+
+[TouchSelectionMenu.run](../../packages/plugin-ui/src/touchSelectionMenu.ts)
+invokes the action synchronously in its click handler. It awaits the result only
+after the action has requested clipboard access. Moving invocation behind a timer
+or other deferred work can lose the activation Safari requires. Rejections keep
+the menu open and show the action's failure message. Paste uses the editor's
+existing paste-provider pipeline.
+
+For a dependency-free reproduction, serve a button over HTTPS or localhost.
+Compare `navigator.clipboard.writeText('example')` directly inside its click handler
+with a call after `setTimeout` outside that gesture. Repeat with `readText()` and
+accept or reject the browser's paste prompt. The direct call can still reject
+when permission or policy denies access; that result is independent of selection.
+For the editor path, hold `bravo` in the touch fixture and use Copy, Cut, and Paste
+through actual taps. Synthetic event dispatch and an injected clipboard verify
+application logic, not Safari permission or trusted activation.
+
+[WebKit's Async Clipboard API description](https://webkit.org/blog/10855/async-clipboard-api/)
+records the secure-context and user-gesture requirements. Keep synchronous action
+invocation while privileged commands require activation. Remove any browser-specific
+handling only after supported Safari accepts the replacement invocation path;
+retain clipboard rejection feedback and paste-range validation.
+
+## Touch haptic availability
+
+Implemented 2026-10-11 as an opt-in `haptics` option on
+`createTouchSelectionPlugin`. Core emits no haptic feedback. On browsers exposing
+`navigator.vibrate`, [createTouchHaptics](../../packages/plugin-ui/src/touchSelectionPlugin.ts)
+requests an 8 ms pulse when selection starts, its range changes, and the menu opens.
+The intended Android path depends on browser support, activation, device hardware,
+and user policy. Physical Android tactile output has not been accepted.
+
+Safari does not expose the Vibration API. Its native checkbox switch can request
+platform haptics through a trusted activation. The plugin's
+[TouchSelectionMenu](../../packages/plugin-ui/src/touchSelectionMenu.ts) uses a label
+with a hidden `input type="checkbox" switch` when switch support exists and
+Vibration API support is absent. The actual switch activation runs the menu action.
+This is a candidate for feedback on a trusted menu tap; physical iPhone feedback
+from the hidden switch has not been verified. It provides no tick for the hold timer
+or range-extension callbacks. Scripted `click()` and `checked` writes do not create
+trusted native activation, even inside an unrelated user gesture.
+
+The reviewed upstream
+[CheckboxInputType.cpp](https://github.com/WebKit/WebKit/blob/ce1fa925b83a6d324929839277036aaa2e30a652/Source/WebCore/html/CheckboxInputType.cpp)
+requires trusted click state before `performSwitchVisuallyOnAnimation`, and requires
+a processing user gesture for click-trigger haptic feedback. This source inspection
+explains the limitation; it is not a trace of the installed Safari engine.
+[WebKit bug 309082](https://bugs.webkit.org/show_bug.cgi?id=309082) is the owner's
+cited issue for scripted switch haptics. The report is access-restricted, so its
+contents and status could not be verified. No additional issue has been filed.
+
+A portable physical-device control contains a visible native checkbox switch,
+a label activating that switch, and a button calling `switchInput.click()`.
+Compare trusted direct taps, trusted label taps, and the scripted button path.
+Then hide the switch as the plugin does and repeat the label tap. Record both
+`click.isTrusted` and whether the device produces feedback. Check the plugin's
+Copy action, keyboard focus, and accessibility separately. A passing DOM test or
+simulator run cannot establish tactile output.
+
+Keep the feature optional. Replace the switch candidate only after a supported
+Safari haptic API or qualified native control provides physical-device feedback
+without taking over editor contacts. Remove the trusted-activation limitation only
+when the upstream behavior and supported Safari device checks both permit it.

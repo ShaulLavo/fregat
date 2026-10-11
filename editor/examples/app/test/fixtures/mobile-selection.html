@@ -25,9 +25,11 @@
     <p id="native-selection-control">Native selection control</p>
     <script type="module">
       import { Editor } from '../../../../packages/editor/src/editor.ts'
+      import { createTouchSelectionPlugin } from '../../../../packages/plugin-ui/src/touchSelectionPlugin.ts'
       window.touchSelectionChanges = []
       const editor = new Editor(document.querySelector('#host'), {
         fontSize: 20,
+        plugins: [createTouchSelectionPlugin()],
         onChange() {
           window.touchSelectionChanges.push(editor.getSelections()[0])
           showSelection()

@@ -24,6 +24,10 @@ export function writeClipboardPayload(
 ): void {
   data.setData('text/plain', text)
   data.setData(CLIPBOARD_METADATA_TYPE, JSON.stringify(metadata))
+  rememberClipboardPayload(text, metadata)
+}
+
+export function rememberClipboardPayload(text: string, metadata: ClipboardMetadata): void {
   lastCopied = { text, metadata }
 }
 

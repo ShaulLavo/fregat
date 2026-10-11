@@ -1,3 +1,4 @@
+import { createTouchSelectionPlugin } from '@singapore-editor/plugin-ui/touch-selection-plugin'
 import { defaultEditorPacks } from '@singapore-editor/core/keymap'
 import { createModalEditingPlugin, modalPack } from './modal/modalPlugin'
 import { createMergeConflictPlugin, Editor, type EditorPlugin } from '@singapore-editor/core/editor'
@@ -125,6 +126,7 @@ export function mountApp(): void {
     lineGutter,
     liveDiff,
     sharedPlugins,
+    [createTouchSelectionPlugin({ haptics: true })],
     modal,
   )
   const diffPlugins: readonly EditorPlugin[] = languagePlugins.concat(liveDiff, sharedPlugins)

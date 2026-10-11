@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Native text selection control</title>
+    <style>
+      body {
+        margin: 0;
+        font: 14px system-ui;
+      }
+      #native {
+        margin: 0;
+        padding: 0;
+        font: 20px/24px monospace;
+        white-space: pre;
+        height: 180px;
+      }
+      output {
+        display: block;
+        white-space: pre-wrap;
+        font: 12px monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="native" contenteditable="true">alpha bravo charlie&#10;second line&#10;third row</div>
+    <output id="selection">Selected: </output><output id="state"></output>
+    <nav>
+      <a href="./mobile-custom-selection.html">Custom</a
+      ><a href="./mobile-native-text.html">Native</a>
+    </nav>
+    <script>
+      document.addEventListener('selectionchange', () => {
+        const selection = document.getSelection()
+        document.querySelector('#selection').textContent =
+          `Selected: ${selection?.toString() ?? ''}`
+        document.querySelector('#state').textContent =
+          `State: ${JSON.stringify({ anchor: selection?.anchorOffset, head: selection?.focusOffset })}`
+      })
+    </script>
+  </body>
+</html>

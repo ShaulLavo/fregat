@@ -186,3 +186,10 @@ export { serializeEditorViewSnapshot } from '../editor/viewSnapshot'
 export type { TextReadSnapshot } from '../documentTextSnapshot'
 export type { EditorContributionChange, EditorLineStartsView } from '../plugins'
 export type { ParsedSnippet, SnippetRange } from '../editor/snippet'
+
+export type {
+  EditorTouchSelectionAnchor,
+  EditorTouchSelectionEvent,
+  EditorInputCommand,
+  EditorInputCommandState,
+} from '../editor/types'

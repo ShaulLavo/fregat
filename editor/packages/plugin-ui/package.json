@@ -83,6 +83,11 @@
       "types": "./dist/tooltip.d.ts",
       "import": "./dist/tooltip.js",
       "default": "./dist/tooltip.js"
+    },
+    "./touch-selection-plugin": {
+      "types": "./dist/touchSelectionPlugin.d.ts",
+      "import": "./dist/touchSelectionPlugin.js",
+      "default": "./dist/touchSelectionPlugin.js"
     }
   },
   "publishConfig": {

@@ -423,6 +423,7 @@ import { markdownSourceEditing } from './markdown-source-editing'
 import { markdownLoadStability } from './markdown-load-stability'
 import { markdownLinks } from './markdown-links'
 import { editorTypeBurst } from './editor-type-burst'
+import { editorTouchSelection } from './editor-touch-selection'
 import { editorUndoBarrier } from './editor-undo-barrier'
 import { editorUndoBranch } from './editor-undo-branch'
 import { editorTitleDiffToggle } from './editor-title-diff-toggle'
@@ -842,6 +843,7 @@ export const scenarios: readonly Scenario[] = [
   problemsPanelRows,
   problemsPanelWorkspace,
   editorTypeBurst,
+  editorTouchSelection,
   markdownSourceEditing,
   markdownLoadStability,
   markdownLinks,

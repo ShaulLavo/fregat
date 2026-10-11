@@ -42,7 +42,14 @@ import type { InlineReplacementSpec } from './inlineMap'
 import type { TextOffsetRange } from './textRanges'
 import type { SelectionAffinity } from './selections'
 import type { EditorSetSelectionOptions } from './editor/selectionReveal'
-import type { EditorScrollPosition, EditorSyntaxStatus } from './editor/types'
+import type {
+  EditorScrollPosition,
+  EditorSyntaxStatus,
+  EditorTouchSelectionAnchor,
+  EditorTouchSelectionEvent,
+  EditorInputCommand,
+  EditorInputCommandState,
+} from './editor/types'
 import type {
   DocumentChangesSinceSyncPoint,
   DocumentLogicalRevisionScope,
@@ -561,6 +568,12 @@ export type EditorViewContributionContext = {
    * `(` into a two-character `()`, and typing over the closer it inserted changes no text at all.
    */
   onDidType(listener: (text: string) => void): EditorDisposable
+  /** Touch recognition and final settled geometry, independent of popup UI. */
+  onDidTouchSelection(listener: (event: EditorTouchSelectionEvent) => void): EditorDisposable
+  getTouchSelectionAnchor(): EditorTouchSelectionAnchor | null
+  getSelectedText(): string
+  getInputCommandState(): EditorInputCommandState
+  runInputCommand(command: EditorInputCommand): void | Promise<void>
   /** Participants are asked in the order they registered. */
   registerPressParticipant(participant: EditorPressParticipant): EditorDisposable
   /**

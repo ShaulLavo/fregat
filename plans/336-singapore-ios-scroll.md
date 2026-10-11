@@ -169,9 +169,90 @@ A DOM lag number alone cannot tell which composited frame the owner saw. No prod
 fix follows from these controls. A geometry-off control and raw JSON are retained locally
 with the probe evidence; the physical-device protocol remains the next decision gate.
 
+## Custom touch selection decision (2026-10-11)
+
+Status: Approved; custom touch selection and optional plugin menu are under review.
+
+Touch uses the editor-owned selection shared with desktop mouse input. Double-tap or hold a
+word, keep that contact down, and drag to extend across rows. Keep ordinary swipes available
+for scrolling. There are no selection handles in this implementation. The input textarea
+continues to own typing and IME; custom selections use the existing session, word boundaries,
+selection highlights, wrap geometry and edge-scroll machinery.
+
+The touch actions use a horizontal iOS-like DOM pill with Cut, Copy, Paste and Select all,
+placed above the selection with an arrow and a system font. Light and dark surfaces inherit
+host popover colors. Hosts can append actions through `createTouchSelectionPlugin({ items })` in `@singapore-editor/plugin-ui`. Desktop
+keeps its existing menu. The app's Base UI context menu is also DOM-based; a web page cannot
+append arbitrary actions to UIKit's native text-selection callout.
+
+The native row-layout change is no longer required for touch selection. The normal-flow
+experiment increased Layout events from **1 to 60** during the same 120-frame scroll scenario
+for both **1 MiB and 10 MiB**. It was stopped without changing the production row renderer.
+Evidence: `/work/reports/editor-touch-selection/flow-layout-experiment.md`. The earlier native
+investigation below records what was learned, rather than a prerequisite for the custom path.
+
+### Gesture measurements and acceptance
+
+- Hold recognition is 550 ms. Bounded native contenteditable samples on the iOS simulator
+  selected no word at 350/450 ms and selected `bravo` at 550/650 ms. This brackets that
+  sample's native threshold; it does not establish an exact system-wide threshold.
+- The repeat-tap window is 350 ms, pre-selection movement slop is 10 CSS pixels, and dragging
+  lifts the hit point by 12 CSS pixels. Extension snaps through shared word boundaries and
+  wrap/bidi geometry. These defaults have browser regression coverage; their exact native
+  parity remains unconfirmed.
+- Trusted iOS hold-and-drag selected offsets `[6, 41]` across all three short-sample rows.
+  The host action received 35 characters, keyboard typing replaced the range, and held
+  edge scrolling advanced the scrollport. A fast ordinary swipe scrolled while retaining
+  the collapsed selection. No native row layout was changed.
+- WebKit covers double tap, second-contact backward drag, wrapped edge scrolling, clipboard
+  actions, asynchronous-paste selection ownership and light/dark narrow menus. Chromium
+  additionally covers real swipe scrolling through its touch protocol.
+- XCTest coordinate double-tap did not produce a usable native-control word selection and
+  delivered only one DOM touch sequence to the custom surface. Actual iOS double-tap parity
+  is therefore unconfirmed, not a passing native comparison. Native clipboard permission
+  flow and physical-device feel also remain acceptance items.
+
+Evidence: `/work/tmp/custom-touch-evidence/`; the simulator harness and result bundles are
+retained under the owner's Mac scratch directory `~/tmp/editor-custom-touch/`.
+
+### Review corrections and native-selection guard
+
+- Touch Paste uses the shared paste-provider pipeline. Select all refreshes the action context
+  and keeps Cut, Copy and Paste available. Keyboard, host and document selection changes dismiss
+  a stale menu; visual-viewport movement repositions it against fresh selection geometry.
+- Release waits one animation frame before showing actions so the last edge-scroll event settles.
+  A later scroll still dismisses the menu.
+- All 19 initial CI failures were real regressions from globally unselectable rows: 15 WebKit
+  syntax/decoration pixel assertions and four generic Chromium iframe DOM-selection assertions.
+  None were obsolete native-touch tests. They remain intact; all 61 targeted browser checks
+  passed with selectable rows restored.
+- A real-iPhone report confirmed intermittent native long-press selection in the private
+  comparison preview. Trusted simulator traces reproduced a native selectionchange collapsing
+  `[6,41]` to `[0,0]` after release/focus, even when the input range was refreshed at focusin.
+  The touchstart capture listener now suppresses row selection synchronously before recognition
+  and host callbacks. Release/cancellation restores selectable rows; the surface disables native
+  touch callouts, and touch-originated visible-row `selectstart` is cancelled.
+- Final native acceptance checks the first long-press after a fresh load and 20 repeated holds,
+  counts native visible-row selections, and retains a screenshot for each attempt. Cross-row
+  release must retain `[6,41]`, show the custom pill, and support replacement typing and clipboard
+  actions. All four trusted simulator tests passed: 20 repeated holds recorded zero native
+  visible-row selections, cross-row release retained `[6,41]`, edge scrolling reached 990 px
+  with Copy still available, and a fast swipe reached 423 px with `[0,0]` unchanged. Copy,
+  Cut and Paste passed. Result bundle: `~/tmp/editor-custom-touch/native-guard-production.xcresult`.
+
+### Approved work scheduled later
+
+- Explore optional selection handles behind a registered setting, including whether handles
+  should be mobile-only. Reuse the shared session selection and hit geometry; measure the
+  control's touch targets and row transitions on real iOS and Android surfaces.
+- Explore CodeMirror-style normal-flow text layout and native selection as a separate
+  performance experiment. Reproduce the Layout-event regression first, then prove a candidate
+  meets the existing typing and scrolling budgets before considering a renderer replacement.
+  Native range preservation and native callout acceptance belong to that later experiment.
+
 ## Native selection handle row advancement (2026-10-11)
 
-Status: Approved implementation follow-up; this investigation delivers a design note.
+Status: Investigation complete. Normal-flow selection is Approved for later exploration.
 Inspected baseline: `c36bb76eff2a4bdba82cd53a9128d3d56c66bd62`.
 This is a separate reproduction from the original shaky-scroll complaint. No production
 renderer change or performance improvement is claimed here.
@@ -280,7 +361,7 @@ Reference clones were refreshed before inspection:
   path. Its textarea edit context owns input separately. It is not a successful native-handle
   reference for this observed gesture.
 
-### Recommended implementation boundary
+### Historical normal-flow implementation boundary
 
 Build an ordered, normal-flow selectable text plane with height gaps for unmounted rows,
 using CodeMirror's structure as the control. Keep the fixed-row virtualizer, document-height
@@ -312,7 +393,7 @@ The implementation is consequently a renderer-contract change with native-select
 performance gates, not a safe one-rule CSS fix. This note schedules that work under the
 existing scrolling plan rather than shipping the broad normal-flow experiment.
 
-### Execution and acceptance
+### Later normal-flow experiment execution and acceptance
 
 1. Extend the portable `editor/bench/ios-scroll` probe with the native-handle fixture and an
    ordered text-window candidate. Keep the current renderer as an explicit baseline. Start
@@ -350,3 +431,17 @@ and the measuring code can each confound results. The first probe isolates fixed
 scrolling; later tests must add those factors individually. Keep raw evidence outside the public
 product pages and keep temporary hosting private. Stop short of production changes until the
 physical-device record supports the decision.
+
+### Optional touch chrome and desktop-equivalent tap sequences
+
+Status: Approved. Core retains tap/hold recognition, document selection, whole-word and whole-line drag extension, edge scrolling and native-input guards. The touch menu and optional haptics move to `@singapore-editor/plugin-ui`, the existing owner of editor popup chrome; this avoids introducing a second package for the same UI lifetime. Core alone creates no touch menu. The Singapore site and example app opt into `createTouchSelectionPlugin`; only the comparison fixture adds “Demo: count characters.”
+
+Three taps select the same line range as desktop triple-click; four taps select the document, matching desktop's `detail >= 4`. Repeated taps retain the existing 350 ms interval and 10 CSS px distance thresholds. Triple-tap drag extends by whole lines in both directions. Undo and Redo are available only for editable documents with the corresponding history and use the same input commands as desktop.
+
+Plugin view hooks receive touch start/update/end/cancel events, current selections and anchor geometry. Generic input commands expose the existing paste-provider pipeline, Select all and history. The menu design stays unchanged; the owner withdrew visual variants. There are no selection handles in the current implementation. Optional plugin haptics request 8 ms Vibration API ticks on supported Android browsers. Safari has no Vibration API; a trusted menu label can activate the plugin's hidden native checkbox switch, but physical iPhone feedback from that control remains unverified. Hold-timer and drag-update callbacks cannot request trusted switch haptics. The reviewed WebKit source requires trusted activation; the owner's cited bug 309082 is access-restricted, so its contents and status were not verified. Physical iOS and Android tactile acceptance remains open.
+
+Every browser-specific guard and limitation in this implementation is indexed in [browser quirks](../editor/docs/display/browser-quirks.md), with browser scope, reproduction, source location, and removal criteria. The entries distinguish the observed focus collapse and release-scroll ordering from native-selection ownership and intended viewport, clipboard, and haptic constraints. The haptic entry links the inspected WebKit source and records the access limit on bug 309082. Native row-layout and optional selection handles remain Approved for later.
+
+The recorded native acceptance remains the trusted iOS 26.5 simulator run, including 20 holds with zero native visible-row selections, `[6, 41]` cross-row release, replacement typing, and clipboard actions. Portable synthetic tests check ownership and input synchronization but do not prove UIKit recognition, physical haptics, or pinch behavior. Physical-device haptics and pinch checks remain open; they do not change the approved scope of the current touch-selection work.
+
+Actual iOS multi-tap acceptance: the 2026-10-11 takeover repeated XCTest triple-taps against the custom fixture and a plain native contenteditable control. Both received only two DOM contacts for the requested three taps. The portable word/line/document tests pass; this simulator path cannot qualify triple or quad tapping. Keep physical-device multi-tap acceptance open and do not add editor workarounds based on that observation.
