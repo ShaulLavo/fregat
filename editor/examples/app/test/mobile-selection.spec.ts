@@ -81,15 +81,20 @@ test('double-tap selects a word and a later tap collapses it', async ({ page }) 
 test('native compatibility tap counts select words', async ({ page }) => {
   const point = await textPoint(page, 8)
   await page.touchscreen.tap(point.x, point.y)
-  await page.locator('.editor-virtualized-row').first().evaluate((row, point) => {
-    row.dispatchEvent(new MouseEvent('mousedown', {
-      bubbles: true,
-      cancelable: true,
-      detail: 2,
-      clientX: point.x,
-      clientY: point.y,
-    }))
-  }, point)
+  await page
+    .locator('.editor-virtualized-row')
+    .first()
+    .evaluate((row, point) => {
+      row.dispatchEvent(
+        new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          detail: 2,
+          clientX: point.x,
+          clientY: point.y,
+        }),
+      )
+    }, point)
   await expect.poll(() => selectedText(page)).toBe('bravo')
 })
 
