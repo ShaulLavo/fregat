@@ -31,10 +31,7 @@ export const editorTouchSelection: Scenario = {
       await step('held-word-menu')
       await copySelection(page, 'bravo')
       for (const count of [3, 4]) {
-        for (let tap = 0; tap < count; tap++) {
-          await finger(page, 'touchstart', point)
-          await finger(page, 'touchend', point)
-        }
+        await tapSequence(page, point, count)
         await selectors.editorTouchMenu(page).waitFor({ state: 'visible' })
         await step(count === 3 ? 'triple-line-menu' : 'quad-document-menu')
         await copySelection(page, count === 3 ? TEXT[0]! : `${TEXT.join('\n')}\n`)
@@ -43,6 +40,17 @@ export const editorTouchSelection: Scenario = {
       await releaseFixture(fixture)
     }
   },
+}
+
+async function tapSequence(
+  page: Page,
+  point: Parameters<typeof finger>[2],
+  count: number,
+): Promise<void> {
+  for (let tap = 0; tap < count; tap++) {
+    await finger(page, 'touchstart', point)
+    await finger(page, 'touchend', point)
+  }
 }
 
 async function copySelection(page: Page, text: string): Promise<void> {
