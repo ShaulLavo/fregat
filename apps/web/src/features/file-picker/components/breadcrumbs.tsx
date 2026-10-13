@@ -30,7 +30,7 @@ export function Breadcrumbs({ currentPath }: { currentPath: string }) {
             type='button'
             variant='ghost'
           >
-            {crumb.label}
+            <span className='truncate'>{crumb.label}</span>
           </Button>
         </Fragment>
       ))}

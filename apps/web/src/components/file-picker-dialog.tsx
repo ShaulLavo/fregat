@@ -31,7 +31,6 @@ import {
   ResizableHandle,
   ResizablePanel,
 } from '@workspace/ui/components/resizable'
-import { Separator } from '@workspace/ui/components/separator'
 import { openingPopupTrigger } from '@workspace/ui/patterns/popup-trigger'
 import { deriveWriteTarget, policyControlledIds } from '@workspace/contracts'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
@@ -614,10 +613,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
 
   const searchField = (
     <InputGroup
-      className={cn(
-        'h-(--density-control-height-sm)',
-        compact ? 'min-w-0 flex-1' : 'w-52 shrink-0',
-      )}
+      className={cn('h-(--density-control-height-sm)', wide ? 'w-52 shrink-0' : 'min-w-0 flex-1')}
     >
       <InputGroupAddon align='inline-start'>
         <MagnifyingGlassIcon aria-hidden='true' className='size-(--icon-size-sm)' />
@@ -822,113 +818,120 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
                 </div>
               </>
             ) : (
-              <PaneBar>
-                <div
-                  aria-label='Folder history'
-                  className='flex shrink-0 items-center gap-0.5'
-                  role='group'
-                >
-                  <IconTooltip label='Back' shortcut='Mod+['>
-                    <Button
-                      aria-keyshortcuts='Meta+['
-                      aria-label='Back'
-                      disabled={!session.canGoBack}
-                      focusableWhenDisabled
-                      onClick={goBack}
-                      size='icon-sm'
-                      type='button'
-                      variant='ghost'
-                    >
-                      <ArrowLeftIcon />
-                    </Button>
-                  </IconTooltip>
-                  <IconTooltip label='Forward' shortcut='Mod+]'>
-                    <Button
-                      aria-keyshortcuts='Meta+]'
-                      aria-label='Forward'
-                      disabled={!session.canGoForward}
-                      focusableWhenDisabled
-                      onClick={goForward}
-                      size='icon-sm'
-                      type='button'
-                      variant='ghost'
-                    >
-                      <ArrowRightIcon />
-                    </Button>
-                  </IconTooltip>
-                  <IconTooltip label='Up one folder' shortcut='Mod+ArrowUp'>
-                    <Button
-                      aria-keyshortcuts='Meta+ArrowUp'
-                      aria-label='Up one folder'
-                      disabled={!session.canGoUp}
-                      focusableWhenDisabled
-                      onClick={goParent}
-                      size='icon-sm'
-                      type='button'
-                      variant='ghost'
-                    >
-                      <ArrowUpIcon />
-                    </Button>
-                  </IconTooltip>
-                </div>
-                <Separator className='h-4' orientation='vertical' />
-                <LocationBar
-                  currentPath={session.currentPath}
-                  draft={pathInput.draft}
-                  error={pathInput.error}
-                  inputRef={pathInput.inputRef}
-                  isEditing={pathInput.isEditing}
-                  isPending={pathInput.isPending || isDirectoryFetching}
-                  onCancel={pathInput.close}
-                  onChange={pathInput.change}
-                  onEdit={pathInput.open}
-                  onSubmit={pathInput.submit}
-                />
-                {wide ? null : (
-                  <PlacesSheet
+              <div className='grid shrink-0 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto]'>
+                <PaneBar className='min-w-0'>
+                  <div
+                    aria-label='Folder history'
+                    className='flex shrink-0 items-center gap-0.5'
+                    role='group'
+                  >
+                    <IconTooltip label='Back' shortcut='Mod+['>
+                      <Button
+                        aria-keyshortcuts='Meta+['
+                        aria-label='Back'
+                        disabled={!session.canGoBack}
+                        focusableWhenDisabled
+                        onClick={goBack}
+                        size='icon-sm'
+                        type='button'
+                        variant='ghost'
+                      >
+                        <ArrowLeftIcon />
+                      </Button>
+                    </IconTooltip>
+                    <IconTooltip label='Forward' shortcut='Mod+]'>
+                      <Button
+                        aria-keyshortcuts='Meta+]'
+                        aria-label='Forward'
+                        disabled={!session.canGoForward}
+                        focusableWhenDisabled
+                        onClick={goForward}
+                        size='icon-sm'
+                        type='button'
+                        variant='ghost'
+                      >
+                        <ArrowRightIcon />
+                      </Button>
+                    </IconTooltip>
+                    <IconTooltip label='Up one folder' shortcut='Mod+ArrowUp'>
+                      <Button
+                        aria-keyshortcuts='Meta+ArrowUp'
+                        aria-label='Up one folder'
+                        disabled={!session.canGoUp}
+                        focusableWhenDisabled
+                        onClick={goParent}
+                        size='icon-sm'
+                        type='button'
+                        variant='ghost'
+                      >
+                        <ArrowUpIcon />
+                      </Button>
+                    </IconTooltip>
+                  </div>
+                  <LocationBar
+                    className='flex-1'
                     currentPath={session.currentPath}
-                    labelled={false}
-                    recentState={recentState}
-                    sections={sections}
+                    draft={pathInput.draft}
+                    error={pathInput.error}
+                    inputRef={pathInput.inputRef}
+                    isEditing={pathInput.isEditing}
+                    isPending={pathInput.isPending || isDirectoryFetching}
+                    onCancel={pathInput.close}
+                    onChange={pathInput.change}
+                    onEdit={pathInput.open}
+                    onSubmit={pathInput.submit}
                   />
-                )}
-                {searchField}
-                {files ? null : (
-                  <Tabs value={chosenView} onValueChange={(next: PickerView) => chooseView(next)}>
-                    <TabsList aria-label='View' variant='segmented'>
-                      <IconTooltip label='Columns'>
-                        <TabsTab
-                          aria-label='Columns'
-                          className='w-(--density-control-height-sm) px-0'
-                          value='columns'
-                        >
-                          <ColumnsIcon />
-                        </TabsTab>
-                      </IconTooltip>
-                      <IconTooltip label='List'>
-                        <TabsTab
-                          aria-label='List'
-                          className='w-(--density-control-height-sm) px-0'
-                          value='list'
-                        >
-                          <ListIcon />
-                        </TabsTab>
-                      </IconTooltip>
-                      <IconTooltip label='Icons'>
-                        <TabsTab
-                          aria-label='Icons'
-                          className='w-(--density-control-height-sm) px-0'
-                          value='icons'
-                        >
-                          <GridFourIcon />
-                        </TabsTab>
-                      </IconTooltip>
-                    </TabsList>
-                  </Tabs>
-                )}
-                <Separator className='h-4' orientation='vertical' />
-                {folderActions}
-              </PaneBar>
+                  {wide ? null : (
+                    <PlacesSheet
+                      currentPath={session.currentPath}
+                      labelled={false}
+                      recentState={recentState}
+                      sections={sections}
+                    />
+                  )}
+                </PaneBar>
+                <PaneBar className='min-w-0'>
+                  {searchField}
+                  {files ? null : (
+                    <Tabs
+                      className='shrink-0'
+                      value={chosenView}
+                      onValueChange={(next: PickerView) => chooseView(next)}
+                    >
+                      <TabsList aria-label='View' variant='segmented'>
+                        <IconTooltip label='Columns'>
+                          <TabsTab
+                            aria-label='Columns'
+                            className='w-(--density-control-height-sm) px-0'
+                            value='columns'
+                          >
+                            <ColumnsIcon />
+                          </TabsTab>
+                        </IconTooltip>
+                        <IconTooltip label='List'>
+                          <TabsTab
+                            aria-label='List'
+                            className='w-(--density-control-height-sm) px-0'
+                            value='list'
+                          >
+                            <ListIcon />
+                          </TabsTab>
+                        </IconTooltip>
+                        <IconTooltip label='Icons'>
+                          <TabsTab
+                            aria-label='Icons'
+                            className='w-(--density-control-height-sm) px-0'
+                            value='icons'
+                          >
+                            <GridFourIcon />
+                          </TabsTab>
+                        </IconTooltip>
+                      </TabsList>
+                    </Tabs>
+                  )}
+                  {folderActions}
+                </PaneBar>
+              </div>
             )}
 
             {wide ? (

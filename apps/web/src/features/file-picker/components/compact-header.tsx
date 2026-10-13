@@ -36,6 +36,8 @@ export function CompactHeader({
 }) {
   const parent = canGoUp ? displayPath(pickerParentPath(currentPath)) : null
 
+  if (editor) return <PaneBar>{editor}</PaneBar>
+
   return (
     <PaneBar className='gap-(--density-gap-tight)'>
       {backPath === null ? (
@@ -57,25 +59,23 @@ export function CompactHeader({
           <span className='truncate'>{folderLabel(backPath)}</span>
         </Button>
       )}
-      {editor ?? (
-        <Button
-          aria-label={`Go to folder, now ${displayPath(currentPath)}`}
-          className='h-auto min-w-0 flex-1 flex-col items-start gap-0 px-1 py-0'
-          onClick={onEditPath}
-          title={displayPath(currentPath)}
-          type='button'
-          variant='ghost'
-        >
-          <span className='w-full truncate text-left text-sm font-semibold'>
-            {folderLabel(currentPath)}
+      <Button
+        aria-label={`Go to folder, now ${displayPath(currentPath)}`}
+        className='h-auto min-w-0 flex-1 flex-col items-start gap-0 px-1 py-0'
+        onClick={onEditPath}
+        title={displayPath(currentPath)}
+        type='button'
+        variant='ghost'
+      >
+        <span className='w-full truncate text-left text-sm font-semibold'>
+          {folderLabel(currentPath)}
+        </span>
+        {parent ? (
+          <span className='text-muted-foreground text-2xs w-full truncate text-left font-normal'>
+            {parent}
           </span>
-          {parent ? (
-            <span className='text-muted-foreground text-2xs w-full truncate text-left font-normal'>
-              {parent}
-            </span>
-          ) : null}
-        </Button>
-      )}
+        ) : null}
+      </Button>
       <div className='flex shrink-0 items-center gap-(--density-gap-tight)'>
         <IconTooltip label='Up one folder'>
           <Button
