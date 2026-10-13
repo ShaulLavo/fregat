@@ -1,6 +1,6 @@
 import { Alert, AlertDescription, AlertTitle } from '@workspace/ui/components/alert'
 import type { SettingsDiagnostic } from '@workspace/contracts'
-import { settingsDiagnosticLabel } from '@workspace/client-core/settings/diagnostic-label'
+import { DiagnosticEntry } from '@/features/settings/components/diagnostic-entry'
 
 export function DiagnosticGroup({
   diagnostics,
@@ -17,11 +17,7 @@ export function DiagnosticGroup({
       <AlertDescription>
         <ul className='flex flex-col gap-0.5'>
           {diagnostics.map((diagnostic) => (
-            <li key={`${diagnostic.layer}:${diagnostic.id}`}>
-              <code>{diagnostic.id}</code> in {diagnostic.layer} settings —{' '}
-              {settingsDiagnosticLabel(diagnostic.kind)}
-              {diagnostic.detail ? `: ${diagnostic.detail}` : ''}
-            </li>
+            <DiagnosticEntry diagnostic={diagnostic} key={`${diagnostic.layer}:${diagnostic.id}`} />
           ))}
         </ul>
       </AlertDescription>

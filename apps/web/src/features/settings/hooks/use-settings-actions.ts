@@ -176,6 +176,8 @@ export function useSettingsActions(owner?: QueryClient) {
       const keys = SETTING_IDS.filter((key) => layerAllowsScope(target, descriptorFor(key).scope))
       return submit(target, [{ kind: 'reset', keys }])
     },
+    removeSettingOverride: (key: SettingId, target: SettingsWriteTarget) =>
+      submit(target, [{ kind: 'reset', keys: [key] }]),
     resetKeybinding: (command: string, context?: string) =>
       submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.remove', command, context }]),
     appendKeybinding: (entry: KeybindingOverride) =>

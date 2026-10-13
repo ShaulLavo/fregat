@@ -67,3 +67,5 @@ Scope is a security boundary: a window-scoped value never reaches execution. Sec
 `scenario claude-usage-import` adds a Claude instance whose config dir holds one hand-written transcript for a fixture project, clicks its Import from Claude Code, and checks `GET /providers/usage/history` and the Usage page: 2 turns, 2000 in, 1000 out, with the repeated content-block row billed once. No real transcript is read.
 
 `scenario prefetch-settings` searches for "prefetch", checks the master switch and each surface's switch indented under it, turns the master off (surfaces disabled and off) and back on.
+
+`scenario settings-invalid-value` plants an invalid saved font in an isolated user file, changes font size through the form, and verifies the new size on disk while the warning remains. It follows Choose font to the picker, resets the invalid entry, then plants it again and selects the displayed fallback font to repair it. Both repair paths remove the warning and preserve the unrelated size change.

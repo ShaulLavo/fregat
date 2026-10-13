@@ -209,9 +209,16 @@ test.each([
   {
     key: 'synthetic-management-secret',
     address: true,
+    configured: true,
+    importKey: true,
+    settingsIssue: 'invalid-value',
+  },
+  {
+    key: 'synthetic-management-secret',
+    address: true,
     configured: false,
     importKey: true,
-    invalidSettings: true,
+    settingsIssue: 'syntax',
   },
   { key: null, address: true, configured: false },
   { key: '', address: true, configured: false },
@@ -244,13 +251,14 @@ test.each([
       options.secretsFilePath!,
       JSON.stringify({ [PROXY_USAGE_MANAGEMENT_KEY_REF]: scenario.key }),
     )
+  const document = JSON.stringify({
+    ...(scenario.settingsIssue === 'invalid-value' ? { 'editor.fontSize': 'invalid' } : {}),
+    'providers.instances': [],
+    'providers.proxyUsageUrl': scenario.address ? source.url : null,
+  })
   await writeFile(
     options.userFilePath!,
-    JSON.stringify({
-      ...(scenario.invalidSettings ? { 'editor.fontSize': 'invalid' } : {}),
-      'providers.instances': [],
-      'providers.proxyUsageUrl': scenario.address ? source.url : null,
-    }),
+    scenario.settingsIssue === 'syntax' ? document.slice(0, -1) : document,
   )
   if (scenario.importKey) {
     const previousSettings = await readFile(options.userFilePath!, 'utf8')
@@ -263,7 +271,7 @@ test.each([
         path.join(checkout, 'scripts/import-proxy-usage-key.ts'),
         keyFile,
         '--url',
-        scenario.invalidSettings ? 'http://127.0.0.1:18318' : source.url,
+        scenario.settingsIssue === 'syntax' ? 'http://127.0.0.1:18318' : source.url,
       ],
       {
         cwd: checkout,
@@ -277,12 +285,16 @@ test.each([
       new Response(child.stdout).text(),
       new Response(child.stderr).text(),
     ])
-    expect(exit, stderr).toBe(scenario.invalidSettings ? 1 : 0)
+    expect(exit, stderr).toBe(scenario.settingsIssue === 'syntax' ? 1 : 0)
     expect(stdout).toBe('')
     expect(stderr).not.toContain(scenario.key)
-    if (!scenario.invalidSettings) expect(stderr).toBe('')
-    if (scenario.invalidSettings)
+    if (scenario.settingsIssue !== 'syntax') expect(stderr).toBe('')
+    if (scenario.settingsIssue === 'syntax')
       expect(await readFile(options.userFilePath!, 'utf8')).toBe(previousSettings)
+    if (scenario.settingsIssue === 'invalid-value')
+      expect(JSON.parse(await readFile(options.userFilePath!, 'utf8'))['editor.fontSize']).toBe(
+        'invalid',
+      )
   }
   const registry = new ProviderAdapterRegistry({ services: { cwd: root }, drivers: [] })
   registries.push(registry)

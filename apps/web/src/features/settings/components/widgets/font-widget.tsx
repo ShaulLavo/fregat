@@ -66,7 +66,7 @@ export function FontWidget({
     preview?.clearFontPreview()
   }
   const choose = (option: FontOption | null) => {
-    if (option && option.ref !== value) onChange(option.ref)
+    if (option) onChange(option.ref)
     preview?.clearFontPreview()
   }
   const highlight = (option: FontOption | undefined) => {
