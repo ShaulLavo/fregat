@@ -35,6 +35,55 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { force: true, recursive: true })))
 })
 
+describe('writes beside an invalid stored value', () => {
+  it('saves an unrelated setting and leaves the invalid font available for repair', async () => {
+    const store = await createStore()
+    await store.writeRaw({
+      target: 'user',
+      baseRevision: '',
+      writeId: 'plant-invalid-font',
+      text: '{ "editor.fontFamily": "Fira Code" }\n',
+    })
+
+    const result = await store.write(setFontSize('unrelated-font-size', 23))
+
+    expect(result.snapshot.values['editor.fontSize']).toBe(23)
+    expect(result.changedSettingIds).toEqual(['editor.fontSize'])
+    expect(JSON.parse(store.rawLayer('user').text)['editor.fontFamily']).toBe('Fira Code')
+    expect(result.snapshot.diagnostics).toContainEqual(
+      expect.objectContaining({ id: 'editor.fontFamily', kind: 'invalid-value', layer: 'user' }),
+    )
+
+    const repaired = await store.write({
+      target: 'user',
+      mutationId: 'reset-invalid-font',
+      operations: [{ kind: 'reset', keys: ['editor.fontFamily'] }],
+    })
+    expect(repaired.snapshot.diagnostics).not.toContainEqual(
+      expect.objectContaining({ id: 'editor.fontFamily', kind: 'invalid-value' }),
+    )
+    expect(JSON.parse(store.rawLayer('user').text)).toEqual({ 'editor.fontSize': 23 })
+  })
+})
+
+describe('validation of changed settings', () => {
+  it('rejects an invalid changed font without saving the other operation', async () => {
+    const store = await createStore()
+    await expect(
+      store.write({
+        target: 'user',
+        mutationId: 'invalid-font-write',
+        operations: [
+          { kind: 'set', key: 'editor.fontSize', value: 23 },
+          { kind: 'set', key: 'editor.fontFamily', value: 'Fira Code' },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: 'settings.WRITE_INVALID' })
+    expect(store.rawLayer('user').text).not.toContain('23')
+    expect(store.snapshot().serverVersion.sequence).toBe(0)
+  })
+})
+
 describe('versioned settings acknowledgements', () => {
   it('publishes one version and returns the same version over HTTP and SSE', async () => {
     const store = await createStore()

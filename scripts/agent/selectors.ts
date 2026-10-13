@@ -963,6 +963,10 @@ export const selectors = {
     page.locator(`[data-setting-row="${id}"] [data-code-theme-preview] pre[data-theme-id]`),
   settingsSlider: (page: Page, title: string) =>
     page.getByRole('slider', { name: title, exact: true }),
+  settingsDiagnostic: (page: Page, id: string) =>
+    page.locator(`[data-settings-diagnostic="${id}"]`),
+  settingsDiagnosticAction: (page: Page, id: string, name: string) =>
+    selectors.settingsDiagnostic(page, id).getByRole('button', { name, exact: true }),
   settingsRowActions: (page: Page, id: string) =>
     page.getByRole('button', { name: `Actions for ${id}`, exact: true }),
   settingsResetMenuItem: (page: Page) =>

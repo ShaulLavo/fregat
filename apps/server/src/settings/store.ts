@@ -901,7 +901,7 @@ export class SettingsStore {
       }
     }
 
-    this.assertReductionValid(raw)
+    this.assertReductionValid(raw, reduction.touchedSettingIds)
     const changedSettingIds = reduction.touchedSettingIds.filter((id) =>
       settingChanged(current, raw, id),
     )
@@ -957,8 +957,8 @@ export class SettingsStore {
     })
   }
 
-  private assertReductionValid(raw: Readonly<Record<string, unknown>>) {
-    for (const id of SETTING_IDS) {
+  private assertReductionValid(raw: Readonly<Record<string, unknown>>, ids: readonly SettingId[]) {
+    for (const id of ids) {
       if (!Object.hasOwn(raw, id)) continue
       const parsed = v.safeParse(descriptorFor(id).schema, raw[id])
       if (parsed.success) continue
