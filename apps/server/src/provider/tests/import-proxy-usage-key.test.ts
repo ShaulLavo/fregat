@@ -18,7 +18,7 @@ type ImportCase = {
   url?: string | null
   instances?: readonly string[]
   noProviders?: boolean
-  invalidSettings?: boolean
+  settingsIssue?: 'invalid-value' | 'syntax'
 }
 
 const cases: ImportCase[] = [
@@ -39,11 +39,18 @@ const cases: ImportCase[] = [
   { name: 'optional mapping', success: true, instances: [] },
   { name: 'no configured providers or mapping', success: true, instances: [], noProviders: true },
   {
-    name: 'failed settings validation preserves absent key and previous endpoint',
+    name: 'syntax error preserves absent key and previous endpoint',
     success: false,
     instances: [],
     noProviders: true,
-    invalidSettings: true,
+    settingsIssue: 'syntax',
+  },
+  {
+    name: 'unrelated invalid value allows import and keeps its saved entry',
+    success: true,
+    instances: [],
+    noProviders: true,
+    settingsIssue: 'invalid-value',
   },
 ]
 
@@ -53,8 +60,8 @@ test.for(cases)('proxy key CLI: $name', async (scenario) => {
   const settingsFile = path.join(root, 'settings.json')
   const secretsFile = path.join(root, 'secrets.json')
   const input = scenario.key ?? `${KEY}\n`
-  const settings = JSON.stringify({
-    ...(scenario.invalidSettings ? { 'editor.fontSize': 'invalid' } : {}),
+  const document = JSON.stringify({
+    ...(scenario.settingsIssue === 'invalid-value' ? { 'editor.fontSize': 'invalid' } : {}),
     'providers.instances': scenario.noProviders
       ? []
       : [
@@ -67,6 +74,7 @@ test.for(cases)('proxy key CLI: $name', async (scenario) => {
     'providers.proxyUsageUrl': 'http://127.0.0.1:11111',
     'providers.proxyUsageProviderInstanceIds': ['codex-unselected'],
   })
+  const settings = scenario.settingsIssue === 'syntax' ? document.slice(0, -1) : document
   const secrets = JSON.stringify({
     'push.vapid.privateKey': 'synthetic-unrelated-secret',
     ...(scenario.existingKey ? { 'usage.cliproxy.management': scenario.existingKey } : {}),
@@ -110,6 +118,7 @@ test.for(cases)('proxy key CLI: $name', async (scenario) => {
     expect(stderr).toBe('')
     const saved = JSON.parse(await readFile(settingsFile, 'utf8'))
     expect(saved['providers.proxyUsageUrl']).toBe(URL)
+    if (scenario.settingsIssue === 'invalid-value') expect(saved['editor.fontSize']).toBe('invalid')
     expect(saved['providers.proxyUsageProviderInstanceIds'] ?? []).toEqual(instances)
     expect(saved['providers.instances']).toEqual(JSON.parse(settings)['providers.instances'])
     expect(await readFile(settingsFile, 'utf8')).not.toContain(KEY)
