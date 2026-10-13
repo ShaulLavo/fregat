@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
+import { cn } from '@workspace/ui/lib/utils'
 
 import { ServerUpdateStatus } from '@/components/server-update-status'
+import { useNativeMacOverlay } from '@/components/use-native-mac-overlay'
 import { BackButton } from '@/features/phone/components/back-button'
 import { PaletteButton } from '@/features/phone/components/palette-button'
 
@@ -18,8 +20,10 @@ export function Header({
   readonly fullTitle?: string
   readonly title: ReactNode
 }) {
+  const nativeMacOverlay = useNativeMacOverlay()
+
   return (
-    <PaneBar as='header' className='text-foreground'>
+    <PaneBar as='header' className={cn('text-foreground', nativeMacOverlay && 'pl-[4.75rem]')}>
       <BackButton />
       <div className='flex min-w-0 flex-1 flex-col justify-center' title={fullTitle}>
         <h1 className='truncate text-xs font-medium'>{title}</h1>

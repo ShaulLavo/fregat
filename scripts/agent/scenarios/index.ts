@@ -5,6 +5,7 @@ import { clientLogDelivery } from './client-log-delivery'
 import { unknownWorkspaceSettings } from './unknown-workspace-settings'
 import { releaseInstallationSettings } from './release-installation-settings'
 import { nativeWindow } from './native-window'
+import { nativePhoneHeader } from './native-phone-header'
 import { installedApp } from './installed-app'
 import { cursorProvider } from './cursor-provider'
 import { cursorModelCatalog } from './cursor-model-catalog'
@@ -488,6 +489,7 @@ export const scenarios: readonly Scenario[] = [
   unknownWorkspaceSettings,
   releaseInstallationSettings,
   nativeWindow,
+  nativePhoneHeader,
   installedApp,
   binaryFileOpen,
   binaryFileRemote,
