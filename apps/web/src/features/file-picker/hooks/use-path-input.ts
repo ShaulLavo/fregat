@@ -35,7 +35,7 @@ export function useFilePickerPathInput({
 }: {
   currentPath: string
   onIntentStart: () => number
-  onNavigate: (path: string, intentId: number) => void
+  onNavigate: (path: string, intentId: number, signal: AbortSignal) => boolean | Promise<boolean>
   serverInfo: ServerInfo | null
 }) {
   const client = clientForQueryClient(useQueryClient())
@@ -96,19 +96,19 @@ export function useFilePickerPathInput({
     setError(null)
 
     const probe = await probeFolder(parsed.path, controller.signal, client)
-    const current = requestRef.current === controller
-    if (current) {
+    if (controller.signal.aborted || requestRef.current !== controller) return
+    if (probe.kind !== 'folder') {
       requestRef.current = null
       setIsPending(false)
-    }
-    if (controller.signal.aborted || !current) return
-    if (probe.kind !== 'folder') {
       setError(probe.message)
       return
     }
 
-    navigate(parsed.path, intentId)
-    setIsEditing(false)
+    const loaded = await navigate(parsed.path, intentId, controller.signal)
+    if (controller.signal.aborted || requestRef.current !== controller) return
+    requestRef.current = null
+    setIsPending(false)
+    if (loaded) setIsEditing(false)
   }
 
   return {

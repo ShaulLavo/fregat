@@ -191,10 +191,11 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
   useIntentHitLog(open)
   const navigateSessionTo = session.navigateTo
   const selectSessionEntry = session.setSelectedEntry
-  const loadAndNavigate = (path: string, intentId: number) => {
-    void loadDirectory(path, intentId).then((loaded) => {
-      if (loaded) navigateSessionTo(path)
-    })
+  const loadAndNavigate = async (path: string, intentId: number, signal?: AbortSignal) => {
+    const loaded = await loadDirectory(path, intentId)
+    if (!loaded || signal?.aborted) return false
+    navigateSessionTo(path)
+    return true
   }
   const navigateTo = (path: string) => {
     loadAndNavigate(path, beginDirectoryIntent())
@@ -373,7 +374,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
   // Declaration order is a constraint, not a preference: React Compiler cannot rewrite a
   // hoisted reference, so every handler below is declared after the handlers it calls.
   function commitPick(entry: PickedFsEntry) {
-    if (commitStartedRef.current) return
+    if (commitStartedRef.current || pathInput.isPending) return
 
     commitStartedRef.current = true
     backGesture.leave(() => {
@@ -998,7 +999,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
                   <Button
                     className='min-w-0 flex-1'
                     size='lg'
-                    disabled={!phoneTarget}
+                    disabled={!phoneTarget || pathInput.isPending}
                     onClick={() => {
                       if (phoneTarget) commitPick(phoneTarget)
                     }}
@@ -1039,7 +1040,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
                     </Button>
                   ) : (
                     <Button
-                      disabled={!selectedPickable}
+                      disabled={!selectedPickable || pathInput.isPending}
                       onClick={chooseSelected}
                       size='sm'
                       type='button'

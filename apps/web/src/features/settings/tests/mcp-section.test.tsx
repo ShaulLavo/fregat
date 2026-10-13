@@ -339,7 +339,11 @@ test('a literal tilde folder keeps its own MCP list and filesystem owner across 
   const folder = path.join(server.root, '~')
   await mkdir(folder)
   adapter.folders.set(folder, [{ ...adapter.servers[0]!, origin: 'https://tilde.example.test' }])
-  const restore = installTestClient(createInProcessClient(server))
+  const gate = createRequestGate((request) => {
+    const url = new URL(request.url)
+    return url.pathname === '/fs/tree' && url.searchParams.get('path') === '~'
+  })
+  const restore = installTestClient(createObservedInProcessClient(server, gate.beforeRequest))
   const rendered = renderWithProviders(<McpSection />)
   try {
     await userEvent.click(await screen.findByRole('tab', { name: 'Claude' }))
@@ -352,8 +356,14 @@ test('a literal tilde folder keeps its own MCP list and filesystem owner across 
     await waitFor(() => expect(input).toBeEnabled())
     await userEvent.clear(input)
     await userEvent.type(input, `${folder}{Enter}`)
-    await waitFor(() => expect(input).not.toBeVisible())
+    await gate.entered
     const open = within(picker).getByRole('button', { name: /^Open$/ })
+    expect(input).toBeVisible()
+    expect(open).toBeDisabled()
+    await userEvent.click(open)
+    expect(adapter.listFolders).toEqual([server.root])
+    gate.release()
+    await waitFor(() => expect(input).not.toBeVisible())
     await waitFor(() => expect(open).toBeEnabled())
     await userEvent.click(open)
     await waitFor(() => expect(adapter.listFolders).toEqual([server.root, folder]))
@@ -365,6 +375,7 @@ test('a literal tilde folder keeps its own MCP list and filesystem owner across 
     expect(screen.queryByText(/tilde.example.test/)).toBeNull()
     expect(adapter.listFolders).toEqual([server.root, folder])
   } finally {
+    gate.release()
     rendered.unmount()
     restore()
     await server.cleanup()
