@@ -1,5 +1,5 @@
 import { scratchPath } from '../paths'
-import { deepEqual } from 'node:assert/strict'
+import { deepEqual, ok } from 'node:assert/strict'
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import path from 'node:path'
 import { selectors } from '../selectors'
@@ -8,7 +8,8 @@ import type { Scenario } from './index'
 
 export const filePickerSelection: Scenario = {
   name: 'file-picker-selection',
-  description: 'Leave an empty column, select its sibling, then hide a selected hidden folder.',
+  description:
+    'Wait for a typed folder to load before Open, leave an empty column, select its sibling, then hide a selected hidden folder.',
   async run(page, { step }) {
     const root = await mkdtemp(scratchPath('fregat-picker-selection-'))
     await Promise.all(
@@ -16,12 +17,30 @@ export const filePickerSelection: Scenario = {
         mkdir(path.join(root, folder), { recursive: true }),
       ),
     )
+    const listingEntered = Promise.withResolvers<void>()
+    const listingReleased = Promise.withResolvers<void>()
+    const listingRoute = `**/fs/tree?*`
+    await page.route(listingRoute, async (route) => {
+      if (new URL(route.request().url()).searchParams.get('path') === root.slice(1)) {
+        listingEntered.resolve()
+        await listingReleased.promise
+      }
+      await route.continue()
+    })
     try {
       await selectors.projectMenu(page).click()
       await selectors.openFolderMenu(page).click()
       await selectors.pickerGoToFolder(page).click()
       await selectors.pickerFolderPath(page).fill(root)
       await page.keyboard.press('Enter')
+      await listingEntered.promise
+      ok(await selectors.pickerFolderPath(page).isVisible(), 'The pending path stays visible')
+      ok(await selectors.pickerChoose(page).isDisabled(), 'Open waits for the destination')
+      await step('typed-folder-loading')
+      listingReleased.resolve()
+      await selectors.pickerFolderPath(page).waitFor({ state: 'hidden' })
+      ok(await selectors.pickerChoose(page).isEnabled(), 'Open becomes available after loading')
+      await step('typed-folder-ready')
       await selectors.pickerRow(page, 'empty-review-folder').click()
       await page.keyboard.press('ArrowRight')
       await selectors.pickerColumn(page, 1).focus()
@@ -52,6 +71,8 @@ export const filePickerSelection: Scenario = {
         },
       )
     } finally {
+      listingReleased.resolve()
+      await page.unroute(listingRoute)
       await releaseFixture(root)
     }
   },

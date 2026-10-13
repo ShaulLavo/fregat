@@ -34,7 +34,11 @@ test('a pending path keeps its validation owner and original navigation session 
       const input = useFilePickerPathInput({
         currentPath: '',
         onIntentStart: () => ++sequence.current,
-        onNavigate: owner === 'a' ? first.navigateTo : second.navigateTo,
+        onNavigate: (path) => {
+          if (owner === 'a') first.navigateTo(path)
+          if (owner === 'b') second.navigateTo(path)
+          return true
+        },
         serverInfo,
       })
       return { first, second, input }
@@ -91,7 +95,10 @@ test('an older validation cannot navigate or clear the input after a newer submi
     const input = useFilePickerPathInput({
       currentPath: '',
       onIntentStart: () => ++sequence.current,
-      onNavigate: session.navigateTo,
+      onNavigate: (path) => {
+        session.navigateTo(path)
+        return true
+      },
       serverInfo,
     })
     return { input, session }
