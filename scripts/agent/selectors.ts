@@ -1445,6 +1445,7 @@ export const selectors = {
   phoneLevelSelector: '[data-phone-level]',
   desktopFirstScreenSelector: '[aria-label="Window toolbar"]',
   phoneShell: (page: Page) => page.locator('[data-phone-shell]'),
+  phoneHeader: (page: Page) => page.locator('[data-phone-shell] header').first(),
   /** The phone shell showing `level`: sessions, session, changes, file or terminal. */
   phoneLevel: (page: Page, level: string) => page.locator(`[data-phone-level="${level}"]`),
   phoneBack: (page: Page) =>
