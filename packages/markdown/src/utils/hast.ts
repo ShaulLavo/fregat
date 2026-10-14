@@ -1,6 +1,6 @@
 import type { Element, Root as HastRoot } from 'hast'
-import type { Root as MdastRoot } from 'mdast'
-import { toHast } from 'mdast-util-to-hast'
+import type { Break, Root as MdastRoot } from 'mdast'
+import { toHast, type State } from 'mdast-util-to-hast'
 import rehypeSanitize from 'rehype-sanitize'
 import { unified, type Pluggable, type Processor } from 'unified'
 
@@ -35,7 +35,11 @@ export function blockToHast(block: MarkdownBlock, processor: HastProcessor): Has
   const root: MdastRoot = { type: 'root', children: [...block.nodes] }
   // Ids leave this stage bare: the sanitizer prefixes raw HTML and footnotes alike, once.
   const tree = processor.runSync(
-    toHast(root, { allowDangerousHtml: true, clobberPrefix: '' }) as HastRoot,
+    toHast(root, {
+      allowDangerousHtml: true,
+      clobberPrefix: '',
+      handlers: { break: hardBreak },
+    }) as HastRoot,
   )
   // The hast root separates blocks with newline text nodes, which a
   // `whitespace-pre-wrap` consumer would paint as blank lines.
@@ -46,6 +50,13 @@ export function blockToHast(block: MarkdownBlock, processor: HastProcessor): Has
   if (block.openFence) markLastFenceIncomplete(tree)
 
   return tree
+}
+
+// A formatting newline after <br> adds another line under whitespace-pre-wrap.
+function hardBreak(state: State, node: Break): Element {
+  const element: Element = { type: 'element', tagName: 'br', properties: {}, children: [] }
+  state.patch(node, element)
+  return state.applyData(node, element)
 }
 
 function markLastFenceIncomplete(tree: HastRoot) {
