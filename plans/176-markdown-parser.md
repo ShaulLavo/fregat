@@ -6,6 +6,10 @@ streaming chat on our parser. Keeping remark for chat and split rendering was
 the scope of the completed integration below. Migrating those consumers remains
 required future work, with streaming and rendering acceptance checks.
 
+The approved [chat qualification work package](chat-markdown-qualification.md) defines the
+remark baseline, semantic and streaming comparisons, real-browser interaction and visual
+checks, paired benchmarks and the gates required before that cutover.
+
 ## Status and authorization
 
 - Status: **IMPLEMENTED**, refreshed 2026-09-28.
