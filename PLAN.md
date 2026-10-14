@@ -224,6 +224,23 @@ starting with a line editor for the site's Shell. [287](plans/287-ghostty-worker
 (OffscreenCanvas) after 283's Zig frame; Platform switches to it.
 Each keeps its existing evidence and execution gates. Native stays editor-first; 088 follows 087.
 
+## TypeScript language-service parity
+
+Approved 2026-10-14. [The parity plan](plans/typescript-language-service-parity.md) owns the
+contract across Singapore's browser worker, classic tsserver through its LSP adapter, native
+TypeScript LSP and capable reference servers through the configured external-LSP route. Arbitrary
+servers retain their actual capability limits. Its order within this program is:
+
+1. Establish the real backend/browser feature matrix and project/lifecycle contract.
+2. Close shared client/UI gaps and current TypeScript backend gaps, using Plan 227's action,
+   declaration, inlay and navigation owners and Plan 088's current semantic-service boundaries.
+3. Qualify the complete existing TypeScript experience, then apply that unchanged contract in
+   [Singapore TypeScript engines](plans/singapore-typescript-engines.md) to the maintained Rust
+   WASM service. Default selection follows full feature and browser performance qualification.
+
+The existing worker's method tests and server tests are controls; they do not yet prove this
+complete cross-backend contract. Runtime implementation follows the owning plans' acceptance gates.
+
 ## Package cutover delivered
 
 This is separate from the foundations wave and from the product programs above.

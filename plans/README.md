@@ -218,9 +218,12 @@ retains historical deliveries, named follow-ons, and owner-only receipts.
 in the [Editor inventory](editor-backlog.md); its [manifest](editor-backlog.json) supports
 `bun run plans:check`. Source and delivery references remain with their packages.
 
-[Singapore TypeScript engines](singapore-typescript-engines.md) adds an explicit choice between
-Microsoft TypeScript and ts-rust WebAssembly, with Rust as the intended default after browser
-language-service parity is proven. Its first step owns the missing persistent WASM interface.
+[TypeScript language-service parity](typescript-language-service-parity.md) first establishes
+one editing contract across the browser worker, classic tsserver adapter, native TypeScript LSP
+and a capable TypeScript server through the configured external route, then closes client, UI
+and backend gaps. It supplies the required
+acceptance gate for [Singapore TypeScript engines](singapore-typescript-engines.md), which applies
+the same contract to our maintained ts-rust WASM service before browser/default qualification.
 
 | Plan                                                                                           | Topic                                                                                  |
 | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
