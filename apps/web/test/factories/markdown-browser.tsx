@@ -159,6 +159,7 @@ export function observeMarkdownDom(host: Element): Observation {
   if (!(copy instanceof Element))
     throw createClientInvariantError('Markdown observation needs an element')
   for (const chrome of copy.querySelectorAll('[data-markdown-copy=""]')) chrome.remove()
+  for (const favicon of copy.querySelectorAll('[data-chat-link-favicon]')) favicon.remove()
   return {
     text: renderedText(copy),
     elements: Array.from(copy.querySelectorAll('*'), (element) => ({
@@ -188,7 +189,6 @@ export function observeMarkdownSemantics(host: HTMLElement): Observation {
   const copy = host.cloneNode(true)
   if (!(copy instanceof HTMLElement))
     throw createClientInvariantError('Markdown semantics need an element')
-  for (const favicon of copy.querySelectorAll('[data-chat-link-favicon]')) favicon.remove()
   const observation = observeMarkdownDom(copy)
   const generatedIds = new Map<string, string>()
   return {
@@ -231,12 +231,14 @@ function normalizeGeneratedIds(value: string, generatedIds: Map<string, string>)
 }
 
 function normalizeGeneratedId(id: string, generatedIds: Map<string, string>): string {
-  if (!/^(?:_r_[\da-z]+_|:r[\da-z]+:|«r[\da-z]+»)$/u.test(id)) return id
-  const existing = generatedIds.get(id)
-  if (existing) return existing
+  const prefix = id.startsWith('base-ui-') ? 'base-ui-' : ''
+  const reactId = id.slice(prefix.length)
+  if (!/^(?:_r_[\da-z]+_|:r[\da-z]+:|«r[\da-z]+»)$/u.test(reactId)) return id
+  const existing = generatedIds.get(reactId)
+  if (existing) return prefix + existing
   const next = `react-generated-${generatedIds.size}`
-  generatedIds.set(id, next)
-  return next
+  generatedIds.set(reactId, next)
+  return prefix + next
 }
 
 function renderedText(node: Node): string {

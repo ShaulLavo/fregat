@@ -1,4 +1,5 @@
 import { describe, vi } from 'vitest'
+import { loadMarkdownExtension } from '@workspace/markdown/state/extensions'
 import { page } from 'vitest/browser'
 
 import { expect, test } from '../../../../test/fixtures'
@@ -112,6 +113,33 @@ describe('real chat prefix projection', () => {
     const emphasis = observeMarkdownSemantics(proof.message())
     expect(emphasis.text).toBe(strong.text)
     expect(emphasis).not.toEqual(strong)
+  })
+
+  test('both observations retain source images and sanitized user ids while excluding host favicons', async () => {
+    const proof = await createMarkdownBrowser()
+    await loadMarkdownExtension('raw')
+    const imageUrl = new URL('/icons/fregat.svg', location.href).href
+    const source = `<div id="base-ui-_r_123_">User namespace</div>\n\n<span id="_r_abc_">User identity</span>\n\n![source image](${imageUrl})\n\n[link](https://example.com/docs)`
+    await proof.update(source)
+    await vi.waitFor(() =>
+      expect(proof.host.querySelector('[data-chat-link-favicon]')).not.toBeNull(),
+    )
+    const dom = observeMarkdownDom(proof.message())
+    const semantics = observeMarkdownSemantics(proof.message())
+    for (const observation of [dom, semantics]) {
+      const images = observation.elements.filter((element) => element.tag === 'img')
+      expect(images).toHaveLength(1)
+      expect(images[0]?.attributes).toMatchObject({ src: imageUrl, alt: 'source image' })
+      const ids = observation.elements.map((element) => element.attributes.id).filter(Boolean)
+      expect(ids).toContain('user-content-base-ui-_r_123_')
+      expect(ids).toContain('user-content-_r_abc_')
+    }
+    await proof.update(source.replace('id="_r_abc_"', 'id="_r_xyz_"'))
+    const changed = observeMarkdownSemantics(proof.message())
+    expect(changed.elements.map((element) => element.attributes.id)).toContain(
+      'user-content-_r_xyz_',
+    )
+    expect(changed).not.toEqual(semantics)
   })
 
   test.each(BASELINE_DEFECTS)(
