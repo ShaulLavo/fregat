@@ -237,6 +237,7 @@ export class OutputTimingTracker {
 export function browserOutputTimingClock(): OutputTimingClock {
   const channel = new MessageChannel()
   const tasks: (() => void)[] = []
+  let disposed = false
   channel.port1.onmessage = () => tasks.shift()?.()
   return {
     now: () => performance.now(),
@@ -244,10 +245,12 @@ export function browserOutputTimingClock(): OutputTimingClock {
     clearTimer: (handle) => window.clearTimeout(handle),
     requestFrame: (callback) => window.requestAnimationFrame(() => callback()),
     postTask: (callback) => {
+      if (disposed) return
       tasks.push(callback)
       channel.port2.postMessage(undefined)
     },
     dispose: () => {
+      disposed = true
       tasks.length = 0
       channel.port1.close()
       channel.port2.close()

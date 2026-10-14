@@ -637,6 +637,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     if (this.emitters.outputTiming.hasListeners) return
     this.outputTimingTracker?.dispose()
     this.outputTimingTracker = undefined
+    this.timedWorkerWrite = undefined
   }
 
   onData(listener: GhosttyWebGpuTerminalListener<'data'>): GhosttyWebGpuTerminalSubscription {
@@ -982,6 +983,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.pendingText.length = 0
     this.outputTimingTracker?.dispose()
     this.outputTimingTracker = undefined
+    this.timedWorkerWrite = undefined
     this.inputOwner?.dispose()
     this.extensions?.dispose()
     this.cleanup.dispose((cause) => this.emitters.error.emit({ cause, operation: 'dispose' }))
