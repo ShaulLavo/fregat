@@ -70,7 +70,7 @@ function lineOffset(lines: readonly string[], index: number): number {
   return offset
 }
 
-function lastBlock(nodes: readonly RootContent[]): Nodes | null {
+export function lastBlock(nodes: readonly RootContent[]): Nodes | null {
   let node: Nodes | undefined = nodes.at(-1)
   while (node && CONTAINER_BLOCKS.has(node.type) && 'children' in node) {
     const child: Nodes | undefined = node.children.at(-1)
@@ -81,7 +81,7 @@ function lastBlock(nodes: readonly RootContent[]): Nodes | null {
   return node ?? null
 }
 
-function lastLeaf(node: Nodes): Nodes {
+export function lastLeaf(node: Nodes): Nodes {
   let leaf = node
   while ('children' in leaf) {
     const child: Nodes | undefined = leaf.children.at(-1)

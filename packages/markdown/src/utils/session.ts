@@ -9,7 +9,12 @@ import {
   type MarkdownBlock,
   type NodeGroup,
 } from './blocks'
-import { healMarkdown } from './heal'
+import {
+  healMarkdown,
+  insertedRepairIsLiteral,
+  nestedStrongRepair,
+  visibleRepairIsLiteral,
+} from './heal'
 import { holdAmbiguousTail } from './hold'
 import { countLines, shiftPositions } from './positions'
 import { createRemarkProcessor } from './processor'
@@ -151,11 +156,25 @@ function healedTail(processor: MarkdownParser, tail: Tail, line: number): Tail {
   if (endsInUnclosedFence(tail.nodes, tail.fileValue)) return tail
 
   const source = tail.fileValue.slice(tail.start)
-  const healed = healMarkdown(holdAmbiguousTail(source, tail.nodes))
-  if (healed === source) return tail
+  const held = holdAmbiguousTail(source, tail.nodes)
+  const healed = healMarkdown(held)
+  let prepared = healed === source ? tail : parseTail(processor, tail, healed, line)
+  if (visibleRepairIsLiteral(held, healed, prepared.nodes))
+    prepared = parseTail(processor, tail, held, line)
+  const repair = nestedStrongRepair(prepared.fileValue, prepared.nodes)
+  if (!repair) return prepared
+  const repaired =
+    prepared.fileValue.slice(tail.start, repair.offset) +
+    repair.closers +
+    prepared.fileValue.slice(repair.offset)
+  const result = parseTail(processor, prepared, repaired, line)
+  return insertedRepairIsLiteral(result.nodes, repair.offset, repair.offset + repair.closers.length)
+    ? prepared
+    : result
+}
 
-  const fileValue = tail.fileValue.slice(0, tail.start) + healed
-
+function parseTail(processor: MarkdownParser, tail: Tail, source: string, line: number): Tail {
+  const fileValue = tail.fileValue.slice(0, tail.start) + source
   return { fileValue, nodes: parseFrom(processor, fileValue, tail.start, line), start: tail.start }
 }
 
