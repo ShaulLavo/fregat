@@ -98,7 +98,9 @@ test('dangerous HTML and link activation preserve safe display after the real HT
   const proof = await createMarkdownBrowser()
   const marker = 'markdownQualificationExecuted'
   Reflect.set(window, marker, false)
-  onTestFinished(() => Reflect.deleteProperty(window, marker))
+  onTestFinished(() => {
+    Reflect.deleteProperty(window, marker)
+  })
   const source = `<script>window.${marker}=true</script>\n\n<a href="javascript:window.${marker}=true" onclick="window.${marker}=true">Run</a>\n\nVisible`
   await proof.update(source)
   await loadMarkdownExtension('raw')
@@ -115,7 +117,7 @@ test('dangerous HTML and link activation preserve safe display after the real HT
 test('late HTML cannot restore a replaced source or contaminate a sibling document', async () => {
   const gate = Promise.withResolvers<void>()
   holdHtml(gate.promise)
-  onTestFinished(gate.resolve)
+  onTestFinished(() => gate.resolve())
   const proof = await createMarkdownBrowser()
   await proof.updateMessages([
     { id: 'changing', text: '<kbd>Stale</kbd>', live: false },
@@ -146,7 +148,7 @@ test('late math loads the actual renderer after a commit and preserves the prose
     },
   })
   onTestFinished(() => setMarkdownExtensionLoaders(null))
-  onTestFinished(gate.resolve)
+  onTestFinished(() => gate.resolve())
   const proof = await createMarkdownBrowser()
   const receipt = await proof.update('Before $$x^2$$ after.')
   expect(receipt.observation.text).toContain('Before x^2 after.')
@@ -161,7 +163,7 @@ test('late math loads the actual renderer after a commit and preserves the prose
 test('disposed messages stay disposed when their deferred HTML stage resolves', async () => {
   const gate = Promise.withResolvers<void>()
   holdHtml(gate.promise)
-  onTestFinished(gate.resolve)
+  onTestFinished(() => gate.resolve())
   const proof = await createMarkdownBrowser()
   await proof.update('<kbd>Disposed source</kbd>')
   const detached = proof.message()

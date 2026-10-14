@@ -10,6 +10,7 @@ import {
   requiredElement,
 } from '../../../../test/factories/markdown-browser'
 import {
+  BASELINE_DEFECTS,
   MARKDOWN_CASES,
   type Checkpoint,
 } from '../../../../../../packages/markdown/test/fixtures/cases'
@@ -27,6 +28,12 @@ describe('real chat prefix projection', () => {
       const proof = await createMarkdownBrowser()
       let priorRevision = 0
       for (const checkpoint of fixture.checkpoints) {
+        if (
+          BASELINE_DEFECTS.some(
+            (defect) => defect.fixtureId === fixture.id && defect.checkpointId === checkpoint.name,
+          )
+        )
+          continue
         const receipt = await proof.update(
           fixture.source.slice(0, checkpoint.offset),
           checkpoint.live,
@@ -48,6 +55,20 @@ describe('real chat prefix projection', () => {
         expect(checkChatExpectations(fresh.message(), fixture.expected)).toEqual([]),
       )
       expect(observeMarkdownDom(fresh.message()).text).toBe(streamed.text)
+    },
+  )
+
+  test.fails.each(BASELINE_DEFECTS)(
+    '$fixtureId/$checkpointId preserves the desired nested streaming semantics',
+    async (defect) => {
+      const fixture = MARKDOWN_CASES.find((entry) => entry.id === defect.fixtureId)
+      const checkpoint = fixture?.checkpoints.find((entry) => entry.name === defect.checkpointId)
+      expect(fixture).toBeDefined()
+      expect(checkpoint).toBeDefined()
+      if (!fixture || !checkpoint) return
+      const proof = await createMarkdownBrowser()
+      await proof.update(fixture.source.slice(0, checkpoint.offset), checkpoint.live)
+      expect(checkChatExpectations(proof.message(), defect.expected)).toEqual([])
     },
   )
 

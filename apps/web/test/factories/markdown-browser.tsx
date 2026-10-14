@@ -296,6 +296,8 @@ export function recordMarkdownFrames(host: HTMLElement) {
     cancelAnimationFrame(callback)
     return frames
   }
-  onTestFinished(stop)
+  onTestFinished(() => {
+    stop()
+  })
   return { frames, stop }
 }
