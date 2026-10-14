@@ -348,6 +348,11 @@ export const SETTINGS_PRESENTATION = {
     widget: 'boolean',
     category: 'Terminal',
   },
+  'terminal.integrated.lowLatencyRendering': {
+    widget: 'boolean',
+    category: 'Terminal',
+    visibility: 'advanced',
+  },
   'editor.inactiveAnalysisEntryLimit': {
     widget: 'number',
     category: 'Editor',

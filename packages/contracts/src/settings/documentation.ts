@@ -526,6 +526,14 @@ export const SETTINGS_DOCUMENTATION = {
     description: 'Blink the terminal cursor while the terminal has focus.',
     keywords: ['terminal', 'cursor', 'blink'],
   },
+  'terminal.integrated.lowLatencyRendering': {
+    title: 'Low-latency rendering',
+    description:
+      'Draw terminal output the moment it arrives, on a WebGL canvas that skips the browser compositor where the browser allows it.',
+    details:
+      'The first output of each display frame is drawn at once; more output in the same frame waits for the next one. Fast output can tear. Open terminals reconnect when this changes.',
+    keywords: ['terminal', 'latency', 'rendering', 'immediate', 'desynchronized', 'webgl', 'speed'],
+  },
   'editor.inactiveAnalysisEntryLimit': {
     title: 'Inactive analysis entry limit',
     description:

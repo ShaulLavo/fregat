@@ -85,6 +85,7 @@ export function TerminalPanel({
   const fontFamily = fontStack(useSettingValue('editor.fontFamily'), 'code')
   const screenReader = useSettingValue('terminal.integrated.screenReader')
   const scrollback = useSettingValue('terminal.integrated.scrollback')
+  const lowLatency = useSettingValue('terminal.integrated.lowLatencyRendering')
   const contextMenu = useContextMenu()
   const terminalActions = useTerminalActions({ rootPath, terminalId: sessionId })
   const [menuTarget, setMenuTarget] = useState<TerminalMenuTarget | null>(null)
@@ -272,6 +273,7 @@ export function TerminalPanel({
       host,
       rootPath,
       scrollback,
+      lowLatency,
       sessionId,
       onConnectedChange: (connected) =>
         handleTerminalConnectedChange(connected, terminalMountIdentity),
@@ -304,6 +306,7 @@ export function TerminalPanel({
     queryClient,
     rootPath,
     scrollback,
+    lowLatency,
     sessionId,
     terminalMountIdentity,
   ])

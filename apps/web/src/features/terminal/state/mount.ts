@@ -43,6 +43,7 @@ export function mountTerminal({
   host,
   rootPath,
   scrollback,
+  lowLatency,
   sessionId,
   onConnectedChange,
   getSavedScroll,
@@ -60,6 +61,7 @@ export function mountTerminal({
   host: HTMLDivElement
   rootPath: string
   scrollback: number
+  lowLatency: boolean
   sessionId: string
   onConnectedChange: (connected: boolean) => void
   getSavedScroll: () => Readonly<TerminalScrollbar> | null
@@ -101,7 +103,7 @@ export function mountTerminal({
     ])
     if (cancelled || signal.aborted) return
 
-    const nextTerminal = await createTerminal(runtime, scrollback)
+    const nextTerminal = await createTerminal(runtime, scrollback, lowLatency)
     if (cancelled || signal.aborted) {
       nextTerminal.dispose()
       return
@@ -134,6 +136,7 @@ export function mountTerminal({
       area: 'terminal',
       durationMs: elapsedMs(startedAt),
       rendererBackend: terminal.diagnostics.rendererBackend ?? null,
+      desynchronized: terminal.diagnostics.desynchronized,
       sessionId,
     })
 
@@ -329,7 +332,7 @@ function handleTerminalServerMessage({
   terminal.writeln(message.message)
 }
 
-function createTerminal(runtime: GhosttyRuntime, scrollback: number) {
+function createTerminal(runtime: GhosttyRuntime, scrollback: number, lowLatency: boolean) {
   return Terminal.create({
     appearance: {
       // Constructed unfocused; the real values arrive at handover, before paint.
@@ -346,6 +349,7 @@ function createTerminal(runtime: GhosttyRuntime, scrollback: number) {
     },
     accessibility: readSettingsMirror()['terminal.integrated.screenReader'] ? {} : undefined,
     links: { activateUri: openTerminalUri },
+    presentation: lowLatency ? 'immediate' : 'frame',
     runtime: { kind: 'borrowed', runtime },
   })
 }

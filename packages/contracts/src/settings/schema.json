@@ -1487,6 +1487,12 @@
       "minimum": 6,
       "type": "integer"
     },
+    "terminal.integrated.lowLatencyRendering": {
+      "default": false,
+      "description": "Draw terminal output the moment it arrives, on a WebGL canvas that skips the browser compositor where the browser allows it.",
+      "markdownDescription": "Draw terminal output the moment it arrives, on a WebGL canvas that skips the browser compositor where the browser allows it.\n\nThe first output of each display frame is drawn at once; more output in the same frame waits for the next one. Fast output can tear. Open terminals reconnect when this changes.",
+      "type": "boolean"
+    },
     "terminal.integrated.screenReader": {
       "default": true,
       "description": "Expose terminal text and announce new output to screen readers.",
