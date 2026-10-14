@@ -1,10 +1,15 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { MarkdownSessionContext } from '@workspace/markdown/providers/session-context'
+import {
+  createMarkdownSession,
+  type MarkdownSessionFactory,
+} from '@workspace/markdown/utils/session'
 import '@workspace/ui/globals.css'
 import { useLayoutEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
-import { onTestFinished, vi } from 'vitest'
+import { inject, onTestFinished, vi } from 'vitest'
 import { page } from 'vitest/browser'
 
 import { AssistantMarkdown } from '@/features/chat/components/assistant-markdown'
@@ -17,6 +22,12 @@ import type { Expectation } from '../../../../packages/markdown/test/fixtures/ca
 import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../render'
 import { TestEditorStateProvider } from './editor-state-provider'
 import { settingsSnapshot } from './settings'
+
+declare module 'vitest' {
+  interface ProvidedContext {
+    markdownEngine?: 'remark' | 'tree-sitter'
+  }
+}
 
 type ReplayMessage = {
   readonly id: string
@@ -43,12 +54,15 @@ export async function createMarkdownBrowser({
   theme = 'dark',
   application,
   queryClient = createTestQueryClient(),
+  sessionFactory,
 }: {
   readonly width?: number
   readonly theme?: 'dark' | 'light'
   readonly application?: ApplicationRuntime
   readonly queryClient?: QueryClient
+  readonly sessionFactory?: MarkdownSessionFactory
 } = {}) {
+  const factory = sessionFactory ?? (await qualificationSessionFactory())
   const previousViewport = { width: window.innerWidth, height: window.innerHeight }
   const host = document.createElement('main')
   host.className = 'bg-background text-foreground font-sans p-4'
@@ -95,17 +109,19 @@ export async function createMarkdownBrowser({
     const received = performance.now()
     flushSync(() => {
       root.render(
-        <AppProviders application={application} queryClient={queryClient}>
-          <TestEditorStateProvider>
-            <ChatWorkspaceRootContext value={null}>
-              <MarkdownReplay
-                messages={messages}
-                onCommitted={completion.resolve}
-                revision={current}
-              />
-            </ChatWorkspaceRootContext>
-          </TestEditorStateProvider>
-        </AppProviders>,
+        <MarkdownSessionContext value={factory}>
+          <AppProviders application={application} queryClient={queryClient}>
+            <TestEditorStateProvider>
+              <ChatWorkspaceRootContext value={null}>
+                <MarkdownReplay
+                  messages={messages}
+                  onCommitted={completion.resolve}
+                  revision={current}
+                />
+              </ChatWorkspaceRootContext>
+            </TestEditorStateProvider>
+          </AppProviders>
+        </MarkdownSessionContext>,
       )
     })
     const committed = await completion.promise
@@ -127,6 +143,22 @@ export async function createMarkdownBrowser({
     update: (text: string, live = false) => updateMessages([{ id: 'primary', text, live }]),
     message: () => requiredElement(host, '[data-chat-markdown]'),
   }
+}
+
+async function qualificationSessionFactory(): Promise<MarkdownSessionFactory> {
+  if (inject('markdownEngine') !== 'tree-sitter') return createMarkdownSession
+  const [candidate, parser, grammar, resolver] = await Promise.all([
+    import('@workspace/markdown/utils/tree-sitter-session'),
+    import('web-tree-sitter/web-tree-sitter.wasm?url'),
+    import('tree-sitter-md/tree-sitter-markdown.wasm?url'),
+    import('tree-sitter-md/tree-sitter-md.wasm?url'),
+  ])
+  await candidate.initializeTreeSitterMarkdown({
+    parser: { locateFile: () => parser.default },
+    grammar: grammar.default,
+    resolver: resolver.default,
+  })
+  return candidate.createTreeSitterMarkdownSession
 }
 
 function MarkdownReplay({

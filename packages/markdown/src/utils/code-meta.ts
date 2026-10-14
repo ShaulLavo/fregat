@@ -14,5 +14,6 @@ export function remarkCodeMeta() {
       const data = node.data ?? {}
       node.data = { ...data, hProperties: { ...data.hProperties, dataMeta: node.meta } }
     })
+    return tree
   }
 }

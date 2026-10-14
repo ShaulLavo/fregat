@@ -12,10 +12,16 @@ import {
 import { healMarkdown } from './heal'
 import { holdAmbiguousTail } from './hold'
 import { countLines, shiftPositions } from './positions'
-import { createRemarkProcessor, type RemarkProcessor } from './processor'
+import { createRemarkProcessor } from './processor'
 
 export type MarkdownSessionOptions = {
   readonly remarkPlugins?: PluggableList
+  readonly processor?: MarkdownParser
+}
+
+export type MarkdownParser = {
+  parse(text: string): Root
+  runSync(root: Root, fileValue: string): Root
 }
 
 export type MarkdownUpdateOptions = {
@@ -26,6 +32,8 @@ export type MarkdownUpdateOptions = {
 export type MarkdownSession = {
   update(text: string, options: MarkdownUpdateOptions): readonly MarkdownBlock[]
 }
+
+export type MarkdownSessionFactory = (options?: MarkdownSessionOptions) => MarkdownSession
 
 type LastUpdate = {
   readonly blocks: readonly MarkdownBlock[]
@@ -54,7 +62,7 @@ const FOOTNOTE = /\[\^[^\]\n]+\]/u
  * ends and healing stops.
  */
 export function createMarkdownSession(options: MarkdownSessionOptions = {}): MarkdownSession {
-  const processor = createRemarkProcessor(options.remarkPlugins)
+  const processor = options.processor ?? createRemarkProcessor(options.remarkPlugins)
   let settled: MarkdownBlock[] = []
   let last: LastUpdate | null = null
 
@@ -113,7 +121,7 @@ function reusableBlocks(blocks: MarkdownBlock[], text: string): MarkdownBlock[] 
 
 /** Parses `fileValue` from `offset`, a line start, and reports absolute positions. */
 function parseFrom(
-  processor: RemarkProcessor,
+  processor: MarkdownParser,
   fileValue: string,
   offset: number,
   lines: number,
@@ -124,11 +132,11 @@ function parseFrom(
   return transform(processor, root, fileValue).children
 }
 
-function transform(processor: RemarkProcessor, root: Root, fileValue: string): Root {
+function transform(processor: MarkdownParser, root: Root, fileValue: string): Root {
   return processor.runSync(root, fileValue)
 }
 
-function wholeDocument(processor: RemarkProcessor, text: string, heal: boolean): MarkdownBlock {
+function wholeDocument(processor: MarkdownParser, text: string, heal: boolean): MarkdownBlock {
   const tail: Tail = { fileValue: text, nodes: parseFrom(processor, text, 0, 0), start: 0 }
 
   return tailBlock(heal ? healedTail(processor, tail, 0) : tail, heal)
@@ -139,7 +147,7 @@ function wholeDocument(processor: RemarkProcessor, text: string, heal: boolean):
  * unfinished syntax closed. Text that stops inside a fence is left alone: the
  * only place a closer could go is inside the code.
  */
-function healedTail(processor: RemarkProcessor, tail: Tail, line: number): Tail {
+function healedTail(processor: MarkdownParser, tail: Tail, line: number): Tail {
   if (endsInUnclosedFence(tail.nodes, tail.fileValue)) return tail
 
   const source = tail.fileValue.slice(tail.start)
