@@ -26,16 +26,62 @@ test('an unmet baseline expectation stays failed in the readiness report', () =>
 })
 
 test('malformed and missing test counters fail rather than inventing executed coverage', () => {
-  expect(parseTestCounts({ numTotalTests: 2, numPassedTests: 1, numFailedTests: 1 })).toEqual({
+  expect(
+    parseTestCounts({
+      numTotalTests: 2,
+      numPassedTests: 1,
+      numFailedTests: 1,
+      numPendingTests: 0,
+      numTodoTests: 0,
+    }),
+  ).toEqual({
     numTotalTests: 2,
     numPassedTests: 1,
     numFailedTests: 1,
+    numPendingTests: 0,
+    numTodoTests: 0,
   })
   expect(() => parseTestCounts({})).toThrow()
   expect(() =>
-    parseTestCounts({ numTotalTests: -1, numPassedTests: 0, numFailedTests: 0 }),
+    parseTestCounts({
+      numTotalTests: -1,
+      numPassedTests: 0,
+      numFailedTests: 0,
+      numPendingTests: 0,
+      numTodoTests: 0,
+    }),
   ).toThrow()
   expect(() =>
-    parseTestCounts({ numTotalTests: 1, numPassedTests: '1', numFailedTests: 0 }),
+    parseTestCounts({
+      numTotalTests: 1,
+      numPassedTests: '1',
+      numFailedTests: 0,
+      numPendingTests: 0,
+      numTodoTests: 0,
+    }),
   ).toThrow()
+  expect(() =>
+    parseTestCounts({
+      numTotalTests: 1,
+      numPassedTests: 1,
+      numFailedTests: 1,
+      numPendingTests: 0,
+      numTodoTests: 0,
+    }),
+  ).toThrow()
+  expect(
+    parseTestCounts({
+      numTotalTests: 10,
+      numPassedTests: 0,
+      numFailedTests: 0,
+      numPendingTests: 9,
+      numTodoTests: 1,
+    }),
+  ).toEqual({
+    numTotalTests: 10,
+    numPassedTests: 0,
+    numFailedTests: 0,
+    numPendingTests: 9,
+    numTodoTests: 1,
+  })
 })

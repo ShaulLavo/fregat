@@ -14,22 +14,30 @@ const GLYPH_CLASS_NAME = 'mr-1 inline-block size-3.5 shrink-0 rounded-md align-[
 export function MarkdownLinkFavicon({ host }: { host: string }) {
   const [failedHost, setFailedHost] = useState<string | null>(null)
   if (host === window.location.hostname) {
-    return <FileTypeIcon className={GLYPH_CLASS_NAME} icon={{ name: 'code' }} />
+    return (
+      <span aria-hidden='true' data-chat-link-favicon={host}>
+        <FileTypeIcon className={GLYPH_CLASS_NAME} icon={{ name: 'code' }} />
+      </span>
+    )
   }
   if (failedHost === host) {
-    return <GlobeIcon aria-hidden='true' className={GLYPH_CLASS_NAME} />
+    return (
+      <span aria-hidden='true' data-chat-link-favicon={host}>
+        <GlobeIcon className={GLYPH_CLASS_NAME} />
+      </span>
+    )
   }
 
   return (
-    <img
-      alt=''
-      aria-hidden='true'
-      className={GLYPH_CLASS_NAME}
-      data-chat-link-favicon={host}
-      draggable={false}
-      loading='lazy'
-      src={faviconUrlForHost(host)}
-      onError={() => setFailedHost(host)}
-    />
+    <span aria-hidden='true' data-chat-link-favicon={host}>
+      <img
+        alt=''
+        className={GLYPH_CLASS_NAME}
+        draggable={false}
+        loading='lazy'
+        src={faviconUrlForHost(host)}
+        onError={() => setFailedHost(host)}
+      />
+    </span>
   )
 }

@@ -18,6 +18,8 @@ type TestRun = {
   readonly tests: number
   readonly passed: number
   readonly failed: number
+  readonly pending: number
+  readonly todo: number
   readonly log: string
 }
 
@@ -100,6 +102,8 @@ async function runSuites(suite: Suite, output: string): Promise<TestRun[]> {
         tests: report.rawSamples.length,
         passed: 0,
         failed: 1,
+        pending: 0,
+        todo: 0,
         log: path.join(output, 'benchmark.json'),
       })
     }
@@ -117,6 +121,8 @@ async function runSuites(suite: Suite, output: string): Promise<TestRun[]> {
       failed: completeMatrix
         ? raster.images.filter((image) => image.status === 'failed').length
         : 1,
+      pending: 0,
+      todo: 0,
       log: path.join(output, 'raster.json'),
     })
   }
@@ -178,17 +184,27 @@ async function runTests(
   const result = await readTestResult(jsonFile)
   return {
     name,
-    exitCode: result.numTotalTests > 0 ? exitCode : 1,
+    exitCode:
+      result.numPassedTests + result.numFailedTests > 0 && result.numTotalTests > 0 ? exitCode : 1,
     tests: result.numTotalTests,
     passed: result.numPassedTests,
     failed: result.numFailedTests,
+    pending: result.numPendingTests,
+    todo: result.numTodoTests,
     log,
   }
 }
 
 async function readTestResult(file: string) {
   const content = await Bun.file(file).exists()
-  if (!content) return { numTotalTests: 0, numPassedTests: 0, numFailedTests: 0 }
+  if (!content)
+    return {
+      numTotalTests: 0,
+      numPassedTests: 0,
+      numFailedTests: 0,
+      numPendingTests: 0,
+      numTodoTests: 0,
+    }
   return parseTestCounts(JSON.parse(await readFile(file, 'utf8')))
 }
 
@@ -197,11 +213,20 @@ export function parseTestCounts(value: unknown) {
     throw createScriptError('The test report has an invalid shape.', {
       internal: { field: 'report' },
     })
-  return {
+  const counts = {
     numTotalTests: testCount(value, 'numTotalTests'),
     numPassedTests: testCount(value, 'numPassedTests'),
     numFailedTests: testCount(value, 'numFailedTests'),
+    numPendingTests: testCount(value, 'numPendingTests'),
+    numTodoTests: testCount(value, 'numTodoTests'),
   }
+  const accounted =
+    counts.numPassedTests + counts.numFailedTests + counts.numPendingTests + counts.numTodoTests
+  if (accounted > counts.numTotalTests)
+    throw createScriptError('The test report has inconsistent counts.', {
+      internal: { total: counts.numTotalTests, accounted },
+    })
+  return counts
 }
 
 function testCount(record: object, field: string): number {
