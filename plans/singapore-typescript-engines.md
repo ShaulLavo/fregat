@@ -1,139 +1,125 @@
 # Singapore: Microsoft TypeScript and ts-rust browser engines
 
-- Status: Approved, 2026-10-10 owner request.
-- Kind: Implementation with an initial feasibility gate.
-- Owner: Editor; Fregat owns application settings and connection pooling.
-- Inspected baseline: `917e6da49cd610209ecb7d55508ed8275f76e5e6`.
-- Upstream inspected: `pingdotgg/ts-rust` at
-  `9f6ee6d147de1f8216c967e2a966cacbac295984`, 2026-10-10.
-- Current progress: source inspection complete; implementation and runtime verification pending.
+- Status: Approved, 2026-10-10 owner request; reordered by the owner on 2026-10-14.
+- Kind: Implementation after the shared TypeScript parity gate.
+- Owner: Cross-repo. Editor owns the reusable engine; Fregat owns application settings and pooling.
+- Depends on: [TypeScript language-service parity](typescript-language-service-parity.md).
+- Inspected baseline: `f03e65e7741646d6fe950b2b7405e4f5cd716aa1`.
+- Maintained Rust source: [ShaulLavo/ts-rust](https://github.com/ShaulLavo/ts-rust/tree/aa1ded92daa337fa387e296eaf438f99d0651e7f),
+  `feat/wasm-lsp`, verified 2026-10-14; includes upstream `144d6e0f862089df2d2628e9eb0de26a26439c1d`.
+- Current progress: persistent WASM service exists in the maintained fork. Singapore integration,
+  distribution, full feature parity and browser/default qualification remain pending.
 
 ## Outcome
 
-Singapore supports two explicitly selectable browser language engines: Microsoft's existing
-TypeScript language service and ts-rust through WebAssembly. The intended default is Rust once
-it passes the editor-feature acceptance gate. The Microsoft engine remains selectable.
+Singapore supports Microsoft's TypeScript service and ts-rust WebAssembly as explicit engine
+choices, with the same editing contract across browser workers and process-server transports.
+Complete and qualify the current TypeScript paths first using the prerequisite plan. Then apply
+its unchanged contract to Rust. The intended Rust default follows feature and browser performance
+qualification; Microsoft remains selectable and today's working default stays during the work.
 
-Both choices provide the current TypeScript and JavaScript editing features, including completion,
-hover, navigation, rename, diagnostics, code actions, formatting and semantic tokens. Opening a
-plain editor with a URI option works without a document session or an application server.
-
-A compiler-only integration is a separate, smaller scope. It does not satisfy this outcome.
-Keep today's working default until the full Rust engine is verified.
+Completion includes imported edits and commands; hover, navigation, rename, diagnostics, actions,
+formatting, tokens and the accepted extension families all have real editor consumers. A plain
+editor given text and a URI works; the host supplies project files through the same workspace API.
 
 ## Current code
 
-- [Package entry](../editor/packages/typescript-lsp/src/index.ts) exports
-  `createTypeScriptLspPlugin` from `pluginWithWorker.ts`.
-- [Worker owner](../editor/packages/typescript-lsp/src/workerOwner.ts) constructs a module worker;
-  [session](../editor/packages/typescript-lsp/src/worker/session.ts) translates LSP messages into
-  the `typescript-api` package, an alias of Microsoft TypeScript 6.0.3.
-- [Workspace](../editor/packages/typescript-lsp/src/workspace.ts) distributes source-file
-  replacement, upsert and deletion notifications to connected clients.
-- [Project host](../editor/packages/typescript-lsp/src/worker/projectHost.ts) owns canonical
-  source identity, live document overlays and versions.
-- [Parity harness](../editor/packages/typescript-lsp/test/parity.test.ts) verifies capabilities
-  and useful answers. [E054 reference](../editor/docs/architecture/e054-worker-language-server-parity.md)
-  records the shipped feature set and preload decision.
-
-Upstream's [WASM README](https://github.com/pingdotgg/ts-rust/blob/9f6ee6d147de1f8216c967e2a966cacbac295984/npm/wasm/README.md)
-explicitly excludes `--lsp`, `--api` and `--watch`. Its `browser.js` exposes `tsc`, which returns
-compiler diagnostics and emitted files. `crates/ts_wasm/src/lib.rs` exports a single compiler
-invocation, creating a new WASM instance per run. This is not an incremental editor service.
-
-The native language server exists in `crates/ts_goport/src/lsp/server.rs`, with reader, writer,
-dispatch and progress threads. A browser worker cannot run those loops unchanged.
-However, the crate publicly exports `project` and `ls`: `project::new_session`,
-`Session::did_open_file`, `did_change_file`, `get_language_service`, and language-service methods
-such as `provide_hover` are public. This supports trying an external wrapper without a fork;
-source visibility alone does not prove that their runtime paths work in WASM.
-At inspection, npm's `ts-rust-wasm/latest` endpoint returned HTTP 404 and the v0.2.0 release
-assets contained native archives and npm packages, with no WASM artifact. Inspect distribution
-again before implementation; do not assume that installing `tsc-rs` supplies browser WASM.
+- [Plugin entry](../editor/packages/typescript-lsp/src/pluginWithWorker.ts),
+  [worker owner](../editor/packages/typescript-lsp/src/workerOwner.ts) and
+  [LSP integration](../editor/packages/typescript-lsp/src/plugin.ts) supply the reuse boundary.
+  [ProjectHost](../editor/packages/typescript-lsp/src/worker/projectHost.ts) currently uses
+  Microsoft TypeScript 6.0.3; the server selects classic or native TypeScript separately.
+- [Workspace](../editor/packages/typescript-lsp/src/workspace.ts) owns file updates and
+  [parity tests](../editor/packages/typescript-lsp/test/parity.test.ts) provide useful scenario
+  validators. The prerequisite strengthens these into a real backend/browser acceptance matrix.
+- The fork's [WASM service](https://github.com/ShaulLavo/ts-rust/blob/aa1ded92daa337fa387e296eaf438f99d0651e7f/npm/wasm/README.md#editor-language-service)
+  exposes `createLanguageService`, LSP-shaped `request`, `updateFiles`, `deleteFiles` and disposal.
+  It is a callable service over supplied files, requiring a worker JSON-RPC/session adapter.
+  Updates replace the program on the next request while reusing unchanged parsed files.
+- Its current dispatch covers diagnostics, hover, completion, signatures, navigation, rename,
+  symbols, code actions, formatting/range formatting and full/range tokens. Auto-imports,
+  completion/action resolution, prepare-rename, workspace symbols, on-type formatting and
+  further contract rows need implementation. Pin and inventory the actual artifact again on entry.
+- Inherited verification from the 2026-10-14 fork update at the pinned commit: 48 WASM
+  package tests passed on each of Node 22 and 26, with focused native and cyclic-config
+  memory/recovery checks. These earlier checks were not repeated in this planning pass.
+  They establish wrapper progress; Singapore/browser and full compiler qualification stay unrun.
 
 ## Scope
 
-Deliver a reusable Singapore engine choice, its reproducible WASM distribution, browser feature
-proof and documentation. Then wire the choice into existing Fregat consumers where they use this
-package. Inspect those consumers first; historical references to a worker do not prove adoption.
+Deliver the Rust worker, the complete prerequisite feature contract, reproducible WASM
+packaging and Singapore/Fregat integration. Preserve the existing shared LSP, editor UI,
+project synchronization and transaction owners. Use patch Changesets for public behavior/API
+changes; retain upstream MIT, Apache-2.0 and BSD notices.
 
-Use a patch Changeset for the package behavior/API change. Preserve upstream MIT, Apache-2.0
-and BSD notices. Reuse existing editor UI and LSP transport, synchronization and navigation.
+The maintained fork is the chosen source. Keep its editor additions and necessary compiler
+patches small; promote pinned upstream updates only after review and tests. A separate wrapper
+can be extracted when it reduces maintenance. Building untested latest upstream is not a release.
 
 ## Design
 
-Proposed public option: `engine: 'typescript' | 'ts-rust'`. Select a worker before initialization.
-An explicit `workerFactory`, external connection provider or WebSocket transport supplies its own
-backend; define their interaction with this option without labelling an external server as Rust.
+Proposed public option: `engine: 'typescript' | 'ts-rust'`. Select the worker before initialization.
+Define interaction with explicit worker factories, external connection providers and WebSocket
+routes; an external server has its own declared identity. Each connection keeps one engine.
+Changing selection replaces the connection and resynchronizes workspace files and unsaved text;
+pool keys distinguish engines. Reuse worker exit reporting and the prerequisite lifecycle tests.
 
-Keep each connection's engine fixed. Changing the choice disposes and replaces the connection,
-then synchronizes workspace files and current unsaved buffers. Pool keys include engine identity
-so documents requesting different engines cannot borrow the same worker. Preserve live URI identity
-and multi-view synchronization. Reuse the worker owner's structured exit notification.
+Wrap the callable WASM service in a module worker. Implement initialization/capabilities,
+document open/change/close overlays, custom workspace notifications, request IDs/errors,
+refresh and disposal. Bind cancellation and stale-result suppression to actual requests; qualify
+what can be interrupted during a synchronous WASM call. Adopt the prerequisite's capability and
+command-application contracts before advertising missing features.
 
-The Rust worker needs a persistent language-service session with a message-based WASM interface.
-Determine whether public `ts_goport` session/language-service APIs can supply it through a small
-Fregat-owned Rust wrapper before considering changes to dependency internals. Reuse the current
-file preload and incremental updates; do not add synchronous network filesystem reads.
-Rust compiler options and built-in declarations must come from its own supported contract.
-Microsoft API enum values are not a Rust configuration format.
+Reuse file preload and dependency declarations. Translate supported compiler options/configuration
+through Rust's contract; numeric Microsoft API enums are not a Rust configuration format. Preserve
+canonical paths, TSX/JSX, package exports, config projects and unsaved imported files. Measure program
+replacement after real edits and retained memory over long sessions.
 
-Prefer a separate wrapper depending on the pinned upstream Rust crate. A custom build of that
-wrapper does not itself require a fork. Only choose a fork if the prototype demonstrates that
-upstream internals must change, and record the smallest required patch and its maintenance cost.
-If the project session reaches native timer/thread machinery, evaluate the lower-level public
-`ls::new_language_service` with a browser-owned `ls::Host` and compiler program. That host supplies
-files, position converters and preferences. Measure program replacement after edits before choosing
-it over an incremental session; merely bypassing native threads is not the full acceptance gate.
-
-Bundle the WASM asset with the built package and load it from a module-relative URL. A fresh
-consumer install must not require a reference clone, a local compiler or an unpinned CDN download.
-Choose a pinned upstream artifact or a reproducible build-and-package step with integrity checks.
+Bundle the WASM asset, pinned revision/toolchain and integrity metadata with the installed package,
+loading a module-relative URL only for the selected engine. A fresh consumer works with the CDN
+blocked, a non-root base path and no reference clone or local Rust compiler. Inspect distribution
+rather than assuming a compiler npm package already contains our language-service artifact.
 
 ## Steps
 
-1. **Prove a persistent browser service.** Build the upstream compiler as a control, then make
-   the smallest owned wrapper that opens a file, answers hover and completion, applies an edit
-   and answers about the changed text in the same session. Test Chromium, Firefox and WebKit.
-   Record required APIs, unsupported threading calls, retained memory and actual WASM size.
-   If this needs substantial dependency changes, document that scope and the exact blocker before
-   changing upstream code. Do not treat compiler diagnostics as proof of editor support.
-2. **Package the runtime.** Pin the upstream revision and toolchain, preserve notices and build
-   the wrapper in CI. Check an installed package in a fresh consumer with a non-root base path,
-   successful worker/WASM responses and the CDN blocked. Keep payloads and caches configurable.
-3. **Implement the two engines.** Add the option, Rust worker session and workspace synchronization.
-   Preserve the Microsoft path. Support compiler options, TSX/JSX, canonical paths, dependency
-   declarations and unsaved imports through the same public workspace API.
-4. **Prove feature parity and lifecycle.** Parameterize the existing parity/method harnesses
-   against real engines, plus the simple editor path, shared workspaces, cancellation, disposal,
-   worker crash and engine replacement. Assert the currently advertised methods produce useful
-   answers. Compare behavior, not TypeScript 6 and 7 diagnostic text byte-for-byte.
-5. **Qualify the default and integrate.** Compare cold load, first diagnostics, completion and
-   edits on the same projects, along with retained memory. Native CLI benchmark ratios are not
-   browser measurements. Only after feature and browser checks pass, set Rust as the default,
-   update demos/docs and register any Fregat knob with its consumer in the settings registry.
+1. **Enter after current TypeScript qualification.** The prerequisite's complete feature/project/
+   lifecycle matrix passes for the existing owned TypeScript paths. Record the exact baseline
+   and compare the Rust artifact's capability inventory against every row; missing rows stay gaps.
+2. **Qualify and package the persistent service.** Pin the fork and toolchain, build in CI,
+   preserve notices and verify artifact integrity. Prove edited-text answers in one persistent
+   session in Chromium, Firefox and WebKit. Record actual optimized/unoptimized size and memory.
+3. **Close Rust feature gaps.** Extend the Rust host and ABI as needed for the unchanged contract,
+   including auto-imports, lazy resolution and accepted extensions. Preserve compiler behavior
+   and diagnostic order, and add focused native/WASM evidence for each core patch.
+4. **Connect the selectable engine.** Implement the worker adapter, workspace synchronization,
+   engine identity/pooling and host option. Run the same useful-result and UI/transaction cases
+   as Microsoft, plus asset loading, crash/disposal and engine changes with dirty shared views.
+5. **Qualify the default and deliver.** Compare cold load, first diagnostics, post-edit completion/
+   hover/diagnostics p50/p95 and memory on the same representative projects. Native CLI ratios
+   are not browser results. Change the default only after complete parity and browser qualification;
+   integrate Fregat consumers, settings, demos/docs, then merge and verify applicable delivery.
 
 ## Verification
 
-- Run `bun run test` and `bun run typecheck` in `editor/packages/typescript-lsp`; extend the
-  existing `test/parity.test.ts`, `test/methods.test.ts` and `test/worker.test.ts` suites.
-- Extend the package's `test:browser` configuration to qualify all three browser engines with
-  the real WASM worker. Test Unicode positions, incremental edits and multiple documents.
-- Build affected workspaces with `bun run build:workspaces` before checking consumers. Verify
-  the built package exports and emitted assets from an installed package, not source aliases.
-- Drive completion acceptance, hover, cross-file rename, quick fixes, formatting, diagnostic
-  updates, engine replacement with unsaved edits, and shared views in the real editor. Capture
-  reviewed screenshots and console/network evidence through the current verification workflow.
-- Run `bun run plans:check` when changing this plan/index. No runtime checks have run yet.
+Use the prerequisite's executable backend matrix and concrete package/server/application checks.
+Add the real Rust worker to the same runner; preserve all required assertions and the Microsoft
+control. Build affected workspaces before consumer checks. Verify built exports and installed assets,
+Unicode/CRLF positions, project/config changes, stale results, commands/edits and multiple documents.
+
+Run the package's `test`, `test:browser` and `typecheck` scripts, the shared LSP/plugin suites,
+and relevant server/app tests named by the prerequisite. Expand browser configuration to all
+three engines. Use `verify-fregat` for reviewed interaction screenshots, network/console evidence
+and cache settlement. Record exact source/artifact/runtime versions and check teardown on each host.
+Run `bun run plans:check` after plan/index changes. Integration checks have not run yet.
 
 ## Risks and decisions
 
-The present blocker is the missing persistent WASM editor interface and its distribution.
-The project being written in Rust does not establish browser speed or feature parity.
-Safari workers have small stacks and no JSPI according to upstream; include deeply nested source
-in qualification and report failures clearly. Upstream also records native long-session memory
-growth; measure the actual wrapper over repeated edits rather than borrowing those numbers.
+Browser speed and memory remain measurements. The current wrapper rebuilds a program after edits;
+compare its actual user latency with the incremental Microsoft service. Small Safari worker stacks
+and JSPI availability require deep-source cases in all three browser engines. Qualify the current
+artifact rather than borrowing limits or timings from an older compiler build.
 
-An explicit Rust selection stays Rust. A worker failure reports the failure through existing LSP
-status handling. Automatic switching to Microsoft would change diagnostics and edits mid-session
-and needs a separate product decision. The default change remains pending the acceptance gate.
+An explicit Rust choice retains that identity through failures. Keep missing capabilities visible;
+automatic switching would change diagnostics and edits mid-session. The prerequisite contract
+cannot be lowered to make Rust pass. Track unavailable upstream semantics explicitly and resolve
+core-patch maintenance before shipping the default.
