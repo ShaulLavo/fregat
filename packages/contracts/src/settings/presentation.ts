@@ -353,6 +353,11 @@ export const SETTINGS_PRESENTATION = {
     category: 'Terminal',
     visibility: 'advanced',
   },
+  'terminal.integrated.showOutputTiming': {
+    widget: 'boolean',
+    category: 'Terminal',
+    visibility: 'advanced',
+  },
   'editor.inactiveAnalysisEntryLimit': {
     widget: 'number',
     category: 'Editor',

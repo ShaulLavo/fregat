@@ -1399,6 +1399,8 @@ export const selectors = {
   editorMinimap: (page: Page) => page.locator('.editor-minimap-right'),
   terminalAccessibilityMirror: (page: Page) =>
     page.getByRole('list', { name: 'Terminal screen', exact: true, includeHidden: true }),
+  terminalOutputTiming: (page: Page) =>
+    selectors.terminalSurface(page).first().locator('[aria-label="Last output timing"]'),
   terminalOpening: (page: Page) => page.getByRole('status', { name: 'Opening terminal' }),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
