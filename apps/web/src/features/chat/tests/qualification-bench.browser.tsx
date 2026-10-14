@@ -38,6 +38,55 @@ type BrowserMetric = {
   readonly cacheState: string
 }
 
+type SourceProjection = {
+  readonly expectations: readonly Expectation[]
+  readonly parentPaths: readonly { readonly tag: string; readonly parents: readonly string[] }[]
+}
+
+const PROJECTION_TAGS: readonly string[] = [
+  'p',
+  'strong',
+  'em',
+  'a',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'ul',
+  'ol',
+  'li',
+  'blockquote',
+  'table',
+  'thead',
+  'tbody',
+  'tr',
+  'th',
+  'td',
+  'pre',
+  'code',
+  'hr',
+  'input',
+  'br',
+  'del',
+  'img',
+  'details',
+  'summary',
+  'kbd',
+  'sup',
+  'sub',
+  'section',
+  'dl',
+  'dt',
+  'dd',
+  'b',
+  'i',
+  's',
+  'script',
+  'iframe',
+]
+
 test('records real first-message mount to a matching painted frame', async () => {
   const fixture = MARKDOWN_CASES.find((entry) => entry.id === 'plain-paragraph')
   expect(fixture).toBeDefined()
@@ -67,11 +116,39 @@ test.each([256, 2048, 8192, 32768, 131072])(
     const proof = await createMarkdownBrowser()
     await proof.update('Warmup.')
     const receipt = await proof.update(workload.source)
-    expect(checkChatExpectations(proof.message(), expected)).toEqual([])
+    expectSourceProjection(proof.message(), expected)
     latency('warm-completed', workload, receipt, 'completedToPaintMs')
   },
   30_000,
 )
+
+test('generated projection checks reject an unexpected empty semantic element', async () => {
+  const source = 'Plain.'
+  const expected = expectedForSource(source)
+  const proof = await createMarkdownBrowser()
+  await proof.update(source)
+  expectSourceProjection(proof.message(), expected)
+  requiredElement(proof.host, 'p').append(document.createElement('strong'))
+  expect(checkChatExpectations(proof.message(), expected.expectations)).toContain(
+    'strong: expected 0 elements, received 1',
+  )
+})
+
+test('generated projection checks reject changed nesting with equal tag counts and text', async () => {
+  const source = '**_label_**'
+  const expected = expectedForSource(source)
+  const proof = await createMarkdownBrowser()
+  await proof.update(source)
+  expectSourceProjection(proof.message(), expected)
+  const paragraph = requiredElement(proof.host, 'p')
+  const strong = requiredElement(proof.host, 'strong')
+  const emphasis = requiredElement(proof.host, 'em')
+  paragraph.replaceChildren(emphasis)
+  emphasis.replaceChildren(strong)
+  strong.textContent = 'label'
+  expect(checkChatExpectations(proof.message(), expected.expectations)).toEqual([])
+  expect(() => expectSourceProjection(proof.message(), expected)).toThrow()
+})
 
 test('records streamed prefixes, completion receipts, held syntax and release paint separately', async () => {
   const workload = mixedWorkload(256)
@@ -80,7 +157,7 @@ test('records streamed prefixes, completion receipts, held syntax and release pa
   for (const chunk of fixedChunks(workload.source, 24)) {
     const expected = expectedForSource(chunk.text, true)
     const receipt = await proof.update(chunk.text, true)
-    expect(checkChatExpectations(proof.message(), expected)).toEqual([])
+    expectSourceProjection(proof.message(), expected)
     receipts += 1
     latency(
       'streaming-replay',
@@ -90,21 +167,28 @@ test('records streamed prefixes, completion receipts, held syntax and release pa
     )
   }
   const settled = await proof.update(workload.source)
-  expect(checkChatExpectations(proof.message(), expectedForSource(workload.source))).toEqual([])
+  expectSourceProjection(proof.message(), expectedForSource(workload.source))
   latency('streaming-replay', workload, settled, 'settlementPaintMs')
-  const held = await proof.update('Stable\n\n## ', true)
+  const heldSource = 'Stable\n\n## '
+  const held = await proof.update(heldSource, true)
   expect(observeMarkdownDom(proof.message()).text).toBe('Stable')
   latency(
     'streaming-replay',
-    { id: 'held-heading', source: 'Stable\n\n## ', sourceBytes: 12, shape: 'held' },
+    { id: 'held-heading', source: heldSource, sourceBytes: bytes(heldSource), shape: 'held' },
     held,
     'heldPrefixProcessingAndPaintMs',
   )
-  const released = await proof.update('Stable\n\n## Ready', true)
+  const releasedSource = 'Stable\n\n## Ready'
+  const released = await proof.update(releasedSource, true)
   expect(requiredElement(proof.host, 'h2').textContent).toBe('Ready')
   latency(
     'streaming-replay',
-    { id: 'released-heading', source: 'Stable\n\n## Ready', sourceBytes: 17, shape: 'held' },
+    {
+      id: 'released-heading',
+      source: releasedSource,
+      sourceBytes: bytes(releasedSource),
+      shape: 'held',
+    },
     released,
     'heldReleasePaintMs',
   )
@@ -128,7 +212,7 @@ test.each(pathologicalWorkloads(8192))(
     const expected = expectedForSource(workload.source)
     const proof = await createMarkdownBrowser()
     const receipt = await proof.update(workload.source)
-    expect(checkChatExpectations(proof.message(), expected)).toEqual([])
+    expectSourceProjection(proof.message(), expected)
     latency('pathological-scaling', workload, receipt, 'largeMessagePaintMs')
   },
   30_000,
@@ -139,7 +223,7 @@ test('records earlier-link publication through late definition edits and removal
   for (const revision of referenceRevisions()) {
     const expected = expectedForSource(revision.source)
     const receipt = await proof.update(revision.source, true)
-    expect(checkChatExpectations(proof.message(), expected)).toEqual([])
+    expectSourceProjection(proof.message(), expected)
     latency(
       'reference-invalidation',
       {
@@ -255,20 +339,48 @@ test('records observed DOM and query cleanup across twenty message lifetimes', a
     await proof.update(source, true)
     await proof.update(source)
     expect(requiredElement(proof.host, 'strong').textContent).toBe('completed')
-    proof.dispose()
-    expect(proof.queryClient.getQueryCache().getAll()).toHaveLength(0)
+    const disposal = proof.dispose()
+    expect(disposal.queryObserversAfterUnmount).toBe(0)
+    expect(disposal.queryEntriesAfterHarnessClear).toBe(0)
     expect(proof.host.isConnected).toBe(false)
     metric({
       family: 'resources',
       fixture: 'message-disposal',
       revision: 2,
-      field: 'remainingQueryEntries',
-      sample: proof.queryClient.getQueryCache().getAll().length,
+      field: 'queryObserversAfterUnmount',
+      sample: disposal.queryObserversAfterUnmount,
       unit: 'count',
       sourceBytes: bytes(source),
       outputMatches: true,
       trial,
-      cacheState: 'disposed real message root; shared renderer caches retained',
+      cacheState:
+        'owned app query observers after React unmount, before harness cache clear; shared renderer caches retained',
+    })
+    metric({
+      family: 'resources',
+      fixture: 'message-disposal',
+      revision: 2,
+      field: 'queryEntriesBeforeHarnessClear',
+      sample: disposal.queryEntriesBeforeClear,
+      unit: 'count',
+      sourceBytes: bytes(source),
+      outputMatches: true,
+      trial,
+      cacheState:
+        'cached entries before explicit harness queryClient.clear; retained inactive cache entries are allowed',
+    })
+    metric({
+      family: 'resources',
+      fixture: 'message-disposal',
+      revision: 2,
+      field: 'queryEntriesAfterHarnessClear',
+      sample: disposal.queryEntriesAfterHarnessClear,
+      unit: 'count',
+      sourceBytes: bytes(source),
+      outputMatches: true,
+      trial,
+      cacheState:
+        'explicit harness queryClient.clear result; does not measure renderer subscriptions',
     })
   }
   metric({
@@ -371,38 +483,12 @@ function latency(
   })
 }
 
-function expectedForSource(source: string, live = false): readonly Expectation[] {
-  const relevantTags = new Set([
-    'p',
-    'strong',
-    'em',
-    'a',
-    'h1',
-    'h2',
-    'h3',
-    'h4',
-    'h5',
-    'h6',
-    'ul',
-    'ol',
-    'li',
-    'blockquote',
-    'table',
-    'thead',
-    'tbody',
-    'tr',
-    'th',
-    'td',
-    'pre',
-    'code',
-    'hr',
-    'input',
-  ])
+function expectedForSource(source: string, live = false): SourceProjection {
+  const relevantTags = new Set(PROJECTION_TAGS)
   const elements = observeHast(renderRemark(source, live)).elements.filter((element) =>
     relevantTags.has(element.tag),
   )
-  const tags = new Set(elements.map((element) => element.tag))
-  return Array.from(tags, (tag) => {
+  const expectations = PROJECTION_TAGS.map((tag) => {
     const matches = elements.filter((element) => element.tag === tag)
     return {
       tag,
@@ -411,6 +497,25 @@ function expectedForSource(source: string, live = false): readonly Expectation[]
       attributes: matches.map((element) => semanticAttributes(element.attributes)),
     }
   })
+  return {
+    expectations,
+    parentPaths: elements.map((element) => ({
+      tag: element.tag,
+      parents: (element.parents ?? []).filter((tag) => relevantTags.has(tag)),
+    })),
+  }
+}
+
+function expectSourceProjection(host: HTMLElement, expected: SourceProjection): void {
+  expect(checkChatExpectations(host, expected.expectations)).toEqual([])
+  const tags = new Set(PROJECTION_TAGS)
+  const parentPaths = observeMarkdownDom(host)
+    .elements.filter((element) => tags.has(element.tag))
+    .map((element) => ({
+      tag: element.tag,
+      parents: (element.parents ?? []).filter((tag) => tags.has(tag)),
+    }))
+  expect(parentPaths).toEqual(expected.parentPaths)
 }
 
 function semanticAttributes(

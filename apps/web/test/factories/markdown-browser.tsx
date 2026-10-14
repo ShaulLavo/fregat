@@ -32,6 +32,12 @@ export type MarkdownPaintReceipt = {
   readonly observation: Observation
 }
 
+type MarkdownDisposalReceipt = {
+  readonly queryObserversAfterUnmount: number
+  readonly queryEntriesBeforeClear: number
+  readonly queryEntriesAfterHarnessClear: number
+}
+
 export async function createMarkdownBrowser({
   width = 720,
   theme = 'dark',
@@ -48,15 +54,26 @@ export async function createMarkdownBrowser({
   host.className = 'bg-background text-foreground font-sans p-4'
   host.dataset.markdownProof = 'true'
   const root = createRoot(host)
-  let disposed = false
+  let disposal: MarkdownDisposalReceipt | null = null
   let revision = 0
   const dispose = () => {
-    if (disposed) return
-    disposed = true
+    if (disposal) return disposal
     flushSync(() => root.unmount())
     host.remove()
+    const queries = queryClient.getQueryCache().getAll()
+    const queryObserversAfterUnmount = queries.reduce(
+      (count, query) => count + query.getObserversCount(),
+      0,
+    )
+    const queryEntriesBeforeClear = queries.length
     queryClient.clear()
     window.getSelection()?.removeAllRanges()
+    disposal = {
+      queryObserversAfterUnmount,
+      queryEntriesBeforeClear,
+      queryEntriesAfterHarnessClear: queryClient.getQueryCache().getAll().length,
+    }
+    return disposal
   }
   onTestFinished(async () => {
     dispose()
@@ -71,7 +88,7 @@ export async function createMarkdownBrowser({
   seedHtmlTheme(theme)
 
   async function updateMessages(messages: readonly ReplayMessage[]): Promise<MarkdownPaintReceipt> {
-    if (disposed) throw createClientInvariantError('Markdown proof was disposed')
+    if (disposal) throw createClientInvariantError('Markdown proof was disposed')
     revision += 1
     const current = revision
     const completion = Promise.withResolvers<number>()

@@ -178,14 +178,15 @@ test('disposed messages stay disposed when their deferred HTML stage resolves', 
   expect(observeMarkdownDom(fresh.message()).text).toBe('Fresh source.')
 })
 
-test('twenty create, stream, replace and dispose cycles leave no message or query cache behind', async () => {
+test('twenty cycles detach message DOM and query observers before harness cache cleanup', async () => {
   for (let cycle = 0; cycle < 20; cycle += 1) {
     const proof = await createMarkdownBrowser()
     await proof.update(`Cycle ${cycle}\n\n**working`, true)
     await proof.update(`Cycle ${cycle}\n\n**done**`, false)
     expect(requiredElement(proof.host, 'strong').textContent).toBe('done')
-    proof.dispose()
-    expect(proof.queryClient.getQueryCache().getAll()).toHaveLength(0)
+    const disposal = proof.dispose()
+    expect(disposal.queryObserversAfterUnmount).toBe(0)
+    expect(disposal.queryEntriesAfterHarnessClear).toBe(0)
     expect(proof.host.isConnected).toBe(false)
   }
   expect(document.querySelectorAll('[data-markdown-proof]')).toHaveLength(0)

@@ -114,8 +114,8 @@ describe('real chat prefix projection', () => {
     expect(emphasis).not.toEqual(strong)
   })
 
-  test.fails.each(BASELINE_DEFECTS)(
-    '$fixtureId/$checkpointId preserves the desired nested streaming semantics',
+  test.each(BASELINE_DEFECTS)(
+    '$fixtureId/$checkpointId records the exact unmet baseline expectation',
     async (defect) => {
       const fixture = MARKDOWN_CASES.find((entry) => entry.id === defect.fixtureId)
       const checkpoint = fixture?.checkpoints.find((entry) => entry.name === defect.checkpointId)
@@ -124,7 +124,22 @@ describe('real chat prefix projection', () => {
       if (!fixture || !checkpoint) return
       const proof = await createMarkdownBrowser()
       await proof.update(fixture.source.slice(0, checkpoint.offset), checkpoint.live)
-      expect(checkChatExpectations(proof.message(), defect.expected)).toEqual([])
+      const findings = checkChatExpectations(proof.message(), defect.expected)
+      expect(findings).toEqual([
+        'strong: expected 1 elements, received 0',
+        'strong[0] text: expected "outside inside", received undefined',
+      ])
+      expect(observeMarkdownDom(proof.message()).text).toBe('**outside inside')
+      console.info(
+        'MARKDOWN_BROWSER_BASELINE_DEFECT ' +
+          JSON.stringify({
+            fixture: fixture.id,
+            checkpoint: checkpoint.name,
+            expected: defect.expected,
+            findings,
+            qualificationPassed: false,
+          }),
+      )
     },
   )
 
@@ -229,7 +244,25 @@ describe('real chat prefix projection', () => {
     expect(codeColors(proof.host)).toEqual(before)
     expect(frames.length).toBeGreaterThan(0)
     expect(frames.every((frame) => frame.code === 'const answer: number = 42')).toBe(true)
-    expect(frames.every((frame) => frame.tokenColors.length > 1)).toBe(true)
+    expect(frames.every((frame) => samePalette(frame.tokenColors, before))).toBe(true)
+  }, 20_000)
+
+  test('the frame palette check rejects a changed color with the same token count', async () => {
+    const proof = await createMarkdownBrowser()
+    await proof.update('```ts\nconst answer: number = 42\n```')
+    await vi.waitFor(() => expect(codeColors(proof.host).length).toBeGreaterThan(1), {
+      timeout: 10_000,
+    })
+    const before = codeColors(proof.host)
+    const token = requiredElement(proof.host, '[data-markdown="code-block-body"] span[style]')
+    token.style.color = 'rgb(1, 2, 3)'
+    const recording = recordMarkdownFrames(proof.host)
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    const frames = recording.stop()
+    expect(frames.length).toBeGreaterThan(0)
+    expect(frames.every((frame) => frame.tokenColors.length === before.length)).toBe(true)
+    expect(frames.every((frame) => samePalette(frame.tokenColors, before))).toBe(false)
   }, 20_000)
 
   test('never paints held heading markers or removes settled prose during release', async () => {
@@ -250,6 +283,12 @@ function codeColors(host: HTMLElement) {
   return Array.from(
     host.querySelectorAll<HTMLElement>('[data-markdown="code-block-body"] span[style]'),
     (span) => getComputedStyle(span).color,
+  )
+}
+
+function samePalette(actual: readonly string[], expected: readonly string[]): boolean {
+  return (
+    actual.length === expected.length && actual.every((color, index) => color === expected[index])
   )
 }
 
