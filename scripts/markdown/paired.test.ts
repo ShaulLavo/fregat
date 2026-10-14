@@ -263,7 +263,7 @@ test('paired bootstrap rejects regression and intervals crossing the frozen budg
       seed: 176,
       resamples: 2048,
     })
-  expect(compare(faster).status).toBe('passed')
+  expect(compare(faster)).toMatchObject({ domain: 'native', build: 'source', status: 'passed' })
   expect(compare(slower).status).toBe('failed')
   expect(compare(ambiguous).status).toBe('inconclusive')
   expect(compare(ambiguous)).toEqual(compare(ambiguous))

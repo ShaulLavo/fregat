@@ -55,6 +55,8 @@ export type NativeTrial = {
   readonly revisions: readonly NativeRevision[]
 }
 export type PairedComparison = {
+  readonly domain: 'native'
+  readonly build: 'source'
   readonly workload: string
   readonly metric: PairedMetric
   readonly independentTrials: number
@@ -257,6 +259,8 @@ export function pairedConfidence(input: {
   if (baseline.length >= frozenBudget.independentPairedTrials && upperMarginMs <= 0)
     status = 'passed'
   return {
+    domain: 'native',
+    build: 'source',
     workload: input.workload,
     metric: input.metric,
     independentTrials: baseline.length,

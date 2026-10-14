@@ -4,13 +4,23 @@ import net from 'node:net'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { baselineRows, inspectCandidate, promotionVerdict } from './report'
+import {
+  createTrustedPromotionContext,
+  evaluatePromotion,
+  frozenBudgetSha256,
+  verifyPromotionArtifacts,
+  type TrustedPromotionContext,
+} from './promotion'
+import { errorMessage } from '../../packages/contracts/src/error-fields'
 import { qualificationProvenance } from './provenance'
 import { inspectRasterEvidence } from './raster'
+import { compareRasterEvidence } from './paired-raster'
 import { createScriptError } from '../structured-errors'
 
 const ROOT = path.resolve(import.meta.dirname, '../..')
 const SUITES = ['parity', 'stream', 'visual', 'bench', 'qualify'] as const
 type Suite = (typeof SUITES)[number]
+export type QualificationMode = 'baseline' | 'candidate' | 'paired'
 
 type TestRun = {
   readonly name: string
@@ -26,11 +36,20 @@ type TestRun = {
 async function main() {
   const { positionals, values } = parseArgs({
     allowPositionals: true,
-    options: { out: { type: 'string' }, baseline: { type: 'boolean' }, help: { type: 'boolean' } },
+    options: {
+      out: { type: 'string' },
+      baseline: { type: 'boolean' },
+      candidate: { type: 'boolean' },
+      'inspect-only': { type: 'boolean' },
+      'promotion-receipts': { type: 'string' },
+      'evaluation-receipt': { type: 'string' },
+      'evaluation-ledger': { type: 'string' },
+      help: { type: 'boolean' },
+    },
   })
   if (values.help) {
     process.stdout.write(
-      'bun scripts/markdown/qualify.ts parity|stream|visual|bench|qualify --out DIRECTORY [--baseline]\nBaseline reports preserve known defects. Qualification exits nonzero until candidate and evaluation gates pass.\n',
+      'bun scripts/markdown/qualify.ts parity|stream|visual|bench|qualify --out DIRECTORY [--baseline|--candidate] [--inspect-only] [--promotion-receipts JSON --evaluation-receipt JSON --evaluation-ledger DIRECTORY]\nDefault runs paired engines. Availability inspection executes actual native/adapter probes; readiness requires complete trusted promotion receipts. Native source timings remain exploratory.\n',
     )
     return
   }
@@ -39,21 +58,38 @@ async function main() {
     throw createScriptError('Choose a Markdown suite and --out DIRECTORY.', {
       internal: { arguments: positionals.length },
     })
+  const mode = qualificationMode(values)
   const output = path.resolve(values.out)
   await mkdir(output, { recursive: true })
   const rows = baselineRows()
   await writeFile(path.join(output, 'baseline-checks.json'), `${JSON.stringify(rows, null, 2)}\n`)
   const candidate = await inspectCandidate(ROOT)
   const provenance = await qualificationProvenance(ROOT)
-  const runs = await runSuites(suite, output)
+  const runs = values['inspect-only'] ? [] : await runSuites(suite, output, mode)
   const browser = runs.some((run) => run.name.startsWith('browser-'))
-  const promotion = promotionVerdict(rows, browser)
+  const evaluated = await suppliedPromotion({
+    receipts: values['promotion-receipts'],
+    evaluationReceipt: values['evaluation-receipt'],
+    evaluationLedger: values['evaluation-ledger'],
+  })
+  const promotion = promotionVerdict(rows, browser, {
+    candidate,
+    promotion: evaluated,
+    executionFailures: runs
+      .filter((run) => run.exitCode !== 0)
+      .map((run) => `${run.name}: required execution failed or produced no executed cases.`),
+  })
   const report = {
     schemaVersion: 1,
     suite,
     generatedAt: new Date().toISOString(),
-    scope: values.baseline ? 'baseline' : 'qualification',
-    candidate,
+    scope: mode,
+    testExecution: values['inspect-only'] ? 'NOT_EXECUTED' : 'EXECUTED',
+    candidate: {
+      ...candidate,
+      status: promotion.verdict === 'VERIFIED' ? 'verified' : candidate.status,
+    },
+    gateEvidence: evaluated,
     provenance,
     promotion,
     runs,
@@ -63,56 +99,88 @@ async function main() {
   process.stdout.write(
     `${JSON.stringify({ evidence: output, verdict: promotion.verdict, checks: promotion.counts, testRuns: runs.map(({ name, exitCode, tests }) => ({ name, exitCode, tests })) })}\n`,
   )
-  process.exitCode = failedRuns || !values.baseline ? 1 : 0
+  process.exitCode = failedRuns || (mode !== 'baseline' && promotion.verdict !== 'VERIFIED') ? 1 : 0
 }
 
-async function runSuites(suite: Suite, output: string): Promise<TestRun[]> {
+async function runSuites(
+  suite: Suite,
+  output: string,
+  mode: QualificationMode,
+): Promise<TestRun[]> {
   const runs: TestRun[] = []
-  if (suite === 'parity' || suite === 'stream' || suite === 'qualify') {
-    const filter = suite === 'stream' ? 'qualification-stream' : 'qualification'
-    runs.push(await runTests('package', 'packages/markdown', ['--project', 'node', filter], output))
-  }
-  if (suite === 'visual' || suite === 'stream' || suite === 'bench' || suite === 'qualify') {
-    const filter = browserFilter(suite)
-    runs.push(
-      await runTests(
-        `browser-${suite}`,
-        'apps/web',
-        ['--config', 'vitest.browser.config.ts', filter],
-        output,
-        true,
-      ),
-    )
+  for (const plan of qualificationTestPlan(suite, mode)) {
+    runs.push(await runTests(plan.name, plan.directory, plan.flags, output, plan.browser))
   }
   if (suite === 'bench' || suite === 'qualify') {
-    const { runMarkdownBenchmarks } = await import('./bench')
-    const log = runs.find((run) => run.name.startsWith('browser-'))?.log
-    const browserLog = log ? await readFile(log, 'utf8') : undefined
-    const report = await runMarkdownBenchmarks({ mode: 'quick', browserLog })
-    const { rawSamples, ...summary } = report
-    await writeFile(path.join(output, 'benchmark.json'), `${JSON.stringify(summary, null, 2)}\n`)
-    await writeFile(
-      path.join(output, 'raw-samples.jsonl'),
-      rawSamples.map((sample) => JSON.stringify(sample)).join('\n') + '\n',
-    )
-    if (report.families.some((family) => family.status === 'FAILED')) {
-      runs.push({
-        name: 'benchmark-output',
-        exitCode: 1,
-        tests: report.rawSamples.length,
-        passed: 0,
-        failed: 1,
-        pending: 0,
-        todo: 0,
-        log: path.join(output, 'benchmark.json'),
-      })
+    if (mode !== 'baseline') {
+      const { runPairedNative } = await import('./paired-native')
+      const report = await runPairedNative({ mode: 'quick' })
+      await writeFile(
+        path.join(output, 'paired-native.json'),
+        `${JSON.stringify(report, null, 2)}\n`,
+      )
+      if (report.status === 'FAILED')
+        runs.push({
+          name: 'paired-native-output',
+          exitCode: 1,
+          tests: report.workloads.reduce((sum, entry) => sum + entry.pairs.length, 0),
+          passed: 0,
+          failed: 1,
+          pending: 0,
+          todo: 0,
+          log: path.join(output, 'paired-native.json'),
+        })
+    } else {
+      const { runMarkdownBenchmarks } = await import('./bench')
+      const browserLog = await browserLogs(runs)
+      const report = await runMarkdownBenchmarks({ mode: 'quick', browserLog })
+      const { rawSamples, ...summary } = report
+      await writeFile(path.join(output, 'benchmark.json'), `${JSON.stringify(summary, null, 2)}\n`)
+      await writeFile(
+        path.join(output, 'raw-samples.jsonl'),
+        rawSamples.map((sample) => JSON.stringify(sample)).join('\n') + '\n',
+      )
+      if (report.families.some((family) => family.status === 'FAILED'))
+        runs.push({
+          name: 'benchmark-output',
+          exitCode: 1,
+          tests: report.rawSamples.length,
+          passed: 0,
+          failed: 1,
+          pending: 0,
+          todo: 0,
+          log: path.join(output, 'benchmark.json'),
+        })
     }
   }
   if (suite === 'visual' || suite === 'qualify') {
-    const log = runs.find((run) => run.name.startsWith('browser-'))?.log
-    const raster = await inspectRasterEvidence(log ? await readFile(log, 'utf8') : '', ROOT, output)
+    const raster = await inspectRasterEvidence(await browserLogs(runs), ROOT, output)
     await writeFile(path.join(output, 'raster.json'), `${JSON.stringify(raster, null, 2)}\n`)
-    const completeMatrix = raster.images.length === 128 && raster.calibration.length === 4
+    if (mode !== 'baseline') {
+      const paired = await compareRasterEvidence(
+        await engineBrowserLog(runs, 'remark'),
+        await engineBrowserLog(runs, 'tree-sitter'),
+        ROOT,
+        output,
+      )
+      await writeFile(
+        path.join(output, 'paired-raster.json'),
+        `${JSON.stringify(paired, null, 2)}\n`,
+      )
+      runs.push({
+        name: 'paired-raster',
+        exitCode: paired.status === 'passed' ? 0 : 1,
+        tests: paired.compared.length,
+        passed: paired.compared.filter((pair) => pair.status === 'passed').length,
+        failed: paired.status === 'passed' ? 0 : 1,
+        pending: 0,
+        todo: 0,
+        log: path.join(output, 'paired-raster.json'),
+      })
+    }
+    const engines = mode === 'baseline' ? 1 : 2
+    const completeMatrix =
+      raster.images.length === 128 * engines && raster.calibration.length === 4 * engines
     runs.push({
       name: 'raster-controls',
       exitCode: raster.status === 'passed' && completeMatrix ? 0 : 1,
@@ -127,6 +195,113 @@ async function runSuites(suite: Suite, output: string): Promise<TestRun[]> {
     })
   }
   return runs
+}
+
+export function qualificationMode(values: {
+  readonly baseline?: boolean
+  readonly candidate?: boolean
+}): QualificationMode {
+  if (values.baseline && values.candidate)
+    throw createScriptError('Choose one explicit Markdown engine mode.', {
+      internal: { argument: 'baseline or candidate' },
+    })
+  if (values.baseline) return 'baseline'
+  if (values.candidate) return 'candidate'
+  return 'paired'
+}
+
+export function qualificationTestPlan(suite: Suite, mode: QualificationMode) {
+  const engines =
+    mode === 'paired' ? ['remark', 'tree-sitter'] : [mode === 'baseline' ? 'remark' : 'tree-sitter']
+  const selected =
+    mode === 'candidate' && (suite === 'visual' || suite === 'qualify')
+      ? ['remark', 'tree-sitter']
+      : engines
+  return selected.flatMap((engine) => {
+    const plans: { name: string; directory: string; flags: string[]; browser: boolean }[] = []
+    if (suite === 'parity' || suite === 'stream' || suite === 'qualify') {
+      const flags =
+        engine === 'tree-sitter'
+          ? ['--project', 'node', 'qualification-candidate']
+          : [
+              '--project',
+              'node',
+              suite === 'stream' ? 'qualification-stream' : 'qualification',
+              '--exclude',
+              '**/qualification-candidate.test.ts',
+            ]
+      plans.push({
+        name: `package-${engine}`,
+        directory: 'packages/markdown',
+        flags,
+        browser: false,
+      })
+    }
+    if (suite === 'visual' || suite === 'stream' || suite === 'bench' || suite === 'qualify')
+      plans.push({
+        name: `browser-${engine}-${suite}`,
+        directory: 'apps/web',
+        flags: [
+          '--config',
+          'vitest.markdown-qualification.config.ts',
+          '--mode',
+          engine === 'tree-sitter' ? 'candidate' : 'baseline',
+          browserFilter(suite),
+        ],
+        browser: true,
+      })
+    return plans
+  })
+}
+
+async function browserLogs(runs: readonly TestRun[]) {
+  return (
+    await Promise.all(
+      runs.filter((run) => run.name.startsWith('browser-')).map((run) => readFile(run.log, 'utf8')),
+    )
+  ).join('\n')
+}
+
+async function engineBrowserLog(runs: readonly TestRun[], engine: 'remark' | 'tree-sitter') {
+  return (
+    await Promise.all(
+      runs
+        .filter((run) => run.name.startsWith(`browser-${engine}-`))
+        .map((run) => readFile(run.log, 'utf8')),
+    )
+  ).join('\n')
+}
+
+async function suppliedPromotion(options: {
+  readonly receipts?: string
+  readonly evaluationReceipt?: string
+  readonly evaluationLedger?: string
+}) {
+  const missing = {
+    verdict: 'NOT VERIFIED' as const,
+    gates: [],
+    findings: ['Trusted complete promotion receipts have not been supplied.'],
+  }
+  if (!options.receipts) return missing
+  try {
+    const directory = path.dirname(path.resolve(options.receipts))
+    const input: unknown = JSON.parse(await readFile(options.receipts, 'utf8'))
+    const artifacts = await verifyPromotionArtifacts(input, directory)
+    let context: TrustedPromotionContext | undefined
+    if (options.evaluationReceipt && options.evaluationLedger)
+      context = await createTrustedPromotionContext({
+        root: ROOT,
+        evaluationReceipt: path.resolve(options.evaluationReceipt),
+        evaluationLedger: path.resolve(options.evaluationLedger),
+        evidenceDirectory: directory,
+      })
+    return evaluatePromotion(input, await frozenBudgetSha256(), artifacts, context)
+  } catch (failure) {
+    return {
+      ...missing,
+      findings: [`Trusted promotion evidence could not be established: ${errorMessage(failure)}`],
+    }
+  }
 }
 
 function browserFilter(suite: Suite): string {
