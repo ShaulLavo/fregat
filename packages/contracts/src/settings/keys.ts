@@ -510,6 +510,11 @@ export const SETTINGS_REGISTRY = {
     default: false,
     scope: 'application',
   }),
+  'terminal.integrated.showOutputTiming': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+  }),
   'editor.inactiveAnalysisEntryLimit': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(Number.MAX_SAFE_INTEGER)),
     default: 2,

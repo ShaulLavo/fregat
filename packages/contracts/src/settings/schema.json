@@ -1505,6 +1505,12 @@
       "minimum": 0,
       "type": "integer"
     },
+    "terminal.integrated.showOutputTiming": {
+      "default": false,
+      "description": "Show how long the last output took: from your input to the first output, from the first output to the last, and then until it was drawn and shown on screen.",
+      "markdownDescription": "Show how long the last output took: from your input to the first output, from the first output to the last, and then until it was drawn and shown on screen.\n\nOutput that pauses for 100 ms counts as finished. Shown is when the browser finished the page update that carries the drawn frame; the display picks it up at its next refresh.",
+      "type": "boolean"
+    },
     "terminal.shellKeys": {
       "default": false,
       "description": "Send Ctrl+letter and readline Alt shortcuts to the focused terminal shell.",
