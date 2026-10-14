@@ -38,12 +38,18 @@ export async function installedTypeScriptRuntimeFixture(
 
 export async function typescriptRuntimeFixture(files: Readonly<Record<string, string>> = {}) {
   const root = await watchableTempDirectory('platform-typescript-runtime-')
-  for (const [relativePath, contents] of Object.entries(files)) {
-    const filePath = path.join(root, relativePath)
-    await mkdir(path.dirname(filePath), { recursive: true })
-    await writeFile(filePath, contents)
+  const dispose = () => rm(path.dirname(root), { recursive: true, force: true })
+  try {
+    for (const [relativePath, contents] of Object.entries(files)) {
+      const filePath = path.join(root, relativePath)
+      await mkdir(path.dirname(filePath), { recursive: true })
+      await writeFile(filePath, contents)
+    }
+    return { root, dispose }
+  } catch (cause) {
+    await dispose()
+    throw cause
   }
-  return { root, dispose: () => rm(path.dirname(root), { recursive: true, force: true }) }
 }
 
 /**
