@@ -6,6 +6,8 @@ import {
   checkChatExpectations,
   createMarkdownBrowser,
   observeMarkdownDom,
+  observeMarkdownSemantics,
+  readyForScreenshot,
   recordMarkdownFrames,
   requiredElement,
 } from '../../../../test/factories/markdown-browser'
@@ -15,11 +17,46 @@ import {
   type Checkpoint,
 } from '../../../../../../packages/markdown/test/fixtures/cases'
 
-const streamCases = MARKDOWN_CASES.filter((fixture) => fixture.checkpoints.length > 0).slice(0, 32)
+const STREAM_CASE_IDS: readonly string[] = [
+  'plain-paragraph',
+  'two-paragraphs',
+  'soft-line-break',
+  'hard-space-break',
+  'hard-backslash-break',
+  'atx-heading',
+  'setext-heading',
+  'setext-second-level',
+  'strong-emphasis',
+  'italic-emphasis',
+  'nested-emphasis',
+  'escaped-markers',
+  'decoded-entities',
+  'inline-code',
+  'inline-code-backticks',
+  'direct-link',
+  'link-title',
+  'link-emphasis',
+  'link-parentheses',
+  'reference-late',
+  'unordered-list',
+  'ordered-start',
+  'nested-list',
+  'task-list',
+  'quoted-paragraph',
+  'nested-quote',
+  'fenced-typescript',
+  'fence-metadata',
+  'fenced-whitespace',
+  'fence-literal-markdown',
+  'simple-table',
+  'hebrew-rtl',
+]
+const streamCases = MARKDOWN_CASES.filter((fixture) => STREAM_CASE_IDS.includes(fixture.id))
 
 describe('real chat prefix projection', () => {
   test('retains the full small streaming fixture denominator', () => {
     expect(streamCases).toHaveLength(32)
+    expect(streamCases.every((fixture) => fixture.checkpoints.length > 0)).toBe(true)
   })
 
   test.each(streamCases)(
@@ -48,15 +85,34 @@ describe('real chat prefix projection', () => {
       await vi.waitFor(() =>
         expect(checkChatExpectations(proof.message(), fixture.expected)).toEqual([]),
       )
-      const streamed = observeMarkdownDom(proof.message())
+      await readyForScreenshot(proof.message())
+      const streamed = observeMarkdownSemantics(proof.message())
       const fresh = await createMarkdownBrowser()
       await fresh.update(fixture.source, false)
       await vi.waitFor(() =>
         expect(checkChatExpectations(fresh.message(), fixture.expected)).toEqual([]),
       )
-      expect(observeMarkdownDom(fresh.message()).text).toBe(streamed.text)
+      await readyForScreenshot(fresh.message())
+      expect(observeMarkdownSemantics(fresh.message())).toEqual(streamed)
     },
+    30_000,
   )
+
+  test('equal displayed text still detects changed destinations and nesting', async () => {
+    const proof = await createMarkdownBrowser()
+    await proof.update('[same label](https://example.com/first)')
+    const first = observeMarkdownSemantics(proof.message())
+    await proof.update('[same label](https://example.com/second)')
+    const second = observeMarkdownSemantics(proof.message())
+    expect(second.text).toBe(first.text)
+    expect(second).not.toEqual(first)
+    await proof.update('**same label**')
+    const strong = observeMarkdownSemantics(proof.message())
+    await proof.update('*same label*')
+    const emphasis = observeMarkdownSemantics(proof.message())
+    expect(emphasis.text).toBe(strong.text)
+    expect(emphasis).not.toEqual(strong)
+  })
 
   test.fails.each(BASELINE_DEFECTS)(
     '$fixtureId/$checkpointId preserves the desired nested streaming semantics',
