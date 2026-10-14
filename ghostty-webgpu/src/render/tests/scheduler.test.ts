@@ -84,7 +84,41 @@ describe('RenderScheduler', () => {
     clock.takeFrame()()
     expect(frames).toHaveLength(2)
     scheduler.scheduleWrite()
+    expect(frames).toHaveLength(2)
+
+    clock.takeFrame()()
+    clock.takeFrame()()
     expect(frames).toHaveLength(3)
+    clock.takeFrame()()
+    expect(clock.frames.size).toBe(0)
+    scheduler.scheduleWrite()
+    expect(frames).toHaveLength(4)
+  })
+
+  it('reports an immediate paint failure after the write returns', async () => {
+    const clock = new FakeClock()
+    const failure = new TypeError('paint failed')
+    const scheduler = new RenderScheduler({
+      clock,
+      onFrame: () => {
+        throw failure
+      },
+      presentation: 'immediate',
+    })
+    const reported = new Promise<unknown>((resolve) => {
+      const original = globalThis.queueMicrotask
+      globalThis.queueMicrotask = (callback) => {
+        globalThis.queueMicrotask = original
+        try {
+          callback()
+        } catch (cause) {
+          resolve(cause)
+        }
+      }
+    })
+
+    expect(() => scheduler.scheduleWrite()).not.toThrow()
+    await expect(reported).resolves.toBe(failure)
   })
 
   it('skips immediate paints while hidden and cancels the frame reset on dispose', () => {
@@ -102,6 +136,7 @@ describe('RenderScheduler', () => {
     expect(clock.frames.size).toBe(0)
 
     scheduler.setDocumentVisible(true)
+    clock.takeFrame()()
     clock.takeFrame()()
     frames.length = 0
     scheduler.scheduleWrite()

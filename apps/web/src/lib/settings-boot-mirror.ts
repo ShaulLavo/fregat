@@ -111,6 +111,7 @@ const MIRRORED_KEYS = [
   'terminal.integrated.fontSize',
   'terminal.integrated.cursorBlinking',
   'terminal.integrated.scrollback',
+  'terminal.integrated.lowLatencyRendering',
   'workbench.theme',
   'workbench.theme.customizations',
   'workbench.palette',

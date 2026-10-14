@@ -9,7 +9,7 @@ export interface RenderFrameState {
   cursorVisible: boolean
 }
 
-/** `immediate` paints the first write of each display frame synchronously; later writes in that frame join the next one. */
+/** `immediate` paints a write synchronously unless a paint already landed this display frame; those writes join the next one. */
 export type TerminalPresentation = 'frame' | 'immediate'
 
 export interface RenderSchedulerOptions {
@@ -80,17 +80,22 @@ export class RenderScheduler {
     this.frameHandle = handle
   }
 
-  /** Schedules output; immediate presentation paints at most once per display frame before batching. */
+  /** Schedules output; immediate presentation paints now unless a paint already landed this display frame. */
   scheduleWrite(): void {
     if (!this.immediate || this.immediateResetHandle !== undefined) {
       this.schedule()
       return
     }
     if (!this.canPaint) return
-    this.immediateResetHandle = this.clock.requestFrame(() => {
-      this.immediateResetHandle = undefined
-    })
-    this.flush()
+    this.armImmediateReset()
+    try {
+      this.flush()
+    } catch (cause) {
+      // Paint failures surface as they do from a frame callback; the caller's write already landed.
+      queueMicrotask(() => {
+        throw cause
+      })
+    }
   }
 
   /** Flushes now; a flush during paint runs after the active frame callback completes. */
@@ -185,7 +190,15 @@ export class RenderScheduler {
     if (this.disposed) return
     if (token !== this.frameToken) return
     this.frameHandle = undefined
+    this.armImmediateReset()
     this.deliverFrames()
+  }
+
+  private armImmediateReset(): void {
+    if (!this.immediate || this.immediateResetHandle !== undefined) return
+    this.immediateResetHandle = this.clock.requestFrame(() => {
+      this.immediateResetHandle = undefined
+    })
   }
 
   private deliverFrames(): void {

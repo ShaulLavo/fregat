@@ -28,7 +28,9 @@ async function openTerminal(options: GhosttyWebGpuTerminalOptions): Promise<Term
   terminals.push(terminal)
   await terminal.open(host)
   await expect.poll(() => terminal.hasPendingFrame).toBe(false)
-  await new Promise((resolve) => requestAnimationFrame(resolve))
+  // The settled paint keeps immediate writes batched until the following frame.
+  for (let frame = 0; frame < 2; frame += 1)
+    await new Promise((resolve) => requestAnimationFrame(resolve))
   return terminal
 }
 

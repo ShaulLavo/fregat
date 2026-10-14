@@ -139,7 +139,7 @@ export class RowTerminalRenderer {
     this.scheduler.schedule()
   }
 
-  /** The browser honoured a low-latency (desynchronized) context. */
+  /** The context reports the low-latency `desynchronized` attribute. */
   get desynchronized(): boolean {
     return false
   }

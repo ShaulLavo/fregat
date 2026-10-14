@@ -70,7 +70,7 @@ function cursorEquals(left: RenderCursorSnapshot, right: RenderCursorSnapshot): 
 
 export class WebGlTerminalRenderer {
   readonly backend = 'webgl2' as const
-  /** The browser honoured a low-latency (desynchronized) context. */
+  /** The context reports the low-latency `desynchronized` attribute. */
   readonly desynchronized: boolean
   readonly metrics: RendererMetrics = {
     zigFrames: 0,

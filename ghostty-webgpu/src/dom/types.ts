@@ -89,7 +89,7 @@ export interface GhosttyWebGpuTerminalDiagnostics {
   readonly pointerOwner: TerminalPointerOwner
   readonly pressedButtonCount: number
   readonly rendererBackend: 'dom' | 'canvas2d' | 'webgl2' | 'webgpu' | undefined
-  /** The renderer's canvas presents without waiting for the browser's compositor. */
+  /** The renderer's context reports `desynchronized`; the browser may still composite it. */
   readonly desynchronized: boolean
   readonly scrollbarVisible: boolean
 }
