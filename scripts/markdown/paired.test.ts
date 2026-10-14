@@ -3,6 +3,7 @@ import { expect, test } from 'vitest'
 import { createMarkdownSession } from '../../packages/markdown/src/utils/session'
 import {
   digestProjection,
+  inspectSourceCorrespondence,
   mismatchedRevisions,
   nativePairWorkloads,
   pairedConfidence,
@@ -60,6 +61,192 @@ test('complete HAST digests preserve nesting, destinations and every ordered chi
   expect(digestProjection(root)).toBe(digestProjection(reordered))
   expect(digestProjection(root)).not.toBe(digestProjection(changed))
   expect(digestProjection(root)).not.toBe(digestProjection({ type: 'root', children: [] }))
+})
+
+test('private text segmentation and container padding preserve exact rendered semantics', () => {
+  const source = '| cell |'
+  const content = {
+    start: { line: 1, column: 3, offset: 2 },
+    end: { line: 1, column: 7, offset: 6 },
+  }
+  const wide: Root = {
+    type: 'root',
+    children: [
+      {
+        type: 'element',
+        tagName: 'th',
+        properties: { dataSourceLine: 1, dataSourceEndLine: 1, style: 'text-align: right' },
+        position: {
+          start: { line: 1, column: 1, offset: 0 },
+          end: { line: 1, column: 9, offset: 8 },
+        },
+        children: [{ type: 'text', value: 'cell', position: content }],
+      },
+    ],
+  }
+  const narrow: Root = {
+    type: 'root',
+    children: [
+      {
+        type: 'element',
+        tagName: 'th',
+        properties: { dataSourceLine: 1, dataSourceEndLine: 1, style: 'text-align: right' },
+        position: content,
+        children: [
+          {
+            type: 'text',
+            value: 'ce',
+            position: { start: content.start, end: { line: 1, column: 5, offset: 4 } },
+          },
+          {
+            type: 'text',
+            value: 'll',
+            position: { start: { line: 1, column: 5, offset: 4 }, end: content.end },
+          },
+        ],
+      },
+    ],
+  }
+  expect(digestProjection(wide)).toBe(digestProjection(narrow))
+  const wideSource = inspectSourceCorrespondence(wide, source)
+  const narrowSource = inspectSourceCorrespondence(narrow, source)
+  expect(wideSource.sourceCoordinateFailures).toEqual([])
+  expect(narrowSource.sourceCoordinateFailures).toEqual([])
+  expect(wideSource.sourceCoordinatesDigest).not.toBe(narrowSource.sourceCoordinatesDigest)
+  const misplaced: Root = {
+    type: 'root',
+    children: [
+      {
+        type: 'element',
+        tagName: 'th',
+        properties: { dataSourceLine: 2, dataSourceEndLine: 2 },
+        position: content,
+        children: [{ type: 'text', value: 'cell' }],
+      },
+    ],
+  }
+  expect(digestProjection(wide)).not.toBe(digestProjection(misplaced))
+  expect(inspectSourceCorrespondence(misplaced, source).sourceCoordinateFailures).not.toEqual([])
+})
+
+test('canonical projection retains whitespace, ordered nesting, list starts and table alignment', () => {
+  const text = (value: string): Root => ({ type: 'root', children: [{ type: 'text', value }] })
+  expect(digestProjection(text('x\n y'))).not.toBe(digestProjection(text('x y')))
+  const structure = (tagName: string, start: number, alignment: string): Root => ({
+    type: 'root',
+    children: [
+      {
+        type: 'element',
+        tagName,
+        properties: { start },
+        children: [
+          {
+            type: 'element',
+            tagName: 'td',
+            properties: { align: alignment },
+            children: [{ type: 'text', value: 'x' }],
+          },
+        ],
+      },
+    ],
+  })
+  expect(digestProjection(structure('ol', 3, 'right'))).not.toBe(
+    digestProjection(structure('ul', 3, 'right')),
+  )
+  expect(digestProjection(structure('ol', 3, 'right'))).not.toBe(
+    digestProjection(structure('ol', 4, 'right')),
+  )
+  expect(digestProjection(structure('ol', 3, 'right'))).not.toBe(
+    digestProjection(structure('ol', 3, 'left')),
+  )
+  const reversed: Root = {
+    type: 'root',
+    children: [
+      {
+        type: 'element',
+        tagName: 'em',
+        properties: {},
+        children: [
+          {
+            type: 'element',
+            tagName: 'strong',
+            properties: {},
+            children: [{ type: 'text', value: 'x' }],
+          },
+        ],
+      },
+    ],
+  }
+  const original: Root = {
+    type: 'root',
+    children: [
+      {
+        type: 'element',
+        tagName: 'strong',
+        properties: {},
+        children: [
+          {
+            type: 'element',
+            tagName: 'em',
+            properties: {},
+            children: [{ type: 'text', value: 'x' }],
+          },
+        ],
+      },
+    ],
+  }
+  expect(digestProjection(original)).not.toBe(digestProjection(reversed))
+})
+
+test('UTF-16 source coordinates are validated separately, including CRLF and generated healing', () => {
+  const root: Root = {
+    type: 'root',
+    children: [
+      {
+        type: 'text',
+        value: 'a',
+        position: {
+          start: { line: 2, column: 1, offset: 4 },
+          end: { line: 2, column: 2, offset: 5 },
+        },
+      },
+    ],
+  }
+  expect(inspectSourceCorrespondence(root, '😀\r\na').sourceCoordinateFailures).toEqual([])
+  expect(inspectSourceCorrespondence(root, '😀\r\n').sourceCoordinateFailures).not.toEqual([])
+  const wrongColumn: Root = {
+    type: 'root',
+    children: [
+      {
+        type: 'text',
+        value: 'a',
+        position: {
+          start: { line: 2, column: 2, offset: 4 },
+          end: { line: 2, column: 2, offset: 5 },
+        },
+      },
+    ],
+  }
+  expect(inspectSourceCorrespondence(wrongColumn, '😀\r\na').sourceCoordinateFailures).not.toEqual(
+    [],
+  )
+  const healed = runNativeTrial({
+    factory: () => createMarkdownSession(),
+    engine: 'remark',
+    trial: 0,
+    workload: {
+      id: 'healed-strong',
+      source: '**open',
+      sourceBytes: 6,
+      shape: 'healed-strong',
+      family: 'streaming-replay',
+      scheduleUnits: 2,
+    },
+    extensions: { raw: null, math: null },
+  })
+  expect(healed.revisions.every((revision) => revision.sourceCoordinateFailures.length === 0)).toBe(
+    true,
+  )
 })
 
 test('paired bootstrap rejects regression and intervals crossing the frozen budget', () => {
@@ -129,11 +316,20 @@ test('retained old output, skipped revisions and changed coverage fail pair comp
     convertedBlocks: 1,
     reusedBlocks: 0,
     outputDigest: 'new',
+    sourceCoordinatesDigest: 'coordinates',
+    sourceCoordinateFailures: [],
+    positionedNodes: 1,
     unchangedProjection: false,
   }
   expect(mismatchedRevisions([revision], [{ ...revision, outputDigest: 'old' }])).toEqual([0])
   expect(mismatchedRevisions([revision], [])).toEqual([0])
   expect(mismatchedRevisions([revision], [{ ...revision, revision: 1 }])).toEqual([0])
+  expect(
+    mismatchedRevisions(
+      [revision],
+      [{ ...revision, sourceCoordinateFailures: ['Invalid source mapping'] }],
+    ),
+  ).toEqual([0])
   expect(mismatchedRevisions([revision], [{ ...revision, offset: 9 }])).toEqual([0])
   expect(mismatchedRevisions([revision], [{ ...revision, phase: 'settlement' }])).toEqual([0])
 })

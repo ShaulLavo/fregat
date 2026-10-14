@@ -42,6 +42,9 @@ export type NativeRevision = {
   readonly convertedBlocks: number
   readonly reusedBlocks: number
   readonly outputDigest: string
+  readonly sourceCoordinatesDigest: string
+  readonly sourceCoordinateFailures: readonly string[]
+  readonly positionedNodes: number
   readonly unchangedProjection: boolean
 }
 export type NativeTrial = {
@@ -92,8 +95,133 @@ export function pairedTrialOrders(count: number, seed: number): PairOrder[] {
   })
 }
 
+type ProjectionNode = Root['children'][number]
+type RenderedNode =
+  | {
+      readonly type: 'element'
+      readonly tagName: string
+      readonly properties: unknown
+      readonly children: readonly RenderedNode[]
+    }
+  | { readonly type: 'text' | 'comment' | 'raw'; readonly value: string }
+  | { readonly type: 'doctype' }
+
 export function digestProjection(root: Root): string {
-  return digest(JSON.stringify(orderedValue(root)))
+  return digest(JSON.stringify(canonicalProjection(root)))
+}
+
+export function canonicalProjection(root: Root) {
+  return { type: 'root', children: renderedChildren(root.children) }
+}
+
+function renderedChildren(children: readonly ProjectionNode[]): RenderedNode[] {
+  const observed: RenderedNode[] = []
+  for (const child of children) {
+    const node = renderedNode(child)
+    const prior = observed.at(-1)
+    if (node.type === 'text' && prior?.type === 'text') {
+      observed[observed.length - 1] = { type: 'text', value: prior.value + node.value }
+      continue
+    }
+    observed.push(node)
+  }
+  return observed
+}
+
+function renderedNode(node: ProjectionNode): RenderedNode {
+  if (node.type === 'element')
+    return {
+      type: 'element',
+      tagName: node.tagName,
+      properties: orderedValue(node.properties),
+      children: renderedChildren(node.children),
+    }
+  if (node.type === 'doctype') return { type: 'doctype' }
+  return { type: node.type, value: node.value }
+}
+
+export function inspectSourceCorrespondence(root: Root, source: string) {
+  const lines = sourceLineStarts(source)
+  const coordinates: unknown[] = []
+  const failures: string[] = []
+  inspectNodeSource(root, 'root', source.length, lines, coordinates, failures)
+  return {
+    sourceCoordinatesDigest: digest(JSON.stringify(coordinates)),
+    sourceCoordinateFailures: failures,
+    positionedNodes: coordinates.length,
+  }
+}
+
+function inspectNodeSource(
+  node: Root | ProjectionNode,
+  path: string,
+  units: number,
+  lines: readonly number[],
+  coordinates: unknown[],
+  failures: string[],
+) {
+  const position = node.position
+  if (position) {
+    coordinates.push({ path, type: node.type, position })
+    checkPoint(position.start, `${path}.start`, units, lines, failures)
+    checkPoint(position.end, `${path}.end`, units, lines, failures)
+    if (
+      position.start.offset !== undefined &&
+      position.end.offset !== undefined &&
+      position.end.offset < position.start.offset
+    )
+      failures.push(`${path}: reversed source bounds.`)
+  }
+  if (node.type === 'element') checkSourceLines(node, path, failures)
+  if (!('children' in node)) return
+  for (const [index, child] of node.children.entries())
+    inspectNodeSource(child, `${path}.${index}`, units, lines, coordinates, failures)
+}
+
+function checkPoint(
+  point: NonNullable<ProjectionNode['position']>['start'],
+  path: string,
+  units: number,
+  lines: readonly number[],
+  failures: string[],
+) {
+  const offset = point.offset
+  if (offset === undefined || !Number.isSafeInteger(offset) || offset < 0 || offset > units) {
+    failures.push(`${path}: source offset is absent or outside projection text.`)
+    return
+  }
+  let low = 0
+  let high = lines.length
+  while (low + 1 < high) {
+    const middle = Math.floor((low + high) / 2)
+    if (lines[middle] <= offset) low = middle
+    else high = middle
+  }
+  if (point.line !== low + 1 || point.column !== offset - lines[low] + 1)
+    failures.push(`${path}: UTF-16 offset disagrees with its source line or column.`)
+}
+
+function checkSourceLines(
+  node: Extract<ProjectionNode, { type: 'element' }>,
+  path: string,
+  failures: string[],
+) {
+  const start = node.properties.dataSourceLine
+  const end = node.properties.dataSourceEndLine
+  if (start === undefined && end === undefined) return
+  if (!node.position || start !== node.position.start.line || end !== node.position.end.line)
+    failures.push(`${path}: published source-line mapping disagrees with node coordinates.`)
+}
+
+function sourceLineStarts(source: string) {
+  const starts = [0]
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index]
+    if (character !== '\r' && character !== '\n') continue
+    if (character === '\r' && source[index + 1] === '\n') index += 1
+    starts.push(index + 1)
+  }
+  return starts
 }
 
 export function pairedConfidence(input: {
@@ -236,11 +364,13 @@ export function runNativeTrial(input: {
     for (const frame of workloadFrames(input.workload)) {
       const result = measureRevision(session, processor, projections, frame)
       const outputDigest = digestProjection(result.root)
-      const { root: _root, ...measured } = result
+      const sourceCorrespondence = inspectSourceCorrespondence(result.root, result.projectionSource)
+      const { root: _root, projectionSource: _projectionSource, ...measured } = result
       revisions.push({
         ...measured,
         revision: revisions.length,
         outputDigest,
+        ...sourceCorrespondence,
         unchangedProjection: priorDigest === outputDigest,
       })
       priorDigest = outputDigest
@@ -305,14 +435,16 @@ function measureRevision(
   })
   const root: Root = { type: 'root', children }
   const finished = performance.now()
+  const cpuMs = usedCpu(cpu)
   return {
     root,
+    projectionSource: blocks.map((block) => block.source).join(''),
     offset: frame.offset,
     phase: frame.phase,
     parseMs: parsed - start,
     projectionMs: finished - parsed,
     wallMs: finished - start,
-    cpuMs: usedCpu(cpu),
+    cpuMs,
     convertedBlocks,
     reusedBlocks: blocks.length - convertedBlocks,
   }
@@ -364,7 +496,11 @@ export async function runPairedNative(options: PairedNativeOptions) {
       cacheState:
         'warm runtime; fresh session, HAST processor and block projection cache per engine per trial',
       boundary:
-        'Session creation plus parse/heal and safe HAST; excludes source generation, output digest, JSX, React, workers and paint',
+        'Session creation plus parse/heal and safe HAST; excludes source generation, rendered digest, source-coordinate validation, JSX, React, workers and paint',
+      outputContract:
+        'Ordered nested rendered nodes and all properties; adjacent text runs coalesce with exact whitespace. Private AST positions/data are observed separately.',
+      sourceContract:
+        'Validate UTF-16 coordinates against actual projection text, including declared healing, and retain all published source-line properties in rendered equality. Private container spans may include or exclude delimiters.',
       gcPolicy:
         'No asymmetric forced GC; shared runtime module caches remain warm for both engines',
       timingStatus: 'EXPLORATORY',
@@ -481,7 +617,9 @@ export function mismatchedRevisions(
       left.revision !== right.revision ||
       left.offset !== right.offset ||
       left.phase !== right.phase ||
-      left.outputDigest !== right.outputDigest
+      left.outputDigest !== right.outputDigest ||
+      left.sourceCoordinateFailures.length > 0 ||
+      right.sourceCoordinateFailures.length > 0
     )
   })
 }
