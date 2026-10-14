@@ -144,6 +144,7 @@
     "server.webBase",
     "spellcheck.words",
     "terminal.integrated.cursorBlinking",
+    "terminal.integrated.lowLatencyRendering",
     "terminal.integrated.fontSize",
     "terminal.integrated.screenReader",
     "terminal.integrated.scrollback",
