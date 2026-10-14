@@ -1,6 +1,6 @@
 # TypeScript language-service parity across workers and servers
 
-- Status: Approved, 2026-10-14 owner request; planning delivered, implementation pending.
+- Status: Approved, 2026-10-14 owner request; implementation underway.
 - Kind: Implementation with a shared acceptance contract.
 - Owner: Cross-repo. Singapore owns reusable LSP integration; Fregat owns server routing,
   workspace/filesystem policy, commands and application UI.
@@ -12,8 +12,9 @@
 - Inspected baseline: `f03e65e7741646d6fe950b2b7405e4f5cd716aa1`.
 - Successor: [Singapore TypeScript engines](singapore-typescript-engines.md). Its Rust
   integration follows this plan's feature, project and lifecycle acceptance gate.
-- Current progress: source and authored-test inventory complete. No new backend or browser
-  qualification ran during planning; code support and test presence are recorded separately.
+- Current progress: the first implementation adds 25 shared core cases, real TS6/TS7 and
+  module-worker adapters, and source-bound baseline capture. Full editor qualification and the
+  external WebSocket reference are pending. See the execution record below.
 
 ## Outcome
 
@@ -196,6 +197,39 @@ Refresh the cited code and fixtures wherever that diff shows drift.
    successor. Gate: baseline/qualification manifests and cleanup receipts are committed under
    `editor/docs/architecture/` with a green CI matrix; plan checks pass, required implementation
    PRs are merged, and the current TypeScript qualification is complete before Rust feature work.
+
+## Execution record
+
+The initial delivery extracts all 21 useful worker method cases and adds four mandatory
+outcomes for post-edit diagnostics, semantic color, completion detail and extraction. Every
+matrix includes the in-process worker, Chromium, Firefox, WebKit, classic TS6, native TS7 and
+external WebSocket roles. Missing execution stays `unrun`; unavailable methods stay
+`unavailable`. `baseline` accepts recorded gaps; `qualify` rejects missing mandatory behavior,
+unrun cases and advertised methods without acceptance cases.
+
+- [x] Shared core contract and useful-result validators; nested capability completeness tests.
+- [x] Real TS6/TS7 process fixtures through the production pool, with pinned observed outcomes.
+- [x] Real module workers support all 25 core cells in Chromium, Firefox and WebKit; cleanup verified.
+- [x] Artifact capture, source fingerprints, artifact hashes and metadata consistency checks.
+- [ ] Complete the configured external-server/WebSocket reference adapter.
+- [ ] Extend the contract to the remaining feature families and editor actions.
+- [ ] Complete routing, action execution, project/lifetime coverage and full qualification.
+
+The classic fixture runs TS6 6.0.3 through typescript-language-server 6.0.1. Of 25 core cells,
+21 are supported, two fail and two are unavailable. Refactor resolution and extraction return
+command actions without usable edits. On-type formatting and pull diagnostics are unavailable;
+standard push diagnostics satisfy the mandatory post-edit outcome. Prepare rename succeeds
+when the client declares prepare support.
+
+Native TS7 7.0.2 supports 22 core cells, fails two and leaves one unavailable. Quick fixes and
+extraction return empty arrays, including a control with the full original diagnostic and
+literal-action negotiation. Code-action resolution is unavailable. Preserve these fixtures as
+upstream/adapter evidence while completing the action owner; do not lower the useful-edit gate.
+
+Commands, source/artifact rules and browser results belong in
+[the baseline guide](../editor/docs/architecture/typescript-parity-baseline.md). These core
+checks do not complete feature, project or editor qualification. Rust integration still waits
+for the current TypeScript qualification gate.
 
 ## Verification
 

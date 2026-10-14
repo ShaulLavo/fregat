@@ -102,6 +102,9 @@ jobs:
       - name: Test tree-sitter browser worker
         if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/tree-sitter"') }}
         run: bun run --cwd editor/packages/tree-sitter test:browser
+      - name: Test TypeScript worker parity in all browsers
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/typescript-lsp"') }}
+        run: bun run --cwd editor/packages/typescript-lsp test:browser
       - name: Test collaboration presence in Chromium
         if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/collaboration"') }}
         run: bun x turbo run test:browser --filter=@singapore-editor/collaboration --concurrency=1 -- test/presence.browser.test.ts
