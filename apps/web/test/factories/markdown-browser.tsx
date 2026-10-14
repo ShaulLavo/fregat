@@ -207,9 +207,19 @@ function normalizeReactReferences(
   return Object.fromEntries(
     Object.entries(attributes).map(([name, value]) => [
       name,
-      referenceAttribute(name) ? normalizeGeneratedIds(value, generatedIds) : value,
+      normalizeReference(name, value, generatedIds),
     ]),
   )
+}
+
+function normalizeReference(
+  name: string,
+  value: string,
+  generatedIds: Map<string, string>,
+): string {
+  if (name === 'id' && value.startsWith('user-content-')) return value
+  if (!referenceAttribute(name)) return value
+  return normalizeGeneratedIds(value, generatedIds)
 }
 
 function referenceAttribute(name: string): boolean {
