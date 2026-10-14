@@ -247,6 +247,7 @@ language-service parity is proven. Its first step owns the missing persistent WA
 | [editor-authoring.md](editor-authoring.md)                                                     | Editor backlog plan contract                                                           |
 | [editor-backlog.md](editor-backlog.md)                                                         | Editor backlog                                                                         |
 | [bubli-markdown-consumer.md](bubli-markdown-consumer.md)                                       | Shared Markdown semantics for Editor and Fregat TUI                                    |
+| [chat-markdown-qualification.md](chat-markdown-qualification.md)                               | Qualify tree-sitter Markdown against remark for chat rendering                         |
 | [editor-wishlist.md](editor-wishlist.md)                                                       | Original Editor wishlist and source-topic inventory                                    |
 | [editor-performance-trace-plan.md](editor-performance-trace-plan.md)                           | Performance Trace Report And Plan                                                      |
 | [editor-architecture-recovery-plan.md](editor-architecture-recovery-plan.md)                   | Architecture Recovery Plan                                                             |
