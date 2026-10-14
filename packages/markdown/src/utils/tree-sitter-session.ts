@@ -221,7 +221,7 @@ function rowToMdast(node: SemanticTableRow, positions: SourcePositions): TableRo
 function cellToMdast(node: SemanticTableCell, positions: SourcePositions): TableCell {
   return {
     type: 'tableCell',
-    position: nodePosition(node.range, positions),
+    position: node.range === null ? undefined : nodePosition(node.range, positions),
     children: inlinesToMdast(node.children, positions),
   }
 }
