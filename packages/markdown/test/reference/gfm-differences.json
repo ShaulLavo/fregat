@@ -1,0 +1,128 @@
+[
+  {
+    "id": "gfm-279",
+    "kind": "renderer-metadata",
+    "reason": "Task-list classes are added by mdast-util-to-hast; checkbox semantics agree.",
+    "actualSha256": "7a6cc4e945ff2a647c484a1f6147bf6bc245c6628875aed8b7b6d5f51b6cb763",
+    "expectedSha256": "123c36d594ce8dae0d63f38ab87c78dbd4c870bd2b6eeea0c292e073301acb35"
+  },
+  {
+    "id": "gfm-280",
+    "kind": "renderer-metadata",
+    "reason": "Task-list classes are added by mdast-util-to-hast; checkbox semantics agree.",
+    "actualSha256": "433eb9bfdb564d05f514de9b03d07f90b41619600b8e63b997c0c3d845446e3f",
+    "expectedSha256": "8197a072c5dffa0413fa8f16c3beb9ddf6de5aead3aa4d807c3500b69d0585db"
+  },
+  {
+    "id": "gfm-398",
+    "kind": "spec-version",
+    "reason": "Exact source matches commonmark-389, whose newer expected nesting agrees with the baseline.",
+    "actualSha256": "cf63cd2f1dd49775aaab04df03b26f0bcb59ceee467e449cfc777c7b36b7933d",
+    "expectedSha256": "28589ef1f9cd25164df6cf0950128a83fa52cdd9ac24827c4be5ce2210755cee"
+  },
+  {
+    "id": "gfm-426",
+    "kind": "spec-version",
+    "reason": "Exact source matches commonmark-417, whose newer expected nesting agrees with the baseline.",
+    "actualSha256": "455a0c0821af52f4e9701d5c5aea619ffa8e251236f56c92873bf02b9588fe08",
+    "expectedSha256": "5f6ca3d36e08bc9dea0377ea9eb5835f945bfa2821471b187a055e1b5b597f35"
+  },
+  {
+    "id": "gfm-434",
+    "kind": "spec-version",
+    "reason": "Exact source matches commonmark-425, whose newer expected nesting agrees with the baseline.",
+    "actualSha256": "f780d8bc720291d1fef53f9d3c9107dfdd502f2c44dcac1bedf3d12753f6fad5",
+    "expectedSha256": "b0bfe4f6b7aceeaed533a3a056ed69670333753b1fa25994de4b1a6cbef88f38"
+  },
+  {
+    "id": "gfm-435",
+    "kind": "spec-version",
+    "reason": "Exact source matches commonmark-426, whose newer expected nesting agrees with the baseline.",
+    "actualSha256": "a54f4bc9cec87147db9cf939f714b758aa5de429dd9340cc945fa03724f94289",
+    "expectedSha256": "51aa7a347756a71facbafe8b068ace38a2173f08176e7fb2d9cc201d504e088c"
+  },
+  {
+    "id": "gfm-436",
+    "kind": "spec-version",
+    "reason": "Exact source matches commonmark-427, whose newer expected nesting agrees with the baseline.",
+    "actualSha256": "1c7e1a3ec1603be7ee90f312a2cc58fa2d44f55e89f3143fe61e6bc191ff3aed",
+    "expectedSha256": "51aa7a347756a71facbafe8b068ace38a2173f08176e7fb2d9cc201d504e088c"
+  },
+  {
+    "id": "gfm-473",
+    "kind": "spec-version",
+    "reason": "Exact source matches commonmark-464, whose newer expected nesting agrees with the baseline.",
+    "actualSha256": "d70d56f1f2d2e0b184758eeeccd371716b35035028c2d1e028a413b2efc2886b",
+    "expectedSha256": "5950fcb01928f2b43b3f7e2684949b965b30ac37774c26afbf5f3eb53b7072e8"
+  },
+  {
+    "id": "gfm-474",
+    "kind": "spec-version",
+    "reason": "Exact source matches commonmark-465, whose newer expected nesting agrees with the baseline.",
+    "actualSha256": "d70d56f1f2d2e0b184758eeeccd371716b35035028c2d1e028a413b2efc2886b",
+    "expectedSha256": "5950fcb01928f2b43b3f7e2684949b965b30ac37774c26afbf5f3eb53b7072e8"
+  },
+  {
+    "id": "gfm-475",
+    "kind": "spec-version",
+    "reason": "Exact source matches commonmark-466, whose newer expected nesting agrees with the baseline.",
+    "actualSha256": "36e37d52c50c8703ed42dec716a8e6b0d7acb37a12f39443408efbd68521e050",
+    "expectedSha256": "5950fcb01928f2b43b3f7e2684949b965b30ac37774c26afbf5f3eb53b7072e8"
+  },
+  {
+    "id": "gfm-477",
+    "kind": "spec-version",
+    "reason": "Exact source matches commonmark-468, whose newer expected nesting agrees with the baseline.",
+    "actualSha256": "630b5cfc7f27876fa88afadf8f4012a4247b4fd0c0f83c0158cad06613e8c5c2",
+    "expectedSha256": "03300da98059228ee36e7ea47d04cf18d15b4c6297b1d07d0ffd829c380bb553"
+  },
+  {
+    "id": "gfm-610",
+    "kind": "autolink-extension",
+    "reason": "The literal URL extension links a URL inside an invalid angle-autolink.",
+    "actualSha256": "964905911acc44a9164a357fc5db8dae1acc022d4a70109299eff31e446f2cc1",
+    "expectedSha256": "cf8ffec431fdc3a4d8cc5eed77c5cc64c9b3ca29a0a8f95061eba527723f8ab0"
+  },
+  {
+    "id": "gfm-614",
+    "kind": "autolink-extension",
+    "reason": "The literal email extension links decoded escaped email text inside brackets.",
+    "actualSha256": "98aaea705a8b54e88e97d7b3f1da995aebff240290d99eaf08ef8fcebc659bb0",
+    "expectedSha256": "2d798819792a0f77755eb8b09957b2b11292701705551c811061e68b64585eb5"
+  },
+  {
+    "id": "gfm-616",
+    "kind": "autolink-extension",
+    "reason": "The literal URL extension links a URL inside spaced angle syntax.",
+    "actualSha256": "898a2976e980b4bcf5a042f7b96696b5fe7ef229302799e608807864fa4cdec5",
+    "expectedSha256": "da7a84b4df6e8896a6514130b0835afeefab0aed521b76320d1e8733a9cdfbeb"
+  },
+  {
+    "id": "gfm-619",
+    "kind": "autolink-extension",
+    "reason": "The enabled literal URL extension links this inherited base-profile URL.",
+    "actualSha256": "9b2b846cb37203a5ab1eb7b46095b92adc0ee5b303c1cbe52b9ce90a8b77c844",
+    "expectedSha256": "2438cbda8af5d2f16dec0a538d4d5cb21654d8422b22075675a083d77d0bf1cb"
+  },
+  {
+    "id": "gfm-620",
+    "kind": "autolink-extension",
+    "reason": "The enabled literal email extension links this inherited base-profile email.",
+    "actualSha256": "305635522621409c69d3d1a19eded88b4c7acd3d06a0a926dcf1082d0f120a1e",
+    "expectedSha256": "ccac8ce465402f3f7c1254140e47718a1e5bb9304eafa13cf1a2038ebd73c63b"
+  },
+  {
+    "id": "gfm-628",
+    "kind": "protocol-support",
+    "reason": "The installed literal extension supports HTTP and HTTPS; this example expects FTP.",
+    "actualSha256": "2da2250d07a163dcd60192f9e722ccb1ecc1e871967c56ad7c17adb6839f1aa4",
+    "expectedSha256": "33fdcb89ecc89dab30bd69e4eb29a3e4e7fa57e5c64a340b396dbc7a19bc092c"
+  },
+  {
+    "id": "gfm-652",
+    "kind": "safe-render-policy",
+    "reason": "The test-only raw renderer lacks the GFM tagfilter; safe product display is checked separately.",
+    "actualSha256": "ea8112fcc516e673ef2dfbcbb785a9ac59dfa318aa10b8ca07bbf9c999c59258",
+    "expectedSha256": "1196c07473aa4ac36c79eddd8b47ca265a0ca7c179e00cc3d1a374f2b02e4796"
+  }
+]

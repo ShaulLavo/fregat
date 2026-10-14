@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { hash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { cpus } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -137,12 +137,12 @@ export async function runMarkdownBenchmarks(options: BenchmarkOptions): Promise<
       startedAt,
       finishedAt: new Date().toISOString(),
       revision,
-      lockfileSha256: sha256(lockfile),
-      trackedDiffSha256: sha256(diff),
+      lockfileSha256: hash('sha256', lockfile, 'hex'),
+      trackedDiffSha256: hash('sha256', diff, 'hex'),
       workloadSources: prepared.all.map((entry) => ({
         id: entry.id,
         sourceBytes: entry.sourceBytes,
-        sha256: sha256(entry.source),
+        sha256: hash('sha256', entry.source, 'hex'),
       })),
       runtime: `${process.release.name} ${process.version}${typeof Bun === 'undefined' ? '' : `; Bun ${Bun.version}`}`,
       platform: process.platform,
@@ -163,7 +163,7 @@ export async function runMarkdownBenchmarks(options: BenchmarkOptions): Promise<
         ? {
             status: 'EXPLORATORY',
             records: browserSamples.length,
-            logSha256: sha256(options.browserLog),
+            logSha256: hash('sha256', options.browserLog, 'hex'),
           }
         : missing(
             ['browserMetrics'],
@@ -415,8 +415,4 @@ function familyResult(
 
 function missing(fields: readonly string[], reason: string): MissingMeasurement {
   return { status: 'NOT_MEASURED', fields, reason }
-}
-
-function sha256(value: string | Buffer): string {
-  return createHash('sha256').update(value).digest('hex')
 }

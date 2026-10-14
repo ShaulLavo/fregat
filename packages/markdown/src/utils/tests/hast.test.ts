@@ -70,6 +70,18 @@ describe('sanitization', () => {
 })
 
 describe('decoration', () => {
+  test.each(['first  \nsecond', 'first\\\nsecond'])(
+    'one hard break renders one line break under preserved whitespace: %j',
+    (source) => {
+      expect(preservedText(render(source))).toBe('first\nsecond')
+    },
+  )
+
+  test('soft breaks, code whitespace and authored HTML newlines keep their content', () => {
+    expect(preservedText(render('first\nsecond'))).toBe('first\nsecond')
+    expect(preservedText(render('```\n  first\n\nsecond\n```'))).toBe('  first\n\nsecond\n')
+    expect(preservedText(render('first<br>\nsecond', withRaw))).toBe('first\n\nsecond')
+  })
   test('block elements carry the pipeline classes', () => {
     const tree = render('# Title\n\n- item\n\n> quote')
     const [heading] = elements(tree, 'h1')
@@ -151,3 +163,10 @@ describe('decoration', () => {
     expect(block?.properties.className).toBeUndefined()
   })
 })
+
+function preservedText(tree: Nodes): string {
+  if (tree.type === 'text') return tree.value
+  if (tree.type === 'element' && tree.tagName === 'br') return '\n'
+  if (!('children' in tree)) return ''
+  return tree.children.map(preservedText).join('')
+}

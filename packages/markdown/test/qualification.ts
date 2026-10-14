@@ -6,7 +6,7 @@ import { blockToHast, createHastProcessor, type HastExtensions } from '../src/ut
 import { createMarkdownSession } from '../src/utils/session'
 import type { Expectation } from './fixtures/cases'
 
-export type ElementObservation = {
+type ElementObservation = {
   readonly tag: string
   readonly text: string
   readonly attributes: Readonly<Record<string, string>>
@@ -142,6 +142,7 @@ function visit(node: Nodes, parents: readonly string[], elements: ElementObserva
 
 function nodeText(node: Nodes): string {
   if (node.type === 'text') return node.value
+  if (node.type === 'element' && node.tagName === 'br') return '\n'
   if (!('children' in node)) return ''
   return node.children.map(nodeText).join('')
 }

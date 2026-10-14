@@ -19,32 +19,32 @@ function parseRecord(value: unknown): BenchmarkSample {
   if (!('family' in value) || !isFamily(value.family)) throw invalidRecord('family')
   if (!('fixture' in value) || typeof value.fixture !== 'string' || value.fixture.length === 0)
     throw invalidRecord('fixture')
-  if (!('revision' in value) || !isInteger(value.revision)) throw invalidRecord('revision')
+  const revision = readCount(value, 'revision')
   if (!('field' in value) || typeof value.field !== 'string' || value.field.length === 0)
     throw invalidRecord('field')
   if (!('sample' in value) || typeof value.sample !== 'number' || !Number.isFinite(value.sample))
     throw invalidRecord('sample')
   if (!('unit' in value) || !isUnit(value.unit)) throw invalidRecord('unit')
-  if (!('sourceBytes' in value) || !isInteger(value.sourceBytes)) throw invalidRecord('sourceBytes')
+  const sourceBytes = readCount(value, 'sourceBytes')
   if (!('outputMatches' in value) || typeof value.outputMatches !== 'boolean')
     throw invalidRecord('outputMatches')
   if (!('build' in value) || !isBuild(value.build)) throw invalidRecord('build')
   if (!('engine' in value) || value.engine !== 'remark') throw invalidRecord('engine')
-  if (!('trial' in value) || !isInteger(value.trial)) throw invalidRecord('trial')
+  const trial = readCount(value, 'trial')
   if (!('cacheState' in value) || typeof value.cacheState !== 'string')
     throw invalidRecord('cacheState')
   return {
     family: value.family,
     fixture: value.fixture,
-    revision: value.revision,
+    revision,
     field: value.field,
     sample: value.sample,
     unit: value.unit,
-    sourceBytes: value.sourceBytes,
+    sourceBytes,
     outputMatches: value.outputMatches,
     build: value.build,
     engine: value.engine,
-    trial: value.trial,
+    trial,
     cacheState: value.cacheState,
     domain: 'browser',
   }
@@ -62,8 +62,11 @@ function isBuild(value: unknown): value is BenchmarkSample['build'] {
   return value === 'development' || value === 'production'
 }
 
-function isInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+function readCount(record: object, field: string): number {
+  const value: unknown = Reflect.get(record, field)
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
+    throw invalidRecord(field)
+  return value
 }
 
 function invalidRecord(field: string) {
