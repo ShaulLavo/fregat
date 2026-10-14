@@ -138,6 +138,13 @@ function blockToMdast(node: SemanticBlock, positions: SourcePositions): MdastBlo
         url: node.url,
         title: node.title,
       }
+    case 'footnoteDefinition':
+      return {
+        type: 'footnoteDefinition',
+        position,
+        identifier: node.identifier,
+        children: node.children.map((child) => blockToMdast(child, positions)),
+      }
     default: {
       const exhaustive: never = node
       return exhaustive
@@ -184,6 +191,8 @@ function inlineToMdast(node: SemanticInline, positions: SourcePositions): Phrasi
       }
     case 'image':
       return { type: 'image', position, url: node.url, title: node.title, alt: node.alt }
+    case 'footnoteReference':
+      return { type: 'footnoteReference', position, identifier: node.identifier }
     default: {
       const exhaustive: never = node
       return exhaustive
