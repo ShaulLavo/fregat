@@ -1,6 +1,6 @@
 # Execution roadmap
 
-Updated 2026-10-06. This file owns cross-project ordering. Each [plan](plans/README.md)
+Updated 2026-10-15. This file owns cross-project ordering. Each [plan](plans/README.md)
 owns its scope, decisions, status and acceptance checks. [AGENTS.md](AGENTS.md) owns execution
 rules; [docs](docs/README.md) holds architecture, research and delivery evidence.
 
@@ -151,6 +151,8 @@ work can proceed independently where their files and contracts do not overlap.
    remain Approved and deferred to Phase 2 preparation. They do not start the stopped parser wave.
 
 ## Next programs
+
+[345](plans/345-ghostty-resizable-wasm-memory.md) and [346](plans/346-tree-sitter-x-resizable-wasm-memory.md) are Approved for resizable WebAssembly memory views in Ghostty WebGPU and tree-sitter-x. The two implementations can run independently after their runtime and browser API boundary checks. Plan 346 delivers the parser package before advancing Singapore and Markdown consumers. Each plan requires growth correctness and a bounded performance comparison before delivery. Bun Wasm, Brush, and third-party Shiki changes are outside these plans.
 
 [336](plans/336-packages-as-products.md) makes Fregat, Singapore, ghostty-webgpu and hotkeys
 look like products: research, pitch with proof, READMEs, Astro sites on our own domains, docs,
