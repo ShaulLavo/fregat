@@ -401,6 +401,11 @@ footer {
     gap: 2px;
   }
 
+  /* A card is 34 columns; on a phone it fills the width so its text reads at body size. */
+  .facts .art canvas {
+    width: 100% !important;
+  }
+
   /* Four narrow columns wrap badly on a phone; the bar's [ docs ] link leads there instead. */
   .docs-panel,
   .docs-panel + hr {
