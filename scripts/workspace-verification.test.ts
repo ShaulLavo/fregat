@@ -146,10 +146,11 @@ test('standalone checks cover every mirror family from an exact folder export', 
   expect(steps.find((step) => step.name === 'Export exact mirror folder')?.run).toContain(
     'git archive "HEAD:$FAMILY"',
   )
-  expect(
-    steps.find((step) => step.name === 'Install and verify standalone package graph')?.run,
-  ).toBe(
-    'bun install && bun run build && bun run typecheck && bun run lint && bun run format:check',
+  expect(steps.find((step) => step.name === 'Install standalone dependencies')?.run).toBe(
+    'bun install',
+  )
+  expect(steps.find((step) => step.name === 'Verify standalone package graph')?.run).toBe(
+    'bun run build && bun run typecheck && bun run lint && bun run format:check',
   )
 })
 
