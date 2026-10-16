@@ -6,13 +6,18 @@ export const MIN_CELL = 3
 // The terminal keeps a 1px scrollbar gutter on the right; the grid leaves it out too.
 export const SCROLLBAR = 1
 
-/** Square cells in whole device pixels, a 2:1 picture `width` CSS pixels wide, rows rounded to whole cells. */
+/**
+ * Square cells in whole device pixels, a 2:1 picture `width` CSS pixels wide, rows rounded to whole cells. The terminal
+ * rounds its gutter to whole device pixels and measures its host in whole CSS pixels; the grid does the same.
+ */
 export function sceneGrid(width, ratio, sceneCols, sceneRows) {
   const cell =
     Math.max(Math.ceil(MIN_CELL * ratio), Math.floor((width / sceneCols) * ratio)) / ratio
-  const columns = Math.floor((width - SCROLLBAR) / cell)
+  const gutter = Math.max(1, Math.round(SCROLLBAR * ratio)) / ratio
+  const columns = Math.floor((width - gutter) / cell)
   const rows = Math.max(1, Math.round((width * sceneRows) / sceneCols / cell))
-  return { cell, columns, rows, height: rows * cell }
+  // Less than a cell taller than its rows, so the host's whole-pixel height still holds exactly `rows`.
+  return { cell, columns, rows, height: Math.ceil(rows * cell) }
 }
 
 /** For each grid column and row, the scene cell it shows: the scene covers the grid, cropped at its middle. */

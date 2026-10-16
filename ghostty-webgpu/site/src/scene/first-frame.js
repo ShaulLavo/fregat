@@ -22,6 +22,7 @@ const paintFrame = (text) => {
   const ratio = devicePixelRatio || 1
   const grid = sceneGrid(host.clientWidth, ratio, sceneCols, sceneRows)
   host.style.height = `${grid.height}px`
+  host.dataset.grid = `${grid.columns}x${grid.rows}`
   const { mapX, mapY } = coverMap(grid.columns, grid.rows, sceneCols, sceneRows)
   canvas.width = Math.round(host.clientWidth * ratio)
   canvas.height = Math.round(grid.height * ratio)

@@ -141,6 +141,8 @@ export async function mountScene(
     const { columns, rows: height } = terminal.appearance.grid
     if (grid?.mapX.length !== columns || grid.mapY.length !== height) {
       grid = coverGrid(columns, height, cols, rows)
+      // Beside the first frame's data-grid: the two must agree for the hand-over to keep its picture.
+      host.dataset.terminalGrid = `${columns}x${height}`
       terminal.write('\x1b[2J')
     }
     const out = frameOutput(frame(t, { paper: false, color }).split('\n'), color, cols, inks, grid)

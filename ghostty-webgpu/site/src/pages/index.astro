@@ -48,7 +48,7 @@ const pageData = {
 }
 
 // The grid module and the first-frame painter, inlined and scoped so the hero paints before any bundle loads.
-const firstFrameScript = ['(() => {', gridSource.replaceAll('export ', ''), firstFrameSource, '})()'].join('\n')
+const firstFrameScript = ['(() => {', gridSource.replace(/^export /gm, ''), firstFrameSource, '})()'].join('\n')
 ---
 
 <!doctype html>
