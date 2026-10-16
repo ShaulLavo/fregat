@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
@@ -151,6 +151,80 @@ test('standalone checks cover every mirror family from an exact folder export', 
   ).toBe(
     'bun install && bun run build && bun run typecheck && bun run lint && bun run format:check',
   )
+})
+
+function standaloneBuild(family: string, browserStatus = 0) {
+  const root = mkdtempSync(path.join(tmpdir(), 'standalone-browser-'))
+  try {
+    mkdirSync(path.join(root, 'site/node_modules/.bin'), { recursive: true })
+    writeFileSync(
+      path.join(root, 'bun'),
+      `#!/bin/bash
+set -euo pipefail
+printf 'bun %s\\n' "$*" >> calls
+if [[ "$*" == install ]]; then touch dependencies; fi
+if [[ "$*" == 'run build' && "$FAMILY" == editor ]]; then test -f browser; fi
+`,
+      { mode: 0o755 },
+    )
+    writeFileSync(
+      path.join(root, 'site/node_modules/.bin/playwright'),
+      `#!/bin/bash
+set -euo pipefail
+test -f dependencies
+[[ "$*" == 'install --with-deps chromium' ]]
+printf 'playwright %s\\n' "$*" >> calls
+if [[ "$BROWSER_STATUS" != 0 ]]; then exit "$BROWSER_STATUS"; fi
+touch browser
+`,
+      { mode: 0o755 },
+    )
+    const runtime = action.runs.steps.findIndex(
+      (step) => step.name === 'Check standalone tree-sitter runtime',
+    )
+    let status = 0
+    for (const step of action.runs.steps.slice(1, runtime)) {
+      if (step.if && !expression(step.if, { inputs: { family } })) continue
+      expect(step['working-directory']).toBe('${{ steps.export.outputs.directory }}')
+      const result = Bun.spawnSync(['bash', '-euo', 'pipefail', '-c', step.run], {
+        cwd: root,
+        env: {
+          ...process.env,
+          PATH: `${root}:${process.env.PATH}`,
+          FAMILY: family,
+          BROWSER_STATUS: String(browserStatus),
+        },
+      })
+      status = result.exitCode
+      if (status !== 0) break
+    }
+    return { status, calls: readFileSync(path.join(root, 'calls'), 'utf8').trim().split('\n') }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+test.each(['editor', 'ghostty-webgpu', 'hotkeys'])(
+  'standalone %s installs its build prerequisites before verification',
+  (family) => {
+    const result = standaloneBuild(family)
+    expect(result.status, result.calls.join('\n')).toBe(0)
+    const browser = family === 'editor' ? ['playwright install --with-deps chromium'] : []
+    expect(result.calls).toEqual(
+      ['bun install'].concat(browser, [
+        'bun run build',
+        'bun run typecheck',
+        'bun run lint',
+        'bun run format:check',
+      ]),
+    )
+  },
+)
+
+test('standalone Editor stops before building when its browser install fails', () => {
+  const result = standaloneBuild('editor', 17)
+  expect(result.status).toBe(17)
+  expect(result.calls).toEqual(['bun install', 'playwright install --with-deps chromium'])
 })
 
 test('CI shares one production site build with every mobile shard', () => {
