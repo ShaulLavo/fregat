@@ -12,6 +12,7 @@ import {
 import { SparkleIcon } from '@phosphor-icons/react'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { TreeRowLead } from '@workspace/ui/patterns/tree-row-lead'
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import { iconForEntry } from '@/lib/file-icons'
 import { TreeGlyphIcon } from '@/features/workspace/components/tree-glyph'
@@ -173,8 +174,11 @@ function DecorationAction({ action }: { action: FileTreeRowDecorationAction }): 
     <span
       aria-label={action.label}
       data-item-decoration-action=''
+      data-feedback='tick'
+      data-row-press
       data-tooltip={action.label}
       role='button'
+      onClickCapture={(event) => playClickFeedback(event.nativeEvent, event.currentTarget)}
       onClick={(event) => {
         event.preventDefault()
         event.stopPropagation()

@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
 
 import { cn } from '@workspace/ui/lib/utils'
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import { listRowClassName } from '@workspace/ui/patterns/list-row-classes'
 import {
   Dialog,
@@ -169,6 +170,8 @@ function CommandItem({
   return (
     <CommandPrimitive.Item
       data-slot='command-item'
+      data-feedback='tick'
+      data-row-press
       className={listRowClassName({
         className: cn(
           "group/command-item cursor-default px-(--density-command-input-padding-x) [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size)",
@@ -176,6 +179,10 @@ function CommandItem({
         ),
       })}
       {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
     >
       {children}
       <CheckIcon className='ml-auto opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100' />

@@ -100,6 +100,7 @@ export function ChatPanelHeader({
               {sessions.map((item) => (
                 <DropdownMenuItem
                   className='grid grid-cols-[1fr_auto] gap-y-0.5'
+                  data-feedback='tick'
                   data-selected={item.id === activeSessionId || undefined}
                   key={item.id}
                   title={`${item.title} — ${chatSessionPreview(item)}`}

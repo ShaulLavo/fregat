@@ -865,7 +865,30 @@ export const selectors = {
   physicalMenu: (page: Page) => page.getByRole('menu'),
   physicalDialog: (page: Page) =>
     page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
-  physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
+  physicalRow: (page: Page) => page.getByRole('option', { name: 'Selectable row', exact: true }),
+  recoverableDraftList: (page: Page) => page.getByRole('listbox', { name: 'Drafts', exact: true }),
+  physicalAddProject: (page: Page) =>
+    page.getByRole('button', { name: 'Add project', exact: true }),
+  physicalPickerGoToFolder: (page: Page) =>
+    selectors.pickerDialog(page).getByRole('button', { name: /^Go to folder/ }),
+  physicalPickerLocation: (page: Page, folder: string) =>
+    selectors.pickerDialog(page).getByRole('button', {
+      name: `Go to folder, now ${folder}`,
+      exact: true,
+    }),
+  physicalSettingLabel: (page: Page, id: string) =>
+    selectors.settingsRow(page, id).locator(`label[for="${id}"]`),
+  physicalSettingChoices: (page: Page, id: string) =>
+    selectors.settingsRow(page, id).getByRole('listbox'),
+  physicalUnselectedChoice: (list: Locator) => list.getByRole('option', { selected: false }),
+  physicalSelectedChoice: (list: Locator) => list.getByRole('option', { selected: true }),
+  physicalCommands: (page: Page) => page.locator('[data-physical-gallery] [data-slot="command"]'),
+  physicalCommand: (page: Page) =>
+    page.getByRole('option', { name: 'Preview command', exact: true }),
+  physicalDisabledCommand: (page: Page) =>
+    page.getByRole('option', { name: 'Disabled command', exact: true }),
+  physicalSelect: (page: Page) =>
+    page.getByRole('combobox', { name: 'Preview select', exact: true }),
   settingsForm: (page: Page) => page.getByRole('region', { name: 'Settings form', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
   settingsSummaryCount: (page: Page) =>

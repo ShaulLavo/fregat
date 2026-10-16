@@ -1,11 +1,7 @@
 import { ok, strictEqual } from 'node:assert/strict'
-import type { Page } from 'playwright'
-import { selectors } from '../selectors'
+import { chords, pressShortcut, selectors } from '../selectors'
 import type { Scenario } from './index'
-
-async function soundCount(page: Page) {
-  return page.evaluate(() => Number(Reflect.get(window, 'physicalSoundCount') ?? 0))
-}
+import { feedbackSoundCount as soundCount, installFeedbackProbe } from '../feedback-probe'
 
 export const physicalMode: Scenario = {
   name: 'physical-mode',
@@ -14,7 +10,7 @@ export const physicalMode: Scenario = {
   async run(page, { step }) {
     const baseline = process.env.PHYSICAL_BASELINE === '1'
     const expectedFeel = baseline ? 'flat' : 'playful'
-    await page.keyboard.press('Control+,')
+    await pressShortcut(page, chords.settings)
     await selectors.settingsSearch(page).fill('workbench.feel')
     for (const feel of ['seam', 'brisk', 'relaxed', 'playful', expectedFeel]) {
       await selectors.settingsFeel(page).click()
@@ -23,18 +19,7 @@ export const physicalMode: Scenario = {
     }
     await step('feel-setting')
     await page.waitForTimeout(500)
-    await page.addInitScript(() => {
-      Reflect.set(window, 'physicalSoundCount', 0)
-      const original = AudioContext.prototype.createBufferSource
-      AudioContext.prototype.createBufferSource = function () {
-        Reflect.set(
-          window,
-          'physicalSoundCount',
-          Number(Reflect.get(window, 'physicalSoundCount')) + 1,
-        )
-        return original.call(this)
-      }
-    })
+    await installFeedbackProbe(page)
     const url = new URL(page.url())
     url.pathname = '/dev/physical'
     url.search = ''
@@ -73,7 +58,41 @@ export const physicalMode: Scenario = {
       strictEqual(await button.getAttribute('data-pressing'), null)
       strictEqual(await soundCount(page), keyboardBefore)
       await selectors.physicalRow(page).click()
-      strictEqual(await soundCount(page), keyboardBefore)
+      strictEqual(await soundCount(page), keyboardBefore + 1)
+      const rowBefore = await soundCount(page)
+
+      const command = selectors.physicalCommand(page)
+      await command.hover()
+      strictEqual(await soundCount(page), rowBefore)
+      await command.click()
+      strictEqual(await soundCount(page), rowBefore + 1)
+      await selectors.physicalCommands(page).focus()
+      const commandKeyboard = await soundCount(page)
+      await page.keyboard.press('Enter')
+      strictEqual(await soundCount(page), commandKeyboard)
+      await selectors.physicalDisabledCommand(page).click({ force: true })
+      strictEqual(await soundCount(page), commandKeyboard)
+
+      const select = selectors.physicalSelect(page)
+      await select.hover()
+      const selectBefore = await soundCount(page)
+      await page.mouse.down()
+      await page.waitForTimeout(180)
+      const selectPressed = await select.evaluate((node) => ({
+        scale: getComputedStyle(node).scale,
+        opacity: getComputedStyle(node).opacity,
+      }))
+      if (!baseline) {
+        strictEqual(selectPressed.scale, '1')
+        ok(Number(selectPressed.opacity) < 1, 'Select dims while its anchor stays stationary')
+      }
+      strictEqual(await select.getAttribute('data-pressing'), '')
+      strictEqual(await soundCount(page), selectBefore)
+      await step(`${prefix}-select-press`)
+      await page.mouse.up()
+      strictEqual(await soundCount(page), selectBefore + 1)
+      strictEqual(await select.getAttribute('data-pressing'), null)
+      await page.keyboard.press('Escape')
 
       const toggle = selectors.physicalSwitch(page, 'Preview switch')
       await toggle.hover()
@@ -101,6 +120,8 @@ export const physicalMode: Scenario = {
     await selectors.physicalSwitch(page, 'Control sounds in this preview').click()
     const silent = await soundCount(page)
     await selectors.physicalButton(page, 'Press me').click()
+    strictEqual(await soundCount(page), silent)
+    await selectors.physicalCommand(page).click()
     strictEqual(await soundCount(page), silent)
     await page.emulateMedia({ reducedMotion: 'no-preference' })
   },

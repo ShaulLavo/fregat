@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 
 import { FocusProvider } from '@/lib/focus/providers/provider'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
+import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 import {
   FocusService,
   focusTargetById,
@@ -16,6 +17,56 @@ import { expect, test } from '../../../../test/fixtures'
 
 test.beforeEach(() => {
   document.body.replaceChildren()
+})
+
+test.each(['chat', 'workbench'] as const)(
+  'phone %s surfaces acknowledge Settings and editor focus without desktop layout markers',
+  async (layout) => {
+    const service = new FocusService()
+    const frame = appendElement()
+    frame.dataset.phoneShell = ''
+    frame.dataset.focusLayout = layout
+    const ids: FocusTargetId[] = [{ kind: 'settings-page', tabId: 'settings' }, editorId('file')]
+
+    for (const id of ids) {
+      const element = document.createElement('button')
+      frame.append(element)
+      const registration = registerTarget(service, {
+        element,
+        id,
+        onIntent: () => {
+          element.focus()
+          return true
+        },
+      })
+      const ticket = service.request({
+        kind: 'match',
+        matches: (target) =>
+          matchesActiveSurface(target, {
+            diffPath: null,
+            layout,
+            searchRoot: null,
+            tabId: id.kind === 'settings-page' ? 'settings' : 'file',
+          }),
+      })
+
+      await expect(ticket.completion).resolves.toEqual({ status: 'acknowledged', targetId: id })
+      expect(service.getTarget(registration.token)?.layout).toBe(layout)
+      registration.unregister()
+    }
+    expect(frame.matches('[data-chat-mode], [data-workbench]')).toBe(false)
+  },
+)
+
+test('a phone home without a workspace has no document focus layout', () => {
+  const service = new FocusService()
+  const frame = appendElement()
+  frame.dataset.phoneShell = ''
+  const element = document.createElement('button')
+  frame.append(element)
+  const registration = registerTarget(service, { element, id: editorId('home') })
+
+  expect(service.getTarget(registration.token)?.layout).toBeNull()
 })
 
 test('retains a pre-registration request until matching registration and focusin', async () => {

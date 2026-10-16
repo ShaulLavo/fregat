@@ -1,6 +1,6 @@
 'use client'
 
-import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 
 import { Menu as MenuPrimitive } from '@base-ui/react/menu'
 
@@ -10,31 +10,32 @@ import {
   SHEET_FRAME_CLASS,
   SHEET_POSITIONER_CLASS,
   SHEET_SURFACE_CLASS,
-  playSheetOpen,
   usePresentation,
 } from '@workspace/ui/patterns/sheet'
 import { CheckIcon } from '@phosphor-icons/react'
 
-function DropdownMenu({ onOpenChange, ...props }: MenuPrimitive.Root.Props) {
-  const presentation = usePresentation()
-  return (
-    <MenuPrimitive.Root
-      data-slot='dropdown-menu'
-      {...props}
-      onOpenChange={(open, details) => {
-        onOpenChange?.(open, details)
-        if (!details.isCanceled) playSheetOpen(presentation, open, details.event)
-      }}
-    />
-  )
+function DropdownMenu(props: MenuPrimitive.Root.Props) {
+  return <MenuPrimitive.Root data-slot='dropdown-menu' {...props} />
 }
 
 function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
   return <MenuPrimitive.Portal data-slot='dropdown-menu-portal' {...props} />
 }
 
-function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
-  return <MenuPrimitive.Trigger data-slot='dropdown-menu-trigger' {...props} />
+function DropdownMenuTrigger(props: MenuPrimitive.Trigger.Props) {
+  const presentation = usePresentation()
+  return (
+    <MenuPrimitive.Trigger
+      data-slot='dropdown-menu-trigger'
+      data-press-depth
+      data-feedback={presentation === 'sheet' ? 'open' : 'tap'}
+      {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
+    />
+  )
 }
 
 function DropdownMenuContent({
@@ -127,6 +128,10 @@ function DropdownMenuItem({
         className,
       )}
       {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
     />
   )
 }
@@ -143,6 +148,7 @@ function DropdownMenuCheckboxItem({
   return (
     <MenuPrimitive.CheckboxItem
       data-slot='dropdown-menu-checkbox-item'
+      data-feedback='tick'
       data-inset={inset || undefined}
       className={cn(
         "relative flex cursor-default items-center gap-2 rounded-md py-(--density-menu-item-padding-y) pr-8 pl-2 text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-(--menu-inset-padding) data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size)",
@@ -150,9 +156,9 @@ function DropdownMenuCheckboxItem({
       )}
       checked={checked}
       {...props}
-      onCheckedChange={(value, details) => {
-        props.onCheckedChange?.(value, details)
-        if (!details.isCanceled) playControlFeedback('tick', details.event)
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
       }}
     >
       <span
@@ -177,14 +183,15 @@ function DropdownMenuSwitchItem({
   return (
     <MenuPrimitive.CheckboxItem
       data-slot='dropdown-menu-switch-item'
+      data-feedback='tick'
       className={cn(
         'group/switch-item relative flex cursor-default items-center gap-2 rounded-md px-2 py-(--density-menu-item-padding-y) text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50',
         className,
       )}
       {...props}
-      onCheckedChange={(value, details) => {
-        props.onCheckedChange?.(value, details)
-        if (!details.isCanceled) playControlFeedback('tick', details.event)
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
       }}
     >
       {children}
@@ -200,16 +207,7 @@ function DropdownMenuSwitchItem({
 }
 
 function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
-  return (
-    <MenuPrimitive.RadioGroup
-      data-slot='dropdown-menu-radio-group'
-      {...props}
-      onValueChange={(value, details) => {
-        props.onValueChange?.(value, details)
-        if (!details.isCanceled) playControlFeedback('tick', details.event)
-      }}
-    />
-  )
+  return <MenuPrimitive.RadioGroup data-slot='dropdown-menu-radio-group' {...props} />
 }
 
 function DropdownMenuRadioItem({
@@ -223,12 +221,17 @@ function DropdownMenuRadioItem({
   return (
     <MenuPrimitive.RadioItem
       data-slot='dropdown-menu-radio-item'
+      data-feedback='tick'
       data-inset={inset || undefined}
       className={cn(
         "relative flex cursor-default items-center gap-2 rounded-md py-(--density-menu-item-padding-y) pr-8 pl-2 text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-(--menu-inset-padding) data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size)",
         className,
       )}
       {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
     >
       <span
         className='pointer-events-none absolute right-2 flex items-center justify-center'

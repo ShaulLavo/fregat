@@ -1,5 +1,7 @@
 'use client'
 
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
+
 import { Collapsible as CollapsiblePrimitive } from '@base-ui/react/collapsible'
 
 function Collapsible({ ...props }: CollapsiblePrimitive.Root.Props) {
@@ -8,7 +10,16 @@ function Collapsible({ ...props }: CollapsiblePrimitive.Root.Props) {
 
 function CollapsibleTrigger({ ...props }: CollapsiblePrimitive.Trigger.Props) {
   return (
-    <CollapsiblePrimitive.Trigger data-slot='collapsible-trigger' data-press-depth {...props} />
+    <CollapsiblePrimitive.Trigger
+      data-slot='collapsible-trigger'
+      data-feedback='tap'
+      data-press-depth
+      {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
+    />
   )
 }
 
