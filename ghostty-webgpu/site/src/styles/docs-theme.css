@@ -2,14 +2,6 @@
  * Starlight in the landing page's look: the tab's scene sets --ground, --surface, --line, --text, --muted, --accent,
  * --accentText and --second, and every part is drawn as ascii.rest draws its frames, trees and buttons.
  */
-@font-face {
-  font-family: 'Paper Mono';
-  font-style: normal;
-  font-weight: 100 800;
-  font-display: block;
-  src: url('/fonts/paper-mono-variable.woff2') format('woff2');
-}
-
 /* Tokyo rain until the scene's colours arrive, and for readers without script. */
 :root {
   --ground: #07060d;

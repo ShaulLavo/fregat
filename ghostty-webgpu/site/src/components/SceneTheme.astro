@@ -1,5 +1,6 @@
 ---
 import { loadScenes } from '../scene/scenes'
+import paperMono from '../fonts/paper-mono-variable.woff2?url'
 
 interface Props {
   /** The landing page draws a new scene each visit; other pages keep the one the tab already has. */
@@ -11,6 +12,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '')
 const scenes = await loadScenes()
 ---
 
+<link rel="preload" href={paperMono} as="font" type="font/woff2" crossorigin />
+<style is:inline set:html={`@font-face{font-family:'Paper Mono';font-style:normal;font-weight:100 800;font-display:optional;src:url('${paperMono}') format('woff2')}`}></style>
 <script type="application/json" id="scenes" set:html={JSON.stringify(scenes)} />
 <script is:inline define:vars={{ fresh, base }}>
   // The scene, and the page's colours from it, before the first paint: the Worker's, ?scene=name, the tab's, or one at random.

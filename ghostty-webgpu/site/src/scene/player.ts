@@ -152,13 +152,21 @@ export async function mountScene(
     painted.dispose()
     requestAnimationFrame(() => baked?.remove())
   })
-  draw(piece.meta.still ?? 0)
+  let t = piece.meta.still ?? 0
+  draw(t)
+  // A new width (a resized window, a turned phone) needs new square cells; the grid change redraws the scene.
+  terminal.onResize(() => draw(t))
+  let width = host.clientWidth
+  new ResizeObserver(() => {
+    if (host.clientWidth === width) return
+    width = host.clientWidth
+    terminal.setFont(squareCells(host, cols, rows))
+  }).observe(host)
   if (reducedMotion || !fps) return terminal
 
   const interval = 1000 / fps
   let visible = true
   let handle = 0
-  let t = piece.meta.still ?? 0
   let last = 0
   const tick = (now: number) => {
     handle = 0

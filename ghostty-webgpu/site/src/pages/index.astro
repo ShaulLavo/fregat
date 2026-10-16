@@ -54,7 +54,6 @@ const pageData = {
     <title>ghostty-webgpu: Ghostty's terminal, in the browser</title>
     <meta name="description" content="The real libghostty-vt core, unpatched, compiled to WebAssembly, with four renderers that draw only what changed." />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="preload" href="fonts/paper-mono-variable.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="ghostty-vt.wasm" as="fetch" type="application/wasm" crossorigin />
     <link rel="preload" href="bridge.wasm" as="fetch" type="application/wasm" crossorigin />
     <SceneTheme fresh />
@@ -62,7 +61,7 @@ const pageData = {
   </head>
   <body>
     <header class="hero">
-      <div class="scene" id="scene" aria-hidden="true">
+      <div class="scene" id="scene" aria-hidden="true" inert>
         <canvas class="scene-first" id="scene-first"></canvas>
       </div>
       <script type="text/plain" id="scene-frame"></script>
@@ -236,7 +235,7 @@ const pageData = {
     </main>
 
     <footer>
-      <p>MIT licensed. Built on libghostty-vt. Not affiliated with the Ghostty project. Scenes and art from <a href="https://ascii.rest">ascii.rest</a> (MIT), set in Paper Mono (OFL).</p>
+      <p>MIT licensed. Built on libghostty-vt. Not affiliated with the Ghostty project. Scenes and art from <a href="https://ascii.rest">ascii.rest</a> (<a href="licenses/ascii.rest.txt">MIT licence</a>), set in Paper Mono (<a href="licenses/paper-mono.txt">OFL</a>).</p>
       <p><a href="https://github.com/ShaulLavo/fregat">Fregat</a> · <a href="https://github.com/ShaulLavo/singapore">Singapore editor</a> · <a href="https://github.com/ShaulLavo/ghostty-webgpu/blob/main/CHANGELOG.md">Changelog</a></p>
     </footer>
 

@@ -93,6 +93,43 @@ try {
     'Paper Mono must load under the active hosting base',
   )
   await page.screenshot({ path: `${directory}/landing.png`, fullPage: true })
+  // The scene is decoration: the first Tab reaches the project links.
+  await page.locator('#scene canvas').first().waitFor()
+  await page.keyboard.press('Tab')
+  assert.equal(
+    await page.evaluate(() => document.activeElement?.textContent?.trim()),
+    '[ docs ]',
+    'The first Tab on the landing page lands on the project links',
+  )
+  // A resized window refits the scene as a fresh load at that width does.
+  const sceneHeight = () => page.evaluate(() => document.getElementById('scene')!.clientHeight)
+  const wide = await sceneHeight()
+  await page.setViewportSize({ width: 320, height: 960 })
+  await page.waitForFunction(
+    (before) => document.getElementById('scene')!.clientHeight < before / 2,
+    wide,
+  )
+  await page.waitForTimeout(300)
+  const resized = await sceneHeight()
+  await page.reload()
+  await page.locator('#scene canvas').first().waitFor()
+  await page.waitForFunction(() => document.querySelector('#scene .scene-first') === null)
+  assert(
+    Math.abs((await sceneHeight()) - resized) <= 2,
+    `Resized scene is ${resized}px tall, a fresh load differs`,
+  )
+  await page.setViewportSize({ width: 1440, height: 960 })
+  // A missing page at any depth is the site's 404, with its font.
+  const missing = await page.goto(new URL('../missing/deep/', root).href)
+  assert.equal(missing?.status(), 404)
+  await page.locator('#not-found').waitFor()
+  assert(
+    await page.evaluate(async () => {
+      const faces = await document.fonts.load('15px "Paper Mono"')
+      return faces.length > 0 && faces.every((face) => face.status === 'loaded')
+    }),
+    'Paper Mono must load on a nested missing page',
+  )
   await page.goto(root.href)
   await page.getByRole('button', { name: 'Search' }).click()
   await page.getByRole('dialog', { name: 'Search' }).getByRole('textbox').fill('scrollback')

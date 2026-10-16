@@ -7,7 +7,7 @@
     "dev": "bun scripts/sync-assets.ts && astro dev",
     "preview": "astro preview",
     "typecheck": "../../node_modules/.bin/tsc --noEmit -p tsconfig.json && ../../node_modules/.bin/tsc --noEmit -p tsconfig.tests.json",
-    "docs:check": "bun scripts/check-docs.ts && bun test scripts/pty.test.ts"
+    "docs:check": "bun scripts/check-docs.ts && bun test scripts/pty.test.ts worker/index.test.ts"
   },
   "dependencies": {
     "ascii.rest": "0.4.0",
