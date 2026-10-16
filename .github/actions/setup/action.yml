@@ -17,12 +17,12 @@ runs:
       with:
         bun-version-file: package.json
 
-    # The node-pty bridge spawns the real Node binary, never Bun's `node`
-    # shim, so the terminal tests need a genuine Node on PATH.
+    # Parser tests and grammar generation require Node 26. The node-pty
+    # bridge also requires the real Node binary on PATH.
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
-        node-version: 24
+        node-version: 26
 
     # Workspace search shells out to `fd` and `rg`, and silently degrades to a
     # different provider when either is missing — so without these the search

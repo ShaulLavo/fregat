@@ -20,6 +20,12 @@ every user-facing knob is a registry entry in `packages/contracts/src/settings/k
 
 [filesystem boundaries](filesystem-boundaries.md) covers ordinary editor access, the optional server root restriction, and the separate permissions agents run under
 
+## prerequisites
+
+Use Node.js 26.0.0 or newer and the Bun version pinned by `packageManager` in the root manifest. Tree-sitter and native Markdown parsing require `WebAssembly.Memory.prototype.toResizableBuffer()`. Their runtime floors are Node 26.0.0, Bun 1.2.22, Chromium 144, Firefox 145, and Safari 26.2.
+
+Editor package tests use Node through Vitest's shebang. `bun run test` starts the package script with Bun's script runner and leaves that Node child on `PATH`. Language catalog generation and the runtime identity fixture also launch `node` explicitly. Install Node 26 before running these checks.
+
 ## checks
 
 ```bash
