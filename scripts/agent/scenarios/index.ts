@@ -279,6 +279,7 @@ import { webPicker } from './web-picker'
 import { nativeHost } from './native-host'
 import { filePickerSelection } from './file-picker-selection'
 import { filePickerBrowse } from './file-picker-browse'
+import { filePickerHeader } from './file-picker-header'
 import { filePickerLocations } from './file-picker-locations'
 import { filePickerAppearance } from './file-picker-appearance'
 import { quickOpenCrlfPreview } from './quick-open-crlf-preview'
@@ -730,6 +731,7 @@ export const scenarios: readonly Scenario[] = [
   tailFollow,
   checkpointRestore,
   filePickerBrowse,
+  filePickerHeader,
   filePickerLocations,
   filePickerAppearance,
   webPicker,
