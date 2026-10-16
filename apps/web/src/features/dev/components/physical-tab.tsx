@@ -105,8 +105,9 @@ export function PhysicalTab() {
       <Input aria-label='Preview field' aria-invalid={invalid} placeholder='Preview field' />
       <Button onClick={() => setInvalid((current) => !current)}>Toggle invalid field</Button>
       <ListRow role='option' onClick={() => setValue((current) => current + 1)}>
-        Silent row
+        Selectable row
       </ListRow>
+      <ListRow>Informational row</ListRow>
     </div>
   )
 }

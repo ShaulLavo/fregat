@@ -1,6 +1,7 @@
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { usePaneHost } from '@/hooks/use-pane-host'
 import { PaneHeaderMenu } from '@/components/pane-header-menu'
@@ -102,11 +103,13 @@ function bottomTab({
 }) {
   return (
     <button
-      data-feedback='silent'
+      data-feedback='tick'
+      data-row-press
       aria-selected={active}
       className={barTabClassName(active, 'focus-ring-inset outline-none')}
       role='tab'
       type='button'
+      onClickCapture={(event) => playClickFeedback(event.nativeEvent, event.currentTarget)}
       onClick={onClick}
     >
       {icon}

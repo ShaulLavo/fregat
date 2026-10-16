@@ -187,6 +187,8 @@ function snapshotFor(registration: InternalRegistration): FocusTargetSnapshot {
 }
 
 function focusLayoutForElement(element: HTMLElement): FocusLayout | null {
+  const explicit = element.closest<HTMLElement>('[data-focus-layout]')?.dataset.focusLayout
+  if (explicit === 'chat' || explicit === 'workbench') return explicit
   if (element.closest('[data-chat-mode]')) return 'chat'
   if (element.closest('[data-workbench]')) return 'workbench'
 

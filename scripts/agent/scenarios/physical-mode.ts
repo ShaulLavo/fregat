@@ -1,5 +1,5 @@
 import { ok, strictEqual } from 'node:assert/strict'
-import { selectors } from '../selectors'
+import { chords, pressShortcut, selectors } from '../selectors'
 import type { Scenario } from './index'
 import { feedbackSoundCount as soundCount, installFeedbackProbe } from '../feedback-probe'
 
@@ -10,7 +10,7 @@ export const physicalMode: Scenario = {
   async run(page, { step }) {
     const baseline = process.env.PHYSICAL_BASELINE === '1'
     const expectedFeel = baseline ? 'flat' : 'playful'
-    await page.keyboard.press('Control+,')
+    await pressShortcut(page, chords.settings)
     await selectors.settingsSearch(page).fill('workbench.feel')
     for (const feel of ['seam', 'brisk', 'relaxed', 'playful', expectedFeel]) {
       await selectors.settingsFeel(page).click()
@@ -58,13 +58,14 @@ export const physicalMode: Scenario = {
       strictEqual(await button.getAttribute('data-pressing'), null)
       strictEqual(await soundCount(page), keyboardBefore)
       await selectors.physicalRow(page).click()
-      strictEqual(await soundCount(page), keyboardBefore)
+      strictEqual(await soundCount(page), keyboardBefore + 1)
+      const rowBefore = await soundCount(page)
 
       const command = selectors.physicalCommand(page)
       await command.hover()
-      strictEqual(await soundCount(page), keyboardBefore)
+      strictEqual(await soundCount(page), rowBefore)
       await command.click()
-      strictEqual(await soundCount(page), keyboardBefore + 1)
+      strictEqual(await soundCount(page), rowBefore + 1)
       await selectors.physicalCommands(page).focus()
       const commandKeyboard = await soundCount(page)
       await page.keyboard.press('Enter')
@@ -86,9 +87,10 @@ export const physicalMode: Scenario = {
         ok(Number(selectPressed.opacity) < 1, 'Select dims while its anchor stays stationary')
       }
       strictEqual(await select.getAttribute('data-pressing'), '')
-      strictEqual(await soundCount(page), selectBefore + 1)
+      strictEqual(await soundCount(page), selectBefore)
       await step(`${prefix}-select-press`)
       await page.mouse.up()
+      strictEqual(await soundCount(page), selectBefore + 1)
       strictEqual(await select.getAttribute('data-pressing'), null)
       await page.keyboard.press('Escape')
 

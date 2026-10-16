@@ -22,7 +22,7 @@ export type UseListboxOptions<Id extends string> = {
   role: ListboxRole
   items: readonly ListboxItem<Id>[]
   activeId: Id | null
-  onActiveChange: (id: Id, event?: MouseEvent<HTMLElement>) => void
+  onActiveChange: (id: Id) => void
   onCommit: (id: Id) => void
   onSelect?: (id: Id) => void
   onCollapse?: (id: Id) => void
@@ -164,7 +164,7 @@ export function useListbox<Id extends string>({
       if (isRowControl(event.target, event.currentTarget)) return
       const current = interactions.current
       const item = current.items.find((candidate) => candidate.id === id)
-      if (item && !item.disabled) current.onActiveChange(id, event)
+      if (item && !item.disabled) current.onActiveChange(id)
       focusFromPointer()
     },
     onMouseDown: (event: MouseEvent<HTMLElement>) => {

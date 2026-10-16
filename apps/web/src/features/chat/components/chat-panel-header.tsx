@@ -36,7 +36,7 @@ export function ChatPanelHeader({
   creating: boolean
   disabled: boolean
   onNewChat: () => void
-  onSelectSession: (sessionId: SessionId, event: Event) => void
+  onSelectSession: (sessionId: SessionId) => void
   sessions: readonly ChatSessionListProjection[]
 }) {
   const historyDisabled = sessions.length === 0
@@ -100,11 +100,11 @@ export function ChatPanelHeader({
               {sessions.map((item) => (
                 <DropdownMenuItem
                   className='grid grid-cols-[1fr_auto] gap-y-0.5'
-                  data-feedback='silent'
+                  data-feedback='tick'
                   data-selected={item.id === activeSessionId || undefined}
                   key={item.id}
                   title={`${item.title} — ${chatSessionPreview(item)}`}
-                  onClick={(event) => onSelectSession(item.id, event.nativeEvent)}
+                  onClick={() => onSelectSession(item.id)}
                 >
                   <span className='truncate font-medium'>
                     {item.id === activeSessionId ? 'Current: ' : ''}

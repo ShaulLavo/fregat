@@ -1,3 +1,4 @@
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import { Accordion as AccordionPrimitive } from '@base-ui/react/accordion'
 
 import { cn } from '@workspace/ui/lib/utils'
@@ -22,12 +23,17 @@ function AccordionTrigger({ className, children, ...props }: AccordionPrimitive.
     <AccordionPrimitive.Header className='flex'>
       <AccordionPrimitive.Trigger
         data-slot='accordion-trigger'
+        data-feedback='tap'
         data-press-depth
         className={cn(
           'focus-ring group/accordion-trigger relative flex flex-1 items-start justify-between border border-transparent py-(--density-accordion-padding-y) text-left text-xs font-medium outline-none hover:underline aria-disabled:pointer-events-none aria-disabled:opacity-50 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-(--icon-size) **:data-[slot=accordion-trigger-icon]:text-muted-foreground',
           className,
         )}
         {...props}
+        onClickCapture={(event) => {
+          props.onClickCapture?.(event)
+          playClickFeedback(event.nativeEvent, event.currentTarget)
+        }}
       >
         {children}
         <CaretDownIcon
