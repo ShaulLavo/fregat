@@ -1,5 +1,5 @@
 import { ok, strictEqual } from 'node:assert/strict'
-import { chords, selectors } from '../selectors'
+import { chords, pressShortcut, selectors } from '../selectors'
 import type { Scenario } from './index'
 import { feedbackSoundCount as soundCount, installFeedbackProbe } from '../feedback-probe'
 
@@ -10,7 +10,7 @@ export const physicalMode: Scenario = {
   async run(page, { step }) {
     const baseline = process.env.PHYSICAL_BASELINE === '1'
     const expectedFeel = baseline ? 'flat' : 'playful'
-    await page.keyboard.press(chords.settings)
+    await pressShortcut(page, chords.settings)
     await selectors.settingsSearch(page).fill('workbench.feel')
     for (const feel of ['seam', 'brisk', 'relaxed', 'playful', expectedFeel]) {
       await selectors.settingsFeel(page).click()

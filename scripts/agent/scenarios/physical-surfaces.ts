@@ -5,7 +5,7 @@ import type { Page } from 'playwright'
 import { feedbackSoundCount, installFeedbackProbe } from '../feedback-probe'
 import { committedFixture, openFixtureWorkspace } from '../fixture-workspace'
 import { writeUserOperations } from '../preserve-settings'
-import { selectors, waitForApp } from '../selectors'
+import { chords, pressShortcut, selectors, waitForApp } from '../selectors'
 import type { Scenario } from './index'
 
 export const physicalSurfaces: Scenario = {
@@ -268,7 +268,7 @@ async function chooseSettingsRow(page: Page, id: string) {
 }
 
 async function paletteChoices(page: Page, mobile: boolean, step: (label: string) => Promise<void>) {
-  await page.keyboard.press('ControlOrMeta+Shift+P')
+  await pressShortcut(page, chords.commandPalette)
   await selectors.paletteInput(page).fill('>Settings')
   const command = selectors.commandOption(page, 'Settings').first()
   await command.waitFor()
@@ -280,7 +280,7 @@ async function paletteChoices(page: Page, mobile: boolean, step: (label: string)
   )
   await selectors.paletteInput(page).waitFor({ state: 'hidden' })
   await step('palette-pointer-command-closed')
-  await page.keyboard.press('ControlOrMeta+Shift+P')
+  await pressShortcut(page, chords.commandPalette)
   await selectors.paletteInput(page).fill('>Settings')
   await selectors.commandOption(page, 'Settings').first().waitFor()
   await silentAction(page, () => page.keyboard.press('Enter'), 'Real palette keyboard command')
