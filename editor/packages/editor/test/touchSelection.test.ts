@@ -170,6 +170,34 @@ describe('TouchSelectionController hold scheduling', () => {
     expect(notify).toHaveBeenLastCalledWith('cancel', null)
   })
 
+  it.each(['holding', 'released', 'settled'])(
+    'clears the selection and cancels a %s touch gesture',
+    (phase) => {
+      const session = {},
+        snapshot = {},
+        selections = {}
+      controller.selectionChanged(session, snapshot, selections)
+      dispatchTouch(row, 'touchstart')
+      if (phase !== 'holding') {
+        vi.advanceTimersByTime(550)
+        dispatchTouch(row, 'touchend', 20, 0)
+      }
+      if (phase === 'settled') vi.advanceTimersByTime(16)
+
+      controller.clearSelection()
+
+      expect(element.hasAttribute('data-editor-touch-selecting')).toBe(false)
+      expect(notify).toHaveBeenLastCalledWith('cancel', null)
+      const calls = notify.mock.calls.length
+      vi.advanceTimersByTime(1000)
+      expect(notify).toHaveBeenCalledTimes(calls)
+      if (phase === 'holding') expect(word).not.toHaveBeenCalled()
+
+      controller.selectionChanged(session, snapshot, selections)
+      expect(notify).toHaveBeenCalledTimes(calls + 1)
+    },
+  )
+
   it.each(['session', 'snapshot', 'selection'])(
     'cancels a hold when the %s changes externally',
     (kind) => {

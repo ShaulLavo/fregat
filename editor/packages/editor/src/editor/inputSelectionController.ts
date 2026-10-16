@@ -1785,6 +1785,7 @@ export class InputSelectionController {
   }
 
   clearSelectionHighlight(): void {
+    this.touchSelection.clearSelection()
     this.options.view.clearSelection()
   }
 
