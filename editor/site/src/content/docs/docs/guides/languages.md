@@ -2,6 +2,8 @@
 
 Add syntax colours and structural language data with tree-sitter. You need a bundler that emits module workers and WebAssembly assets.
 
+Use Chromium 144, Firefox 145, Safari 26.2, or newer for Tree-sitter and native Markdown parsing. Parser calls in Node require Node.js 26.0.0 or newer; Bun requires 1.2.22 or newer. The parser uses `WebAssembly.Memory.prototype.toResizableBuffer()`.
+
 ## 1. Install the syntax packages
 
 ```sh

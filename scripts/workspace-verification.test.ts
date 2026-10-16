@@ -270,6 +270,25 @@ test('each standalone install uses a fresh directory and selected families conti
   ).toContain('mktemp -d "$RUNNER_TEMP/mirror-editor-hoisted-XXXXXX"')
 })
 
+test.each([
+  ['workflow_dispatch', false, '26'],
+  ['workflow_call', true, '26'],
+  ['workflow_call', false, '24'],
+])(
+  'standalone runtime for %s with Editor enabled %s selects Node %s',
+  (event, editor, expected) => {
+    const step = readWorkflow('workspace-libraries.yml').jobs.standalone!.steps.find(
+      (entry) => entry.uses === 'actions/setup-node@v4',
+    )
+    const version = step?.with?.['node-version']
+    expect(typeof version).toBe('string')
+    if (typeof version !== 'string') return
+    expect(
+      expression(version, { github: { event_name: event }, inputs: { standalone_editor: editor } }),
+    ).toBe(expected)
+  },
+)
+
 test('automatic bump branches include the matched Markdown source', () => {
   const steps = readWorkflow('editor-tree-sitter-x.yml').jobs.update!.steps
   const branch = steps.find((step) => step.name === 'Open a pull request')

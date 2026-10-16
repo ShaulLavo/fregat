@@ -219,3 +219,63 @@ it('keeps a sibling document intact after disposal and initialization repeats', 
   })
   expect(after?.records).toEqual(before?.records)
 })
+
+it('preserves Unicode Markdown worker results after measured shared-heap growth', async () => {
+  const text = '# שלום 🪐\n\nA **bold** paragraph.\n'
+  const document = sourceDocument(text)
+  const initial = await document.withRead((source) =>
+    client.parse({ ...identity, snapshotVersion: 1, source }),
+  )
+  expect(initial?.records?.data.length).toBeGreaterThan(0)
+  const before = (await client.inspectRetention())?.shared.wasmMemory
+  if (before?.kind !== 'committed') throw new TypeError('Expected the initialized parser heap')
+  expect(before.bytes).toBeLessThanOrEqual(32 * 1024 * 1024)
+  const pressure = sourceDocument('x'.repeat(before.bytes))
+  await pressure.withRead((source) =>
+    client.parse({
+      ...identity,
+      runtimeSessionId: 'growth-pressure',
+      snapshotVersion: 1,
+      source,
+      resultMode: 'parseOnly',
+    }),
+  )
+  const after = (await client.inspectRetention())?.shared.wasmMemory
+  if (after?.kind !== 'committed') throw new TypeError('Expected the grown parser heap')
+  expect(after.bytes).toBeGreaterThan(before.bytes)
+  client.disposeDocument('growth-pressure')
+  await client.awaitRuntimeSessionIdle('growth-pressure')
+  pressure.dispose()
+  const retained = await client.queryRange({
+    ...identity,
+    snapshotVersion: 1,
+    includeHighlights: true,
+    range: { startIndex: 0, endIndex: text.length },
+  })
+  expect(retained?.records).toEqual(initial?.records)
+  const previous = document.delivery.current()!
+  const edit = { from: 0, to: 0, text: '漢字 🦀\n\n' }
+  document.view.applyEdits([edit])
+  const actual = await document.withRead((source) => {
+    const payload = createTreeSitterEditPayload({
+      ...identity,
+      previousSnapshotVersion: 1,
+      snapshotVersion: 2,
+      previousRead: previous.text,
+      source,
+      edits: [edit],
+    })
+    if (!payload) throw new TypeError('Expected the Unicode Markdown edit payload')
+    return client.edit(payload)
+  })
+  const freshDocument = sourceDocument(edit.text + text)
+  const fresh = await freshDocument.withRead((source) =>
+    client.parse({ ...identity, runtimeSessionId: 'growth-fresh', snapshotVersion: 2, source }),
+  )
+  expect(actual?.records?.data.length).toBeGreaterThan(0)
+  expect(fresh?.records?.data.length).toBeGreaterThan(0)
+  expect(actual?.records).toEqual(fresh?.records)
+  expect(actual?.captures).toEqual(fresh?.captures)
+  expect(actual?.folds).toEqual(fresh?.folds)
+  expect(actual?.injections).toEqual(fresh?.injections)
+})

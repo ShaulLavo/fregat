@@ -72,7 +72,7 @@
     "tree-sitter-javascript": "0.25.0",
     "tree-sitter-jsdoc": "0.25.0",
     "tree-sitter-json": "0.24.8",
-    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#e2ae3f735f614b3b618b5de71fc41644a180b9e7",
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#347a798ac598fbb4523ee83287a99df6ada42487",
     "tree-sitter-php": "0.24.2",
     "tree-sitter-python": "0.25.0",
     "tree-sitter-regex": "0.25.0",
@@ -87,10 +87,14 @@
     "oxlint": "1.85.0",
     "typescript": "7.0.2",
     "vitest": "5.0.2",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#121cf0d206a57a98e704dcee0c53e6804c619633"
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#aab7db1518c19f61c1b13ec3f832b881cf5f1385"
   },
   "peerDependencies": {
     "@singapore-editor/core": "workspace:*",
     "@singapore-editor/tree-sitter": "workspace:*"
+  },
+  "engines": {
+    "bun": ">=1.2.22",
+    "node": ">=26.0.0"
   }
 }

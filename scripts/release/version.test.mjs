@@ -321,7 +321,11 @@ test('versions the public Editor group with versioned and unversioned private ex
       ([, manifest]) => !manifest.private,
     )
     expect(publicPackages).toHaveLength(20)
-    for (const [file] of publicPackages) expect((await read(dirname(file))).version).toBe('0.2.1')
+    for (const [file, manifest] of publicPackages) {
+      const published = await read(dirname(file))
+      expect(published.version).toBe('0.2.1')
+      expect(published.engines).toEqual(manifest.engines)
+    }
     expect((await read('editor/examples/app')).version).toBe('0.0.0')
     expect(await read('editor/examples/stress')).not.toHaveProperty('version')
     expect((await read('hotkeys/packages/hotkeys')).version).toBe('0.0.0')
