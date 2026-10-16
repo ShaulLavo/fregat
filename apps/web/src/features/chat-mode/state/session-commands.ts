@@ -26,19 +26,27 @@ import { useActiveProjectStore } from '@/features/workspace/state/active-project
 import { activeEnvironmentId } from '@/lib/environments/state/domain'
 import { getNavigation } from '@/state/navigation-binding'
 import { isPhoneShell } from '@/lib/shell/state/store'
+import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
 export type SessionTraversalDirection = 'next' | 'previous'
 export type SessionOpenOptions = {
   readonly baseWorktree?: ScopedWorktreeRef
 }
-export async function openSessionRow(session: SessionRailItem) {
+export async function openSessionRow(session: SessionRailItem, event?: Event) {
+  const changed = selectedSessionKey() !== session.key
   const result = await getNavigation().openChat({
     environmentId: session.environmentId,
     sessionId: session.id,
     surface: 'main',
   })
-  return result.status === 'applied'
+  const applied = result.status === 'applied'
+  if (applied && changed && event) playControlFeedback('tick', event)
+  return applied
 }
-export function activateSessionRow(session: SessionRailItem, intent: SessionClickIntent) {
+export function activateSessionRow(
+  session: SessionRailItem,
+  intent: SessionClickIntent,
+  event?: Event,
+) {
   const multi = useSessionMultiSelectStore.getState()
   if (intent === 'toggle') {
     multi.toggle(session.ref)
@@ -53,7 +61,7 @@ export function activateSessionRow(session: SessionRailItem, intent: SessionClic
   }
   if (isPhoneShell()) multi.clear()
   else multi.markOnly(session.ref)
-  return openSessionRow(session)
+  return openSessionRow(session, event)
 }
 export function clearSessionMultiSelect() {
   useSessionMultiSelectStore.getState().clear()

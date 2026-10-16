@@ -12,6 +12,14 @@ import {
   DropdownMenuTrigger,
 } from '@workspace/ui/components/dropdown-menu'
 import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@workspace/ui/components/select'
+import { Command, CommandItem, CommandList } from '@workspace/ui/components/command'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { useFeedbackLayer } from '@workspace/ui/hooks/use-feedback-layer'
 import { configureFeedback } from '@workspace/ui/patterns/feedback-layer'
@@ -22,6 +30,7 @@ export function PhysicalTab() {
   const [sounds, setSounds] = useState(false)
   const [invalid, setInvalid] = useState(false)
   const [value, setValue] = useState(50)
+  const [choice, setChoice] = useState('one')
   useFeedbackLayer()
   useEffect(() => {
     configureFeedback({ channels: sounds ? ['controls'] : [], volume: 50 })
@@ -52,6 +61,25 @@ export function PhysicalTab() {
       </label>
       <Slider aria-label='Preview slider' value={value} onValueChange={setValue} />
       <Ticker value={value} />
+      <Select value={choice} onValueChange={(next) => next && setChoice(next)}>
+        <SelectTrigger aria-label='Preview select'>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='one'>First choice</SelectItem>
+          <SelectItem value='two'>Second choice</SelectItem>
+        </SelectContent>
+      </Select>
+      <Command>
+        <CommandList aria-label='Preview commands'>
+          <CommandItem value='first' onSelect={() => setValue((current) => current + 1)}>
+            Preview command
+          </CommandItem>
+          <CommandItem value='disabled' disabled>
+            Disabled command
+          </CommandItem>
+        </CommandList>
+      </Command>
       <Tabs defaultValue='one'>
         <TabsList aria-label='Preview tabs'>
           <TabsTab value='one'>One</TabsTab>

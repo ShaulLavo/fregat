@@ -1,11 +1,7 @@
 import { ok, strictEqual } from 'node:assert/strict'
-import type { Page } from 'playwright'
 import { selectors } from '../selectors'
 import type { Scenario } from './index'
-
-async function soundCount(page: Page) {
-  return page.evaluate(() => Number(Reflect.get(window, 'physicalSoundCount') ?? 0))
-}
+import { feedbackSoundCount as soundCount, installFeedbackProbe } from '../feedback-probe'
 
 export const physicalMode: Scenario = {
   name: 'physical-mode',
@@ -23,18 +19,7 @@ export const physicalMode: Scenario = {
     }
     await step('feel-setting')
     await page.waitForTimeout(500)
-    await page.addInitScript(() => {
-      Reflect.set(window, 'physicalSoundCount', 0)
-      const original = AudioContext.prototype.createBufferSource
-      AudioContext.prototype.createBufferSource = function () {
-        Reflect.set(
-          window,
-          'physicalSoundCount',
-          Number(Reflect.get(window, 'physicalSoundCount')) + 1,
-        )
-        return original.call(this)
-      }
-    })
+    await installFeedbackProbe(page)
     const url = new URL(page.url())
     url.pathname = '/dev/physical'
     url.search = ''
@@ -75,6 +60,38 @@ export const physicalMode: Scenario = {
       await selectors.physicalRow(page).click()
       strictEqual(await soundCount(page), keyboardBefore)
 
+      const command = selectors.physicalCommand(page)
+      await command.hover()
+      strictEqual(await soundCount(page), keyboardBefore)
+      await command.click()
+      strictEqual(await soundCount(page), keyboardBefore + 1)
+      await selectors.physicalCommands(page).focus()
+      const commandKeyboard = await soundCount(page)
+      await page.keyboard.press('Enter')
+      strictEqual(await soundCount(page), commandKeyboard)
+      await selectors.physicalDisabledCommand(page).click({ force: true })
+      strictEqual(await soundCount(page), commandKeyboard)
+
+      const select = selectors.physicalSelect(page)
+      await select.hover()
+      const selectBefore = await soundCount(page)
+      await page.mouse.down()
+      await page.waitForTimeout(180)
+      const selectPressed = await select.evaluate((node) => ({
+        scale: getComputedStyle(node).scale,
+        opacity: getComputedStyle(node).opacity,
+      }))
+      if (!baseline) {
+        strictEqual(selectPressed.scale, '1')
+        ok(Number(selectPressed.opacity) < 1, 'Select dims while its anchor stays stationary')
+      }
+      strictEqual(await select.getAttribute('data-pressing'), '')
+      strictEqual(await soundCount(page), selectBefore + 1)
+      await step(`${prefix}-select-press`)
+      await page.mouse.up()
+      strictEqual(await select.getAttribute('data-pressing'), null)
+      await page.keyboard.press('Escape')
+
       const toggle = selectors.physicalSwitch(page, 'Preview switch')
       await toggle.hover()
       await page.mouse.down()
@@ -101,6 +118,8 @@ export const physicalMode: Scenario = {
     await selectors.physicalSwitch(page, 'Control sounds in this preview').click()
     const silent = await soundCount(page)
     await selectors.physicalButton(page, 'Press me').click()
+    strictEqual(await soundCount(page), silent)
+    await selectors.physicalCommand(page).click()
     strictEqual(await soundCount(page), silent)
     await page.emulateMedia({ reducedMotion: 'no-preference' })
   },

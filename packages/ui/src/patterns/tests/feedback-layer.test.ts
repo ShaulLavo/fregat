@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'vitest'
+import { act, createElement } from 'react'
+import { mount } from '../../../test/render'
+import { Command, CommandItem, CommandList } from '../../components/command'
 
 import {
   configureFeedback,
@@ -12,6 +15,7 @@ import {
 let clock = 0
 let hidden = false
 let starts = 0
+let cleanup = () => {}
 
 // The audio boundary: counts what would reach the speaker.
 function fakeContext() {
@@ -44,7 +48,11 @@ beforeEach(() => {
   resetFeedbackForTest({ createContext: fakeContext, now: () => clock, hidden: () => hidden })
 })
 
-afterEach(() => configureFeedback({ channels: [], volume: 50 }))
+afterEach(() => {
+  cleanup()
+  cleanup = () => {}
+  configureFeedback({ channels: [], volume: 50 })
+})
 
 test('nothing sounds before a gesture unlocks the context', () => {
   configureFeedback({ channels: ['errors'], volume: 50 })
@@ -106,4 +114,83 @@ test('pointer commits sound, keyboard and programmatic commits stay silent', () 
   expect(starts).toBe(0)
   playControlFeedback('tick', new MouseEvent('click', { detail: 1 }))
   expect(starts).toBe(1)
+})
+
+test('command items tick after pointer selection and stay quiet on hover and keyboard activation', () => {
+  configureFeedback({ channels: ['controls'], volume: 50 })
+  unlockFeedback()
+  let selections = 0
+  const mounted = mount(
+    createElement(
+      Command,
+      null,
+      createElement(
+        CommandList,
+        null,
+        createElement(
+          CommandItem,
+          {
+            value: 'choice',
+            onSelect: () => {
+              expect(starts).toBe(0)
+              selections += 1
+            },
+          },
+          'Choice',
+        ),
+      ),
+    ),
+  )
+  cleanup = mounted.unmount
+  const item = mounted.container.querySelector('[data-slot="command-item"]')!
+  const command = mounted.container.querySelector('[cmdk-root]')!
+  act(() =>
+    item.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse' })),
+  )
+  expect(starts).toBe(0)
+  act(() => command.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
+  act(() => item.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 })))
+  expect(selections).toBe(2)
+  expect(starts).toBe(0)
+  act(() => item.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })))
+  expect(selections).toBe(3)
+  expect(starts).toBe(1)
+})
+
+test.each(['disabled', 'canceled'] as const)('a %s command item stays silent', (reason) => {
+  configureFeedback({ channels: ['controls'], volume: 50 })
+  unlockFeedback()
+  let selections = 0
+  const mounted = mount(
+    createElement(
+      Command,
+      {
+        onClick: (event) => {
+          if (reason === 'canceled') event.preventDefault()
+        },
+      },
+      createElement(
+        CommandList,
+        null,
+        createElement(
+          CommandItem,
+          {
+            value: 'choice',
+            disabled: reason === 'disabled',
+            onSelect: () => {
+              selections += 1
+            },
+          },
+          'Choice',
+        ),
+      ),
+    ),
+  )
+  cleanup = mounted.unmount
+  const item = mounted.container.querySelector('[data-slot="command-item"]')!
+  act(() =>
+    item.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, cancelable: true })),
+  )
+  expect(selections).toBe(reason === 'disabled' ? 0 : 1)
+  expect(starts).toBe(0)
 })

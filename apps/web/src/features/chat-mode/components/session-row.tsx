@@ -83,7 +83,7 @@ export function SessionRow({ session }: { readonly session: SessionRailItem }) {
           rowProps.onClick(event)
           return
         }
-        void activateSessionRow(session, intent)
+        void activateSessionRow(session, intent, event.nativeEvent)
       }}
     >
       <ShortcutHintBadge className='top-1 left-0.5' command={itemCommand} />
