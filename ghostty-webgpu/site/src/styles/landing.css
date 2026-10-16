@@ -55,7 +55,14 @@ code {
   white-space: nowrap;
 }
 
-/* ascii.rest pieces: text first, then a canvas the width of that text. */
+/* ascii.rest pieces: text first, then a canvas the width of that text. Neither may widen the page. */
+.art {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+}
+
 .art pre {
   margin: 0;
   font: inherit;
@@ -277,11 +284,8 @@ hr::before {
   color: var(--accent);
 }
 
-.art {
-  font-size: 14px;
-}
-
 .scores {
+  grid-template-columns: minmax(0, 1fr);
   list-style: none;
   margin: 18px 0;
   padding: 0;
