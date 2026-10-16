@@ -83,6 +83,11 @@ export class TouchSelectionController {
     this.selectionState = { session, snapshot, selections }
   }
 
+  clearSelection(): void {
+    this.selectionState = null
+    this.cancel()
+  }
+
   get ownsMouseEvent(): boolean {
     return this.pointerType === 'touch'
   }
@@ -119,7 +124,7 @@ export class TouchSelectionController {
     element.removeEventListener('scroll', this.scrollNotification)
     element.removeEventListener('wheel', this.cancelNotification)
     element.removeEventListener('beforeinput', this.cancelNotification)
-    this.cancel()
+    this.clearSelection()
     this.scheduler.dispose()
     this.pendingMousePress = null
   }
