@@ -334,8 +334,14 @@
       "project": ["src/**/*.ts"]
     },
     "ghostty-webgpu/site": {
-      "entry": ["src/main.ts", "src/pages/**/*.{astro,ts}", "src/examples/**/*.ts", "scripts/*.ts"],
-      "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts"]
+      "entry": [
+        "src/landing.ts",
+        "src/pages/**/*.{astro,ts}",
+        "src/examples/**/*.ts",
+        "scripts/*.ts",
+        "worker/index.ts"
+      ],
+      "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts", "worker/**/*.ts"]
     },
     "editor/packages/collaboration": {
       "entry": [

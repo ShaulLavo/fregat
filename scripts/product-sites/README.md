@@ -33,7 +33,11 @@ The build also writes a standalone project index; none of these Workers publishe
 
 To use output built elsewhere, copy its `fregat`, `singapore` and `ghostty-webgpu` directories
 into `scripts/product-sites/dist`. The three native Wrangler configs declare those directories,
-exact Custom Domains, and assets-only serving. Unknown pages and assets return 404.
+exact Custom Domains, and asset serving. Fregat and Singapore are assets-only, and their unknown
+pages and assets return 404. Ghostty's Worker (`ghostty-webgpu/site/worker/index.ts`) runs in
+front of its pages only: it picks the visitor's scene and writes the scene's colours, and on the
+landing page its first frame, into the HTML. Scripts, fonts, frames and WASM are served directly.
+Its missing pages return the site's `404.html` with status 404.
 There is no SPA fallback. Cloudflare handles static MIME types, DNS and TLS.
 The build copies `_headers` into each site to preserve HSTS, the referrer policy, `nosniff`
 and same-origin framing. HSTS covers each exact hostname.
@@ -71,7 +75,7 @@ bun run --cwd scripts wrangler rollback VERSION_ID --config product-sites/wrangl
 Repeat for `wrangler.fregat.jsonc` or `wrangler.ghostty.jsonc`. Rollback restores a previous
 Worker version and its assets. The first deployment has no prior version. To withdraw it, run `wrangler delete` with the
 matching config for each Worker created here, then verify its Custom Domain was removed. Before rollback, check the
-version belongs to the intended Worker. These Workers have no databases or state bindings.
+version belongs to the intended Worker. These Workers have no databases or state bindings. Ghostty's Worker keeps the visitor's scene in a session cookie.
 
 ## Verification
 

@@ -12,6 +12,8 @@ const browser = await chromium.launch({ headless: true })
 const page = await browser.newPage()
 const errors: string[] = []
 page.on('pageerror', (error) => errors.push(error.message))
+// The narrowest phones in use are 320 CSS pixels wide; no page may scroll sideways on them.
+const WIDTHS = [1440, 390, 320]
 const paths = [
   '',
   'guides/pty/',
@@ -23,7 +25,7 @@ const paths = [
   'examples/echo/',
 ]
 try {
-  for (const width of [1440, 390]) {
+  for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: 960 })
     for (const path of paths) {
       const response = await page.goto(new URL(path, root).href)
@@ -63,18 +65,32 @@ try {
       })
     }
   }
+  for (const width of WIDTHS) {
+    await page.setViewportSize({ width, height: 960 })
+    for (const [name, path] of [
+      ['landing', '../'],
+      ['not-found', '../404.html'],
+    ] as const) {
+      await page.goto(new URL(path, root).href)
+      await page.locator('main').waitFor()
+      assert(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        `${name} overflows at ${width}`,
+      )
+    }
+  }
   await page.setViewportSize({ width: 1440, height: 960 })
   await page.goto(new URL('../', root).href)
   assert.equal(
-    await page.getByRole('link', { name: 'Docs', exact: true }).getAttribute('href'),
+    await page.getByRole('link', { name: '[ docs ]', exact: true }).getAttribute('href'),
     root.pathname,
   )
   assert(
     await page.evaluate(async () => {
-      const faces = await document.fonts.load('19px "Bricolage Grotesque"')
+      const faces = await document.fonts.load('15px "Paper Mono"')
       return faces.length > 0 && faces.every((face) => face.status === 'loaded')
     }),
-    'Landing font must load under the active hosting base',
+    'Paper Mono must load under the active hosting base',
   )
   await page.screenshot({ path: `${directory}/landing.png`, fullPage: true })
   await page.goto(root.href)
@@ -88,7 +104,7 @@ try {
     JSON.stringify(
       {
         url: root.href,
-        widths: [1440, 390],
+        widths: WIDTHS,
         pages: paths,
         errors,
         search: 'scrollback',
