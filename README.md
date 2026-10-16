@@ -38,7 +38,7 @@ The reason to try Fregat is how your work survives, and how much control you hav
 
 ## Quick start
 
-Install [Bun](https://bun.sh/) and [Git](https://git-scm.com/), then run:
+Install [Bun](https://bun.sh/), [Node.js 26 or newer](https://nodejs.org/), and [Git](https://git-scm.com/), then run:
 
 ```sh
 git clone https://github.com/ShaulLavo/fregat.git

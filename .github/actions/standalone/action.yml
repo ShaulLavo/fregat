@@ -22,10 +22,19 @@ runs:
         mirror=$(mktemp -d "$RUNNER_TEMP/mirror-$FAMILY-XXXXXX")
         git archive "HEAD:$FAMILY" | tar -x -C "$mirror"
         echo "directory=$mirror" >> "$GITHUB_OUTPUT"
-    - name: Install and verify standalone package graph
+    - name: Install standalone dependencies
       shell: bash
       working-directory: ${{ steps.export.outputs.directory }}
-      run: bun install && bun run build && bun run typecheck && bun run lint && bun run format:check
+      run: bun install
+    - name: Install Editor site browser
+      if: ${{ inputs.family == 'editor' }}
+      shell: bash
+      working-directory: ${{ steps.export.outputs.directory }}
+      run: ./site/node_modules/.bin/playwright install --with-deps chromium
+    - name: Verify standalone package graph
+      shell: bash
+      working-directory: ${{ steps.export.outputs.directory }}
+      run: bun run build && bun run typecheck && bun run lint && bun run format:check
     - name: Check standalone tree-sitter runtime
       if: ${{ inputs.family == 'editor' }}
       shell: bash

@@ -66,13 +66,15 @@ Booting, and connecting to a server, show one `StatusFrame`: a mark, a title, a 
 
 `scenario physical-mode` selects each Feel in Settings, verifies the choice survives navigation,
 and exercises the shared controls at `/dev/physical`: pointer and Space depth, switch stretch,
-menu and dialog surfaces, select press dimming, committed command choices, an invalid field,
-silent keyboard and default row activation, and the control sound switch. It repeats with
+menu and dialog surfaces, select press dimming, command choices, an invalid field,
+actionable row feedback, silent keyboard activation, and the control sound switch. It repeats with
 reduced motion. The gallery also gives the owner a device check.
 
 `physical-chat` uses the isolated native fixture to stream a response and scroll the transcript;
-recycled rows must never replay a live entrance. It checks accepted chat selection in the rail
-and sidebar history, keeping current-chat clicks, keyboard, multiple selection and dragging quiet.
+recycled rows must never replay a live entrance. It checks pointer selection in the rail
+and sidebar history, including current rows, modifier selection, saved drafts and phone navigation.
+Keyboard activation and dragging stay quiet. `physical-surfaces` exercises workspace tree rows,
+file picker layouts, Settings choices and the command palette with exact audio counts.
 `PHYSICAL_BASELINE=1` selects Flat for trace comparisons.
 
 The `chat-draft-context-strip` scenario checks the flat branch picker for external branches, then creates an app worktree from release, reloads, checks its recorded parent and fixed lane gutter, and selects that branch. Parent persistence uses migration 35; the picker never infers ancestry from Git.

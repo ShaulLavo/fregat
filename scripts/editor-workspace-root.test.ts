@@ -2,12 +2,23 @@ import { createRequire } from 'node:module'
 import { execFileSync } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
 const repository = path.resolve(import.meta.dirname, '..')
+const typescriptApi = path.dirname(
+  createRequire(import.meta.url).resolve('typescript-api/package.json'),
+)
 
 test.each([
   ['editor', 'array'],
@@ -50,6 +61,8 @@ test.each([
     copyFileSync(path.join(repository, 'editor/scripts', file), path.join(family, 'scripts', file))
   }
   try {
+    mkdirSync(path.join(root, 'node_modules'))
+    symlinkSync(typescriptApi, path.join(root, 'node_modules/typescript-api'), 'junction')
     const check = Bun.spawnSync(['bun', 'scripts/check-turbo-inputs.mjs'], { cwd: family })
     expect(check.exitCode, check.stderr.toString()).toBe(0)
     const result = Bun.spawnSync(
@@ -298,6 +311,27 @@ test('an abbreviated remote SHA fails before writing the graph', async () => {
   })
 })
 
+test('parser consumers and release fixtures declare the Node runtime that supports Wasm resizable memory', () => {
+  const read = (relative: string) =>
+    JSON.parse(readFileSync(path.join(repository, relative), 'utf8'))
+  const fixtures = read('scripts/release/editor-fixture.json').packages
+  for (const relative of ['package.json', 'editor/package.json']) {
+    const range = read(relative).engines.node
+    expect(Bun.semver.satisfies('26.0.0', range)).toBe(true)
+    expect(Bun.semver.satisfies('25.9.0', range)).toBe(false)
+  }
+  for (const name of ['tree-sitter', 'tree-sitter-languages', 'markdown']) {
+    const relative = `editor/packages/${name}/package.json`
+    const range = read(relative).engines.node
+    expect(Bun.semver.satisfies('26.0.0', range)).toBe(true)
+    expect(Bun.semver.satisfies('25.9.0', range)).toBe(false)
+    const engines = read(relative).engines
+    expect(Bun.semver.satisfies('1.2.22', engines.bun)).toBe(true)
+    expect(Bun.semver.satisfies('1.2.21', engines.bun)).toBe(false)
+    expect(fixtures[relative].engines).toEqual(engines)
+  }
+})
+
 test('authored host, Markdown, catalog, and release fixture pins agree with the required peer', () => {
   const read = (relative: string) =>
     JSON.parse(readFileSync(path.join(repository, relative), 'utf8'))
@@ -324,6 +358,7 @@ test('authored host, Markdown, catalog, and release fixture pins agree with the 
   expect(
     Bun.semver.satisfies(runtimeManifest.version, peer.peerDependencies['web-tree-sitter']),
   ).toBe(true)
+  expect(peer.peerDependenciesMeta?.['web-tree-sitter']?.optional).not.toBe(true)
   expect(peer.dependencies?.['web-tree-sitter']).toBeUndefined()
   const fixtures = read('scripts/release/editor-fixture.json').packages
   for (const name of ['editor', 'markdown', 'tree-sitter', 'tree-sitter-languages']) {

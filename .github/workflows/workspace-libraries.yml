@@ -88,6 +88,9 @@ jobs:
         env:
           CI_PACKAGES: ${{ inputs.packages || 'all' }}
         run: bun scripts/ci/packages.mjs editor-tests "$CI_PACKAGES"
+      - name: Test shared parser memory in three browsers
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/tree-sitter"') }}
+        run: bun run --cwd editor/packages/tree-sitter test:memory:browser --api.host 127.0.0.1 --api.port 0 --api.strictPort
       - name: Test complete document snapshot paint
         if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/core"') }}
         run: |
@@ -171,7 +174,7 @@ jobs:
           bun-version-file: package.json
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ (github.event_name == 'workflow_dispatch' || inputs.standalone_editor) && '26' || '24' }}
       - name: Standalone Editor
         if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || inputs.standalone_editor) }}
         uses: ./.github/actions/standalone

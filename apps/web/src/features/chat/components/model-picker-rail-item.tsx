@@ -1,6 +1,6 @@
 import type { ProviderInstanceId } from '@workspace/contracts'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { listRowClassName } from '@workspace/ui/patterns/list-row-classes'
+import { ListRow } from '@workspace/ui/patterns/list-row'
 
 import { ProviderGlyph } from '@/features/chat/components/provider-glyph'
 import type { ProviderModelOptionGroup } from '@workspace/client-core/chat/providers/models'
@@ -24,15 +24,13 @@ export function ModelPickerRailItem({
       <Tooltip>
         <TooltipTrigger
           render={
-            <button
-              data-feedback='silent'
+            <ListRow
+              as='button'
               aria-disabled={blocked}
+              interactive={!blocked}
               aria-label={group.displayLabel}
-              className={listRowClassName({
-                interactive: !blocked,
-                className:
-                  'focus-ring aspect-square h-auto w-full justify-center rounded-md border border-transparent bg-clip-padding px-0 aria-disabled:cursor-not-allowed',
-              })}
+              className='focus-ring aspect-square h-auto w-full justify-center rounded-md border border-transparent bg-clip-padding px-0 aria-disabled:cursor-not-allowed'
+              tabIndex={0}
               type='button'
               onClick={blocked ? undefined : () => onSelect(group.providerInstanceId)}
             >
@@ -41,7 +39,7 @@ export function ModelPickerRailItem({
                 displayLabel={group.displayLabel}
                 driverKind={group.driverKind}
               />
-            </button>
+            </ListRow>
           }
         />
         <TooltipContent align='center' className='max-w-64 leading-snug text-balance'>

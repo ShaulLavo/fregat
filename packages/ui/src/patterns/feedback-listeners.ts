@@ -1,10 +1,21 @@
-import { playFeedback } from './feedback-layer'
+import {
+  beginControlGesture,
+  cancelControlGesture,
+  feedbackControl,
+  finishControlGesture,
+  playClickFeedback,
+  releaseControlGesture,
+} from './feedback-layer'
 
 function enabledControl(event: Event): HTMLElement | null {
-  const target = event.composedPath().find((node) => node instanceof HTMLElement)
-  if (!(target instanceof HTMLElement)) return null
-  const control = target.closest<HTMLElement>('.pressable, [data-press-depth], [data-feedback]')
-  if (!control || control.matches(':disabled, [aria-disabled="true"], [data-disabled]')) return null
+  const control = feedbackControl(event)
+  if (
+    !control ||
+    control.matches(
+      ':disabled, [aria-disabled="true"], [data-disabled]:not([data-disabled="false"])',
+    )
+  )
+    return null
   return control
 }
 
@@ -33,15 +44,21 @@ export function installFeedbackListeners(document: Document) {
     release()
     if (event.button !== 0 || event.defaultPrevented) return
     const control = enabledControl(event)
-    if (control?.matches('.pressable, [data-press-depth]')) {
+    if (control?.matches('.pressable, [data-press-depth], [data-row-press]')) {
       pressed = { element: control, input: 'pointer', pointerId: event.pointerId }
       control.setAttribute('data-pressing', '')
     }
-    if (control?.dataset.feedback !== 'tap') return
-    playFeedback('tap', 'controls')
   }
   const pointerup = (event: PointerEvent) => {
     if (pressed?.input === 'pointer' && pressed.pointerId === event.pointerId) release()
+  }
+  const pointercancel = (event: PointerEvent) => {
+    pointerup(event)
+    cancelControlGesture(event.pointerId)
+  }
+  const dragstart = () => {
+    release()
+    cancelControlGesture()
   }
   const focusout = () => {
     if (pressed?.input === 'keyboard') release()
@@ -49,18 +66,29 @@ export function installFeedbackListeners(document: Document) {
   document.addEventListener('keydown', keydown)
   document.addEventListener('keyup', keyup)
   document.addEventListener('pointerdown', pointerdown)
+  document.addEventListener('pointerdown', beginControlGesture, true)
+  document.addEventListener('mouseup', releaseControlGesture, true)
+  document.addEventListener('mouseup', finishControlGesture)
+  document.addEventListener('click', playClickFeedback)
   document.addEventListener('pointerup', pointerup, true)
-  document.addEventListener('pointercancel', pointerup, true)
+  document.addEventListener('pointercancel', pointercancel, true)
   document.addEventListener('focusout', focusout)
+  document.addEventListener('dragstart', dragstart, true)
   document.defaultView?.addEventListener('blur', release)
   return () => {
     release()
+    cancelControlGesture()
     document.removeEventListener('keydown', keydown)
     document.removeEventListener('keyup', keyup)
     document.removeEventListener('pointerdown', pointerdown)
+    document.removeEventListener('pointerdown', beginControlGesture, true)
+    document.removeEventListener('mouseup', releaseControlGesture, true)
+    document.removeEventListener('mouseup', finishControlGesture)
+    document.removeEventListener('click', playClickFeedback)
     document.removeEventListener('pointerup', pointerup, true)
-    document.removeEventListener('pointercancel', pointerup, true)
+    document.removeEventListener('pointercancel', pointercancel, true)
     document.removeEventListener('focusout', focusout)
+    document.removeEventListener('dragstart', dragstart, true)
     document.defaultView?.removeEventListener('blur', release)
   }
 }

@@ -30,11 +30,6 @@
     "reason": "An inline chip set in a run of prose. It must track the text around it, which a fixed step cannot do; 0.9em also offsets the larger x-height of the mono face."
   },
   {
-    "file": "apps/web/src/features/chat/components/model-picker-rail-item.tsx",
-    "class": "<button>",
-    "reason": "Square provider selector uses shared listRowClassName paint with its own aspect ratio. It is a control, so a ListRow height would distort the provider rail."
-  },
-  {
     "file": "apps/web/src/features/workbench/components/bottom-panel.tsx",
     "class": "<button>",
     "reason": "A tab inside a bar: square, full bar height, lifted to the well colour when active. The Button primitive owns a radius, a fixed height and its own hover fill, none of which a bar tab may have; it shares its classes with the editor tab, which is allow-listed for the same shape."
