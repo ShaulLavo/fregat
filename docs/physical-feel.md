@@ -5,8 +5,12 @@ profiles add spring motion and control depth. The OS reduced-motion preference r
 with fades and press dimming. `/dev/physical` shows the shared primitives together for device checks.
 
 Control, error, Git and terminal-bell sounds are independent switches under Sounds. They default
-off. Control sounds follow pointer actions; keyboard activation and list rows stay silent. Volume
-also applies to agent notification sounds. Audio starts only after a user gesture.
+off. Control sounds follow pointer actions. Buttons tap when pressed; command choices and chat
+navigation tick when accepted. Chat rows stay stationary and tick only when opening a different
+chat. Other rows are silent by default and may opt into a committed navigation or choice tick.
+Hover, dragging, scrolling, keyboard activation and programmatic changes stay silent. Select
+triggers dim under a press and anchored selects tap when opened; their committed choices tick.
+Volume also applies to agent notification sounds. Audio starts only after a user gesture.
 
 `scripts/generate-spring-easings.ts` samples seamui's four spring profiles into the generated block
 in `packages/ui/src/styles/globals.css`. Run `bun scripts/generate-spring-easings.ts` to regenerate;

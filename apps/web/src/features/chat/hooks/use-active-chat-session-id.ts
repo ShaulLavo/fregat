@@ -14,6 +14,7 @@ import {
 import { useEffect, useRef } from 'react'
 import { useNavigation } from '@/hooks/use-navigation'
 import { useSidebarSelectionStore } from '@/features/chat/state/sidebar-selection-store'
+import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
 
 export function useActiveChatSessionId({
   sessionIds,
@@ -55,9 +56,17 @@ export function useActiveChatSessionId({
     })
   }, [environmentId, navigation, projectId, selectedKey, selectedSessionId, sessionIds])
 
-  function selectSession(sessionId: SessionId, replace = false) {
+  async function selectSession(sessionId: SessionId, replace = false, event?: Event) {
     if (!projectId) return
-    void navigation.openChat({ environmentId, projectId, sessionId, surface: 'sidebar', replace })
+    const changed = sessionId !== activeSessionId
+    const result = await navigation.openChat({
+      environmentId,
+      projectId,
+      sessionId,
+      surface: 'sidebar',
+      replace,
+    })
+    if (result.status === 'applied' && changed && event) playControlFeedback('tick', event)
   }
 
   function promoteDraftSession(sessionId: SessionId) {
@@ -75,7 +84,7 @@ export function useActiveChatSessionId({
     const root = owner.editor.workspaceStore.getState().rootFolder?.path
     const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), environmentId)
     if (root === undefined || selectWorktreeAtPath(slice, root)?.projectId !== projectId) return
-    selectSession(sessionId, true)
+    void selectSession(sessionId, true)
   }
 
   return {
@@ -91,6 +100,7 @@ export function useActiveChatSessionId({
         newDraft: true,
       })
     },
-    setActiveSessionId: (sessionId: SessionId) => selectSession(sessionId),
+    setActiveSessionId: (sessionId: SessionId, event?: Event) =>
+      selectSession(sessionId, false, event),
   }
 }

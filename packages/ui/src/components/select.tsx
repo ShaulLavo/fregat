@@ -24,7 +24,10 @@ function Select<Value, Multiple extends boolean | undefined = false>({
       {...props}
       onOpenChange={(open, details) => {
         onOpenChange?.(open, details)
-        if (!details.isCanceled) playSheetOpen(presentation, open, details.event)
+        if (details.isCanceled) return
+        playSheetOpen(presentation, open, details.event)
+        if (presentation === 'anchored' && open && details.reason === 'trigger-press')
+          playControlFeedback('tap', details.event)
       }}
       onValueChange={(value, details) => {
         onValueChange?.(value, details)
@@ -66,6 +69,7 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot='select-trigger'
       data-size={size}
+      data-press-depth
       className={cn(
         "focus-ring flex h-(--select-trigger-height) w-fit items-center justify-between gap-1.5 rounded-md border border-transparent bg-input/30 py-(--density-menu-item-padding-y) pr-2 pl-(--density-control-padding-x) text-xs whitespace-nowrap outline-none select-none [--select-trigger-height:var(--density-control-height)] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=sm]:[--select-trigger-height:var(--density-control-height-sm)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size)",
         className,

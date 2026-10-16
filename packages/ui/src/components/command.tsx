@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
 
 import { cn } from '@workspace/ui/lib/utils'
+import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
 import { listRowClassName } from '@workspace/ui/patterns/list-row-classes'
 import {
   Dialog,
@@ -15,12 +16,21 @@ import {
 import { InputGroup, InputGroupAddon } from '@workspace/ui/components/input-group'
 import { MagnifyingGlassIcon, CheckIcon } from '@phosphor-icons/react'
 
-function Command({ className, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
+function Command({ className, onClick, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
   return (
     <CommandPrimitive
       data-slot='command'
       className={cn('flex size-full flex-col overflow-hidden text-popover-foreground', className)}
       {...props}
+      onClick={(event) => {
+        onClick?.(event)
+        if (event.defaultPrevented || !(event.target instanceof Element)) return
+        const item = event.target.closest('[data-slot="command-item"]')
+        if (!item || item.closest('[cmdk-root]') !== event.currentTarget) return
+        if (item.getAttribute('aria-disabled') === 'true') return
+        // cmdk commits in the item's click handler before this event reaches its root.
+        playControlFeedback('tick', event.nativeEvent)
+      }}
     />
   )
 }

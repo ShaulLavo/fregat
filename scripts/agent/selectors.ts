@@ -866,6 +866,13 @@ export const selectors = {
   physicalDialog: (page: Page) =>
     page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
   physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
+  physicalCommands: (page: Page) => page.locator('[data-physical-gallery] [data-slot="command"]'),
+  physicalCommand: (page: Page) =>
+    page.getByRole('option', { name: 'Preview command', exact: true }),
+  physicalDisabledCommand: (page: Page) =>
+    page.getByRole('option', { name: 'Disabled command', exact: true }),
+  physicalSelect: (page: Page) =>
+    page.getByRole('combobox', { name: 'Preview select', exact: true }),
   settingsForm: (page: Page) => page.getByRole('region', { name: 'Settings form', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
   settingsSummaryCount: (page: Page) =>

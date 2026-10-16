@@ -29,7 +29,15 @@ import {
   PlusIcon,
   XIcon,
 } from '@phosphor-icons/react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react'
 import { createStore } from 'zustand/vanilla'
 
 import { SessionRailEmpty } from '@/features/chat-mode/components/session-rail-empty'
@@ -174,10 +182,13 @@ export function SessionRail({
   })
   const menuSession = visibleSessions.find((session) => session.key === contextMenu.target)
   const menuGroup = model.groups.find((group) => group.key === contextMenu.target)
-  function selectSession(id: string) {
+  function selectSession(id: string, event?: MouseEvent<HTMLElement>) {
     setCursor({ owner: activeSessionKey, id })
     const session = visibleSessions.find((item) => item.key === id)
-    if (session) void activateSessionRow(session, 'open')
+    if (!session) return
+    const changed =
+      session.id !== activeSession.sessionId || session.environmentId !== transport.environmentId
+    void activateSessionRow(session, 'open', changed ? event?.nativeEvent : undefined)
   }
   function commitRow(id: string) {
     const group = model.groups.find((item) => item.key === id)
