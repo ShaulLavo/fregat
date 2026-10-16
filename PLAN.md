@@ -152,7 +152,7 @@ work can proceed independently where their files and contracts do not overlap.
 
 ## Next programs
 
-[345](plans/345-ghostty-resizable-wasm-memory.md) and [346](plans/346-tree-sitter-x-resizable-wasm-memory.md) are Approved for resizable WebAssembly memory views in Ghostty WebGPU and tree-sitter-x. The two implementations can run independently after their runtime and browser API boundary checks. Plan 346 delivers the parser package before advancing Singapore and Markdown consumers. Each plan requires growth correctness and a bounded performance comparison before delivery. Bun Wasm, Brush, and third-party Shiki changes are outside these plans.
+[346](plans/346-tree-sitter-x-resizable-wasm-memory.md) is Approved for resizable WebAssembly memory views in tree-sitter-x. It delivers the parser package before advancing Singapore and Markdown consumers, and requires growth correctness and a bounded performance comparison before delivery. Ghostty WebGPU's Plan 345 was dropped on 2026-10-16: its official Wasm build declares no memory maximum, which Chromium, Firefox and Node require for `toResizableBuffer()`, and `TextDecoder`, WebGL and WebGPU uploads reject resizable-backed views, so each frame would need a staging copy. Bun Wasm, Brush, and third-party Shiki changes are outside this plan.
 
 [336](plans/336-packages-as-products.md) makes Fregat, Singapore, ghostty-webgpu and hotkeys
 look like products: research, pitch with proof, READMEs, Astro sites on our own domains, docs,
