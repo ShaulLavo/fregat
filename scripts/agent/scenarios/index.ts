@@ -263,6 +263,7 @@ import { gitDiscardConfirm } from './git-discard-confirm'
 import { baseComponents } from './base-components'
 import { physicalMode } from './physical-mode'
 import { physicalChat } from './physical-chat'
+import { physicalSurfaces } from './physical-surfaces'
 import { connectionFrame } from './connection-frame'
 import { settingsValueGrids } from './settings-value-grids'
 import { settingsDependentRow } from './settings-dependent-row'
@@ -718,6 +719,7 @@ export const scenarios: readonly Scenario[] = [
   physicalMode,
   devTransitions,
   physicalChat,
+  physicalSurfaces,
   connectionFrame,
   settingsValueGrids,
   settingsDependentRow,

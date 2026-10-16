@@ -1,5 +1,6 @@
-import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
-;('use client')
+'use client'
+
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 
 import { Switch as SwitchPrimitive } from '@base-ui/react/switch'
 
@@ -8,7 +9,6 @@ import { cn } from '@workspace/ui/lib/utils'
 function Switch({
   className,
   size = 'default',
-  onCheckedChange,
   ...props
 }: SwitchPrimitive.Root.Props & {
   size?: 'sm' | 'default'
@@ -16,18 +16,18 @@ function Switch({
   return (
     <SwitchPrimitive.Root
       data-slot='switch'
+      data-feedback='tick'
       data-press-depth
       data-size={size}
       className={cn(
         'shadow-(--shadow-well) focus-ring peer group/switch relative inline-flex shrink-0 items-center rounded-full border border-transparent outline-none after:absolute after:-inset-x-3 after:-inset-y-2 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 data-[size=default]:h-[18.4px] data-[size=default]:w-[32px] data-[size=sm]:h-[14px] data-[size=sm]:w-[24px] dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:bg-primary data-unchecked:bg-input dark:data-unchecked:bg-input/80 data-disabled:cursor-not-allowed data-disabled:opacity-50',
         className,
       )}
-      onCheckedChange={(value, details) => {
-        onCheckedChange?.(value, details)
-        if (details.isCanceled) return
-        playControlFeedback(value ? 'tick' : 'tick-off', details.event)
-      }}
       {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
     >
       <SwitchPrimitive.Thumb
         data-slot='switch-thumb'

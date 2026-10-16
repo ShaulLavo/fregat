@@ -159,8 +159,7 @@ describe('useListbox', () => {
       row.click()
     })
     expect(reveal).not.toHaveBeenCalled()
-    expect(onActiveChange).toHaveBeenCalledOnce()
-    expect(onActiveChange).toHaveBeenCalledWith('d', expect.objectContaining({ type: 'click' }))
+    expect(onActiveChange.mock.calls).toEqual([['d']])
   })
 
   it('preserves restored scroll until focus or a later cursor change requests a reveal', () => {
@@ -279,7 +278,7 @@ describe('useListbox', () => {
     expect(updated.rowBindings).toBe(initial.rowBindings)
     expect(updated.rowProps).toBe(initial.rowProps)
     act(() => mounted.container.querySelector<HTMLElement>('[role="option"]')!.click())
-    expect(nextSelect).toHaveBeenCalledWith('c', expect.objectContaining({ type: 'click' }))
+    expect(nextSelect).toHaveBeenCalledWith('c')
     expect(firstSelect).not.toHaveBeenCalled()
     mounted.render(<ObservedList activeId='c' onActiveChange={nextSelect} />)
     const selected = record.mock.calls.at(-1)![0]

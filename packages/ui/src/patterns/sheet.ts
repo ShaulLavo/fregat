@@ -1,7 +1,5 @@
 import { createContext, use } from 'react'
 
-import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
-
 /** How a picker, popover or menu presents: against its trigger, or as a sheet on the bottom edge. */
 export type Presentation = 'anchored' | 'sheet'
 
@@ -15,11 +13,6 @@ export const PresentationContext = createContext<Presentation>('anchored')
 export function usePresentation(requested?: Presentation): Presentation {
   const provided = use(PresentationContext)
   return requested ?? provided
-}
-
-/** A sheet is modal, so it opens with the dialog's voice. */
-export function playSheetOpen(presentation: Presentation, open: boolean, event: Event) {
-  if (presentation === 'sheet' && open) playControlFeedback('open', event)
 }
 
 const OPEN_SHEET = '[data-presentation="sheet"][data-open]'

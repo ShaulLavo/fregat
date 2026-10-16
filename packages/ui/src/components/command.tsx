@@ -4,7 +4,7 @@ import * as React from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
 
 import { cn } from '@workspace/ui/lib/utils'
-import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import { listRowClassName } from '@workspace/ui/patterns/list-row-classes'
 import {
   Dialog,
@@ -16,21 +16,12 @@ import {
 import { InputGroup, InputGroupAddon } from '@workspace/ui/components/input-group'
 import { MagnifyingGlassIcon, CheckIcon } from '@phosphor-icons/react'
 
-function Command({ className, onClick, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
+function Command({ className, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
   return (
     <CommandPrimitive
       data-slot='command'
       className={cn('flex size-full flex-col overflow-hidden text-popover-foreground', className)}
       {...props}
-      onClick={(event) => {
-        onClick?.(event)
-        if (event.defaultPrevented || !(event.target instanceof Element)) return
-        const item = event.target.closest('[data-slot="command-item"]')
-        if (!item || item.closest('[cmdk-root]') !== event.currentTarget) return
-        if (item.getAttribute('aria-disabled') === 'true') return
-        // cmdk commits in the item's click handler before this event reaches its root.
-        playControlFeedback('tick', event.nativeEvent)
-      }}
     />
   )
 }
@@ -179,6 +170,8 @@ function CommandItem({
   return (
     <CommandPrimitive.Item
       data-slot='command-item'
+      data-feedback='tick'
+      data-row-press
       className={listRowClassName({
         className: cn(
           "group/command-item cursor-default px-(--density-command-input-padding-x) [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size)",
@@ -186,6 +179,10 @@ function CommandItem({
         ),
       })}
       {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
     >
       {children}
       <CheckIcon className='ml-auto opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100' />

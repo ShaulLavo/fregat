@@ -5,6 +5,7 @@ import type { FileSnapshot } from '@/lib/file-snapshot'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 import { toClientError } from '@/lib/client-error-taxonomy'
 import { assignRef } from '@workspace/ui/lib/assign-ref'
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
 import { type CSSProperties, type Ref } from 'react'
@@ -90,7 +91,8 @@ export function EditorTabButton({
   // Raw <button>: spreads dnd-kit drag listeners and needs role='tab'; Button offers neither.
   const trigger = (
     <button
-      data-feedback='silent'
+      data-feedback='tick'
+      data-row-press
       {...dragAttributes}
       {...dragListeners}
       aria-busy={loading || undefined}
@@ -118,6 +120,7 @@ export function EditorTabButton({
           : displayTab.title
       }
       type='button'
+      onClickCapture={(event) => playClickFeedback(event.nativeEvent, event.currentTarget)}
       onClick={handleSelectTab}
     >
       <FileTypeIcon className='size-(--icon-size-sm) shrink-0 object-contain' icon={tab.icon} />

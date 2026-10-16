@@ -640,6 +640,18 @@
   }
 }
 
+/* Selected rows and custom tree tints still acknowledge pressure without moving their text. */
+:root[data-feel]:not([data-feel='flat']) [data-row-press] {
+  transition: opacity var(--duration-color);
+  &:is(:active, [data-pressing]):not(
+      :disabled,
+      [aria-disabled='true'],
+      [data-disabled]:not([data-disabled='false'])
+    ) {
+    opacity: 0.7;
+  }
+}
+
 /* A length, so its computed value is in pixels: an editor takes it as its gutter's leading inset
    (`useEditorGutterInset`), which keeps line numbers off the phone's screen edge while row tints reach it. */
 @property --density-editor-inset-x {
