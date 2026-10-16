@@ -7,17 +7,27 @@ import unittest
 
 
 class DeploymentTests(unittest.TestCase):
-    def test_cloudflare_configs_are_assets_only_and_exact_domains(self):
+    def test_cloudflare_configs_use_exact_domains(self):
         import json
         root = Path(__file__).resolve().parents[2]
+        configs = {}
         for site in ('fregat', 'singapore', 'ghostty'):
             source = (Path(__file__).parent / f'wrangler.{site}.jsonc').read_text()
-            config = json.loads(re.sub(r',\s*([}\]])', r'\1', source))
-            self.assertEqual(config['routes'], [{'pattern': f'{site}.shaulavo.dev', 'custom_domain': True}])
-            self.assertEqual(config['assets']['not_found_handling'], 'none')
-            self.assertFalse(config['workers_dev'])
-            self.assertNotIn('main', config)
+            configs[site] = json.loads(re.sub(r',\s*([}\]])', r'\1', source))
+            self.assertEqual(configs[site]['routes'], [{'pattern': f'{site}.shaulavo.dev', 'custom_domain': True}])
+            self.assertFalse(configs[site]['workers_dev'])
+        for site in ('fregat', 'singapore'):
+            self.assertEqual(configs[site]['assets']['not_found_handling'], 'none')
+            self.assertNotIn('main', configs[site])
+        # Ghostty's Worker writes the visitor's scene into pages and leaves files to the asset server.
+        ghostty = configs['ghostty']
+        self.assertTrue((Path(__file__).parent / ghostty['main']).resolve().is_file())
+        self.assertEqual(ghostty['assets']['binding'], 'ASSETS')
+        self.assertEqual(ghostty['assets']['not_found_handling'], '404-page')
+        for files in ('!/_astro/*', '!/fonts/*', '!/scenes/*', '!/*.wasm'):
+            self.assertIn(files, ghostty['assets']['run_worker_first'])
         self.assertFalse((root / '.github/workflows/product-sites.yml').exists())
+        self.assertFalse((root / '.github/workflows/site.yml').exists())
 
     def test_build_keeps_docs_and_repository_demo_at_separate_routes(self):
         with tempfile.TemporaryDirectory(prefix='product-sites-build-') as directory:

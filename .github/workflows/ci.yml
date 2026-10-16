@@ -602,7 +602,14 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" --paginate --slurp > "$RUNNER_TEMP/ci-jobs.json"
+          # The jobs API can report a needed job as running for a few seconds after it finished; read it once
+          # it has caught up, and let the verdict judge whatever is still unfinished after a minute.
+          for attempt in $(seq 1 12); do
+            gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" --paginate --slurp > "$RUNNER_TEMP/ci-jobs.json"
+            pending=$(jq '[.[].jobs[] | select(.name != "CI" and .status != "completed")] | length' "$RUNNER_TEMP/ci-jobs.json")
+            if [ "$pending" = 0 ]; then break; fi
+            sleep 5
+          done
           gh api "repos/$GH_REPO/actions/runs/$RUN_ID" > "$RUNNER_TEMP/ci-run.json"
           bun scripts/ci-verdict.ts .github/workflows/ci.yml "$RUNNER_TEMP/ci-jobs.json" "$RUNNER_TEMP/ci-run.json"
       - name: Report queue and execution times
