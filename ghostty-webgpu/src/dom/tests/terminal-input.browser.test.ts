@@ -395,7 +395,6 @@ describe('Terminal DOM host', () => {
   it('only follows the cursor for input positioning while focused or composing', async () => {
     const recording: RendererRecording = {}
     const terminal = await trackedTerminal({
-      autoFit: false,
       rendererFactory: recordingRendererFactory(recording),
     })
     await terminal.open(trackedHost())
