@@ -296,6 +296,10 @@
     "@singapore-editor/core#bench:paint": {
       "dependsOn": ["^build", "build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
+    },
+    "ghostty-webgpu-line-editor#build": {
+      "dependsOn": ["^build", "ghostty-webgpu#build"],
+      "outputs": ["dist/**"]
     }
   },
   "agentGuidance": false,

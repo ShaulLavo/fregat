@@ -834,23 +834,6 @@
         "ws": "8.22.0",
       },
     },
-    "ghostty-webgpu-line-editor": {
-      "name": "ghostty-webgpu-line-editor",
-      "version": "0.0.2",
-      "dependencies": {
-        "evlog": "2.29.0",
-      },
-      "devDependencies": {
-        "ghostty-webgpu": "workspace:*",
-        "oxfmt": "0.70.0",
-        "oxlint": "1.85.0",
-        "typescript": "7.0.2",
-        "vitest": "5.0.2",
-      },
-      "peerDependencies": {
-        "ghostty-webgpu": "workspace:*",
-      },
-    },
     "ghostty-webgpu/demo": {
       "name": "ghostty-webgpu-demo",
       "dependencies": {
@@ -862,6 +845,25 @@
         "typescript": "7.0.2",
         "vitest": "5.0.2",
       },
+    },
+    "ghostty-webgpu/packages/line-editor": {
+      "name": "ghostty-webgpu-line-editor",
+      "version": "0.0.3",
+      "dependencies": {
+        "evlog": "2.29.0",
+      },
+      "devDependencies": {
+        "oxfmt": "0.70.0",
+        "oxlint": "1.85.0",
+        "typescript": "7.0.2",
+        "vitest": "5.0.2",
+      },
+      "peerDependencies": {
+        "ghostty-webgpu": "^0.3.24",
+      },
+      "optionalPeers": [
+        "ghostty-webgpu",
+      ],
     },
     "ghostty-webgpu/site": {
       "name": "ghostty-webgpu-site",
@@ -2964,7 +2966,7 @@
 
     "ghostty-webgpu-demo": ["ghostty-webgpu-demo@workspace:ghostty-webgpu/demo"],
 
-    "ghostty-webgpu-line-editor": ["ghostty-webgpu-line-editor@workspace:ghostty-webgpu-line-editor"],
+    "ghostty-webgpu-line-editor": ["ghostty-webgpu-line-editor@workspace:ghostty-webgpu/packages/line-editor"],
 
     "ghostty-webgpu-site": ["ghostty-webgpu-site@workspace:ghostty-webgpu/site"],
 
