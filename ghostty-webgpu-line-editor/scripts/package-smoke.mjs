@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { EditModel, History, ReadSession, keyCommand } from 'ghostty-webgpu-line-editor'
+import { EditModel, History, ReadSession, keyCommand, readline } from 'ghostty-webgpu-line-editor'
 
 const history = new History({ limit: 2 })
 const model = new EditModel(history)
@@ -19,4 +19,5 @@ await session.dispatch(enter)
 assert.deepEqual(await pending, { kind: 'submit', text: 'echo' })
 assert.deepEqual(history.entries, ['echo'])
 session.dispose()
+assert.equal(readline().name, 'readline')
 console.log('Built package exports, structured errors, Unicode editing and read lifecycle passed.')
