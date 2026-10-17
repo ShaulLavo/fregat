@@ -1,5 +1,9 @@
 # @singapore-editor/panes
 
+## 0.2.10
+
+No changes in this release.
+
 ## 0.2.9
 
 No changes in this release.

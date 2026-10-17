@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/diff",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "Stacked and split diffs with inline changes for the Singapore editor.",
   "keywords": [
     "browser",
