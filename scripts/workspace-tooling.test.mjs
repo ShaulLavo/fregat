@@ -75,7 +75,13 @@ async function prepare({ root, put }) {
     private: true,
     packageManager: 'bun@1.4.2',
     workspaces: {
-      packages: ['apps/*', 'hotkeys/packages/*', 'editor/site', 'ghostty-webgpu/site'],
+      packages: [
+        'apps/*',
+        'hotkeys/packages/*',
+        'editor/site',
+        'ghostty-webgpu/site',
+        'ghostty-webgpu/site-classic',
+      ],
       catalog,
     },
   })
@@ -104,6 +110,10 @@ test('checks workspace tools, standalone catalogs and the Astro compiler API', a
     })
     await fixture.put('ghostty-webgpu/site', {
       name: 'ghostty-webgpu-site',
+      devDependencies: { typescript: catalog['typescript-api'] },
+    })
+    await fixture.put('ghostty-webgpu/site-classic', {
+      name: 'ghostty-webgpu-classic-site',
       devDependencies: { typescript: catalog['typescript-api'] },
     })
     await fixture.put('hotkeys', {

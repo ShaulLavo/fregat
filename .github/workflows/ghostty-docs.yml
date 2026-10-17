@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ghostty-webgpu/site/**
+      - ghostty-webgpu/site-classic/**
       - ghostty-webgpu/src/dom/**
       - ghostty-webgpu/docs/correctness-results.json
       - ghostty-webgpu/docs/benchmarks/**
@@ -17,6 +18,7 @@ on:
     branches: [main]
     paths:
       - ghostty-webgpu/site/**
+      - ghostty-webgpu/site-classic/**
       - ghostty-webgpu/src/dom/**
       - ghostty-webgpu/docs/correctness-results.json
       - ghostty-webgpu/docs/benchmarks/**
@@ -36,16 +38,20 @@ permissions:
 jobs:
   docs:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        site: [site, site-classic]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
       - name: Check samples, generate reference and validate links
-        run: bun run --cwd ghostty-webgpu/site build --base /fregat/ghostty-webgpu/
+        run: bun run --cwd ghostty-webgpu/${{ matrix.site }} build --base /fregat/ghostty-webgpu/
       - name: Install Chromium and WebKit
-        working-directory: ghostty-webgpu/site
+        working-directory: ghostty-webgpu/${{ matrix.site }}
         run: bunx playwright install --with-deps chromium webkit
       - name: Start docs preview
-        working-directory: ghostty-webgpu/site
+        working-directory: ghostty-webgpu/${{ matrix.site }}
         run: |
           bun run preview --ignore-lock --base /fregat/ghostty-webgpu/ --host 127.0.0.1 --port 4327 > "$RUNNER_TEMP/ghostty-preview.log" 2>&1 &
           preview=$!
@@ -61,7 +67,7 @@ jobs:
           done
           test "$ready" = 1 || { cat "$RUNNER_TEMP/ghostty-preview.log"; exit 1; }
       - name: Verify docs, echo example and search
-        working-directory: ghostty-webgpu/site
+        working-directory: ghostty-webgpu/${{ matrix.site }}
         run: bun scripts/verify-docs.ts http://127.0.0.1:4327/fregat/ghostty-webgpu/docs/ "$RUNNER_TEMP/ghostty-docs-evidence"
       - name: Stop docs preview
         if: always()
@@ -72,9 +78,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ghostty-docs-browser
+          name: ghostty-docs-browser-${{ matrix.site }}
           path: ${{ runner.temp }}/ghostty-docs-evidence
       - uses: actions/upload-artifact@v4
         with:
-          name: ghostty-docs
-          path: ghostty-webgpu/site/dist
+          name: ghostty-docs-${{ matrix.site }}
+          path: ghostty-webgpu/${{ matrix.site }}/dist

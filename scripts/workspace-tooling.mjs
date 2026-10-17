@@ -39,6 +39,7 @@ function expectedVersion(file, name) {
       'apps/site/package.json',
       'editor/site/package.json',
       'ghostty-webgpu/site/package.json',
+      'ghostty-webgpu/site-classic/package.json',
     ].includes(file)
   )
     return catalog['typescript-api']
