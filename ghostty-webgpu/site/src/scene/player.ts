@@ -1,5 +1,5 @@
 import { load, type Piece, type PieceName } from 'ascii.rest'
-import { attachTerminalHotkeys, fitTerminalFont, Terminal } from '../../../dist/index.js'
+import { fitTerminalFont, Terminal } from '../../../dist/index.js'
 import { coverMap, sceneGrid, SCROLLBAR } from './grid.js'
 import type { SceneTheme } from './theme'
 
@@ -87,6 +87,23 @@ function frameOutput(
   return out
 }
 
+let lastPointer = ''
+
+function mouseOnly(event: Event) {
+  if (event instanceof PointerEvent && event.type !== 'click') lastPointer = event.pointerType
+  if (lastPointer !== 'mouse') event.stopPropagation()
+}
+
+/** Ctrl or Cmd+C copies the scene's selected cells, unless the page has its own text selected. */
+function copySelection(event: KeyboardEvent, terminal: Terminal) {
+  if (event.key.toLowerCase() !== 'c' || !(event.ctrlKey || event.metaKey) || event.altKey) return
+  if (!document.getSelection()?.isCollapsed) return
+  const text = terminal.getSelection()
+  if (!text) return
+  event.preventDefault()
+  void navigator.clipboard.writeText(text)
+}
+
 /** Plays an ascii.rest scene in a ghostty-webgpu terminal, cell for cell, while it is on screen. */
 export async function mountScene(
   host: HTMLElement,
@@ -128,20 +145,17 @@ export async function mountScene(
     },
   })
   await terminal.open(host)
-  // The wheel scrolls the page. With a mouse the scene's text can be selected and copied; on touch it is a picture,
-  // so a tap never raises the keyboard. Neither way does the scene take a Tab stop.
+  // Only a mouse reaches the terminal, to select cells; touch passes through to the page on any device. Nothing in
+  // the scene takes focus, so the keyboard stays with the page, and Ctrl or Cmd+C copies the selected cells.
+  host.inert = false
   host.addEventListener('wheel', (event) => event.stopPropagation(), { capture: true })
-  if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
-    host.inert = false
-    // The input box, scrollbar and link overlay each take a Tab stop; the scene is reached by mouse only.
-    for (const stop of host.querySelectorAll('textarea, [tabindex]'))
-      stop.setAttribute('tabindex', '-1')
-    attachTerminalHotkeys(terminal)
-  } else {
-    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'click'] as const) {
-      host.addEventListener(type, (event) => event.stopPropagation(), { capture: true })
-    }
+  for (const type of ['pointerdown', 'pointermove', 'pointerup', 'click'] as const) {
+    host.addEventListener(type, (event) => mouseOnly(event), { capture: true })
   }
+  host.addEventListener('focusin', (event) => (event.target as HTMLElement).blur())
+  for (const stop of host.querySelectorAll('textarea, [tabindex]'))
+    stop.setAttribute('tabindex', '-1')
+  document.addEventListener('keydown', (event) => copySelection(event, terminal))
   terminal.write('\x1b[?25l\x1b[?7l\x1b[2J')
 
   const inks = palette.map(int)
