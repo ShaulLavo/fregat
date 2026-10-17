@@ -17,18 +17,6 @@ export function counterpartWasmServing(): Plugin {
     enforce: 'pre',
     configureServer(instance) {
       server = instance
-      const failures = new Set<string>()
-      instance.middlewares.use((request, response, next) => {
-        const url = request.url
-        response.on('finish', () => {
-          if (response.statusCode < 400) return
-          const failure = `${response.statusCode} ${url}`
-          if (failures.has(failure)) return
-          failures.add(failure)
-          instance.config.logger.error(`Browser fixture request failed: ${failure}`)
-        })
-        next()
-      })
     },
     async resolveId(id, importer) {
       if (id !== 'ghostty-web/ghostty-vt.wasm?url') return
