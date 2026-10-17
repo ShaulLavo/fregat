@@ -1,5 +1,12 @@
 # @singapore-editor/minimap
 
+## 0.2.10
+
+### Patch Changes
+
+- Updated dependencies [[`c8964ca`](https://github.com/ShaulLavo/fregat/commit/c8964ca9f13ea527acb6f049fbf3b4d24bec256b), [`5b50c80`](https://github.com/ShaulLavo/fregat/commit/5b50c80dc40b6173023ea94a83c3215094304779), [`044eafe`](https://github.com/ShaulLavo/fregat/commit/044eafef8f31f2cb5435a07988785793194a283c), [`57cbbbf`](https://github.com/ShaulLavo/fregat/commit/57cbbbf1b0a37df9e6cdc5a2e97e3732975d1cbe), [`b981120`](https://github.com/ShaulLavo/fregat/commit/b9811202176722702d40fef6e8e1b781a2e5a816), [`bb88ac6`](https://github.com/ShaulLavo/fregat/commit/bb88ac6c1dc8fd3ad7e938d707ca1990f92d6899)]:
+  - @singapore-editor/core@0.2.10
+
 ## 0.2.9
 
 ### Patch Changes

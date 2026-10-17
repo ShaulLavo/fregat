@@ -1,5 +1,19 @@
 # @singapore-editor/tree-sitter-languages
 
+## 0.2.10
+
+### Patch Changes
+
+- [#1297](https://github.com/ShaulLavo/fregat/pull/1297) [`e0be280`](https://github.com/ShaulLavo/fregat/commit/e0be2804215974a90850b881f42e9fb702d098d7) - Breaking: Tree-sitter and Markdown parsing require Node.js 26.0.0 or newer, Bun 1.2.22 or newer, Chromium 144 or newer, Firefox 145 or newer, or Safari 26.2 or newer.
+
+  Improved memory growth so retained `heap()` views stay attached and track the new heap length.
+
+  Fixed Markdown extension access above 2 GiB and semantic decoding from resizable memory by updating `tree-sitter-md` to 0.1.6.
+
+- Updated dependencies [[`c8964ca`](https://github.com/ShaulLavo/fregat/commit/c8964ca9f13ea527acb6f049fbf3b4d24bec256b), [`5b50c80`](https://github.com/ShaulLavo/fregat/commit/5b50c80dc40b6173023ea94a83c3215094304779), [`044eafe`](https://github.com/ShaulLavo/fregat/commit/044eafef8f31f2cb5435a07988785793194a283c), [`57cbbbf`](https://github.com/ShaulLavo/fregat/commit/57cbbbf1b0a37df9e6cdc5a2e97e3732975d1cbe), [`b981120`](https://github.com/ShaulLavo/fregat/commit/b9811202176722702d40fef6e8e1b781a2e5a816), [`bb88ac6`](https://github.com/ShaulLavo/fregat/commit/bb88ac6c1dc8fd3ad7e938d707ca1990f92d6899), [`e0be280`](https://github.com/ShaulLavo/fregat/commit/e0be2804215974a90850b881f42e9fb702d098d7)]:
+  - @singapore-editor/core@0.2.10
+  - @singapore-editor/tree-sitter@0.2.10
+
 ## 0.2.9
 
 ### Patch Changes
