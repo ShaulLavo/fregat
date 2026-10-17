@@ -201,7 +201,7 @@ try {
     await scenePage.mouse.move(lede.x + lede.width - 2, lede.y + lede.height / 2, { steps: 8 })
     await scenePage.mouse.up()
     assert.match(
-      String(await scenePage.evaluate(() => getSelection())),
+      await scenePage.evaluate(() => String(getSelection())),
       /terminal/,
       'The tagline can be selected',
     )
