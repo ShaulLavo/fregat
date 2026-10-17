@@ -1,4 +1,14 @@
-export type BenchmarkBackend = 'webgpu' | 'webgl2' | 'canvas2d' | 'ghostty-web'
+export const benchmarkBackends = [
+  'canvas2d',
+  'canvas2d-pixels',
+  'webgl2',
+  'webgpu',
+  'webgpu-compute',
+  'webgpu-fullscreen-fragment',
+  'ghostty-web',
+] as const
+
+export type BenchmarkBackend = (typeof benchmarkBackends)[number]
 export type BenchmarkScenario =
   | 'settled-idle'
   | 'cursor-movement'
@@ -18,7 +28,7 @@ export interface BenchmarkResult {
 }
 
 export interface RendererBenchmark {
-  dispose(): void
+  dispose(): Promise<void> | void
   getPageInfo(): unknown
   output(): string
   run(
@@ -31,5 +41,6 @@ export interface RendererBenchmark {
 declare global {
   interface Window {
     __rendererBench: RendererBenchmark
+    __rendererBenchFailure?: string
   }
 }

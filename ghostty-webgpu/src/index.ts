@@ -103,6 +103,7 @@ export type {
   RendererTextFrameSnapshot,
   RendererGridSize,
   RendererMetrics,
+  ExperimentalWebGpuCompositor,
   RenderStateSource,
   WebGpuTerminalRendererOptions,
 } from './render/renderer.js'

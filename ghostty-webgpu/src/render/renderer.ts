@@ -40,7 +40,13 @@ import {
   type RenderSchedulerClock,
   type TerminalPresentation,
 } from './scheduler.js'
-import { textPassGlyphCapacity, WebGpuTextPass } from './text-pass.js'
+import {
+  textPassGlyphCapacity,
+  WebGpuTextPass,
+  type ExperimentalWebGpuCompositor,
+} from './text-pass.js'
+
+export type { ExperimentalWebGpuCompositor } from './text-pass.js'
 
 export interface RenderStateSource {
   readonly snapshotVersion?: number
@@ -91,6 +97,7 @@ export interface RendererMetrics {
   atlasUploadOperations: number
   deviceRestores: number
   draws: number
+  dispatches: number
   instanceUploadOperations: number
   rebuiltRows: number
   submittedFrames: number
@@ -101,6 +108,8 @@ type TerminalRendererMode = 'auto' | 'canvas2d-fill-text' | 'canvas2d-pixels'
 export type CanvasPaintMode = 'fill-text' | 'pixels'
 
 export interface WebGpuTerminalRendererOptions {
+  /** Select an experimental pixel compositor for direct WebGPU construction. */
+  experimentalCompositor?: ExperimentalWebGpuCompositor
   /** Eligibility for initial built-in acquisition; custom device factories own their policy. */
   adapterPolicy?: 'hardware' | 'any'
   canvas: HTMLCanvasElement | OffscreenCanvas
@@ -274,6 +283,7 @@ export class WebGpuTerminalRenderer {
   private deviceUnavailable = false
   private readonly scheduler: RenderScheduler
   private textPass: WebGpuTextPass
+  private readonly experimentalCompositor?: ExperimentalWebGpuCompositor
   private theme: CanonicalRendererTheme
   private themeInput: RendererTheme
   readonly metrics: RendererMetrics = {
@@ -286,6 +296,7 @@ export class WebGpuTerminalRenderer {
     atlasUploadOperations: 0,
     deviceRestores: 0,
     draws: 0,
+    dispatches: 0,
     instanceUploadOperations: 0,
     rebuiltRows: 0,
     submittedFrames: 0,
@@ -309,6 +320,7 @@ export class WebGpuTerminalRenderer {
     if (!options.deviceFactory && !options.schedulerClock)
       this.coordinator = sharedFrameCoordinator()
     this.renderState = options.renderState
+    this.experimentalCompositor = options.experimentalCompositor
     this.onError = options.onError
     this.grid = prepared.grid
     this.font = prepared.font
@@ -329,7 +341,6 @@ export class WebGpuTerminalRenderer {
       this.atlasTextures = atlasTextures
       textPass = this.createTextPass()
       this.textPass = textPass
-      this.textPass.syncAtlas(this.atlasTextures)
       scheduler = new RenderScheduler({
         clock: options.schedulerClock ?? this.coordinator ?? browserRenderClock(),
         onFrame: () => this.drawFrame(),
@@ -441,9 +452,17 @@ export class WebGpuTerminalRenderer {
     const geometryChanged = !fittedFontGeometryEquals(this.font, next)
     this.coordinator?.flushOwner(this)
     if (this.disposed) return
+    const rasterizer = this.createRasterizer(next)
+    const replacement = geometryChanged ? this.createTextPass({ font: next }) : undefined
+    if (replacement) {
+      this.replaceTextPass(replacement, () => {
+        this.configureContext(this.device)
+        this.resizeCanvas(next)
+      })
+    }
     this.font = next
-    if (geometryChanged) this.rebuildGeometryResources()
-    this.rasterizer = this.createRasterizer()
+    this.rasterizer = rasterizer
+    if (replacement) this.frames.resize(this.grid.rows)
     this.resetAtlasResources()
     this.invalidateAll()
   }
@@ -459,13 +478,14 @@ export class WebGpuTerminalRenderer {
     if (this.disposed) return
     const next = normalizeRendererGrid(grid)
     if (this.gridEquals(next)) return
-    textPassGlyphCapacity(this.device, next.columns * next.rows)
+    const replacement = this.createTextPass({ grid: next })
     for (const row of this.overlayRows) {
       if (row >= next.rows) this.overlayRows.delete(row)
     }
-    this.grid = next
-    this.resizeCanvas()
-    this.replaceTextPass()
+    this.replaceTextPass(replacement, () => {
+      this.grid = next
+      this.resizeCanvas()
+    })
     this.frames.resize(this.grid.rows)
     this.repaintNow()
   }
@@ -533,18 +553,42 @@ export class WebGpuTerminalRenderer {
     })
   }
 
-  private createRasterizer(): CanvasGlyphRasterizer {
-    return new CanvasGlyphRasterizer({ font: this.font })
+  private createRasterizer(font: TerminalFittedFont = this.font): CanvasGlyphRasterizer {
+    return new CanvasGlyphRasterizer({ font })
   }
 
-  private createTextPass(device: GPUDevice = this.device): WebGpuTextPass {
-    return new WebGpuTextPass({
+  private createTextPass(
+    options: {
+      device?: GPUDevice
+      grid?: RendererGridSize
+      font?: TerminalFittedFont
+      atlasTextures?: AtlasGpuTextures
+    } = {},
+  ): WebGpuTextPass {
+    const {
+      device = this.device,
+      grid = this.grid,
+      font = this.font,
+      atlasTextures = this.atlasTextures,
+    } = options
+    const replacement = new WebGpuTextPass({
+      experimentalCompositor: this.experimentalCompositor,
+      columns: grid.columns,
+      cellWidth: font.deviceCellWidth,
+      cellHeight: font.deviceCellHeight,
       device,
       format: this.format,
-      height: this.canvas.height,
-      instanceCount: this.grid.columns * this.grid.rows,
-      width: this.canvas.width,
+      height: grid.rows * font.deviceCellHeight,
+      instanceCount: grid.columns * grid.rows,
+      width: grid.columns * font.deviceCellWidth,
     })
+    try {
+      replacement.syncAtlas(atlasTextures)
+      return replacement
+    } catch (cause) {
+      replacement.destroy()
+      throw cause
+    }
   }
 
   private drawFrame(): void {
@@ -607,7 +651,7 @@ export class WebGpuTerminalRenderer {
         this.focused ? undefined : this.inactiveCursorStyle,
       ),
       full: this.needsFullRebuild,
-      stableRows: this.textPass.drawCount === 2,
+      stableRows: this.textPass.supportsStableRows,
       overlayRows: this.overlayRows,
     }
     const status = buildZigFrame(builder, this.atlas, this.rasterizer, options)
@@ -782,15 +826,6 @@ export class WebGpuTerminalRenderer {
     this.atlas.invalidateAll()
   }
 
-  private rebuildGeometryResources(): void {
-    this.coordinator?.flushOwner(this)
-    if (this.disposed) return
-    this.resizeCanvas()
-    this.configureContext(this.device)
-    this.replaceTextPass()
-    this.frames.resize(this.grid.rows)
-  }
-
   private recordFrame(rebuiltRows: number, instanceUploadOperations: number): void {
     this.metrics.atlasCacheHits = this.atlas.cacheHitCount
     this.metrics.atlasCacheMisses = this.atlas.cacheMissCount
@@ -800,26 +835,29 @@ export class WebGpuTerminalRenderer {
     this.metrics.atlasUploadOperations =
       this.atlasUploadOperationsOffset + this.atlasTextures.uploadOperationCount
     this.metrics.draws += this.textPass.drawCount
+    this.metrics.dispatches += this.textPass.dispatchCount
     this.metrics.instanceUploadOperations += instanceUploadOperations
     this.metrics.rebuiltRows += rebuiltRows
     this.metrics.submittedFrames += 1
     this.metrics.uploadedBytes += this.textPass.frameUploadedBytes
   }
 
-  private replaceTextPass(): void {
-    this.coordinator?.flushOwner(this)
-    if (this.disposed) return
-    const replacement = this.createTextPass()
-    replacement.syncAtlas(this.atlasTextures)
-    this.textPass.destroy()
+  private replaceTextPass(replacement: WebGpuTextPass, commitGeometry: () => void): void {
+    try {
+      commitGeometry()
+      this.textPass.destroy()
+    } catch (cause) {
+      replacement.destroy()
+      throw cause
+    }
     this.textPass = replacement
   }
 
-  private resizeCanvas(): void {
-    const logicalWidth = this.grid.columns * this.font.cssCellWidth
-    const logicalHeight = this.grid.rows * this.font.cssCellHeight
-    this.canvas.width = this.grid.columns * this.deviceCellWidth
-    this.canvas.height = this.grid.rows * this.deviceCellHeight
+  private resizeCanvas(font: TerminalFittedFont = this.font): void {
+    const logicalWidth = this.grid.columns * font.cssCellWidth
+    const logicalHeight = this.grid.rows * font.cssCellHeight
+    this.canvas.width = this.grid.columns * font.deviceCellWidth
+    this.canvas.height = this.grid.rows * font.deviceCellHeight
     if (!('style' in this.canvas)) return
     this.canvas.style.width = `${logicalWidth}px`
     this.canvas.style.height = `${logicalHeight}px`
@@ -914,8 +952,7 @@ export class WebGpuTerminalRenderer {
     try {
       textPassGlyphCapacity(device, this.grid.columns * this.grid.rows)
       atlasTextures = new AtlasGpuTextures(device, this.atlas.textureLayout)
-      textPass = this.createTextPass(device)
-      textPass.syncAtlas(atlasTextures)
+      textPass = this.createTextPass({ device, atlasTextures })
       this.configureContext(device)
       return { atlasTextures, textPass }
     } catch (cause) {

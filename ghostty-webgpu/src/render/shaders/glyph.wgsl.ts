@@ -1,3 +1,4 @@
+import { colorFunctions } from './composition.wgsl.js'
 import { rowRemapShader } from './row-remap.wgsl.js'
 
 export const glyphShader = /* wgsl */ `
@@ -61,43 +62,7 @@ ${rowRemapShader}
   return output;
 }
 
-fn srgbChannelToLinear(value: f32) -> f32 {
-  if (value <= 0.04045) {
-    return value / 12.92;
-  }
-  return pow((value + 0.055) / 1.055, 2.4);
-}
-
-fn luminance(color: vec3f) -> f32 {
-  let linear = vec3f(
-    srgbChannelToLinear(color.r),
-    srgbChannelToLinear(color.g),
-    srgbChannelToLinear(color.b),
-  );
-  return dot(linear, vec3f(0.2126, 0.7152, 0.0722));
-}
-
-fn contrastRatio(first: vec3f, second: vec3f) -> f32 {
-  let bright = max(luminance(first), luminance(second));
-  let dark = min(luminance(first), luminance(second));
-  return (bright + 0.05) / (dark + 0.05);
-}
-
-fn contrastColor(foreground: vec3f, background: vec3f, minimum: f32) -> vec3f {
-  if (minimum <= 1.0 || contrastRatio(foreground, background) >= minimum) {
-    return foreground;
-  }
-  let black = vec3f(0.0);
-  let white = vec3f(1.0);
-  if (contrastRatio(white, background) >= contrastRatio(black, background)) {
-    return white;
-  }
-  return black;
-}
-
-fn hasFlag(flags: u32, flag: u32) -> bool {
-  return (flags & flag) != 0u;
-}
+${colorFunctions}
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {

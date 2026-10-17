@@ -82,6 +82,7 @@ export class WebGlTerminalRenderer {
     atlasUploadOperations: 0,
     deviceRestores: 0,
     draws: 0,
+    dispatches: 0,
     instanceUploadOperations: 0,
     rebuiltRows: 0,
     submittedFrames: 0,

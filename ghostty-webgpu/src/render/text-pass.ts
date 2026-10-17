@@ -7,11 +7,25 @@ import {
   planWrappedUploadRanges,
   type UploadPlan,
 } from './instances/upload-ranges.js'
-import { CELL_INSTANCE_BYTES, GLYPH_INSTANCE_BYTES } from './instances/layout.js'
+import {
+  CELL_INSTANCE_BYTES,
+  GLYPH_INSTANCE_BYTES,
+  GLYPH_INSTANCE_FLOATS,
+  GlyphFlag,
+  GlyphOffset,
+} from './instances/layout.js'
 import { cellShader } from './shaders/cell.wgsl.js'
 import { glyphShader } from './shaders/glyph.wgsl.js'
+import {
+  compositorPresentationShader,
+  computeCompositorShader,
+  fullscreenCompositorShader,
+} from './shaders/pixel-compositor.wgsl.js'
+
+export type ExperimentalWebGpuCompositor = 'compute' | 'fullscreen-fragment'
 
 export interface TextPassMetrics {
+  dispatches: number
   draws: number
   submittedFrames: number
   uploadedBytes: number
@@ -19,6 +33,10 @@ export interface TextPassMetrics {
 }
 
 export interface WebGpuTextPassOptions {
+  experimentalCompositor?: ExperimentalWebGpuCompositor
+  columns?: number
+  cellWidth?: number
+  cellHeight?: number
   device: GPUDevice
   format: GPUTextureFormat
   height: number
@@ -48,9 +66,73 @@ type FrameRows =
     }
 
 interface PipelineResources {
+  readonly kind: 'instanced'
   cellBindGroup: GPUBindGroup
   cellPipeline: GPURenderPipeline
   glyphPipeline: GPURenderPipeline
+}
+
+interface PixelGeometry {
+  readonly columns: number
+  readonly rows: number
+  readonly cellWidth: number
+  readonly cellHeight: number
+}
+
+interface FragmentResources {
+  readonly kind: 'fullscreen-fragment'
+  readonly pipeline: GPURenderPipeline
+  bindGroup?: GPUBindGroup
+}
+
+interface ComputeResources {
+  readonly kind: 'compute'
+  readonly pipeline: GPUComputePipeline
+  readonly output: GPUTexture
+  readonly outputView: GPUTextureView
+  readonly presentPipeline: GPURenderPipeline
+  readonly presentBindGroup: GPUBindGroup
+  bindGroup?: GPUBindGroup
+}
+
+type TextPipelineResources = PipelineResources | FragmentResources | ComputeResources
+
+function pixelGeometry(options: WebGpuTextPassOptions): PixelGeometry | undefined {
+  if (!options.experimentalCompositor) return undefined
+  const { columns, cellWidth, cellHeight, instanceCount, width, height } = options
+  if (
+    columns === undefined ||
+    cellWidth === undefined ||
+    cellHeight === undefined ||
+    !Number.isSafeInteger(columns) ||
+    columns <= 0 ||
+    instanceCount % columns !== 0 ||
+    !Number.isSafeInteger(cellWidth) ||
+    cellWidth <= 0 ||
+    !Number.isSafeInteger(cellHeight) ||
+    cellHeight <= 0 ||
+    width !== columns * cellWidth ||
+    height !== (instanceCount / columns) * cellHeight
+  ) {
+    throw createGhosttyError(
+      'webgpu_compositor',
+      'Pixel composition requires integer grid and cell geometry matching the viewport',
+    )
+  }
+  if (options.format !== 'rgba8unorm' && options.format !== 'bgra8unorm') {
+    throw createGhosttyError(
+      'webgpu_compositor',
+      'Pixel composition requires an rgba8unorm or bgra8unorm target',
+    )
+  }
+  const limit = options.device.limits.maxTextureDimension2D
+  if (width > limit || height > limit) {
+    throw createGhosttyError(
+      'webgpu_capacity',
+      `The compositor viewport exceeds the ${limit}-pixel texture dimension limit`,
+    )
+  }
+  return { columns, rows: instanceCount / columns, cellWidth, cellHeight }
 }
 
 interface GlyphBatch {
@@ -93,17 +175,24 @@ export class WebGpuTextPass {
   private readonly glyphBuffer: GPUBuffer
   private readonly glyphBatches: GlyphBatch[] = []
   readonly drawCount: number
+  readonly dispatchCount: number
+  readonly supportsStableRows: boolean
   private frameUploadedBytesValue = 0
   private glyphBindGroupCreationCountValue = 0
   private glyphBindGroup?: GPUBindGroup
   private readonly instanceCount: number
   readonly metrics: TextPassMetrics = {
+    dispatches: 0,
     draws: 0,
     submittedFrames: 0,
     uploadedBytes: 0,
     uploadOperations: 0,
   }
-  private readonly resources: PipelineResources
+  private readonly resources: TextPipelineResources
+  private readonly geometry?: PixelGeometry
+  private readonly width: number
+  private readonly height: number
+  private readonly reach = new Float32Array(4)
   private readonly sampler: GPUSampler
   private readonly viewportBuffer: GPUBuffer
   private readonly rowData = new ArrayBuffer(24)
@@ -119,7 +208,16 @@ export class WebGpuTextPass {
   constructor(options: WebGpuTextPassOptions) {
     this.device = options.device
     this.instanceCount = options.instanceCount
+    this.width = options.width
+    this.height = options.height
+    this.geometry = pixelGeometry(options)
     const capacity = textPassGlyphCapacity(this.device, this.instanceCount)
+    if (this.geometry && capacity < this.instanceCount) {
+      throw createGhosttyError(
+        'webgpu_capacity',
+        'Pixel composition requires the glyph records to fit one storage binding',
+      )
+    }
     try {
       this.cellBuffer = this.createStorageBuffer(this.instanceCount * CELL_INSTANCE_BYTES)
       for (let first = 0; first < this.instanceCount; first += capacity) {
@@ -131,9 +229,11 @@ export class WebGpuTextPass {
         })
       }
       this.glyphBuffer = this.glyphBatches[0]!.buffer
-      this.drawCount = 1 + this.glyphBatches.length
+      this.drawCount = options.experimentalCompositor ? 1 : 1 + this.glyphBatches.length
+      this.dispatchCount = options.experimentalCompositor === 'compute' ? 1 : 0
+      this.supportsStableRows = this.glyphBatches.length === 1
       this.viewportBuffer = options.device.createBuffer({
-        size: 32,
+        size: this.geometry ? 64 : 32,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
       })
       this.ownedBuffers.push(this.viewportBuffer)
@@ -143,7 +243,8 @@ export class WebGpuTextPass {
         0,
         new Float32Array([options.width, options.height, 0, 0]),
       )
-      this.resources = this.createPipelines(options.format)
+      this.resources = this.createResources(options.format, options.experimentalCompositor)
+      this.initializePixelGeometry()
     } catch (cause) {
       this.destroy()
       throw cause
@@ -151,6 +252,10 @@ export class WebGpuTextPass {
   }
 
   syncAtlas(textures: AtlasGpuTextures): void {
+    if (this.resources.kind !== 'instanced') {
+      this.syncPixelAtlas(textures, this.resources)
+      return
+    }
     for (const batch of this.glyphBatches) {
       batch.bindGroup = this.device.createBindGroup({
         entries: [
@@ -195,14 +300,17 @@ export class WebGpuTextPass {
         : planSparseUploadRanges(updates)
     const cellData = data.cellData
     const glyphData = data.glyphData
+    const reachOperations = this.geometry
+      ? this.updateGlyphReach(glyphData, updates, data.stableRows ?? false)
+      : 0
     for (const range of plan.cell) this.writeRange(this.cellBuffer, cellData, range)
     if (this.glyphBatches.length === 1) {
       for (const range of plan.glyph) this.writeRange(this.glyphBuffer, glyphData, range)
-      return plan.cell.length + plan.glyph.length
+      return plan.cell.length + plan.glyph.length + reachOperations
     }
     let operations = plan.cell.length
     for (const range of plan.glyph) operations += this.writeGlyphRange(glyphData, range)
-    return operations
+    return operations + reachOperations
   }
 
   submit(view: GPUTextureView, copy?: TextPassCopy): void {
@@ -212,12 +320,30 @@ export class WebGpuTextPass {
 
   acceptFrame(): void {
     this.metrics.draws += this.drawCount
+    this.metrics.dispatches += this.dispatchCount
     this.metrics.submittedFrames += 1
   }
 
   encode(view: GPUTextureView, copy?: TextPassCopy): GPUCommandBuffer {
-    if (!this.glyphBindGroup) throw new Error('Atlas textures must be synchronized before drawing')
     const encoder = this.device.createCommandEncoder()
+    this.encodeComposition(encoder, view)
+    if (copy) {
+      encoder.copyTextureToBuffer(
+        { texture: copy.texture },
+        { buffer: copy.buffer, bytesPerRow: copy.bytesPerRow },
+        copy.size,
+      )
+    }
+    return encoder.finish()
+  }
+
+  private encodeComposition(encoder: GPUCommandEncoder, view: GPUTextureView): void {
+    if (this.resources.kind !== 'instanced') {
+      this.encodePixels(encoder, view, this.resources)
+      return
+    }
+    if (!this.glyphBindGroup)
+      throw createGhosttyError('webgpu_atlas', 'Atlas textures must be synchronized before drawing')
     const pass = encoder.beginRenderPass({
       colorAttachments: [
         {
@@ -240,18 +366,11 @@ export class WebGpuTextPass {
       pass.draw(6, batch.instanceCount)
     }
     pass.end()
-    if (copy) {
-      encoder.copyTextureToBuffer(
-        { texture: copy.texture },
-        { buffer: copy.buffer, bytesPerRow: copy.bytesPerRow },
-        copy.size,
-      )
-    }
-    return encoder.finish()
   }
 
   destroy(): void {
     for (const buffer of this.ownedBuffers) buffer.destroy()
+    if (this.resources?.kind === 'compute') this.resources.output.destroy()
   }
 
   private uploadRows(data: FrameRows): void {
@@ -309,7 +428,181 @@ export class WebGpuTextPass {
       ],
       layout: cellPipeline.getBindGroupLayout(0),
     })
-    return { cellBindGroup, cellPipeline, glyphPipeline }
+    return { kind: 'instanced', cellBindGroup, cellPipeline, glyphPipeline }
+  }
+
+  private createResources(
+    format: GPUTextureFormat,
+    compositor: ExperimentalWebGpuCompositor | undefined,
+  ): TextPipelineResources {
+    if (!compositor) return this.createPipelines(format)
+    if (compositor === 'fullscreen-fragment') {
+      return {
+        kind: compositor,
+        pipeline: this.createFullscreenPipeline(format, fullscreenCompositorShader),
+      }
+    }
+    const output = this.device.createTexture({
+      format: 'rgba8unorm',
+      size: [this.width, this.height],
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    })
+    try {
+      const outputView = output.createView()
+      const presentPipeline = this.createFullscreenPipeline(format, compositorPresentationShader)
+      const presentBindGroup = this.device.createBindGroup({
+        layout: presentPipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: outputView }],
+      })
+      const pipeline = this.device.createComputePipeline({
+        layout: 'auto',
+        compute: {
+          entryPoint: 'computeMain',
+          module: this.device.createShaderModule({ code: computeCompositorShader }),
+        },
+      })
+      return { kind: compositor, output, outputView, pipeline, presentPipeline, presentBindGroup }
+    } catch (cause) {
+      output.destroy()
+      throw cause
+    }
+  }
+
+  private createFullscreenPipeline(format: GPUTextureFormat, code: string): GPURenderPipeline {
+    const module = this.device.createShaderModule({ code })
+    return this.device.createRenderPipeline({
+      layout: 'auto',
+      fragment: { entryPoint: 'fragmentMain', module, targets: [{ format }] },
+      vertex: { entryPoint: 'vertexMain', module },
+      primitive: { topology: 'triangle-list' },
+    })
+  }
+
+  private initializePixelGeometry(): void {
+    const geometry = this.geometry
+    if (!geometry) return
+    const data = new ArrayBuffer(32)
+    const view = new DataView(data)
+    view.setUint32(0, geometry.columns, true)
+    view.setUint32(4, geometry.rows, true)
+    view.setFloat32(8, geometry.cellWidth, true)
+    view.setFloat32(12, geometry.cellHeight, true)
+    this.reach[2] = geometry.cellWidth
+    this.reach[3] = geometry.cellHeight
+    new Float32Array(data, 16).set(this.reach)
+    this.device.queue.writeBuffer(this.viewportBuffer, 32, data)
+  }
+
+  private syncPixelAtlas(
+    textures: AtlasGpuTextures,
+    resources: FragmentResources | ComputeResources,
+  ): void {
+    const entries: GPUBindGroupEntry[] = [
+      { binding: 0, resource: { buffer: this.cellBuffer } },
+      { binding: 1, resource: { buffer: this.glyphBuffer } },
+      { binding: 2, resource: { buffer: this.viewportBuffer } },
+      { binding: 3, resource: this.sampler },
+      { binding: 4, resource: textures.view('grayscale') },
+      { binding: 5, resource: textures.view('color') },
+    ]
+    if (resources.kind === 'compute') entries.push({ binding: 6, resource: resources.outputView })
+    resources.bindGroup = this.device.createBindGroup({
+      entries,
+      layout: resources.pipeline.getBindGroupLayout(0),
+    })
+    this.glyphBindGroupCreationCountValue += 1
+  }
+
+  private updateGlyphReach(
+    data: Float32Array,
+    updates: readonly RowInstanceUpdate[],
+    stableRows: boolean,
+  ): number {
+    const geometry = this.geometry
+    if (!geometry) return 0
+    let changed = false
+    for (const update of updates) {
+      const first = update.glyph.byteOffset / Float32Array.BYTES_PER_ELEMENT
+      const end = first + update.glyph.byteLength / Float32Array.BYTES_PER_ELEMENT
+      for (let offset = first; offset < end; offset += GLYPH_INSTANCE_FLOATS) {
+        changed = this.extendGlyphReach(data, offset, geometry, stableRows) || changed
+      }
+    }
+    if (!changed) return 0
+    this.device.queue.writeBuffer(this.viewportBuffer, 48, this.reach)
+    this.frameUploadedBytesValue += this.reach.byteLength
+    this.metrics.uploadedBytes += this.reach.byteLength
+    this.metrics.uploadOperations += 1
+    return 1
+  }
+
+  private extendGlyphReach(
+    data: Float32Array,
+    offset: number,
+    geometry: PixelGeometry,
+    stableRows: boolean,
+  ): boolean {
+    if ((data[offset + GlyphOffset.Meta]! & GlyphFlag.Glyph) === 0) return false
+    const index = offset / GLYPH_INSTANCE_FLOATS
+    const x = data[offset]! - (index % geometry.columns) * geometry.cellWidth
+    const y =
+      data[offset + 1]! -
+      (stableRows ? 0 : Math.floor(index / geometry.columns) * geometry.cellHeight)
+    const minX = Math.min(this.reach[0]!, x)
+    const minY = Math.min(this.reach[1]!, y)
+    const maxX = Math.max(this.reach[2]!, x + data[offset + 2]!)
+    const maxY = Math.max(this.reach[3]!, y + data[offset + 3]!)
+    const changed =
+      minX !== this.reach[0] ||
+      minY !== this.reach[1] ||
+      maxX !== this.reach[2] ||
+      maxY !== this.reach[3]
+    this.reach[0] = minX
+    this.reach[1] = minY
+    this.reach[2] = maxX
+    this.reach[3] = maxY
+    return changed
+  }
+
+  private encodePixels(
+    encoder: GPUCommandEncoder,
+    view: GPUTextureView,
+    resources: FragmentResources | ComputeResources,
+  ): void {
+    if (!resources.bindGroup)
+      throw createGhosttyError('webgpu_atlas', 'Atlas textures must be synchronized before drawing')
+    if (resources.kind === 'compute') {
+      const pass = encoder.beginComputePass()
+      pass.setPipeline(resources.pipeline)
+      pass.setBindGroup(0, resources.bindGroup)
+      pass.dispatchWorkgroups(Math.ceil(this.width / 8), Math.ceil(this.height / 8))
+      pass.end()
+      this.encodeFullscreen(encoder, view, resources.presentPipeline, resources.presentBindGroup)
+      return
+    }
+    this.encodeFullscreen(encoder, view, resources.pipeline, resources.bindGroup)
+  }
+
+  private encodeFullscreen(
+    encoder: GPUCommandEncoder,
+    view: GPUTextureView,
+    pipeline: GPURenderPipeline,
+    bindGroup: GPUBindGroup,
+  ): void {
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: 'clear',
+          storeOp: 'store',
+          view,
+        },
+      ],
+    })
+    pass.setPipeline(pipeline)
+    pass.setBindGroup(0, bindGroup)
+    pass.draw(3)
+    pass.end()
   }
 
   private createStorageBuffer(size: number): GPUBuffer {
