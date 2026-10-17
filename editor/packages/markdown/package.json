@@ -52,7 +52,7 @@
     "@singapore-editor/core": "workspace:*",
     "micromark-util-decode-string": "2.0.1",
     "micromark-util-normalize-identifier": "2.0.1",
-    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#347a798ac598fbb4523ee83287a99df6ada42487"
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#adab10f83e955a5660cad5bbc4d849e74cc39ce9"
   },
   "devDependencies": {
     "@types/node": "^26.6.3",
