@@ -361,6 +361,31 @@ it('recomputes old and new overhang reach on partial replacement and removes old
   expect(removed.pixels.every((channel) => channel === 0)).toBe(true)
 })
 
+it('shrinks obsolete reach on full rebuilds and buffer uploads before narrow edits', async ({
+  skip,
+}) => {
+  const gpu = await createGpu(skip)
+  for (const full of [true, false]) {
+    const fixture = await createComparison(gpu, [row(6, [cell(6, { text: 'C' })])])
+    const initial = await fixture.render(true)
+    expect(pixel(initial.pixels, 40, 72)[3]).toBeGreaterThan(0)
+    fixture.native.terminal.write('\x1b[2J')
+    if (!full)
+      fixture.native.writeRows(
+        Array.from({ length: rows }, (_, y) => row(y, [cell(0, { text: 'X' })])),
+      )
+    const rebuilt = await fixture.render(full)
+    expect((fixture.builder.rowChanges & 4) !== 0).toBe(full)
+    expectBands(rebuilt.work, fullBands)
+    expect(pixel(rebuilt.pixels, 40, 72)[3]).toBe(0)
+    fixture.native.writeRows([row(6, [cell(3, { text: 'X' })])])
+    const narrow = await fixture.render(false)
+    expectBands(narrow.work, cellSize / 8)
+    expect(pixel(narrow.pixels, 48, 96)[3]).toBeGreaterThan(0)
+    expect(pixel(narrow.pixels, 40, 72)[3]).toBe(0)
+  }
+})
+
 it('copies unchanged accepted pixels without dispatch and preserves dirty work until acceptance', async ({
   skip,
 }) => {

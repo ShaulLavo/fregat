@@ -338,10 +338,18 @@ export class WebGpuTextPass {
         : planSparseUploadRanges(updates)
     const cellData = data.cellData
     const glyphData = data.glyphData
+    const rebuildReach =
+      this.geometry !== undefined &&
+      ((changes & 4) !== 0 ||
+        plan.glyph.some(
+          (range) => range.byteOffset === 0 && range.byteLength === glyphData.byteLength,
+        ))
     const reachOperations = this.geometry
-      ? this.updateGlyphReach(glyphData, updates, data.stableRows ?? false)
+      ? this.updateGlyphReach(glyphData, updates, data.stableRows ?? false, rebuildReach)
       : 0
-    const bandOperations = this.dirtyBands ? this.updateDirtyBands(updates, changes) : 0
+    const bandOperations = this.dirtyBands
+      ? this.updateDirtyBands(updates, changes, rebuildReach)
+      : 0
     for (const range of plan.cell) this.writeRange(this.cellBuffer, cellData, range)
     if (this.glyphBatches.length === 1) {
       for (const range of plan.glyph) this.writeRange(this.glyphBuffer, glyphData, range)
@@ -597,18 +605,35 @@ export class WebGpuTextPass {
     data: Float32Array,
     updates: readonly RowInstanceUpdate[],
     stableRows: boolean,
+    rebuild: boolean,
   ): number {
     const geometry = this.geometry
     if (!geometry) return 0
-    let changed = false
-    for (const update of updates) {
-      const first = update.glyph.byteOffset / Float32Array.BYTES_PER_ELEMENT
-      const end = first + update.glyph.byteLength / Float32Array.BYTES_PER_ELEMENT
-      for (let offset = first; offset < end; offset += GLYPH_INSTANCE_FLOATS) {
-        changed = this.extendGlyphReach(data, offset, geometry, stableRows) || changed
+    const minX = this.reach[0]
+    const minY = this.reach[1]
+    const maxX = this.reach[2]
+    const maxY = this.reach[3]
+    if (rebuild) {
+      this.reach[0] = 0
+      this.reach[1] = 0
+      this.reach[2] = geometry.cellWidth
+      this.reach[3] = geometry.cellHeight
+      this.extendGlyphRange(data, 0, data.length, geometry, stableRows)
+    }
+    if (!rebuild) {
+      for (const update of updates) {
+        const first = update.glyph.byteOffset / Float32Array.BYTES_PER_ELEMENT
+        const end = first + update.glyph.byteLength / Float32Array.BYTES_PER_ELEMENT
+        this.extendGlyphRange(data, first, end, geometry, stableRows)
       }
     }
-    if (!changed) return 0
+    if (
+      minX === this.reach[0] &&
+      minY === this.reach[1] &&
+      maxX === this.reach[2] &&
+      maxY === this.reach[3]
+    )
+      return 0
     this.device.queue.writeBuffer(this.viewportBuffer, 48, this.reach)
     this.frameUploadedBytesValue += this.reach.byteLength
     this.metrics.uploadedBytes += this.reach.byteLength
@@ -616,13 +641,25 @@ export class WebGpuTextPass {
     return 1
   }
 
+  private extendGlyphRange(
+    data: Float32Array,
+    first: number,
+    end: number,
+    geometry: PixelGeometry,
+    stableRows: boolean,
+  ): void {
+    for (let offset = first; offset < end; offset += GLYPH_INSTANCE_FLOATS) {
+      this.extendGlyphReach(data, offset, geometry, stableRows)
+    }
+  }
+
   private extendGlyphReach(
     data: Float32Array,
     offset: number,
     geometry: PixelGeometry,
     stableRows: boolean,
-  ): boolean {
-    if ((data[offset + GlyphOffset.Meta]! & GlyphFlag.Glyph) === 0) return false
+  ): void {
+    if ((data[offset + GlyphOffset.Meta]! & GlyphFlag.Glyph) === 0) return
     const index = offset / GLYPH_INSTANCE_FLOATS
     const x = data[offset]! - (index % geometry.columns) * geometry.cellWidth
     const y =
@@ -632,24 +669,22 @@ export class WebGpuTextPass {
     const minY = Math.min(this.reach[1]!, y)
     const maxX = Math.max(this.reach[2]!, x + data[offset + 2]!)
     const maxY = Math.max(this.reach[3]!, y + data[offset + 3]!)
-    const changed =
-      minX !== this.reach[0] ||
-      minY !== this.reach[1] ||
-      maxX !== this.reach[2] ||
-      maxY !== this.reach[3]
     this.reach[0] = minX
     this.reach[1] = minY
     this.reach[2] = maxX
     this.reach[3] = maxY
-    return changed
   }
 
-  private updateDirtyBands(updates: readonly RowInstanceUpdate[], changes: number): number {
+  private updateDirtyBands(
+    updates: readonly RowInstanceUpdate[],
+    changes: number,
+    rebuildReach: boolean,
+  ): number {
     const resources = this.resources
     const mask = this.dirtyBands
     const indices = this.bandIndices
     if (resources.kind !== 'compute-copy' || !mask || !indices) return 0
-    if (changes !== 0) mask.fill(1)
+    if (changes !== 0 || rebuildReach) mask.fill(1)
     for (const update of updates) {
       this.markChangedRows(update.cell, CELL_INSTANCE_BYTES)
       this.markChangedRows(update.glyph, GLYPH_INSTANCE_BYTES)
