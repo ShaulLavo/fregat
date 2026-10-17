@@ -65,6 +65,8 @@ code {
 }
 
 .ascii {
+  max-width: 100%;
+  overflow: hidden;
   margin: 0;
   font: inherit;
   font-size: min(14px, calc(100cqi / var(--cols) / 0.62));
