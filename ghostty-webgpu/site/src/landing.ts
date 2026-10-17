@@ -27,6 +27,15 @@ const scene =
   scenes.find((entry) => entry.name === document.documentElement.dataset['scene']) ?? scenes[0]!
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
 
+/** One column of a server-written piece `cols` wide, in ems of its own font. */
+function advance(host: HTMLElement, cols: number): number {
+  const text = host.querySelector('pre')
+  if (!text) return 0.6
+  return (
+    text.getBoundingClientRect().width / cols / Number.parseFloat(getComputedStyle(text).fontSize)
+  )
+}
+
 /** Redraws each server-written piece in the scene's colours, on a canvas the size of its text. */
 async function paintArt() {
   const [{ mount }, { chart, fact, score, wordmark, working }] = await Promise.all([
@@ -50,8 +59,8 @@ async function paintArt() {
     if (!art) continue
     const piece = art(scene.theme)
     const canvas = document.createElement('canvas')
-    // mount() fills the canvas's width; this keeps a piece at the size of the text it replaces.
-    canvas.style.width = `calc(${piece.meta.cols}ch * var(--art-scale, 1))`
+    // mount() fills the canvas's width: give it the width of the text it replaces, in ems so it follows the text's size.
+    canvas.style.width = `${piece.meta.cols * advance(host, piece.meta.cols)}em`
     canvas.style.aspectRatio = `${piece.meta.cols} / ${piece.meta.rows * (piece.meta.cell ?? 2)}`
     host.replaceChildren(canvas)
     mount(canvas, piece, { motion: !reducedMotion })

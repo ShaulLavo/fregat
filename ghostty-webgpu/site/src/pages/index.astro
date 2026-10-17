@@ -32,10 +32,19 @@ const scores = correctness.scores.map((entry) => ({
   text: `${entry.pass} of ${total}`,
 }))
 
+// The banner as its canvas colours it: letters (its ▓ fill) fade from the accent to the second colour across the
+// columns, and the shadow strokes are ascii.rest's grey.
+function wordmarkLayers(text: string) {
+  return {
+    letters: text.replace(/[^▓\n]/g, ' '),
+    shadow: text.replace(/▓/g, ' '),
+  }
+}
+
 // Each ascii.rest piece on the page: the server writes its first frame as text, and the page redraws it in the
 // scene's colours.
 const arts = {
-  wordmark: still(wordmark),
+  wordmark: wordmarkLayers(still(wordmark)),
   facts: facts.map(([title, text]) => still(fact(title, text))),
   charts: measured.map(({ data, max }) => (data ? still(chart(data, max)) : '')),
   scores: scores.map(({ label, value, ours }) => still(score(label, value, ours))),
@@ -74,7 +83,7 @@ const firstFrameScript = ['(() => {', gridSource.replace(/^export /gm, ''), firs
       <div class="hero-copy">
         <h1>
           <span class="sr-only">ghostty-webgpu</span>
-          <span class="art wordmark" data-art="wordmark" aria-hidden="true"><pre>{arts.wordmark}</pre></span>
+          <span class="art wordmark" data-art="wordmark" aria-hidden="true"><pre><span class="letters">{arts.wordmark.letters}</span><span class="shadow">{arts.wordmark.shadow}</span></pre></span>
         </h1>
         <p class="lede">Ghostty's terminal, in the browser. The real libghostty-vt core, unpatched, compiled to WebAssembly.</p>
       </div>

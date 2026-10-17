@@ -1,5 +1,5 @@
 import { load, type Piece, type PieceName } from 'ascii.rest'
-import { fitTerminalFont, Terminal } from '../../../dist/index.js'
+import { attachTerminalHotkeys, fitTerminalFont, Terminal } from '../../../dist/index.js'
 import { coverMap, sceneGrid, SCROLLBAR } from './grid.js'
 import type { SceneTheme } from './theme'
 
@@ -112,8 +112,8 @@ export async function mountScene(
         minimumContrast: 1,
         // The scene writes exact colours, so the indexed palette is never read.
         palette: new Array(256).fill(ground),
-        selectionBackground: rgb(theme.line),
-        selectionForeground: rgb(theme.text),
+        selectionBackground: rgb(theme.accent),
+        selectionForeground: ground,
       },
     },
     padding: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -128,8 +128,17 @@ export async function mountScene(
     },
   })
   await terminal.open(host)
-  for (const type of ['wheel', 'pointerdown', 'pointermove', 'pointerup', 'click'] as const) {
-    host.addEventListener(type, (event) => event.stopPropagation(), { capture: true })
+  // The wheel scrolls the page. With a mouse the scene's text can be selected and copied; on touch it is a picture,
+  // so a tap never raises the keyboard. Neither way does the scene take a Tab stop.
+  host.addEventListener('wheel', (event) => event.stopPropagation(), { capture: true })
+  if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    host.inert = false
+    host.querySelector<HTMLElement>('.ghostty-webgpu-input')?.setAttribute('tabindex', '-1')
+    attachTerminalHotkeys(terminal)
+  } else {
+    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'click'] as const) {
+      host.addEventListener(type, (event) => event.stopPropagation(), { capture: true })
+    }
   }
   terminal.write('\x1b[?25l\x1b[?7l\x1b[2J')
 
