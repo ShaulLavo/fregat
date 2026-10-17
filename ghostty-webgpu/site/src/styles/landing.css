@@ -57,7 +57,7 @@ code {
 
 /*
  * ascii.rest pieces as text: the server writes each piece's frame as coloured HTML, and the page animates it. A piece
- * shrinks to fit its column (--cols columns of 0.61em), and never past 14px.
+ * shrinks to fit its column (--cols columns of about 0.61em, sized at 0.62 for headroom), and never past 14px.
  */
 .panel,
 .facts article {
@@ -67,7 +67,7 @@ code {
 .ascii {
   margin: 0;
   font: inherit;
-  font-size: min(14px, calc(100cqi / var(--cols) / 0.61));
+  font-size: min(14px, calc(100cqi / var(--cols) / 0.62));
   line-height: 1.2;
   white-space: pre;
   color: #f0f6fc;
@@ -430,7 +430,7 @@ footer {
 
   /* A card is 34 columns; on a phone it fills the width so its text reads at body size. */
   .facts .ascii {
-    font-size: calc(100cqi / var(--cols) / 0.61);
+    font-size: calc(100cqi / var(--cols) / 0.62);
   }
 
   /* Four narrow columns wrap badly on a phone; the bar's [ docs ] link leads there instead. */
