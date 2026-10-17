@@ -175,6 +175,11 @@ code {
   color: var(--muted);
 }
 
+/* The scene's name arrives with its colours, before the first paint, so the line never shifts. */
+.credit::before {
+  content: var(--scene-label) ' · ';
+}
+
 main,
 footer {
   max-width: var(--measure);

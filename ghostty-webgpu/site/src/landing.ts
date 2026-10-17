@@ -104,7 +104,6 @@ function wireTabs() {
   })
 }
 
-document.getElementById('credit')!.prepend(`${scene.label} · `)
 wireCopy()
 wireTabs()
 // The scene's terminal and the page's art load side by side; neither waits for the other.
