@@ -19,9 +19,10 @@ export function counterpartWasmServing(): Plugin {
       server = instance
       const failures = new Set<string>()
       instance.middlewares.use((request, response, next) => {
+        const url = request.url
         response.on('finish', () => {
           if (response.statusCode < 400) return
-          const failure = `${response.statusCode} ${request.url}`
+          const failure = `${response.statusCode} ${url}`
           if (failures.has(failure)) return
           failures.add(failure)
           instance.config.logger.error(`Browser fixture request failed: ${failure}`)
