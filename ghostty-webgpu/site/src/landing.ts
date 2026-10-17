@@ -63,9 +63,10 @@ function fitWidth(text: HTMLElement) {
   const current = text.innerHTML
   text.innerHTML = finals.get(text) ?? current
   text.style.fontSize = ''
-  const overflow = text.scrollWidth / text.clientWidth
-  if (overflow > 1) {
-    text.style.fontSize = `${Number.parseFloat(getComputedStyle(text).fontSize) / overflow}px`
+  // Glyph advances round to whole pixels, so one proportional step can leave a pixel or two; a few steps settle it.
+  for (let step = 0; step < 4 && text.scrollWidth > text.clientWidth; step++) {
+    const size = Number.parseFloat(getComputedStyle(text).fontSize)
+    text.style.fontSize = `${(size * text.clientWidth * 0.99) / text.scrollWidth}px`
   }
   text.innerHTML = current
 }
