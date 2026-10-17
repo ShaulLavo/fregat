@@ -297,6 +297,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private fit?: TerminalFitController
   private fittedFont?: TerminalFittedFont
   private preeditActive = false
+  private inputFocused = false
   private compositionActive = false
   private workerCanvasSize?: {
     readonly canvas: HTMLCanvasElement
@@ -1358,6 +1359,12 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     if (this.keyboard !== false) {
       const view = elements.root.ownerDocument.defaultView
       if (!view) throw createGhosttyError('input.install', 'Terminal input requires a window')
+      elements.textarea.addEventListener('focus', this.handleTextareaFocus, {
+        signal: elements.signal,
+      })
+      elements.textarea.addEventListener('blur', this.handleTextareaBlur, {
+        signal: elements.signal,
+      })
       elements.textarea.addEventListener('compositionstart', this.handleCompositionStart, {
         signal: elements.signal,
       })
@@ -1663,6 +1670,16 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.pointer?.cancel()
   }
 
+  private readonly handleTextareaFocus = (): void => {
+    this.inputFocused = true
+    const snapshot = this.lastFrame
+    if (snapshot) this.runUiOperation('focus.caret', () => this.positionTextarea(snapshot))
+  }
+
+  private readonly handleTextareaBlur = (): void => {
+    this.inputFocused = false
+  }
+
   private readonly handleCompositionStart = (): void => {
     this.compositionActive = true
     const snapshot = this.lastFrame
@@ -1909,8 +1926,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private positionTextarea(snapshot: RendererTextFrameSnapshot): void {
     const elements = this.elementsValue
     if (!elements) return
-    const focused = elements.root.ownerDocument.activeElement === elements.textarea
-    if (!focused && !this.compositionActive) return
+    if (!this.inputFocused && !this.compositionActive) return
     if (this.stateValue !== 'open' && this.stateValue !== 'opening') return
     this.lastFrame = snapshot
     const column = leadingCursorColumn(snapshot)
