@@ -212,12 +212,11 @@ test.each(['editor', 'ghostty-webgpu', 'hotkeys'])(
     expect(result.status, result.calls.join('\n')).toBe(0)
     const browser = family === 'editor' ? ['playwright install --with-deps chromium'] : []
     expect(result.calls).toEqual(
-      ['bun install'].concat(browser, [
-        'bun run build',
-        'bun run typecheck',
-        'bun run lint',
-        'bun run format:check',
-      ]),
+      ['bun install'].concat(
+        browser,
+        ['bun run build', 'bun run typecheck', 'bun run lint', 'bun run format:check'],
+        family === 'ghostty-webgpu' ? ['bun run --cwd packages/line-editor verify'] : [],
+      ),
     )
   },
 )
@@ -372,15 +371,27 @@ test('automatic bump branches include the matched Markdown source', () => {
 
 test('canonical ghostty CI verifies the separate line editor package', () => {
   const steps = readWorkflow('workspace-libraries.yml').jobs.ghostty!.steps
-  expect(steps.map((step) => step.run)).toContain('bun run --cwd ghostty-webgpu-line-editor verify')
+  expect(steps.map((step) => step.run)).toContain(
+    'bun run --cwd ghostty-webgpu/packages/line-editor verify',
+  )
   const root = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
-  expect(root.workspaces.packages).toContain('ghostty-webgpu-line-editor')
+  expect(root.workspaces.packages).toContain('ghostty-webgpu/packages/*')
   expect(root.scripts['build:workspaces']).toContain('--filter=ghostty-webgpu-line-editor')
 })
 
 test('the provisional line editor workspace is private until publication is authorized', () => {
   const manifest = JSON.parse(
-    readFileSync(new URL('../ghostty-webgpu-line-editor/package.json', import.meta.url), 'utf8'),
+    readFileSync(
+      new URL('../ghostty-webgpu/packages/line-editor/package.json', import.meta.url),
+      'utf8',
+    ),
   )
   expect(manifest.private).toBe(true)
+})
+
+test('line editor builds after the root terminal declarations', () => {
+  const graph = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'))
+  expect(graph.tasks['ghostty-webgpu-line-editor#build'].dependsOn).toContain(
+    'ghostty-webgpu#build',
+  )
 })

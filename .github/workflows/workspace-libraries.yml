@@ -136,7 +136,7 @@ jobs:
           browsers: chromium
       - name: Verify line editor package
         if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"ghostty-webgpu-line-editor"') }}
-        run: bun run --cwd ghostty-webgpu-line-editor verify
+        run: bun run --cwd ghostty-webgpu/packages/line-editor verify
       - name: Verify terminal library and browser package
         if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"ghostty-webgpu"') }}
         run: bun run --cwd ghostty-webgpu verify
