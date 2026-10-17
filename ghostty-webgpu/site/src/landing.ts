@@ -39,6 +39,52 @@ function play(seconds: number, frame: (t: number) => void) {
   requestAnimationFrame(step)
 }
 
+/** Plays `frame(t)` on animation frames while `host` is on screen. */
+function playWhileVisible(host: HTMLElement, frame: (t: number) => void) {
+  const start = performance.now()
+  let handle = 0
+  const step = (now: number) => {
+    frame((now - start) / 1000)
+    handle = requestAnimationFrame(step)
+  }
+  new IntersectionObserver(([entry]) => {
+    if (entry?.isIntersecting && !handle) handle = requestAnimationFrame(step)
+    if (entry?.isIntersecting || !handle) return
+    cancelAnimationFrame(handle)
+    handle = 0
+  }).observe(host)
+}
+
+// Each piece's final frame as the server wrote it: the widest it gets, so the one its size must fit.
+const finals = new WeakMap<HTMLElement, string>()
+
+/** Shrinks a piece's text until its final frame fits its column, in whatever font draws it. */
+function fitWidth(text: HTMLElement) {
+  const current = text.innerHTML
+  text.innerHTML = finals.get(text) ?? current
+  text.style.fontSize = ''
+  const overflow = text.scrollWidth / text.clientWidth
+  if (overflow > 1) {
+    text.style.fontSize = `${Number.parseFloat(getComputedStyle(text).fontSize) / overflow}px`
+  }
+  text.innerHTML = current
+}
+
+function fitAll() {
+  const pieces = Array.from(document.querySelectorAll<HTMLElement>('.ascii:not(.inline)'))
+  for (const text of pieces) finals.set(text, text.innerHTML)
+  for (const text of pieces) fitWidth(text)
+  const widths = new WeakMap<Element, number>()
+  const resized = new ResizeObserver((entries) => {
+    for (const { target, contentRect } of entries) {
+      if (widths.get(target) === contentRect.width) continue
+      widths.set(target, contentRect.width)
+      fitWidth(target as HTMLElement)
+    }
+  })
+  for (const text of pieces) resized.observe(text)
+}
+
 /**
  * Plays a slider once, the first time it scrolls into view. One already on screen when the page opens keeps the
  * server's final frame, so nothing runs backwards.
@@ -84,7 +130,7 @@ async function paintArt() {
 
   for (const host of document.querySelectorAll<HTMLElement>('[data-working]')) {
     const piece = working(scene.theme)
-    play(Number.POSITIVE_INFINITY, (t) => draw(host, piece, t))
+    playWhileVisible(host, (t) => draw(host, piece, t))
   }
   for (const host of document.querySelectorAll<HTMLElement>('[data-chart]')) {
     const entry = page.charts[Number(host.dataset['chart'])]
@@ -164,4 +210,8 @@ import('./scene/player')
     ),
   )
   .catch((cause: unknown) => console.error('The scene did not start', cause))
+fitAll()
 paintArt().catch((cause: unknown) => console.error('The page art did not draw', cause))
+void document.fonts.ready.then(() =>
+  document.querySelectorAll<HTMLElement>('.ascii:not(.inline)').forEach(fitWidth),
+)
