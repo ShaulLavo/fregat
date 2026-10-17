@@ -1,8 +1,8 @@
 # ghostty-webgpu-line-editor
 
-Readline-style editing for local shells hosted by ghostty-webgpu. Working package name and initial version `0.0.1`. This package is under development and marked private until publication is authorized.
+Readline-style editing for local shells hosted by ghostty-webgpu. Working package name and current version `0.0.2`. This package is under development and marked private until publication is authorized.
 
-The editing checkpoint provides a browser-independent model, keymap, history and read lifecycle. Native terminal rendering and the `readline()` extension are the next integration unit. The current checkpoint does not attach to a terminal or replace the site's Shell editor.
+The package provides a browser-independent model, keymap, history, read lifecycle and a `readline()` terminal extension. The extension owns input while a read is active, renders the prompt through the terminal API, and exposes `print()` for output that arrives during editing.
 
 ## Editing model
 
@@ -22,6 +22,22 @@ await session.dispatch({ kind: 'insert', text: 'echo hello' })
 await session.dispatch({ kind: 'submit' })
 const result = await pending
 ```
+
+To attach the editor to a `ghostty-webgpu` terminal, load the extension and start a read when the
+terminal is open:
+
+```ts
+import { Terminal } from 'ghostty-webgpu'
+import { readline } from 'ghostty-webgpu-line-editor'
+
+const terminal = await Terminal.create()
+await terminal.open(container)
+const editor = terminal.use(readline({ complete: completeCommand }))
+const result = await editor.api.read({ prompt: '$ ' })
+```
+
+Call `editor.api.print(text)` for shell output while the prompt is active. The extension
+clears and restores the prompt so output does not corrupt the line being edited.
 
 Completion candidates are replacements for the whitespace-delimited token before the cursor. A common grapheme prefix extends that token. A second Tab at the same revision emits the candidate list. Hosts that need shell-aware quoting can implement candidate formatting in their callback.
 

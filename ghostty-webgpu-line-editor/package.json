@@ -1,6 +1,6 @@
 {
   "name": "ghostty-webgpu-line-editor",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Readline-style editing for ghostty-webgpu local shells",
   "license": "MIT",
@@ -31,10 +31,14 @@
     "evlog": "2.29.0"
   },
   "devDependencies": {
+    "ghostty-webgpu": "workspace:*",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
     "typescript": "7.0.2",
     "vitest": "5.0.2"
+  },
+  "peerDependencies": {
+    "ghostty-webgpu": "workspace:*"
   },
   "engines": {
     "node": ">=20"

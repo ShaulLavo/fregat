@@ -218,7 +218,7 @@ export class ReadSession {
     }
     if (!this.current(read, snapshot.revision, work)) return
     this.work = undefined
-    const candidates = [...new Set(values)]
+    const candidates = Array.from(new Set(values))
     if (candidates.length === 0) return
     const prefix = commonPrefix(candidates)
     const before = snapshot.text.slice(0, snapshot.cursor)
