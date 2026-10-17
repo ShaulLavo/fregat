@@ -1,9 +1,7 @@
-import type { PieceName } from 'ascii.rest'
-import type { Art } from './scene/art'
+import type { Piece, PieceName } from 'ascii.rest'
 import type { Scene } from './scene/scenes'
 
 interface PageData {
-  readonly facts: readonly (readonly [string, string])[]
   readonly charts: readonly ({
     readonly data: Record<string, number>
     readonly max: number
@@ -27,31 +25,92 @@ const scene =
   scenes.find((entry) => entry.name === document.documentElement.dataset['scene']) ?? scenes[0]!
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
 
-/** Draws each piece in the scene's colours, on a canvas filling the box the server sized for it. */
+// A slider's reveal: as long as the bar chart's own growth, to its resting frame.
+const REVEAL_SECONDS = 1.05
+
+/** Plays `frame(t)` from 0 to `seconds` on animation frames, then holds the last one. */
+function play(seconds: number, frame: (t: number) => void) {
+  const start = performance.now()
+  const step = (now: number) => {
+    const t = Math.min(seconds, (now - start) / 1000)
+    frame(t)
+    if (t < seconds) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
+
+/**
+ * Plays a slider once, the first time it scrolls into view. One already on screen when the page opens keeps the
+ * server's final frame, so nothing runs backwards.
+ */
+function revealOnce(host: HTMLElement, empty: () => void, reveal: () => void) {
+  const observer = new IntersectionObserver(([entry], self) => {
+    if (!entry) return
+    if (entry.isIntersecting && !host.dataset['armed']) return self.disconnect()
+    if (!entry.isIntersecting) {
+      if (!host.dataset['armed']) empty()
+      host.dataset['armed'] = 'true'
+      return
+    }
+    self.disconnect()
+    reveal()
+  })
+  observer.observe(host)
+}
+
+/** The page's ascii.rest pieces in the scene's colours: the wordmark on a canvas, the rest as animated HTML text. */
 async function paintArt() {
-  const [{ mount }, { chart, fact, score, wordmark, working }] = await Promise.all([
+  const [{ mount }, { chart, score, wordmark, working }, { frameHtml }] = await Promise.all([
     import('ascii.rest'),
     import('./scene/art'),
+    import('./scene/ascii-html'),
   ])
-  const entries: [string, Art][] = [
-    ['wordmark', wordmark],
-    ['working', working],
-  ]
-  page.facts.forEach(([title, text], index) => entries.push([`fact-${index}`, fact(title, text)]))
-  page.charts.forEach(
-    (entry, index) => entry && entries.push([`chart-${index}`, chart(entry.data, entry.max)]),
-  )
-  page.scores.forEach(({ label, value, ours }, index) =>
-    entries.push([`score-${index}`, score(label, value, ours)]),
-  )
-  const byName = Object.fromEntries(entries)
-  for (const host of document.querySelectorAll<HTMLElement>('[data-art]')) {
-    const art = byName[host.dataset['art']!]
-    if (!art) continue
-    const piece = art(scene.theme)
+  const ink = (_: number, hex: string) => hex
+  const drawn = new WeakMap<HTMLElement, string>()
+  const draw = (host: HTMLElement, piece: Piece, t: number) => {
+    const html = frameHtml(piece, t, ink)
+    if (drawn.get(host) === html) return
+    drawn.set(host, html)
+    host.innerHTML = html
+  }
+
+  const banner = document.querySelector<HTMLElement>('[data-art="wordmark"]')
+  if (banner) {
     const canvas = document.createElement('canvas')
-    host.replaceChildren(canvas)
-    mount(canvas, piece, { motion: !reducedMotion })
+    banner.replaceChildren(canvas)
+    mount(canvas, wordmark(scene.theme), { motion: !reducedMotion })
+  }
+  if (reducedMotion) return
+
+  for (const host of document.querySelectorAll<HTMLElement>('[data-working]')) {
+    const piece = working(scene.theme)
+    play(Number.POSITIVE_INFINITY, (t) => draw(host, piece, t))
+  }
+  for (const host of document.querySelectorAll<HTMLElement>('[data-chart]')) {
+    const entry = page.charts[Number(host.dataset['chart'])]
+    if (!entry) continue
+    const piece = chart(entry.data, entry.max)(scene.theme)
+    revealOnce(
+      host,
+      () => draw(host, piece, 0),
+      () => play(piece.meta.still ?? REVEAL_SECONDS, (t) => draw(host, piece, t)),
+    )
+  }
+  for (const host of document.querySelectorAll<HTMLElement>('[data-score]')) {
+    const entry = page.scores[Number(host.dataset['score'])]
+    if (!entry) continue
+    let shown = 0
+    const piece = score(entry.label, () => shown, entry.ours)(scene.theme)
+    revealOnce(
+      host,
+      () => draw(host, piece, 0),
+      () =>
+        play(REVEAL_SECONDS, (t) => {
+          // Eases out like the bar chart's growth.
+          shown = entry.value * (1 - (1 - t / REVEAL_SECONDS) ** 3)
+          draw(host, piece, t)
+        }),
+    )
   }
 }
 
