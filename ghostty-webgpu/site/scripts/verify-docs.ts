@@ -202,7 +202,7 @@ try {
     await scenePage.mouse.up()
     assert.match(
       await scenePage.evaluate(() => String(getSelection())),
-      /terminal/,
+      /WebAssembly/,
       'The tagline can be selected',
     )
     await scenePage.touchscreen.tap(sceneBox.x + 200, sceneBox.y + 120)
