@@ -134,6 +134,8 @@ code {
 }
 
 .lede {
+  /* Hugs its lines, so the blank space beside a wrapped tagline still reaches the scene. */
+  width: fit-content;
   pointer-events: auto;
 }
 
