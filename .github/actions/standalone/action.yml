@@ -35,6 +35,11 @@ runs:
       shell: bash
       working-directory: ${{ steps.export.outputs.directory }}
       run: bun run build && bun run typecheck && bun run lint && bun run format:check
+    - name: Verify standalone Ghostty line editor
+      if: ${{ inputs.family == 'ghostty-webgpu' }}
+      shell: bash
+      working-directory: ${{ steps.export.outputs.directory }}
+      run: bun run --cwd packages/line-editor verify
     - name: Check standalone tree-sitter runtime
       if: ${{ inputs.family == 'editor' }}
       shell: bash

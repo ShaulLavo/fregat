@@ -1,9 +1,7 @@
 import { CanvasTerminalRenderer } from '../src/render/canvas/renderer.js'
 import { WebGlTerminalRenderer } from '../src/render/webgl/renderer.js'
-import {
-  WebGpuTerminalRenderer,
-  type WebGpuTerminalRendererOptions,
-} from '../src/render/renderer.js'
+import { WebGpuTerminalRenderer } from '../src/render/webgpu/renderer.js'
+import type { WebGpuTerminalRendererOptions } from '../src/render/shared/types.js'
 import { benchmarkBackends, type BenchmarkBackend } from './renderer-benchmark-types.js'
 
 interface AdapterInfo {

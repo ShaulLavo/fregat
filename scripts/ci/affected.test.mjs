@@ -35,9 +35,9 @@ test('the four documentation files in PR 1207 do not consume application or libr
 const terminalPrFiles = [
   '.changeset/desktop-linux-webgl-auto.md',
   'ghostty-webgpu/docs/api.md',
-  'ghostty-webgpu/src/render/backend-order.test.ts',
-  'ghostty-webgpu/src/render/backend-order.ts',
-  'ghostty-webgpu/src/render/selector.ts',
+  'ghostty-webgpu/src/render/shared/backend-order.test.ts',
+  'ghostty-webgpu/src/render/shared/backend-order.ts',
+  'ghostty-webgpu/src/render/shared/selector.ts',
   'ghostty-webgpu/src/render/tests/platforms.ts',
   'ghostty-webgpu/src/render/tests/selector.browser.test.ts',
   'ghostty-webgpu/src/worker/runtime.ts',

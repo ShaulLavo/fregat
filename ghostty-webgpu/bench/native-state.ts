@@ -1,5 +1,5 @@
 import type { GhosttyRenderState } from '../src/core/render-state.js'
-import type { RenderStateSource } from '../src/render/renderer.js'
+import type { RenderStateSource } from '../src/render/shared/types.js'
 
 export interface DecodedRows {
   cells: number
