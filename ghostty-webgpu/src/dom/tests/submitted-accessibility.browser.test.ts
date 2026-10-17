@@ -150,6 +150,7 @@ async function expectDisplayed(
   harness: { readonly terminal: Pick<TerminalApi, 'textarea'> },
   summary: TerminalSubmittedSnapshot,
 ): Promise<void> {
+  harness.terminal.textarea!.focus()
   const accessibility = controller(harness.terminal)
   const viewport = summary.cursor.viewport
   const column = viewport?.wideTail ? Math.max(0, viewport.x - 1) : viewport?.x
