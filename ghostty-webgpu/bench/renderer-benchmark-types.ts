@@ -4,6 +4,7 @@ export const benchmarkBackends = [
   'webgl2',
   'webgpu',
   'webgpu-compute',
+  'webgpu-compute-copy',
   'webgpu-fullscreen-fragment',
   'ghostty-web',
 ] as const

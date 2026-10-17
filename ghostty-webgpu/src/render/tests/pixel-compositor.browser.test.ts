@@ -15,7 +15,7 @@ import { qualifyDeviceReplacement } from './adapter-qualification.js'
 import { limitDeviceBuffers } from './device-limits.js'
 
 type Compositor = NonNullable<WebGpuTextPassOptions['experimentalCompositor']>
-const compositors: readonly Compositor[] = ['compute', 'fullscreen-fragment']
+const compositors: readonly Compositor[] = ['compute', 'fullscreen-fragment', 'compute-copy']
 const columns = 7
 const rows = 4
 const cellSize = 16
@@ -33,7 +33,10 @@ function destroyResources(owned: { destroy(): void }[], device: GPUDevice): void
 async function createGpu() {
   const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
   if (!adapter) throw new Error('WebGPU requestAdapter returned null')
-  const device = await adapter.requestDevice()
+  const requiredFeatures: GPUFeatureName[] = adapter.features.has('bgra8unorm-storage')
+    ? ['bgra8unorm-storage']
+    : []
+  const device = await adapter.requestDevice({ requiredFeatures })
   const owned: { destroy(): void }[] = []
   let scopeOpen = true
   device.pushErrorScope('validation')
@@ -85,7 +88,8 @@ function createTarget(gpu: TestGpu, experimentalCompositor?: Compositor) {
     gpu.device.createTexture({
       format: 'rgba8unorm',
       size: [width, height],
-      usage: GPUTextureUsage.COPY_SRC | GPUTextureUsage.RENDER_ATTACHMENT,
+      usage:
+        GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
     }),
   )
   const output = gpu.own(
@@ -102,10 +106,10 @@ function createTarget(gpu: TestGpu, experimentalCompositor?: Compositor) {
       texture,
     }
     if (experimentalCompositor) {
-      gpu.device.queue.submit([pass.encode(texture.createView(), copy)])
+      gpu.device.queue.submit([pass.encode(texture, copy)])
       pass.acceptFrame()
     }
-    if (!experimentalCompositor) pass.submit(texture.createView(), copy)
+    if (!experimentalCompositor) pass.submit(texture, copy)
     await output.mapAsync(GPUMapMode.READ)
     try {
       return unpadPixels(new Uint8Array(output.getMappedRange()))
@@ -276,8 +280,8 @@ it.each(compositors)(
     expect(pixel(pixels, 4, 8)[3]).toBeGreaterThan(0)
     expect(pixel(pixels, 40, 24)[3]).toBe(255)
     expect(pixel(pixels, 108, 60)[3]).toBeGreaterThan(0)
-    expect(fixture.candidate.pass.drawCount).toBe(1)
-    expect(fixture.candidate.pass.metrics.dispatches).toBe(mode === 'compute' ? 1 : 0)
+    expect(fixture.candidate.pass.drawCount).toBe(mode === 'compute-copy' ? 0 : 1)
+    expect(fixture.candidate.pass.metrics.dispatches).toBe(mode === 'fullscreen-fragment' ? 0 : 1)
   },
 )
 
@@ -474,7 +478,7 @@ it.each(compositors)(
         fixture.renderer.resize(size)
         fixture.clock.flush()
       }
-      expect(candidate.renderer.metrics.draws - draws).toBe(1)
+      expect(candidate.renderer.metrics.draws - draws).toBe(mode === 'compute-copy' ? 0 : 1)
       expect(candidate.canvas.width).toBe(reference.canvas.width)
       expect(candidate.canvas.height).toBe(reference.canvas.height)
       await expectMatchingRenderers(
@@ -560,43 +564,46 @@ it.each(compositors)(
   },
 )
 
-it('destroys compute output and every buffer after pipeline construction fails', async () => {
-  const gpu = await createGpu()
-  const buffers = vi.spyOn(gpu.device, 'createBuffer')
-  const textures = vi.spyOn(gpu.device, 'createTexture')
-  const bufferDestroy = vi.spyOn(GPUBuffer.prototype, 'destroy')
-  const textureDestroy = vi.spyOn(GPUTexture.prototype, 'destroy')
-  const pipeline = vi.spyOn(gpu.device, 'createComputePipeline').mockImplementationOnce(() => {
-    throw new TypeError('Injected compute pipeline failure')
-  })
-  onTestFinished(() => {
-    buffers.mockRestore()
-    textures.mockRestore()
-    bufferDestroy.mockRestore()
-    textureDestroy.mockRestore()
-    pipeline.mockRestore()
-  })
-  expect(
-    () =>
-      new WebGpuTextPass({
-        cellHeight: cellSize,
-        cellWidth: cellSize,
-        columns: 2,
-        device: gpu.device,
-        experimentalCompositor: 'compute',
-        format: 'rgba8unorm',
-        height: cellSize * 2,
-        instanceCount: 4,
-        width: cellSize * 2,
-      }),
-  ).toThrow('Injected compute pipeline failure')
-  expect(buffers.mock.results.length).toBeGreaterThanOrEqual(3)
-  expect(textures).toHaveBeenCalledOnce()
-  for (const result of buffers.mock.results) {
-    if (result.type === 'return') expect(bufferDestroy.mock.contexts).toContain(result.value)
-  }
-  expect(textureDestroy.mock.contexts).toContain(textures.mock.results[0]!.value)
-})
+it.each(['compute', 'compute-copy'] as const)(
+  '%s destroys output and every buffer after pipeline construction fails',
+  async (mode) => {
+    const gpu = await createGpu()
+    const buffers = vi.spyOn(gpu.device, 'createBuffer')
+    const textures = vi.spyOn(gpu.device, 'createTexture')
+    const bufferDestroy = vi.spyOn(GPUBuffer.prototype, 'destroy')
+    const textureDestroy = vi.spyOn(GPUTexture.prototype, 'destroy')
+    const pipeline = vi.spyOn(gpu.device, 'createComputePipeline').mockImplementationOnce(() => {
+      throw new TypeError('Injected compute pipeline failure')
+    })
+    onTestFinished(() => {
+      buffers.mockRestore()
+      textures.mockRestore()
+      bufferDestroy.mockRestore()
+      textureDestroy.mockRestore()
+      pipeline.mockRestore()
+    })
+    expect(
+      () =>
+        new WebGpuTextPass({
+          cellHeight: cellSize,
+          cellWidth: cellSize,
+          columns: 2,
+          device: gpu.device,
+          experimentalCompositor: mode,
+          format: 'rgba8unorm',
+          height: cellSize * 2,
+          instanceCount: 4,
+          width: cellSize * 2,
+        }),
+    ).toThrow('Injected compute pipeline failure')
+    expect(buffers.mock.results.length).toBeGreaterThanOrEqual(3)
+    expect(textures).toHaveBeenCalledOnce()
+    for (const result of buffers.mock.results) {
+      if (result.type === 'return') expect(bufferDestroy.mock.contexts).toContain(result.value)
+    }
+    expect(textureDestroy.mock.contexts).toContain(textures.mock.results[0]!.value)
+  },
+)
 
 it('retains the compute renderer after a qualified replacement device', async ({ skip }) => {
   const gpu = await createGpu()

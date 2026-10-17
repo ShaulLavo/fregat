@@ -11,6 +11,9 @@ interface AdapterInfo {
   readonly architecture: string
   readonly description: string
   readonly fallback: boolean
+  readonly bgra8unormStorageAdvertised: boolean
+  readonly bgra8unormStorageEnabled: boolean
+  readonly preferredCanvasFormat: GPUTextureFormat
 }
 
 export function parseBenchmarkBackend(value: string): BenchmarkBackend {
@@ -47,13 +50,21 @@ export async function createBenchmarkRenderer(
 
   const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' })
   if (!adapter) throw new Error('No WebGPU adapter')
+  const advertised = adapter.features.has('bgra8unorm-storage')
+  const preferredCanvasFormat = navigator.gpu.getPreferredCanvasFormat()
+  if (backend === 'webgpu-compute-copy' && preferredCanvasFormat === 'bgra8unorm' && !advertised)
+    throw new Error('Compute copy requires bgra8unorm-storage on this WebGPU adapter')
+  const requiredFeatures: GPUFeatureName[] = advertised ? ['bgra8unorm-storage'] : []
+  const device = await adapter.requestDevice({ requiredFeatures })
   const info: AdapterInfo = {
     vendor: adapter.info.vendor,
     architecture: adapter.info.architecture,
     description: adapter.info.description,
     fallback: adapter.info.isFallbackAdapter,
+    bgra8unormStorageAdvertised: advertised,
+    bgra8unormStorageEnabled: device.features.has('bgra8unorm-storage'),
+    preferredCanvasFormat,
   }
-  const device = await adapter.requestDevice()
   if (backend === 'webgpu-compute')
     return {
       renderer: await WebGpuTerminalRenderer.create({
@@ -63,6 +74,16 @@ export async function createBenchmarkRenderer(
       }),
       adapter: info,
       path: 'compute',
+    }
+  if (backend === 'webgpu-compute-copy')
+    return {
+      renderer: await WebGpuTerminalRenderer.create({
+        ...options,
+        deviceFactory: async () => device,
+        experimentalCompositor: 'compute-copy',
+      }),
+      adapter: info,
+      path: 'compute-copy',
     }
   if (backend === 'webgpu-fullscreen-fragment')
     return {

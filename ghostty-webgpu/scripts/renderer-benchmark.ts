@@ -225,6 +225,17 @@ async function measure(
     )
     const after = await processes(browserSession)
     const cpu = cpuDelta(before, after, performance.now() - started)
+    if (backend === 'webgpu-compute-copy' && scenario !== 'settled-idle') {
+      const metrics = result.metrics
+      assert((metrics.submittedFrames ?? 0) > 0, 'Compute copy submitted no sampled frames')
+      assert((metrics.dispatches ?? 0) > 0, 'Compute copy dispatched no sampled work')
+      assert.equal(metrics.draws, 0, 'Compute copy used a draw in the sampled work')
+      assert.equal(
+        metrics.textureCopies,
+        metrics.submittedFrames,
+        'Compute copy omitted a texture copy in the sampled work',
+      )
+    }
     const info = await page.evaluate(() => window.__rendererBench.getPageInfo())
     if (!headless && backend.startsWith('webgpu')) {
       assert(info && typeof info === 'object' && 'adapter' in info)

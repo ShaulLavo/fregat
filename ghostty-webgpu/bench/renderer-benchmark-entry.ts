@@ -179,6 +179,17 @@ function assertSelectedRendererPath(): void {
     throw new Error('Canvas pixel benchmark arm selected a different paint mode')
   if (backend === 'webgpu-compute' && (metrics.dispatches ?? 0) < 1)
     throw new Error('Compute benchmark arm submitted no compute dispatch')
+  if (backend === 'webgpu-compute-copy') {
+    const submitted = metrics.submittedFrames ?? 0
+    if (
+      submitted > 0 &&
+      metrics.draws === 0 &&
+      (metrics.dispatches ?? 0) > 0 &&
+      metrics.textureCopies === submitted
+    )
+      return
+    throw new Error('Compute copy benchmark arm did not dispatch and copy each frame')
+  }
   if (backend !== 'webgpu-fullscreen-fragment') return
   if ((metrics.submittedFrames ?? 0) > 0 && metrics.draws === metrics.submittedFrames) return
   throw new Error('Fullscreen fragment benchmark arm did not submit one draw per frame')

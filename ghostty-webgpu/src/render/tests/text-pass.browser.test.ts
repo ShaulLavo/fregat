@@ -317,6 +317,7 @@ it('renders transparent defaults, opaque explicit colors, glyphs, and an outline
   expect(grid.pixel(48, 8)[3]).toBeGreaterThan(0)
   expect(grid.pass.metrics).toEqual({
     dispatches: 0,
+    textureCopies: 0,
     draws: 2,
     submittedFrames: 1,
     uploadedBytes: columns * rows * (64 + 96),

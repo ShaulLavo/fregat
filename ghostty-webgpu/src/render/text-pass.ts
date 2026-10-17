@@ -19,12 +19,14 @@ import { glyphShader } from './shaders/glyph.wgsl.js'
 import {
   compositorPresentationShader,
   computeCompositorShader,
+  copyComputeCompositorShader,
   fullscreenCompositorShader,
 } from './shaders/pixel-compositor.wgsl.js'
 
-export type ExperimentalWebGpuCompositor = 'compute' | 'fullscreen-fragment'
+export type ExperimentalWebGpuCompositor = 'compute' | 'fullscreen-fragment' | 'compute-copy'
 
 export interface TextPassMetrics {
+  textureCopies: number
   dispatches: number
   draws: number
   submittedFrames: number
@@ -95,7 +97,18 @@ interface ComputeResources {
   bindGroup?: GPUBindGroup
 }
 
-type TextPipelineResources = PipelineResources | FragmentResources | ComputeResources
+interface CopyComputeResources {
+  readonly kind: 'compute-copy'
+  readonly pipeline: GPUComputePipeline
+  readonly output: GPUTexture
+  readonly outputView: GPUTextureView
+  readonly bands: GPUBuffer
+  bindGroup?: GPUBindGroup
+}
+
+type PixelResources = FragmentResources | ComputeResources | CopyComputeResources
+
+type TextPipelineResources = PipelineResources | PixelResources
 
 function pixelGeometry(options: WebGpuTextPassOptions): PixelGeometry | undefined {
   if (!options.experimentalCompositor) return undefined
@@ -123,6 +136,16 @@ function pixelGeometry(options: WebGpuTextPassOptions): PixelGeometry | undefine
     throw createGhosttyError(
       'webgpu_compositor',
       'Pixel composition requires an rgba8unorm or bgra8unorm target',
+    )
+  }
+  if (
+    options.experimentalCompositor === 'compute-copy' &&
+    options.format === 'bgra8unorm' &&
+    !options.device.features.has('bgra8unorm-storage')
+  ) {
+    throw createGhosttyError(
+      'webgpu_compositor',
+      'BGRA compute copying requires the bgra8unorm-storage device feature',
     )
   }
   const limit = options.device.limits.maxTextureDimension2D
@@ -175,13 +198,15 @@ export class WebGpuTextPass {
   private readonly glyphBuffer: GPUBuffer
   private readonly glyphBatches: GlyphBatch[] = []
   readonly drawCount: number
-  readonly dispatchCount: number
+  private dispatchCountValue: number
+  readonly textureCopyCount: number
   readonly supportsStableRows: boolean
   private frameUploadedBytesValue = 0
   private glyphBindGroupCreationCountValue = 0
   private glyphBindGroup?: GPUBindGroup
   private readonly instanceCount: number
   readonly metrics: TextPassMetrics = {
+    textureCopies: 0,
     dispatches: 0,
     draws: 0,
     submittedFrames: 0,
@@ -193,6 +218,9 @@ export class WebGpuTextPass {
   private readonly width: number
   private readonly height: number
   private readonly reach = new Float32Array(4)
+  private readonly dirtyBands?: Uint8Array
+  private readonly bandIndices?: Uint32Array
+  private dirtyBandCount = 0
   private readonly sampler: GPUSampler
   private readonly viewportBuffer: GPUBuffer
   private readonly rowData = new ArrayBuffer(24)
@@ -230,7 +258,13 @@ export class WebGpuTextPass {
       }
       this.glyphBuffer = this.glyphBatches[0]!.buffer
       this.drawCount = options.experimentalCompositor ? 1 : 1 + this.glyphBatches.length
-      this.dispatchCount = options.experimentalCompositor === 'compute' ? 1 : 0
+      this.dispatchCountValue = options.experimentalCompositor === 'compute' ? 1 : 0
+      this.textureCopyCount = options.experimentalCompositor === 'compute-copy' ? 1 : 0
+      if (options.experimentalCompositor === 'compute-copy') {
+        this.drawCount = 0
+        this.dirtyBands = new Uint8Array(Math.ceil(this.height / 8)).fill(1)
+        this.bandIndices = new Uint32Array(this.dirtyBands.length)
+      }
       this.supportsStableRows = this.glyphBatches.length === 1
       this.viewportBuffer = options.device.createBuffer({
         size: this.geometry ? 64 : 32,
@@ -276,6 +310,10 @@ export class WebGpuTextPass {
     return this.glyphBindGroupCreationCountValue
   }
 
+  get dispatchCount(): number {
+    return this.dispatchCountValue
+  }
+
   get frameUploadedBytes(): number {
     return this.frameUploadedBytesValue
   }
@@ -303,28 +341,32 @@ export class WebGpuTextPass {
     const reachOperations = this.geometry
       ? this.updateGlyphReach(glyphData, updates, data.stableRows ?? false)
       : 0
+    const bandOperations = this.dirtyBands ? this.updateDirtyBands(updates, changes) : 0
     for (const range of plan.cell) this.writeRange(this.cellBuffer, cellData, range)
     if (this.glyphBatches.length === 1) {
       for (const range of plan.glyph) this.writeRange(this.glyphBuffer, glyphData, range)
-      return plan.cell.length + plan.glyph.length + reachOperations
+      return plan.cell.length + plan.glyph.length + reachOperations + bandOperations
     }
     let operations = plan.cell.length
     for (const range of plan.glyph) operations += this.writeGlyphRange(glyphData, range)
-    return operations + reachOperations
+    return operations + reachOperations + bandOperations
   }
 
-  submit(view: GPUTextureView, copy?: TextPassCopy): void {
+  submit(view: GPUTexture | GPUTextureView, copy?: TextPassCopy): void {
     this.device.queue.submit([this.encode(view, copy)])
     this.acceptFrame()
   }
 
   acceptFrame(): void {
     this.metrics.draws += this.drawCount
+    this.metrics.textureCopies += this.textureCopyCount
     this.metrics.dispatches += this.dispatchCount
     this.metrics.submittedFrames += 1
+    this.dirtyBands?.fill(0)
+    this.dirtyBandCount = 0
   }
 
-  encode(view: GPUTextureView, copy?: TextPassCopy): GPUCommandBuffer {
+  encode(view: GPUTexture | GPUTextureView, copy?: TextPassCopy): GPUCommandBuffer {
     const encoder = this.device.createCommandEncoder()
     this.encodeComposition(encoder, view)
     if (copy) {
@@ -337,7 +379,18 @@ export class WebGpuTextPass {
     return encoder.finish()
   }
 
-  private encodeComposition(encoder: GPUCommandEncoder, view: GPUTextureView): void {
+  private encodeComposition(encoder: GPUCommandEncoder, target: GPUTexture | GPUTextureView): void {
+    if (this.resources.kind === 'compute-copy') {
+      if (!('createView' in target)) {
+        throw createGhosttyError(
+          'webgpu_compositor',
+          'Compute copying requires the destination texture',
+        )
+      }
+      this.encodeCopyCompute(encoder, target, this.resources)
+      return
+    }
+    const view = 'createView' in target ? target.createView() : target
     if (this.resources.kind !== 'instanced') {
       this.encodePixels(encoder, view, this.resources)
       return
@@ -370,7 +423,8 @@ export class WebGpuTextPass {
 
   destroy(): void {
     for (const buffer of this.ownedBuffers) buffer.destroy()
-    if (this.resources?.kind === 'compute') this.resources.output.destroy()
+    if (this.resources?.kind === 'compute' || this.resources?.kind === 'compute-copy')
+      this.resources.output.destroy()
   }
 
   private uploadRows(data: FrameRows): void {
@@ -436,6 +490,7 @@ export class WebGpuTextPass {
     compositor: ExperimentalWebGpuCompositor | undefined,
   ): TextPipelineResources {
     if (!compositor) return this.createPipelines(format)
+    if (compositor === 'compute-copy') return this.createCopyComputeResources(format)
     if (compositor === 'fullscreen-fragment') {
       return {
         kind: compositor,
@@ -468,6 +523,31 @@ export class WebGpuTextPass {
     }
   }
 
+  private createCopyComputeResources(format: GPUTextureFormat): CopyComputeResources {
+    if (format !== 'rgba8unorm' && format !== 'bgra8unorm') {
+      throw createGhosttyError('webgpu_compositor', 'Compute copying requires an unorm target')
+    }
+    const output = this.device.createTexture({
+      format,
+      size: [this.width, this.height],
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
+    })
+    try {
+      const bands = this.createStorageBuffer(Math.ceil(this.height / 8) * 4)
+      const pipeline = this.device.createComputePipeline({
+        layout: 'auto',
+        compute: {
+          entryPoint: 'computeMain',
+          module: this.device.createShaderModule({ code: copyComputeCompositorShader(format) }),
+        },
+      })
+      return { kind: 'compute-copy', pipeline, output, outputView: output.createView(), bands }
+    } catch (cause) {
+      output.destroy()
+      throw cause
+    }
+  }
+
   private createFullscreenPipeline(format: GPUTextureFormat, code: string): GPURenderPipeline {
     const module = this.device.createShaderModule({ code })
     return this.device.createRenderPipeline({
@@ -493,10 +573,7 @@ export class WebGpuTextPass {
     this.device.queue.writeBuffer(this.viewportBuffer, 32, data)
   }
 
-  private syncPixelAtlas(
-    textures: AtlasGpuTextures,
-    resources: FragmentResources | ComputeResources,
-  ): void {
+  private syncPixelAtlas(textures: AtlasGpuTextures, resources: PixelResources): void {
     const entries: GPUBindGroupEntry[] = [
       { binding: 0, resource: { buffer: this.cellBuffer } },
       { binding: 1, resource: { buffer: this.glyphBuffer } },
@@ -505,7 +582,10 @@ export class WebGpuTextPass {
       { binding: 4, resource: textures.view('grayscale') },
       { binding: 5, resource: textures.view('color') },
     ]
-    if (resources.kind === 'compute') entries.push({ binding: 6, resource: resources.outputView })
+    if (resources.kind !== 'fullscreen-fragment')
+      entries.push({ binding: 6, resource: resources.outputView })
+    if (resources.kind === 'compute-copy')
+      entries.push({ binding: 7, resource: { buffer: resources.bands } })
     resources.bindGroup = this.device.createBindGroup({
       entries,
       layout: resources.pipeline.getBindGroupLayout(0),
@@ -562,6 +642,84 @@ export class WebGpuTextPass {
     this.reach[2] = maxX
     this.reach[3] = maxY
     return changed
+  }
+
+  private updateDirtyBands(updates: readonly RowInstanceUpdate[], changes: number): number {
+    const resources = this.resources
+    const mask = this.dirtyBands
+    const indices = this.bandIndices
+    if (resources.kind !== 'compute-copy' || !mask || !indices) return 0
+    if (changes !== 0) mask.fill(1)
+    for (const update of updates) {
+      this.markChangedRows(update.cell, CELL_INSTANCE_BYTES)
+      this.markChangedRows(update.glyph, GLYPH_INSTANCE_BYTES)
+    }
+    this.dirtyBandCount = 0
+    for (let band = 0; band < mask.length; band += 1) {
+      if (mask[band] === 0) continue
+      indices[this.dirtyBandCount++] = band
+    }
+    if (this.dirtyBandCount === 0) return 0
+    const byteLength = this.dirtyBandCount * 4
+    this.device.queue.writeBuffer(resources.bands, 0, indices.buffer, 0, byteLength)
+    this.frameUploadedBytesValue += byteLength
+    this.metrics.uploadedBytes += byteLength
+    this.metrics.uploadOperations += 1
+    return 1
+  }
+
+  private markChangedRows(
+    range: { byteOffset: number; byteLength: number },
+    recordBytes: number,
+  ): void {
+    const geometry = this.geometry
+    const mask = this.dirtyBands
+    if (!geometry || !mask || range.byteLength === 0) return
+    const rowBytes = geometry.columns * recordBytes
+    const firstRow = Math.floor(range.byteOffset / rowBytes)
+    const lastRow = Math.ceil((range.byteOffset + range.byteLength) / rowBytes)
+    for (let row = firstRow; row < lastRow; row += 1) {
+      const logicalRow = (row + geometry.rows - this.rowOffset) % geometry.rows
+      const top = logicalRow * geometry.cellHeight + Math.min(0, this.reach[1]!)
+      const bottom =
+        logicalRow * geometry.cellHeight + Math.max(geometry.cellHeight, this.reach[3]!)
+      const firstBand = Math.max(0, Math.floor(top / 8))
+      const lastBand = Math.min(mask.length, Math.ceil(bottom / 8))
+      mask.fill(1, firstBand, lastBand)
+    }
+  }
+
+  private encodeCopyCompute(
+    encoder: GPUCommandEncoder,
+    target: GPUTexture,
+    resources: CopyComputeResources,
+  ): void {
+    if (!resources.bindGroup)
+      throw createGhosttyError('webgpu_atlas', 'Atlas textures must be synchronized before drawing')
+    if (
+      target.format !== resources.output.format ||
+      target.width !== this.width ||
+      target.height !== this.height ||
+      target.sampleCount !== 1 ||
+      (target.usage & GPUTextureUsage.COPY_DST) === 0
+    ) {
+      throw createGhosttyError(
+        'webgpu_compositor',
+        'Compute copying requires a matching single-sample COPY_DST destination texture',
+      )
+    }
+    this.dispatchCountValue = this.dirtyBandCount === 0 ? 0 : 1
+    if (this.dirtyBandCount !== 0) {
+      const pass = encoder.beginComputePass()
+      pass.setPipeline(resources.pipeline)
+      pass.setBindGroup(0, resources.bindGroup)
+      pass.dispatchWorkgroups(Math.ceil(this.width / 8), this.dirtyBandCount)
+      pass.end()
+    }
+    encoder.copyTextureToTexture({ texture: resources.output }, { texture: target }, [
+      this.width,
+      this.height,
+    ])
   }
 
   private encodePixels(

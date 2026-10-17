@@ -92,14 +92,16 @@ fn glyphPixel(pixel: vec2f, logical: vec2u) -> vec4f {
   if (!contains(local, glyph.rect.zw)) { return vec4f(0.0); }
   let uv = mix(glyph.uv.xy, glyph.uv.zw, local / glyph.rect.zw);
   let layer = i32(glyph.atlas.x);
-  let grayscale = textureSampleLevel(grayscaleAtlas, atlasSampler, uv, layer, 0.0).r;
-  let color = textureSampleLevel(colorAtlas, atlasSampler, uv, layer, 0.0);
   let colorGlyph = glyph.atlas.z >= 0.5;
-  let coverage = select(grayscale, color.a, colorGlyph);
   let adjusted = contrastColor(glyph.color.rgb, glyph.background.rgb, glyph.metadata.z);
-  let rgb = select(adjusted, color.rgb, colorGlyph);
+  if (colorGlyph) {
+    let color = textureSampleLevel(colorAtlas, atlasSampler, uv, layer, 0.0);
+    let alpha = color.a * glyph.color.a;
+    return vec4f(color.rgb * alpha, alpha);
+  }
+  let coverage = textureSampleLevel(grayscaleAtlas, atlasSampler, uv, layer, 0.0).r;
   let alpha = coverage * glyph.color.a;
-  return vec4f(rgb * alpha, alpha);
+  return vec4f(adjusted * alpha, alpha);
 }
 
 fn composeRow(pixel: vec2f, row: u32, first: u32, last: u32, initial: vec4f) -> vec4f {
@@ -114,6 +116,10 @@ fn composeRow(pixel: vec2f, row: u32, first: u32, last: u32, initial: vec4f) -> 
 fn composePixel(pixel: vec2f) -> vec4f {
   let logical = min(vec2u(pixel / viewport.cellSize), viewport.grid - vec2u(1u));
   var result = cellPixel(pixel, logical);
+  if (all(viewport.reach == vec4f(0.0, 0.0, viewport.cellSize))) {
+    let glyph = glyphPixel(pixel, logical);
+    return quantized(glyph + result * (1.0 - glyph.a));
+  }
   let limit = vec2i(viewport.grid) - vec2i(1);
   let first = vec2u(clamp(vec2i(ceil((pixel - viewport.reach.zw) / viewport.cellSize)), vec2i(0), limit));
   let last = vec2u(clamp(vec2i(floor((pixel - viewport.reach.xy) / viewport.cellSize)), vec2i(0), limit));
@@ -156,3 +162,23 @@ fn fragmentMain(@builtin(position) pixel: vec4f) -> @location(0) vec4f {
   return textureLoad(pixels, vec2i(pixel.xy), 0);
 }
 `
+
+export function copyComputeCompositorShader(format: 'rgba8unorm' | 'bgra8unorm'): string {
+  return (
+    composition +
+    /* wgsl */ `
+@group(0) @binding(6) var output: texture_storage_2d<${format}, write>;
+@group(0) @binding(7) var<storage, read> bands: array<u32>;
+
+@compute @workgroup_size(8, 8)
+fn computeMain(
+  @builtin(workgroup_id) group: vec3u,
+  @builtin(local_invocation_id) local: vec3u,
+) {
+  let pixel = vec2u(group.x * 8u + local.x, bands[group.y] * 8u + local.y);
+  if (any(pixel >= vec2u(viewport.size))) { return; }
+  textureStore(output, pixel, composePixel(vec2f(pixel) + vec2f(0.5)));
+}
+`
+  )
+}

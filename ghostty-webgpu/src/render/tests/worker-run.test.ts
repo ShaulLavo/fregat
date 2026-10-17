@@ -21,6 +21,7 @@ const observation: WorkerObservation = {
     atlasUploadOperations: 1,
     deviceRestores: 0,
     dispatches: 0,
+    textureCopies: 0,
     draws: 1,
     instanceUploadOperations: 1,
     rebuiltRows: 4,

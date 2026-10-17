@@ -83,6 +83,7 @@ export class WebGlTerminalRenderer {
     deviceRestores: 0,
     draws: 0,
     dispatches: 0,
+    textureCopies: 0,
     instanceUploadOperations: 0,
     rebuiltRows: 0,
     submittedFrames: 0,

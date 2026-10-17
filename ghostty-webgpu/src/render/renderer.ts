@@ -98,6 +98,7 @@ export interface RendererMetrics {
   deviceRestores: number
   draws: number
   dispatches: number
+  textureCopies: number
   instanceUploadOperations: number
   rebuiltRows: number
   submittedFrames: number
@@ -193,7 +194,10 @@ async function defaultDeviceFactory(adapterPolicy: 'hardware' | 'any'): Promise<
     )
   }
   try {
-    return await adapter.requestDevice()
+    const requiredFeatures: GPUFeatureName[] = adapter.features.has('bgra8unorm-storage')
+      ? ['bgra8unorm-storage']
+      : []
+    return await adapter.requestDevice({ requiredFeatures })
   } catch (cause) {
     throw new WebGpuUnavailableError('adapter', 'WebGPU device request failed', { cause })
   }
@@ -297,6 +301,7 @@ export class WebGpuTerminalRenderer {
     deviceRestores: 0,
     draws: 0,
     dispatches: 0,
+    textureCopies: 0,
     instanceUploadOperations: 0,
     rebuiltRows: 0,
     submittedFrames: 0,
@@ -549,7 +554,10 @@ export class WebGpuTerminalRenderer {
       alphaMode: 'premultiplied',
       device,
       format: this.format,
-      usage: GPUTextureUsage.COPY_SRC | GPUTextureUsage.RENDER_ATTACHMENT,
+      usage:
+        GPUTextureUsage.COPY_SRC |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        (this.experimentalCompositor === 'compute-copy' ? GPUTextureUsage.COPY_DST : 0),
     })
   }
 
@@ -667,12 +675,12 @@ export class WebGpuTerminalRenderer {
     const operations = this.textPass.uploadFrame(builder, updates)
     if (!this.coordinator) {
       try {
-        this.textPass.submit(this.context.getCurrentTexture().createView())
+        this.textPass.submit(this.context.getCurrentTexture())
       } catch (cause) {
         this.reportFrameFailure(cause)
         if (this.disposed) return
         // Retry once in this turn; an acquired canvas texture presents empty after an abandoned submit.
-        this.textPass.submit(this.context.getCurrentTexture().createView())
+        this.textPass.submit(this.context.getCurrentTexture())
       }
       let rows: readonly RenderRow[] | undefined
       if (this.frames.requiresFullRows) {
@@ -700,11 +708,11 @@ export class WebGpuTerminalRenderer {
     }
     let command: GPUCommandBuffer
     try {
-      command = this.textPass.encode(this.context.getCurrentTexture().createView())
+      command = this.textPass.encode(this.context.getCurrentTexture())
     } catch (cause) {
       this.reportFrameFailure(cause)
       if (this.disposed) return
-      command = this.textPass.encode(this.context.getCurrentTexture().createView())
+      command = this.textPass.encode(this.context.getCurrentTexture())
     }
     let rows: readonly RenderRow[] | undefined
     if (this.frames.requiresFullRows) {
@@ -836,6 +844,7 @@ export class WebGpuTerminalRenderer {
       this.atlasUploadOperationsOffset + this.atlasTextures.uploadOperationCount
     this.metrics.draws += this.textPass.drawCount
     this.metrics.dispatches += this.textPass.dispatchCount
+    this.metrics.textureCopies += this.textPass.textureCopyCount
     this.metrics.instanceUploadOperations += instanceUploadOperations
     this.metrics.rebuiltRows += rebuiltRows
     this.metrics.submittedFrames += 1
