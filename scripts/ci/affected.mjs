@@ -173,7 +173,8 @@ export function selectAffected(graph, files, full = false) {
   if (selected.has('site')) sites.push('fregat')
   if (selected.has('singapore-editor-site')) sites.push('singapore')
   if (selected.has('@singapore-editor/example-app')) sites.push('demo')
-  if (selected.has('ghostty-webgpu-site')) sites.push('ghostty-webgpu')
+  if (selected.has('ghostty-webgpu-site') || selected.has('ghostty-webgpu-classic-site'))
+    sites.push('ghostty-webgpu')
   return {
     exhaustive: full,
     code: tooling || packages.length > 0,

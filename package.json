@@ -24,6 +24,7 @@
       "ghostty-webgpu-line-editor",
       "ghostty-webgpu/demo",
       "ghostty-webgpu/site",
+      "ghostty-webgpu/site-classic",
       "editor/site"
     ],
     "catalog": {

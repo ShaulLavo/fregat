@@ -443,6 +443,9 @@ jobs:
         env:
           CI_SITES: ${{ needs.changes.outputs.sites }}
         run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites" "$CI_SITES"
+      - name: Build classic Ghostty site for Pages
+        if: ${{ contains(needs.changes.outputs.sites, 'ghostty-webgpu') }}
+        run: bun run --cwd ghostty-webgpu/site-classic build --base /ghostty-webgpu/
       - name: Check deployment config and cache headers
         run: python3 -m unittest discover -s scripts/product-sites -p 'test_*.py'
       - name: Check Ghostty font assets
