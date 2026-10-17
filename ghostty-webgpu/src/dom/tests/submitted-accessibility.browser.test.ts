@@ -921,6 +921,7 @@ async function packagedFixture(mode: 'main' | 'webgl' | 'webgpu') {
   terminal.on('error', (error) => errors.push(error))
   observeText(terminal)
   await terminal.open(host)
+  terminal.focus()
   await expect.poll(() => publishedFrame(terminal), { timeout: 5_000 }).toBeDefined()
   await expectDisplayed({ terminal }, publishedFrame(terminal)!)
   return { terminal, host, errors }
