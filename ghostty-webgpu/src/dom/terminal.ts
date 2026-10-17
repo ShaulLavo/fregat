@@ -297,7 +297,6 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private fit?: TerminalFitController
   private fittedFont?: TerminalFittedFont
   private preeditActive = false
-  private inputFocused = false
   private compositionActive = false
   private workerCanvasSize?: {
     readonly canvas: HTMLCanvasElement
@@ -1655,7 +1654,6 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   }
 
   private handleFocused(focused: boolean): void {
-    this.inputFocused = focused
     this.renderer?.setFocused(focused)
     if (focused) {
       const snapshot = this.lastFrame
@@ -1911,7 +1909,8 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private positionTextarea(snapshot: RendererTextFrameSnapshot): void {
     const elements = this.elementsValue
     if (!elements) return
-    if (!this.inputFocused && !this.compositionActive) return
+    const focused = elements.root.ownerDocument.activeElement === elements.textarea
+    if (!focused && !this.compositionActive) return
     if (this.stateValue !== 'open' && this.stateValue !== 'opening') return
     this.lastFrame = snapshot
     const column = leadingCursorColumn(snapshot)
