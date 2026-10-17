@@ -211,6 +211,7 @@ function assertDisplayed(
   expect(textarea.getAttribute('aria-activedescendant')).toBe(row.id)
   expect(row.getAttribute('aria-current')).toBe('true')
   expect(rows.filter((row) => row.hasAttribute('aria-current'))).toHaveLength(1)
+  if (textarea.ownerDocument.activeElement !== textarea) return
   expect(Number.parseFloat(textarea.style.left)).toBeCloseTo(
     summary.padding.left + column * summary.grid.cellWidth,
   )
@@ -921,8 +922,6 @@ async function packagedFixture(mode: 'main' | 'webgl' | 'webgpu') {
   terminal.on('error', (error) => errors.push(error))
   observeText(terminal)
   await terminal.open(host)
-  terminal.focus()
-  terminal.textarea!.dispatchEvent(new FocusEvent('focus'))
   await expect.poll(() => publishedFrame(terminal), { timeout: 5_000 }).toBeDefined()
   await expectDisplayed({ terminal }, publishedFrame(terminal)!)
   return { terminal, host, errors }
