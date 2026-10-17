@@ -297,6 +297,8 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private fit?: TerminalFitController
   private fittedFont?: TerminalFittedFont
   private preeditActive = false
+  private inputFocused = false
+  private compositionActive = false
   private workerCanvasSize?: {
     readonly canvas: HTMLCanvasElement
     readonly width: number
@@ -1357,6 +1359,12 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     if (this.keyboard !== false) {
       const view = elements.root.ownerDocument.defaultView
       if (!view) throw createGhosttyError('input.install', 'Terminal input requires a window')
+      elements.textarea.addEventListener('compositionstart', this.handleCompositionStart, {
+        signal: elements.signal,
+      })
+      elements.textarea.addEventListener('compositionend', this.handleCompositionEnd, {
+        signal: elements.signal,
+      })
       input = createDomInputController({
         claimKey: this.claimDomKey,
         claimText: this.claimText,
@@ -1647,8 +1655,24 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   }
 
   private handleFocused(focused: boolean): void {
+    this.inputFocused = focused
     this.renderer?.setFocused(focused)
-    if (!focused) this.pointer?.cancel()
+    if (focused) {
+      const snapshot = this.lastFrame
+      if (snapshot) this.runUiOperation('focus.caret', () => this.positionTextarea(snapshot))
+      return
+    }
+    this.pointer?.cancel()
+  }
+
+  private readonly handleCompositionStart = (): void => {
+    this.compositionActive = true
+    const snapshot = this.lastFrame
+    if (snapshot) this.runUiOperation('composition.caret', () => this.positionTextarea(snapshot))
+  }
+
+  private readonly handleCompositionEnd = (): void => {
+    this.compositionActive = false
   }
 
   private handleRenderRequest(): void {
@@ -1887,6 +1911,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private positionTextarea(snapshot: RendererTextFrameSnapshot): void {
     const elements = this.elementsValue
     if (!elements) return
+    if (!this.inputFocused && !this.compositionActive) return
     if (this.stateValue !== 'open' && this.stateValue !== 'opening') return
     this.lastFrame = snapshot
     const column = leadingCursorColumn(snapshot)
