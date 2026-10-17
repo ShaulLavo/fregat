@@ -133,7 +133,9 @@ export async function mountScene(
   host.addEventListener('wheel', (event) => event.stopPropagation(), { capture: true })
   if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
     host.inert = false
-    host.querySelector<HTMLElement>('.ghostty-webgpu-input')?.setAttribute('tabindex', '-1')
+    // The input box, scrollbar and link overlay each take a Tab stop; the scene is reached by mouse only.
+    for (const stop of host.querySelectorAll('textarea, [tabindex]'))
+      stop.setAttribute('tabindex', '-1')
     attachTerminalHotkeys(terminal)
   } else {
     for (const type of ['pointerdown', 'pointermove', 'pointerup', 'click'] as const) {
