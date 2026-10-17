@@ -129,7 +129,12 @@ code {
     color-mix(in srgb, var(--ground) 94%, transparent) 55%,
     var(--ground)
   );
+  /* The faded strip above the tagline passes the mouse to the scene; the tagline is text to select. */
   pointer-events: none;
+}
+
+.lede {
+  pointer-events: auto;
 }
 
 .hero-copy h1 {
