@@ -72,6 +72,51 @@ describe('inlineSpecsAfterRewrite', () => {
     expect(specs).toEqual([])
   })
 
+  it('keeps a group whole when one of its lines moves and the other changes', () => {
+    // One group across two lines: `[one` opens on the first, `](url)` closes on the second.
+    const text = '[one\ntwo](url)\n[one\ntwo](url)\n'
+    const before = createPieceTableSnapshot(text)
+    const map = createInlineMap(before, [
+      { id: 'open', startIndex: 0, endIndex: 1, text: '', kind: 'marker', groupId: 'link' },
+      { id: 'close', startIndex: 8, endIndex: 14, text: '', kind: 'marker', groupId: 'link' },
+    ])
+    // The first link's destination changes in the same edit that rewrites its first line.
+    const after = applyBatchToPieceTable(before, [{ from: 0, to: 15, text: '[one\ntwo](other)' }])
+
+    const specs = inlineSpecsAfterRewrite(
+      map,
+      createDocumentTextSnapshot(before),
+      after,
+      createDocumentTextSnapshot(after),
+    )
+
+    expect(specs).toEqual([])
+  })
+
+  it('moves a two-line group with its lines when they move together', () => {
+    const text = 'x\n[one\ntwo](url)\n'
+    const before = createPieceTableSnapshot(text)
+    const map = createInlineMap(before, [
+      { id: 'open', startIndex: 2, endIndex: 3, text: '', kind: 'marker', groupId: 'link' },
+      { id: 'close', startIndex: 10, endIndex: 16, text: '', kind: 'marker', groupId: 'link' },
+    ])
+    const after = applyBatchToPieceTable(before, [
+      { from: 0, to: text.length, text: '[one\ntwo](url)\nx\n' },
+    ])
+
+    const specs = inlineSpecsAfterRewrite(
+      map,
+      createDocumentTextSnapshot(before),
+      after,
+      createDocumentTextSnapshot(after),
+    )
+
+    expect(specs.map((spec) => [spec.id, spec.startIndex, spec.endIndex])).toEqual([
+      ['open', 0, 1],
+      ['close', 8, 14],
+    ])
+  })
+
   it('drops the replacements of a line the edit changed', () => {
     const before = createPieceTableSnapshot(BOLD_LINE)
     const map = createInlineMap(before, boldSpecs())

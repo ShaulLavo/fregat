@@ -148,8 +148,10 @@ const REWRITE_SEARCH_CHARS = 16_384
 
 /**
  * {@link inlineSpecsAtSnapshot}, plus the replacements an edit rewrote away: one on a line the edit
- * put back word for word nearby, as moving lines does, follows that line. `source` is the text the
- * map was built on and `text` the text at `snapshot`.
+ * put back word for word nearby, as moving lines does, follows that line. A replacement whose text
+ * the edit changed is dropped, so typed text shows until the next parse. Groups stay whole: all
+ * carried, all moved with their lines, or gone. `source` is the text the map was built on and
+ * `text` the text at `snapshot`.
  */
 export const inlineSpecsAfterRewrite = (
   map: InlineMap,
@@ -165,20 +167,26 @@ export const inlineSpecsAfterRewrite = (
   const taken = new Set(carried.map((spec) => text.lineAt(spec.startIndex)))
   const moved = new Map<number, number | null>()
   const relocated: InlineReplacementSpec[] = []
+  // A group moves as one block: every member by the same distance.
+  const groupShift = new Map<string, number | null>()
   for (const range of lost) {
     const oldLine = source.lineAt(range.startOffset)
     if (!moved.has(oldLine)) moved.set(oldLine, rewrittenLineStart(source, oldLine, text, taken))
     const lineStart = moved.get(oldLine)
     if (lineStart === null || lineStart === undefined) continue
-    relocated.push(shiftedSpec(range, lineStart - source.lineStart(oldLine)))
+    const delta = lineStart - source.lineStart(oldLine)
+    relocated.push(shiftedSpec(range, delta))
+    if (range.groupId === undefined) continue
+    const shift = groupShift.get(range.groupId)
+    groupShift.set(range.groupId, shift === undefined || shift === delta ? delta : null)
   }
-  return carried.concat(relocated)
+  const together = relocated.filter(
+    (spec) => spec.groupId === undefined || groupShift.get(spec.groupId) !== null,
+  )
+  return wholeGroups(map, carried).concat(wholeGroups(map, together))
 }
 
-/**
- * The carried specs whose source still reads as it did, with their whole group: text typed inside
- * hidden markup would otherwise stay hidden until the next parse.
- */
+/** The carried specs whose source still reads as it did. */
 function unchangedSpecs(
   map: InlineMap,
   source: TextReadSnapshot,
@@ -186,20 +194,24 @@ function unchangedSpecs(
   text: TextReadSnapshot,
 ): readonly InlineReplacementSpec[] {
   const before = new Map(map.ranges.map((range) => [range.id, range]))
-  const changed = new Set<string>()
-  const changedGroups = new Set<string>()
-  for (const spec of carried) {
+  return carried.filter((spec) => {
     const old = before.get(spec.id)
     const was = old ? source.readRange(old.startOffset, old.endOffset) : null
-    if (was === text.readRange(spec.startIndex, spec.endIndex)) continue
-    changed.add(spec.id)
-    if (spec.groupId !== undefined) changedGroups.add(spec.groupId)
+    return was === text.readRange(spec.startIndex, spec.endIndex)
+  })
+}
+
+/** `specs` without any group that lost a member the map had, which would paint half a pair. */
+function wholeGroups(
+  map: InlineMap,
+  specs: readonly InlineReplacementSpec[],
+): readonly InlineReplacementSpec[] {
+  const present = new Set(specs.map((spec) => spec.id))
+  const broken = new Set<string>()
+  for (const range of map.ranges) {
+    if (range.groupId !== undefined && !present.has(range.id)) broken.add(range.groupId)
   }
-  if (changed.size === 0) return carried
-  return carried.filter(
-    (spec) =>
-      !changed.has(spec.id) && (spec.groupId === undefined || !changedGroups.has(spec.groupId)),
-  )
+  return specs.filter((spec) => spec.groupId === undefined || !broken.has(spec.groupId))
 }
 
 /** Where the old line's exact text now starts as a whole line, nearest first, or null. */
