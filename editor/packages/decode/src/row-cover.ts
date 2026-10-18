@@ -32,9 +32,10 @@ export class RowCover {
   public constructor(private readonly context: EditorViewContributionContext) {}
 
   /** The mounted rows' handles, so a caller can read from them before anything writes. */
-  public collect(snapshot: EditorViewSnapshot): CoveredRow[] {
+  public collect(snapshot: EditorViewSnapshot, include?: ReadonlySet<number>): CoveredRow[] {
     const rows: CoveredRow[] = []
     for (const row of snapshot.visibleRows) {
+      if (include && !include.has(row.index)) continue
       const presentation = this.context.getRowPresentation(row.index)
       if (presentation) rows.push({ index: row.index, presentation })
     }

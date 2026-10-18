@@ -13,9 +13,11 @@ import {
   inlinePointToBufferPoint,
   inlineReplacementsForBufferRow,
   inlineRowForBufferRow,
+  inlineSpecsAfterRewrite,
   revealInlineMap,
   updateInlineMapForEdit,
 } from '../src/inlineMap'
+import { createDocumentTextSnapshot } from '../src/documentTextSnapshot'
 
 const BOLD_LINE = 'a **bold** b\n'
 
@@ -23,6 +25,54 @@ const boldSpecs = (): InlineReplacementSpec[] => [
   { id: 'open', startIndex: 2, endIndex: 4, text: '', kind: 'marker', groupId: 'bold' },
   { id: 'close', startIndex: 8, endIndex: 10, text: '', kind: 'marker', groupId: 'bold' },
 ]
+
+describe('inlineSpecsAfterRewrite', () => {
+  it('moves the replacements of a line that a rewrite put back elsewhere', () => {
+    const text = 'plain\na **bold** b\n'
+    const before = createPieceTableSnapshot(text)
+    const map = createInlineMap(
+      before,
+      boldSpecs().map((spec) => ({
+        ...spec,
+        startIndex: spec.startIndex + 6,
+        endIndex: spec.endIndex + 6,
+      })),
+    )
+    // Moving the bold line up rewrites both lines in one edit.
+    const after = applyBatchToPieceTable(before, [
+      { from: 0, to: text.length, text: 'a **bold** b\nplain\n' },
+    ])
+
+    const specs = inlineSpecsAfterRewrite(
+      map,
+      createDocumentTextSnapshot(before),
+      after,
+      createDocumentTextSnapshot(after),
+    )
+
+    expect(specs.map((spec) => [spec.id, spec.startIndex, spec.endIndex])).toEqual([
+      ['open', 2, 4],
+      ['close', 8, 10],
+    ])
+  })
+
+  it('drops the replacements of a line the edit changed', () => {
+    const before = createPieceTableSnapshot(BOLD_LINE)
+    const map = createInlineMap(before, boldSpecs())
+    const after = applyBatchToPieceTable(before, [
+      { from: 0, to: BOLD_LINE.length, text: 'a **bolder** b\n' },
+    ])
+
+    const specs = inlineSpecsAfterRewrite(
+      map,
+      createDocumentTextSnapshot(before),
+      after,
+      createDocumentTextSnapshot(after),
+    )
+
+    expect(specs).toEqual([])
+  })
+})
 
 describe('InlineMap', () => {
   it('anchors specs to single-line source spans', () => {

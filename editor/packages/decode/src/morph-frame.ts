@@ -22,6 +22,7 @@ export type MorphFrame = {
 }
 
 type Tokens = EditorViewSnapshot['tokens']
+type VisibleRow = EditorViewSnapshot['visibleRows'][number]
 type TokenStyle = ReturnType<Tokens['styleAt']>
 
 // Words, runs of punctuation, and whitespace. Whitespace only advances x.
@@ -32,13 +33,15 @@ const WHITESPACE = /^\s+$/
  * The visible rows as positioned pieces, split at both syntax-token and word
  * boundaries so a piece never straddles two colours. Null when a mounted row
  * is a horizontal window of a long line, whose x origin is not the row start,
- * or carries paint the overlay cannot redraw.
+ * or carries paint the overlay cannot redraw. With `drawable`, rows it rejects
+ * are left out instead, for a caller that leaves those rows uncovered.
  */
 export function buildFrame(
   snapshot: EditorViewSnapshot,
   measurer: TextMeasurer,
   maxPieces: number,
   maxRows = Number.POSITIVE_INFINITY,
+  drawable?: (row: VisibleRow) => boolean,
 ): MorphFrame | null {
   const pieces: MorphPiece[] = []
   const styleAt = tokenStyleLookup(snapshot.tokens)
@@ -47,6 +50,7 @@ export function buildFrame(
   for (const visible of snapshot.visibleRows) {
     if (visible.kind !== 'text') continue
     if (typeof visible.text !== 'string') return null
+    if (drawable && !drawable(visible)) continue
     // Paint the overlay cannot redraw, such as plugin CSS or control-character boxes, would vanish
     // with the hidden row.
     if (!drawsAsPlainText(visible)) return null
@@ -147,7 +151,7 @@ function tokenStyleLookup(
   }
 }
 
-function drawsAsPlainText(row: EditorViewSnapshot['visibleRows'][number]): boolean {
+export function drawsAsPlainText(row: VisibleRow): boolean {
   if (row.mountedPaintSupport !== 'replayable') return false
   return row.chunks.every(
     (chunk) =>
@@ -159,18 +163,23 @@ function drawsAsPlainText(row: EditorViewSnapshot['visibleRows'][number]): boole
 /**
  * Whether the rows a frame was built from now stand somewhere else, hold other text or paint it
  * differently: new metrics, a rewrap, a changed indent, an inline replacement landing. Rows only
- * one side mounts (a scroll) do not count.
+ * one side mounts (a scroll) do not count, nor rows outside `rows` when it is given.
  */
-export function frameMoved(before: EditorViewSnapshot, after: EditorViewSnapshot): boolean {
+export function frameMoved(
+  before: EditorViewSnapshot,
+  after: EditorViewSnapshot,
+  rows?: ReadonlySet<number>,
+): boolean {
   if (
     before.metrics.rowHeight !== after.metrics.rowHeight ||
     before.metrics.characterWidth !== after.metrics.characterWidth
   ) {
     return true
   }
-  const rows = new Map(after.visibleRows.map((row) => [row.index, row]))
+  const mounted = new Map(after.visibleRows.map((row) => [row.index, row]))
   return before.visibleRows.some((row) => {
-    const now = rows.get(row.index)
+    if (rows && !rows.has(row.index)) return false
+    const now = mounted.get(row.index)
     if (!now) return false
     return (
       now.top !== row.top ||

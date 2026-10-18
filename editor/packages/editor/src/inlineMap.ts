@@ -21,6 +21,7 @@ import {
   type TransformBias,
 } from './displayTransforms'
 
+import type { TextReadSnapshot } from './documentTextSnapshot'
 import type { TextOffsetRange } from './textRanges'
 
 declare const inlinePointBrand: unique symbol
@@ -141,6 +142,80 @@ export const inlineSpecsAtSnapshot = (
   snapshot: PieceTableSnapshot,
 ): readonly InlineReplacementSpec[] =>
   inlineMapFromRanges(snapshot, map.ranges).ranges.map(inlineSpecFromRange)
+
+// How far from its old line a rewritten line is looked for, in characters either way.
+const REWRITE_SEARCH_CHARS = 16_384
+
+/**
+ * {@link inlineSpecsAtSnapshot}, plus the replacements an edit rewrote away: one on a line the edit
+ * put back word for word nearby, as moving lines does, follows that line. `source` is the text the
+ * map was built on and `text` the text at `snapshot`.
+ */
+export const inlineSpecsAfterRewrite = (
+  map: InlineMap,
+  source: TextReadSnapshot,
+  snapshot: PieceTableSnapshot,
+  text: TextReadSnapshot,
+): readonly InlineReplacementSpec[] => {
+  const carried = inlineSpecsAtSnapshot(map, snapshot)
+  const kept = new Set(carried.map((spec) => spec.id))
+  const lost = map.ranges.filter((range) => !kept.has(range.id) && range.insertion !== true)
+  if (lost.length === 0) return carried
+
+  const taken = new Set(carried.map((spec) => text.lineAt(spec.startIndex)))
+  const moved = new Map<number, number | null>()
+  const relocated: InlineReplacementSpec[] = []
+  for (const range of lost) {
+    const oldLine = source.lineAt(range.startOffset)
+    if (!moved.has(oldLine)) moved.set(oldLine, rewrittenLineStart(source, oldLine, text, taken))
+    const lineStart = moved.get(oldLine)
+    if (lineStart === null || lineStart === undefined) continue
+    relocated.push(shiftedSpec(range, lineStart - source.lineStart(oldLine)))
+  }
+  return carried.concat(relocated)
+}
+
+/** Where the old line's exact text now starts as a whole line, nearest first, or null. */
+function rewrittenLineStart(
+  source: TextReadSnapshot,
+  oldLine: number,
+  text: TextReadSnapshot,
+  taken: Set<number>,
+): number | null {
+  const { start, end } = source.lineRange(oldLine)
+  const line = source.readRange(start, end)
+  if (line.length === 0) return null
+  const windowStart = Math.max(0, start - REWRITE_SEARCH_CHARS)
+  const window = text.readRange(windowStart, Math.min(text.length, end + REWRITE_SEARCH_CHARS))
+  let best: number | null = null
+  for (let at = window.indexOf(line); at >= 0; at = window.indexOf(line, at + 1)) {
+    const lineStart = windowStart + at
+    const newLine = text.lineAt(lineStart)
+    const range = text.lineRange(newLine)
+    if (range.start !== lineStart || range.end !== lineStart + line.length) continue
+    if (taken.has(newLine)) continue
+    if (best === null || Math.abs(lineStart - start) < Math.abs(best - start)) best = lineStart
+  }
+  if (best !== null) taken.add(text.lineAt(best))
+  return best
+}
+
+function shiftedSpec(range: InlineReplacementRange, delta: number): InlineReplacementSpec {
+  const spec = inlineSpecFromRange(range)
+  return {
+    ...spec,
+    startIndex: spec.startIndex + delta,
+    endIndex: spec.endIndex + delta,
+    ...(range.revealRange === undefined
+      ? {}
+      : {
+          revealRange: {
+            start: range.revealRange.offsets.start + delta,
+            end: range.revealRange.offsets.end + delta,
+          },
+        }),
+  }
+}
 
 const inlineSpecFromRange = (range: InlineReplacementRange): InlineReplacementSpec => ({
   id: range.id,

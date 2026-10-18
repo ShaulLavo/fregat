@@ -142,7 +142,13 @@ import {
   type EditorViewContributionFailurePhase,
 } from './viewContributions'
 import type { FoldMap } from '../foldMap'
-import { createInlineMap, inlineSpecsAtSnapshot, type InlineMap } from '../inlineMap'
+import {
+  createInlineMap,
+  inlineSpecsAfterRewrite,
+  inlineSpecsAtSnapshot,
+  type InlineMap,
+  type InlineReplacementSpec,
+} from '../inlineMap'
 import type { BracketInfo, EditorSyntaxCapture, EditorSyntaxRecords } from '../syntax/session'
 import type {
   EditorContributionChange,
@@ -227,6 +233,7 @@ import type { EditorDocument, TextEdit } from '../tokens'
 import {
   createStringTextSnapshot,
   getPieceTreeSnapshot,
+  type TextReadSnapshot,
   type TextSnapshot,
 } from '../documentTextSnapshot'
 import { clamp } from '../style-utils'
@@ -434,6 +441,9 @@ export class Editor {
   private sessionChangeVersion = 0
   private inlineReplacementProvider: EditorInlineReplacementSource | null = null
   private syntaxInlineMap: InlineMap | null = null
+  /** What edit-triggered providers that need syntax derived from the last current records. */
+  private recordsInlineMap: InlineMap | null = null
+  private recordsSource: TextReadSnapshot | null = null
   private syntaxCaptures: readonly EditorSyntaxCapture[] = []
   private syntaxRecords: EditorSyntaxRecords | undefined
   private syntaxCaptureDemand = 0
@@ -1558,31 +1568,66 @@ export class Editor {
    * Syntax-triggered providers read captures, which describe the text of the last parse: they run
    * only when captures land or providers change (`'rerun'`), and between parses their map is carried
    * to the current text by its anchors (`'carry'`). A new document drops it (`'drop'`). Edit-triggered
-   * providers run every time.
+   * providers run every time, except that one needing syntax is carried the same way while the
+   * records trail the text: rerun without them, it would show the document unrendered until the
+   * parse lands.
    */
   private refreshInlineMap(syntax: 'rerun' | 'carry' | 'drop' = 'carry'): void {
     const snapshot = this.session?.getSnapshot()
     if (!snapshot) {
       this.syntaxInlineMap = null
+      this.recordsInlineMap = null
       this.view.setInlineMap(null)
       return
     }
 
     const providers = this.inlineReplacementProviders()
     const context = this.inlineReplacementContext()
-    if (syntax === 'drop') this.syntaxInlineMap = null
+    if (syntax === 'drop') {
+      this.syntaxInlineMap = null
+      this.recordsInlineMap = null
+    }
     if (syntax === 'rerun') this.syntaxInlineMap = this.syntaxDerivedInlineMap(providers, context)
     const carried = this.syntaxInlineMap
       ? inlineSpecsAtSnapshot(this.syntaxInlineMap, snapshot)
       : []
-    const derived = providers
-      .filter((source) => source.trigger === 'edit')
+    const editSources = providers.filter((source) => source.trigger === 'edit')
+    const derived = editSources
+      .filter((source) => !source.requiresSyntax)
       .flatMap((source) => source.provide(context))
+      .concat(
+        this.recordsDerivedSpecs(
+          editSources.filter((source) => source.requiresSyntax),
+          context,
+          snapshot,
+        ),
+      )
     // The suggestion joins the same map rather than one of its own: a document rendering itself
     // through replacements is still that document, and ghost text has to take its columns from what
     // is on screen rather than from text the reader cannot see.
     const specs = carried.concat(derived, this.inputSelection.inlineSuggestionSpecs())
     this.view.setInlineMap(specs.length === 0 ? null : createInlineMap(snapshot, specs))
+  }
+
+  private recordsDerivedSpecs(
+    sources: readonly EditorInlineReplacementSource[],
+    context: EditorInlineReplacementContext,
+    snapshot: PieceTableSnapshot,
+  ): readonly InlineReplacementSpec[] {
+    if (sources.length === 0) {
+      this.recordsInlineMap = null
+      return []
+    }
+    if (!context.records) {
+      const map = this.recordsInlineMap
+      const source = this.recordsSource
+      if (!map || !source) return []
+      return inlineSpecsAfterRewrite(map, source, snapshot, context.textSnapshot)
+    }
+    const specs = sources.flatMap((source) => source.provide(context))
+    this.recordsInlineMap = specs.length > 0 ? createInlineMap(snapshot, specs) : null
+    this.recordsSource = context.textSnapshot
+    return specs
   }
 
   private syntaxDerivedInlineMap(
