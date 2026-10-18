@@ -99,6 +99,36 @@ test('keeps a comma inside a parenthesized srcset descriptor', () => {
   ])
 })
 
+test('loads a chosen external source normally beside a workspace fallback', async () => {
+  const { container } = render(
+    <MarkdownPreviewContext
+      value={{
+        documentPath: 'repo/README.md',
+        rootPath: 'repo',
+        origin: 'http://example.com',
+        openFile: () => {},
+        colorMode: 'dark',
+      }}
+    >
+      <Markdown
+        components={{
+          img: MarkdownPreviewImage,
+          picture: MarkdownPreviewPicture,
+          source: MarkdownPreviewSource,
+        }}
+        text={[
+          '<picture>',
+          '  <source media="(prefers-color-scheme: dark)" srcset="https://cdn.example/dark.png">',
+          '  <img alt="logo" src="./light.png">',
+          '</picture>',
+        ].join('\n')}
+      />
+    </MarkdownPreviewContext>,
+  )
+  await waitFor(() => expect(container.querySelector('img')).not.toBeNull())
+  expect(container.querySelector('img')?.getAttribute('crossorigin')).toBeNull()
+})
+
 test('loads an external fallback normally when its workspace source is for the other mode', async () => {
   const { container } = render(
     <MarkdownPreviewContext

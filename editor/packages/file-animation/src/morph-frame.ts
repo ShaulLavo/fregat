@@ -39,7 +39,7 @@ const WHITESPACE = /^\s+$/
  * are left out instead, for a caller that leaves those rows uncovered.
  */
 export function buildFrame(
-  snapshot: EditorViewSnapshot,
+  snapshot: Pick<EditorViewSnapshot, 'visibleRows' | 'tokens'>,
   measurer: TextMeasurer,
   maxPieces: number,
   maxRows = Number.POSITIVE_INFINITY,

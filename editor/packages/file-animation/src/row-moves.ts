@@ -78,7 +78,7 @@ function animateRow(element: HTMLElement, move: RowMove, timing: MorphTiming): A
  * rows they took, which the overlay must leave out.
  */
 export function rowMoves(
-  before: EditorViewSnapshot | null,
+  before: Pick<EditorViewSnapshot, 'visibleRows'> | null,
   after: EditorViewSnapshot,
   rows: ReadonlySet<number>,
   shift: ScreenShift = { dx: 0, dy: 0 },
