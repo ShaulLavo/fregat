@@ -1,4 +1,4 @@
-import type { Root, RootContent } from 'mdast'
+import type { Nodes, Root, RootContent } from 'mdast'
 import type { PluggableList } from 'unified'
 
 import {
@@ -53,7 +53,6 @@ type Tail = {
 }
 
 /** Definitions and footnotes reach across the whole document, so no prefix is ever settled. */
-const LINK_DEFINITION = /^ {0,3}\[[^\]\n]*\]:/mu
 const FOOTNOTE = /\[\^[^\]\n]+\]/u
 
 /**
@@ -90,8 +89,16 @@ export function createMarkdownSession(options: MarkdownSessionOptions = {}): Mar
       settled = []
       return [wholeDocument(processor, text, heal)]
     }
+    if (hasDefinition(settled)) {
+      settled = []
+      return [wholeDocument(processor, text, heal)]
+    }
 
     const children = parseFrom(processor, text, prefixEnd, prefix?.endLine ?? 0)
+    if (containsDefinition(children)) {
+      settled = []
+      return [wholeDocument(processor, text, heal)]
+    }
     const groups = groupRootNodes(children, prefixEnd, text.length)
     for (const group of groups.slice(0, -1)) {
       settled.push(settledBlock(group, text, settled.at(-1)?.endLine ?? 0))
@@ -107,9 +114,22 @@ export function createMarkdownSession(options: MarkdownSessionOptions = {}): Mar
 function isIncrementallyParsable(suffix: string): boolean {
   if (suffix.includes('\r')) return false
   if (suffix.includes('﻿')) return false
-  if (LINK_DEFINITION.test(suffix)) return false
 
   return !FOOTNOTE.test(suffix)
+}
+
+function hasDefinition(blocks: readonly MarkdownBlock[]): boolean {
+  return blocks.some((block) => containsDefinition(block.nodes))
+}
+
+function containsDefinition(nodes: readonly Nodes[]): boolean {
+  for (const node of nodes) {
+    if (node.type === 'definition') return true
+    if (!('children' in node)) continue
+    if (containsDefinition(node.children)) return true
+  }
+
+  return false
 }
 
 /** The longest run of settled blocks whose source the text still starts with. */
