@@ -142,7 +142,7 @@ stays safe to read, share and export.
 | `editor.guides.indentation`                   | `true`                     | window      | Draw indentation guides (scope lines). _(restart)_                                                                                                                                                                            |
 | `editor.syntaxHighlighting.enabled`           | `true`                     | window      | Colour code by syntax. Turning this off makes very large files faster. _(restart)_                                                                                                                                            |
 | `editor.decode.mode`                          | `"off"`                    | window      | Animate a file as it opens, as if it were being written.                                                                                                                                                                      |
-| `editor.morph.enabled`                        | `true`                     | window      | Animate undo, redo, pasted and generated code: text that stays slides to its new place, removed text fades out, and new text streams in. Typing stays instant.                                                                |
+| `editor.morph.enabled`                        | `true`                     | window      | Animate every edit except typing: undo, redo, paste, commands and generated code. Text that stays slides to its new place, removed text fades out, and new text streams in. Typing stays instant.                             |
 
 ### Details
 

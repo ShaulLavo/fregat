@@ -1,6 +1,5 @@
 import type {
   EditorContributionChange,
-  EditorDisposable,
   EditorPlugin,
   EditorViewContribution,
   EditorViewContributionContext,
@@ -8,10 +7,17 @@ import type {
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
 import { TextMeasurer, canvasFont, renderedTabColumns } from './measure'
-import { buildFrame, frameMoved, recolorFrame, type MorphFrame } from './morph-frame'
+import {
+  buildFrame,
+  drawsAsPlainText,
+  frameMoved,
+  recolorFrame,
+  type MorphFrame,
+} from './morph-frame'
 import { matchPieces } from './morph-match'
 import { MorphRun, restingPieces, springEasing, type MorphTiming } from './morph-run'
 import { RowCover } from './row-cover'
+import { RowMoves, rowMoves } from './row-moves'
 import './style.css'
 
 export type MorphPluginOptions = {
@@ -19,29 +25,27 @@ export type MorphPluginOptions = {
   readonly durationMs?: number
   /** Spring overshoot of moving text, from `0` (none) to `0.5`. Defaults to `0.18`. */
   readonly bounce?: number
-  /**
-   * Smallest edit, in characters inserted plus removed, that morphs. Undo, redo,
-   * checkout and reconcile always morph. Defaults to `8`, so typing stays instant.
-   */
-  readonly minEditChars?: number
   /** Safety cap on pieces drawn; a larger viewport skips the morph. Defaults to `2500`. */
   readonly maxPieces?: number
 }
 
 const ACTIVE_CLASS = 'editor-morph-active'
-const ALWAYS_MORPH = new Set(['undo', 'redo', 'checkout', 'reconcile'])
+
+type TextOffsetRange = ReturnType<
+  EditorViewContributionContext['getInlineReplacementRanges']
+>[number]
 const TEXT_CHANGES = new Set(['edit', 'undo', 'redo', 'checkout', 'reconcile'])
 
 /**
  * Text changes animate from the old text to the new: text that survives the
  * change slides to its new place, removed text fades out, and new text streams
- * in. Including this plugin turns the effect on.
+ * in. Every change morphs except keyboard text input, so typing stays instant.
+ * Including this plugin turns the effect on.
  */
 export function createMorphPlugin(options: MorphPluginOptions = {}): EditorPlugin {
   const resolved = {
     durationMs: positive(options.durationMs, 520),
     bounce: Math.min(0.5, Math.max(0, options.bounce ?? 0.18)),
-    minEditChars: Math.max(0, options.minEditChars ?? 8),
     maxPieces: positive(options.maxPieces, 2500),
   }
   return {
@@ -56,22 +60,25 @@ export function createMorphPlugin(options: MorphPluginOptions = {}): EditorPlugi
 type ResolvedMorphOptions = {
   readonly durationMs: number
   readonly bounce: number
-  readonly minEditChars: number
   readonly maxPieces: number
 }
 
 class MorphViewContribution implements EditorViewContribution {
-  public readonly inputs = ['content', 'tokens', 'viewport', 'layout'] as const
+  public readonly inputs = ['content', 'tokens', 'viewport', 'layout', 'selection'] as const
   private latest: EditorViewSnapshot | null = null
   /** The last snapshot of the text before `latest`'s, which a change morphs from. */
   private before: EditorViewSnapshot | null = null
+  /** Text painted as something other than its source (chips, hidden markup), for each snapshot. */
+  private latestReplaced: readonly TextOffsetRange[] = []
+  private beforeReplaced: readonly TextOffsetRange[] = []
+  private moves: RowMoves | null = null
   private measurer: TextMeasurer | null = null
   private run: MorphRun | null = null
-  /** The snapshot the running morph settles on. */
+  /** The snapshot the running morph settles on, and the rows its overlay covers. */
   private runSnapshot: EditorViewSnapshot | null = null
+  private runRows: ReadonlySet<number> = new Set()
   private readonly cover: RowCover
   private timing: MorphTiming | null = null
-  private readonly typing: EditorDisposable
 
   public constructor(
     private readonly context: EditorViewContributionContext,
@@ -80,8 +87,7 @@ class MorphViewContribution implements EditorViewContribution {
     // Added to an editor that already shows a document, the first change still needs its before.
     this.cover = new RowCover(context)
     if (context.hasDocument()) this.latest = context.getSnapshot()
-    // Typed text shows at once: a keystroke settles any morph instead of joining it.
-    this.typing = context.onDidType(() => this.finish())
+    this.latestReplaced = context.getInlineReplacementRanges()
   }
 
   public update(
@@ -90,8 +96,13 @@ class MorphViewContribution implements EditorViewContribution {
     change?: EditorContributionChange | null,
   ): void {
     // One pass can deliver the new text under several kinds, `viewport` before `content`.
-    if (this.latest && this.latest.textVersion !== snapshot.textVersion) this.before = this.latest
+    if (this.latest && this.latest.textVersion !== snapshot.textVersion) {
+      this.before = this.latest
+      this.beforeReplaced = this.latestReplaced
+    }
     this.latest = snapshot
+    // Read while each snapshot is current: once the text changes, the old replacements are gone.
+    if (kind !== 'viewport') this.latestReplaced = this.context.getInlineReplacementRanges()
     const previous = this.before
     if (kind === 'document' || kind === 'clear') {
       this.finish()
@@ -120,7 +131,7 @@ class MorphViewContribution implements EditorViewContribution {
       if (kind === 'content') this.finish()
       return
     }
-    if (frameMoved(started, snapshot)) {
+    if (frameMoved(started, snapshot, this.runRows)) {
       this.finish()
       return
     }
@@ -129,7 +140,6 @@ class MorphViewContribution implements EditorViewContribution {
   }
 
   public dispose(): void {
-    this.typing.dispose()
     this.finish()
   }
 
@@ -141,44 +151,40 @@ class MorphViewContribution implements EditorViewContribution {
     if (reducedMotion(this.context)) return false
     if (previous.documentId !== snapshot.documentId) return false
     // `setContent` on an editor without a session re-renders the whole text with no change record.
-    if (!change) return true
-    if (ALWAYS_MORPH.has(change.kind)) return true
-    // A small edit landing mid-morph joins it, so streamed text never snaps the motion to its end.
-    if (this.run) return true
-    return changedChars(change) >= this.options.minEditChars
+    // Typed text shows at once: a keystroke settles any morph instead of joining it.
+    return !change?.typing
   }
 
+  // Rows painted as their source text morph on the overlay. The rest (rendered Markdown, chips)
+  // stay real and move as whole rows, because the overlay cannot draw what they show.
   private morph(previous: EditorViewSnapshot, snapshot: EditorViewSnapshot): void {
-    // Chips, hidden markup and phantom text are painted as something other than their source.
-    if (this.context.getInlineReplacementRanges().length > 0) {
-      this.finish()
-      return
-    }
-    const rows = this.cover.collect(snapshot)
+    const drawn = drawableRows(snapshot, this.latestReplaced)
+    const real = new Set(Array.from(snapshot.visibleRows, (row) => row.index))
+    for (const index of drawn) real.delete(index)
+    const { moves, taken } = rowMoves(previous, snapshot, real)
+    const rows = this.cover.collect(snapshot, drawn)
     const measurer = this.ensureMeasurer(snapshot, rows[0]?.presentation.element)
-    const next = buildFrame(snapshot, measurer, this.options.maxPieces)
-    const from = this.run ? this.run.visualPieces() : this.restingFrom(previous, measurer)
+    const next = buildFrame(snapshot, measurer, this.options.maxPieces, undefined, (row) =>
+      drawn.has(row.index),
+    )
+    const from = this.run ? this.run.visualPieces() : this.restingFrom(previous, measurer, taken)
     if (!next || !from) {
       for (const row of rows) row.presentation.dispose()
       this.finish()
       return
     }
-    const pairs = matchPieces(
-      from.map((piece) => piece.text),
-      next.pieces.map((piece) => piece.text),
-    )
+    const pairs = matchPieces(from, next.pieces)
 
     this.run?.cancel()
-    this.run = new MorphRun(
-      this.context.contentElement,
-      next,
-      from,
-      pairs,
-      this.ensureTiming(),
-      () => this.finish(),
+    this.moves?.cancel()
+    const timing = this.ensureTiming()
+    this.run = new MorphRun(this.context.contentElement, next, from, pairs, timing, () =>
+      this.settleOverlay(),
     )
+    this.moves = new RowMoves(this.context, moves, timing)
     this.context.scrollElement.classList.add(ACTIVE_CLASS)
     this.runSnapshot = snapshot
+    this.runRows = drawn
     this.cover.cover(rows)
     this.context.log({
       level: 'info',
@@ -189,15 +195,34 @@ class MorphViewContribution implements EditorViewContribution {
     })
   }
 
-  private restingFrom(previous: EditorViewSnapshot, measurer: TextMeasurer) {
-    const frame: MorphFrame | null = buildFrame(previous, measurer, this.options.maxPieces)
+  private restingFrom(
+    previous: EditorViewSnapshot,
+    measurer: TextMeasurer,
+    moving: ReadonlySet<number>,
+  ) {
+    const drawn = drawableRows(previous, this.beforeReplaced)
+    const frame: MorphFrame | null = buildFrame(
+      previous,
+      measurer,
+      this.options.maxPieces,
+      undefined,
+      (row) => drawn.has(row.index) && !moving.has(row.index),
+    )
     return frame ? restingPieces(frame) : null
   }
 
   private finish(): void {
+    this.moves?.cancel()
+    this.moves = null
+    this.settleOverlay()
+  }
+
+  /** Drops the overlay; rows still moving on their own finish their motion. */
+  private settleOverlay(): void {
     this.context.scrollElement.classList.remove(ACTIVE_CLASS)
     this.cover.showAll()
     this.runSnapshot = null
+    this.runRows = new Set()
     this.run?.cancel()
     this.run = null
   }
@@ -226,10 +251,19 @@ class MorphViewContribution implements EditorViewContribution {
   }
 }
 
-function changedChars(change: EditorContributionChange): number {
-  let total = 0
-  for (const edit of change.edits) total += edit.to - edit.from + edit.text.length
-  return total
+/** Rows painted as their own source text, which the overlay can redraw. */
+function drawableRows(
+  snapshot: EditorViewSnapshot,
+  replaced: readonly TextOffsetRange[],
+): Set<number> {
+  const rows = new Set<number>()
+  for (const row of snapshot.visibleRows) {
+    if (row.kind !== 'text' || !drawsAsPlainText(row)) continue
+    if (replaced.some((range) => range.start < row.endOffset && range.end > row.startOffset))
+      continue
+    rows.add(row.index)
+  }
+  return rows
 }
 
 function positive(value: number | undefined, fallback: number): number {

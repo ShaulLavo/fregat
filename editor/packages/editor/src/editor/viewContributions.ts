@@ -1,6 +1,6 @@
 import { createError } from '../logging/errors'
-import type { DocumentSessionChange } from '../documentSession'
 import type {
+  EditorContributionChange,
   EditorViewContribution,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
@@ -36,7 +36,7 @@ type QueuedUpdate = {
   readonly kind: EditorViewContributionUpdateKind
   /** Every kind the operation changed, `kind` first; one pass carries them all. */
   readonly kinds: readonly EditorViewContributionUpdateKind[]
-  readonly change: DocumentSessionChange | null
+  readonly change: EditorContributionChange | null
   /** Set when one contribution asked to be updated again; the pass reaches only it. */
   readonly target: EditorViewContribution | null
   /** The contribution whose update or viewport callback asked for it, when one did. */
@@ -222,7 +222,7 @@ export class EditorViewContributionController {
    */
   notify(
     kind: EditorViewContributionUpdateKind,
-    change: DocumentSessionChange | null = null,
+    change: EditorContributionChange | null = null,
     also: readonly EditorViewContributionUpdateKind[] = [],
   ): void {
     if (!this.canPresent() || this.contributions.length === 0) return
@@ -272,7 +272,7 @@ export class EditorViewContributionController {
 
   private queueReentrantUpdate(
     kinds: readonly EditorViewContributionUpdateKind[],
-    change: DocumentSessionChange | null,
+    change: EditorContributionChange | null,
   ): void {
     if (kinds[0] !== 'layout' || kinds.length > 1) {
       this.pendingUpdates.push(this.queuedUpdate(kinds, change, null))
@@ -291,7 +291,7 @@ export class EditorViewContributionController {
 
   private queuedUpdate(
     kinds: readonly EditorViewContributionUpdateKind[],
-    change: DocumentSessionChange | null,
+    change: EditorContributionChange | null,
     target: EditorViewContribution | null,
   ): QueuedUpdate {
     const cause = this.deliveringUpdate
@@ -477,7 +477,7 @@ export class EditorViewContributionController {
     contribution: EditorViewContribution,
     snapshot: EditorViewSnapshot,
     kind: EditorViewContributionUpdateKind,
-    change: DocumentSessionChange | null,
+    change: EditorContributionChange | null,
   ): void {
     if (!this.members.has(contribution)) return
     const initialUpdate = this.initialUpdates.delete(contribution)
@@ -521,7 +521,7 @@ export class EditorViewContributionController {
 
 function rootUpdate(
   kinds: readonly EditorViewContributionUpdateKind[],
-  change: DocumentSessionChange | null,
+  change: EditorContributionChange | null,
   target: EditorViewContribution | null,
 ): QueuedUpdate {
   return { kind: kinds[0]!, kinds, change, target, requester: null, cause: null, depth: 0 }

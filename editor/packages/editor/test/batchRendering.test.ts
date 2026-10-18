@@ -203,6 +203,42 @@ test('batch contributions see matching final text, tokens, folds and mounted row
   }
 })
 
+test('contributions see keyboard text input as typing and every other edit as not', () => {
+  const typing: (boolean | undefined)[] = []
+  const plugin: EditorPlugin = {
+    activate: (context) =>
+      context.registerViewContribution({
+        createContribution: () => ({
+          update: (_snapshot, kind, change) => {
+            if (kind === 'content' && change && change.edits.length > 0) typing.push(change.typing)
+          },
+          dispose() {},
+        }),
+      }),
+  }
+  const editor = mountEditor({ plugins: [plugin] })
+  const text = 'head\nbody'
+  const session = createDocumentSession(text)
+  editor.attachSession(session)
+  editor.setSelection(0, 0)
+  editor.getInputElement().dispatchEvent(
+    new InputEvent('beforeinput', {
+      inputType: 'insertText',
+      data: 'X',
+      bubbles: true,
+      cancelable: true,
+    }),
+  )
+  editor.dispatchCommand('deleteBackward')
+  editor.dispatchCommand('insertNewlineAndIndent')
+  editor.dispatchCommand('editor.action.indentLines')
+  editor.setSelection(0, 4)
+  editor.dispatchCommand('deleteBackward')
+  editor.edit([{ from: 0, to: 0, text: 'Y' }])
+
+  expect(typing).toEqual([true, true, true, undefined, undefined, undefined])
+})
+
 test('three shared views deliver reentrant batches once in committed order', () => {
   const buffer = createEditorTextBuffer('alpha\nbeta\ngamma')
   const first = mountEditor()

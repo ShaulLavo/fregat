@@ -1,4 +1,4 @@
-import { ok, strictEqual } from 'node:assert/strict'
+import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 
 import type { Scenario } from './index'
@@ -73,6 +73,19 @@ function freezeAt(ms: number): number {
   return frozen
 }
 
+/** Page-side: freezes every animation at `ms` and names the pieces drawn part way transparent. */
+function fadingAt({ ms, selector }: { ms: number; selector: string }): string[] {
+  for (const animation of document.getAnimations()) {
+    const end = animation.effect?.getComputedTiming().endTime
+    if (typeof end !== 'number' || !Number.isFinite(end)) continue
+    animation.pause()
+    animation.currentTime = ms
+  }
+  return Array.from(document.querySelectorAll<HTMLElement>(selector))
+    .filter((piece) => Number(getComputedStyle(piece).opacity) < 0.99)
+    .map((piece) => piece.textContent ?? '')
+}
+
 function resume(): void {
   for (const animation of document.getAnimations()) animation.play()
 }
@@ -103,7 +116,7 @@ let report: unknown = null
 export const devTransitions: Scenario = {
   name: 'dev-transitions',
   description:
-    'Step the /dev transitions editor through a refactor and every file-open reveal in slow motion: pieces move mid-flight, land exactly on the real text, and the real rows come back when the animation ends.',
+    'Step the /dev transitions editor through a refactor, a typed key, an indent and every file-open reveal in slow motion: pieces move mid-flight, land exactly on the real text, typing stays instant, and the real rows come back when the animation ends.',
   capture: { width: 900, height: 900 },
   async run(page, { step }) {
     const url = new URL(page.url())
@@ -149,6 +162,41 @@ export const devTransitions: Scenario = {
     await page.locator(morphSelectors.layer).waitFor({ state: 'detached', timeout: 20_000 })
     await step('stream-settled')
     ok((await editorText(page)).includes('totalWithTax'), 'the streamed function landed')
+
+    // Keyboard text input stays instant; a command edit of any size morphs.
+    await morphSelectors
+      .editor(page)
+      .locator('.editor-virtualized-row', { hasText: 'const lineTotal' })
+      .click()
+    await page.keyboard.press('End')
+    await page.keyboard.type('x')
+    await page.keyboard.press('Backspace')
+    strictEqual(await page.locator(morphSelectors.layer).count(), 0, 'typing stays instant')
+    await page.keyboard.press('Home')
+    await page.keyboard.press('Shift+ArrowDown')
+    await page.keyboard.press('Tab')
+    await page.locator(morphSelectors.piece).first().waitFor({ state: 'attached' })
+    await page.evaluate(freezeAt, 300)
+    await step('indent-mid-flight')
+    await page.evaluate(resume)
+    await page.locator(morphSelectors.layer).waitFor({ state: 'detached', timeout: 10_000 })
+
+    // Swapped lines travel whole: no piece of either line fades out and back in.
+    await morphSelectors
+      .editor(page)
+      .locator('.editor-virtualized-row', { hasText: 'const gross' })
+      .click()
+    await page.keyboard.press('Alt+ArrowUp')
+    await page.locator(morphSelectors.piece).first().waitFor({ state: 'attached' })
+    const fading = await page.evaluate(fadingAt, { ms: 300, selector: morphSelectors.piece })
+    await step('swap-mid-flight')
+    await page.evaluate(resume)
+    await page.locator(morphSelectors.layer).waitFor({ state: 'detached', timeout: 10_000 })
+    ok(
+      (await editorText(page)).includes('const gross = net * (1 + rate)\n  const net'),
+      'lines swapped',
+    )
+    deepStrictEqual(fading, [], 'no piece of a swapped line fades')
 
     const reveals: Record<string, Landing> = {}
     for (const mode of ['Autoregressive', 'Parallel', 'Token', 'Diffusion']) {
