@@ -38,7 +38,8 @@
     "preview": "bun --bun --env-file=../../.env vite preview",
     "dev:vite": "bun ../../scripts/run-with-env.ts vite",
     "dev:types": "bun ../../scripts/check-dev-types.ts --watch",
-    "typecheck:dev": "bun ../../scripts/check-dev-types.ts"
+    "typecheck:dev": "bun ../../scripts/check-dev-types.ts",
+    "test:markdown": "vitest run --config vitest.markdown-qualification.config.ts --mode candidate qualification-semantics.browser.tsx qualification-production.browser.tsx"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

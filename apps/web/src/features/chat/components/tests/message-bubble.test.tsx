@@ -1,6 +1,8 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ChatAttachment } from '@workspace/contracts'
+import { MarkdownSessionContext } from '@workspace/markdown/providers/session-context'
+import { createMarkdownSession } from '@workspace/markdown/utils/session'
 import type { ReactNode } from 'react'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
@@ -216,7 +218,9 @@ function withProviders(children: ReactNode) {
 
   return (
     <EditorStateProvider>
-      <ChatTimelineActionsContext value={actions}>{children}</ChatTimelineActionsContext>
+      <MarkdownSessionContext value={createMarkdownSession}>
+        <ChatTimelineActionsContext value={actions}>{children}</ChatTimelineActionsContext>
+      </MarkdownSessionContext>
     </EditorStateProvider>
   )
 }

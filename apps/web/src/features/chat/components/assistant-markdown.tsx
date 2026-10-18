@@ -15,6 +15,7 @@ import { useEnvironmentsStore } from '@/lib/environments/state/store'
 
 import { useMermaid } from '../hooks/use-mermaid'
 import { useOpenFileReference } from '../hooks/use-open-file-reference'
+import { ChatMarkdownProvider } from '../providers/markdown-session-provider'
 import { MarkdownDiagramContext } from '../providers/markdown-diagram-context'
 import { MarkdownFileLinkContext } from '../providers/markdown-file-link-context'
 import { normalizeAgentMarkdown } from '@/features/chat/utils/agent-markdown'
@@ -110,15 +111,17 @@ export function AssistantMarkdown({
 
   return (
     <div className='min-w-0' data-chat-markdown='true' onCopy={handleCopy}>
-      <MarkdownFileLinkContext value={fileLinkActions}>
-        <CodeHighlighterContext value={highlighter}>
-          <MarkdownDiagramContext value={mermaid}>
-            {onlyMarkdown === null
-              ? segments.map(renderSegment)
-              : renderMarkdown(onlyMarkdown, streaming)}
-          </MarkdownDiagramContext>
-        </CodeHighlighterContext>
-      </MarkdownFileLinkContext>
+      <ChatMarkdownProvider>
+        <MarkdownFileLinkContext value={fileLinkActions}>
+          <CodeHighlighterContext value={highlighter}>
+            <MarkdownDiagramContext value={mermaid}>
+              {onlyMarkdown === null
+                ? segments.map(renderSegment)
+                : renderMarkdown(onlyMarkdown, streaming)}
+            </MarkdownDiagramContext>
+          </CodeHighlighterContext>
+        </MarkdownFileLinkContext>
+      </ChatMarkdownProvider>
     </div>
   )
 }

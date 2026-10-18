@@ -99,3 +99,30 @@ Review the new bytes, counts and hashes before replacing committed fixtures. Pre
 and attribution in the [reference README](../../packages/markdown/test/reference/README.md).
 Keep the [Approved qualification plan](../../plans/chat-markdown-qualification.md) current as each
 producer, consumer and promotion gate lands.
+
+## Bounded chat candidate check
+
+```sh
+bun run markdown:check
+```
+
+This runs the candidate's development correctness cases and Chromium chat semantics,
+then exercises cold production initialization, explicit oracle overrides, split preview,
+and selection across streaming appends. CI selects Markdown/chat source and their shared
+runtime/test inputs. The browser fixture owns its server, browser and temporary state;
+set `VITEST_BROWSER_PORT` and `VITEST_BROWSER_FILE_SERVER_PORT` to free explicit ports locally.
+
+A passing check is a development regression result, never a `VERIFIED` verdict or a promotion
+receipt. It does not open evaluation batches or run timing/resource/visual promotion jobs.
+The existing `markdown:qualify` command still fails without complete trusted identity-bound
+receipts. Nightly broad fuzz/visual/benchmark scheduling, independent evaluation, the full
+streaming/interaction/resource/native matrix, reviewed paired visuals and quiet-host timing
+remain required before the coordinator can complete Q5 and authorize delivery.
+
+Production `AssistantMarkdown` selects tree-sitter through its local provider after the package
+initializer loads the grammar, resolver and runtime URLs. Until that succeeds it shows a loading
+state, then uses the existing transforms and safe HAST renderer. An explicit
+`MarkdownSessionContext` factory takes precedence, keeping the remark oracle independent.
+Unscoped `Markdown`, including the file split preview, retains remark. Production remark
+packages remain installed for those consumers. This branch changes source wiring only; it does
+not establish qualification, deploy the change or verify the served release.

@@ -1,5 +1,6 @@
 import { createContext } from 'react'
 
-import { createMarkdownSession, type MarkdownSessionFactory } from '../utils/session'
+import type { MarkdownSessionFactory } from '../utils/session'
 
-export const MarkdownSessionContext = createContext<MarkdownSessionFactory>(createMarkdownSession)
+/** A host may select its parser; unscoped Markdown keeps the remark default. */
+export const MarkdownSessionContext = createContext<MarkdownSessionFactory | null>(null)

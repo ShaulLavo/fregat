@@ -95,3 +95,27 @@ test('bundle size does not block CI or repository verification', async () => {
     })
   }
 })
+
+test('chat Markdown CI runs bounded candidate checks without promotion receipts or evaluation', async () => {
+  const markdown = YAML.parse(
+    await readFile(new URL('.github/workflows/markdown-chat.yml', root), 'utf8'),
+  )
+  const web = JSON.parse(await readFile(new URL('apps/web/package.json', root), 'utf8'))
+  expect(markdown.on.pull_request.paths).toEqual(markdown.on.push.paths)
+  expect(markdown.on.pull_request.paths).toContain('packages/markdown/**')
+  expect(markdown.on.pull_request.paths).toContain('apps/web/src/features/chat/**')
+  expect(markdown.on.pull_request.paths).not.toContain('apps/web/**')
+  expect(markdown.on).not.toHaveProperty('schedule')
+  const step = markdown.jobs['candidate-check'].steps.find((entry) => entry.run)
+  expect(step.run).toBe('bun run markdown:check')
+  expect(step.env).toMatchObject({
+    VITEST_BROWSER_PORT: '5397',
+    VITEST_BROWSER_FILE_SERVER_PORT: '33497',
+  })
+  expect(JSON.parse(manifest).scripts['markdown:check']).toBe(
+    'bun run --cwd packages/markdown test qualification-candidate && bun run --cwd apps/web test:markdown',
+  )
+  expect(web.scripts['test:markdown']).toBe(
+    'vitest run --config vitest.markdown-qualification.config.ts --mode candidate qualification-semantics.browser.tsx qualification-production.browser.tsx',
+  )
+})

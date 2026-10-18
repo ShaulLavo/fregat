@@ -1,0 +1,66 @@
+name: Chat Markdown checks
+
+on:
+  pull_request:
+    paths:
+      - 'packages/markdown/**'
+      - 'apps/web/src/features/chat/**'
+      - 'apps/web/src/features/workbench/components/markdown-preview*'
+      - 'apps/web/test/factories/markdown*'
+      - 'apps/web/test/providers.tsx'
+      - 'apps/web/test/render.tsx'
+      - 'apps/web/test/env/**'
+      - 'apps/web/vitest*.ts'
+      - 'scripts/markdown/**'
+      - 'package.json'
+      - 'apps/web/package.json'
+      - 'bun.lock'
+      - '.github/workflows/markdown-chat.yml'
+      - '.github/actions/setup/**'
+      - '.github/actions/install-browsers/**'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/markdown/**'
+      - 'apps/web/src/features/chat/**'
+      - 'apps/web/src/features/workbench/components/markdown-preview*'
+      - 'apps/web/test/factories/markdown*'
+      - 'apps/web/test/providers.tsx'
+      - 'apps/web/test/render.tsx'
+      - 'apps/web/test/env/**'
+      - 'apps/web/vitest*.ts'
+      - 'scripts/markdown/**'
+      - 'package.json'
+      - 'apps/web/package.json'
+      - 'bun.lock'
+      - '.github/workflows/markdown-chat.yml'
+      - '.github/actions/setup/**'
+      - '.github/actions/install-browsers/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: markdown-chat-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+jobs:
+  candidate-check:
+    name: Candidate correctness and chat boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          build-packages: '["web", "@workspace/markdown"]'
+      - uses: ./.github/actions/install-browsers
+        with:
+          playwright: apps/web/node_modules/.bin/playwright
+          browsers: chromium chromium-headless-shell
+      - name: Check the candidate and production boundary
+        env:
+          VITEST_BROWSER_PORT: '5397'
+          VITEST_BROWSER_FILE_SERVER_PORT: '33497'
+        run: bun run markdown:check

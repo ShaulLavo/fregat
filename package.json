@@ -128,7 +128,8 @@
     "markdown:stream": "bun scripts/markdown/qualify.ts stream --baseline",
     "markdown:visual": "bun scripts/markdown/qualify.ts visual --baseline",
     "markdown:bench": "bun scripts/markdown/qualify.ts bench --baseline",
-    "markdown:qualify": "bun scripts/markdown/qualify.ts qualify"
+    "markdown:qualify": "bun scripts/markdown/qualify.ts qualify",
+    "markdown:check": "bun run --cwd packages/markdown test qualification-candidate && bun run --cwd apps/web test:markdown"
   },
   "devDependencies": {
     "@changesets/changelog-github": "1.0.1",

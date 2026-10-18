@@ -20,7 +20,7 @@ const labelledSession: MarkdownSessionFactory = (options = {}) =>
     ]),
   })
 
-test('a scoped factory reaches Markdown while siblings use the production default', () => {
+test('a scoped factory reaches Markdown while siblings keep the remark default', () => {
   const view = render(
     <>
       <MarkdownSessionContext value={labelledSession}>
@@ -47,4 +47,18 @@ test('changing the scoped factory replaces its parse cache and keeps the current
     </MarkdownSessionContext>,
   )
   expect(view.container.querySelector('strong')?.textContent).toBe('answer')
+})
+
+test('a null boundary restores the remark default inside an explicit host factory', () => {
+  const view = render(
+    <MarkdownSessionContext value={labelledSession}>
+      <Markdown text='**host**' />
+      <MarkdownSessionContext value={null}>
+        <Markdown text='**preview**' />
+      </MarkdownSessionContext>
+    </MarkdownSessionContext>,
+  )
+  expect(Array.from(view.container.querySelectorAll('strong'), (node) => node.textContent)).toEqual(
+    ['Scoped host', 'preview'],
+  )
 })

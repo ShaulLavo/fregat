@@ -61,9 +61,11 @@ export async function createMarkdownBrowser({
   readonly theme?: 'dark' | 'light'
   readonly application?: ApplicationRuntime
   readonly queryClient?: QueryClient
-  readonly sessionFactory?: MarkdownSessionFactory
+  // null exercises production initialization without a qualification override.
+  readonly sessionFactory?: MarkdownSessionFactory | null
 } = {}) {
-  const factory = sessionFactory ?? (await qualificationSessionFactory())
+  const factory =
+    sessionFactory === undefined ? await qualificationSessionFactory() : sessionFactory
   const previousViewport = { width: window.innerWidth, height: window.innerHeight }
   const host = document.createElement('main')
   host.className = 'bg-background text-foreground font-sans p-4'
