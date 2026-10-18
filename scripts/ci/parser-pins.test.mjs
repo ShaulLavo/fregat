@@ -40,7 +40,9 @@ function githubFixture() {
     },
     pages: async (endpoint) => {
       state.reads.push(endpoint)
-      if (endpoint.startsWith('pulls?')) return state.pulls
+      if (endpoint.startsWith('pulls?state=open&'))
+        return state.pulls.filter((pull) => pull.state === 'open')
+      if (endpoint.startsWith('pulls?state=all&')) return state.pulls
       if (endpoint.startsWith('actions/artifacts?')) return state.artifacts
       if (endpoint.startsWith('actions/workflows/ci.yml/runs?')) return state.runs
       if (endpoint.startsWith('actions/runs/20/jobs?')) return state.jobs
@@ -313,6 +315,144 @@ function publicationFixture() {
     })
   return { ...fixture, root, directory, git, metadata, patch, publish, manifest, before }
 }
+
+function cliPublicationFixture(historySize) {
+  const fixture = publicationFixture()
+  const bin = path.join(fixture.root, 'bin')
+  const statePath = path.join(fixture.directory, 'github.json')
+  const pins = path.join(fixture.directory, 'pin-update')
+  for (const directory of [bin, pins]) mkdirSync(directory)
+  const history = Array.from({ length: historySize }, (_, index) => ({
+    ...fixture.state.pull,
+    number: 100 + index,
+    state: index < 101 ? 'open' : 'closed',
+    user: { id: 1, login: 'contributor', type: 'User' },
+    head: { ...fixture.state.pull.head, ref: `feature/${index}` },
+    body: 'Build and test verification for this pull request.\n'.repeat(400),
+  }))
+  const obsolete = structuredClone(fixture.state.pull)
+  obsolete.head.ref = obsolete.head.ref.replace('a'.repeat(40), 'd'.repeat(40))
+  fixture.state.pulls = history.concat([obsolete])
+  writeFileSync(statePath, JSON.stringify(fixture.state))
+  writeFileSync(path.join(pins, 'update.patch'), fixture.patch)
+  writeFileSync(path.join(pins, 'metadata.json'), JSON.stringify(fixture.metadata))
+  writeFileSync(
+    path.join(bin, 'gh'),
+    `#!/usr/bin/env node
+import assert from 'node:assert/strict'
+import { readFileSync, writeFileSync } from 'node:fs'
+const state = JSON.parse(readFileSync('github.json', 'utf8'))
+const [command, endpoint, ...flags] = process.argv.slice(2)
+assert.equal(command, 'api')
+const url = new URL('https://fixture.invalid/' + endpoint)
+const route = url.pathname.replace('/repos/' + state.repository + '/', '')
+const method = flags.includes('--method') ? flags[flags.indexOf('--method') + 1] : 'GET'
+state.reads.push(endpoint)
+let result
+if (route === 'pulls' && method === 'GET') {
+  const query = url.searchParams
+  result = state.pulls.filter(pull =>
+    (query.get('state') === 'all' || pull.state === query.get('state')) &&
+    pull.base.ref === query.get('base') &&
+    (!query.has('head') || query.get('head') === state.repository.split('/')[0] + ':' + pull.head.ref))
+} else if (route === 'pulls' && method === 'POST') {
+  const body = JSON.parse(readFileSync(0, 'utf8'))
+  result = { ...state.pull, number: 2000, head: { ...state.pull.head, ref: body.head } }
+  state.pulls.push(result)
+} else if (route.endsWith('/files')) {
+  result = state.files
+} else if (route === 'actions/artifacts') {
+  result = { artifacts: state.artifacts }
+} else {
+  result = state.pulls.find(pull => route === 'pulls/' + pull.number)
+  assert.ok(result, endpoint)
+  if (method === 'PATCH') Object.assign(result, JSON.parse(readFileSync(0, 'utf8')))
+}
+if (method !== 'GET') state.writes.push({ endpoint, method })
+writeFileSync('github.json', JSON.stringify(state))
+if (flags.includes('--paginate')) {
+  assert.ok(flags.includes('--slurp'))
+  result = Array.isArray(result)
+    ? Array.from({ length: Math.max(1, Math.ceil(result.length / 100)) }, (_, page) => result.slice(page * 100, (page + 1) * 100))
+    : [result]
+}
+process.stdout.write(JSON.stringify(result))
+`,
+    { mode: 0o755 },
+  )
+  const read = () => JSON.parse(readFileSync(statePath, 'utf8'))
+  const run = () => {
+    const result = spawnSync(
+      'node',
+      [path.resolve(import.meta.dirname, 'parser-pins.mjs'), 'publish'],
+      {
+        cwd: fixture.directory,
+        env: {
+          ...process.env,
+          PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+          GITHUB_REPOSITORY: fixture.state.repository,
+          GITHUB_OUTPUT: path.join(fixture.root, 'output'),
+        },
+        encoding: 'utf8',
+        timeout: 30_000,
+      },
+    )
+    expect(result.status, result.stderr).toBe(0)
+    return result
+  }
+  return { ...fixture, run, read, statePath, pins, history }
+}
+
+test.skipIf(process.platform === 'win32').each([0, 1300])(
+  'production CLI publishes once and reuses the exact branch with %i historical PRs',
+  (historySize) => {
+    const fixture = cliPublicationFixture(historySize)
+    if (historySize)
+      expect(Buffer.byteLength(JSON.stringify(fixture.history))).toBeGreaterThan(16 * 1024 * 1024)
+    fixture.run()
+    const receipt = JSON.parse(
+      readFileSync(path.join(fixture.directory, 'pin-receipt.json'), 'utf8'),
+    )
+    const state = fixture.read()
+    state.pulls.find((pull) => pull.number === receipt.number).head.sha = receipt.head
+    writeFileSync(fixture.statePath, JSON.stringify(state))
+    fixture.run()
+    expect(
+      JSON.parse(readFileSync(path.join(fixture.directory, 'pin-receipt.json'), 'utf8')),
+    ).toEqual(receipt)
+    const final = fixture.read()
+    expect(final.writes.filter((write) => write.method === 'POST')).toHaveLength(1)
+    expect(final.writes.filter((write) => write.method === 'PATCH')).toHaveLength(1)
+    expect(final.pulls.find((pull) => pull.number === 42).state).toBe('closed')
+    expect(final.pulls.filter((pull) => pull.user.id === 1 && pull.state === 'open')).toHaveLength(
+      Math.min(historySize, 101),
+    )
+    if (!historySize) return
+    expect(final.reads).toContain(
+      `repos/fixture/parser/pulls?state=all&base=main&head=${encodeURIComponent(`fixture:${receipt.branch}`)}&per_page=100`,
+    )
+    expect(final.reads).not.toContain('repos/fixture/parser/pulls?state=all&base=main&per_page=100')
+  },
+)
+
+test.skipIf(process.platform === 'win32').each(['closed', 'merged'])(
+  'production CLI preserves a %s same-pin PR buried in large history',
+  (status) => {
+    const fixture = cliPublicationFixture(1300)
+    const state = fixture.read()
+    state.pulls.push({
+      ...state.pull,
+      number: 2001,
+      state: 'closed',
+      merged_at: status === 'merged' ? '2026-10-18T00:00:00Z' : null,
+    })
+    writeFileSync(fixture.statePath, JSON.stringify(state))
+    fixture.run()
+    expect(fixture.read().writes).toEqual([])
+    expect(fixture.git('ls-remote', 'origin')).toBe('')
+    expect(existsSync(path.join(fixture.directory, 'pin-receipt.json'))).toBe(false)
+  },
+)
 
 test('creates one immutable branch and PR, and reuses it on the same pin pair rerun', async () => {
   const fixture = publicationFixture()

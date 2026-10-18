@@ -197,20 +197,28 @@ function validateManifests(git, files, metadata) {
   }
 }
 
+function branchPullsPath(repository, branch) {
+  const head = encodeURIComponent(`${repository.split('/')[0]}:${branch}`)
+  return `pulls?state=all&base=main&head=${head}&per_page=100`
+}
+
 export async function publishPins({ api, repository, directory, patch, metadata }) {
   assert.match(metadata.base, sha)
   assert.match(metadata.runtime, sha)
   assert.match(metadata.markdown, sha)
   const branch = `${prefix}${metadata.runtime}-${metadata.markdown}`
-  const pulls = await api.pages('pulls?state=all&base=main&per_page=100')
+  const openPulls = await api.pages('pulls?state=open&base=main&per_page=100')
   if (!patch.trim()) {
-    await closeObsolete(api, repository, pulls)
+    await closeObsolete(api, repository, openPulls)
     return null
   }
-  const existing = pulls.find((pull) => nativePull(pull, repository) && pull.head.ref === branch)
+  const branchPulls = await api.pages(branchPullsPath(repository, branch))
+  const existing = branchPulls.find(
+    (pull) => nativePull(pull, repository) && pull.head.ref === branch,
+  )
   if (existing && existing.state !== 'open') return null
   if (existing && (await trustedPull(api, repository, existing))) {
-    await closeObsolete(api, repository, pulls, existing.number)
+    await closeObsolete(api, repository, openPulls, existing.number)
     return { branch, head: existing.head.sha, number: existing.number }
   }
   const head = generatedHead({ directory, patch, metadata, branch })
@@ -225,7 +233,7 @@ export async function publishPins({ api, repository, directory, patch, metadata 
     })
     number = created.number
   }
-  await closeObsolete(api, repository, pulls, number)
+  await closeObsolete(api, repository, openPulls, number)
   return { branch, head, number }
 }
 
