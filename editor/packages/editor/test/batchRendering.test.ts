@@ -230,12 +230,13 @@ test('contributions see keyboard text input as typing and every other edit as no
     }),
   )
   editor.dispatchCommand('deleteBackward')
+  editor.dispatchCommand('insertNewlineAndIndent')
   editor.dispatchCommand('editor.action.indentLines')
   editor.setSelection(0, 4)
   editor.dispatchCommand('deleteBackward')
   editor.edit([{ from: 0, to: 0, text: 'Y' }])
 
-  expect(typing).toEqual([true, true, undefined, undefined, undefined])
+  expect(typing).toEqual([true, true, true, undefined, undefined, undefined])
 })
 
 test('three shared views deliver reentrant batches once in committed order', () => {

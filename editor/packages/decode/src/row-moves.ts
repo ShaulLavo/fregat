@@ -12,7 +12,7 @@ type VisibleRow = EditorViewSnapshot['visibleRows'][number]
  * property composes with however the editor positions the row.
  */
 export class RowMoves {
-  private readonly animations: Animation[] = []
+  private readonly releases: (() => void)[] = []
 
   public constructor(
     context: EditorViewContributionContext,
@@ -23,14 +23,27 @@ export class RowMoves {
       const presentation = context.getRowPresentation(move.index)
       if (!presentation) continue
       const animation = animateRow(presentation.element, move, timing)
-      presentation.dispose()
-      if (animation) this.animations.push(animation)
+      if (!animation) {
+        presentation.dispose()
+        continue
+      }
+      // A recycled row element shows other text; the motion stops with the row it was for.
+      const release = () => {
+        animation.cancel()
+        presentation.dispose()
+      }
+      presentation.signal.addEventListener('abort', release, { once: true })
+      animation.finished.then(
+        () => presentation.dispose(),
+        () => undefined,
+      )
+      this.releases.push(release)
     }
   }
 
   public cancel(): void {
-    for (const animation of this.animations) animation.cancel()
-    this.animations.length = 0
+    for (const release of this.releases) release()
+    this.releases.length = 0
   }
 }
 

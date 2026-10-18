@@ -157,7 +157,7 @@ export const inlineSpecsAfterRewrite = (
   snapshot: PieceTableSnapshot,
   text: TextReadSnapshot,
 ): readonly InlineReplacementSpec[] => {
-  const carried = inlineSpecsAtSnapshot(map, snapshot)
+  const carried = unchangedSpecs(map, source, inlineSpecsAtSnapshot(map, snapshot), text)
   const kept = new Set(carried.map((spec) => spec.id))
   const lost = map.ranges.filter((range) => !kept.has(range.id) && range.insertion !== true)
   if (lost.length === 0) return carried
@@ -173,6 +173,33 @@ export const inlineSpecsAfterRewrite = (
     relocated.push(shiftedSpec(range, lineStart - source.lineStart(oldLine)))
   }
   return carried.concat(relocated)
+}
+
+/**
+ * The carried specs whose source still reads as it did, with their whole group: text typed inside
+ * hidden markup would otherwise stay hidden until the next parse.
+ */
+function unchangedSpecs(
+  map: InlineMap,
+  source: TextReadSnapshot,
+  carried: readonly InlineReplacementSpec[],
+  text: TextReadSnapshot,
+): readonly InlineReplacementSpec[] {
+  const before = new Map(map.ranges.map((range) => [range.id, range]))
+  const changed = new Set<string>()
+  const changedGroups = new Set<string>()
+  for (const spec of carried) {
+    const old = before.get(spec.id)
+    const was = old ? source.readRange(old.startOffset, old.endOffset) : null
+    if (was === text.readRange(spec.startIndex, spec.endIndex)) continue
+    changed.add(spec.id)
+    if (spec.groupId !== undefined) changedGroups.add(spec.groupId)
+  }
+  if (changed.size === 0) return carried
+  return carried.filter(
+    (spec) =>
+      !changed.has(spec.id) && (spec.groupId === undefined || !changedGroups.has(spec.groupId)),
+  )
 }
 
 /** Where the old line's exact text now starts as a whole line, nearest first, or null. */

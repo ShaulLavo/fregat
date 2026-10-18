@@ -56,6 +56,22 @@ describe('inlineSpecsAfterRewrite', () => {
     ])
   })
 
+  it('drops a group whose hidden markup the edit typed into', () => {
+    const before = createPieceTableSnapshot(BOLD_LINE)
+    const map = createInlineMap(before, boldSpecs())
+    // `x` lands between the two `*` of the opening marker.
+    const after = applyBatchToPieceTable(before, [{ from: 3, to: 3, text: 'x' }])
+
+    const specs = inlineSpecsAfterRewrite(
+      map,
+      createDocumentTextSnapshot(before),
+      after,
+      createDocumentTextSnapshot(after),
+    )
+
+    expect(specs).toEqual([])
+  })
+
   it('drops the replacements of a line the edit changed', () => {
     const before = createPieceTableSnapshot(BOLD_LINE)
     const map = createInlineMap(before, boldSpecs())

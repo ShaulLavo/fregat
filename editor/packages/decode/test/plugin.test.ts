@@ -419,6 +419,25 @@ describe('createMorphPlugin', () => {
     contribution.dispose()
   })
 
+  it('stops a rendered row moving when the editor recycles that row', () => {
+    const { context, contribution, presentations } = mountMorph()
+    const lines = SAMPLE.split('\n')
+    const swapped = [lines[0], lines[2], lines[1]].concat(lines.slice(3)).join('\n')
+    let replaced = rangeOf(SAMPLE, lines[2]!)
+    vi.spyOn(context, 'getInlineReplacementRanges').mockImplementation(() => [replaced])
+    contribution.update(snapshot(), 'layout')
+    replaced = rangeOf(swapped, lines[2]!)
+    contribution.update(snapshot({ text: swapped, textVersion: 2 }), 'content', edit(1))
+    const moved = rowAnimations().find((entry) => entry.keyframes[0]?.translate !== undefined)
+    expect(moved).toBeDefined()
+
+    invalidateRowPresentations(moved!.element)
+
+    expect(moved!.cancel).toHaveBeenCalled()
+    expect(presentations.some((handle) => handle.element === moved!.element)).toBe(true)
+    contribution.dispose()
+  })
+
   it('slides a rendered row whole to where its text moved', () => {
     const { context, contribution } = mountMorph()
     const lines = SAMPLE.split('\n')

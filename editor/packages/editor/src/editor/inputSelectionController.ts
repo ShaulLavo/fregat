@@ -3434,6 +3434,7 @@ export class InputSelectionController {
     if (!session) return
     if (!this.canTypeText()) return
 
+    this.pendingKeyboardEdit = true
     const selectionChange = measureEditorPerformance('input.selectionChangeBeforeEdit', () =>
       this.selectionChangeBeforeEdit(),
     )
