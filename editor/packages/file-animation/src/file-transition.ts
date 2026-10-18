@@ -74,6 +74,14 @@ function fileFrame(snapshot: EditorViewSnapshot): FileFrame {
   return { documentId, visibleRows, tokens, gutterWidth, viewport }
 }
 
+function holdsOnlyText(frame: FileFrame) {
+  return frame.visibleRows.every(
+    (row) =>
+      row.kind !== 'text' ||
+      (typeof row.text === 'string' && row.chunks.every((chunk) => typeof chunk.text === 'string')),
+  )
+}
+
 /** The file opened last, as its editor shows it now, and where that editor's viewport sat. */
 type LastFile = {
   /** The editor showing it, until that editor goes. */
@@ -145,10 +153,14 @@ class FileTransitionViewContribution implements EditorViewContribution {
 
   public dispose(): void {
     this.finish()
-    // The file stays the one to move from, but this editor and its view are let go.
+    // The file stays the one to move from, but this editor and its view are let go. A row read
+    // through its document (a long line) would keep that document alive, and a frame with one
+    // cannot be drawn anyway, so such a file is not kept.
     const last = this.handoff.last
     if (last?.owner !== this) return
-    this.handoff.last = { ...last, owner: null, viewport: this.viewportOrigin() ?? last.viewport }
+    this.handoff.last = holdsOnlyText(last.snapshot)
+      ? { ...last, owner: null, viewport: this.viewportOrigin() ?? last.viewport }
+      : null
   }
 
   /** Where this editor's viewport sits on screen, while it is on screen. */
