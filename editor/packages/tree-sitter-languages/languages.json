@@ -3,40 +3,23 @@
   "languages": [
     {
       "id": "javascript",
-      "extensions": [
-        ".cjs",
-        ".js",
-        ".jsx",
-        ".mjs"
-      ],
+      "extensions": [".cjs", ".js", ".jsx", ".mjs"],
       "filenames": [],
-      "aliases": [
-        "js",
-        "jsx",
-        "node"
-      ],
+      "aliases": ["js", "jsx", "node"],
       "wasm": "tree-sitter-javascript/tree-sitter-javascript.wasm",
       "queries": {
         "highlights": [
           "./queries/javascript-highlights.scm",
           "tree-sitter-javascript/queries/highlights-jsx.scm"
         ],
-        "folds": [
-          "./queries/javascript-folds.scm",
-          "./queries/jsx-folds.scm"
-        ],
-        "injections": [
-          "./queries/javascript-injections.scm"
-        ],
+        "folds": ["./queries/javascript-folds.scm", "./queries/jsx-folds.scm"],
+        "injections": ["./queries/javascript-injections.scm"],
         "merge-units": [
           "./queries/javascript-merge-units.scm",
           "./queries/javascript-fields-merge-units.scm"
         ]
       },
-      "injectionDependencies": [
-        "regex",
-        "jsdoc"
-      ],
+      "injectionDependencies": ["regex", "jsdoc"],
       "source": "tree-sitter-javascript",
       "capabilities": {
         "highlighting": "partial",
@@ -47,37 +30,23 @@
     },
     {
       "id": "typescript",
-      "extensions": [
-        ".cts",
-        ".mts",
-        ".ts"
-      ],
+      "extensions": [".cts", ".mts", ".ts"],
       "filenames": [],
-      "aliases": [
-        "ts"
-      ],
+      "aliases": ["ts"],
       "wasm": "tree-sitter-typescript/tree-sitter-typescript.wasm",
       "queries": {
         "highlights": [
           "./queries/typescript-highlights.scm",
           "./queries/javascript-highlights.scm"
         ],
-        "folds": [
-          "./queries/typescript-folds.scm",
-          "./queries/javascript-folds.scm"
-        ],
-        "injections": [
-          "./queries/javascript-injections.scm"
-        ],
+        "folds": ["./queries/typescript-folds.scm", "./queries/javascript-folds.scm"],
+        "injections": ["./queries/javascript-injections.scm"],
         "merge-units": [
           "./queries/javascript-merge-units.scm",
           "./queries/typescript-merge-units.scm"
         ]
       },
-      "injectionDependencies": [
-        "regex",
-        "jsdoc"
-      ],
+      "injectionDependencies": ["regex", "jsdoc"],
       "source": "tree-sitter-typescript",
       "capabilities": {
         "highlighting": "partial",
@@ -88,13 +57,9 @@
     },
     {
       "id": "tsx",
-      "extensions": [
-        ".tsx"
-      ],
+      "extensions": [".tsx"],
       "filenames": [],
-      "aliases": [
-        "typescriptreact"
-      ],
+      "aliases": ["typescriptreact"],
       "wasm": "tree-sitter-typescript/tree-sitter-tsx.wasm",
       "queries": {
         "highlights": [
@@ -107,19 +72,14 @@
           "./queries/javascript-folds.scm",
           "./queries/jsx-folds.scm"
         ],
-        "injections": [
-          "./queries/javascript-injections.scm"
-        ],
+        "injections": ["./queries/javascript-injections.scm"],
         "merge-units": [
           "./queries/javascript-merge-units.scm",
           "./queries/typescript-merge-units.scm",
           "./queries/tsx-merge-units.scm"
         ]
       },
-      "injectionDependencies": [
-        "regex",
-        "jsdoc"
-      ],
+      "injectionDependencies": ["regex", "jsdoc"],
       "source": "tree-sitter-typescript",
       "capabilities": {
         "highlighting": "partial",
@@ -130,28 +90,16 @@
     },
     {
       "id": "html",
-      "extensions": [
-        ".htm",
-        ".html"
-      ],
+      "extensions": [".htm", ".html"],
       "filenames": [],
       "aliases": [],
       "wasm": "tree-sitter-html/tree-sitter-html.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-html/queries/highlights.scm"
-        ],
-        "folds": [
-          "./queries/html-folds.scm"
-        ],
-        "injections": [
-          "tree-sitter-html/queries/injections.scm"
-        ]
+        "highlights": ["tree-sitter-html/queries/highlights.scm"],
+        "folds": ["./queries/html-folds.scm"],
+        "injections": ["tree-sitter-html/queries/injections.scm"]
       },
-      "injectionDependencies": [
-        "javascript",
-        "css"
-      ],
+      "injectionDependencies": ["javascript", "css"],
       "source": "tree-sitter-html",
       "capabilities": {
         "highlighting": "partial",
@@ -162,23 +110,15 @@
     },
     {
       "id": "css",
-      "extensions": [
-        ".css"
-      ],
+      "extensions": [".css"],
       "filenames": [],
       "aliases": [],
       "wasm": "tree-sitter-css/tree-sitter-css.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-css/queries/highlights.scm"
-        ],
-        "folds": [
-          "./queries/css-folds.scm"
-        ],
+        "highlights": ["tree-sitter-css/queries/highlights.scm"],
+        "folds": ["./queries/css-folds.scm"],
         "injections": [],
-        "merge-units": [
-          "./queries/css-merge-units.scm"
-        ]
+        "merge-units": ["./queries/css-merge-units.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-css",
@@ -191,23 +131,15 @@
     },
     {
       "id": "json",
-      "extensions": [
-        ".json"
-      ],
+      "extensions": [".json"],
       "filenames": [],
       "aliases": [],
       "wasm": "tree-sitter-json/tree-sitter-json.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-json/queries/highlights.scm"
-        ],
-        "folds": [
-          "./queries/json-folds.scm"
-        ],
+        "highlights": ["tree-sitter-json/queries/highlights.scm"],
+        "folds": ["./queries/json-folds.scm"],
         "injections": [],
-        "merge-units": [
-          "./queries/json-merge-units.scm"
-        ]
+        "merge-units": ["./queries/json-merge-units.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-json",
@@ -220,23 +152,15 @@
     },
     {
       "id": "markdown",
-      "extensions": [
-        ".md",
-        ".markdown"
-      ],
+      "extensions": [".md", ".markdown"],
       "filenames": [],
-      "aliases": [
-        "md",
-        "gfm"
-      ],
+      "aliases": ["md", "gfm"],
       "wasm": "tree-sitter-md/tree-sitter-markdown.wasm",
       "queries": {
         "highlights": [],
         "folds": [],
         "injections": [],
-        "merge-units": [
-          "./queries/markdown-merge-units.scm"
-        ]
+        "merge-units": ["./queries/markdown-merge-units.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-md",
@@ -249,27 +173,16 @@
     },
     {
       "id": "astro",
-      "extensions": [
-        ".astro"
-      ],
+      "extensions": [".astro"],
       "filenames": [],
       "aliases": [],
       "wasm": "./grammars/tree-sitter-astro.wasm",
       "queries": {
-        "highlights": [
-          "./queries/astro-highlights.scm"
-        ],
-        "folds": [
-          "./queries/astro-folds.scm"
-        ],
-        "injections": [
-          "./queries/astro-injections.scm"
-        ]
+        "highlights": ["./queries/astro-highlights.scm"],
+        "folds": ["./queries/astro-folds.scm"],
+        "injections": ["./queries/astro-injections.scm"]
       },
-      "injectionDependencies": [
-        "typescript",
-        "css"
-      ],
+      "injectionDependencies": ["typescript", "css"],
       "source": "astro",
       "capabilities": {
         "highlighting": "partial",
@@ -280,24 +193,15 @@
     },
     {
       "id": "python",
-      "extensions": [
-        ".py",
-        ".pyi"
-      ],
+      "extensions": [".py", ".pyi"],
       "filenames": [],
-      "aliases": [
-        "py"
-      ],
+      "aliases": ["py"],
       "wasm": "tree-sitter-python/tree-sitter-python.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-python/queries/highlights.scm"
-        ],
+        "highlights": ["tree-sitter-python/queries/highlights.scm"],
         "folds": [],
         "injections": [],
-        "merge-units": [
-          "./queries/python-merge-units.scm"
-        ]
+        "merge-units": ["./queries/python-merge-units.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-python",
@@ -310,26 +214,12 @@
     },
     {
       "id": "shellscript",
-      "extensions": [
-        ".sh",
-        ".bash",
-        ".zsh",
-        ".ksh"
-      ],
-      "filenames": [
-        ".bashrc",
-        ".zshrc"
-      ],
-      "aliases": [
-        "bash",
-        "sh",
-        "zsh"
-      ],
+      "extensions": [".sh", ".bash", ".zsh", ".ksh"],
+      "filenames": [".bashrc", ".zshrc"],
+      "aliases": ["bash", "sh", "zsh"],
       "wasm": "tree-sitter-bash/tree-sitter-bash.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-bash/queries/highlights.scm"
-        ],
+        "highlights": ["tree-sitter-bash/queries/highlights.scm"],
         "folds": [],
         "injections": []
       },
@@ -344,23 +234,15 @@
     },
     {
       "id": "rust",
-      "extensions": [
-        ".rs"
-      ],
+      "extensions": [".rs"],
       "filenames": [],
-      "aliases": [
-        "rs"
-      ],
+      "aliases": ["rs"],
       "wasm": "tree-sitter-rust/tree-sitter-rust.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-rust/queries/highlights.scm"
-        ],
+        "highlights": ["tree-sitter-rust/queries/highlights.scm"],
         "folds": [],
         "injections": [],
-        "merge-units": [
-          "./queries/rust-merge-units.scm"
-        ]
+        "merge-units": ["./queries/rust-merge-units.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-rust",
@@ -373,23 +255,15 @@
     },
     {
       "id": "go",
-      "extensions": [
-        ".go"
-      ],
+      "extensions": [".go"],
       "filenames": [],
-      "aliases": [
-        "golang"
-      ],
+      "aliases": ["golang"],
       "wasm": "tree-sitter-go/tree-sitter-go.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-go/queries/highlights.scm"
-        ],
+        "highlights": ["tree-sitter-go/queries/highlights.scm"],
         "folds": [],
         "injections": [],
-        "merge-units": [
-          "./queries/go-merge-units.scm"
-        ]
+        "merge-units": ["./queries/go-merge-units.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-go",
@@ -402,19 +276,12 @@
     },
     {
       "id": "yaml",
-      "extensions": [
-        ".yml",
-        ".yaml"
-      ],
+      "extensions": [".yml", ".yaml"],
       "filenames": [],
-      "aliases": [
-        "yml"
-      ],
+      "aliases": ["yml"],
       "wasm": "@tree-sitter-grammars/tree-sitter-yaml/tree-sitter-yaml.wasm",
       "queries": {
-        "highlights": [
-          "@tree-sitter-grammars/tree-sitter-yaml/queries/highlights.scm"
-        ],
+        "highlights": ["@tree-sitter-grammars/tree-sitter-yaml/queries/highlights.scm"],
         "folds": [],
         "injections": []
       },
@@ -429,18 +296,12 @@
     },
     {
       "id": "toml",
-      "extensions": [
-        ".toml"
-      ],
-      "filenames": [
-        "Cargo.lock"
-      ],
+      "extensions": [".toml"],
+      "filenames": ["Cargo.lock"],
       "aliases": [],
       "wasm": "@tree-sitter-grammars/tree-sitter-toml/tree-sitter-toml.wasm",
       "queries": {
-        "highlights": [
-          "@tree-sitter-grammars/tree-sitter-toml/queries/highlights.scm"
-        ],
+        "highlights": ["@tree-sitter-grammars/tree-sitter-toml/queries/highlights.scm"],
         "folds": [],
         "injections": []
       },
@@ -455,17 +316,12 @@
     },
     {
       "id": "c",
-      "extensions": [
-        ".c",
-        ".h"
-      ],
+      "extensions": [".c", ".h"],
       "filenames": [],
       "aliases": [],
       "wasm": "tree-sitter-c/tree-sitter-c.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-c/queries/highlights.scm"
-        ],
+        "highlights": ["tree-sitter-c/queries/highlights.scm"],
         "folds": [],
         "injections": []
       },
@@ -480,18 +336,9 @@
     },
     {
       "id": "cpp",
-      "extensions": [
-        ".cpp",
-        ".cc",
-        ".cxx",
-        ".hpp",
-        ".hh",
-        ".hxx"
-      ],
+      "extensions": [".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx"],
       "filenames": [],
-      "aliases": [
-        "c++"
-      ],
+      "aliases": ["c++"],
       "wasm": "tree-sitter-cpp/tree-sitter-cpp.wasm",
       "queries": {
         "highlights": [
@@ -512,19 +359,12 @@
     },
     {
       "id": "csharp",
-      "extensions": [
-        ".cs"
-      ],
+      "extensions": [".cs"],
       "filenames": [],
-      "aliases": [
-        "c-sharp",
-        "cs"
-      ],
+      "aliases": ["c-sharp", "cs"],
       "wasm": "tree-sitter-c-sharp/tree-sitter-c_sharp.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-c-sharp/queries/highlights.scm"
-        ],
+        "highlights": ["tree-sitter-c-sharp/queries/highlights.scm"],
         "folds": [],
         "injections": []
       },
@@ -539,16 +379,12 @@
     },
     {
       "id": "java",
-      "extensions": [
-        ".java"
-      ],
+      "extensions": [".java"],
       "filenames": [],
       "aliases": [],
       "wasm": "tree-sitter-java/tree-sitter-java.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-java/queries/highlights.scm"
-        ],
+        "highlights": ["tree-sitter-java/queries/highlights.scm"],
         "folds": [],
         "injections": []
       },
@@ -563,24 +399,16 @@
     },
     {
       "id": "php",
-      "extensions": [
-        ".php"
-      ],
+      "extensions": [".php"],
       "filenames": [],
       "aliases": [],
       "wasm": "tree-sitter-php/tree-sitter-php.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-php/queries/highlights.scm"
-        ],
+        "highlights": ["tree-sitter-php/queries/highlights.scm"],
         "folds": [],
-        "injections": [
-          "tree-sitter-php/queries/injections.scm"
-        ]
+        "injections": ["tree-sitter-php/queries/injections.scm"]
       },
-      "injectionDependencies": [
-        "phpdoc"
-      ],
+      "injectionDependencies": ["phpdoc"],
       "source": "tree-sitter-php",
       "capabilities": {
         "highlighting": "partial",
@@ -591,24 +419,16 @@
     },
     {
       "id": "lua",
-      "extensions": [
-        ".lua"
-      ],
+      "extensions": [".lua"],
       "filenames": [],
       "aliases": [],
       "wasm": "@tree-sitter-grammars/tree-sitter-lua/tree-sitter-lua.wasm",
       "queries": {
-        "highlights": [
-          "@tree-sitter-grammars/tree-sitter-lua/queries/highlights.scm"
-        ],
+        "highlights": ["@tree-sitter-grammars/tree-sitter-lua/queries/highlights.scm"],
         "folds": [],
-        "injections": [
-          "@tree-sitter-grammars/tree-sitter-lua/queries/injections.scm"
-        ]
+        "injections": ["@tree-sitter-grammars/tree-sitter-lua/queries/injections.scm"]
       },
-      "injectionDependencies": [
-        "c"
-      ],
+      "injectionDependencies": ["c"],
       "source": "@tree-sitter-grammars/tree-sitter-lua",
       "capabilities": {
         "highlighting": "partial",
@@ -619,27 +439,16 @@
     },
     {
       "id": "svelte",
-      "extensions": [
-        ".svelte"
-      ],
+      "extensions": [".svelte"],
       "filenames": [],
       "aliases": [],
       "wasm": "tree-sitter-svelte/tree-sitter-svelte.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-svelte/queries/highlights.scm"
-        ],
-        "folds": [
-          "tree-sitter-svelte/queries/folds.scm"
-        ],
-        "injections": [
-          "./queries/svelte-injections.scm"
-        ]
+        "highlights": ["tree-sitter-svelte/queries/highlights.scm"],
+        "folds": ["tree-sitter-svelte/queries/folds.scm"],
+        "injections": ["./queries/svelte-injections.scm"]
       },
-      "injectionDependencies": [
-        "typescript",
-        "css"
-      ],
+      "injectionDependencies": ["typescript", "css"],
       "source": "tree-sitter-svelte",
       "capabilities": {
         "highlighting": "partial",
@@ -650,16 +459,12 @@
     },
     {
       "id": "sql",
-      "extensions": [
-        ".sql"
-      ],
+      "extensions": [".sql"],
       "filenames": [],
       "aliases": [],
       "wasm": "./grammars/tree-sitter-sql.wasm",
       "queries": {
-        "highlights": [
-          "./queries/sql-highlights.scm"
-        ],
+        "highlights": ["./queries/sql-highlights.scm"],
         "folds": [],
         "injections": []
       },
@@ -674,24 +479,16 @@
     },
     {
       "id": "mdx",
-      "extensions": [
-        ".mdx"
-      ],
+      "extensions": [".mdx"],
       "filenames": [],
       "aliases": [],
       "wasm": "./grammars/tree-sitter-mdx.wasm",
       "queries": {
-        "highlights": [
-          "./queries/mdx-highlights.scm"
-        ],
+        "highlights": ["./queries/mdx-highlights.scm"],
         "folds": [],
-        "injections": [
-          "./queries/mdx-injections.scm"
-        ]
+        "injections": ["./queries/mdx-injections.scm"]
       },
-      "injectionDependencies": [
-        "markdown"
-      ],
+      "injectionDependencies": ["markdown"],
       "source": "mdx",
       "capabilities": {
         "highlighting": "partial",
@@ -707,9 +504,7 @@
       "aliases": [],
       "wasm": "tree-sitter-jsdoc/tree-sitter-jsdoc.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-jsdoc/queries/highlights.scm"
-        ]
+        "highlights": ["tree-sitter-jsdoc/queries/highlights.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-jsdoc",
@@ -727,9 +522,7 @@
       "aliases": [],
       "wasm": "tree-sitter-regex/tree-sitter-regex.wasm",
       "queries": {
-        "highlights": [
-          "tree-sitter-regex/queries/highlights.scm"
-        ]
+        "highlights": ["tree-sitter-regex/queries/highlights.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-regex",
@@ -1030,14 +823,8 @@
     "embedded": "The children supply interpolation colors. Preserve this parent capture for raw consumers."
   },
   "knownUnsupported": {
-    "javascript": [
-      "is-not? local: locals are not evaluated; builtin shadowing remains partial"
-    ],
-    "typescript": [
-      "is-not? local: locals are not evaluated; builtin shadowing remains partial"
-    ],
-    "tsx": [
-      "is-not? local: locals are not evaluated; builtin shadowing remains partial"
-    ]
+    "javascript": ["is-not? local: locals are not evaluated; builtin shadowing remains partial"],
+    "typescript": ["is-not? local: locals are not evaluated; builtin shadowing remains partial"],
+    "tsx": ["is-not? local: locals are not evaluated; builtin shadowing remains partial"]
   }
 }
