@@ -117,6 +117,26 @@ describe('inlineSpecsAfterRewrite', () => {
     ])
   })
 
+  it('drops a group whose phantom text the edit took away', () => {
+    const before = createPieceTableSnapshot(BOLD_LINE)
+    const map = createInlineMap(
+      before,
+      boldSpecs().concat([
+        { id: 'tip', startIndex: 6, endIndex: 6, text: '!', insertion: true, groupId: 'bold' },
+      ]),
+    )
+    const after = applyBatchToPieceTable(before, [{ from: 5, to: 7, text: 'X' }])
+
+    const specs = inlineSpecsAfterRewrite(
+      map,
+      createDocumentTextSnapshot(before),
+      after,
+      createDocumentTextSnapshot(after),
+    )
+
+    expect(specs).toEqual([])
+  })
+
   it('drops the replacements of a line the edit changed', () => {
     const before = createPieceTableSnapshot(BOLD_LINE)
     const map = createInlineMap(before, boldSpecs())

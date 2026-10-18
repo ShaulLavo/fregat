@@ -162,7 +162,7 @@ export const inlineSpecsAfterRewrite = (
   const carried = unchangedSpecs(map, source, inlineSpecsAtSnapshot(map, snapshot), text)
   const kept = new Set(carried.map((spec) => spec.id))
   const lost = map.ranges.filter((range) => !kept.has(range.id) && range.insertion !== true)
-  if (lost.length === 0) return carried
+  if (lost.length === 0) return wholeGroups(map, carried)
 
   const taken = new Set(carried.map((spec) => text.lineAt(spec.startIndex)))
   const moved = new Map<number, number | null>()
