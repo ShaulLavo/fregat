@@ -39,7 +39,6 @@ runs:
     - name: Install search tools
       shell: bash
       env:
-        GH_TOKEN: ${{ github.token }}
         RG_VERSION: 15.2.0
         RG_SHA256: 33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c
         FD_VERSION: 10.4.2
@@ -54,7 +53,7 @@ runs:
           if [[ -f "$archive" ]]; then return; fi
           for attempt in 1 2 3 4 5 6; do
             echo "Downloading $repo $tag $archive (attempt $attempt/6)"
-            if timeout 30s gh release download "$tag" --repo "$repo" --pattern "$archive" --dir . --clobber; then
+            if timeout 30s curl --fail --location --silent --show-error --output "$archive" "https://github.com/$repo/releases/download/$tag/$archive"; then
               return
             fi
             if [[ "$attempt" == 6 ]]; then

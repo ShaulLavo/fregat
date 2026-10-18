@@ -66,9 +66,8 @@ async function hasReceipt(api, repository, head) {
   return false
 }
 
-async function trustedPull(api, repository, pull) {
+async function allowedPull(api, repository, pull) {
   if (!nativePull(pull, repository)) return false
-  if (!(await hasReceipt(api, repository, pull.head.sha))) return false
   const files = await api.pages(`pulls/${pull.number}/files?per_page=100`)
   return (
     files.length > 0 &&
@@ -76,6 +75,11 @@ async function trustedPull(api, repository, pull) {
       (file) => file.status === 'modified' && allowedFile(file.filename) && !file.previous_filename,
     )
   )
+}
+
+async function trustedPull(api, repository, pull) {
+  if (!(await allowedPull(api, repository, pull))) return false
+  return hasReceipt(api, repository, pull.head.sha)
 }
 
 async function fullCi(api, repository, pull) {
@@ -108,9 +112,14 @@ async function fullCi(api, repository, pull) {
 async function closeObsolete(api, repository, pulls, keep) {
   for (const pull of pulls) {
     if (pull.number === keep || pull.state !== 'open') continue
-    if (!(await trustedPull(api, repository, pull))) continue
+    if (!(await allowedPull(api, repository, pull))) continue
     const current = await api.get(`pulls/${pull.number}`)
-    if (current.state !== 'open' || current.head.sha !== pull.head.sha) continue
+    if (
+      current.state !== 'open' ||
+      current.head.sha !== pull.head.sha ||
+      !nativePull(current, repository)
+    )
+      continue
     await api.write(`pulls/${pull.number}`, 'PATCH', { state: 'closed' })
   }
 }
@@ -172,20 +181,18 @@ function shellGit(cwd, index) {
     }).trim()
 }
 
-function validateManifests(git, files) {
-  const normalize = (text) =>
-    JSON.parse(
-      text.replace(
-        /github:ShaulLavo\/tree-sitter-(x|md)#[0-9a-f]{40}/g,
-        'github:ShaulLavo/tree-sitter-$1#PIN',
-      ),
-    )
+function validateManifests(git, files, metadata) {
   for (const file of files) {
     if (!file.endsWith('/package.json') && !manifests.has(file)) continue
+    const expected = git(['show', `HEAD:${file}`]).replace(
+      /github:ShaulLavo\/tree-sitter-(x|md)#[0-9a-f]{40}/g,
+      (_, parser) =>
+        `github:ShaulLavo/tree-sitter-${parser}#${parser === 'x' ? metadata.runtime : metadata.markdown}`,
+    )
     assert.deepEqual(
-      normalize(git(['show', `:${file}`])),
-      normalize(git(['show', `HEAD:${file}`])),
-      'Manifest edits must contain only parser pin replacements',
+      JSON.parse(git(['show', `:${file}`])),
+      JSON.parse(expected),
+      'Manifest edits must contain only parser pin replacements to exact metadata SHAs',
     )
   }
 }
@@ -247,7 +254,7 @@ function commitGenerated(git, patch, metadata, branch) {
       .every((line) => line.startsWith('M\t')),
     'Pin updates must modify existing files',
   )
-  validateManifests(git, files)
+  validateManifests(git, files, metadata)
   const manifest = JSON.parse(git(['show', ':editor/packages/tree-sitter/package.json']))
   assert.equal(
     manifest.dependencies['web-tree-sitter'],

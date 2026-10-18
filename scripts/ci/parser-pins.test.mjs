@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, onTestFinished, test } from 'vitest'
@@ -279,6 +287,9 @@ function publicationFixture() {
     },
   })
   writeFileSync(path.join(directory, manifest), before)
+  const secondary = path.join(directory, 'editor/packages/other/package.json')
+  mkdirSync(path.dirname(secondary), { recursive: true })
+  writeFileSync(secondary, before)
   git('add', '.')
   git('commit', '-qm', 'initial')
   const base = git('rev-parse', 'HEAD')
@@ -357,6 +368,31 @@ test('new pins close only obsolete authenticated bot PRs and leave unrelated PRs
   ])
 })
 
+test('new upstream pins leave one current PR even when multiple old receipts expired', async () => {
+  const fixture = publicationFixture()
+  fixture.state.pulls = ['d', 'e', 'f'].map((pin, index) => {
+    const pull = structuredClone(fixture.state.pull)
+    pull.number += index
+    pull.head.ref = pull.head.ref.replace('a'.repeat(40), pin.repeat(40))
+    return pull
+  })
+  fixture.state.current = fixture.state.pulls[0]
+  const result = await fixture.publish()
+  expect(
+    fixture.state.pulls.filter((pull) => pull.state === 'open').map((pull) => pull.number),
+  ).toEqual([result.number])
+  const current = fixture.state.pulls.find((pull) => pull.number === result.number)
+  current.head.sha = result.head
+  fixture.state.artifacts.push({
+    ...fixture.state.artifact,
+    name: `tree-sitter-pin-${result.head}`,
+  })
+  const repeated = await fixture.publish()
+  expect(repeated).toEqual(result)
+  expect(fixture.state.writes.filter((write) => write.method === 'POST')).toHaveLength(1)
+  expect(fixture.state.writes.filter((write) => write.method === 'PATCH')).toHaveLength(3)
+})
+
 test('already-current main closes obsolete authenticated pin PRs without publishing', async () => {
   const fixture = publicationFixture()
   fixture.state.pulls = [fixture.state.pull]
@@ -372,6 +408,68 @@ test('already-current main closes obsolete authenticated pin PRs without publish
   ).toBeNull()
   expect(fixture.state.writes).toHaveLength(1)
   expect(fixture.git('ls-remote', 'origin')).toBe('')
+})
+
+test.each(['expired', 'missing'])(
+  '%s receipts still allow obsolete bot PR cleanup',
+  async (receipt) => {
+    const fixture = publicationFixture()
+    fixture.state.pulls = [fixture.state.pull]
+    fixture.state.artifacts =
+      receipt === 'missing' ? [] : [{ ...fixture.state.artifact, expired: true }]
+    const result = await publishPins({
+      api: fixture.api,
+      repository: fixture.state.repository,
+      directory: fixture.directory,
+      patch: '',
+      metadata: fixture.metadata,
+    })
+    expect(result).toBeNull()
+    expect(fixture.state.writes).toContainEqual({
+      endpoint: 'pulls/42',
+      method: 'PATCH',
+      body: { state: 'closed' },
+    })
+  },
+)
+
+test.each([
+  (state) => {
+    state.pull.user.id = 1
+  },
+  (state) => {
+    state.pull.head.repo.full_name = 'fixture/fork'
+  },
+  (state) => {
+    state.pull.base.ref = 'release'
+  },
+  (state) => {
+    state.pull.head.ref = 'changeset-release/main'
+  },
+  (state) => {
+    state.pull.draft = true
+  },
+  (state) => {
+    state.files[0].filename = '.github/workflows/ci.yml'
+  },
+  (state) => {
+    state.files[0].status = 'added'
+  },
+  (state) => {
+    state.files[0].previous_filename = 'other'
+  },
+])('receipt-free cleanup preserves irrelevant or untrusted PRs %#', async (mutate) => {
+  const fixture = publicationFixture()
+  fixture.state.pulls = [fixture.state.pull]
+  mutate(fixture.state)
+  await publishPins({
+    api: fixture.api,
+    repository: fixture.state.repository,
+    directory: fixture.directory,
+    patch: '',
+    metadata: fixture.metadata,
+  })
+  expect(fixture.state.writes).toEqual([])
 })
 
 test('a preexisting contaminated branch is rejected and never overwritten', async () => {
@@ -402,6 +500,51 @@ test('a generated patch cannot add arbitrary workflow code or change manifest sc
     }),
   ).rejects.toThrow('Manifest edits must contain only parser pin replacements')
   expect(fixture.state.writes).toEqual([])
+})
+
+test.each(['tree-sitter-x', 'tree-sitter-md'])(
+  'a changed secondary manifest cannot carry a different %s pin',
+  async (parser) => {
+    const fixture = publicationFixture()
+    const secondary = path.join(fixture.directory, 'editor/packages/other/package.json')
+    const changed = fixture.before
+      .replace(/tree-sitter-x#0{40}/g, `tree-sitter-x#${fixture.metadata.runtime}`)
+      .replace(/tree-sitter-md#0{40}/g, `tree-sitter-md#${fixture.metadata.markdown}`)
+    writeFileSync(
+      secondary,
+      changed.replace(
+        `${parser}#${parser === 'tree-sitter-x' ? fixture.metadata.runtime : fixture.metadata.markdown}`,
+        `${parser}#${'c'.repeat(40)}`,
+      ),
+    )
+    const patch = fixture.git('diff') + '\n'
+    await expect(
+      publishPins({
+        api: fixture.api,
+        repository: fixture.state.repository,
+        directory: fixture.directory,
+        patch,
+        metadata: fixture.metadata,
+      }),
+    ).rejects.toThrow('exact metadata SHAs')
+  },
+)
+
+test('all changed manifests accept the same exact metadata pin replacements', async () => {
+  const fixture = publicationFixture()
+  const changed = fixture.before
+    .replace(/tree-sitter-x#0{40}/g, `tree-sitter-x#${fixture.metadata.runtime}`)
+    .replace(/tree-sitter-md#0{40}/g, `tree-sitter-md#${fixture.metadata.markdown}`)
+  for (const manifest of [fixture.manifest, 'editor/packages/other/package.json'])
+    writeFileSync(path.join(fixture.directory, manifest), changed)
+  const result = await publishPins({
+    api: fixture.api,
+    repository: fixture.state.repository,
+    directory: fixture.directory,
+    patch: fixture.git('diff') + '\n',
+    metadata: fixture.metadata,
+  })
+  expect(result.number).toBe(42)
 })
 
 test.skipIf(process.platform === 'win32')(
@@ -516,17 +659,187 @@ test.skipIf(process.platform === 'win32')(
   },
 )
 
-test('workflow permissions and dispatch keep privileged work on trusted refs', () => {
-  const treeWorkflow = readFileSync(
-    path.resolve(import.meta.dirname, '../../.github/workflows/editor-tree-sitter-x.yml'),
-    'utf8',
+function dispatchFixture({
+  status = 'completed',
+  conclusion = 'success',
+  runs,
+  before,
+  after,
+} = {}) {
+  let root
+  onTestFinished(() => {
+    if (root) rmSync(root, { recursive: true, force: true })
+  })
+  root = mkdtempSync(path.join(tmpdir(), 'parser-pin-dispatch-'))
+  const { state } = githubFixture()
+  const branch = state.pull.head.ref
+  const commit = state.pull.head.sha
+  const bin = path.join(root, 'bin')
+  mkdirSync(bin)
+  const dispatches = path.join(root, 'dispatches')
+  writeFileSync(
+    path.join(bin, 'gh'),
+    `#!/bin/sh
+set -eu
+case "$1 $2" in
+  "api repos/fixture/parser/git/ref/heads/$BRANCH")
+    if [ -f "$DISPATCHES" ]; then printf '%s\n' "$AFTER"; else printf '%s\n' "$BEFORE"; fi ;;
+  "run list") printf '%s\n' "$RUNS" ;;
+  "workflow run")
+    [ "$3" = ci.yml ] && [ "$4" = --ref ] && [ "$5" = "$BRANCH" ]
+    printf 'dispatch\n' >> "$DISPATCHES" ;;
+  *) printf 'unexpected gh call: %s\n' "$*" >&2; exit 64 ;;
+esac
+`,
+    { mode: 0o755 },
   )
-  const mergeWorkflow = readFileSync(
-    path.resolve(import.meta.dirname, '../../.github/workflows/editor-parser-pin-merge.yml'),
-    'utf8',
+  const workflow = Bun.YAML.parse(
+    readFileSync(
+      path.resolve(import.meta.dirname, '../../.github/workflows/editor-tree-sitter-x.yml'),
+      'utf8',
+    ),
   )
+  const step = workflow.jobs.publish.steps.find((entry) => entry.name === 'Dispatch full CI')
+  const selected = runs ?? [
+    { headSha: commit, headBranch: branch, event: 'workflow_dispatch', status, conclusion },
+  ]
+  const run = () =>
+    spawnSync('bash', ['-euo', 'pipefail', '-c', step.run], {
+      cwd: root,
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        GITHUB_REPOSITORY: state.repository,
+        branch,
+        commit,
+        BRANCH: branch,
+        BEFORE: before ?? commit,
+        AFTER: after ?? commit,
+        RUNS: JSON.stringify(selected),
+        DISPATCHES: dispatches,
+      },
+      encoding: 'utf8',
+    })
+  const count = () =>
+    existsSync(dispatches) ? readFileSync(dispatches, 'utf8').trim().split('\n').length : 0
+  return { run, count, selected, commit, branch }
+}
+
+const shellAvailable = ['bash', 'jq', 'git'].every((command) => Bun.which(command))
+if (!shellAvailable)
+  console.info('Skipping dispatch shell fixtures: Bash, jq and Git are required.')
+
+test.skipIf(!shellAvailable).each([
+  ['missing', undefined, undefined, true],
+  ['failed', 'completed', 'failure', true],
+  ['cancelled', 'completed', 'cancelled', true],
+  ['timed out', 'completed', 'timed_out', true],
+  ['queued', 'queued', null, false],
+  ['pending', 'in_progress', null, false],
+  ['success', 'completed', 'success', false],
+])('dispatch recovery handles %s exact-head CI', (name, status, conclusion, dispatch) => {
+  const fixture = dispatchFixture({ status, conclusion, runs: name === 'missing' ? [] : undefined })
+  const result = fixture.run()
+  expect(result.status, result.stdout + result.stderr).toBe(0)
+  expect(fixture.count()).toBe(dispatch ? 1 : 0)
+  // GitHub has accepted a run. A later updater must leave that pending run alone.
+  fixture.selected.unshift({
+    headSha: fixture.commit,
+    headBranch: fixture.branch,
+    event: 'workflow_dispatch',
+    status: 'queued',
+    conclusion: null,
+  })
+  const repeated = fixture.run()
+  expect(repeated.status, repeated.stdout + repeated.stderr).toBe(0)
+  expect(fixture.count()).toBe(dispatch ? 1 : 0)
+})
+
+test.skipIf(!shellAvailable).each(['before', 'after'])(
+  'a branch moving %s dispatch fails closed',
+  (phase) => {
+    const fixture = dispatchFixture({ runs: [], [phase]: 'd'.repeat(40) })
+    const result = fixture.run()
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Pin branch moved')
+    expect(fixture.count()).toBe(phase === 'after' ? 1 : 0)
+  },
+)
+
+test.skipIf(!shellAvailable)('foreign or stale successful CI does not suppress a dispatch', () => {
+  const fixture = dispatchFixture({
+    runs: [
+      {
+        status: 'completed',
+        conclusion: 'success',
+        headSha: 'd'.repeat(40),
+        headBranch: 'human',
+        event: 'pull_request',
+      },
+    ],
+  })
+  const result = fixture.run()
+  expect(result.status, result.stdout + result.stderr).toBe(0)
+  expect(fixture.count()).toBe(1)
+})
+
+test('workflow permissions and token boundaries keep branch code unprivileged', () => {
+  const read = (file) => readFileSync(path.resolve(import.meta.dirname, '../..', file), 'utf8')
+  const treeWorkflow = read('.github/workflows/editor-tree-sitter-x.yml')
+  const mergeWorkflow = read('.github/workflows/editor-parser-pin-merge.yml')
+  const ci = Bun.YAML.parse(read('.github/workflows/ci.yml'))
+  const libraries = Bun.YAML.parse(read('.github/workflows/workspace-libraries.yml'))
+  expect(ci.permissions).toEqual({ contents: 'read' })
+  expect(libraries.permissions).toEqual({ contents: 'read' })
+  const jobs = Object.entries(ci.jobs).concat(Object.entries(libraries.jobs))
+  for (const [name, job] of jobs) {
+    const permissions = job.permissions ?? ci.permissions
+    expect(Object.values(permissions)).not.toContain('write')
+    if (['baseline', 'verdict'].includes(name)) continue
+    expect(JSON.stringify(job)).not.toMatch(/github\.token|secrets\.|GH_TOKEN|GITHUB_TOKEN/)
+    expect(permissions).toEqual({ contents: 'read' })
+  }
+  const checkouts = jobs
+    .flatMap(([, job]) => job.steps ?? [])
+    .filter((step) => step.uses?.startsWith('actions/checkout@'))
+  expect(checkouts).toHaveLength(15)
+  for (const step of checkouts) expect(step.with?.['persist-credentials']).toBe(false)
+
+  const baseline = ci.jobs.baseline
+  expect(baseline.permissions).toEqual({ actions: 'read' })
+  expect(baseline.steps).toHaveLength(1)
+  expect(baseline.steps[0].uses).toBeUndefined()
+  expect(baseline.steps[0].run).not.toMatch(/bun |node |\.\//)
+  expect(ci.jobs.changes.needs).toBe('baseline')
+  expect(ci.jobs.changes.steps.find((step) => step.id === 'plan').env.BASELINE_SHA).toBe(
+    '${{ needs.baseline.outputs.sha }}',
+  )
+
+  const verdict = ci.jobs.verdict
+  expect(verdict.permissions).toEqual({ actions: 'read', contents: 'read' })
+  expect(verdict.needs).toContain('baseline')
+  expect(verdict.steps.map((step) => step.name)).toEqual([
+    'Checkout trusted verifier',
+    'Checkout candidate graph',
+    'Fetch CI metadata',
+    'Setup Bun',
+    'Verdict',
+    'Report queue and execution times',
+  ])
+  expect(verdict.steps[0].with).toMatchObject({ ref: 'refs/heads/main', path: 'trusted' })
+  expect(verdict.steps[1].with).toMatchObject({ path: 'candidate' })
+  expect(verdict.steps[2].env.GH_TOKEN).toBe('${{ github.token }}')
+  expect(verdict.steps[2].run).not.toMatch(/bun |node |candidate|trusted/)
+  expect(verdict.steps[3].with).toEqual({ 'bun-version-file': 'trusted/package.json' })
+  expect(verdict.steps[4].run).toBe(
+    'bun trusted/scripts/ci-verdict.ts candidate/.github/workflows/ci.yml "$RUNNER_TEMP/ci-jobs.json" "$RUNNER_TEMP/ci-run.json"',
+  )
+  expect(verdict.steps[4].env).not.toHaveProperty('GH_TOKEN')
+  expect(verdict.steps[5].env).not.toHaveProperty('GH_TOKEN')
+  const setup = read('.github/actions/setup/action.yml')
+  expect(setup).not.toMatch(/github\.token|secrets\.|GH_TOKEN|GITHUB_TOKEN|gh release download/)
+  expect(setup).toContain('curl --fail --location --silent --show-error')
   expect(treeWorkflow).toContain('persist-credentials: false')
-  expect(treeWorkflow).toContain('contents: read')
   expect(treeWorkflow).toContain('contents: write')
   expect(treeWorkflow).toContain('gh workflow run ci.yml --ref "$branch"')
   expect(mergeWorkflow).toContain('ref: refs/heads/main')

@@ -55,7 +55,7 @@ test.skipIf(!reportSupported)(
   'the verdict reports paginated queue timings without changing its gate',
   () => {
     const steps = readWorkflow('ci.yml').jobs.verdict!.steps
-    const producer = steps.find((entry) => entry.name === 'Verdict')!
+    const producer = steps.find((entry) => entry.name === 'Fetch CI metadata')!
     const step = steps.find((entry) => entry.name === 'Report queue and execution times')!
     expect(step['continue-on-error']).toBe(true)
     const root = mkdtempSync(path.join(tmpdir(), 'ci-timings-'))

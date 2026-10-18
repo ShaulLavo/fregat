@@ -86,7 +86,19 @@ jobs:
           branch: ${{ steps.publish.outputs.branch }}
           commit: ${{ steps.publish.outputs.head }}
         run: |
-          runs=$(gh run list --workflow ci.yml --branch "$branch" --commit "$commit" --event workflow_dispatch --limit 1 --json databaseId -q length)
-          if [ "$runs" -eq 0 ]; then
+          set -euo pipefail
+          tip=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/$branch" --jq '.object.sha')
+          if [ "$tip" != "$commit" ]; then
+            echo "::error::Pin branch moved before CI dispatch" >&2
+            exit 1
+          fi
+          run=$(gh run list --workflow ci.yml --branch "$branch" --commit "$commit" --event workflow_dispatch --limit 20 --json status,conclusion,headSha,headBranch,event |
+            jq -c --arg branch "$branch" --arg commit "$commit" '[.[] | select(.event == "workflow_dispatch" and .headBranch == $branch and .headSha == $commit)] | first // empty')
+          if [ -z "$run" ] || jq -e '.status == "completed" and .conclusion != "success"' <<<"$run" > /dev/null; then
             gh workflow run ci.yml --ref "$branch"
+            dispatched_tip=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/$branch" --jq '.object.sha')
+            if [ "$dispatched_tip" != "$commit" ]; then
+              echo "::error::Pin branch moved during CI dispatch" >&2
+              exit 1
+            fi
           fi

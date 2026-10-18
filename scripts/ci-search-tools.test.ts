@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { expect, test } from 'vitest'
+import { expect, onTestFinished, test } from 'vitest'
 
 interface SearchToolsStep {
   name: string
@@ -29,13 +29,22 @@ async function runSetup(
   failure?: 'checksum' | 'extraction' | 'installation',
   cached: readonly Tool[] = [],
 ) {
+  let cleanupDirectory: string | undefined
+  let stopServer = () => {}
+  let stopChild = async () => {}
+  onTestFinished(async () => {
+    await stopChild()
+    stopServer()
+    if (cleanupDirectory) rmSync(cleanupDirectory, { recursive: true, force: true })
+  })
   const root = mkdtempSync(path.join(tmpdir(), 'fregat-ci-search-tools-'))
+  cleanupDirectory = root
   const bin = path.join(root, 'bin')
   const destination = path.join(root, 'installed')
   const downloads = path.join(root, 'downloads')
   for (const directory of [bin, destination, downloads]) mkdirSync(directory)
   const bodies = {} as Record<Tool, Uint8Array<ArrayBuffer>>
-  const env: Record<string, string> = { ...step.env, GH_TOKEN: 'fixture-token' }
+  const env: Record<string, string> = { ...step.env }
   const cache = path.join(downloads, 'search-tools')
   mkdirSync(cache)
   for (const tool of tools) {
@@ -72,18 +81,19 @@ async function runSetup(
       return new Response(status === 200 ? bodies[tool] : 'fixture transfer failure', { status })
     },
   })
+  stopServer = () => server.stop(true)
   writeFileSync(
-    path.join(bin, 'gh'),
+    path.join(bin, 'curl'),
     `#!/usr/bin/env bash
 set -eu
-if [ "$GH_TOKEN" != fixture-token ]; then exit 65; fi
-if [ "$#" != 10 ] || [ "$1" != release ] || [ "$2" != download ] || [ "$4" != --repo ] || [ "$6" != --pattern ] || [ "$8" != --dir ] || [ "$9" != . ] || [ "\${10}" != --clobber ]; then exit 64; fi
-case "$5:$3:$7" in
+if [ -n "\${GH_TOKEN-}" ] || [ -n "\${GITHUB_TOKEN-}" ]; then exit 65; fi
+if [ "$#" != 7 ] || [ "$1" != --fail ] || [ "$2" != --location ] || [ "$3" != --silent ] || [ "$4" != --show-error ] || [ "$5" != --output ]; then exit 64; fi
+case "$7" in
   "$FIXTURE_RG_RELEASE") ;;
   "$FIXTURE_FD_RELEASE") ;;
-  *) printf 'Unexpected release request\\n' >&2; exit 64 ;;
+  *) printf 'Unexpected release request\n' >&2; exit 64 ;;
 esac
-exec "$FIXTURE_CURL" --disable --noproxy '*' -fsS --output "$7" "$FIXTURE_ORIGIN/$7"
+exec "$FIXTURE_CURL" --disable --noproxy '*' -fsS --output "$6" "$FIXTURE_ORIGIN/$6"
 `,
     { mode: 0o755 },
   )
@@ -109,12 +119,14 @@ exec install -m 0755 "$4" "$5" "$FIXTURE_DESTINATION/"
       env: {
         ...process.env,
         ...env,
+        GH_TOKEN: '',
+        GITHUB_TOKEN: '',
         PATH: `${bin}:${process.env.PATH}`,
         RUNNER_TEMP: downloads,
         FIXTURE_CURL: Bun.which('curl')!,
         FIXTURE_ORIGIN: `http://127.0.0.1:${server.port}`,
-        FIXTURE_RG_RELEASE: `BurntSushi/ripgrep:${env.RG_VERSION}:${archives.rg}.tar.gz`,
-        FIXTURE_FD_RELEASE: `sharkdp/fd:v${env.FD_VERSION}:${archives.fd}.tar.gz`,
+        FIXTURE_RG_RELEASE: `https://github.com/BurntSushi/ripgrep/releases/download/${env.RG_VERSION}/${archives.rg}.tar.gz`,
+        FIXTURE_FD_RELEASE: `https://github.com/sharkdp/fd/releases/download/v${env.FD_VERSION}/${archives.fd}.tar.gz`,
         FIXTURE_DELAY_LOG: path.join(root, 'delays.log'),
         FIXTURE_DESTINATION: destination,
         FIXTURE_INSTALL_LOG: path.join(root, 'install.log'),
@@ -123,6 +135,10 @@ exec install -m 0755 "$4" "$5" "$FIXTURE_DESTINATION/"
       stdout: 'pipe',
       stderr: 'pipe',
     })
+    stopChild = async () => {
+      if (child.exitCode === null) child.kill()
+      await child.exited
+    }
     const [exitCode, stdout, stderr] = await Promise.all([
       child.exited,
       new Response(child.stdout).text(),
@@ -154,7 +170,6 @@ exec install -m 0755 "$4" "$5" "$FIXTURE_DESTINATION/"
 
 test('CI search tools keep their release versions and checksums pinned', () => {
   expect(step.env).toEqual({
-    GH_TOKEN: '${{ github.token }}',
     RG_VERSION: '15.2.0',
     RG_SHA256: '33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c',
     FD_VERSION: '10.4.2',
