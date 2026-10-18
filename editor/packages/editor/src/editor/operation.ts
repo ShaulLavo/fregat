@@ -18,6 +18,8 @@ export type EditorOperationFlush = {
   readonly revealAffinity: SessionChangeOptions['revealAffinity']
   readonly revealBlock: SessionChangeOptions['revealBlock']
   readonly syncDomSelection: boolean
+  /** Every text change in the pass was keyboard input. */
+  readonly typing: boolean
 }
 
 /**
@@ -76,6 +78,8 @@ export class EditorOperation {
     let revealAffinity: SessionChangeOptions['revealAffinity']
     let revealBlock: SessionChangeOptions['revealBlock']
     let syncDomSelection = false
+    let textChanges = 0
+    let typedChanges = 0
     for (const { change, options } of this.changes) {
       if (options.revealOffset !== undefined) {
         revealOffset = options.revealOffset
@@ -84,6 +88,9 @@ export class EditorOperation {
       }
       if (options.syncDomSelection !== false) syncDomSelection = true
       if (viewContributionKindForChange(change) === 'content') contributionKind = 'content'
+      if (change.edits.length === 0) continue
+      textChanges += 1
+      if (options.typing) typedChanges += 1
     }
     return {
       changes: this.changes,
@@ -93,6 +100,7 @@ export class EditorOperation {
       revealAffinity,
       revealBlock,
       syncDomSelection,
+      typing: textChanges > 0 && typedChanges === textChanges,
     }
   }
 }

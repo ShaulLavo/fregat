@@ -145,6 +145,7 @@ import type { FoldMap } from '../foldMap'
 import { createInlineMap, inlineSpecsAtSnapshot, type InlineMap } from '../inlineMap'
 import type { BracketInfo, EditorSyntaxCapture, EditorSyntaxRecords } from '../syntax/session'
 import type {
+  EditorContributionChange,
   EditorInlineReplacementContext,
   EditorInlineReplacementProvider,
   EditorInlineReplacementProviderOptions,
@@ -4372,7 +4373,7 @@ export class Editor {
 
   private notifyViewContributions(
     kind: EditorViewContributionUpdateKind,
-    change?: DocumentSessionChange | null,
+    change?: EditorContributionChange | null,
     also: readonly EditorViewContributionUpdateKind[] = [],
   ): void {
     this.publishSyntaxDisplayDemand()
@@ -4846,12 +4847,15 @@ export class Editor {
       )
     }
     const passChange = coalescedPassChange(flush, finalChange)
+    const contributionChange: EditorContributionChange = flush.typing
+      ? { ...passChange, typing: true }
+      : passChange
     this.publishSyntaxDisplayDemand()
     this.sessionOptions.onChange?.(passChange)
     measureEditorPerformance('editor.notifyViewContributions', () =>
       this.notifyViewContributions(
         flush.contributionKind,
-        passChange,
+        contributionChange,
         flush.syncDomSelection ? ['selection'] : [],
       ),
     )

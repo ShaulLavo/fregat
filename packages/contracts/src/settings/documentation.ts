@@ -646,7 +646,7 @@ export const SETTINGS_DOCUMENTATION = {
   'editor.morph.enabled': {
     title: 'Animate edits',
     description:
-      'Animate undo, redo, pasted and generated code: text that stays slides to its new place, removed text fades out, and new text streams in. Typing stays instant.',
+      'Animate every edit except typing: undo, redo, paste, commands and generated code. Text that stays slides to its new place, removed text fades out, and new text streams in. Typing stays instant.',
     keywords: ['morph', 'animation', 'transition', 'undo', 'motion'],
   },
   'search.defaultMatchMode': {

@@ -315,10 +315,18 @@ describe('createMorphPlugin', () => {
 
   it('keeps typing instant', () => {
     const { context, contribution } = mountMorph()
-    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(1))
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', typed(1))
 
     expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
     expect(rowAnimations()).toHaveLength(0)
+  })
+
+  it('morphs a command edit however small it is', () => {
+    const { context, contribution } = mountMorph()
+    contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(1))
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).not.toBeNull()
+    contribution.dispose()
   })
 
   it('morphs undo however small it is', () => {
@@ -343,12 +351,11 @@ describe('createMorphPlugin', () => {
   })
 
   it('settles a running morph the moment the user types', () => {
-    const typing: { listener: ((text: string) => void) | null } = { listener: null }
-    const { context, contribution } = mountMorph({}, (listener) => (typing.listener = listener))
+    const { context, contribution } = mountMorph()
     contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(12))
     expect(context.contentElement.querySelector('.editor-morph-layer')).not.toBeNull()
 
-    typing.listener?.('a')
+    contribution.update(snapshot({ text: `${EDITED}a`, textVersion: 3 }), 'content', typed(1))
 
     expect(context.contentElement.querySelector('.editor-morph-layer')).toBeNull()
     expect(rowAnimations().every((entry) => entry.cancel.mock.calls.length > 0)).toBe(true)
@@ -436,10 +443,11 @@ function edit(size: number, kind: EditorContributionChange['kind'] = 'edit') {
   } as unknown as EditorContributionChange
 }
 
-function mountMorph(
-  options: MorphPluginOptions = {},
-  onDidType?: (listener: (text: string) => void) => void,
-): {
+function typed(size: number): EditorContributionChange {
+  return { ...edit(size), typing: true }
+}
+
+function mountMorph(options: MorphPluginOptions = {}): {
   context: EditorViewContributionContext
   contribution: EditorViewContribution
   presentations: EditorRowPresentation[]
@@ -452,16 +460,7 @@ function mountMorph(
     }),
   )
   const presentations: EditorRowPresentation[] = []
-  const base = viewContext(presentations)
-  const context: EditorViewContributionContext = onDidType
-    ? {
-        ...base,
-        onDidType: (listener) => {
-          onDidType(listener)
-          return { dispose: vi.fn() }
-        },
-      }
-    : base
+  const context = viewContext(presentations)
   populateRows(context.contentElement, snapshot())
   const contribution = provider?.createContribution(context)
   if (!contribution) throw new Error('morph contribution was not created')

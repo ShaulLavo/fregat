@@ -1,6 +1,5 @@
 import type {
   EditorContributionChange,
-  EditorDisposable,
   EditorPlugin,
   EditorViewContribution,
   EditorViewContributionContext,
@@ -19,29 +18,23 @@ export type MorphPluginOptions = {
   readonly durationMs?: number
   /** Spring overshoot of moving text, from `0` (none) to `0.5`. Defaults to `0.18`. */
   readonly bounce?: number
-  /**
-   * Smallest edit, in characters inserted plus removed, that morphs. Undo, redo,
-   * checkout and reconcile always morph. Defaults to `8`, so typing stays instant.
-   */
-  readonly minEditChars?: number
   /** Safety cap on pieces drawn; a larger viewport skips the morph. Defaults to `2500`. */
   readonly maxPieces?: number
 }
 
 const ACTIVE_CLASS = 'editor-morph-active'
-const ALWAYS_MORPH = new Set(['undo', 'redo', 'checkout', 'reconcile'])
 const TEXT_CHANGES = new Set(['edit', 'undo', 'redo', 'checkout', 'reconcile'])
 
 /**
  * Text changes animate from the old text to the new: text that survives the
  * change slides to its new place, removed text fades out, and new text streams
- * in. Including this plugin turns the effect on.
+ * in. Every change morphs except keyboard text input, so typing stays instant.
+ * Including this plugin turns the effect on.
  */
 export function createMorphPlugin(options: MorphPluginOptions = {}): EditorPlugin {
   const resolved = {
     durationMs: positive(options.durationMs, 520),
     bounce: Math.min(0.5, Math.max(0, options.bounce ?? 0.18)),
-    minEditChars: Math.max(0, options.minEditChars ?? 8),
     maxPieces: positive(options.maxPieces, 2500),
   }
   return {
@@ -56,7 +49,6 @@ export function createMorphPlugin(options: MorphPluginOptions = {}): EditorPlugi
 type ResolvedMorphOptions = {
   readonly durationMs: number
   readonly bounce: number
-  readonly minEditChars: number
   readonly maxPieces: number
 }
 
@@ -71,7 +63,6 @@ class MorphViewContribution implements EditorViewContribution {
   private runSnapshot: EditorViewSnapshot | null = null
   private readonly cover: RowCover
   private timing: MorphTiming | null = null
-  private readonly typing: EditorDisposable
 
   public constructor(
     private readonly context: EditorViewContributionContext,
@@ -80,8 +71,6 @@ class MorphViewContribution implements EditorViewContribution {
     // Added to an editor that already shows a document, the first change still needs its before.
     this.cover = new RowCover(context)
     if (context.hasDocument()) this.latest = context.getSnapshot()
-    // Typed text shows at once: a keystroke settles any morph instead of joining it.
-    this.typing = context.onDidType(() => this.finish())
   }
 
   public update(
@@ -129,7 +118,6 @@ class MorphViewContribution implements EditorViewContribution {
   }
 
   public dispose(): void {
-    this.typing.dispose()
     this.finish()
   }
 
@@ -141,11 +129,8 @@ class MorphViewContribution implements EditorViewContribution {
     if (reducedMotion(this.context)) return false
     if (previous.documentId !== snapshot.documentId) return false
     // `setContent` on an editor without a session re-renders the whole text with no change record.
-    if (!change) return true
-    if (ALWAYS_MORPH.has(change.kind)) return true
-    // A small edit landing mid-morph joins it, so streamed text never snaps the motion to its end.
-    if (this.run) return true
-    return changedChars(change) >= this.options.minEditChars
+    // Typed text shows at once: a keystroke settles any morph instead of joining it.
+    return !change?.typing
   }
 
   private morph(previous: EditorViewSnapshot, snapshot: EditorViewSnapshot): void {
@@ -224,12 +209,6 @@ class MorphViewContribution implements EditorViewContribution {
     }
     return this.timing
   }
-}
-
-function changedChars(change: EditorContributionChange): number {
-  let total = 0
-  for (const edit of change.edits) total += edit.to - edit.from + edit.text.length
-  return total
 }
 
 function positive(value: number | undefined, fallback: number): number {

@@ -18,6 +18,8 @@ export type SessionChangeOptions = {
   /** Present only when revealOffset names the active caret rather than an arbitrary document point. */
   readonly revealAffinity?: SelectionAffinity
   readonly revealBlock?: EditorSetSelectionOptions['revealBlock']
+  /** The change is keyboard text input, which contributions keep instant. */
+  readonly typing?: boolean
 }
 
 export function syntaxRefreshDelay(change: DocumentSessionChange | null): number {
