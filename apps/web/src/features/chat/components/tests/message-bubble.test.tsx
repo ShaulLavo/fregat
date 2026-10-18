@@ -14,7 +14,8 @@ import { createTestApplicationRuntime } from '../../../../../test/factories/appl
 import { chatMessage } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
 import { activeServerOrigin, setActiveServerOrigin } from '@/lib/client'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 
 const LONG_USER_TEXT = Array.from({ length: 40 }, (_, index) => `line ${index}`).join('\n')
 

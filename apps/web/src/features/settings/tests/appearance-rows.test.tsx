@@ -11,7 +11,8 @@ import {
 } from '@workspace/contracts'
 
 import { activeServerOrigin, getClient } from '@/lib/client'
-import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
+import { renderWithProviders } from '../../../../test/render'
 import { expect, test } from '../../../../test/fixtures'
 import { fetchSettings, saveSettings } from '@/features/settings/utils/api'
 import { SETTINGS_MUTATION_KEY } from '@/features/settings/utils/mutation-keys'

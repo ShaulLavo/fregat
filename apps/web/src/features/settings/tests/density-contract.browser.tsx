@@ -41,7 +41,7 @@ import { FilePickerSessionActionsContext } from '@/features/file-picker/provider
 import { DiffBanner } from '@/features/git/components/diff-banner'
 import { LogsToolbar } from '@/features/logs/components/toolbar'
 import { SearchControls } from '@/features/workspace/components/search-controls'
-import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/providers'
 
 // Every horizontal bar and every vertical icon rail resolves to --bar-height.
 // Naming it once is the contract: a bar that disagrees is the header-jump bug

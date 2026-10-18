@@ -7,7 +7,8 @@ import { ChatProviderSignInProvider } from '@/features/chat/providers/provider-s
 import type { ChatSession } from '@workspace/client-core/chat/types'
 import { providerSnapshot, session } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 
 test('pending requests do not produce duplicate runtime banners', () => {
   renderStatus({ session: session({ pendingApprovalCount: 2, pendingUserInputCount: 1 }) })

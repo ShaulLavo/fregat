@@ -1,19 +1,20 @@
-import { describe, vi } from 'vitest'
+import { describe, inject, vi } from 'vitest'
 import { loadMarkdownExtension } from '@workspace/markdown/state/extensions'
 import { page } from 'vitest/browser'
 
 import { expect, test } from '../../../../test/fixtures'
 import {
-  checkChatExpectations,
-  createMarkdownBrowser,
   observeMarkdownDom,
   observeMarkdownSemantics,
+} from '../../../../test/factories/markdown-observation'
+import {
+  checkChatExpectations,
+  createMarkdownBrowser,
   readyForScreenshot,
   recordMarkdownFrames,
   requiredElement,
 } from '../../../../test/factories/markdown-browser'
 import {
-  BASELINE_DEFECTS,
   MARKDOWN_CASES,
   type Checkpoint,
 } from '../../../../../../packages/markdown/test/fixtures/cases'
@@ -64,14 +65,10 @@ describe('real chat prefix projection', () => {
     '$id paints every named prefix and settles to the completed result',
     async (fixture) => {
       const proof = await createMarkdownBrowser()
+      const recording = recordMarkdownFrames(proof.host)
+      const checkpoints = new Map<number, Checkpoint>()
       let priorRevision = 0
       for (const checkpoint of fixture.checkpoints) {
-        if (
-          BASELINE_DEFECTS.some(
-            (defect) => defect.fixtureId === fixture.id && defect.checkpointId === checkpoint.name,
-          )
-        )
-          continue
         const receipt = await proof.update(
           fixture.source.slice(0, checkpoint.offset),
           checkpoint.live,
@@ -80,6 +77,7 @@ describe('real chat prefix projection', () => {
         expect(receipt.committed).toBeGreaterThanOrEqual(receipt.received)
         expect(receipt.painted).toBeGreaterThanOrEqual(receipt.committed)
         await vi.waitFor(() => assertCheckpoint(proof.message(), checkpoint))
+        checkpoints.set(receipt.revision, checkpoint)
         priorRevision = receipt.revision
       }
       await proof.update(fixture.source, false)
@@ -87,6 +85,32 @@ describe('real chat prefix projection', () => {
         expect(checkChatExpectations(proof.message(), fixture.expected)).toEqual([]),
       )
       await readyForScreenshot(proof.message())
+      const frames = recording.stop()
+      expect(frames.length).toBeGreaterThan(0)
+      const observedRevisions = new Set(frames.map((frame) => frame.revision))
+      for (const revision of checkpoints.keys())
+        expect(observedRevisions.has(revision), `${fixture.id} painted revision ${revision}`).toBe(
+          true,
+        )
+      for (const frame of frames) {
+        const checkpoint = checkpoints.get(frame.revision)
+        if (!checkpoint) continue
+        for (const text of checkpoint.textIncludes ?? [])
+          expect(frame.text, `${fixture.id} painted ${checkpoint.name}`).toContain(text)
+        for (const text of checkpoint.textExcludes ?? [])
+          expect(frame.text, `${fixture.id} painted ${checkpoint.name}`).not.toContain(text)
+      }
+      console.info(
+        'MARKDOWN_BROWSER_FRAMES ' +
+          JSON.stringify({
+            fixture: fixture.id,
+            engine: inject('markdownEngine') ?? 'remark',
+            observedFrames: frames.length,
+            requiredRevisions: checkpoints.size,
+            observedRevisions: Array.from(observedRevisions),
+            frames,
+          }),
+      )
       const streamed = observeMarkdownSemantics(proof.message())
       const fresh = await createMarkdownBrowser()
       await fresh.update(fixture.source, false)
@@ -142,34 +166,23 @@ describe('real chat prefix projection', () => {
     expect(changed).not.toEqual(semantics)
   })
 
-  test.each(BASELINE_DEFECTS)(
-    '$fixtureId/$checkpointId records the exact unmet baseline expectation',
-    async (defect) => {
-      const fixture = MARKDOWN_CASES.find((entry) => entry.id === defect.fixtureId)
-      const checkpoint = fixture?.checkpoints.find((entry) => entry.name === defect.checkpointId)
-      expect(fixture).toBeDefined()
-      expect(checkpoint).toBeDefined()
-      if (!fixture || !checkpoint) return
-      const proof = await createMarkdownBrowser()
-      await proof.update(fixture.source.slice(0, checkpoint.offset), checkpoint.live)
-      const findings = checkChatExpectations(proof.message(), defect.expected)
-      expect(findings).toEqual([
-        'strong: expected 1 elements, received 0',
-        'strong[0] text: expected "outside inside", received undefined',
-      ])
-      expect(observeMarkdownDom(proof.message()).text).toBe('**outside inside')
-      console.info(
-        'MARKDOWN_BROWSER_BASELINE_DEFECT ' +
-          JSON.stringify({
-            fixture: fixture.id,
-            checkpoint: checkpoint.name,
-            expected: defect.expected,
-            findings,
-            qualificationPassed: false,
-          }),
-      )
-    },
-  )
+  test.each([
+    '**outside *inside',
+    '**outside *inside* ',
+    '**outside *inside*\n',
+    '**outside *inside*\n\n',
+    '> **outside *inside*\n',
+    '**outside *inside*\\ ',
+    '**outside *inside*\\\n',
+    '__outside _inside_\\ ',
+  ])('unfinished outer strong remains nested after paint: %s', async (source) => {
+    const proof = await createMarkdownBrowser()
+    await proof.update(source, true)
+    const visible = observeMarkdownDom(proof.message()).text
+    expect(visible).toContain('outside inside')
+    expect(visible).not.toContain('**')
+    expect(proof.message().querySelector('strong > em')?.textContent).toBe('inside')
+  })
 
   test('acknowledges processing and paint while heading syntax remains held', async () => {
     const proof = await createMarkdownBrowser()

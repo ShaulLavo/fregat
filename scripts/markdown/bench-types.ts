@@ -5,7 +5,7 @@ export type BenchmarkUnit = 'ms' | 'bytes' | 'count'
 export type BenchmarkSample = {
   readonly family: BenchmarkFamily
   readonly fixture: string
-  readonly engine: 'remark'
+  readonly engine: 'remark' | 'tree-sitter'
   readonly domain: 'native' | 'browser'
   readonly build: 'source' | 'development' | 'production'
   readonly trial: number
@@ -42,6 +42,7 @@ export type FamilyResult = {
 }
 
 export type BenchmarkSummary = {
+  readonly engine: BenchmarkSample['engine']
   readonly family: BenchmarkFamily
   readonly fixture: string
   readonly domain: BenchmarkSample['domain']
@@ -109,6 +110,7 @@ export function summarizeBenchmarks(samples: readonly BenchmarkSample[]): Benchm
   const groups = new Map<string, BenchmarkSample[]>()
   for (const sample of samples) {
     const key = JSON.stringify([
+      sample.engine,
       sample.family,
       sample.fixture,
       sample.domain,
@@ -136,6 +138,7 @@ function summarizeGroup(samples: readonly BenchmarkSample[]): BenchmarkSummary {
     })
   const values = samples.map((sample) => sample.sample)
   return {
+    engine: first.engine,
     family: first.family,
     fixture: first.fixture,
     domain: first.domain,

@@ -26,7 +26,8 @@ import { testDiffLanguageHost } from '../../../../../test/factories/diff-languag
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import { stubHighlightApi } from '../../../../../test/env/highlight-api'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 
 // Diff syntax reads a row's tokens from source line N of each side. A checkpoint patch skips the
 // lines between hunks, so parsing it as a whole file paints each row with another line's tokens.

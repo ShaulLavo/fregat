@@ -7,7 +7,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, test } from 'vitest'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
-import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/providers'
 
 // A pure rename has no hunks, and for a long time that meant the pane drew a sentence where the
 // file should have been. What replaces it is whole-file context rows, which only a real browser can

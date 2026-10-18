@@ -8,7 +8,8 @@ import { beforeEach, vi } from 'vitest'
 
 import { ChatInputSubmitButton } from '@/features/chat/components/chat-input-submit-button'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 import { TEST_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import {
   resetChatInputDraftStore,

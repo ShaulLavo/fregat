@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
-import { createHash } from 'node:crypto'
-import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
+import { hash } from 'node:crypto'
+import { mkdir, open, readFile, realpath, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -190,7 +190,7 @@ export type HeldoutReport = {
   readonly fatal: string | null
 }
 
-export const HELDOUT_STREAM_POLICY = {
+const HELDOUT_STREAM_POLICY = {
   seededSchedules: 8,
   firstSeed: 176,
   maxUnits: 24,
@@ -248,7 +248,7 @@ export function validateEvaluationMessages(
   batch: EvaluationBatch,
 ): EvaluationMessage[] {
   const messages = parse(array(messageSchema), value)
-  const sourceHashes = messages.map((message) => digest(message.source))
+  const sourceHashes = messages.map((message) => hash('sha256', message.source))
   if (
     messages.length !== 100 ||
     batch.sourceSha256.length !== 100 ||
@@ -447,7 +447,7 @@ export function evaluationCounts(cases: readonly EvaluationCase[]) {
   }
 }
 
-export async function inspectCandidateIdentity(root: string): Promise<CandidateIdentity> {
+async function inspectCandidateIdentity(root: string): Promise<CandidateIdentity> {
   const require = createRequire(path.join(root, 'packages/markdown/package.json'))
   const parser = require.resolve('tree-sitter-md')
   const runtime = path.join(path.dirname(require.resolve('web-tree-sitter')), 'web-tree-sitter.js')
@@ -475,7 +475,7 @@ export async function inspectCandidateIdentity(root: string): Promise<CandidateI
     lockfileSha256: path.join(root, 'bun.lock'),
   }
   const entries = await Promise.all(
-    Object.entries(files).map(async ([name, file]) => [name, digest(await readFile(file))]),
+    Object.entries(files).map(async ([name, file]) => [name, hash('sha256', await readFile(file))]),
   )
   const provenance = await qualificationProvenance(root)
   return parse(identitySchema, {
@@ -528,7 +528,7 @@ export async function reserveEvaluationExposure(input: {
     retirementReason: '',
   }
   try {
-    await writeFile(ledgerPath(input.ledgerDirectory, input.batch), encoded(ledger), { flag: 'wx' })
+    await writeDurableExposure(ledgerPath(input.ledgerDirectory, input.batch), encoded(ledger))
   } catch (error) {
     throw createScriptError(
       'This evaluation batch already has an exposure ledger or its ledger could not be reserved.',
@@ -542,6 +542,23 @@ export async function reserveEvaluationExposure(input: {
     )
   }
   return ledger
+}
+
+async function writeDurableExposure(file: string, bytes: string) {
+  const handle = await open(file, 'wx')
+  try {
+    await handle.writeFile(bytes)
+    await handle.sync()
+  } finally {
+    await handle.close()
+  }
+  if (process.platform === 'win32') return
+  const directory = await open(path.dirname(file), 'r')
+  try {
+    await directory.sync()
+  } finally {
+    await directory.close()
+  }
 }
 
 export async function retireEvaluationBatch(
@@ -623,7 +640,7 @@ const browserInputSchema = object({
     }),
   ),
 })
-export function parseBrowserInput(value: unknown): BrowserEvaluationInput {
+function parseBrowserInput(value: unknown): BrowserEvaluationInput {
   return parse(browserInputSchema, value)
 }
 export function parseBrowserReceipt(value: unknown): BrowserEvaluationReceipt {
@@ -697,7 +714,7 @@ function checkBrowserPairs(
   }
 }
 
-export async function attachBrowserEvaluation(input: {
+async function attachBrowserEvaluation(input: {
   readonly root: string
   readonly receiptPath: string
   readonly ledgerDirectory: string
@@ -709,7 +726,7 @@ export async function attachBrowserEvaluation(input: {
   const report = parseReport(JSON.parse(reportBytes.toString('utf8')))
   await trustedLedger(input, report, reportBytes)
   const browserInputBytes = await readFile(report.browser.inputPath)
-  if (digest(browserInputBytes) !== report.browser.inputSha256)
+  if (hash('sha256', browserInputBytes) !== report.browser.inputSha256)
     throw createScriptError('The frozen browser input has changed.', {
       internal: { boundary: 'browser-input-digest' },
     })
@@ -731,7 +748,7 @@ export async function attachBrowserEvaluation(input: {
     counters: { ...report.counters, browserCases: observed.cases },
     browser: {
       ...report.browser,
-      receiptSha256: digest(browserBytes),
+      receiptSha256: hash('sha256', browserBytes),
       receiptPath: path.resolve(input.browserReceiptPath),
       productionBuildSha256: receipt.productionBuildSha256,
       failures: observed.failures,
@@ -749,7 +766,7 @@ export async function attachBrowserEvaluation(input: {
     encoded({
       ...ledger,
       receiptPath: path.resolve(input.outputPath),
-      receiptSha256: digest(combinedBytes),
+      receiptSha256: hash('sha256', combinedBytes),
     }),
   )
   return combined
@@ -771,7 +788,7 @@ async function trustedLedger(
   )
   if (
     ledger.state !== 'completed' ||
-    ledger.receiptSha256 !== digest(bytes) ||
+    ledger.receiptSha256 !== hash('sha256', bytes) ||
     path.resolve(ledger.receiptPath) !== path.resolve(input.receiptPath) ||
     ledger.manifestSha256 !== report.manifestSha256 ||
     stable(ledger.batch) !== stable(report.batch)
@@ -786,7 +803,7 @@ async function trustedLedger(
   )
   const manifest = parse(manifestSchema, JSON.parse(manifestBytes.toString('utf8')))
   if (
-    digest(manifestBytes) !== report.manifestSha256 ||
+    hash('sha256', manifestBytes) !== report.manifestSha256 ||
     stable(manifest.batches.find((batch) => batch.file === report.batch.file)) !==
       stable(report.batch)
   )
@@ -805,7 +822,7 @@ export async function readTrustedEvaluationContext(input: {
   const report = parseReport(JSON.parse(bytes.toString('utf8')))
   await trustedLedger(input, report, bytes)
   const browserInputBytes = await readFile(report.browser.inputPath)
-  if (digest(browserInputBytes) !== report.browser.inputSha256)
+  if (hash('sha256', browserInputBytes) !== report.browser.inputSha256)
     throw createScriptError('The frozen browser input has changed.', {
       internal: { boundary: 'trusted-browser-input' },
     })
@@ -813,7 +830,7 @@ export async function readTrustedEvaluationContext(input: {
   validateTrustedInput(request, report)
   if (report.browser.receiptPath) {
     const browserBytes = await readFile(report.browser.receiptPath)
-    if (digest(browserBytes) !== report.browser.receiptSha256)
+    if (hash('sha256', browserBytes) !== report.browser.receiptSha256)
       throw createScriptError('The attached browser evidence has changed.', {
         internal: { boundary: 'trusted-browser-receipt' },
       })
@@ -851,7 +868,7 @@ export async function readTrustedEvaluationContext(input: {
       retired: false as const,
     },
     requiredChecks: report.counters,
-    artifact: { path: path.resolve(input.receiptPath), sha256: digest(bytes) },
+    artifact: { path: path.resolve(input.receiptPath), sha256: hash('sha256', bytes) },
   }
 }
 
@@ -871,7 +888,7 @@ function validateTrustedInput(request: BrowserEvaluationInput, report: HeldoutRe
     if (
       !entry ||
       entry.id !== message.id ||
-      digest(message.source) !== message.sourceSha256 ||
+      hash('sha256', message.source) !== message.sourceSha256 ||
       stable(message.schedules) !== stable(heldoutSchedules(message.source)) ||
       stable(entry.streams.map((stream) => stream.schedule)) !== stable(message.schedules)
     )
@@ -1132,7 +1149,7 @@ async function main() {
   const ledger = await reserveEvaluationExposure({
     ledgerDirectory: path.resolve(values.ledger),
     batch,
-    manifestSha256: digest(manifestBytes),
+    manifestSha256: hash('sha256', manifestBytes),
     candidate: frozen,
     receiptPath,
   })
@@ -1141,18 +1158,18 @@ async function main() {
   let fatal: string | null = null
   try {
     const compressed = await readFile(path.join(path.dirname(manifestFile), batch.file))
-    if (digest(compressed) !== batch.assetSha256)
+    if (hash('sha256', compressed) !== batch.assetSha256)
       throw createScriptError('The sealed batch asset differs from its frozen digest.', {
         internal: { boundary: 'evaluation-asset' },
       })
     const bytes = gunzipSync(compressed)
-    if (digest(bytes) !== batch.uncompressedSha256)
+    if (hash('sha256', bytes) !== batch.uncompressedSha256)
       throw createScriptError('The opened batch differs from its frozen payload digest.', {
         internal: { boundary: 'evaluation-payload' },
       })
     const messages = validateEvaluationMessages(JSON.parse(bytes.toString('utf8')), manifest, batch)
     const inputBytes = encoded(browserInput(messages, frozen, batch))
-    browserInputSha256 = digest(inputBytes)
+    browserInputSha256 = hash('sha256', inputBytes)
     await writeFile(path.join(output, 'browser-input.json'), inputBytes, { flag: 'wx' })
     for (const message of messages) cases.push(await evaluateNativeMessage(message))
     await verifyCandidate(ROOT, frozen)
@@ -1201,7 +1218,7 @@ async function main() {
   await writeFile(receiptPath, receipt, { flag: 'wx' })
   await writeFile(
     ledgerPath(values.ledger, batch),
-    encoded({ ...ledger, state: 'completed', receiptSha256: digest(receipt) }),
+    encoded({ ...ledger, state: 'completed', receiptSha256: hash('sha256', receipt) }),
   )
   process.stdout.write(
     encoded({
@@ -1214,9 +1231,7 @@ async function main() {
   )
   process.exitCode = report.status === 'passed' ? 0 : 1
 }
-function digest(value: string | Uint8Array) {
-  return createHash('sha256').update(value).digest('hex')
-}
+
 function ordered(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(ordered)
   if (!value || typeof value !== 'object') return value

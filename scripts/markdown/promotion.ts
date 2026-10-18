@@ -65,6 +65,22 @@ const receiptSchema = v.strictObject({
   metrics: v.record(label, v.union([finite, v.boolean(), label])),
   comparisons: v.optional(v.array(comparisonSchema)),
 })
+const productionWorkloadsSchema = v.pipe(
+  v.array(
+    v.strictObject({
+      id: label,
+      sourceBytes: count,
+      scheduleUnits: count,
+      metrics: v.pipe(v.array(metric), v.minLength(1)),
+      arrival: v.picklist(['paced', 'burst-coalesced']),
+      scheduleId: label,
+      sourceSha256: hashSchema,
+      expectedInputUpdates: count,
+      paintPolicy: v.picklist(['every-revision', 'sampled']),
+    }),
+  ),
+  v.minLength(1),
+)
 const evidenceSchema = v.strictObject({
   schemaVersion: v.literal(1),
   identity: identitySchema,
@@ -79,22 +95,7 @@ const evidenceSchema = v.strictObject({
     ),
     v.minLength(1),
   ),
-  expectedWorkloads: v.pipe(
-    v.array(
-      v.strictObject({
-        id: label,
-        sourceBytes: count,
-        scheduleUnits: count,
-        metrics: v.pipe(v.array(metric), v.minLength(1)),
-        arrival: v.picklist(['paced', 'burst-coalesced']),
-        scheduleId: label,
-        sourceSha256: hashSchema,
-        expectedInputUpdates: count,
-        paintPolicy: v.picklist(['every-revision', 'sampled']),
-      }),
-    ),
-    v.minLength(1),
-  ),
+  expectedWorkloads: productionWorkloadsSchema,
   receipts: v.array(receiptSchema),
 })
 export type PromotionEvidence = v.InferOutput<typeof evidenceSchema>
@@ -763,22 +764,7 @@ export async function createTrustedPromotionContext(
       schemaVersion: v.literal(1),
       domain: v.literal('browser'),
       build: v.literal('production'),
-      workloads: v.pipe(
-        v.array(
-          v.strictObject({
-            id: label,
-            sourceBytes: count,
-            scheduleUnits: count,
-            metrics: v.pipe(v.array(metric), v.minLength(1)),
-            arrival: v.picklist(['paced', 'burst-coalesced']),
-            scheduleId: label,
-            sourceSha256: hashSchema,
-            expectedInputUpdates: count,
-            paintPolicy: v.picklist(['every-revision', 'sampled']),
-          }),
-        ),
-        v.minLength(1),
-      ),
+      workloads: productionWorkloadsSchema,
     }),
     Reflect.apply(producer, production, []),
   )

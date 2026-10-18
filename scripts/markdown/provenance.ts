@@ -61,7 +61,17 @@ async function sourceFiles(root: string): Promise<string[]> {
     await Promise.all(directories.map((directory) => codeFiles(root, directory)))
   ).flat()
   files.push(
+    'apps/web/test/providers.tsx',
     'apps/web/test/factories/markdown-browser.tsx',
+    'apps/web/test/factories/markdown-observation.ts',
+    'apps/web/test/factories/markdown-production-types.ts',
+    'apps/web/test/factories/markdown-production.tsx',
+    'apps/web/test/factories/markdown-timeline-scene.tsx',
+    'apps/web/test/factories/qualification-image-command.ts',
+    'apps/web/test/markdown-production.html',
+    'apps/web/test/markdown-production.ts',
+    'apps/web/vitest.markdown-qualification.config.ts',
+    'apps/web/vite.config.ts',
     'apps/web/vitest.browser.config.ts',
     'package.json',
   )

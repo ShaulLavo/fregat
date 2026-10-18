@@ -63,7 +63,7 @@ import {
   type TokenPaintReference,
   type TokenPaintObservation,
 } from '../../../../../../scripts/agent/scenarios/editor-tab-hover-highlights-probe'
-import { AppProviders, seedHtmlTheme } from '../../../../test/render'
+import { AppProviders, seedHtmlTheme } from '../../../../test/providers'
 import {
   installDelayedFileReadClient,
   type DelayedFileReadClient,

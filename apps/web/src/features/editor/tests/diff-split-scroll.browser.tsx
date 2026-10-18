@@ -8,7 +8,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, test } from 'vitest'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
-import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/providers'
 
 // Registered in `vitest.config.ts` under `browser.commands`, which is a runtime registry with no
 // types of its own — a caller has to say what it accepts.

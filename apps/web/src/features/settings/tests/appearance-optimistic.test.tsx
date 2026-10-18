@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 import { expect, test } from '../../../../test/fixtures'
 import { settingsSnapshot } from '../../../../test/factories/settings'
-import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/providers'
 import { useTheme } from '@/features/settings/hooks/use-theme'
 import {
   resetSettingsIntentStore,

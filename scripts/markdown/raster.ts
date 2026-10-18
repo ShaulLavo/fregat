@@ -157,38 +157,30 @@ export function rasterRecords(log: string) {
 
 function readVisual(value: unknown): Visual {
   if (!value || typeof value !== 'object') throw invalidRaster('visual-record')
-  if (!('fixture' in value) || typeof value.fixture !== 'string') throw invalidRaster('fixture')
+  const metadata = readVisualMetadata(value)
   if (!('screenshot' in value) || typeof value.screenshot !== 'string')
     throw invalidRaster('screenshot')
-  if (!('width' in value) || typeof value.width !== 'number') throw invalidRaster('width')
-  if (!('theme' in value) || typeof value.theme !== 'string') throw invalidRaster('theme')
-  if (!('browser' in value) || typeof value.browser !== 'string') throw invalidRaster('browser')
-  return {
-    engine: readEngine(value),
-    fixture: value.fixture,
-    screenshot: value.screenshot,
-    width: value.width,
-    theme: value.theme,
-    browser: value.browser,
-  }
+  return { ...metadata, screenshot: value.screenshot }
 }
 
 function readCalibration(value: unknown): Calibration {
   if (!value || typeof value !== 'object') throw invalidRaster('calibration-record')
   if (!('first' in value) || typeof value.first !== 'string') throw invalidRaster('first')
   if (!('repeated' in value) || typeof value.repeated !== 'string') throw invalidRaster('repeated')
+  return { ...readVisualMetadata(value), first: value.first, repeated: value.repeated }
+}
+
+function readVisualMetadata(value: object) {
   if (!('fixture' in value) || typeof value.fixture !== 'string') throw invalidRaster('fixture')
   if (!('width' in value) || typeof value.width !== 'number') throw invalidRaster('width')
   if (!('theme' in value) || typeof value.theme !== 'string') throw invalidRaster('theme')
   if (!('browser' in value) || typeof value.browser !== 'string') throw invalidRaster('browser')
   return {
     engine: readEngine(value),
-    browser: value.browser,
     fixture: value.fixture,
-    first: value.first,
-    repeated: value.repeated,
     width: value.width,
     theme: value.theme,
+    browser: value.browser,
   }
 }
 

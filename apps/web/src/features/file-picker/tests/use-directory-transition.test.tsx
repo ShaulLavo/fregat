@@ -1,4 +1,4 @@
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 import { type QueryClient, QueryClientProvider, type QueryKey } from '@tanstack/react-query'
 import { act, renderHook } from '@testing-library/react'
 import { useState, type ReactNode } from 'react'

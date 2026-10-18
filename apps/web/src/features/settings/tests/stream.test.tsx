@@ -1,6 +1,6 @@
 import { getClient } from '@/lib/client'
 import type { QueryClient } from '@tanstack/react-query'
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 import { renderHook, waitFor } from '@testing-library/react'
 import { providerDriverKindSchema, providerInstanceIdSchema } from '@workspace/contracts'
 import { createElement, type ReactNode } from 'react'

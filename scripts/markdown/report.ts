@@ -80,7 +80,7 @@ function digest(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
-export type CandidateArtifact = {
+type CandidateArtifact = {
   readonly kind: 'grammar' | 'resolver' | 'binding' | 'semantic-binding' | 'runtime'
   readonly file: string
   readonly bytes: number

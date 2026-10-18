@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 import { admitDiscard } from '@/features/git/utils/admit-mutation'
 import { fetchStatus } from '@/features/git/utils/api'
 import { gitKeys } from '@/lib/query-keys'

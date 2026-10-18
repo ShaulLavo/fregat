@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { hash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { cpus, hostname } from 'node:os'
@@ -109,7 +109,7 @@ type RenderedNode =
   | { readonly type: 'doctype' }
 
 export function digestProjection(root: Root): string {
-  return digest(JSON.stringify(canonicalProjection(root)))
+  return hash('sha256', JSON.stringify(canonicalProjection(root)), 'hex')
 }
 
 export function canonicalProjection(root: Root) {
@@ -148,7 +148,7 @@ export function inspectSourceCorrespondence(root: Root, source: string) {
   const failures: string[] = []
   inspectNodeSource(root, 'root', source.length, lines, coordinates, failures)
   return {
-    sourceCoordinatesDigest: digest(JSON.stringify(coordinates)),
+    sourceCoordinatesDigest: hash('sha256', JSON.stringify(coordinates), 'hex'),
     sourceCoordinateFailures: failures,
     positionedNodes: coordinates.length,
   }
@@ -513,14 +513,16 @@ export async function runPairedNative(options: PairedNativeOptions) {
       platform: process.platform,
       architecture: process.arch,
       runtime: `${process.release.name} ${process.version}`,
-      workloadManifestSha256: digest(
+      workloadManifestSha256: hash(
+        'sha256',
         JSON.stringify(
           allWorkloads.map(({ source, revisions, ...entry }) => ({
             ...entry,
-            sourceSha256: digest(source),
-            revisionSourceSha256: revisions?.map(digest) ?? [],
+            sourceSha256: hash('sha256', source, 'hex'),
+            revisionSourceSha256: revisions?.map((source) => hash('sha256', source, 'hex')) ?? [],
           })),
         ),
+        'hex',
       ),
       ...(await provenance()),
     },
@@ -559,7 +561,7 @@ function runWorkloadPairs(
     id: entry.id,
     family: entry.family,
     sourceBytes: entry.sourceBytes,
-    sourceSha256: digest(entry.source),
+    sourceSha256: hash('sha256', entry.source, 'hex'),
     scheduleUnits: entry.scheduleUnits,
     pairs,
     comparisons: metrics.map((metric) =>
@@ -700,7 +702,7 @@ async function provenance() {
     Promise.all(
       sourcePaths.map(async (file) => ({
         path: file,
-        sha256: digest(await readFile(path.join(checkout, file))),
+        sha256: hash('sha256', await readFile(path.join(checkout, file)), 'hex'),
       })),
     ),
   ])
@@ -708,11 +710,11 @@ async function provenance() {
     revision: revision.stdout.trim(),
     candidateCommit: revision.stdout.trim(),
     sourceFiles: sources,
-    candidateSourceSha256: digest(JSON.stringify(sources)),
-    lockfileSha256: digest(lockfile),
-    budgetSha256: digest(budget),
-    grammarSha256: digest(grammar),
-    resolverSha256: digest(resolver),
+    candidateSourceSha256: hash('sha256', JSON.stringify(sources), 'hex'),
+    lockfileSha256: hash('sha256', lockfile, 'hex'),
+    budgetSha256: hash('sha256', budget, 'hex'),
+    grammarSha256: hash('sha256', grammar, 'hex'),
+    resolverSha256: hash('sha256', resolver, 'hex'),
   }
 }
 
@@ -724,9 +726,6 @@ function orderedValue(value: unknown): unknown {
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, entry]) => [key, orderedValue(entry)]),
   )
-}
-function digest(value: string | Uint8Array) {
-  return createHash('sha256').update(value).digest('hex')
 }
 function usedCpu(start: NodeJS.CpuUsage) {
   const cpu = process.cpuUsage(start)

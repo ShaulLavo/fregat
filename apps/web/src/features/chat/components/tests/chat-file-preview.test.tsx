@@ -22,7 +22,8 @@ import {
 } from '../../utils/attachment-file'
 import { chatAttachmentImages, unrenderableChatAttachments } from '../../utils/attachment-image'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 
 test('previews text literally and downloads from its owner', async () => {
   const content = '<script>do not execute</script>\nFile preview content'

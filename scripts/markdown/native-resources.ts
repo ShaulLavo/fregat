@@ -285,7 +285,7 @@ async function measureScale(input: {
   return rows
 }
 
-export async function runNativeResourceProbe(root: string, windows = 4) {
+async function runNativeResourceProbe(root: string, windows = 4) {
   const provenance = await qualificationProvenance(root)
   const candidate = await candidateIdentity(root)
   await initializeTreeSitterMarkdown()

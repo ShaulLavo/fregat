@@ -13,7 +13,7 @@ import {
 } from '@/features/editor/state/document-state'
 import { testDiffLanguageHost } from '../../../../../test/factories/diff-language-host'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
 
 test('fails loudly when Platform document state is absent', () => {
   expect(() =>

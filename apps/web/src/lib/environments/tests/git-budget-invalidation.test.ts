@@ -1,7 +1,7 @@
 import { QueryObserver } from '@tanstack/react-query'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 import { settingsSnapshot } from '../../../../test/factories/settings'
 import { gitKeys } from '@/lib/query-keys'
 import { installGitBudgetInvalidation } from '@/lib/environments/state/git-budget-invalidation'

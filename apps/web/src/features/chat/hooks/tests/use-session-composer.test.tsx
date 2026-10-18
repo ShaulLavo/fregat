@@ -14,7 +14,8 @@ import type {
 import { createClientError } from '@workspace/client-core/errors'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderHookWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderHookWithProviders } from '../../../../../test/render'
 import {
   chatMessage,
   providerSnapshot,

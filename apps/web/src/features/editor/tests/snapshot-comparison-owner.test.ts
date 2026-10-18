@@ -1,6 +1,6 @@
 import { expect, test } from '../../../../test/fixtures'
 import { createSnapshotComparisonFixture } from '../../../../test/factories/snapshot-comparison'
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { createSnapshotComparisonOwner } from '@/features/editor/state/snapshot-comparison-owner'

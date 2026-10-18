@@ -6,7 +6,7 @@ import {
 import { createApprovalRespondCommand } from '@workspace/client-core/chat/commands'
 import * as v from 'valibot'
 import { test, expect } from '../../../../../test/fixtures'
-import { createTestQueryClient } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
 import { sessionShell, TEST_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import { unsupportedChatTransport } from '../../../../../test/factories/chat-transport'
 import { pendingRequestMutationOptions } from '../pending-request-dispatch'

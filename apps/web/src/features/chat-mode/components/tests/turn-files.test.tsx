@@ -17,7 +17,8 @@ import { createRailHarness } from '../../../../../test/factories/rail-harness'
 import { createObservedInProcessClient } from '../../../../../test/client'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
 import { activeServerOrigin } from '@/lib/client'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 
 const IDENTITY: readonly string[] = ['-c', 'user.email=t@example.com', '-c', 'user.name=T']
 const before = Array.from({ length: 20 }, (_, index) => `line ${index + 1}`)

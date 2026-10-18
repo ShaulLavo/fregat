@@ -15,7 +15,8 @@ import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
 import { createInProcessClient } from '../../../../test/client'
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
+import { renderWithProviders } from '../../../../test/render'
 import { makeTestServer } from '../../../../test/server'
 
 test('page reset follows the remote JSON document and returns to the primary owner in form view', async ({

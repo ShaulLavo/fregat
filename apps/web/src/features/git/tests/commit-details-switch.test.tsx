@@ -9,7 +9,8 @@ import { createRequestGate } from '../../../../test/factories/request-gate'
 import { installTestClient } from '../../../../test/factories/client-binding'
 import { createObservedInProcessClient } from '../../../../test/client'
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
+import { renderWithProviders } from '../../../../test/render'
 
 test('commit details retain their hash and files until the selected commit can paint', async ({
   server,
