@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const PACKAGE_DIRS = [
   'packages/textbuffer',
   'packages/editor',
-  'packages/decode',
+  'packages/file-animation',
   'packages/markdown',
   'packages/panes',
   'packages/lsp',

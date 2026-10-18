@@ -1,11 +1,11 @@
 import type { MorphFrame } from './morph-frame'
 import { hash01, scramble, spatialNoise } from './noise'
-import type { ResolvedDecodeOptions } from './options'
+import type { ResolvedTransitionOptions } from './transition-options'
 import { appendPieceSpan, whenAllFinished } from './piece-span'
 
-const LAYER_CLASS = 'editor-decode-layer'
-const CARET_CLASS = 'editor-decode-caret'
-const CARET_BAR_CLASS = 'editor-decode-caret-bar'
+const LAYER_CLASS = 'editor-file-transition-layer'
+const CARET_CLASS = 'editor-file-transition-caret'
+const CARET_BAR_CLASS = 'editor-file-transition-caret-bar'
 
 // A typed piece blurs in over this long, so the stream reads as smooth rather than stamped.
 const APPEAR_MS = 160
@@ -43,7 +43,7 @@ export class RevealRun {
   public constructor(
     host: HTMLElement,
     frame: MorphFrame,
-    options: ResolvedDecodeOptions,
+    options: ResolvedTransitionOptions,
     widthOf: (text: string) => number,
     onDone: () => void,
   ) {
@@ -76,7 +76,7 @@ export class RevealRun {
 
   private stream(
     frame: MorphFrame,
-    options: ResolvedDecodeOptions,
+    options: ResolvedTransitionOptions,
     widthOf: (text: string) => number,
   ): void {
     const times = capTimes(streamTimes(frame, options), options.maxDurationMs - APPEAR_MS)
@@ -113,7 +113,7 @@ export class RevealRun {
   // text. The scrambles are fixed strings; only their opacity animates.
   private diffuse(
     frame: MorphFrame,
-    options: ResolvedDecodeOptions,
+    options: ResolvedTransitionOptions,
     widthOf: (text: string) => number,
   ): void {
     const run = options.maxDurationMs
@@ -203,7 +203,7 @@ const NOISE_FRAMES: readonly Keyframe[][] = [
 ]
 
 /** When each piece starts to appear, before the cap. */
-function streamTimes(frame: MorphFrame, options: ResolvedDecodeOptions): number[] {
+function streamTimes(frame: MorphFrame, options: ResolvedTransitionOptions): number[] {
   if (options.mode === 'token') return frame.pieces.map((_, index) => index * options.perTokenMs)
   if (options.mode === 'parallel') return parallelTimes(frame, options)
 
@@ -230,7 +230,7 @@ function streamTimes(frame: MorphFrame, options: ResolvedDecodeOptions): number[
 // carets scatter across columns instead of advancing in lockstep. A row starts typing at its
 // first piece, past the indent. The jitter is a hash of the row, never Math.random, so a reveal
 // is reproducible.
-function parallelTimes(frame: MorphFrame, options: ResolvedDecodeOptions): number[] {
+function parallelTimes(frame: MorphFrame, options: ResolvedTransitionOptions): number[] {
   let row = -1
   let rowStart = 0
   return frame.pieces.map((piece) => {
@@ -256,7 +256,7 @@ function capTimes(times: readonly number[], limit: number): number[] {
 function caretTracks(
   frame: MorphFrame,
   times: readonly number[],
-  mode: ResolvedDecodeOptions['mode'],
+  mode: ResolvedTransitionOptions['mode'],
   widthOf: (text: string) => number,
 ): CaretPoint[][] {
   const tracks = new Map<number, CaretPoint[]>()

@@ -7,20 +7,15 @@ import type {
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
 import { TextMeasurer, canvasFont, renderedTabColumns } from './measure'
-import {
-  buildFrame,
-  drawsAsPlainText,
-  frameMoved,
-  recolorFrame,
-  type MorphFrame,
-} from './morph-frame'
+import { buildFrame, frameMoved, recolorFrame, type MorphFrame } from './morph-frame'
 import { matchPieces } from './morph-match'
 import { MorphRun, restingPieces, springEasing, type MorphTiming } from './morph-run'
 import { RowCover } from './row-cover'
 import { RowMoves, rowMoves } from './row-moves'
+import { drawableRows, reducedMotion, supportsLinearEasing, type TextOffsetRange } from './motion'
 import './style.css'
 
-export type MorphPluginOptions = {
+export type FileEditAnimationPluginOptions = {
   /** Length of one morph in milliseconds. Defaults to `520`. */
   readonly durationMs?: number
   /** Spring overshoot of moving text, from `0` (none) to `0.5`. Defaults to `0.18`. */
@@ -31,9 +26,6 @@ export type MorphPluginOptions = {
 
 const ACTIVE_CLASS = 'editor-morph-active'
 
-type TextOffsetRange = ReturnType<
-  EditorViewContributionContext['getInlineReplacementRanges']
->[number]
 const TEXT_CHANGES = new Set(['edit', 'undo', 'redo', 'checkout', 'reconcile'])
 
 /**
@@ -42,28 +34,31 @@ const TEXT_CHANGES = new Set(['edit', 'undo', 'redo', 'checkout', 'reconcile'])
  * in. Every change morphs except keyboard text input, so typing stays instant.
  * Including this plugin turns the effect on.
  */
-export function createMorphPlugin(options: MorphPluginOptions = {}): EditorPlugin {
+export function createFileEditAnimationPlugin(
+  options: FileEditAnimationPluginOptions = {},
+): EditorPlugin {
   const resolved = {
     durationMs: positive(options.durationMs, 520),
     bounce: Math.min(0.5, Math.max(0, options.bounce ?? 0.18)),
     maxPieces: positive(options.maxPieces, 2500),
   }
   return {
-    name: 'editor.morph',
+    name: 'editor.fileEditAnimation',
     activate: (context) =>
       context.registerViewContribution({
-        createContribution: (viewContext) => new MorphViewContribution(viewContext, resolved),
+        createContribution: (viewContext) =>
+          new FileEditAnimationViewContribution(viewContext, resolved),
       }),
   }
 }
 
-type ResolvedMorphOptions = {
+type ResolvedEditAnimationOptions = {
   readonly durationMs: number
   readonly bounce: number
   readonly maxPieces: number
 }
 
-class MorphViewContribution implements EditorViewContribution {
+class FileEditAnimationViewContribution implements EditorViewContribution {
   public readonly inputs = ['content', 'tokens', 'viewport', 'layout', 'selection'] as const
   private latest: EditorViewSnapshot | null = null
   /** The last snapshot of the text before `latest`'s, which a change morphs from. */
@@ -82,7 +77,7 @@ class MorphViewContribution implements EditorViewContribution {
 
   public constructor(
     private readonly context: EditorViewContributionContext,
-    private readonly options: ResolvedMorphOptions,
+    private readonly options: ResolvedEditAnimationOptions,
   ) {
     // Added to an editor that already shows a document, the first change still needs its before.
     this.cover = new RowCover(context)
@@ -251,32 +246,7 @@ class MorphViewContribution implements EditorViewContribution {
   }
 }
 
-/** Rows painted as their own source text, which the overlay can redraw. */
-function drawableRows(
-  snapshot: EditorViewSnapshot,
-  replaced: readonly TextOffsetRange[],
-): Set<number> {
-  const rows = new Set<number>()
-  for (const row of snapshot.visibleRows) {
-    if (row.kind !== 'text' || !drawsAsPlainText(row)) continue
-    if (replaced.some((range) => range.start < row.endOffset && range.end > row.startOffset))
-      continue
-    rows.add(row.index)
-  }
-  return rows
-}
-
 function positive(value: number | undefined, fallback: number): number {
   if (value === undefined || !Number.isFinite(value) || value <= 0) return fallback
   return value
-}
-
-function reducedMotion(context: EditorViewContributionContext): boolean {
-  const view = context.scrollElement.ownerDocument.defaultView
-  return view?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-}
-
-function supportsLinearEasing(context: EditorViewContributionContext): boolean {
-  const css = context.scrollElement.ownerDocument.defaultView?.CSS
-  return css?.supports?.('animation-timing-function', 'linear(0, 1)') ?? false
 }

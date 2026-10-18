@@ -11,8 +11,11 @@ export type MatchPiece = {
 }
 
 type Line = {
+  /** The line's text without whitespace, the same however highlighting split it into pieces. */
   readonly key: string
   readonly pieces: readonly number[]
+  /** Where each piece starts in `key`. */
+  readonly starts: readonly number[]
   readonly hasWord: boolean
 }
 
@@ -55,11 +58,20 @@ function linesOf(pieces: readonly MatchPiece[]): Line[] {
     if (line) line.push(index)
     else byTop.set(piece.top, [index])
   })
-  return Array.from(byTop.values(), (indices) => ({
-    key: indices.map((index) => pieces[index]?.text).join('\u0000'),
-    pieces: indices,
-    hasWord: indices.some((index) => WORD.test(pieces[index]?.text ?? '')),
-  }))
+  return Array.from(byTop.values(), (indices) => {
+    const starts: number[] = []
+    let key = ''
+    for (const index of indices) {
+      starts.push(key.length)
+      key += pieces[index]?.text ?? ''
+    }
+    return {
+      key,
+      pieces: indices,
+      starts,
+      hasWord: indices.some((index) => WORD.test(pieces[index]?.text ?? '')),
+    }
+  })
 }
 
 function matchLines(
@@ -73,9 +85,7 @@ function matchLines(
   const pairLine = (oldLine: number, newLine: number) => {
     oldLineUsed[oldLine] = 1
     newLineUsed[newLine] = 1
-    const from = oldLines[oldLine]?.pieces ?? []
-    const to = newLines[newLine]?.pieces ?? []
-    to.forEach((newIndex, order) => pair(from[order] ?? -1, newIndex, pairs, oldUsed))
+    pairLinePieces(oldLines[oldLine], newLines[newLine], pairs, oldUsed)
   }
   matchInOrder(
     Array.from(oldLines, (_, index) => index),
@@ -96,6 +106,25 @@ function matchLines(
     if (newLineUsed[newLine] || !line.hasWord) return
     const oldLine = movedByKey.get(line.key)?.shift()
     if (oldLine !== undefined) pairLine(oldLine, newLine)
+  })
+}
+
+/**
+ * Pairs the pieces of two lines that read the same by where each starts: highlighting may split
+ * the two differently, and a new piece then moves from the old piece it starts at.
+ */
+function pairLinePieces(
+  from: Line | undefined,
+  to: Line | undefined,
+  pairs: Int32Array,
+  oldUsed: Uint8Array,
+): void {
+  if (!from || !to) return
+  const byStart = new Map<number, number>()
+  from.starts.forEach((start, order) => byStart.set(start, from.pieces[order] ?? -1))
+  to.starts.forEach((start, order) => {
+    const newIndex = to.pieces[order]
+    if (newIndex !== undefined) pair(byStart.get(start) ?? -1, newIndex, pairs, oldUsed)
   })
 }
 

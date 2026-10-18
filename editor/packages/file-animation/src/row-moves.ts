@@ -71,16 +71,18 @@ function animateRow(element: HTMLElement, move: RowMove, timing: MorphTiming): A
 
 /**
  * Pairs each of `rows` in `after` with the row in `before` that held the same text, nearest
- * first, so a moved block of rendered rows slides together. Returns the pairs and the old rows
- * they took, which the overlay must leave out.
+ * first, so a moved block of rendered rows slides together. `shiftTop` moves `before`'s rows into
+ * `after`'s coordinates, for a different scroll position. Returns the pairs and the old rows they
+ * took, which the overlay must leave out.
  */
 export function rowMoves(
-  before: EditorViewSnapshot,
+  before: EditorViewSnapshot | null,
   after: EditorViewSnapshot,
   rows: ReadonlySet<number>,
+  shiftTop = 0,
 ): { readonly moves: RowMove[]; readonly taken: Set<number> } {
   const byText = new Map<string, VisibleRow[]>()
-  for (const row of before.visibleRows) {
+  for (const row of before?.visibleRows ?? []) {
     if (row.kind !== 'text' || typeof row.text !== 'string') continue
     const list = byText.get(row.text)
     if (list) list.push(row)
@@ -90,9 +92,9 @@ export function rowMoves(
   const moves: RowMove[] = []
   for (const row of after.visibleRows) {
     if (!rows.has(row.index) || row.kind !== 'text' || typeof row.text !== 'string') continue
-    const old = nearestFree(byText.get(row.text), row.top, taken)
+    const old = nearestFree(byText.get(row.text), row.top - shiftTop, taken)
     if (old) taken.add(old.index)
-    moves.push({ index: row.index, fromTop: old ? old.top : null, top: row.top })
+    moves.push({ index: row.index, fromTop: old ? old.top + shiftTop : null, top: row.top })
   }
   return { moves, taken }
 }

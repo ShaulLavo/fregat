@@ -1,7 +1,7 @@
 import { deepStrictEqual, ok } from 'node:assert/strict'
 import type { Scenario } from './index'
 import type { Page } from 'playwright'
-import { morphSelectors, openFileByName, selectors } from '../selectors'
+import { fileEditAnimationSelectors, openFileByName, selectors } from '../selectors'
 
 type Motion = {
   /** First-row text of each painted frame while the edit lands, when it changed. */
@@ -49,8 +49,8 @@ function slidingRowsAt(ms: number): number {
   return sliding
 }
 
-export const editorMarkdownMorph: Scenario = {
-  name: 'editor-markdown-morph',
+export const editorMarkdownEditAnimation: Scenario = {
+  name: 'editor-markdown-edit-animation',
   description:
     'Open docs/releasing.md in Markdown preview and move a line up: the preview stays rendered through the edit, plain rows morph on the overlay and rendered rows slide whole.',
   inspect: async (page) => reports.get(page),
@@ -76,14 +76,16 @@ export const editorMarkdownMorph: Scenario = {
       .click()
     await page.evaluate(watchFirstRow)
     await page.keyboard.press('Alt+ArrowUp')
-    await page.locator(morphSelectors.piece).first().waitFor({ state: 'attached' })
-    const overlay = (await page.locator(morphSelectors.layer).count()) > 0
+    await page.locator(fileEditAnimationSelectors.piece).first().waitFor({ state: 'attached' })
+    const overlay = (await page.locator(fileEditAnimationSelectors.layer).count()) > 0
     const slidingRows = await page.evaluate(slidingRowsAt, 200)
     await step('moved-mid-flight')
     await page.evaluate(() => {
       for (const animation of document.getAnimations()) animation.play()
     })
-    await page.locator(morphSelectors.layer).waitFor({ state: 'detached', timeout: 10_000 })
+    await page
+      .locator(fileEditAnimationSelectors.layer)
+      .waitFor({ state: 'detached', timeout: 10_000 })
     await page.waitForTimeout(600)
     const firstRowFrames = await page.evaluate(stopWatching)
     await step('settled')

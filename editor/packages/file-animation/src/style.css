@@ -1,7 +1,7 @@
-/* Overlays for the reveal (`editor-decode-layer`) and the morph (`editor-morph-layer`).
+/* Overlays for the reveal (`editor-file-transition-layer`) and the morph (`editor-morph-layer`).
    Anchored at the content origin so they scroll with the rows; pieces sit at their
    final spot and WAAPI opacity, filter and transform animations do the rest. */
-.editor-decode-layer,
+.editor-file-transition-layer,
 .editor-morph-layer {
   height: 0;
   left: var(--editor-gutter-width, 0px);
@@ -19,7 +19,7 @@
 }
 
 /* The reveal's caret, one per stream, riding the newest piece. */
-.editor-decode-caret {
+.editor-file-transition-caret {
   left: 0;
   opacity: 0;
   position: absolute;
@@ -29,14 +29,14 @@
 }
 
 /* The visible bar blinks on its own; the outer caret's opacity gates it to its turn. */
-.editor-decode-caret-bar {
-  animation: editor-decode-caret-blink 0.6s step-end infinite;
+.editor-file-transition-caret-bar {
+  animation: editor-file-transition-caret-blink 0.6s step-end infinite;
   background: var(--editor-caret-color);
   height: 100%;
   width: 100%;
 }
 
-@keyframes editor-decode-caret-blink {
+@keyframes editor-file-transition-caret-blink {
   from,
   to {
     opacity: 1;
@@ -54,19 +54,19 @@
 
 /* While a file writes itself in, what decorates its text waits for the text: the editor caret,
    whitespace dots and indentation guides would otherwise sit on rows that are still empty. */
-.editor-decode-active .editor-virtualized-caret-layer,
-.editor-decode-active .editor-virtualized-hidden-character-layer,
-.editor-decode-active .editor-scope-lines {
+.editor-file-transition-active .editor-virtualized-caret-layer,
+.editor-file-transition-active .editor-virtualized-hidden-character-layer,
+.editor-file-transition-active .editor-scope-lines {
   opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .editor-decode-layer,
+  .editor-file-transition-layer,
   .editor-morph-layer {
     display: none;
   }
 
-  .editor-decode-caret-bar {
+  .editor-file-transition-caret-bar {
     animation: none;
   }
 }

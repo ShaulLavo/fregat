@@ -17,8 +17,8 @@
   "dependencies": {
     "@singapore-editor/collab": "workspace:*",
     "@singapore-editor/core": "workspace:*",
-    "@singapore-editor/decode": "workspace:*",
     "@singapore-editor/diff": "workspace:*",
+    "@singapore-editor/file-animation": "workspace:*",
     "@singapore-editor/find": "workspace:*",
     "@singapore-editor/gutters": "workspace:*",
     "@singapore-editor/highlighting": "workspace:*",

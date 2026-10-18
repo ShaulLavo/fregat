@@ -33,6 +33,14 @@ describe('matchPieces', () => {
     expect(pairs).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7])
   })
 
+  it('moves a line whole when highlighting split it differently', () => {
+    const before = line(0, 'total ( items : number [] ): {')
+    const after = line(0, 'const x').concat(line(20, 'total ( items : number []): {'))
+    const pairs = Array.from(matchPieces(before, after))
+    // `[]):` moves from where `[]` started; `):` has no piece of its own any more and leaves.
+    expect(pairs).toEqual([-1, -1, 0, 1, 2, 3, 4, 5, 7])
+  })
+
   it('lets a lone bracket fade instead of flying to a distant match', () => {
     const pairs = matchPieces(line(0, 'a { b'), line(0, 'b { c'))
     expect(Array.from(pairs)).toEqual([2, -1, -1])

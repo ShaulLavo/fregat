@@ -29,8 +29,8 @@ import { EditorFrame } from '@/features/editor/components/frame'
 import { DiagnosticPeek } from '@/features/editor/components/diagnostic-peek'
 import {
   createCriticalEditorCorePlugins,
-  createRevealPlugins,
-  MORPH_PLUGIN,
+  fileTransitionPlugins,
+  FILE_EDIT_ANIMATION_PLUGIN,
 } from '@/features/editor/utils/plugins'
 import { selectionForDefinition } from '@/features/editor/utils/position'
 import { languageIdForFilePath } from '@/lib/file-language'
@@ -64,7 +64,7 @@ import { editorPreparedDocumentTags } from '@/features/editor/utils/prepared-doc
 import { useMountedEditorRegistry } from '@/features/editor/hooks/use-mounted-editor-registry'
 import { useRegisterEditorController } from '@/features/editor/hooks/use-register-editor-controller'
 import type { SnapshotCaptureSource } from '@/lib/editor-visible-snapshot-cache'
-import { effectiveDecodeMode } from '@/features/editor/utils/decode-mode'
+import { effectiveFileTransitionMode } from '@/features/editor/utils/file-transition-mode'
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
 
 const NO_ADDITIONAL_PLUGINS: readonly EditorPlugin[] = []
@@ -203,11 +203,15 @@ export function Editor({
     useSettingValue('editor.syntaxHighlighting.enabled') && analysisAllowed
   const indentationGuidesEnabled = useSettingValue('editor.guides.indentation') && analysisAllowed
   const minimapEnabled = useSettingValue('editor.minimap.enabled') && minimapAllowed
-  const decodeSetting = useSettingValue('editor.decode.mode')
-  const morphEnabled = useSettingValue('editor.morph.enabled') && analysisAllowed
+  const fileTransitionSetting = useSettingValue('editor.fileTransition.mode')
+  const fileEditAnimationEnabled =
+    useSettingValue('editor.fileEditAnimation.enabled') && analysisAllowed
   const inputRoute = useSettingValue('editor.inputRoute')
-  const decodeMode = analysisAllowed
-    ? effectiveDecodeMode(decodeSetting, typeof window === 'undefined' ? '' : location.search)
+  const fileTransitionMode = analysisAllowed
+    ? effectiveFileTransitionMode(
+        fileTransitionSetting,
+        typeof window === 'undefined' ? '' : location.search,
+      )
     : null
   const mountedEditors = useMountedEditorRegistry()
   const clearStatusBarSource = useEditorUiState((state) => state.clearStatusBarSource)
@@ -285,7 +289,10 @@ export function Editor({
       compareMergeConflict,
     ],
   )
-  const revealPlugins = useMemo(() => createRevealPlugins(decodeMode), [decodeMode])
+  const transitionPlugins = useMemo(
+    () => fileTransitionPlugins(fileTransitionMode),
+    [fileTransitionMode],
+  )
   const unicodeHighlights = useUnicodeHighlights()
   const spellcheckPlugin = useSpellcheckPlugin()
   const textMenuRequest = useEditorUiState((state) =>
@@ -297,8 +304,8 @@ export function Editor({
     [unicodeHighlights.plugin],
     analysisAllowed && spellcheckPlugin ? [spellcheckPlugin] : [],
     [diagnosticPeek.plugin, languageServer],
-    revealPlugins,
-    morphEnabled ? [MORPH_PLUGIN] : [],
+    transitionPlugins,
+    fileEditAnimationEnabled ? [FILE_EDIT_ANIMATION_PLUGIN] : [],
     [scrollPersistencePlugin],
     additionalPlugins,
   )
@@ -327,7 +334,7 @@ export function Editor({
     folding: analysisAllowed,
     detectIndentation: analysisAllowed,
     documentKey: comparison ? null : paintKey,
-    snapshot: !comparison && !decodeMode ? snapshot : null,
+    snapshot: !comparison && !fileTransitionMode ? snapshot : null,
     editability,
     ...typography,
     gutterLeadingInset: gutterInset,
@@ -352,12 +359,14 @@ export function Editor({
     theme: editorTheme,
   })
   useLayoutEffect(() => {
-    // Decode changes visible text during its animation and has no replay contract.
+    // The file transition changes visible text during its animation and has no replay contract.
     onCaptureSourceChange?.(
-      comparison || decodeMode ? null : () => controller.getEditor()?.captureSnapshot() ?? null,
+      comparison || fileTransitionMode
+        ? null
+        : () => controller.getEditor()?.captureSnapshot() ?? null,
     )
     return () => onCaptureSourceChange?.(null)
-  }, [comparison, controller, decodeMode, onCaptureSourceChange])
+  }, [comparison, controller, fileTransitionMode, onCaptureSourceChange])
   const mountedPath = liveDocument ? resource?.path : undefined
   useRegisterEditorController(tabId, liveDocument ? controller : null)
   useLayoutEffect(

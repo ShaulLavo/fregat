@@ -26,7 +26,11 @@ import {
 import { highlightingService } from '@/lib/highlighting/state/service'
 import { log } from '@/lib/client-logging'
 import { editorPerformanceFeatureDisabled } from '@/features/editor/state/performance-trace'
-import { createDecodePlugin, createMorphPlugin, type DecodeMode } from '@singapore-editor/decode'
+import {
+  createFileTransitionPlugin,
+  createFileEditAnimationPlugin,
+  type FileTransitionMode,
+} from '@singapore-editor/file-animation'
 import { editorIndentationGuidesSupported } from '@/features/editor/utils/indentation-guides'
 import { FOLD_CHEVRON_ICON } from '@/features/editor/utils/fold-icon'
 
@@ -106,13 +110,23 @@ export function createCriticalEditorCorePlugins(
 }
 
 /** The file-open reveal, when a mode is set. */
-export function createRevealPlugins(mode: DecodeMode | null): EditorPlugin[] {
-  return mode ? [createDecodePlugin({ mode })] : []
+// One instance per mode for every editor: a magic move starts from the file another editor, such
+// as the previous tab's, opened last, which only the shared instance remembers.
+const FILE_TRANSITION_PLUGINS = new Map<FileTransitionMode, EditorPlugin>()
+
+export function fileTransitionPlugins(mode: FileTransitionMode | null): EditorPlugin[] {
+  if (!mode) return []
+  let plugin = FILE_TRANSITION_PLUGINS.get(mode)
+  if (!plugin) {
+    plugin = createFileTransitionPlugin({ mode })
+    FILE_TRANSITION_PLUGINS.set(mode, plugin)
+  }
+  return [plugin]
 }
 
 // One instance for every editor, so turning edit animation on or off adds or removes only this
 // plugin: a rebuilt reveal plugin would replay on every open file.
-export const MORPH_PLUGIN = createMorphPlugin()
+export const FILE_EDIT_ANIMATION_PLUGIN = createFileEditAnimationPlugin()
 
 function createEditorSyntaxHighlightingPlugins(
   languageId: EditorSyntaxLanguageId | null,

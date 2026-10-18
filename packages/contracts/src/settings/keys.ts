@@ -600,12 +600,19 @@ export const SETTINGS_REGISTRY = {
     default: true,
     scope: 'window',
   }),
-  'editor.decode.mode': defineSetting({
-    schema: v.picklist(['off', 'diffusion', 'autoregressive', 'parallel', 'token'] as const),
+  'editor.fileTransition.mode': defineSetting({
+    schema: v.picklist([
+      'off',
+      'diffusion',
+      'autoregressive',
+      'parallel',
+      'token',
+      'magicMove',
+    ] as const),
     default: 'off',
     scope: 'window',
   }),
-  'editor.morph.enabled': defineSetting({
+  'editor.fileEditAnimation.enabled': defineSetting({
     schema: v.boolean(),
     default: true,
     scope: 'window',
