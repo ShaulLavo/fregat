@@ -47,23 +47,25 @@ export class RowMoves {
   }
 }
 
-/** A real row to animate: from `fromTop` when its text stood there before, else entering. */
+/** A real row to animate: from `offset` away when its text stood there before, else entering. */
 export type RowMove = {
   readonly index: number
-  readonly fromTop: number | null
-  readonly top: number
+  readonly offset: { readonly dx: number; readonly dy: number } | null
 }
 
+/** How far `before`'s content coordinates sit from `after`'s on screen. */
+export type ScreenShift = { readonly dx: number; readonly dy: number }
+
 function animateRow(element: HTMLElement, move: RowMove, timing: MorphTiming): Animation | null {
-  if (move.fromTop === null) {
+  if (move.offset === null) {
     return element.animate([{ opacity: 0 }, { opacity: 1 }], {
       duration: timing.durationMs,
       easing: 'ease-out',
     })
   }
-  const dy = move.fromTop - move.top
-  if (dy === 0) return null
-  return element.animate([{ translate: `0 ${dy}px` }, { translate: '0 0' }], {
+  const { dx, dy } = move.offset
+  if (dx === 0 && dy === 0) return null
+  return element.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], {
     duration: timing.durationMs,
     easing: timing.moveEasing,
   })
@@ -71,16 +73,18 @@ function animateRow(element: HTMLElement, move: RowMove, timing: MorphTiming): A
 
 /**
  * Pairs each of `rows` in `after` with the row in `before` that held the same text, nearest
- * first, so a moved block of rendered rows slides together. Returns the pairs and the old rows
- * they took, which the overlay must leave out.
+ * first, so a moved block of rendered rows slides together. `shift` moves `before`'s rows into
+ * `after`'s coordinates: another editor, scroll position or gutter. Returns the pairs and the old
+ * rows they took, which the overlay must leave out.
  */
 export function rowMoves(
-  before: EditorViewSnapshot,
+  before: EditorViewSnapshot | null,
   after: EditorViewSnapshot,
   rows: ReadonlySet<number>,
+  shift: ScreenShift = { dx: 0, dy: 0 },
 ): { readonly moves: RowMove[]; readonly taken: Set<number> } {
   const byText = new Map<string, VisibleRow[]>()
-  for (const row of before.visibleRows) {
+  for (const row of before?.visibleRows ?? []) {
     if (row.kind !== 'text' || typeof row.text !== 'string') continue
     const list = byText.get(row.text)
     if (list) list.push(row)
@@ -90,9 +94,10 @@ export function rowMoves(
   const moves: RowMove[] = []
   for (const row of after.visibleRows) {
     if (!rows.has(row.index) || row.kind !== 'text' || typeof row.text !== 'string') continue
-    const old = nearestFree(byText.get(row.text), row.top, taken)
+    const old = nearestFree(byText.get(row.text), row.top - shift.dy, taken)
     if (old) taken.add(old.index)
-    moves.push({ index: row.index, fromTop: old ? old.top : null, top: row.top })
+    const offset = old ? { dx: shift.dx, dy: old.top + shift.dy - row.top } : null
+    moves.push({ index: row.index, offset })
   }
   return { moves, taken }
 }

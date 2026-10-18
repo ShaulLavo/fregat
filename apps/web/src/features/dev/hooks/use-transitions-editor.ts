@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Editor } from '@singapore-editor/core/editor'
-import { createDecodePlugin, createMorphPlugin, type DecodeMode } from '@singapore-editor/decode'
+import {
+  createFileTransitionPlugin,
+  createFileEditAnimationPlugin,
+  type FileTransitionMode,
+} from '@singapore-editor/file-animation'
 import { createHighlightingPlugin } from '@singapore-editor/highlighting'
 import { highlightingService } from '@/lib/highlighting/state/service'
 import { TRANSITION_STEPS } from '@/features/dev/utils/transition-samples'
@@ -10,8 +14,10 @@ export type TransitionsMotion = {
   readonly durationMs: number
   readonly bounce: number
   /** The file-open reveal, replayed by reopening the text as a new document when `replay` grows. */
-  readonly reveal: DecodeMode
+  readonly reveal: FileTransitionMode
   readonly replay: number
+  /** Text the replay opens; null reopens what the editor holds. */
+  readonly replayText: string | null
   readonly speed: number
 }
 
@@ -40,7 +46,7 @@ export function useTransitionsEditor(motion: TransitionsMotion) {
   useEffect(() => {
     if (!editor) return
     const registration = editor.addPlugin(
-      createMorphPlugin({ durationMs: motion.durationMs, bounce: motion.bounce }),
+      createFileEditAnimationPlugin({ durationMs: motion.durationMs, bounce: motion.bounce }),
     )
     return () => registration.dispose()
   }, [editor, motion.durationMs, motion.bounce])
@@ -48,7 +54,7 @@ export function useTransitionsEditor(motion: TransitionsMotion) {
   useEffect(() => {
     if (!editor) return
     const registration = editor.addPlugin(
-      createDecodePlugin({ mode: motion.reveal, speed: motion.speed }),
+      createFileTransitionPlugin({ mode: motion.reveal, speed: motion.speed }),
     )
     return () => registration.dispose()
   }, [editor, motion.reveal, motion.speed])
@@ -59,9 +65,9 @@ export function useTransitionsEditor(motion: TransitionsMotion) {
     editor.openDocument({
       documentId: `transitions-${motion.replay}.ts`,
       languageId: 'typescript',
-      text: editor.materializeFullText(),
+      text: motion.replayText ?? editor.materializeFullText(),
     })
-  }, [editor, motion.replay])
+  }, [editor, motion.replay, motion.replayText])
 
   return { editor, containerRef }
 }

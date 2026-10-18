@@ -1,5 +1,5 @@
 {
-  "name": "@singapore-editor/decode",
+  "name": "@singapore-editor/file-animation",
   "version": "0.2.9",
   "description": "Text reveal animations for documents opened in the Singapore editor.",
   "keywords": [
@@ -10,7 +10,7 @@
     "text-reveal",
     "typescript"
   ],
-  "homepage": "https://singapore.shaulavo.dev/docs/reference/api/decode/overview/",
+  "homepage": "https://singapore.shaulavo.dev/docs/reference/api/file-animation/overview/",
   "bugs": {
     "url": "https://github.com/ShaulLavo/fregat/issues"
   },
@@ -18,7 +18,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ShaulLavo/fregat.git",
-    "directory": "editor/packages/decode"
+    "directory": "editor/packages/file-animation"
   },
   "files": [
     "README.md",

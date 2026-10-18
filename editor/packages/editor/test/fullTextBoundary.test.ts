@@ -2,7 +2,7 @@ import { createEditorStructuralOperation } from '../src/editor/operationDefiniti
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Kind } from 'tree-sitter-md'
 
-import { createDecodePlugin } from '../../decode/src/index'
+import { createFileTransitionPlugin } from '../../file-animation/src/index'
 import { createMarkdownPreviewPlugin } from '../../markdown/src/index'
 import { createScopeLinesPlugin } from '../../scope-lines/src/index'
 import {
@@ -244,7 +244,7 @@ function mount(buffer: EditorTextBuffer, viewId: string) {
       markdownCaptures(),
       observedMarkdown(),
       createScopeLinesPlugin(),
-      createDecodePlugin(),
+      createFileTransitionPlugin(),
       createMergeConflictPlugin(),
       recordSnapshots(snapshots),
     ],

@@ -1,8 +1,12 @@
-export type DecodeMode = 'autoregressive' | 'parallel' | 'diffusion' | 'token'
+/**
+ * How an opened file arrives. `magicMove` carries the text the previous file shares with it from
+ * where it stood to where it stands now; the rest fades out and in.
+ */
+export type FileTransitionMode = 'autoregressive' | 'parallel' | 'diffusion' | 'token' | 'magicMove'
 
-export type DecodePluginOptions = {
-  /** Decoding style. Defaults to `autoregressive`. */
-  readonly mode?: DecodeMode
+export type FileTransitionPluginOptions = {
+  /** How the opened file writes itself in. Defaults to `autoregressive`. */
+  readonly mode?: FileTransitionMode
   /** Typing speed: milliseconds per character (one step per character). Defaults to `20`. */
   readonly perCharMs?: number
   /**
@@ -30,8 +34,8 @@ export type DecodePluginOptions = {
   readonly maxRows?: number
 }
 
-export type ResolvedDecodeOptions = {
-  readonly mode: DecodeMode
+export type ResolvedTransitionOptions = {
+  readonly mode: FileTransitionMode
   readonly perCharMs: number
   readonly perTokenMs: number
   readonly speed: number
@@ -40,7 +44,7 @@ export type ResolvedDecodeOptions = {
   readonly maxRows: number
 }
 
-const DEFAULTS: ResolvedDecodeOptions = {
+const DEFAULTS: ResolvedTransitionOptions = {
   mode: 'autoregressive',
   // ~one character per frame: fast, but still reads as typing.
   perCharMs: 20,
@@ -52,7 +56,9 @@ const DEFAULTS: ResolvedDecodeOptions = {
   maxRows: 400,
 }
 
-export function resolveDecodeOptions(options: DecodePluginOptions): ResolvedDecodeOptions {
+export function resolveTransitionOptions(
+  options: FileTransitionPluginOptions,
+): ResolvedTransitionOptions {
   return {
     mode: resolveMode(options.mode),
     perCharMs: positiveNumber(options.perCharMs, DEFAULTS.perCharMs),
@@ -64,8 +70,9 @@ export function resolveDecodeOptions(options: DecodePluginOptions): ResolvedDeco
   }
 }
 
-function resolveMode(mode: DecodeMode | undefined): DecodeMode {
-  if (mode === 'parallel' || mode === 'diffusion' || mode === 'token') return mode
+function resolveMode(mode: FileTransitionMode | undefined): FileTransitionMode {
+  if (mode === 'parallel' || mode === 'diffusion' || mode === 'token' || mode === 'magicMove')
+    return mode
   return DEFAULTS.mode
 }
 

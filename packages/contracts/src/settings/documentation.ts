@@ -630,24 +630,26 @@ export const SETTINGS_DOCUMENTATION = {
     description: 'Colour code by syntax. Turning this off makes very large files faster.',
     keywords: ['syntax', 'highlighting', 'colour', 'performance'],
   },
-  'editor.decode.mode': {
+  'editor.fileTransition.mode': {
+    title: 'File transition animation',
     optionTitles: {
       off: 'Off',
       diffusion: 'Diffusion',
       autoregressive: 'Autoregressive',
       parallel: 'Parallel',
       token: 'Token',
+      magicMove: 'Magic move',
     },
     details:
-      'Autoregressive writes the file in reading order behind a caret. Parallel writes every line at once from staggered starts. Token stamps one token at a time, like a language model. Diffusion resolves scrambled text in clusters.',
+      'Autoregressive writes the file in reading order behind a caret. Parallel writes every line at once from staggered starts. Token stamps one token at a time, like a language model. Diffusion resolves scrambled text in clusters. Magic move slides the text two files share from where it stood in the previous file to its place in the new one.',
     description: 'Animate a file as it opens, as if it were being written.',
-    keywords: ['decode', 'animation', 'diffusion', 'typewriter'],
+    keywords: ['transition', 'animation', 'file', 'open', 'diffusion', 'typewriter'],
   },
-  'editor.morph.enabled': {
-    title: 'Animate edits',
+  'editor.fileEditAnimation.enabled': {
+    title: 'File edit animation',
     description:
       'Animate every edit except typing: undo, redo, paste, commands and generated code. Text that stays slides to its new place, removed text fades out, and new text streams in. Typing stays instant.',
-    keywords: ['morph', 'animation', 'transition', 'undo', 'motion'],
+    keywords: ['edit', 'animation', 'morph', 'undo', 'motion'],
   },
   'search.defaultMatchMode': {
     optionTitles: { literal: 'Exact text', regex: 'Regular expression', fuzzy: 'Fuzzy' },

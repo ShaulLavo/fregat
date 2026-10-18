@@ -17,10 +17,10 @@ import type {
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
 import {
-  createDecodePlugin,
-  createMorphPlugin,
-  type DecodePluginOptions,
-  type MorphPluginOptions,
+  createFileTransitionPlugin,
+  createFileEditAnimationPlugin,
+  type FileTransitionPluginOptions,
+  type FileEditAnimationPluginOptions,
 } from '../src/index'
 import { RangeText } from '../../editor/dist/textContent'
 import { measureString } from '../../editor/dist/textMeasurements'
@@ -86,20 +86,20 @@ const pieceDelays = () =>
     .filter((entry) => entry.element.classList.contains('editor-morph-piece'))
     .map((entry) => Number(entry.options.delay ?? 0))
 const carets = (context: EditorViewContributionContext) =>
-  context.contentElement.querySelectorAll('.editor-decode-caret')
+  context.contentElement.querySelectorAll('.editor-file-transition-caret')
 const revealLayer = (context: EditorViewContributionContext) =>
-  context.contentElement.querySelector('.editor-decode-layer')
+  context.contentElement.querySelector('.editor-file-transition-layer')
 
-describe('createDecodePlugin', () => {
+describe('createFileTransitionPlugin', () => {
   it('registers a single view contribution', () => {
     const registerViewContribution = vi.fn<EditorPluginContext['registerViewContribution']>(() => ({
       dispose: vi.fn(),
     }))
-    const plugin = createDecodePlugin()
+    const plugin = createFileTransitionPlugin()
 
     const disposable = plugin.activate(pluginContext(registerViewContribution))
 
-    expect(plugin.name).toBe('editor.decode')
+    expect(plugin.name).toBe('editor.fileTransition')
     expect(disposable).toBeDefined()
     expect(registerViewContribution).toHaveBeenCalledOnce()
   })
@@ -111,7 +111,7 @@ describe('createDecodePlugin', () => {
     expect(revealLayer(context)).not.toBeNull()
     expect(pieceSpans(context).length).toBeGreaterThan(0)
     expect(rowAnimations().length).toBeGreaterThan(0)
-    expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(true)
+    expect(context.scrollElement.classList.contains('editor-file-transition-active')).toBe(true)
     contribution.dispose()
   })
 
@@ -186,7 +186,7 @@ describe('createDecodePlugin', () => {
       }
 
       expect(revealLayer(context)).toBeNull()
-      expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
+      expect(context.scrollElement.classList.contains('editor-file-transition-active')).toBe(false)
       expect(rowAnimations().every((entry) => entry.cancel.mock.calls.length > 0)).toBe(true)
       expect(presentations.every((handle) => vi.mocked(handle.dispose).mock.calls.length > 0)).toBe(
         true,
@@ -288,9 +288,122 @@ describe('createDecodePlugin', () => {
   })
 })
 
+describe('magic move', () => {
+  const MOVED = '  if (x) {\n    y()\n  }\nfunction f() {\n}\n'
+  const fromY = (entry: RecordedAnimation) =>
+    Number(/translate\([^,]+,\s*(-?[\d.]+)px\)/.exec(String(entry.keyframes[0]?.transform))?.[1])
+
+  it('slides the text two files share from where it stood in the previous file', () => {
+    const { context, contribution } = mount({ mode: 'magicMove' })
+    contribution.update(snapshot(), 'layout')
+    contribution.update(snapshot({ documentId: 'other', text: MOVED, textVersion: 2 }), 'document')
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).not.toBeNull()
+    const rowHeight = snapshot().metrics.rowHeight
+    // `function` stood on the first row and now stands on the fourth.
+    const moved = recorded.filter((entry) => entry.element.textContent === 'function')
+    expect(moved.map(fromY)).toEqual([-3 * rowHeight])
+    expect(enterAnimations()).toHaveLength(0)
+    contribution.dispose()
+  })
+
+  it('moves from the file another editor opened last, like the previous tab', () => {
+    const provider = registeredProvider(createFileTransitionPlugin({ mode: 'magicMove' }))
+    const firstContext = viewContext()
+    populateRows(firstContext.contentElement, snapshot())
+    const first = provider?.createContribution(firstContext)
+    first?.update(snapshot({ documentId: 'previous-tab' }), 'document')
+    first?.dispose()
+    recorded = []
+
+    const secondContext = viewContext()
+    populateRows(secondContext.contentElement, snapshot({ text: MOVED }))
+    const second = provider?.createContribution(secondContext)
+    second?.update(snapshot({ documentId: 'next-tab', text: MOVED, textVersion: 2 }), 'document')
+
+    const moved = recorded.filter((entry) => entry.element.textContent === 'function')
+    expect(moved.map(fromY)).toEqual([-3 * snapshot().metrics.rowHeight])
+    second?.dispose()
+  })
+
+  it('keeps a rendered row fading in after an overlay with nothing to draw is done', async () => {
+    const provider = registeredProvider(createFileTransitionPlugin({ mode: 'magicMove' }))
+    const context = { ...viewContext(), hasDocument: () => false }
+    populateRows(context.contentElement, snapshot({ text: 'heading\n' }))
+    // The whole file renders as something other than its source.
+    vi.spyOn(context, 'getInlineReplacementRanges').mockReturnValue([{ start: 0, end: 7 }])
+    const contribution = provider?.createContribution(context)
+    contribution?.update(snapshot({ documentId: 'heading', text: 'heading\n' }), 'document')
+    const fade = rowAnimations().find((entry) => entry.keyframes[0]?.opacity === 0)
+    expect(fade).toBeDefined()
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(fade!.cancel).not.toHaveBeenCalled()
+    contribution?.dispose()
+  })
+
+  it('slides a rendered row across from another editor beside this one', () => {
+    const provider = registeredProvider(createFileTransitionPlugin({ mode: 'magicMove' }))
+    const left = viewContext()
+    vi.spyOn(left.scrollElement, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 0, 400, 400),
+    )
+    document.body.append(left.scrollElement)
+    vi.spyOn(left, 'getInlineReplacementRanges').mockReturnValue([{ start: 0, end: 7 }])
+    const first = provider?.createContribution(left)
+    first?.update(snapshot({ documentId: 'left', text: 'heading\n' }), 'document')
+
+    const right = viewContext()
+    vi.spyOn(right.scrollElement, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(400, 0, 400, 400),
+    )
+    document.body.append(right.scrollElement)
+    vi.spyOn(right, 'getInlineReplacementRanges').mockReturnValue([{ start: 0, end: 7 }])
+    populateRows(right.contentElement, snapshot({ text: 'heading\n' }))
+    recorded = []
+    const second = provider?.createContribution(right)
+    second?.update(snapshot({ documentId: 'right', text: 'heading\n' }), 'document')
+
+    const slide = rowAnimations().find((entry) => entry.keyframes[0]?.translate !== undefined)
+    expect(slide?.keyframes[0]?.translate).toBe('-400px 0px')
+    first?.dispose()
+    second?.dispose()
+    left.scrollElement.remove()
+    right.scrollElement.remove()
+  })
+
+  it('brings the first file in when nothing came before it', () => {
+    const provider = registeredProvider(createFileTransitionPlugin({ mode: 'magicMove' }))
+    const context = { ...viewContext(), hasDocument: () => false }
+    populateRows(context.contentElement, snapshot({ text: MOVED }))
+    const contribution = provider?.createContribution(context)
+    if (!contribution) throw new Error('file transition contribution was not created')
+    contribution.update(snapshot({ documentId: 'first', text: MOVED, textVersion: 2 }), 'document')
+
+    expect(context.contentElement.querySelector('.editor-morph-layer')).not.toBeNull()
+    expect(enterAnimations().length).toBeGreaterThan(0)
+    contribution.dispose()
+  })
+
+  it('places the previous file where it stood on screen when the new one opens scrolled', () => {
+    const { contribution } = mount({ mode: 'magicMove' })
+    contribution.update(snapshot(), 'layout')
+    const opened = snapshot({ documentId: 'other', text: SAMPLE, textVersion: 2 })
+    const scrolled = { ...opened, viewport: { ...opened.viewport, scrollTop: 40 } }
+    contribution.update(scrolled, 'document')
+
+    const moved = recorded.filter((entry) => entry.element.textContent === 'function')
+    // The same row on screen sits 40px further down the content of the scrolled file.
+    expect(moved.map(fromY)).toEqual([40])
+    contribution.dispose()
+  })
+})
+
 const EDITED = 'function f(a: number) {\n  if (x) {\n    y(a)\n  }\n}\n'
 
-describe('createMorphPlugin', () => {
+describe('createFileEditAnimationPlugin', () => {
   it('morphs an edit: the real rows hide under an overlay of pieces', () => {
     const { context, contribution } = mountMorph()
     contribution.update(snapshot({ text: EDITED, textVersion: 2 }), 'content', edit(12))
@@ -452,7 +565,7 @@ describe('createMorphPlugin', () => {
 
     const moved = rowAnimations().find((entry) => entry.element.dataset.editorVirtualRow === '1')
     const rowHeight = next.metrics.rowHeight
-    expect(moved?.keyframes).toEqual([{ translate: `0 ${rowHeight}px` }, { translate: '0 0' }])
+    expect(moved?.keyframes).toEqual([{ translate: `0px ${rowHeight}px` }, { translate: '0 0' }])
     const covered = coverAnimations().map((entry) => entry.element.dataset.editorVirtualRow)
     expect(covered).not.toContain('1')
     expect(pieceSpans(context).map((span) => span.textContent)).not.toContain('y')
@@ -501,13 +614,13 @@ function typed(size: number): EditorContributionChange {
   return { ...edit(size), typing: true }
 }
 
-function mountMorph(options: MorphPluginOptions = {}): {
+function mountMorph(options: FileEditAnimationPluginOptions = {}): {
   context: EditorViewContributionContext
   contribution: EditorViewContribution
   presentations: EditorRowPresentation[]
 } {
   let provider: EditorViewContributionProvider | undefined
-  createMorphPlugin(options).activate(
+  createFileEditAnimationPlugin(options).activate(
     pluginContext((registered) => {
       provider = registered
       return { dispose: vi.fn() }
@@ -521,17 +634,17 @@ function mountMorph(options: MorphPluginOptions = {}): {
   return { context, contribution, presentations }
 }
 
-function mount(options: DecodePluginOptions = {}): {
+function mount(options: FileTransitionPluginOptions = {}): {
   context: EditorViewContributionContext
   contribution: EditorViewContribution
   presentations: EditorRowPresentation[]
 } {
-  const provider = registeredProvider(createDecodePlugin(options))
+  const provider = registeredProvider(createFileTransitionPlugin(options))
   const presentations: EditorRowPresentation[] = []
   const context = viewContext(presentations)
   populateRows(context.contentElement, snapshot())
   const contribution = provider?.createContribution(context)
-  if (!contribution) throw new Error('decode contribution was not created')
+  if (!contribution) throw new Error('file transition contribution was not created')
   return { context, contribution, presentations }
 }
 
@@ -550,7 +663,7 @@ function populateRows(scroll: HTMLElement, snap: EditorViewSnapshot): void {
 }
 
 function registeredProvider(
-  plugin: ReturnType<typeof createDecodePlugin>,
+  plugin: ReturnType<typeof createFileTransitionPlugin>,
 ): EditorViewContributionProvider | undefined {
   let registration: EditorViewContributionProvider | undefined
   plugin.activate(
@@ -608,7 +721,7 @@ function snapshot({
   ...overrides
 }: Partial<EditorViewSnapshot> & { readonly text?: string } = {}): EditorViewSnapshot {
   return {
-    documentId: 'decode-test',
+    documentId: 'transition-test',
     languageId: 'typescript',
     syntaxStatus: 'ready',
     paintLayers: [],

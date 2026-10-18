@@ -1,4 +1,4 @@
-# @singapore-editor/decode
+# @singapore-editor/file-animation
 
 ## 0.2.9
 

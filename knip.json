@@ -148,7 +148,7 @@
     "packages/pty": {
       "entry": ["test/nvim-smoke.ts", "test/fixtures/child.ts"]
     },
-    "editor/packages/decode": {
+    "editor/packages/file-animation": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },

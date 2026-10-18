@@ -13,10 +13,10 @@ import {
   type EditorSyntaxResult,
   type EditorSyntaxRuntime,
 } from '@singapore-editor/core/syntax'
-import { createDecodePlugin } from '@singapore-editor/decode'
+import { createFileTransitionPlugin } from '@singapore-editor/file-animation'
 import { createMinimapPlugin } from '@singapore-editor/minimap'
 import '@singapore-editor/minimap/style.css'
-import '@singapore-editor/decode/style.css'
+import '@singapore-editor/file-animation/style.css'
 import { createMarkdownPreviewPlugin } from '@singapore-editor/markdown'
 import '@singapore-editor/markdown/style.css'
 import { createScopeLinesPlugin } from '@singapore-editor/scope-lines'
@@ -127,7 +127,7 @@ function plugins(config: BoundaryConfig): EditorPlugin[] {
     markdownCaptures(),
     createMarkdownPreviewPlugin(),
     createScopeLinesPlugin(),
-    createDecodePlugin(),
+    createFileTransitionPlugin(),
     createMergeConflictPlugin(),
   ]
 }
