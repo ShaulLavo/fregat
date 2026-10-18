@@ -1,0 +1,229 @@
+export interface RenderSchedulerClock {
+  cancelFrame(handle: number): void
+  clearTimer(handle: number): void
+  requestFrame(callback: () => void): number
+  setTimer(callback: () => void, delayMs: number): number
+}
+
+export interface RenderFrameState {
+  cursorVisible: boolean
+}
+
+/** `immediate` paints a write synchronously unless a paint already landed this display frame; those writes join the next one. */
+export type TerminalPresentation = 'frame' | 'immediate'
+
+export interface RenderSchedulerOptions {
+  blinkIntervalMs?: number
+  clock: RenderSchedulerClock
+  onFrame(state: RenderFrameState): void
+  presentation?: TerminalPresentation
+}
+
+const defaultBlinkIntervalMs = 500
+
+function validateBlinkInterval(value: number): number {
+  if (Number.isFinite(value) && value > 0) return value
+  throw new RangeError('blinkIntervalMs must be greater than zero')
+}
+
+export class RenderScheduler {
+  private blinkEnabled = false
+  private readonly blinkIntervalMs: number
+  private blinkTimerHandle?: number
+  private blinkTimerToken = 0
+  private readonly clock: RenderSchedulerClock
+  private cursorVisibleValue = true
+  private disposed = false
+  private documentVisible = true
+  private focused = false
+  private frameActive = false
+  private frameHandle?: number
+  private frameToken = 0
+  private flushRequested = false
+  private immediateResetHandle?: number
+  private readonly immediate: boolean
+  private readonly onFrame: (state: RenderFrameState) => void
+
+  constructor(options: RenderSchedulerOptions) {
+    this.clock = options.clock
+    this.onFrame = options.onFrame
+    this.immediate = options.presentation === 'immediate'
+    this.blinkIntervalMs = validateBlinkInterval(options.blinkIntervalMs ?? defaultBlinkIntervalMs)
+  }
+
+  get cursorVisible(): boolean {
+    return this.cursorVisibleValue
+  }
+
+  get canPaint(): boolean {
+    return !this.disposed && this.documentVisible
+  }
+
+  get hasPendingFrame(): boolean {
+    return this.canPaint && (this.frameHandle !== undefined || this.flushRequested)
+  }
+
+  get hasPendingTimer(): boolean {
+    return this.blinkTimerHandle !== undefined
+  }
+
+  schedule(): void {
+    if (this.disposed) return
+    if (!this.documentVisible) return
+    if (this.frameHandle !== undefined) return
+    const token = ++this.frameToken
+    const handle = this.clock.requestFrame(() => this.runFrame(token))
+    if (this.disposed) {
+      this.clock.cancelFrame(handle)
+      return
+    }
+    this.frameHandle = handle
+  }
+
+  /** Schedules output; immediate presentation paints now unless a paint already landed this display frame. */
+  scheduleWrite(): void {
+    if (!this.immediate || this.immediateResetHandle !== undefined) {
+      this.schedule()
+      return
+    }
+    if (!this.canPaint) return
+    this.armImmediateReset()
+    try {
+      this.flush()
+    } catch (cause) {
+      // Paint failures surface as they do from a frame callback; the caller's write already landed.
+      queueMicrotask(() => {
+        throw cause
+      })
+    }
+  }
+
+  /** Flushes now; a flush during paint runs after the active frame callback completes. */
+  flush(): void {
+    if (this.disposed) return
+    if (!this.documentVisible) return
+    this.cancelFrame()
+    this.deliverFrames()
+  }
+
+  setCursorBlinkEnabled(enabled: boolean): void {
+    if (this.disposed) return
+    if (this.blinkEnabled === enabled) return
+    this.blinkEnabled = enabled
+    this.synchronizeBlinkTimer()
+    this.schedule()
+  }
+
+  setDocumentVisible(visible: boolean): void {
+    if (this.disposed) return
+    if (this.documentVisible === visible) return
+    this.documentVisible = visible
+    this.synchronizeBlinkTimer()
+    if (!visible) {
+      this.cancelFrame()
+      return
+    }
+    this.schedule()
+  }
+
+  setFocused(focused: boolean): void {
+    if (this.disposed) return
+    if (this.focused === focused) return
+    this.focused = focused
+    this.synchronizeBlinkTimer()
+    this.schedule()
+  }
+
+  dispose(): void {
+    if (this.disposed) return
+    this.disposed = true
+    this.cancelFrame()
+    this.cancelBlinkTimer()
+    if (this.immediateResetHandle === undefined) return
+    this.clock.cancelFrame(this.immediateResetHandle)
+    this.immediateResetHandle = undefined
+  }
+
+  private get blinkEligible(): boolean {
+    return this.blinkEnabled && this.documentVisible && this.focused
+  }
+
+  private armBlinkTimer(): void {
+    if (!this.blinkEligible) return
+    if (this.blinkTimerHandle !== undefined) return
+    const token = ++this.blinkTimerToken
+    this.blinkTimerHandle = this.clock.setTimer(
+      () => this.runBlinkTransition(token),
+      this.blinkIntervalMs,
+    )
+  }
+
+  private cancelBlinkTimer(): void {
+    this.blinkTimerToken += 1
+    if (this.blinkTimerHandle === undefined) return
+    this.clock.clearTimer(this.blinkTimerHandle)
+    this.blinkTimerHandle = undefined
+  }
+
+  private cancelFrame(): void {
+    this.frameToken += 1
+    if (this.frameHandle === undefined) return
+    this.clock.cancelFrame(this.frameHandle)
+    this.frameHandle = undefined
+  }
+
+  private restoreCursor(): void {
+    this.cursorVisibleValue = true
+  }
+
+  private runBlinkTransition(token: number): void {
+    if (this.disposed) return
+    if (token !== this.blinkTimerToken) return
+    this.blinkTimerHandle = undefined
+    if (!this.blinkEligible) return
+    this.cursorVisibleValue = !this.cursorVisibleValue
+    this.schedule()
+    this.armBlinkTimer()
+  }
+
+  private runFrame(token: number): void {
+    if (this.disposed) return
+    if (token !== this.frameToken) return
+    this.frameHandle = undefined
+    this.armImmediateReset()
+    this.deliverFrames()
+  }
+
+  private armImmediateReset(): void {
+    if (!this.immediate || this.immediateResetHandle !== undefined) return
+    this.immediateResetHandle = this.clock.requestFrame(() => {
+      this.immediateResetHandle = undefined
+    })
+  }
+
+  private deliverFrames(): void {
+    if (this.frameActive) {
+      this.flushRequested = true
+      return
+    }
+    this.frameActive = true
+    try {
+      do {
+        this.flushRequested = false
+        this.onFrame({ cursorVisible: this.cursorVisibleValue })
+      } while (this.flushRequested && !this.disposed && this.documentVisible)
+    } finally {
+      this.frameActive = false
+      if (this.flushRequested) this.schedule()
+    }
+  }
+
+  private synchronizeBlinkTimer(): void {
+    if (this.blinkEligible) {
+      this.armBlinkTimer()
+      return
+    }
+    this.cancelBlinkTimer()
+    this.restoreCursor()
+  }
+}

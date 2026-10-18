@@ -76,6 +76,18 @@
       ],
       "outputs": ["dist/**"]
     },
+    "ghostty-webgpu-classic-site#build": {
+      "dependsOn": ["^build", "ghostty-webgpu#build", "ghostty-webgpu-site#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*",
+        "$TURBO_ROOT$/ghostty-webgpu/site/src/**",
+        "$TURBO_ROOT$/ghostty-webgpu/site/scripts/**",
+        "$TURBO_ROOT$/ghostty-webgpu/docs/correctness-results.json",
+        "$TURBO_ROOT$/ghostty-webgpu/docs/benchmarks/**"
+      ],
+      "outputs": ["dist/**"]
+    },
     "lint": {
       "dependsOn": ["^lint"]
     },
@@ -188,8 +200,13 @@
       "dependsOn": ["^build", "build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
     },
+    "@singapore-editor/typescript-lsp#test": {
+      "dependsOn": ["^build", "build"],
+      "cache": false
+    },
     "@singapore-editor/typescript-lsp#test:browser": {
       "dependsOn": ["^build", "build"],
+      "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
     },
     "@singapore-editor/tree-sitter#test:browser": {
@@ -279,6 +296,10 @@
     "@singapore-editor/core#bench:paint": {
       "dependsOn": ["^build", "build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
+    },
+    "ghostty-webgpu-line-editor#build": {
+      "dependsOn": ["^build", "ghostty-webgpu#build"],
+      "outputs": ["dist/**"]
     }
   },
   "agentGuidance": false,

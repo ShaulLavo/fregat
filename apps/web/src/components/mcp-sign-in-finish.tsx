@@ -63,6 +63,7 @@ export function McpSignInFinish({
   return (
     <div className='flex min-w-0 flex-col gap-1.5 py-1'>
       <a
+        data-feedback='tap'
         className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'self-start')}
         href={authorizationUrl}
         rel='noopener noreferrer'

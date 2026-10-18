@@ -1,3 +1,4 @@
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import * as React from 'react'
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 
@@ -8,14 +9,12 @@ import {
   SHEET_POSITIONER_CLASS,
   SHEET_SURFACE_CLASS,
   PresentationContext,
-  playSheetOpen,
   usePresentation,
   type Presentation,
 } from '@workspace/ui/patterns/sheet'
 
 function Popover({
   modal,
-  onOpenChange,
   presentation: requested,
   ...props
 }: PopoverPrimitive.Root.Props & {
@@ -31,17 +30,24 @@ function Popover({
         // A sheet over a scrim is modal: scroll locked, focus kept inside, the page behind inert.
         modal={modal ?? presentation === 'sheet'}
         {...props}
-        onOpenChange={(open, details) => {
-          onOpenChange?.(open, details)
-          if (!details.isCanceled) playSheetOpen(presentation, open, details.event)
-        }}
       />
     </PresentationContext>
   )
 }
 
 function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
-  return <PopoverPrimitive.Trigger data-slot='popover-trigger' {...props} />
+  const presentation = usePresentation()
+  return (
+    <PopoverPrimitive.Trigger
+      data-slot='popover-trigger'
+      data-feedback={presentation === 'sheet' ? 'open' : 'tap'}
+      {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
+    />
+  )
 }
 
 function PopoverContent({

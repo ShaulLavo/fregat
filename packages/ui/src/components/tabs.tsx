@@ -1,19 +1,14 @@
-import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import { Tabs as TabsPrimitive } from '@base-ui/react/tabs'
 import { cva, type VariantProps } from 'class-variance-authority'
 
 import { cn } from '@workspace/ui/lib/utils'
 
-function Tabs({ className, onValueChange, ...props }: TabsPrimitive.Root.Props) {
+function Tabs({ className, ...props }: TabsPrimitive.Root.Props) {
   return (
     <TabsPrimitive.Root
       data-slot='tabs'
       className={cn('flex min-w-0 flex-col gap-2', className)}
-      onValueChange={(value, details) => {
-        onValueChange?.(value, details)
-        if (details.isCanceled) return
-        playControlFeedback('tick', details.event)
-      }}
       {...props}
     />
   )
@@ -61,6 +56,7 @@ function TabsTab({ className, ...props }: TabsPrimitive.Tab.Props) {
   return (
     <TabsPrimitive.Tab
       data-slot='tabs-tab'
+      data-feedback='tick'
       data-press-depth
       className={cn(
         'focus-ring text-muted-foreground inline-flex shrink-0 items-center justify-center gap-1 rounded-md font-medium whitespace-nowrap outline-none select-none',
@@ -71,6 +67,10 @@ function TabsTab({ className, ...props }: TabsPrimitive.Tab.Props) {
         className,
       )}
       {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
     />
   )
 }

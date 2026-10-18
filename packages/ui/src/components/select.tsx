@@ -1,4 +1,4 @@
-import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import * as React from 'react'
 import { Select as SelectPrimitive } from '@base-ui/react/select'
 
@@ -8,30 +8,14 @@ import {
   SHEET_FRAME_CLASS,
   SHEET_POSITIONER_CLASS,
   SHEET_SURFACE_CLASS,
-  playSheetOpen,
   usePresentation,
 } from '@workspace/ui/patterns/sheet'
 import { CaretDownIcon, CheckIcon, CaretUpIcon } from '@phosphor-icons/react'
 
-function Select<Value, Multiple extends boolean | undefined = false>({
-  onOpenChange,
-  onValueChange,
-  ...props
-}: SelectPrimitive.Root.Props<Value, Multiple>) {
-  const presentation = usePresentation()
-  return (
-    <SelectPrimitive.Root
-      {...props}
-      onOpenChange={(open, details) => {
-        onOpenChange?.(open, details)
-        if (!details.isCanceled) playSheetOpen(presentation, open, details.event)
-      }}
-      onValueChange={(value, details) => {
-        onValueChange?.(value, details)
-        if (!details.isCanceled) playControlFeedback('tick', details.event)
-      }}
-    />
-  )
+function Select<Value, Multiple extends boolean | undefined = false>(
+  props: SelectPrimitive.Root.Props<Value, Multiple>,
+) {
+  return <SelectPrimitive.Root {...props} />
 }
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
@@ -62,15 +46,22 @@ function SelectTrigger({
 }: SelectPrimitive.Trigger.Props & {
   size?: 'sm' | 'default'
 }) {
+  const presentation = usePresentation()
   return (
     <SelectPrimitive.Trigger
       data-slot='select-trigger'
+      data-feedback={presentation === 'sheet' ? 'open' : 'tap'}
       data-size={size}
+      data-press-depth
       className={cn(
         "focus-ring flex h-(--select-trigger-height) w-fit items-center justify-between gap-1.5 rounded-md border border-transparent bg-input/30 py-(--density-menu-item-padding-y) pr-2 pl-(--density-control-padding-x) text-xs whitespace-nowrap outline-none select-none [--select-trigger-height:var(--density-control-height)] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=sm]:[--select-trigger-height:var(--density-control-height-sm)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size)",
         className,
       )}
       {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
     >
       {children}
       <SelectPrimitive.Icon
@@ -153,11 +144,17 @@ function SelectItem({ className, children, ...props }: SelectPrimitive.Item.Prop
   return (
     <SelectPrimitive.Item
       data-slot='select-item'
+      data-feedback='tick'
+      data-row-press
       className={cn(
         "relative flex w-full cursor-default items-center gap-2 rounded-md py-(--density-menu-item-padding-y) pr-8 pl-2 text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size) *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
         className,
       )}
       {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
     >
       <SelectPrimitive.ItemText className='flex flex-1 shrink-0 gap-2 whitespace-nowrap'>
         {children}

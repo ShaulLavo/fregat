@@ -66,6 +66,7 @@ test.for(['cancel', 'removed'] as const)(
       const picker = await screen.findByRole('dialog', { name: 'Choose folder' })
       await userEvent.click(within(picker).getByRole('button', { name: 'Go to folder' }))
       const input = within(picker).getByRole('textbox', { name: 'Folder path' })
+      await waitFor(() => expect(input).toBeEnabled())
       await userEvent.clear(input)
       await userEvent.type(input, `${path.join(server.root, 'pending-target')}{Enter}`)
       await gate.entered

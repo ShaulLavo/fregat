@@ -15,6 +15,10 @@ Tree-sitter provides a single structural model for:
 - outline-style symbol extraction
 - future semantic decorations and code-intelligence hooks
 
+## Runtime requirements
+
+Tree-sitter and the same-memory Markdown extension require `WebAssembly.Memory.prototype.toResizableBuffer()`. The supported floors are Chromium 144, Firefox 145, Safari 26.2, Node 26.0.0, and Bun 1.2.22. Repository development uses the pinned Bun version and Node 26 on `PATH`; Vitest and grammar generation run in Node.
+
 ## Core Invariant
 
 The piece table remains the canonical document model. A Tree-sitter parse is a derived projection over one `PieceTableSnapshot`.

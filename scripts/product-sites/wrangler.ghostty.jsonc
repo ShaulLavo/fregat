@@ -1,6 +1,7 @@
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "product-sites-ghostty",
+  "main": "../../ghostty-webgpu/site/worker/index.ts",
   "compatibility_date": "2026-10-10",
   "workers_dev": false,
   "preview_urls": false,
@@ -12,7 +13,19 @@
   ],
   "assets": {
     "directory": "./dist/ghostty-webgpu",
+    "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    "not_found_handling": "none",
+    "not_found_handling": "404-page",
+    "run_worker_first": [
+      "/*",
+      "!/_astro/*",
+      "!/fonts/*",
+      "!/pagefind/*",
+      "!/scenes/*",
+      "!/*.wasm",
+      "!/*.svg",
+      "!/*.xml",
+      "!/*.txt",
+    ],
   },
 }

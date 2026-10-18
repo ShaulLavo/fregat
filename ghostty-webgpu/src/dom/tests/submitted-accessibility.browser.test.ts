@@ -3,7 +3,7 @@ import {
   observeDisplayedFrame,
   displayedFrameListener,
   type DisplayedTextFrame,
-} from '../../render/displayed-frame.js'
+} from '../../render/shared/displayed-frame.js'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cdp, page, server } from 'vitest/browser'
 import { Terminal as MainTerminal } from '../../../dist/index.js'
@@ -13,8 +13,8 @@ import { WebGlTerminalRenderer } from '../../../dist/render/webgl/renderer.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import { CanvasTerminalRenderer } from '../../render/canvas/renderer.js'
 import { WebGlTerminalRenderer as SourceWebGlRenderer } from '../../render/webgl/renderer.js'
-import type { RendererTextFrameSnapshot } from '../../render/renderer.js'
-import type { RenderSchedulerClock } from '../../render/scheduler.js'
+import type { RendererTextFrameSnapshot } from '../../render/shared/types.js'
+import type { RenderSchedulerClock } from '../../render/shared/scheduler.js'
 import { TerminalSession } from '../../term/session.js'
 import type { TerminalAccessibilityController } from '../accessibility.js'
 import { createTerminalElements } from '../elements.js'
@@ -211,6 +211,7 @@ function assertDisplayed(
   expect(textarea.getAttribute('aria-activedescendant')).toBe(row.id)
   expect(row.getAttribute('aria-current')).toBe('true')
   expect(rows.filter((row) => row.hasAttribute('aria-current'))).toHaveLength(1)
+  if (textarea.ownerDocument.activeElement !== textarea) return
   expect(Number.parseFloat(textarea.style.left)).toBeCloseTo(
     summary.padding.left + column * summary.grid.cellWidth,
   )

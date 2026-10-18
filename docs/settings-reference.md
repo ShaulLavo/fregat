@@ -324,13 +324,20 @@ stays safe to read, share and export.
 
 ## Terminal
 
-| Setting                              | Default | Scope       | What it does                                                               |
-| ------------------------------------ | ------- | ----------- | -------------------------------------------------------------------------- |
-| `terminal.shellKeys`                 | `false` | application | Send Ctrl+letter and readline Alt shortcuts to the focused terminal shell. |
-| `terminal.integrated.screenReader`   | `true`  | application | Expose terminal text and announce new output to screen readers.            |
-| `terminal.integrated.fontSize`       | `12`    | window      | Terminal font size in pixels.                                              |
-| `terminal.integrated.scrollback`     | `10000` | window      | How many lines of output the terminal keeps.                               |
-| `terminal.integrated.cursorBlinking` | `true`  | window      | Blink the terminal cursor while the terminal has focus.                    |
+| Setting                                   | Default | Scope       | What it does                                                                                                                                                 |
+| ----------------------------------------- | ------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `terminal.shellKeys`                      | `false` | application | Send Ctrl+letter and readline Alt shortcuts to the focused terminal shell.                                                                                   |
+| `terminal.integrated.screenReader`        | `true`  | application | Expose terminal text and announce new output to screen readers.                                                                                              |
+| `terminal.integrated.fontSize`            | `12`    | window      | Terminal font size in pixels.                                                                                                                                |
+| `terminal.integrated.scrollback`          | `10000` | window      | How many lines of output the terminal keeps.                                                                                                                 |
+| `terminal.integrated.cursorBlinking`      | `true`  | window      | Blink the terminal cursor while the terminal has focus.                                                                                                      |
+| `terminal.integrated.lowLatencyRendering` | `false` | application | Draw terminal output the moment it arrives, on a WebGL canvas that skips the browser compositor where the browser allows it.                                 |
+| `terminal.integrated.showOutputTiming`    | `false` | application | Show how long the last output took: from your input to the first output, from the first output to the last, and then until it was drawn and shown on screen. |
+
+### Details
+
+- `terminal.integrated.lowLatencyRendering`: The first output of each display frame is drawn at once; more output in the same frame waits for the next one. Fast output can tear. Open terminals reconnect when this changes.
+- `terminal.integrated.showOutputTiming`: Output that pauses for 100 ms counts as finished. Shown is when the browser finished the page update that carries the drawn frame; the display picks it up at its next refresh.
 
 ## Window
 

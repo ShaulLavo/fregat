@@ -49,6 +49,8 @@ import { useSettingValue } from '@/hooks/use-setting-value'
 import { fontStack } from '@/lib/fonts/utils/stack'
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
 import { ConnectionNotice } from '@/features/terminal/components/connection-notice'
+import { OutputTiming } from '@/features/terminal/components/output-timing'
+import { useTerminalOutputTiming } from '@/features/terminal/hooks/use-output-timing'
 import { useServerRestarting } from '@/lib/environments/hooks/use-server-restarting'
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
@@ -74,6 +76,8 @@ export function TerminalPanel({
   const scrollbackLengthRef = useRef(0)
   const sendInputRef = useRef<TerminalInputSender | null>(null)
   const terminalRef = useRef<Terminal | null>(null)
+  // State as well as the ref: the timing readout subscribes to whichever terminal is mounted.
+  const [liveTerminal, setLiveTerminal] = useState<Terminal | null>(null)
   const { resolved: palette } = usePalette()
   const terminalColors = palette.terminal
   const paletteHash = palette.contentHash
@@ -85,6 +89,8 @@ export function TerminalPanel({
   const fontFamily = fontStack(useSettingValue('editor.fontFamily'), 'code')
   const screenReader = useSettingValue('terminal.integrated.screenReader')
   const scrollback = useSettingValue('terminal.integrated.scrollback')
+  const lowLatency = useSettingValue('terminal.integrated.lowLatencyRendering')
+  const showOutputTiming = useSettingValue('terminal.integrated.showOutputTiming')
   const contextMenu = useContextMenu()
   const terminalActions = useTerminalActions({ rootPath, terminalId: sessionId })
   const [menuTarget, setMenuTarget] = useState<TerminalMenuTarget | null>(null)
@@ -112,6 +118,7 @@ export function TerminalPanel({
     identity: string
     message: string
   } | null>(null)
+  const outputTiming = useTerminalOutputTiming(liveTerminal, showOutputTiming && socketConnected)
   const registerTerminalLinks = useTerminalLinks(rootPath)
   useTerminalCommandInbox({
     active: active && socketConnected && !machineUnavailable,
@@ -147,6 +154,7 @@ export function TerminalPanel({
     (terminal: Terminal, sendInput: TerminalInputSender, identity: string) => {
       if (identity !== terminalMountIdentity) return
       terminalRef.current = terminal
+      setLiveTerminal(terminal)
       sendInputRef.current = sendInput
       attachTerminalHotkeys(terminal, {
         mode: 'hosted',
@@ -272,6 +280,7 @@ export function TerminalPanel({
       host,
       rootPath,
       scrollback,
+      lowLatency,
       sessionId,
       onConnectedChange: (connected) =>
         handleTerminalConnectedChange(connected, terminalMountIdentity),
@@ -293,6 +302,7 @@ export function TerminalPanel({
       sendInputRef.current = null
       scrollbackLengthRef.current = 0
       terminalRef.current = null
+      setLiveTerminal(null)
       // The open menu holds the terminal it was opened against. Dropping it
       // here keeps a settings-driven remount from leaving items pointed at a disposed one.
       setMenuTarget(null)
@@ -304,6 +314,7 @@ export function TerminalPanel({
     queryClient,
     rootPath,
     scrollback,
+    lowLatency,
     sessionId,
     terminalMountIdentity,
   ])
@@ -365,6 +376,7 @@ export function TerminalPanel({
           }}
         />
       ) : null}
+      {outputTiming ? <OutputTiming timing={outputTiming} /> : null}
       {/* Keyed: the socket reconnects just after a restart ends, so the warning waits afresh. */}
       {!socketConnected && (machineUnavailable || savedPaint || hasLivePaint) ? (
         <ConnectionNotice

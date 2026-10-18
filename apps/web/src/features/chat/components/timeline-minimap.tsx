@@ -1,5 +1,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import { useRef, useState, type KeyboardEvent } from 'react'
 
 import {
@@ -75,7 +76,8 @@ export function TimelineMinimap({
             <TooltipTrigger
               render={
                 <button
-                  data-feedback='silent'
+                  data-feedback='tick'
+                  data-row-press
                   aria-current={mark.id === activeMarkId ? 'true' : undefined}
                   aria-label={`Jump to turn ${mark.ordinal} of ${marks.length}`}
                   className='focus-ring pointer-events-auto absolute right-0 flex h-3 w-full -translate-y-1/2 items-center justify-end focus-visible:outline-none'
@@ -83,6 +85,9 @@ export function TimelineMinimap({
                   style={{ top: `${mark.startFraction * 100}%` }}
                   tabIndex={mark.id === rovingMarkId ? 0 : -1}
                   type='button'
+                  onClickCapture={(event) =>
+                    playClickFeedback(event.nativeEvent, event.currentTarget)
+                  }
                   onClick={() => onSelect(mark)}
                   onFocus={() => setFocusedMarkId(mark.id)}
                 />

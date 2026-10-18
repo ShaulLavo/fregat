@@ -117,8 +117,13 @@
       "dependsOn": ["^build", "build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"]
     },
+    "@singapore-editor/typescript-lsp#test": {
+      "dependsOn": ["^build", "build"],
+      "cache": false
+    },
     "@singapore-editor/typescript-lsp#test:browser": {
       "dependsOn": ["^build", "build"],
+      "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"]
     },
     "@singapore-editor/tree-sitter#test:browser": {

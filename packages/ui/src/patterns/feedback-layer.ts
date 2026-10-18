@@ -24,12 +24,27 @@ type FeedbackOptions = {
   readonly volume: number
 }
 
+type ControlGesture =
+  | { kind: 'pressed'; pointerId: number; control: HTMLElement }
+  | {
+      kind: 'released'
+      pointerId: number
+      control: HTMLElement
+      event: MouseEvent
+      target: HTMLElement | null
+    }
+  | { kind: 'canceled' }
+
 type FeedbackState = {
   channels: ReadonlySet<FeedbackChannel>
   volume: number
   context: AudioContext | null
   output: GainNode | null
   lastPlayed: Map<FeedbackVoice, number>
+  playedInputs: WeakSet<Event>
+  inputSources: WeakMap<Event, Event | null>
+  gesture: ControlGesture | null
+  releaseDispatch: MouseEvent | null
   createContext: () => AudioContext | null
   now: () => number
   hidden: () => boolean
@@ -41,6 +56,10 @@ const state: FeedbackState = {
   context: null,
   output: null,
   lastPlayed: new Map(),
+  playedInputs: new WeakSet(),
+  inputSources: new WeakMap(),
+  gesture: null,
+  releaseDispatch: null,
   createContext: () =>
     typeof AudioContext === 'undefined' ? null : new AudioContext({ latencyHint: 'interactive' }),
   now: () => performance.now(),
@@ -92,7 +111,7 @@ export function feedbackOutput(channel: FeedbackChannel) {
 
 export function playFeedback(voice: FeedbackVoice, channel: FeedbackChannel) {
   const audio = feedbackOutput(channel)
-  if (!audio || !admit(voice)) return
+  if (!audio || (channel !== 'controls' && !admit(voice))) return
   try {
     scheduleFeedbackVoice(audio.context, audio.output, voice)
   } catch {
@@ -100,12 +119,175 @@ export function playFeedback(voice: FeedbackVoice, channel: FeedbackChannel) {
   }
 }
 
-/** A committed pointer action sounds; keyboard and programmatic changes stay silent. */
+/** Pointer input acknowledgement; keyboard and programmatic changes stay silent. */
 export function playControlFeedback(voice: FeedbackVoice, event: Event) {
+  playControlInput(voice, event, feedbackControl(event))
+}
+
+function playControlInput(voice: FeedbackVoice, event: Event, control: HTMLElement | null) {
+  const source = controlInputSource(event)
+  if (!source || state.playedInputs.has(source) || event.defaultPrevented) return
+  if (
+    control?.matches(
+      ':disabled, [aria-disabled="true"], [data-disabled]:not([data-disabled="false"])',
+    )
+  )
+    return
+  if (control?.dataset.feedback === 'silent') return
+  state.playedInputs.add(source)
+  playFeedback(voice, 'controls')
+}
+
+function pointerInput(event: Event) {
   const pointer =
     typeof PointerEvent !== 'undefined' && event instanceof PointerEvent && event.pointerType !== ''
   const mouse = typeof MouseEvent !== 'undefined' && event instanceof MouseEvent && event.detail > 0
-  if (pointer || mouse) playFeedback(voice, 'controls')
+  return (pointer || mouse) && ['click', 'pointerup', 'mouseup', 'mousedown'].includes(event.type)
+}
+
+function parentPopup(popup: Element): Element | null {
+  for (const trigger of popup.ownerDocument.querySelectorAll('[aria-controls]')) {
+    if (trigger.getAttribute('aria-controls') !== popup.id) continue
+    return trigger.closest('[role="menu"]')
+  }
+  return null
+}
+
+function popupRelease(gesture: Extract<ControlGesture, { kind: 'released' }>) {
+  const controlledId = gesture.control.getAttribute('aria-controls')
+  if (
+    !controlledId ||
+    !gesture.control.matches('[aria-haspopup="listbox"], [aria-haspopup="menu"]')
+  )
+    return false
+  let popup = gesture.target?.closest('[role="listbox"], [role="menu"]') ?? null
+  const visited = new Set<Element>()
+  while (popup && !visited.has(popup)) {
+    if (popup.id === controlledId) return true
+    visited.add(popup)
+    popup = parentPopup(popup)
+  }
+  return false
+}
+
+/** Capture the native press/release pair so generated picker clicks retain their real input. */
+export function beginControlGesture(event: PointerEvent) {
+  const control = feedbackControl(event)
+  state.gesture =
+    event.button === 0 && !event.defaultPrevented && control
+      ? { kind: 'pressed', pointerId: event.pointerId, control }
+      : null
+}
+
+export function cancelControlGesture(pointerId?: number) {
+  if (
+    pointerId !== undefined &&
+    state.gesture &&
+    state.gesture.kind !== 'canceled' &&
+    state.gesture.pointerId !== pointerId
+  )
+    return
+  state.gesture = { kind: 'canceled' }
+  state.releaseDispatch = null
+}
+
+export function releaseControlGesture(event: MouseEvent) {
+  if (event.button !== 0 || state.gesture?.kind !== 'pressed') return
+  const gesture: Extract<ControlGesture, { kind: 'released' }> = {
+    ...state.gesture,
+    kind: 'released',
+    event,
+    target: feedbackControl(event),
+  }
+  state.gesture = gesture
+  state.releaseDispatch = event
+  // A task boundary expires stopped propagation without racing native event listeners.
+  setTimeout(() => finishControlRelease(gesture), 0)
+}
+
+export function finishControlGesture(event: MouseEvent) {
+  const gesture = state.gesture
+  if (gesture?.kind === 'released' && gesture.event === event) finishControlRelease(gesture)
+}
+
+function finishControlRelease(gesture: Extract<ControlGesture, { kind: 'released' }>) {
+  if (state.releaseDispatch !== gesture.event) return
+  state.releaseDispatch = null
+  if (state.gesture !== gesture || !popupRelease(gesture)) return
+  const bounds = gesture.control.getBoundingClientRect()
+  const { clientX, clientY } = gesture.event
+  if (
+    clientX < bounds.left ||
+    clientX > bounds.right ||
+    clientY < bounds.top ||
+    clientY > bounds.bottom
+  )
+    return
+  // An aligned popup can cover the trigger before its release, suppressing its native click.
+  const voice = gesture.control.dataset.feedback === 'open' ? 'open' : 'tap'
+  playControlInput(voice, gesture.event, gesture.control)
+}
+
+function controlInputSource(event: Event): Event | null {
+  const known = state.inputSources.get(event)
+  if (known !== undefined) return known
+  const gesture = state.gesture
+  if (event.type !== 'click') return pointerInput(event) ? event : null
+  const generatedPopup =
+    gesture?.kind === 'released' &&
+    state.releaseDispatch === gesture.event &&
+    gesture.event.eventPhase !== Event.NONE &&
+    popupRelease(gesture) &&
+    feedbackControl(event) === gesture.target
+  if (!pointerInput(event) && !generatedPopup) return null
+  if (gesture?.kind === 'canceled') {
+    state.inputSources.set(event, null)
+    state.gesture = null
+    return null
+  }
+  const source = gesture?.kind === 'released' ? gesture.event : event
+  const valid =
+    gesture?.kind !== 'released' || gesture.control === gesture.target || popupRelease(gesture)
+  state.inputSources.set(event, valid ? source : null)
+  if (!generatedPopup) state.gesture = null
+  return valid ? source : null
+}
+
+/** The innermost control owns a pointer action, including its explicit silence policy. */
+export function feedbackControl(event: Event): HTMLElement | null {
+  const target = event.composedPath().find((node) => node instanceof Element)
+  if (!(target instanceof Element)) return null
+  const control = target.closest<HTMLElement>(
+    '[data-feedback], .pressable, [data-press-depth], [data-row-press], button, a[href], input, select, textarea, [role="button"], [role="option"], [role="treeitem"], [role="tab"], [role^="menuitem"]',
+  )
+  if (control) return control
+  const label = target.closest('label')
+  const labeledControl = label?.control
+  if (!labeledControl) return null
+  // Base UI's labelable checkbox sits beside its visible switch, after an optional hidden value.
+  if (labeledControl.matches('input[type="checkbox"][aria-hidden="true"]')) {
+    const sibling = labeledControl.previousElementSibling
+    const visible = sibling?.matches('input[type="hidden"]')
+      ? sibling.previousElementSibling
+      : sibling
+    return visible instanceof HTMLElement && visible.matches('[data-slot="switch"]')
+      ? visible
+      : labeledControl
+  }
+  return labeledControl
+}
+
+/** One enabled control acknowledges each pointer click, even when its action stops propagation. */
+export function playClickFeedback(event: Event, currentTarget?: HTMLElement) {
+  if (event.type !== 'click') return
+  const control = feedbackControl(event)
+  if (!control || (currentTarget && currentTarget !== control)) return
+  const voice =
+    control.dataset.feedback ??
+    (control.matches('.pressable, [data-press-depth]') ? 'tap' : undefined)
+  if (voice !== 'tap' && voice !== 'tick' && voice !== 'tick-off' && voice !== 'open') return
+  const toggleOff = voice === 'tick' && control.matches('[role="switch"][aria-checked="true"]')
+  playControlFeedback(toggleOff ? 'tick-off' : voice, event)
 }
 
 function admit(voice: FeedbackVoice) {
@@ -155,4 +337,8 @@ export function resetFeedbackForTest(
   state.context = null
   state.output = null
   state.lastPlayed.clear()
+  state.playedInputs = new WeakSet()
+  state.inputSources = new WeakMap()
+  state.gesture = null
+  state.releaseDispatch = null
 }

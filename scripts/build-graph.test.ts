@@ -122,6 +122,12 @@ test('the ghostty site builds after its library', () => {
   expect(buildTask('ghostty-webgpu-site').dependencies).toContain('ghostty-webgpu#build')
 })
 
+test('classic docs build after the scene site finishes generating shared reference pages', () => {
+  expect(buildTask('ghostty-webgpu-classic-site').dependencies).toContain(
+    'ghostty-webgpu-site#build',
+  )
+})
+
 test('a library source change invalidates the ghostty site build cache', () => {
   const before = buildTask('ghostty-webgpu-site').hash
   const probe = path.join(root, 'ghostty-webgpu/src/turbo-cache-probe.ts')

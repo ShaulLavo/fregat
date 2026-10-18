@@ -122,6 +122,7 @@ export function BranchActions({
         // buttonVariants rather than <Button render={<a />}>: Base UI's Button stamps
         // type/role onto whatever it renders, which would cost this link its link semantics.
         <a
+          data-feedback='tap'
           className={cn(
             buttonVariants({ size: 'sm', variant: 'ghost' }),
             'text-2xs',

@@ -539,11 +539,21 @@ export const selectors = {
   pickerList: (page: Page) => page.getByRole('listbox', { name: 'Folders', exact: true }),
   pickerOptions: (page: Page) =>
     page.getByRole('listbox', { name: 'Folders', exact: true }).getByRole('option'),
-  pickerGoToFolder: (page: Page) => page.getByRole('button', { name: 'Go to folder', exact: true }),
+  pickerGoToFolder: (page: Page) =>
+    page.getByRole('button', { name: /^Go to folder(?:, now .+)?$/ }),
   pickerUpOneFolder: (page: Page) =>
     page.getByRole('button', { name: 'Up one folder', exact: true }),
   pickerFolderPath: (page: Page) => page.getByRole('textbox', { name: 'Folder path', exact: true }),
   pickerSearch: (page: Page) => page.getByRole('textbox', { name: 'Search folders', exact: true }),
+  pickerViewGeometry: (page: Page, view: 'Columns' | 'List' | 'Icons') =>
+    selectors.pickerView(page, view).evaluate((element) => {
+      const bounds = element.getBoundingClientRect()
+      const owner = element.closest('[data-slot="tabs"]')?.getBoundingClientRect()
+      return { right: bounds.right, ownerRight: owner?.right }
+    }),
+  phoneAddProject: (page: Page) =>
+    selectors.phoneShell(page).getByRole('button', { name: 'Add project', exact: true }),
+  colorModeRoot: (page: Page, mode: 'light' | 'dark') => page.locator(`html.${mode}`),
   pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),
   /** The folder the picker shows, from its screen-reader description; a folder picker lists no files. */
   pickerBrowsing: (page: Page, path: string) =>
@@ -865,7 +875,30 @@ export const selectors = {
   physicalMenu: (page: Page) => page.getByRole('menu'),
   physicalDialog: (page: Page) =>
     page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
-  physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
+  physicalRow: (page: Page) => page.getByRole('option', { name: 'Selectable row', exact: true }),
+  recoverableDraftList: (page: Page) => page.getByRole('listbox', { name: 'Drafts', exact: true }),
+  physicalAddProject: (page: Page) =>
+    page.getByRole('button', { name: 'Add project', exact: true }),
+  physicalPickerGoToFolder: (page: Page) =>
+    selectors.pickerDialog(page).getByRole('button', { name: /^Go to folder/ }),
+  physicalPickerLocation: (page: Page, folder: string) =>
+    selectors.pickerDialog(page).getByRole('button', {
+      name: `Go to folder, now ${folder}`,
+      exact: true,
+    }),
+  physicalSettingLabel: (page: Page, id: string) =>
+    selectors.settingsRow(page, id).locator(`label[for="${id}"]`),
+  physicalSettingChoices: (page: Page, id: string) =>
+    selectors.settingsRow(page, id).getByRole('listbox'),
+  physicalUnselectedChoice: (list: Locator) => list.getByRole('option', { selected: false }),
+  physicalSelectedChoice: (list: Locator) => list.getByRole('option', { selected: true }),
+  physicalCommands: (page: Page) => page.locator('[data-physical-gallery] [data-slot="command"]'),
+  physicalCommand: (page: Page) =>
+    page.getByRole('option', { name: 'Preview command', exact: true }),
+  physicalDisabledCommand: (page: Page) =>
+    page.getByRole('option', { name: 'Disabled command', exact: true }),
+  physicalSelect: (page: Page) =>
+    page.getByRole('combobox', { name: 'Preview select', exact: true }),
   settingsForm: (page: Page) => page.getByRole('region', { name: 'Settings form', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
   settingsSummaryCount: (page: Page) =>
@@ -1399,6 +1432,8 @@ export const selectors = {
   editorMinimap: (page: Page) => page.locator('.editor-minimap-right'),
   terminalAccessibilityMirror: (page: Page) =>
     page.getByRole('list', { name: 'Terminal screen', exact: true, includeHidden: true }),
+  terminalOutputTiming: (page: Page) =>
+    selectors.terminalSurface(page).first().locator('[aria-label="Last output timing"]'),
   terminalOpening: (page: Page) => page.getByRole('status', { name: 'Opening terminal' }),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),

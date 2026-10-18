@@ -325,16 +325,27 @@
       "entry": ["src/index.ts", "src/worker/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],
       "project": ["src/**/*.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"]
     },
-    "ghostty-webgpu-line-editor": {
+    "ghostty-webgpu/packages/line-editor": {
       "entry": ["src/index.ts"],
-      "project": ["src/**/*.ts"]
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["ghostty-webgpu"]
     },
     "ghostty-webgpu/demo": {
       "entry": ["src/client.ts"],
       "project": ["src/**/*.ts"]
     },
     "ghostty-webgpu/site": {
-      "entry": ["src/main.ts", "src/pages/**/*.{astro,ts}", "src/examples/**/*.ts", "scripts/*.ts"],
+      "entry": [
+        "src/landing.ts",
+        "src/pages/**/*.{astro,ts}",
+        "src/examples/**/*.ts",
+        "scripts/*.ts",
+        "worker/index.ts"
+      ],
+      "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts", "worker/**/*.ts"]
+    },
+    "ghostty-webgpu/site-classic": {
+      "entry": ["src/main.ts", "src/docs-theme.ts", "src/pages/**/*.{astro,ts}", "scripts/*.ts"],
       "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts"]
     },
     "editor/packages/collaboration": {

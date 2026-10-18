@@ -88,6 +88,9 @@ jobs:
         env:
           CI_PACKAGES: ${{ inputs.packages || 'all' }}
         run: bun scripts/ci/packages.mjs editor-tests "$CI_PACKAGES"
+      - name: Test shared parser memory in three browsers
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/tree-sitter"') }}
+        run: bun run --cwd editor/packages/tree-sitter test:memory:browser --api.host 127.0.0.1 --api.port 0 --api.strictPort
       - name: Test complete document snapshot paint
         if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/core"') }}
         run: |
@@ -102,6 +105,9 @@ jobs:
       - name: Test tree-sitter browser worker
         if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/tree-sitter"') }}
         run: bun run --cwd editor/packages/tree-sitter test:browser
+      - name: Test TypeScript worker parity in all browsers
+        if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/typescript-lsp"') }}
+        run: bun run --cwd editor/packages/typescript-lsp test:browser
       - name: Test collaboration presence in Chromium
         if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"@singapore-editor/collaboration"') }}
         run: bun x turbo run test:browser --filter=@singapore-editor/collaboration --concurrency=1 -- test/presence.browser.test.ts
@@ -130,7 +136,7 @@ jobs:
           browsers: chromium
       - name: Verify line editor package
         if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"ghostty-webgpu-line-editor"') }}
-        run: bun run --cwd ghostty-webgpu-line-editor verify
+        run: bun run --cwd ghostty-webgpu/packages/line-editor verify
       - name: Verify terminal library and browser package
         if: ${{ inputs.packages == 'all' || github.event_name == 'workflow_dispatch' || contains(inputs.packages, '"ghostty-webgpu"') }}
         run: bun run --cwd ghostty-webgpu verify
@@ -168,7 +174,7 @@ jobs:
           bun-version-file: package.json
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ (github.event_name == 'workflow_dispatch' || inputs.standalone_editor) && '26' || '24' }}
       - name: Standalone Editor
         if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || inputs.standalone_editor) }}
         uses: ./.github/actions/standalone

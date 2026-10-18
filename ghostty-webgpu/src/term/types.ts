@@ -13,8 +13,8 @@ import type {
   TerminalCursorStyle,
   TerminalScrollbar,
 } from '../core/types.js'
-import type { RendererTheme } from '../render/instances/types.js'
-import type { RenderStateSource } from '../render/renderer.js'
+import type { RendererTheme } from '../render/shared/instances/types.js'
+import type { RenderStateSource } from '../render/shared/types.js'
 import type { LinkRequest, LinkResolverOptions } from './links.js'
 
 type RendererColorKey =
@@ -50,6 +50,7 @@ export interface TerminalFontSettings {
   readonly boldWeight: number
   readonly family: string
   readonly letterSpacing: number
+  /** Measured font-box multiplier, at least 0.5. Values below 1 clip glyphs to their cells. */
   readonly lineHeight: number
   readonly size: number
   readonly weight: number
@@ -57,6 +58,7 @@ export interface TerminalFontSettings {
 
 export interface TerminalFittedFont {
   readonly charLeft: number
+  /** Signed device-pixel offset that centres the natural font box inside its cell. */
   readonly charTop: number
   readonly cssCellHeight: number
   readonly cssCellWidth: number
@@ -233,6 +235,8 @@ export type TerminalCursorSnapshot = Readonly<TerminalCursor>
 
 export interface TerminalDataEvent {
   readonly bytes: Uint8Array
+  /** `input` comes from typing, pasting, mouse reports or `sendInput`; `reply` is the terminal answering a query or reporting focus. */
+  readonly origin: 'input' | 'reply'
 }
 
 export interface TerminalTitleEvent {

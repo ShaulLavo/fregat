@@ -1,4 +1,4 @@
-import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
+import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import * as React from 'react'
 import { ContextMenu as ContextMenuPrimitive } from '@base-ui/react/context-menu'
 
@@ -113,6 +113,10 @@ function ContextMenuItem({
         className,
       )}
       {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
     />
   )
 }
@@ -132,12 +136,18 @@ function ContextMenuSubTrigger({
   return (
     <ContextMenuPrimitive.SubmenuTrigger
       data-slot='context-menu-sub-trigger'
+      data-feedback='tap'
+      data-row-press
       data-inset={inset || undefined}
       className={cn(
         "flex cursor-default items-center gap-2 rounded-md px-2 py-(--density-menu-item-padding-y) text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-(--menu-inset-padding) data-popup-open:bg-accent data-popup-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size)",
         className,
       )}
       {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
     >
       {children}
       <CaretRightIcon className='ml-auto' />
@@ -171,6 +181,7 @@ function ContextMenuCheckboxItem({
   return (
     <ContextMenuPrimitive.CheckboxItem
       data-slot='context-menu-checkbox-item'
+      data-feedback='tick'
       data-inset={inset || undefined}
       className={cn(
         "relative flex cursor-default items-center gap-2 rounded-md py-(--density-menu-item-padding-y) pr-8 pl-2 text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-(--menu-inset-padding) data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size)",
@@ -178,9 +189,9 @@ function ContextMenuCheckboxItem({
       )}
       checked={checked}
       {...props}
-      onCheckedChange={(value, details) => {
-        props.onCheckedChange?.(value, details)
-        if (!details.isCanceled) playControlFeedback('tick', details.event)
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
       }}
     >
       <span className='pointer-events-none absolute right-2'>
@@ -194,16 +205,7 @@ function ContextMenuCheckboxItem({
 }
 
 function ContextMenuRadioGroup({ ...props }: ContextMenuPrimitive.RadioGroup.Props) {
-  return (
-    <ContextMenuPrimitive.RadioGroup
-      data-slot='context-menu-radio-group'
-      {...props}
-      onValueChange={(value, details) => {
-        props.onValueChange?.(value, details)
-        if (!details.isCanceled) playControlFeedback('tick', details.event)
-      }}
-    />
-  )
+  return <ContextMenuPrimitive.RadioGroup data-slot='context-menu-radio-group' {...props} />
 }
 
 function ContextMenuRadioItem({
@@ -217,12 +219,17 @@ function ContextMenuRadioItem({
   return (
     <ContextMenuPrimitive.RadioItem
       data-slot='context-menu-radio-item'
+      data-feedback='tick'
       data-inset={inset || undefined}
       className={cn(
         "relative flex cursor-default items-center gap-2 rounded-md py-(--density-menu-item-padding-y) pr-8 pl-2 text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-(--menu-inset-padding) data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size)",
         className,
       )}
       {...props}
+      onClickCapture={(event) => {
+        props.onClickCapture?.(event)
+        playClickFeedback(event.nativeEvent, event.currentTarget)
+      }}
     >
       <span className='pointer-events-none absolute right-2'>
         <ContextMenuPrimitive.RadioItemIndicator data-slot='check-indicator'>

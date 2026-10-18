@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
@@ -146,11 +146,85 @@ test('standalone checks cover every mirror family from an exact folder export', 
   expect(steps.find((step) => step.name === 'Export exact mirror folder')?.run).toContain(
     'git archive "HEAD:$FAMILY"',
   )
-  expect(
-    steps.find((step) => step.name === 'Install and verify standalone package graph')?.run,
-  ).toBe(
-    'bun install && bun run build && bun run typecheck && bun run lint && bun run format:check',
+  expect(steps.find((step) => step.name === 'Install standalone dependencies')?.run).toBe(
+    'bun install',
   )
+  expect(steps.find((step) => step.name === 'Verify standalone package graph')?.run).toBe(
+    'bun run build && bun run typecheck && bun run lint && bun run format:check',
+  )
+})
+
+function standaloneBuild(family: string, browserStatus = 0) {
+  const root = mkdtempSync(path.join(tmpdir(), 'standalone-browser-'))
+  try {
+    mkdirSync(path.join(root, 'site/node_modules/.bin'), { recursive: true })
+    writeFileSync(
+      path.join(root, 'bun'),
+      `#!/bin/bash
+set -euo pipefail
+printf 'bun %s\\n' "$*" >> calls
+if [[ "$*" == install ]]; then touch dependencies; fi
+if [[ "$*" == 'run build' && "$FAMILY" == editor ]]; then test -f browser; fi
+`,
+      { mode: 0o755 },
+    )
+    writeFileSync(
+      path.join(root, 'site/node_modules/.bin/playwright'),
+      `#!/bin/bash
+set -euo pipefail
+test -f dependencies
+[[ "$*" == 'install --with-deps chromium' ]]
+printf 'playwright %s\\n' "$*" >> calls
+if [[ "$BROWSER_STATUS" != 0 ]]; then exit "$BROWSER_STATUS"; fi
+touch browser
+`,
+      { mode: 0o755 },
+    )
+    const runtime = action.runs.steps.findIndex(
+      (step) => step.name === 'Check standalone tree-sitter runtime',
+    )
+    let status = 0
+    for (const step of action.runs.steps.slice(1, runtime)) {
+      if (step.if && !expression(step.if, { inputs: { family } })) continue
+      expect(step['working-directory']).toBe('${{ steps.export.outputs.directory }}')
+      const result = Bun.spawnSync(['bash', '-euo', 'pipefail', '-c', step.run], {
+        cwd: root,
+        env: {
+          ...process.env,
+          PATH: `${root}:${process.env.PATH}`,
+          FAMILY: family,
+          BROWSER_STATUS: String(browserStatus),
+        },
+      })
+      status = result.exitCode
+      if (status !== 0) break
+    }
+    return { status, calls: readFileSync(path.join(root, 'calls'), 'utf8').trim().split('\n') }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+test.each(['editor', 'ghostty-webgpu', 'hotkeys'])(
+  'standalone %s installs its build prerequisites before verification',
+  (family) => {
+    const result = standaloneBuild(family)
+    expect(result.status, result.calls.join('\n')).toBe(0)
+    const browser = family === 'editor' ? ['playwright install --with-deps chromium'] : []
+    expect(result.calls).toEqual(
+      ['bun install'].concat(
+        browser,
+        ['bun run build', 'bun run typecheck', 'bun run lint', 'bun run format:check'],
+        family === 'ghostty-webgpu' ? ['bun run --cwd packages/line-editor verify'] : [],
+      ),
+    )
+  },
+)
+
+test('standalone Editor stops before building when its browser install fails', () => {
+  const result = standaloneBuild('editor', 17)
+  expect(result.status).toBe(17)
+  expect(result.calls).toEqual(['bun install', 'playwright install --with-deps chromium'])
 })
 
 test('CI shares one production site build with every mobile shard', () => {
@@ -270,6 +344,25 @@ test('each standalone install uses a fresh directory and selected families conti
   ).toContain('mktemp -d "$RUNNER_TEMP/mirror-editor-hoisted-XXXXXX"')
 })
 
+test.each([
+  ['workflow_dispatch', false, '26'],
+  ['workflow_call', true, '26'],
+  ['workflow_call', false, '24'],
+])(
+  'standalone runtime for %s with Editor enabled %s selects Node %s',
+  (event, editor, expected) => {
+    const step = readWorkflow('workspace-libraries.yml').jobs.standalone!.steps.find(
+      (entry) => entry.uses === 'actions/setup-node@v4',
+    )
+    const version = step?.with?.['node-version']
+    expect(typeof version).toBe('string')
+    if (typeof version !== 'string') return
+    expect(
+      expression(version, { github: { event_name: event }, inputs: { standalone_editor: editor } }),
+    ).toBe(expected)
+  },
+)
+
 test('automatic bump branches include the matched Markdown source', () => {
   const steps = readWorkflow('editor-tree-sitter-x.yml').jobs.update!.steps
   const branch = steps.find((step) => step.name === 'Open a pull request')
@@ -278,15 +371,27 @@ test('automatic bump branches include the matched Markdown source', () => {
 
 test('canonical ghostty CI verifies the separate line editor package', () => {
   const steps = readWorkflow('workspace-libraries.yml').jobs.ghostty!.steps
-  expect(steps.map((step) => step.run)).toContain('bun run --cwd ghostty-webgpu-line-editor verify')
+  expect(steps.map((step) => step.run)).toContain(
+    'bun run --cwd ghostty-webgpu/packages/line-editor verify',
+  )
   const root = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
-  expect(root.workspaces.packages).toContain('ghostty-webgpu-line-editor')
+  expect(root.workspaces.packages).toContain('ghostty-webgpu/packages/*')
   expect(root.scripts['build:workspaces']).toContain('--filter=ghostty-webgpu-line-editor')
 })
 
 test('the provisional line editor workspace is private until publication is authorized', () => {
   const manifest = JSON.parse(
-    readFileSync(new URL('../ghostty-webgpu-line-editor/package.json', import.meta.url), 'utf8'),
+    readFileSync(
+      new URL('../ghostty-webgpu/packages/line-editor/package.json', import.meta.url),
+      'utf8',
+    ),
   )
   expect(manifest.private).toBe(true)
+})
+
+test('line editor builds after the root terminal declarations', () => {
+  const graph = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'))
+  expect(graph.tasks['ghostty-webgpu-line-editor#build'].dependsOn).toContain(
+    'ghostty-webgpu#build',
+  )
 })

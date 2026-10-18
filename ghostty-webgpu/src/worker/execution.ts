@@ -1,7 +1,7 @@
 import type { LocalTerminalExecution } from '../dom/execution-local.js'
 import type { TerminalElements } from '../dom/elements.js'
 import type { TerminalSubmittedSnapshot } from '../dom/submitted-frame.js'
-import type { RendererTextFrameSnapshot } from '../render/renderer.js'
+import type { RendererTextFrameSnapshot } from '../render/shared/types.js'
 import { EventEmitter } from '../term/events.js'
 import {
   createProjectedLinkSession,
@@ -57,6 +57,7 @@ export class WorkerTerminalExecution {
   private output = 0
   private readonly outputControls = new Set<number>()
   private submittedOutputValue = false
+  private submittedControlValue = 0
   private submittedProducerOutput = 0
   private nextId = 0
   private state?: WorkerState
@@ -188,6 +189,14 @@ export class WorkerTerminalExecution {
   get submittedOutput(): boolean {
     return this.submittedOutputValue
   }
+  /** The newest request sent to the worker. */
+  get requestedControl(): number {
+    return this.control
+  }
+  /** The newest request the last submitted frame includes. */
+  get submittedControl(): number {
+    return this.submittedControlValue
+  }
   get backend() {
     return this.state?.backend
   }
@@ -269,6 +278,7 @@ export class WorkerTerminalExecution {
       // Producer submissions advance independently of the host's requested output fence.
       this.submittedOutputValue = message.output > this.submittedProducerOutput
       this.submittedProducerOutput = message.output
+      this.submittedControlValue = message.control
       for (const control of this.outputControls) {
         if (control > message.control) break
         this.submittedOutputValue = true

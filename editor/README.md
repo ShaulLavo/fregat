@@ -68,7 +68,7 @@ See the [method, raw samples, bundle sizes, and reproduction commands](https://g
 ## Quick start
 
 [Try the browser demo](https://singapore.shaulavo.dev/) to edit text without installing anything.
-For current code, clone Fregat and prepare its workspace packages:
+For current code, install Node.js 26 or newer and the Bun version pinned in `packageManager`, then clone Fregat and prepare its workspace packages:
 
 ```sh
 git clone https://github.com/ShaulLavo/fregat.git

@@ -235,6 +235,7 @@ import { terminalCancelledStartup } from './terminal-cancelled-startup'
 import { terminalWasmCancelledStartup } from './terminal-wasm-cancelled-startup'
 import { terminalWasmNavigationStartup } from './terminal-wasm-navigation-startup'
 import { terminalScreenReader } from './terminal-screen-reader'
+import { terminalOutputTiming } from './terminal-output-timing'
 import { terminalRenderer, terminalRendererDom, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { sidebarToggle } from './sidebar-toggle'
@@ -262,6 +263,7 @@ import { gitDiscardConfirm } from './git-discard-confirm'
 import { baseComponents } from './base-components'
 import { physicalMode } from './physical-mode'
 import { physicalChat } from './physical-chat'
+import { physicalSurfaces } from './physical-surfaces'
 import { connectionFrame } from './connection-frame'
 import { settingsValueGrids } from './settings-value-grids'
 import { settingsDependentRow } from './settings-dependent-row'
@@ -277,6 +279,7 @@ import { webPicker } from './web-picker'
 import { nativeHost } from './native-host'
 import { filePickerSelection } from './file-picker-selection'
 import { filePickerBrowse } from './file-picker-browse'
+import { filePickerHeader } from './file-picker-header'
 import { filePickerLocations } from './file-picker-locations'
 import { filePickerAppearance } from './file-picker-appearance'
 import { quickOpenCrlfPreview } from './quick-open-crlf-preview'
@@ -687,6 +690,7 @@ export const scenarios: readonly Scenario[] = [
   terminalWasmNavigationStartup,
   terminalOfflineHost,
   terminalScreenReader,
+  terminalOutputTiming,
   terminalRenderer,
   terminalRendererDom,
   terminalRendererWebgl,
@@ -716,6 +720,7 @@ export const scenarios: readonly Scenario[] = [
   physicalMode,
   devTransitions,
   physicalChat,
+  physicalSurfaces,
   connectionFrame,
   settingsValueGrids,
   settingsDependentRow,
@@ -726,6 +731,7 @@ export const scenarios: readonly Scenario[] = [
   tailFollow,
   checkpointRestore,
   filePickerBrowse,
+  filePickerHeader,
   filePickerLocations,
   filePickerAppearance,
   webPicker,

@@ -7,9 +7,13 @@ import {
   copyFittedFont,
   mergeRendererTheme,
   normalizeRendererGrid,
-} from '../config.js'
-import type { CanonicalRendererTheme, CursorState, RendererTheme } from '../instances/types.js'
-import type { RendererFrameSnapshot, RendererGridSize } from '../renderer.js'
+} from '../shared/config.js'
+import type {
+  CanonicalRendererTheme,
+  CursorState,
+  RendererTheme,
+} from '../shared/instances/types.js'
+import type { RendererFrameSnapshot, RendererGridSize } from '../shared/types.js'
 
 export interface RenderFrameHtmlOptions extends RendererGridSize {
   readonly font: TerminalFittedFont
@@ -99,6 +103,7 @@ function cellStyle(
     .join(' ')
   const underlineStyles = ['solid', 'solid', 'double', 'wavy', 'dotted', 'dashed']
   let css = `display:inline-block;flex:none;contain:size layout;direction:ltr;unicode-bidi:bidi-override;height:var(--ghostty-cell-height, ${font.cssCellHeight}px);vertical-align:top;`
+  if (font.settings.lineHeight < 1) css += 'overflow:hidden;'
   if (width > 1) css += 'text-align:center;'
   css += `color:${style?.invisible ? 'transparent' : foreground};`
   if (style?.faint && !style.invisible)
@@ -186,7 +191,12 @@ export function renderRowRuns(
   const columns = packed?.length ?? row.cells.length
   const defaultStyle = styles?.cell
   const defaultRunStyle = styles?.columns === columns ? styles.run : undefined
-  if (packed && defaultRunStyle !== undefined && (!cursor?.visible || cursor.y !== row.y)) {
+  if (
+    font.settings.lineHeight >= 1 &&
+    packed &&
+    defaultRunStyle !== undefined &&
+    (!cursor?.visible || cursor.y !== row.y)
+  ) {
     const text = packed.defaultRunText()
     if (text !== undefined) return text ? [{ cursor: undefined, style: defaultRunStyle, text }] : []
   }
@@ -263,7 +273,7 @@ export function renderRowRuns(
     currentText += cell.text || ' '
     currentWidth += width
     // Wide glyphs occupy two cells but one character; their following run must start at its own cell.
-    if (width > 1 || paintedCursor) flush()
+    if (width > 1 || paintedCursor || font.settings.lineHeight < 1) flush()
   }
   if (length > 0 && length < columns) {
     const style =

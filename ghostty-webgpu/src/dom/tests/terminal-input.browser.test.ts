@@ -1,13 +1,13 @@
-import { displayedFrameListener } from '../../render/displayed-frame.js'
+import { displayedFrameListener } from '../../render/shared/displayed-frame.js'
 import { detectPlatform } from '@fregat/hotkeys'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { GhosttyRuntime } from '../../core/runtime.js'
-import type { RendererTheme } from '../../render/instances/types.js'
+import type { RendererTheme } from '../../render/shared/instances/types.js'
 import type {
   RendererFrameSnapshot,
   RendererGridSize,
   WebGpuTerminalRendererOptions,
-} from '../../render/renderer.js'
+} from '../../render/shared/types.js'
 import { TerminalSession } from '../../term/session.js'
 import type { TerminalFittedFont, TerminalKeyInput } from '../../term/types.js'
 import { createTerminalElements } from '../elements.js'
@@ -390,6 +390,45 @@ describe('Terminal DOM host', () => {
     expect(renderer.themes.at(-1)?.background).toEqual({ b: 3, g: 2, r: 1 })
     expect(renderer.resizes.at(-1)).toEqual({ columns: 23, rows: 7 })
     expect(session.grid).toMatchObject({ columns: 23, rows: 7 })
+  })
+
+  it('only follows the cursor for input positioning while focused or composing', async () => {
+    const recording: RendererRecording = {}
+    const terminal = await trackedTerminal({
+      rendererFactory: recordingRendererFactory(recording),
+    })
+    await terminal.open(trackedHost())
+    await settleRenderer(terminal)
+    const textarea = terminal.textarea!
+    const composition = terminal.element!.querySelector<HTMLDivElement>(
+      '.ghostty-webgpu-composition',
+    )!
+    const mutations: MutationRecord[] = []
+    const observer = new MutationObserver((records) => mutations.push(...records))
+    observer.observe(textarea, { attributes: true, attributeFilter: ['style'] })
+    observer.observe(composition, { attributes: true, attributeFilter: ['style'] })
+
+    const initialPosition = { left: textarea.style.left, top: textarea.style.top }
+    const frame = displayedFrameListener(recording.options!)!
+    for (let index = 1; index <= 12; index += 1) frame(cursorFrame(index, index))
+    await animationFrames(1)
+    expect({ left: textarea.style.left, top: textarea.style.top }).toEqual(initialPosition)
+    expect(mutations).toHaveLength(0)
+
+    terminal.focus()
+    frame(cursorFrame(4, 2))
+    await animationFrames(1)
+    expect(textarea.style.left).not.toBe(initialPosition.left)
+    expect(textarea.style.top).not.toBe(initialPosition.top)
+
+    terminal.blur()
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    frame(cursorFrame(8, 3))
+    await animationFrames(1)
+    expect(composition.style.left).toBe(textarea.style.left)
+    expect(composition.style.top).toBe(textarea.style.top)
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
+    observer.disconnect()
   })
 
   it('cancels compatibility mouse focus changes only on the retained canvas', async () => {

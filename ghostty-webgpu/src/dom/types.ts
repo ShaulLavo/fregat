@@ -17,13 +17,13 @@ import type {
   TerminalSessionRuntime,
   TerminalTheme,
 } from '../term/types.js'
-import type { RendererTheme } from '../render/instances/types.js'
-import type { InactiveCursorStyle } from '../render/cursor.js'
+import type { RendererTheme } from '../render/shared/instances/types.js'
+import type { InactiveCursorStyle } from '../render/shared/cursor.js'
 import type {
   RendererFrameSnapshot,
   RendererGridSize,
   WebGpuTerminalRendererOptions,
-} from '../render/renderer.js'
+} from '../render/shared/types.js'
 import type { TerminalAccessibilityOptions } from './accessibility.js'
 import type { DomClipboardWritePolicy } from './clipboard.js'
 import type { TerminalElementPaddingInput, TerminalElements } from './elements.js'
@@ -43,6 +43,43 @@ export interface GhosttyWebGpuTerminalResizeEvent {
   readonly rows: number
 }
 
+/**
+ * One burst of output: writes that arrive with less than `quietMs` between them. All times are
+ * `performance.now()` values in this window's clock.
+ */
+export interface TerminalOutputTiming {
+  /** The last typed, pasted, mouse or `sendInput` input within `inputWindowMs` before this output began. */
+  readonly inputAt?: number
+  readonly firstOutputAt: number
+  readonly lastOutputAt: number
+  /**
+   * When the first frame holding the last output was drawn: WebGPU commands submitted, WebGL or
+   * canvas draw calls issued, or DOM rows written. In a worker terminal, when the frame's notice
+   * reached this window. Missing when no frame drew it, such as output that changed nothing visible.
+   */
+  readonly drawnAt?: number
+  /**
+   * When the browser finished the page update that carries the drawn frame: the first task after
+   * that update. The display shows it at its next refresh. A desynchronized canvas can appear
+   * before this. Missing in worker terminals and when `drawnAt` is missing.
+   */
+  readonly presentedAt?: number
+  readonly writes: number
+  /** No frame drew this output because the page was hidden when it ended. */
+  readonly hidden: boolean
+  readonly presentation: NonNullable<GhosttyWebGpuTerminalOptions['presentation']>
+  /** The canvas presents without waiting for the browser's compositor, as `diagnostics.desynchronized`. */
+  readonly desynchronized: boolean
+  readonly rendererBackend: 'dom' | 'canvas2d' | 'webgl2' | 'webgpu' | undefined
+}
+
+export interface GhosttyWebGpuTerminalOutputTimingOptions {
+  /** Output that pauses for this many milliseconds ends a burst. Defaults to 100. */
+  readonly quietMs?: number
+  /** Input older than this many milliseconds when output begins is not paired with it. Defaults to 2000. */
+  readonly inputWindowMs?: number
+}
+
 export interface GhosttyWebGpuTerminalEventMap {
   readonly open: HTMLDivElement
   readonly appearance: TerminalAppearance
@@ -50,6 +87,8 @@ export interface GhosttyWebGpuTerminalEventMap {
   readonly data: Uint8Array
   readonly frame: { readonly rows: readonly number[] }
   readonly error: TerminalErrorEvent
+  /** Fires once per output burst after it is drawn. Timing is recorded only while someone listens. */
+  readonly outputTiming: TerminalOutputTiming
   readonly resize: GhosttyWebGpuTerminalResizeEvent
   readonly scroll: TerminalScrollEvent
   readonly selection: TerminalSelectionEvent
@@ -89,6 +128,8 @@ export interface GhosttyWebGpuTerminalDiagnostics {
   readonly pointerOwner: TerminalPointerOwner
   readonly pressedButtonCount: number
   readonly rendererBackend: 'dom' | 'canvas2d' | 'webgl2' | 'webgpu' | undefined
+  /** The renderer's context reports `desynchronized`; the browser may still composite it. */
+  readonly desynchronized: boolean
   readonly scrollbarVisible: boolean
 }
 
@@ -106,6 +147,7 @@ export interface GhosttyWebGpuRenderer {
   /** Required to settle clean updates through onCleanUpdate. */
   readonly canPaint?: boolean
   readonly backend?: 'dom' | 'canvas2d' | 'webgl2' | 'webgpu'
+  readonly desynchronized?: boolean
   readonly hasPendingFrame?: boolean
   readonly hasPendingTimer?: boolean
   clearTextureAtlas?(): void
@@ -139,9 +181,12 @@ export interface GhosttyWebGpuTerminalOptions {
   readonly extensions?: readonly ExtensionInput[]
   readonly linkActivationModifier?: (event: MouseEvent) => boolean
   readonly links?: LinkResolverOptions<Event>
+  readonly outputTiming?: GhosttyWebGpuTerminalOutputTimingOptions
   readonly padding?: TerminalElementPaddingInput
   readonly rendererFactory?: GhosttyWebGpuRendererFactory
   readonly rendererMode?: WebGpuTerminalRendererOptions['rendererMode']
+  /** `immediate` paints a write before the next display frame; main-thread terminals only. */
+  readonly presentation?: WebGpuTerminalRendererOptions['presentation']
   readonly runtime?: TerminalSessionRuntime
   readonly scrollbar?: GhosttyWebGpuTerminalScrollbarOptions
 }

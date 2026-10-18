@@ -35,9 +35,9 @@ test('the four documentation files in PR 1207 do not consume application or libr
 const terminalPrFiles = [
   '.changeset/desktop-linux-webgl-auto.md',
   'ghostty-webgpu/docs/api.md',
-  'ghostty-webgpu/src/render/backend-order.test.ts',
-  'ghostty-webgpu/src/render/backend-order.ts',
-  'ghostty-webgpu/src/render/selector.ts',
+  'ghostty-webgpu/src/render/shared/backend-order.test.ts',
+  'ghostty-webgpu/src/render/shared/backend-order.ts',
+  'ghostty-webgpu/src/render/shared/selector.ts',
   'ghostty-webgpu/src/render/tests/platforms.ts',
   'ghostty-webgpu/src/render/tests/selector.browser.test.ts',
   'ghostty-webgpu/src/worker/runtime.ts',
@@ -98,10 +98,18 @@ test.each([
   ['hotkeys/packages/hotkeys/src/index.ts', '@fregat/hotkeys'],
   ['packages/contracts/src/index.ts', '@workspace/contracts'],
   ['ghostty-webgpu/site/src/main.ts', 'ghostty-webgpu-site'],
+  ['ghostty-webgpu/site-classic/src/main.ts', 'ghostty-webgpu-classic-site'],
   ['ghostty-webgpu/docs/correctness-results.json', 'ghostty-webgpu'],
 ])('%s selects only its owning package', (file, name) => {
   expect(select([file]).packages).toEqual([name])
   expect(select([file]).tooling).toBe(false)
+})
+
+test('classic Ghostty changes select the site build', () => {
+  expect(select(['ghostty-webgpu/site-classic/src/main.ts'])).toMatchObject({
+    site: true,
+    sites: 'ghostty-webgpu',
+  })
 })
 
 test('PR 1232 selects Editor health when changing its baseline and workflow', () => {

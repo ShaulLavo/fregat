@@ -1,4 +1,5 @@
 import { useShellStore } from '@/lib/shell/state/store'
+import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { useSessionDiffScope } from '@/features/chat/hooks/use-session-diff-scope'
 import { useSessionCheckoutRefresh } from '@/features/chat-mode/hooks/use-session-checkout-refresh'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
@@ -13,6 +14,7 @@ import { phoneLevel } from '@/features/phone/utils/level'
 
 /** One screen at a time, chosen by the address, so the browser's Back gesture walks the stack. */
 export function Stack({ rootPath }: { readonly rootPath: string }) {
+  const layout = useEditorWorkspaceState((state) => state.uiMode)
   const selection = useSessionSelectionStore((state) => state.selection.kind)
   const screen = useShellStore((state) => state.phoneScreen)
   const level = phoneLevel(selection, screen)
@@ -27,7 +29,7 @@ export function Stack({ rootPath }: { readonly rootPath: string }) {
 
   return (
     <BackContext value={back}>
-      <Frame>
+      <Frame focusLayout={layout}>
         <Screen diffScope={diffScope} level={level} rootPath={rootPath} />
       </Frame>
     </BackContext>

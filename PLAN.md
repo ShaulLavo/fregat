@@ -1,6 +1,6 @@
 # Execution roadmap
 
-Updated 2026-10-06. This file owns cross-project ordering. Each [plan](plans/README.md)
+Updated 2026-10-15. This file owns cross-project ordering. Each [plan](plans/README.md)
 owns its scope, decisions, status and acceptance checks. [AGENTS.md](AGENTS.md) owns execution
 rules; [docs](docs/README.md) holds architecture, research and delivery evidence.
 
@@ -151,6 +151,8 @@ work can proceed independently where their files and contracts do not overlap.
    remain Approved and deferred to Phase 2 preparation. They do not start the stopped parser wave.
 
 ## Next programs
+
+[346](plans/346-tree-sitter-x-resizable-wasm-memory.md) is Approved for resizable WebAssembly memory views in tree-sitter-x. It delivers the parser package before advancing Singapore and Markdown consumers, and requires growth correctness and a bounded performance comparison before delivery. Ghostty WebGPU's Plan 345 was dropped on 2026-10-16: its official Wasm build declares no memory maximum, which Chromium, Firefox and Node require for `toResizableBuffer()`, and `TextDecoder`, WebGL and WebGPU uploads reject resizable-backed views, so each frame would need a staging copy. Bun Wasm, Brush, and third-party Shiki changes are outside this plan.
 
 [336](plans/336-packages-as-products.md) makes Fregat, Singapore, ghostty-webgpu and hotkeys
 look like products: research, pitch with proof, READMEs, Astro sites on our own domains, docs,
