@@ -865,6 +865,20 @@
         "ghostty-webgpu",
       ],
     },
+    "ghostty-webgpu/packages/shaders": {
+      "name": "ghostty-webgpu-shaders",
+      "version": "0.0.1",
+      "devDependencies": {
+        "@webgpu/types": "0.1.74",
+        "oxfmt": "0.70.0",
+        "oxlint": "1.85.0",
+        "typescript": "7.0.2",
+        "vitest": "5.0.2",
+      },
+      "peerDependencies": {
+        "ghostty-webgpu": "^0.3.24",
+      },
+    },
     "ghostty-webgpu/site": {
       "name": "ghostty-webgpu-site",
       "dependencies": {
@@ -2967,6 +2981,8 @@
     "ghostty-webgpu-demo": ["ghostty-webgpu-demo@workspace:ghostty-webgpu/demo"],
 
     "ghostty-webgpu-line-editor": ["ghostty-webgpu-line-editor@workspace:ghostty-webgpu/packages/line-editor"],
+
+    "ghostty-webgpu-shaders": ["ghostty-webgpu-shaders@workspace:ghostty-webgpu/packages/shaders"],
 
     "ghostty-webgpu-site": ["ghostty-webgpu-site@workspace:ghostty-webgpu/site"],
 

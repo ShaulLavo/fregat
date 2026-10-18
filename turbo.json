@@ -308,6 +308,11 @@
     "ghostty-webgpu-line-editor#build": {
       "dependsOn": ["^build", "ghostty-webgpu#build"],
       "outputs": ["dist/**"]
+    },
+    "ghostty-webgpu-shaders#build": {
+      "dependsOn": ["^build", "ghostty-webgpu#build"],
+      "inputs": ["$TURBO_DEFAULT$"],
+      "outputs": ["dist/**"]
     }
   },
   "agentGuidance": false,
