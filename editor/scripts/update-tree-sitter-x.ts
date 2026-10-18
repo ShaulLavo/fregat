@@ -81,6 +81,7 @@ if (updates.length === 0) {
     for (const { path, text } of updates) await writeFile(path, text)
     await $`bun install`.cwd(workspaceRoot)
     await $`bun run --cwd packages/tree-sitter-languages languages:generate`.cwd(root)
+    await $`bun x --no-install oxfmt --write ${updates.map(({ path }) => path)}`.cwd(workspaceRoot)
   } catch (cause) {
     // Restore source pins so the next run retries installation and generation for this same pair.
     for (const { path, before } of updates) await writeFile(path, before)

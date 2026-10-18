@@ -220,8 +220,16 @@ test('a matching Markdown source advances full host, peer, catalog, and fixture 
     expect(await readFile(path.join(root, 'requested-url'), 'utf8')).toBe(
       `https://raw.githubusercontent.com/ShaulLavo/tree-sitter-x/${nextRuntime}/package.json`,
     )
-    expect(await readFile(path.join(root, 'commands'), 'utf8')).toBe(
-      `${root}|install\n${path.join(root, 'editor')}|run --cwd packages/tree-sitter-languages languages:generate\n`,
+    const commands = (await readFile(path.join(root, 'commands'), 'utf8')).trim().split('\n')
+    expect(commands).toHaveLength(3)
+    expect(commands.slice(0, 2)).toEqual([
+      `${root}|install`,
+      `${path.join(root, 'editor')}|run --cwd packages/tree-sitter-languages languages:generate`,
+    ])
+    const formatPrefix = `${root}|x --no-install oxfmt --write `
+    expect(commands[2]!.startsWith(formatPrefix)).toBe(true)
+    expect(new Set(commands[2]!.slice(formatPrefix.length).split(' '))).toEqual(
+      new Set(files.concat(path.join(root, 'editor/package.json'))),
     )
   })
 })
@@ -280,8 +288,16 @@ test('standalone updates leave the parent graph whole and install inside the fam
         before,
       )
       const editor = path.join(root, 'singapore')
-      expect(await readFile(path.join(root, 'commands'), 'utf8')).toBe(
-        `${editor}|install\n${editor}|run --cwd packages/tree-sitter-languages languages:generate\n`,
+      const commands = (await readFile(path.join(root, 'commands'), 'utf8')).trim().split('\n')
+      expect(commands).toHaveLength(3)
+      expect(commands.slice(0, 2)).toEqual([
+        `${editor}|install`,
+        `${editor}|run --cwd packages/tree-sitter-languages languages:generate`,
+      ])
+      const formatPrefix = `${editor}|x --no-install oxfmt --write `
+      expect(commands[2]!.startsWith(formatPrefix)).toBe(true)
+      expect(new Set(commands[2]!.slice(formatPrefix.length).split(' '))).toEqual(
+        new Set(files.slice(2).concat(path.join(editor, 'package.json'))),
       )
       for (const file of files.slice(3)) {
         expect(JSON.parse(await readFile(file, 'utf8')).dependencies['tree-sitter-md']).toBe(
