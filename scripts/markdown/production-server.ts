@@ -17,8 +17,11 @@ export async function serveMarkdownProductionProbe(directory: string, port: numb
   async function close() {
     if (closed) return
     closed = true
-    await server.stop(true)
-    await fixture.cleanup()
+    try {
+      await server.stop(true)
+    } finally {
+      await fixture.cleanup()
+    }
   }
   return {
     url: `http://127.0.0.1:${server.port}/test/markdown-production.html`,
