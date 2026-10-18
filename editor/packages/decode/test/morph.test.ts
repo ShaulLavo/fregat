@@ -4,42 +4,58 @@ import { springEasing } from '../src/morph-run'
 
 describe('matchPieces', () => {
   it('keeps every piece an insertion left alone', () => {
-    const pairs = matchPieces(['const', 'a', '=', '1'], ['const', 'a', ':', 'number', '=', '1'])
+    const pairs = matchPieces(line(0, 'const a = 1'), line(0, 'const a : number = 1'))
     expect(Array.from(pairs)).toEqual([0, 1, -1, -1, 2, 3])
   })
 
   it('lets removed pieces leave and the rest keep their order', () => {
-    const pairs = matchPieces(['f', '(', 'a', ',', 'b', ')'], ['f', '(', 'b', ')'])
+    const pairs = matchPieces(line(0, 'f ( a , b )'), line(0, 'f ( b )'))
     expect(Array.from(pairs)).toEqual([0, 1, 4, 5])
   })
 
   it('pairs a block that moved past other code', () => {
-    const before = ['one', 'uno', 'two', 'dos']
-    const after = ['two', 'dos', 'one', 'uno']
+    const before = line(0, 'one uno').concat(line(1, 'two dos'))
+    const after = line(0, 'two dos').concat(line(1, 'one uno'))
     const pairs = Array.from(matchPieces(before, after))
-    // The in-order pass keeps one block; the moved block is paired by its unique texts.
     expect(pairs.filter((old) => old >= 0)).toHaveLength(4)
-    expect(after.map((_, index) => before[pairs[index] ?? -1])).toEqual(after)
+    expect(after.map((_, index) => before[pairs[index] ?? -1]?.text)).toEqual(
+      after.map((piece) => piece.text),
+    )
+  })
+
+  it('moves swapped lines whole, punctuation and shared words included', () => {
+    const first = 'const a = f ( 1 ) ;'
+    const second = 'const b = g ( 2 ) ;'
+    const before = line(0, first).concat(line(1, second))
+    const after = line(0, second).concat(line(1, first))
+    const pairs = Array.from(matchPieces(before, after))
+    // Every piece continues the one on the same text's old line: nothing fades.
+    expect(pairs).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7])
   })
 
   it('lets a lone bracket fade instead of flying to a distant match', () => {
-    const pairs = matchPieces(['a', '{', 'b'], ['b', '{', 'c'])
+    const pairs = matchPieces(line(0, 'a { b'), line(0, 'b { c'))
     expect(Array.from(pairs)).toEqual([2, -1, -1])
   })
 
   it('leaves repeated texts unpaired when their counts differ', () => {
-    const before = ['xx', 'yy', 'xx']
-    const after = ['zz', 'xx', 'ww', 'xx', 'xx']
+    const before = line(0, 'xx yy xx')
+    const after = line(0, 'zz xx ww xx xx')
     for (const [index, old] of Array.from(matchPieces(before, after)).entries()) {
-      if (old >= 0) expect(before[old]).toBe(after[index])
+      if (old >= 0) expect(before[old]?.text).toBe(after[index]?.text)
     }
   })
 
   it('handles empty sides', () => {
-    expect(Array.from(matchPieces([], ['a']))).toEqual([-1])
-    expect(Array.from(matchPieces(['a'], []))).toEqual([])
+    expect(Array.from(matchPieces([], line(0, 'a')))).toEqual([-1])
+    expect(Array.from(matchPieces(line(0, 'a'), []))).toEqual([])
   })
 })
+
+/** One line's pieces from space-separated texts. */
+function line(top: number, texts: string) {
+  return texts.split(' ').map((text) => ({ text, top }))
+}
 
 describe('springEasing', () => {
   it('starts at 0, overshoots, and lands on 1', () => {

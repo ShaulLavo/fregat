@@ -148,10 +148,7 @@ class MorphViewContribution implements EditorViewContribution {
       this.finish()
       return
     }
-    const pairs = matchPieces(
-      from.map((piece) => piece.text),
-      next.pieces.map((piece) => piece.text),
-    )
+    const pairs = matchPieces(from, next.pieces)
 
     this.run?.cancel()
     this.run = new MorphRun(
