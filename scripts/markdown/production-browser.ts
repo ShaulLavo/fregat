@@ -1,4 +1,4 @@
-import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { cpus, hostname, loadavg, release, totalmem } from 'node:os'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
@@ -34,6 +34,8 @@ import { productionBrowserControls } from './production-controls.ts'
 import { measureProductionTimeline } from './production-scenes.ts'
 import { qualificationProvenance } from './provenance.ts'
 import { createScriptError } from '../structured-errors.ts'
+import { absent, listenerAbsent } from './production-cleanup.ts'
+import { isRecord } from './serialization.ts'
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const WEB = path.join(ROOT, 'apps/web')
@@ -252,6 +254,14 @@ export async function runProductionMarkdownPairs({
   const reportFailures = failures.concat(
     incompleteEvidence,
     ordinaryFindings,
+    comparisons.flatMap((comparison) =>
+      comparison.metric === 'streamCpu'
+        ? comparison.excludedPairs.map(
+            (excluded) =>
+              `${comparison.workload}/pair-${excluded.pair}/${excluded.engine}: ${excluded.reason}`,
+          )
+        : [],
+    ),
     failedComparisons.map(
       (comparison) =>
         `${comparison.workload}: paired ${comparison.metric} confidence bound failed.`,
@@ -325,7 +335,7 @@ export async function runProductionMarkdownPairs({
       'Native retained buffer identities/counts are unmeasured; backing storage reports bytes only.',
       'Headed Mac capture accepts an explicit host evidence file and records actual browser arguments, fonts and host observations. Quiet timing qualification must still be reconciled against the final frozen candidate; supplying a file never grants VERIFIED.',
       'Worker CPU is counted from dedicated-worker RunTask thread ticks only when the trace maps each worker target and every counted task stays within the stream marks. Missing mappings, boundary-crossing tasks and worker replacement remain incomplete.',
-      'Worker bootstrap completion can report headers after the body arrived before attachment. Its raw completionEncodedBytes is preserved, but full transfer bytes remain unknown without a worker request-start receipt.',
+      'Worker bootstrap completion can report headers after the body arrived before attachment. A complete dedicated-thread trace receipt adds response encoded bytes and encoded transfer-size updates; decoded body chunks remain diagnostic only.',
       'Paint receipts observe matching DOM after a frame opportunity; pixel/presentation and visual-state qualification are separate gates.',
       'Resource plateau verdict requires collected live-heap and repeated native reservation evidence; allocated JS heap alone cannot certify absence of a leak.',
       'Parser wall spans are observed in the actual session wrapper. Highlighter/loader/sanitizer/React CPU attribution and component render counts require the raw trace or a profiling build; no subtraction is presented as exclusive CPU.',
@@ -853,10 +863,6 @@ export function validateProductionBuildIdentity(
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object'
-}
-
 function stringField(record: Record<string, unknown>, key: string) {
   const value = record[key]
   return typeof value === 'string' ? value : null
@@ -976,26 +982,6 @@ export async function main() {
     }) + '\n',
   )
   if (report.failures.length > 0) process.exitCode = 1
-}
-
-async function listenerAbsent(url: string) {
-  try {
-    await fetch(url, { signal: AbortSignal.timeout(1000) })
-    return false
-  } catch {
-    return true
-  }
-}
-
-async function absent(file: string) {
-  try {
-    await access(file)
-    return false
-  } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
-      return true
-    throw error
-  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))

@@ -32,7 +32,7 @@ import {
   createTreeSitterMarkdownSession,
   initializeTreeSitterMarkdown,
 } from '../../packages/markdown/src/utils/tree-sitter-session'
-import { readyRemarkExtensions } from '../../packages/markdown/test/qualification'
+import { readyRemarkExtensions, type Observation } from '../../packages/markdown/test/qualification'
 import {
   adversarialUtf16,
   everyPrefix,
@@ -42,6 +42,7 @@ import {
 import { createScriptError } from '../structured-errors'
 import { canonicalProjection, digestProjection, inspectSourceCorrespondence } from './paired-native'
 import { qualificationProvenance } from './provenance'
+import { encoded, stable } from './serialization'
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const execute = promisify(execFile)
@@ -148,13 +149,19 @@ export type BrowserEvaluationInput = {
     readonly schedules: readonly EvaluationSchedule[]
   }[]
 }
+type BrowserEvaluationFrame = Omit<InferOutput<typeof browserFrameSchema>, 'observation'> & {
+  readonly observation: Observation
+}
 export type BrowserEvaluationRow = {
   readonly id: string
   readonly sourceSha256: string
-  readonly completed: readonly { readonly baseline: unknown; readonly candidate: unknown }[]
+  readonly completed: readonly {
+    readonly baseline: BrowserEvaluationFrame
+    readonly candidate: BrowserEvaluationFrame
+  }[]
   readonly streams: readonly {
     readonly scheduleId: string
-    readonly observations: readonly { readonly baseline: unknown; readonly candidate: unknown }[]
+    readonly observations: BrowserEvaluationRow['completed']
   }[]
 }
 export type BrowserEvaluationReceipt = {
@@ -491,7 +498,7 @@ export function assertFrozenIdentity(actual: CandidateIdentity, expected: Candid
       internal: { boundary: 'candidate-freeze' },
     })
 }
-async function verifyCandidate(root: string, expected: CandidateIdentity) {
+export async function verifyCandidate(root: string, expected: CandidateIdentity) {
   const status = await execute('git', ['status', '--porcelain=v1', '--untracked-files=all'], {
     cwd: root,
   })
@@ -607,7 +614,13 @@ const observationSchema = object({
     }),
   ),
 })
-const browserPairSchema = object({ baseline: observationSchema, candidate: observationSchema })
+const browserFrameSchema = object({
+  observation: observationSchema,
+  inputSha256: sha,
+  inputUtf16Units: number(),
+  live: boolean(),
+})
+const browserPairSchema = object({ baseline: browserFrameSchema, candidate: browserFrameSchema })
 const browserReceiptSchema = object({
   candidate: identitySchema,
   batchAssetSha256: sha,
@@ -640,7 +653,7 @@ const browserInputSchema = object({
     }),
   ),
 })
-function parseBrowserInput(value: unknown): BrowserEvaluationInput {
+export function parseBrowserInput(value: unknown): BrowserEvaluationInput {
   return parse(browserInputSchema, value)
 }
 export function parseBrowserReceipt(value: unknown): BrowserEvaluationReceipt {
@@ -674,44 +687,85 @@ export function validateBrowserEvaluation(
       continue
     }
     const before = failures.length
-    checkBrowserPairs(row.completed, 1, `${message.id}/completed`, failures)
-    for (const schedule of message.schedules) {
-      const streams = row.streams.filter((stream) => stream.scheduleId === schedule.id)
-      const stream = streams[0]
-      if (streams.length !== 1 || !stream) {
-        failures.push(`${message.id}/${schedule.id} has no unique stream receipt.`)
-        continue
-      }
-      checkBrowserPairs(
-        stream.observations,
-        schedule.offsets.length + 1,
-        `${message.id}/${schedule.id}`,
-        failures,
-      )
-    }
-    if (row.streams.length !== message.schedules.length)
-      failures.push(`${message.id} has an unexpected browser schedule denominator.`)
+    checkBrowserMessage(row, message, failures)
     statuses.push(before === failures.length)
   }
   if (receipt.rows.length !== input.messages.length)
     failures.push('The browser receipt changes the original message denominator.')
   return { cases: counts(statuses), failures }
 }
+function checkBrowserMessage(
+  row: BrowserEvaluationRow,
+  message: BrowserEvaluationInput['messages'][number],
+  failures: string[],
+) {
+  checkBrowserPairs(
+    row.completed,
+    [{ source: message.source, live: false }],
+    `${message.id}/completed`,
+    failures,
+  )
+  for (const schedule of message.schedules) {
+    const streams = row.streams.filter((stream) => stream.scheduleId === schedule.id)
+    const stream = streams[0]
+    if (streams.length !== 1 || !stream) {
+      failures.push(`${message.id}/${schedule.id} has no unique stream receipt.`)
+      continue
+    }
+    checkBrowserPairs(
+      stream.observations,
+      schedule.offsets
+        .map((offset) => ({ source: message.source.slice(0, offset), live: true }))
+        .concat([{ source: message.source, live: false }]),
+      `${message.id}/${schedule.id}`,
+      failures,
+    )
+    const completed = row.completed[0]
+    const settlement = stream.observations.at(-1)
+    if (
+      completed &&
+      settlement &&
+      (stable(completed.baseline.observation) !== stable(settlement.baseline.observation) ||
+        stable(completed.candidate.observation) !== stable(settlement.candidate.observation))
+    )
+      failures.push(`${message.id}/${schedule.id} settlement differs from fresh completed output.`)
+  }
+  if (row.streams.length !== message.schedules.length)
+    failures.push(`${message.id} has an unexpected browser schedule denominator.`)
+}
+
 function checkBrowserPairs(
   pairs: BrowserEvaluationRow['completed'],
-  expected: number,
+  expected: readonly { readonly source: string; readonly live: boolean }[],
   label: string,
   failures: string[],
 ) {
-  if (pairs.length !== expected) failures.push(`${label} has an incomplete frame denominator.`)
+  if (pairs.length !== expected.length)
+    failures.push(`${label} has an incomplete frame denominator.`)
   for (const [index, pair] of pairs.entries()) {
+    const frame = expected[index]
     if (
-      pair.baseline === null ||
-      pair.candidate === null ||
-      stable(pair.baseline) !== stable(pair.candidate)
+      !frame ||
+      !matchesBrowserFrame(pair.baseline, frame) ||
+      !matchesBrowserFrame(pair.candidate, frame)
     )
+      failures.push(
+        `${label} frame ${index} has incorrect source, prefix, UTF-16 length, or live provenance.`,
+      )
+    if (stable(pair.baseline.observation) !== stable(pair.candidate.observation))
       failures.push(`${label} frame ${index} differs or lacks an observation.`)
   }
+}
+
+function matchesBrowserFrame(
+  frame: BrowserEvaluationFrame,
+  expected: { readonly source: string; readonly live: boolean },
+) {
+  return (
+    frame.inputSha256 === hash('sha256', expected.source) &&
+    frame.inputUtf16Units === expected.source.length &&
+    frame.live === expected.live
+  )
 }
 
 async function attachBrowserEvaluation(input: {
@@ -1232,19 +1286,4 @@ async function main() {
   process.exitCode = report.status === 'passed' ? 0 : 1
 }
 
-function ordered(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(ordered)
-  if (!value || typeof value !== 'object') return value
-  return Object.fromEntries(
-    Object.entries(value)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => [key, ordered(entry)]),
-  )
-}
-function stable(value: unknown) {
-  return JSON.stringify(ordered(value))
-}
-function encoded(value: unknown) {
-  return JSON.stringify(value, null, 2) + '\n'
-}
 if (import.meta.main) await main()

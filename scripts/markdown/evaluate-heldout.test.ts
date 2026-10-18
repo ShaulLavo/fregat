@@ -243,6 +243,9 @@ const observation = {
   text: 'owned visible',
   elements: [{ tag: 'p', text: 'owned visible', attributes: {}, parents: [] }],
 }
+function browserFrame(source: string, live: boolean) {
+  return { observation, inputSha256: hash(source), inputUtf16Units: source.length, live }
+}
 function browserReceipt() {
   const input = browserInput(messages, fingerprint, batch())
   return {
@@ -253,15 +256,22 @@ function browserReceipt() {
       id: entry.id,
       sourceSha256: entry.sourceSha256,
       completed: Array.from({ length: 1 }, () => ({
-        baseline: observation,
-        candidate: observation,
+        baseline: browserFrame(entry.source, false),
+        candidate: browserFrame(entry.source, false),
       })),
       streams: entry.schedules.map((schedule) => ({
         scheduleId: schedule.id,
-        observations: Array.from({ length: schedule.offsets.length + 1 }, () => ({
-          baseline: observation,
-          candidate: observation,
-        })),
+        observations: schedule.offsets
+          .map((offset) => ({
+            baseline: browserFrame(entry.source.slice(0, offset), true),
+            candidate: browserFrame(entry.source.slice(0, offset), true),
+          }))
+          .concat([
+            {
+              baseline: browserFrame(entry.source, false),
+              candidate: browserFrame(entry.source, false),
+            },
+          ]),
       })),
     })),
   }

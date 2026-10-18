@@ -82,9 +82,11 @@ export function createMarkdownSession(options: MarkdownSessionOptions = {}): Mar
   }
 
   function parse(text: string, heal: boolean): readonly MarkdownBlock[] {
-    settled = reusableBlocks(settled, text)
-    const prefix = settled.at(-1)
-    const prefixEnd = prefix?.end ?? 0
+    const edited = last !== null && !text.startsWith(last.text)
+    const truncated = last !== null && text.length < last.text.length && last.text.startsWith(text)
+    settled = reusableBlocks(settled, text, edited, truncated)
+    let prefix = settled.at(-1)
+    let prefixEnd = prefix?.end ?? 0
     if (!isIncrementallyParsable(text.slice(prefixEnd))) {
       settled = []
       return [wholeDocument(processor, text, heal)]
@@ -94,7 +96,14 @@ export function createMarkdownSession(options: MarkdownSessionOptions = {}): Mar
       return [wholeDocument(processor, text, heal)]
     }
 
-    const children = parseFrom(processor, text, prefixEnd, prefix?.endLine ?? 0)
+    let children = parseFrom(processor, text, prefixEnd, prefix?.endLine ?? 0)
+    if (children.length === 0 && prefix) {
+      // Without a following node, the last settled block becomes the tail.
+      settled.pop()
+      prefix = settled.at(-1)
+      prefixEnd = prefix?.end ?? 0
+      children = parseFrom(processor, text, prefixEnd, prefix?.endLine ?? 0)
+    }
     if (containsDefinition(children)) {
       settled = []
       return [wholeDocument(processor, text, heal)]
@@ -132,13 +141,30 @@ function containsDefinition(nodes: readonly Nodes[]): boolean {
   return false
 }
 
-/** The longest run of settled blocks whose source the text still starts with. */
-function reusableBlocks(blocks: MarkdownBlock[], text: string): MarkdownBlock[] {
+/** Edits can change the previous block through lazy continuation or table delimiters. */
+function reusableBlocks(
+  blocks: MarkdownBlock[],
+  text: string,
+  edited: boolean,
+  truncated: boolean,
+): MarkdownBlock[] {
   let count = 0
   for (const block of blocks) {
     if (!text.startsWith(block.source, block.start)) break
     count += 1
   }
+  // Trimming a block's trailing separator leaves its preceding boundary unchanged.
+  const truncatedBlockEnd = truncated
+    ? blocks[count]?.nodes.at(-1)?.position?.end.offset
+    : undefined
+  const separatedTail =
+    truncated && count === blocks.length && blocks.at(-1)?.source.endsWith('\n\n')
+  if (
+    edited &&
+    !separatedTail &&
+    (truncatedBlockEnd === undefined || text.length < truncatedBlockEnd)
+  )
+    count = Math.max(0, count - 1)
   if (count === blocks.length) return blocks
 
   return blocks.slice(0, count)
@@ -179,7 +205,7 @@ function healedTail(processor: MarkdownParser, tail: Tail, line: number): Tail {
   const held = holdAmbiguousTail(source, tail.nodes)
   const healed = healMarkdown(held)
   let prepared = healed === source ? tail : parseTail(processor, tail, healed, line)
-  if (visibleRepairIsLiteral(held, healed, prepared.nodes))
+  if (visibleTailRepairIsLiteral(held, healed, prepared.nodes))
     prepared = parseTail(processor, tail, held, line)
   const repair = nestedStrongRepair(prepared.fileValue, prepared.nodes)
   if (!repair) return prepared
@@ -191,6 +217,29 @@ function healedTail(processor: MarkdownParser, tail: Tail, line: number): Tail {
   return insertedRepairIsLiteral(result.nodes, repair.offset, repair.offset + repair.closers.length)
     ? prepared
     : result
+}
+
+function visibleTailRepairIsLiteral(
+  source: string,
+  repaired: string,
+  nodes: readonly RootContent[],
+): boolean {
+  if (visibleRepairIsLiteral(source, repaired, nodes)) return true
+  if (!repaired.startsWith(source)) return false
+  const suffix = repaired.slice(source.length)
+  if (!/^[*_~`]+$/u.test(suffix)) return false
+  const leaf = lastAuthoredLeaf(nodes.at(-1))
+  return leaf?.type === 'text' && leaf.value.endsWith(suffix)
+}
+
+function lastAuthoredLeaf(node: Nodes | undefined): Nodes | undefined {
+  if (!node || !('children' in node)) return node
+  // Padded table cells have no source and cannot hide an appended literal marker.
+  const child = node.children.findLast(
+    (entry) =>
+      entry.type !== 'tableCell' || entry.position !== undefined || entry.children.length > 0,
+  )
+  return child ? lastAuthoredLeaf(child) : node
 }
 
 function parseTail(processor: MarkdownParser, tail: Tail, source: string, line: number): Tail {

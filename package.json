@@ -131,6 +131,7 @@
     "markdown:qualify": "bun scripts/markdown/qualify.ts qualify",
     "markdown:nightly": "bun scripts/markdown/qualify.ts --checks-only",
     "markdown:production:smoke": "bun scripts/markdown/production-browser.ts --smoke --trials 2 --warmups 1 --negative-controls",
+    "markdown:production:retention": "bun scripts/markdown/production-resource-retention.ts",
     "markdown:check": "bun run --cwd packages/markdown test qualification-candidate && bun run --cwd apps/web test:markdown"
   },
   "devDependencies": {
@@ -147,7 +148,7 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "pngjs": "7.0.0",
-    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#20981e83c31b78a917ce5747ee9e5205d69a5cd4",
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#ef1452f6f1167504b3a2d227536b7235d9b77e69",
     "turbo": "catalog:",
     "typescript": "catalog:",
     "typescript-api": "catalog:",

@@ -227,9 +227,9 @@ export function createProductionMarkdownProbe({
     await Promise.all(stages)
     await document.fonts.ready
     await Promise.all(
-      Array.from(container.querySelectorAll('img'), (image) =>
-        image.decode().catch(() => undefined),
-      ),
+      Array.from(container.querySelectorAll('img'))
+        .filter((image) => !image.closest('[data-chat-link-favicon]'))
+        .map((image) => image.decode().catch(() => undefined)),
     )
     const deadline = performance.now() + 15_000
     while (true) {

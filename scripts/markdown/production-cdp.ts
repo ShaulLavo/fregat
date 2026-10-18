@@ -4,6 +4,7 @@ import type { CDPSession, Page } from 'playwright'
 
 import { productionAssetKind } from '../../apps/web/test/factories/markdown-production-assets'
 import { withProductionDeadline } from './production-deadline'
+import { productionWorkerTraceConfig } from './production-worker-trace-config'
 import { summarizeTrace } from '../agent/trace-summary.ts'
 import { createScriptError } from '../structured-errors'
 
@@ -30,6 +31,14 @@ export type ProductionNetworkRequest = {
   readonly fromCache: boolean
   readonly transferredBytes: number | null
   readonly completionEncodedBytes: number | null
+  readonly transferReceiptError?: string
+  /** Sum of Network.dataReceived.dataLength; it is not a full transfer receipt. */
+  readonly dataReceivedBytes: number | null
+  readonly traceTransferReceipt?: {
+    readonly requestId: string
+    readonly responseEncodedBytes: number
+    readonly receivedEncodedBytes: number
+  }
   readonly transferScope: 'full-request' | 'worker-bootstrap-completion'
   readonly phase: 'navigation' | 'prewarm' | 'measurement' | 'scenes'
   readonly kind: 'host' | 'grammar' | 'resolver' | 'javascript' | 'other'
@@ -60,10 +69,15 @@ export type ProductionWorkerCpu = {
   readonly url: string
   readonly threadId: number | null
   readonly pid: number | null
-  readonly cpuMs: number | null
-  readonly measurement: 'complete' | 'incomplete'
-  readonly reason: string | null
-}
+  readonly coveredCpuMs: number | null
+  readonly taskCount: number
+  readonly nestedTaskCount: number
+  readonly incompleteTaskCount: number
+  readonly boundaryCrossingTaskCount: number
+} & (
+  | { readonly measurement: 'complete'; readonly cpuMs: number; readonly reason: null }
+  | { readonly measurement: 'incomplete'; readonly cpuMs: null; readonly reason: string }
+)
 
 export async function startProductionCdp(page: Page) {
   const session = await page.context().newCDPSession(page)
@@ -96,8 +110,11 @@ async function initializeProductionCdp(page: Page, session: CDPSession) {
   const markWorkerRequestResolved = (workerRequest: ProductionNetworkRequest) => {
     const candidate = requests.get(workerRequest.id)
     if (!candidate) return
-    const resolved = completedWorkerAlias(candidate, workerRequest)
-    if (resolved) savePageRequest(resolved)
+    const reconciliation = reconcileWorkerRequestCopies(candidate, workerRequest)
+    if (!reconciliation) return
+    savePageRequest(reconciliation.page)
+    if (workerRequest.workerTargetId !== null)
+      saveWorkerRequest(workerRequest.workerTargetId, reconciliation.worker)
   }
 
   session.on('Network.requestWillBeSent', (event) =>
@@ -108,6 +125,7 @@ async function initializeProductionCdp(page: Page, session: CDPSession) {
       fromCache: false,
       transferredBytes: null,
       completionEncodedBytes: null,
+      dataReceivedBytes: null,
       transferScope: 'full-request',
       phase,
       kind: productionAssetKind(event.request.url),
@@ -137,6 +155,11 @@ async function initializeProductionCdp(page: Page, session: CDPSession) {
         event.response.fromServiceWorker ||
         false,
     })
+  })
+  session.on('Network.dataReceived', (event) => {
+    const request = requests.get(event.requestId)
+    if (!request) return
+    savePageRequest(addDataReceivedBytes(request, event.dataLength))
   })
   session.on('Network.loadingFinished', (event) => {
     const request = requests.get(event.requestId)
@@ -202,7 +225,18 @@ async function initializeProductionCdp(page: Page, session: CDPSession) {
     flatten: false,
   })
 
-  const trace = await traceTasks(session, workers)
+  const trace = await traceTasks(session, workers, (events) => {
+    for (const request of workerRequests.values()) {
+      const completed = completeWorkerBootstrapTransfer(
+        events,
+        Array.from(workers.values()),
+        request,
+      )
+      if (!completed) continue
+      saveWorkerRequest(completed.workerTargetId ?? '', completed)
+      markWorkerRequestResolved(completed)
+    }
+  })
   return {
     setPhase: (next: ProductionNetworkRequest['phase']) => {
       phase = next
@@ -212,7 +246,10 @@ async function initializeProductionCdp(page: Page, session: CDPSession) {
       await session.send('HeapProfiler.collectGarbage')
       return sampleMetrics(session)
     },
-    network: () => Array.from(requests.values()).concat(Array.from(workerRequests.values())),
+    network: () =>
+      reconcileProductionNetworkRequests(
+        Array.from(requests.values()).concat(Array.from(workerRequests.values())),
+      ),
     workers: () => ({
       created: workers.size,
       active: page.workers().length,
@@ -238,6 +275,15 @@ async function initializeProductionCdp(page: Page, session: CDPSession) {
 
 function transferredBytes(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+}
+
+function addDataReceivedBytes(request: ProductionNetworkRequest, value: unknown) {
+  const received = transferredBytes(value)
+  if (received === null) return request
+  return {
+    ...request,
+    dataReceivedBytes: (request.dataReceivedBytes ?? 0) + received,
+  }
 }
 
 type WorkerMessage = {
@@ -346,17 +392,20 @@ export function handleWorkerEvent(
     const rawUrl = objectField(request, 'url')
     if (typeof rawUrl !== 'string') return
     const url = rawUrl
+    const previous = requests.get(key)
     const entry: ProductionNetworkRequest = {
       id: requestId,
       url,
       type: typeof params.type === 'string' ? params.type : 'Other',
-      fromCache: false,
-      transferredBytes: null,
-      completionEncodedBytes: null,
+      fromCache: previous?.fromCache ?? false,
+      transferredBytes: previous?.transferredBytes ?? null,
+      completionEncodedBytes: previous?.completionEncodedBytes ?? null,
+      transferReceiptError: previous?.transferReceiptError,
+      dataReceivedBytes: previous?.dataReceivedBytes ?? null,
       transferScope: 'full-request',
-      phase,
+      phase: previous?.phase ?? phase,
       kind: productionAssetKind(url),
-      failure: null,
+      failure: previous?.failure ?? null,
       target: 'worker',
       workerTargetId: worker.targetId,
       resolvedByWorkerRequestId: null,
@@ -366,6 +415,10 @@ export function handleWorkerEvent(
   }
   const entry = requests.get(key) ?? workerScriptRequest(worker, requestId, pageRequests)
   if (!entry) return
+  if (method === 'Network.dataReceived') {
+    save(worker.targetId, addDataReceivedBytes(entry, params.dataLength))
+    return
+  }
   if (method === 'Network.responseReceived') {
     const response = params.response
     const fromCache =
@@ -420,6 +473,7 @@ function workerScriptRequest(
     workerTargetId: worker.targetId,
     transferredBytes: null,
     completionEncodedBytes: null,
+    dataReceivedBytes: null,
     transferScope: 'worker-bootstrap-completion',
   }
 }
@@ -443,23 +497,33 @@ function metricMilliseconds(values: ReadonlyMap<string, number>, key: string) {
   return value === undefined ? null : value * 1000
 }
 
-async function traceTasks(session: CDPSession, workers: ReadonlyMap<string, WorkerTarget>) {
+async function traceTasks(
+  session: CDPSession,
+  workers: ReadonlyMap<string, WorkerTarget>,
+  completeTransfers: (events: readonly unknown[]) => void,
+) {
   const events: unknown[] = []
-  const completion = Promise.withResolvers<void>()
+  const completion = Promise.withResolvers<{ readonly dataLossOccurred: boolean }>()
   const capture = (chunk: { readonly value: readonly unknown[] }) => {
     for (const event of chunk.value) events.push(event)
   }
   session.on('Tracing.dataCollected', capture)
-  session.once('Tracing.tracingComplete', () => completion.resolve())
+  session.once('Tracing.tracingComplete', (event) => completion.resolve(event))
   await session.send('Tracing.start', {
-    categories:
-      'toplevel,devtools.timeline,v8.execute,blink.user_timing,disabled-by-default-devtools.timeline',
+    perfettoConfig: productionWorkerTraceConfig(),
     transferMode: 'ReportEvents',
   })
   return async (output: string) => {
     try {
       await session.send('Tracing.end')
-      await withProductionDeadline(completion.promise, 'Chrome trace completion', 15_000)
+      const finished = await withProductionDeadline(
+        completion.promise,
+        'Chrome trace completion',
+        15_000,
+      )
+      if (finished.dataLossOccurred)
+        throw createScriptError('Chrome trace lost events; accounting is incomplete.')
+      completeTransfers(events)
       const raw = JSON.stringify({ traceEvents: events })
       await writeFile(path.join(output, 'production-trace.json'), raw)
       const summary = {
@@ -485,65 +549,111 @@ export function workerCpuReceipts(
 ): ProductionWorkerCpu[] {
   const interval = traceMarkInterval(events, 'markdown-stream-start', 'markdown-stream-end')
   const mappings = events.flatMap((event) => workerTraceMapping(event))
-  return workers.map((worker) => {
-    const mapping = mappings.find((entry) => entry.workerId === worker.targetId)
-    if (!mapping)
-      return {
-        targetId: worker.targetId,
-        url: worker.url,
-        threadId: null,
-        pid: null,
-        cpuMs: null,
-        measurement: 'incomplete',
-        reason: 'Trace did not map the worker target to a dedicated thread.',
-      }
+  return workers.map((worker): ProductionWorkerCpu => {
+    const workerMappings = mappings.filter((entry) => entry.workerId === worker.targetId)
+    if (workerMappings.length === 0)
+      return incompleteWorkerCpu(
+        worker,
+        null,
+        'Trace did not map the worker target to a dedicated thread.',
+      )
+    if (workerMappings.length !== 1)
+      return incompleteWorkerCpu(
+        worker,
+        null,
+        'Trace mapped the worker target to multiple dedicated threads.',
+      )
+    const mapping = workerMappings[0]
     if (
       mappings.filter((entry) => entry.pid === mapping.pid && entry.threadId === mapping.threadId)
         .length !== 1
     )
-      return {
-        targetId: worker.targetId,
-        url: worker.url,
-        threadId: mapping.threadId,
-        pid: mapping.pid,
-        cpuMs: null,
-        measurement: 'incomplete',
-        reason: 'The dedicated thread was mapped to multiple worker lifetimes.',
-      }
+      return incompleteWorkerCpu(
+        worker,
+        mapping,
+        'The dedicated thread was mapped to multiple worker lifetimes.',
+      )
     if (!interval)
+      return incompleteWorkerCpu(worker, mapping, 'Stream measurement marks are missing.')
+    const tasks = events.flatMap((event, sequence) =>
+      workerTask(event, mapping, interval, sequence),
+    )
+    if (tasks.length === 0)
+      return incompleteWorkerCpu(
+        worker,
+        mapping,
+        'Trace captured no worker tasks to establish task coverage.',
+      )
+    const outerTasks = selectOuterTasks(tasks)
+    const incompleteTaskCount = outerTasks.filter((task) => !task.complete).length
+    const boundaryCrossingTaskCount = outerTasks.filter((task) => task.crossesBoundary).length
+    const nestedTaskCount = tasks.length - outerTasks.length
+    const coveredCpuMs = outerTasks.reduce((sum, task) => sum + (task.cpuUs ?? 0), 0) / 1000
+    const taskEvidence = {
+      coveredCpuMs,
+      taskCount: tasks.length,
+      nestedTaskCount,
+      incompleteTaskCount,
+      boundaryCrossingTaskCount,
+    }
+    const outerCompleteTasks = outerTasks.filter((task) => task.complete)
+    if (hasOverlappingTaskSpans(outerCompleteTasks))
       return {
-        targetId: worker.targetId,
-        url: worker.url,
-        threadId: mapping.threadId,
-        pid: mapping.pid,
-        cpuMs: null,
-        measurement: 'incomplete',
-        reason: 'Stream measurement marks are missing.',
+        ...incompleteWorkerCpu(
+          worker,
+          mapping,
+          'Worker task spans overlap without a nested relationship; CPU ownership is ambiguous.',
+        ),
+        ...taskEvidence,
+        coveredCpuMs: null,
+        incompleteTaskCount: outerTasks.length,
       }
-    const tasks = events.flatMap((event) => workerTask(event, mapping, interval))
-    if (tasks.length === 0 || tasks.some((task) => task.crossesBoundary))
+    if (boundaryCrossingTaskCount > 0)
       return {
-        targetId: worker.targetId,
-        url: worker.url,
-        threadId: mapping.threadId,
-        pid: mapping.pid,
-        cpuMs: null,
-        measurement: 'incomplete',
-        reason:
-          tasks.length === 0
-            ? 'Trace captured no worker tasks to establish task coverage.'
-            : 'A worker task had missing CPU/span data or crossed the stream boundary.',
+        ...incompleteWorkerCpu(
+          worker,
+          mapping,
+          'A worker task crossed the stream boundary; its CPU is not attributable to the interval.',
+        ),
+        ...taskEvidence,
+      }
+    if (incompleteTaskCount > 0)
+      return {
+        ...incompleteWorkerCpu(worker, mapping, 'A worker task lacked complete thread CPU data.'),
+        ...taskEvidence,
       }
     return {
       targetId: worker.targetId,
       url: worker.url,
       threadId: mapping.threadId,
       pid: mapping.pid,
-      cpuMs: tasks.reduce((sum, task) => sum + task.cpuUs, 0) / 1000,
+      cpuMs: coveredCpuMs,
+      ...taskEvidence,
       measurement: 'complete',
       reason: null,
     }
   })
+}
+
+function incompleteWorkerCpu(
+  worker: WorkerTargetSummary,
+  mapping: { readonly threadId: number; readonly pid: number } | null,
+  reason: string,
+): Extract<ProductionWorkerCpu, { readonly measurement: 'incomplete' }> {
+  return {
+    targetId: worker.targetId,
+    url: worker.url,
+    threadId: mapping?.threadId ?? null,
+    pid: mapping?.pid ?? null,
+    cpuMs: null,
+    coveredCpuMs: null,
+    taskCount: 0,
+    nestedTaskCount: 0,
+    incompleteTaskCount: 0,
+    boundaryCrossingTaskCount: 0,
+    measurement: 'incomplete',
+    reason,
+  }
 }
 
 function traceMarkInterval(events: readonly unknown[], startName: string, endName: string) {
@@ -600,33 +710,138 @@ function workerTraceMapping(event: unknown) {
   return [{ workerId, threadId: record.tid, pid: record.pid }]
 }
 
+type WorkerTaskObservation = {
+  readonly sequence: number
+  readonly ts: number | null
+  readonly finish: number | null
+  readonly tts: number | null
+  readonly threadFinish: number | null
+  readonly cpuUs: number | null
+  readonly complete: boolean
+  readonly crossesBoundary: boolean
+}
+
 function workerTask(
   event: unknown,
   mapping: { threadId: number; pid: number },
   interval: { start: number; end: number },
-) {
+  sequence: number,
+): WorkerTaskObservation[] {
   if (!event || typeof event !== 'object') return []
   const record: Record<string, unknown> = { ...event }
   if (record.name !== 'RunTask' || record.pid !== mapping.pid || record.tid !== mapping.threadId)
     return []
-  if (
-    record.ph !== 'X' ||
-    typeof record.ts !== 'number' ||
-    !Number.isFinite(record.ts) ||
-    typeof record.dur !== 'number' ||
-    !Number.isFinite(record.dur) ||
-    record.dur < 0
+  const start = finiteNumber(record.ts)
+  if (start === null) return [unknownTask(sequence)]
+  if (start >= interval.end) return [zeroTask(sequence, start)]
+  if (record.ph !== 'X') return [unknownTask(sequence, start)]
+  const duration = finiteNonnegativeNumber(record.dur)
+  if (duration === null) return [unknownTask(sequence, start)]
+  const finish = start + duration
+  if (finish <= interval.start) return []
+  const crossesBoundary = start < interval.start || finish > interval.end
+  const tts = finiteNumber(record.tts)
+  const tdur = finiteNonnegativeNumber(record.tdur)
+  const threadFinish = tts !== null && tdur !== null ? tts + tdur : null
+  const complete = !crossesBoundary && tdur !== null
+  return [
+    {
+      sequence,
+      ts: start,
+      finish,
+      tts,
+      threadFinish,
+      cpuUs: complete ? tdur : null,
+      complete,
+      crossesBoundary,
+    },
+  ]
+}
+
+function zeroTask(sequence: number, ts: number): WorkerTaskObservation {
+  return {
+    sequence,
+    ts,
+    finish: ts,
+    tts: null,
+    threadFinish: null,
+    cpuUs: 0,
+    complete: true,
+    crossesBoundary: false,
+  }
+}
+
+function unknownTask(sequence: number, ts: number | null = null): WorkerTaskObservation {
+  return {
+    sequence,
+    ts,
+    finish: null,
+    tts: null,
+    threadFinish: null,
+    cpuUs: null,
+    complete: false,
+    crossesBoundary: false,
+  }
+}
+
+function selectOuterTasks(tasks: readonly WorkerTaskObservation[]) {
+  return tasks.filter(
+    (task) => !tasks.some((candidate) => candidate !== task && containsTask(candidate, task)),
   )
-    return [{ cpuUs: 0, crossesBoundary: true }]
-  const finish = record.ts + record.dur
-  if (finish <= interval.start || record.ts >= interval.end)
-    return [{ cpuUs: 0, crossesBoundary: false }]
-  const complete = record.ts >= interval.start && finish <= interval.end
-  const tdur =
-    typeof record.tdur === 'number' && Number.isFinite(record.tdur) && record.tdur >= 0
-      ? record.tdur
-      : null
-  return [{ cpuUs: tdur ?? 0, crossesBoundary: !complete || tdur === null }]
+}
+
+function containsTask(outer: WorkerTaskObservation, inner: WorkerTaskObservation) {
+  if (!outer.complete || !inner.complete) return false
+  if (
+    outer.ts === null ||
+    outer.finish === null ||
+    outer.tts === null ||
+    outer.threadFinish === null ||
+    inner.ts === null ||
+    inner.finish === null ||
+    inner.tts === null ||
+    inner.threadFinish === null
+  )
+    return false
+  const wallContains = outer.ts <= inner.ts && inner.finish <= outer.finish
+  const threadContains = outer.tts <= inner.tts && inner.threadFinish <= outer.threadFinish
+  if (!wallContains || !threadContains) return false
+  const strictContainment =
+    outer.ts < inner.ts ||
+    inner.finish < outer.finish ||
+    outer.tts < inner.tts ||
+    inner.threadFinish < outer.threadFinish
+  return strictContainment || outer.sequence < inner.sequence
+}
+
+function hasOverlappingTaskSpans(tasks: readonly WorkerTaskObservation[]) {
+  return tasks.some((task, index) =>
+    tasks.slice(index + 1).some((other) => taskSpansOverlap(task, other)),
+  )
+}
+
+function taskSpansOverlap(left: WorkerTaskObservation, right: WorkerTaskObservation) {
+  if (left.ts === null || left.finish === null || right.ts === null || right.finish === null)
+    return false
+  if (left.ts < right.finish && right.ts < left.finish) return true
+  if (
+    left.tts === null ||
+    left.threadFinish === null ||
+    right.tts === null ||
+    right.threadFinish === null
+  )
+    return false
+  return left.tts < right.threadFinish && right.tts < left.threadFinish
+}
+
+function finiteNumber(value: unknown) {
+  if (typeof value !== 'number') return null
+  return Number.isFinite(value) ? value : null
+}
+
+function finiteNonnegativeNumber(value: unknown) {
+  const number = finiteNumber(value)
+  return number !== null && number >= 0 ? number : null
 }
 
 function recordCpuMark(
@@ -693,18 +908,136 @@ export function completedWorkerAlias(
   page: ProductionNetworkRequest,
   worker: ProductionNetworkRequest,
 ) {
+  const reconciliation = reconcileWorkerRequestCopies(page, worker)
+  if (!reconciliation || reconciliation.page.transferReceiptError) return null
+  return reconciliation.page
+}
+
+export function reconcileWorkerRequestCopies(
+  page: ProductionNetworkRequest,
+  worker: ProductionNetworkRequest,
+) {
   if (
     page.target !== 'page' ||
     page.failure !== null ||
-    page.transferredBytes !== null ||
-    page.resolvedByWorkerRequestId !== null ||
+    page.transferReceiptError ||
     worker.target !== 'worker' ||
     worker.transferScope !== 'full-request' ||
     worker.workerTargetId === null ||
     worker.failure !== null ||
+    worker.transferReceiptError ||
     transferredBytes(worker.transferredBytes) === null
   )
     return null
+  if (worker.id !== worker.workerTargetId && page.workerTargetId !== worker.workerTargetId)
+    return null
   if (page.id !== worker.id || page.url !== worker.url || page.kind !== worker.kind) return null
-  return { ...page, resolvedByWorkerRequestId: worker.id }
+  const workerBytes = worker.transferredBytes
+  if (page.transferredBytes !== null && page.transferredBytes !== workerBytes) {
+    const transferReceiptError = 'Page and worker transfer receipts disagree.'
+    return {
+      page: {
+        ...page,
+        transferredBytes: null,
+        transferReceiptError,
+        resolvedByWorkerRequestId: worker.id,
+      },
+      worker: { ...worker, transferredBytes: null, transferReceiptError },
+    }
+  }
+  return { page: { ...page, resolvedByWorkerRequestId: worker.id }, worker }
+}
+
+export function reconcileProductionNetworkRequests(network: readonly ProductionNetworkRequest[]) {
+  const reconciled = Array.from(network)
+  for (const [workerIndex, worker] of reconciled.entries()) {
+    if (worker.target !== 'worker') continue
+    const pageIndex = reconciled.findIndex(
+      (request) =>
+        request.target === 'page' &&
+        request.id === worker.id &&
+        request.url === worker.url &&
+        request.kind === worker.kind,
+    )
+    if (pageIndex < 0) continue
+    const reconciliation = reconcileWorkerRequestCopies(reconciled[pageIndex], worker)
+    if (!reconciliation) continue
+    reconciled[pageIndex] = reconciliation.page
+    reconciled[workerIndex] = reconciliation.worker
+  }
+  return reconciled
+}
+
+type TraceResource = {
+  readonly name: string
+  readonly pid: number
+  readonly tid: number
+  readonly ts: number
+  readonly data: Record<string, unknown>
+}
+
+function traceResource(event: unknown): TraceResource[] {
+  if (!event || typeof event !== 'object') return []
+  const record: Record<string, unknown> = { ...event }
+  if (typeof record.name !== 'string' || !record.name.startsWith('Resource')) return []
+  if (typeof record.pid !== 'number' || typeof record.tid !== 'number') return []
+  if (typeof record.ts !== 'number' || !Number.isFinite(record.ts)) return []
+  const data =
+    record.args && typeof record.args === 'object' ? objectField(record.args, 'data') : null
+  if (!data || typeof data !== 'object') return []
+  return [{ name: record.name, pid: record.pid, tid: record.tid, ts: record.ts, data: { ...data } }]
+}
+
+export function completeWorkerBootstrapTransfer(
+  events: readonly unknown[],
+  workers: readonly WorkerTargetSummary[],
+  request: ProductionNetworkRequest,
+): ProductionNetworkRequest | null {
+  if (request.target !== 'worker' || request.transferScope !== 'worker-bootstrap-completion')
+    return null
+  if (request.failure !== null || request.fromCache) return null
+  const worker = workers.find(
+    (entry) => entry.targetId === request.workerTargetId && entry.url === request.url,
+  )
+  if (!worker) return null
+  const mappings = events.flatMap((event) => workerTraceMapping(event))
+  const workerMappings = mappings.filter((entry) => entry.workerId === worker.targetId)
+  if (workerMappings.length !== 1) return null
+  const mapping = workerMappings[0]
+  if (
+    mappings.filter((entry) => entry.pid === mapping.pid && entry.threadId === mapping.threadId)
+      .length !== 1
+  )
+    return null
+  const resources = events
+    .flatMap(traceResource)
+    .filter((entry) => entry.pid === mapping.pid && entry.tid === mapping.threadId)
+  const responses = resources.filter(
+    (entry) =>
+      entry.name === 'ResourceReceiveResponse' && entry.data.mimeType === 'text/javascript',
+  )
+  // The bootstrap's renderer request id differs from the target-scoped CDP alias.
+  if (responses.length !== 1) return null
+  const response = responses[0]
+  const id = response.data.requestId
+  if (typeof id !== 'string' || response.data.fromCache || response.data.fromServiceWorker)
+    return null
+  const parts = resources.filter((entry) => entry.data.requestId === id)
+  const finishes = parts.filter((entry) => entry.name === 'ResourceFinish')
+  if (finishes.length !== 1 || finishes[0].data.didFail !== false) return null
+  const finish = finishes[0]
+  if (finish.ts < response.ts) return null
+  const chunks = parts.filter((entry) => entry.name === 'ResourceReceivedData')
+  if (chunks.length === 0 || chunks.some((entry) => entry.ts < response.ts || entry.ts > finish.ts))
+    return null
+  const responseEncodedBytes = transferredBytes(response.data.encodedDataLength)
+  const lengths = chunks.map((entry) => transferredBytes(entry.data.encodedDataLength))
+  if (responseEncodedBytes === null || lengths.some((entry) => entry === null)) return null
+  const receivedEncodedBytes = lengths.reduce<number>((total, entry) => total + (entry ?? 0), 0)
+  return {
+    ...request,
+    transferredBytes: responseEncodedBytes + receivedEncodedBytes,
+    transferScope: 'full-request',
+    traceTransferReceipt: { requestId: id, responseEncodedBytes, receivedEncodedBytes },
+  }
 }

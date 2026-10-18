@@ -278,7 +278,7 @@ const FROZEN_COVERAGE: Readonly<Record<PromotionReceipt['gate'], number>> = {
   'native-paired': 75 * 20,
   'production-timing': 20,
 }
-const FROZEN_SCENARIOS: TrustedPromotionContext['scenarioIds'] = {
+export const FROZEN_SCENARIOS: TrustedPromotionContext['scenarioIds'] = {
   interactions: [
     'native keyboard copy preserves a selected settled paragraph during unrelated appends',
     'fragment activation scrolls to the heading in its own message',

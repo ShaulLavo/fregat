@@ -237,6 +237,59 @@ test('20 independent observed pairs may clear a paired bound, without qualifying
   )
 })
 
+test('selected incomplete stream CPU pairs remain excluded from a passing population', () => {
+  const completeWorker = {
+    targetId: 'worker',
+    url: 'https://fixture.test/shiki.worker.js',
+    threadId: 3,
+    pid: 1,
+    cpuMs: 1,
+    coveredCpuMs: 1,
+    taskCount: 1,
+    nestedTaskCount: 0,
+    incompleteTaskCount: 0,
+    boundaryCrossingTaskCount: 0,
+    measurement: 'complete' as const,
+    reason: null,
+  }
+  const trials = Array.from({ length: 21 }, (_, pair) =>
+    (['remark', 'tree-sitter'] as const).map((engine) => ({
+      ...trial(engine),
+      pair,
+      workload: 'control',
+      workers: { created: 1, active: 1 },
+      streamMainThreadCpuMs: 100,
+      workerCpu: [
+        pair === 20 && engine === 'tree-sitter'
+          ? {
+              ...completeWorker,
+              cpuMs: null,
+              measurement: 'incomplete' as const,
+              incompleteTaskCount: 1,
+              reason: 'A worker task lacked complete thread CPU data.',
+            }
+          : completeWorker,
+      ],
+    })),
+  ).flat()
+  const comparison = productionComparisons(trials, [
+    { ...productionBrowserWorkloads()[0], id: 'control' },
+  ]).find((entry) => entry.metric === 'streamCpu')
+  expect(comparison).toMatchObject({
+    status: 'inconclusive',
+    independentTrials: 20,
+    selectedPairs: 21,
+    excludedPairs: [
+      {
+        pair: 20,
+        engine: 'tree-sitter',
+        reason:
+          'Dedicated-worker CPU is incomplete: A worker task lacked complete thread CPU data.',
+      },
+    ],
+  })
+})
+
 test('ordinary frozen budgets reject missing held syntax, CPU, and oversized long tasks', () => {
   const workload = productionBrowserWorkloads().find((entry) => entry.scheduleUnits === 24)
   if (!workload) throw new TypeError('Ordinary fixture missing')
@@ -413,6 +466,10 @@ test('stream CPU uses main and dedicated worker thread ticks over the same expli
   expect(streamMainThreadCpu(events)).toBe(2)
   expect(workerCpuReceipts(events, [worker])[0]).toMatchObject({
     cpuMs: 0.6,
+    coveredCpuMs: 0.6,
+    taskCount: 1,
+    incompleteTaskCount: 0,
+    boundaryCrossingTaskCount: 0,
     measurement: 'complete',
   })
   expect(streamMainThreadCpu([streamStart, { ...streamEnd, tts: undefined }])).toBeNull()
@@ -430,11 +487,31 @@ test('worker CPU stays incomplete for missing ticks, absent mappings and crossin
     { ...workerTask, dur: 4000 },
   ])
     expect(workerCpuReceipts(events.concat([task]), [worker])[0].measurement).toBe('incomplete')
+  expect(workerCpuReceipts(events.concat([{ ...workerTask, ts: 500 }]), [worker])[0]).toMatchObject(
+    {
+      coveredCpuMs: 0,
+      taskCount: 1,
+      incompleteTaskCount: 1,
+      boundaryCrossingTaskCount: 1,
+    },
+  )
+  expect(
+    workerCpuReceipts(events.concat([{ ...workerTask, tdur: undefined }]), [worker])[0],
+  ).toMatchObject({
+    coveredCpuMs: 0,
+    taskCount: 1,
+    incompleteTaskCount: 1,
+    boundaryCrossingTaskCount: 0,
+  })
   expect(workerCpuReceipts([streamStart, streamEnd], [worker])[0].measurement).toBe('incomplete')
   expect(workerCpuReceipts([workerMapping], [worker])[0].measurement).toBe('incomplete')
   expect(workerCpuReceipts(events, [worker])[0]).toMatchObject({
     measurement: 'incomplete',
     cpuMs: null,
+    coveredCpuMs: null,
+    taskCount: 0,
+    incompleteTaskCount: 0,
+    boundaryCrossingTaskCount: 0,
   })
   expect(workerCpuReceipts(events.concat([{ ...workerTask, ts: 6000 }]), [worker])[0].cpuMs).toBe(0)
   const replacement = {
@@ -454,6 +531,7 @@ function request(target: 'page' | 'worker'): ProductionNetworkRequest {
     fromCache: false,
     transferredBytes: null,
     completionEncodedBytes: null,
+    dataReceivedBytes: null,
     transferScope: 'full-request',
     phase: 'navigation',
     kind: 'javascript',
@@ -535,14 +613,30 @@ test('worker script transfers require real network events and preserve unknown b
   expect(observed.size).toBe(0)
   event('unobserved-request', 123)
   expect(observed.size).toBe(0)
+  dispatch('Network.dataReceived', { requestId: worker.targetId, dataLength: 500000 })
+  dispatch('Network.dataReceived', { requestId: worker.targetId, dataLength: 294046 })
+  const bodyOnly = observed.get(`${worker.targetId}:${worker.targetId}`)
+  expect(bodyOnly).toMatchObject({
+    phase: 'navigation',
+    transferredBytes: null,
+    dataReceivedBytes: 794046,
+    target: 'worker',
+  })
+  expect(bodyOnly && completedWorkerAlias(pageRequest, bodyOnly)).toBeNull()
   event(worker.targetId, -1)
   const unknown = observed.get(`${worker.targetId}:${worker.targetId}`)
-  expect(unknown).toMatchObject({ phase: 'navigation', transferredBytes: null, target: 'worker' })
+  expect(unknown).toMatchObject({
+    phase: 'navigation',
+    transferredBytes: null,
+    dataReceivedBytes: 794046,
+    target: 'worker',
+  })
   expect(unknown && completedWorkerAlias(pageRequest, unknown)).toBeNull()
   event(worker.targetId, 123)
   expect(observed.get(`${worker.targetId}:${worker.targetId}`)).toMatchObject({
     phase: 'navigation',
     transferredBytes: null,
+    dataReceivedBytes: 794046,
     completionEncodedBytes: 123,
     transferScope: 'worker-bootstrap-completion',
   })
@@ -556,10 +650,71 @@ test('worker script transfers require real network events and preserve unknown b
   event(worker.targetId, 794046)
   expect(observed.get(`${worker.targetId}:${worker.targetId}`)).toMatchObject({
     transferredBytes: 794046,
+    dataReceivedBytes: 794046,
     completionEncodedBytes: 794046,
     transferScope: 'full-request',
   })
   expect(completedWorkerAlias(pageRequest, aliases[2])).not.toBeNull()
+})
+
+test('payload summaries retain bootstrap body bytes without inventing transfer bytes', () => {
+  const summary = productionTrialSummary({
+    ...trial('tree-sitter'),
+    network: [
+      {
+        ...request('worker'),
+        dataReceivedBytes: 794046,
+        completionEncodedBytes: 162,
+        transferScope: 'worker-bootstrap-completion',
+      },
+    ],
+  }).transferred
+  expect(summary?.find((entry) => entry.kind === 'javascript')).toMatchObject({
+    requests: 1,
+    transferredBytes: null,
+    dataReceivedBytes: 794046,
+    dataReceivedRequestCount: 1,
+    incompleteRequests: 1,
+  })
+})
+
+test('payload summaries charge one transfer for complete page and worker copies', () => {
+  const page = {
+    ...request('page'),
+    transferredBytes: 794489,
+    completionEncodedBytes: 794489,
+  }
+  const workerCopy = {
+    ...request('worker'),
+    transferredBytes: 794489,
+    completionEncodedBytes: 794489,
+  }
+  const summary = productionTrialSummary({
+    ...trial('tree-sitter'),
+    network: [page, workerCopy],
+  }).transferred
+  expect(summary?.find((entry) => entry.kind === 'javascript')).toMatchObject({
+    requests: 1,
+    transferredBytes: 794489,
+    incompleteRequests: 0,
+  })
+  expect(completedWorkerAlias(page, workerCopy)).toMatchObject({
+    resolvedByWorkerRequestId: workerCopy.id,
+  })
+})
+
+test('payload summaries expose conflicting page and worker receipts as incomplete', () => {
+  const page = { ...request('page'), transferredBytes: 794489 }
+  const workerCopy = { ...request('worker'), transferredBytes: 794490 }
+  const summary = productionTrialSummary({
+    ...trial('tree-sitter'),
+    network: [page, workerCopy],
+  }).transferred
+  expect(summary?.find((entry) => entry.kind === 'javascript')).toMatchObject({
+    requests: 1,
+    transferredBytes: null,
+    incompleteRequests: 1,
+  })
 })
 
 test('only sustained product event streams are distinguished from incomplete finite assets', () => {
@@ -660,6 +815,12 @@ test('only the predeclared stable cache tail with matching stable control can ob
     }),
   )
   expect(productionResourcePlateau(windows, controls).status).toBe('OBSERVED_PLATEAU')
+  expect(
+    productionResourcePlateau(
+      windows,
+      controls.map((entry, index) => (index < 2 ? { ...entry, cycles: 0 } : entry)),
+    ).status,
+  ).toBe('INCONCLUSIVE')
   expect(productionResourcePlateau(windows, null).status).toBe('INCONCLUSIVE')
   expect(
     productionResourcePlateau(
@@ -670,6 +831,30 @@ test('only the predeclared stable cache tail with matching stable control can ob
       })),
     ).status,
   ).toBe('INCONCLUSIVE')
+  expect(
+    productionResourcePlateau(
+      windows.map((entry, index) => ({
+        ...entry,
+        jsHeapUsedAfterBytes: 100 + index,
+      })),
+      controls.map((entry, index) => ({
+        ...entry,
+        jsHeapUsedAfterBytes: 200 + index - (index === 3 ? 2 : 0),
+      })),
+    ),
+  ).toMatchObject({
+    status: 'INCONCLUSIVE',
+    reason: expect.stringContaining('no-op control'),
+  })
+  expect(
+    productionResourcePlateau(
+      windows.map((entry, index) => ({
+        ...entry,
+        jsHeapUsedAfterBytes: 100 + index,
+      })),
+      controls,
+    ).status,
+  ).toBe('NOT VERIFIED')
   expect(
     productionResourcePlateau(
       windows.map((entry) => ({ ...entry, cycles: 0 })),

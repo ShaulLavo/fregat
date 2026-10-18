@@ -25,7 +25,7 @@ export type TreeSitterMarkdownInitOptions = NonNullable<Parameters<typeof init>[
 }
 
 type Range = SemanticBlock['range']
-type SourcePositions = { readonly lines: readonly number[] }
+type SourcePositions = { readonly lines: readonly number[]; readonly source: string }
 type MdastBlock = ListItem['children'][number]
 
 export async function initializeTreeSitterMarkdown(options: TreeSitterMarkdownInitOptions = {}) {
@@ -76,7 +76,11 @@ function blockToMdast(node: SemanticBlock, positions: SourcePositions): MdastBlo
   const position = nodePosition(node.range, positions)
   switch (node.type) {
     case 'paragraph':
-      return { type: 'paragraph', position, children: inlinesToMdast(node.children, positions) }
+      return {
+        type: 'paragraph',
+        position,
+        children: inlinesToMdast(node.children, positions),
+      }
     case 'heading':
       return {
         type: 'heading',
@@ -100,7 +104,13 @@ function blockToMdast(node: SemanticBlock, positions: SourcePositions): MdastBlo
         children: node.items.map((item) => itemToMdast(item, positions)),
       }
     case 'code':
-      return { type: 'code', position, value: node.value, lang: node.language, meta: node.meta }
+      return {
+        type: 'code',
+        position,
+        value: codeBlockValue(node, positions.source),
+        lang: node.language,
+        meta: node.meta,
+      }
     case 'html':
       return { type: 'html', position, value: node.value }
     case 'math':
@@ -152,6 +162,53 @@ function blockToMdast(node: SemanticBlock, positions: SourcePositions): MdastBlo
   }
 }
 
+function isInvalidAngleAutolink(
+  node: Extract<SemanticInline, { type: 'link' }>,
+  source: string,
+): boolean {
+  return source[node.range.start - 1] === '<' && source[node.range.end] === '>'
+}
+
+function sourceLineEnding(start: number, source: string) {
+  if (source.startsWith('\r\n', start)) return '\r\n'
+  if (source[start] === '\r') return '\r'
+  return '\n'
+}
+
+function inlineText(node: SemanticInline): string {
+  switch (node.type) {
+    case 'text':
+    case 'html':
+    case 'math':
+      return node.value
+    case 'code':
+      return node.value
+    case 'emphasis':
+    case 'strong':
+    case 'delete':
+    case 'link':
+      return node.children.map(inlineText).join('')
+    case 'break':
+      return node.hard ? '' : '\n'
+    case 'image':
+      return node.alt
+    case 'footnoteReference':
+      return node.identifier
+    default: {
+      const exhaustive: never = node
+      return exhaustive
+    }
+  }
+}
+
+function codeBlockValue(node: Extract<SemanticBlock, { type: 'code' }>, source: string) {
+  const endings = source.slice(node.range.start, node.range.end).matchAll(/\r\n|\r|\n/g)
+  if (node.fence !== 'indented') endings.next()
+
+  // Native values already remove container prefixes and fence indentation.
+  return node.value.replace(/\n/g, (newline) => endings.next().value?.[0] ?? newline)
+}
+
 function inlinesToMdast(nodes: readonly SemanticInline[], positions: SourcePositions) {
   return nodes.map((node) => inlineToMdast(node, positions))
 }
@@ -163,7 +220,7 @@ function inlineToMdast(node: SemanticInline, positions: SourcePositions): Phrasi
     case 'html':
       return { type: node.type, position, value: node.value }
     case 'code':
-      return { type: 'inlineCode', position, value: node.value }
+      return { type: 'inlineCode', position, value: node.sourceValue }
     case 'math':
       return {
         type: 'inlineMath',
@@ -178,16 +235,42 @@ function inlineToMdast(node: SemanticInline, positions: SourcePositions): Phrasi
     case 'emphasis':
     case 'strong':
     case 'delete':
-      return { type: node.type, position, children: inlinesToMdast(node.children, positions) }
+      return {
+        type: node.type,
+        position,
+        children: inlinesToMdast(node.children, positions),
+      }
     case 'break':
-      return node.hard ? { type: 'break', position } : { type: 'text', position, value: '\n' }
+      return node.hard
+        ? { type: 'break', position }
+        : {
+            type: 'text',
+            position,
+            value: sourceLineEnding(node.range.start, positions.source),
+          }
     case 'link':
+      if (node.origin === 'gfm-autolink' && isInvalidAngleAutolink(node, positions.source))
+        return {
+          type: 'text',
+          position,
+          value: node.children.map(inlineText).join(''),
+        }
+
       return {
         type: 'link',
         position,
-        url: node.url,
+        url: node.origin === 'gfm-autolink' ? node.sourceUrl : node.url,
         title: node.title,
-        children: inlinesToMdast(node.children, positions),
+        children:
+          node.origin === 'gfm-autolink'
+            ? [
+                {
+                  type: 'text',
+                  position: nodePosition(node.range, positions),
+                  value: node.sourceValue,
+                },
+              ]
+            : inlinesToMdast(node.children, positions),
       }
     case 'image':
       return { type: 'image', position, url: node.url, title: node.title, alt: node.alt }
@@ -234,7 +317,7 @@ function sourcePositions(source: string): SourcePositions {
     if (character === '\r' && source[index + 1] === '\n') index += 1
     lines.push(index + 1)
   }
-  return { lines }
+  return { lines, source }
 }
 
 function nodePosition(range: Range, positions: SourcePositions) {

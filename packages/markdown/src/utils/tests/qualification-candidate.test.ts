@@ -34,9 +34,12 @@ describe('Tree-sitter completed semantics against the official output', () => {
     const expected = expectedOutput(example.html)
     const difference = differences.find((entry) => entry.id === example.id)
     if (difference) {
-      expect(hash('sha256', JSON.stringify(actual), 'hex')).toBe(difference.actualSha256)
+      const candidateSha256 = difference.candidateSha256 ?? difference.actualSha256
+      expect(hash('sha256', JSON.stringify(actual), 'hex')).toBe(candidateSha256)
       expect(hash('sha256', JSON.stringify(expected), 'hex')).toBe(difference.expectedSha256)
-      expect(actual).toEqual(referenceOutput(example.source, 'gfm'))
+      expect(actual).toEqual(
+        difference.candidateSha256 ? expected : referenceOutput(example.source, 'gfm'),
+      )
       return
     }
     expect(actual).toEqual(expected)

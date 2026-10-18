@@ -11,7 +11,7 @@ import { percentile } from './bench-types'
 import { pairedConfidence } from './paired-native'
 import frozenBudget from './promotion-budget.json'
 import { BENCHMARK_FAMILIES } from './workloads'
-import { isSustainedProductStream } from './production-cdp'
+import { isSustainedProductStream, reconcileProductionNetworkRequests } from './production-cdp'
 import type {
   ProductionCpuMetrics,
   ProductionNetworkRequest,
@@ -187,6 +187,17 @@ function digestObservation(frame: ProductionMarkdownReceipt['final']) {
   return productionDigest(JSON.stringify({ text: frame.text, elements: frame.elements }))
 }
 
+type ProductionComparisonExclusion = {
+  readonly pair: number
+  readonly engine: ProductionTrial['engine']
+  readonly reason: string
+}
+
+type MetricObservation = {
+  readonly value: number | null
+  readonly reason: string | null
+}
+
 export function productionComparisons(
   trials: readonly ProductionTrial[],
   workloads: readonly ProductionWorkload[],
@@ -196,81 +207,152 @@ export function productionComparisons(
     const pairs = Array.from(new Set(selected.map((trial) => trial.pair))).sort(
       (left, right) => left - right,
     )
-    return (['updateP95', 'settlementP95', 'mountP95', 'streamCpu'] as const).map((metric) => {
-      const vectors = pairs.flatMap((pair) => {
-        const baseline = selected.find((trial) => trial.pair === pair && trial.engine === 'remark')
-        const candidate = selected.find(
-          (trial) => trial.pair === pair && trial.engine === 'tree-sitter',
-        )
-        if (!baseline || !candidate) return []
-        const left = trialMetric(baseline, metric)
-        const right = trialMetric(candidate, metric)
-        return left === null || right === null ? [] : [{ baseline: left, candidate: right }]
-      })
-      if (vectors.length === 0)
-        return {
-          workload: workload.id,
-          metric,
-          status: 'inconclusive' as const,
-          reason: 'No complete observed metric pairs.',
-          independentTrials: 0,
-        }
-      return {
-        ...pairedConfidence({
-          workload: workload.id,
-          metric,
-          baseline: vectors.map((value) => value.baseline),
-          candidate: vectors.map((value) => value.candidate),
-          seed: 941 + index,
-          resamples: 4096,
-        }),
-        domain: 'browser' as const,
-        build: 'production' as const,
-      }
-    })
+    return (['updateP95', 'settlementP95', 'mountP95', 'streamCpu'] as const).map((metric) =>
+      compareProductionMetric(selected, pairs, workload.id, index, metric),
+    )
   })
+}
+
+type ProductionMetric = Parameters<typeof metricObservation>[1]
+
+function compareProductionMetric(
+  selected: readonly ProductionTrial[],
+  pairs: readonly number[],
+  workload: string,
+  workloadIndex: number,
+  metric: ProductionMetric,
+) {
+  const excludedPairs: ProductionComparisonExclusion[] = []
+  const vectors = pairs.flatMap((pair) => observedMetricPair(selected, pair, metric, excludedPairs))
+  const evidence = { workload, metric, selectedPairs: pairs.length, excludedPairs }
+  if (vectors.length === 0)
+    return {
+      ...evidence,
+      status: 'inconclusive' as const,
+      reason: 'No complete observed metric pairs.',
+      independentTrials: 0,
+    }
+  const comparison = pairedConfidence({
+    workload,
+    metric,
+    baseline: vectors.map((value) => value.baseline),
+    candidate: vectors.map((value) => value.candidate),
+    seed: 941 + workloadIndex,
+    resamples: 4096,
+  })
+  const cpuEvidenceIncomplete = metric === 'streamCpu' && excludedPairs.length > 0
+  return {
+    ...comparison,
+    ...evidence,
+    status: cpuEvidenceIncomplete ? ('inconclusive' as const) : comparison.status,
+    reason: cpuEvidenceIncomplete
+      ? 'At least one selected stream CPU pair has incomplete evidence.'
+      : null,
+    domain: 'browser' as const,
+    build: 'production' as const,
+  }
+}
+
+function observedMetricPair(
+  selected: readonly ProductionTrial[],
+  pair: number,
+  metric: ProductionMetric,
+  excludedPairs: ProductionComparisonExclusion[],
+) {
+  const baseline = selected.find((trial) => trial.pair === pair && trial.engine === 'remark')
+  const candidate = selected.find((trial) => trial.pair === pair && trial.engine === 'tree-sitter')
+  if (!baseline || !candidate) {
+    excludedPairs.push({
+      pair,
+      engine: !baseline ? 'remark' : 'tree-sitter',
+      reason: 'Selected pair is missing an engine trial.',
+    })
+    return []
+  }
+  const left = metricObservation(baseline, metric)
+  const right = metricObservation(candidate, metric)
+  for (const [trial, observation] of [
+    [baseline, left],
+    [candidate, right],
+  ] as const) {
+    if (observation.value !== null) continue
+    excludedPairs.push({
+      pair,
+      engine: trial.engine,
+      reason: observation.reason ?? 'Selected metric observation is incomplete.',
+    })
+  }
+  if (left.value === null || right.value === null) return []
+  return [{ baseline: left.value, candidate: right.value }]
+}
+
+function metricObservation(
+  trial: ProductionTrial,
+  metric: 'updateP95' | 'settlementP95' | 'mountP95' | 'streamCpu',
+): MetricObservation {
+  if (metric === 'mountP95')
+    return trial.receipt.frames.length === 0
+      ? { value: null, reason: 'No paint frame was observed.' }
+      : {
+          value: trial.navigationMs + trial.receipt.frames[0].painted - trial.receipt.started,
+          reason: null,
+        }
+  if (metric === 'settlementP95')
+    return {
+      value: trial.receipt.fullyReady - trial.receipt.final.received,
+      reason: null,
+    }
+  if (metric === 'updateP95')
+    return trial.receipt.frames.length === 0
+      ? { value: null, reason: 'No paint frame was observed.' }
+      : {
+          value: percentile(
+            trial.receipt.frames.map((frame) => frame.painted - frame.received),
+            0.95,
+          ),
+          reason: null,
+        }
+  return streamCpuObservation(trial)
+}
+
+function streamCpuObservation(trial: ProductionTrial): MetricObservation {
+  if (!trial.workers) return { value: null, reason: 'Worker target counts are unavailable.' }
+  if (trial.workerCpu === null)
+    return { value: null, reason: 'Dedicated-worker CPU evidence is unavailable.' }
+  if (trial.workerCpu.length !== trial.workers.created)
+    return {
+      value: null,
+      reason: 'Dedicated-worker CPU receipts do not cover every created worker.',
+    }
+  if (trial.workers.active > trial.workers.created)
+    return { value: null, reason: 'Active worker count exceeds created worker count.' }
+  if (
+    trial.streamMainThreadCpuMs === null ||
+    !Number.isFinite(trial.streamMainThreadCpuMs) ||
+    trial.streamMainThreadCpuMs < 0
+  )
+    return { value: null, reason: 'Main-thread stream CPU evidence is unavailable.' }
+  const incompleteWorker = trial.workerCpu.find(
+    (worker) =>
+      worker.measurement !== 'complete' ||
+      worker.cpuMs === null ||
+      !Number.isFinite(worker.cpuMs) ||
+      worker.cpuMs < 0,
+  )
+  if (incompleteWorker)
+    return {
+      value: null,
+      reason: `Dedicated-worker CPU is incomplete: ${incompleteWorker.reason ?? 'no exact task total.'}`,
+    }
+  const workerCpuMs = trial.workerCpu.reduce((sum, worker) => sum + (worker.cpuMs ?? 0), 0)
+  return { value: trial.streamMainThreadCpuMs + workerCpuMs, reason: null }
 }
 
 function trialMetric(
   trial: ProductionTrial,
   metric: 'updateP95' | 'settlementP95' | 'mountP95' | 'streamCpu',
 ) {
-  if (metric === 'mountP95')
-    return trial.receipt.frames.length === 0
-      ? null
-      : trial.navigationMs + trial.receipt.frames[0].painted - trial.receipt.started
-  if (metric === 'settlementP95') return trial.receipt.fullyReady - trial.receipt.final.received
-  if (metric === 'updateP95')
-    return trial.receipt.frames.length === 0
-      ? null
-      : percentile(
-          trial.receipt.frames.map((frame) => frame.painted - frame.received),
-          0.95,
-        )
-  if (!trial.workers || trial.workerCpu === null) return null
-  if (
-    trial.workerCpu.length !== trial.workers.created ||
-    trial.workers.active > trial.workers.created
-  )
-    return null
-  if (
-    trial.streamMainThreadCpuMs === null ||
-    !Number.isFinite(trial.streamMainThreadCpuMs) ||
-    trial.streamMainThreadCpuMs < 0
-  )
-    return null
-  if (
-    trial.workerCpu.some(
-      (worker) =>
-        worker.measurement !== 'complete' ||
-        worker.cpuMs === null ||
-        !Number.isFinite(worker.cpuMs) ||
-        worker.cpuMs < 0,
-    )
-  )
-    return null
-  const workerCpuMs = trial.workerCpu.reduce((sum, worker) => sum + (worker.cpuMs ?? 0), 0)
-  return trial.streamMainThreadCpuMs + workerCpuMs
+  return metricObservation(trial, metric).value
 }
 
 export function ordinaryProductionFindings(
@@ -367,29 +449,43 @@ export function productionResourcePlateau(
   )
   const live = windows.map((window) => window.jsHeapUsedAfterBytes)
   const backing = windows.map((window) => window.backingStorageAfterBytes)
-  const monotonicGrowth = strictlyGrowing(live.slice(-4)) || strictlyGrowing(backing.slice(-4))
   const peaks = windows.map((window) => window.peakWasmReservedBytes)
   const nativeGrowth = wasmRequired && strictlyGrowing(peaks.slice(-4))
-  const failed = retained || monotonicGrowth || nativeGrowth
-  if (failed)
+  const completeSchedule =
+    controls !== null && windows.length === required && controls.length === required
+  const tail = completeSchedule ? windows.slice(schedule.settlingBatches) : null
+  const controlTail = completeSchedule ? controls.slice(schedule.settlingBatches) : null
+  const liveGrowth = strictlyGrowing(live.slice(-4))
+  const backingGrowth = strictlyGrowing(backing.slice(-4))
+  const controlLiveGrowth = controlTail
+    ? hasFiniteGrowth(controlTail.map((window) => window.jsHeapUsedAfterBytes))
+    : false
+  const controlBackingGrowth = controlTail
+    ? strictlyGrowing(controlTail.map((window) => window.backingStorageAfterBytes))
+    : false
+  const matchedControlGrowth =
+    (liveGrowth && controlLiveGrowth) || (backingGrowth && controlBackingGrowth)
+  const unattributedGrowth = (liveGrowth || backingGrowth) && !matchedControlGrowth
+  if (retained || nativeGrowth || unattributedGrowth)
     return {
       status: 'NOT VERIFIED',
-      reason: 'Retained nodes, observers, or monotonic post-GC live/native growth was observed.',
+      reason:
+        'Retained nodes, observers, or product-attributed monotonic post-GC live/native growth was observed.',
       live,
       backing,
       peaks,
     }
-  if (windows.length !== required || controls?.length !== required)
+  if (!tail || !controlTail || !controls)
     return {
       status: 'INCONCLUSIVE',
-      reason: 'The fixed settling/tail schedule and matching no-op control were not completed.',
+      reason: matchedControlGrowth
+        ? 'Post-GC live/backing growth was also observed in the matching no-op control, so product attribution is inconclusive.'
+        : 'The fixed settling/tail schedule and matching no-op control were not completed.',
       schedule,
       live,
       backing,
       peaks,
     }
-  const tail = windows.slice(schedule.settlingBatches)
-  const controlTail = controls.slice(schedule.settlingBatches)
   const observations = tail
     .flatMap((window) => [window.jsHeapUsedAfterBytes, window.backingStorageAfterBytes])
     .concat(
@@ -439,8 +535,9 @@ export function productionResourcePlateau(
     controlJsLiveAfterGcBytes: controls.map((window) => window.jsHeapUsedAfterBytes),
     observedPersistentGrowth: observedPlateau ? false : null,
     observedWasmHighWaterReuse: wasmRequired ? wasmReuse : null,
-    reason:
-      'A passing bounded observation requires four exactly stable post-GC live/backing windows after two settling batches, unchanged observers, repeated peak reservation reuse and a stable no-op control. No control subtraction or heap tolerance is applied. This does not certify unobserved future lifetimes.',
+    reason: matchedControlGrowth
+      ? 'Post-GC live/backing growth was also observed in the matching no-op control, so the bounded measurement cannot attribute it to Markdown.'
+      : 'A passing bounded observation requires four exactly stable post-GC live/backing windows after two settling batches, unchanged observers, repeated peak reservation reuse and a stable no-op control. No control subtraction or heap tolerance is applied. This does not certify unobserved future lifetimes.',
   }
 }
 
@@ -463,6 +560,19 @@ function strictlyGrowing(values: readonly (number | null)[]) {
       return value !== null && previous !== null && value > previous
     })
   )
+}
+
+function hasFiniteGrowth(values: readonly (number | null)[]) {
+  if (values.length < 4) return false
+  const first = values[0]
+  if (first === undefined || first === null || !Number.isFinite(first)) return false
+  let maximum = first
+  for (let index = 1; index < values.length; index += 1) {
+    const value = values[index]
+    if (value === null || value === undefined || !Number.isFinite(value)) return false
+    maximum = Math.max(maximum, value)
+  }
+  return maximum > first
 }
 
 export function productionTrialSummary(trial: ProductionTrial) {
@@ -503,8 +613,9 @@ function distribution(values: readonly number[]) {
 
 function payloadSummary(network: readonly ProductionNetworkRequest[] | null) {
   if (network === null) return null
+  const reconciled = reconcileProductionNetworkRequests(network)
   return (['host', 'grammar', 'resolver', 'javascript', 'other'] as const).map((kind) => {
-    const requests = network.filter(
+    const requests = reconciled.filter(
       (request) =>
         request.kind === kind &&
         request.resolvedByWorkerRequestId === null &&
@@ -513,8 +624,10 @@ function payloadSummary(network: readonly ProductionNetworkRequest[] | null) {
     const missing = requests.filter(
       (request) =>
         (request.transferredBytes === null && request.resolvedByWorkerRequestId === null) ||
-        request.failure !== null,
+        request.failure !== null ||
+        Boolean(request.transferReceiptError),
     )
+    const observedDataReceived = requests.filter((request) => request.dataReceivedBytes !== null)
     return {
       kind,
       requests: requests.length,
@@ -523,6 +636,11 @@ function payloadSummary(network: readonly ProductionNetworkRequest[] | null) {
         missing.length > 0
           ? null
           : requests.reduce((sum, request) => sum + (request.transferredBytes ?? 0), 0),
+      dataReceivedBytes:
+        observedDataReceived.length === requests.length
+          ? observedDataReceived.reduce((sum, request) => sum + (request.dataReceivedBytes ?? 0), 0)
+          : null,
+      dataReceivedRequestCount: observedDataReceived.length,
       incompleteRequests: missing.length,
     }
   })
