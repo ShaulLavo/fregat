@@ -1,7 +1,7 @@
 name: tree-sitter-x
 
-# Generate with read access, publish data with write access, then merge only the exact head
-# recorded by this updater after its explicitly dispatched full CI verdict succeeds.
+# Generate with read access, then publish the generated data to one rolling pull request.
+# Updates stay open for manual review and merging.
 on:
   schedule:
     - cron: '17 */3 * * *'
@@ -70,14 +70,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci/parser-pins.mjs publish
-      - name: Record the generated head
-        if: ${{ steps.publish.outputs.head != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: tree-sitter-pin-${{ steps.publish.outputs.head }}
-          overwrite: true
-          path: pin-receipt.json
-          retention-days: 30
       # GITHUB_TOKEN PRs do not start PR CI. Manual CI validates the entire repository.
       - name: Dispatch full CI
         if: ${{ steps.publish.outputs.head != '' }}

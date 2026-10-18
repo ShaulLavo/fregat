@@ -6,6 +6,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { detectPlatform } from '@fregat/hotkeys'
+import { createPortal } from 'react-dom'
 import { restrictToWindowEdges } from '@dnd-kit/modifiers'
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'
 import { useEditorGroupActions } from '@/features/editor/hooks/use-editor-group-actions'
@@ -161,6 +162,12 @@ export function EditorGroupsDragProvider({ children }: { readonly children: Reac
         onDragCancel={cancelDrag}
       >
         {children}
+        {drag && tab
+          ? createPortal(
+              <div aria-hidden className='fixed inset-0 z-50 cursor-pointer' />,
+              document.body,
+            )
+          : null}
         <DragOverlay dropAnimation={null} modifiers={[restrictToWindowEdges]}>
           {drag && tab ? (
             <EditorDragPreview title={tabLabel(tab.content)} copy={drag.copy} />
