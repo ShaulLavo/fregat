@@ -201,6 +201,7 @@ export function FileEditorBody({
       ) : null}
       <Editor
         active={active && currentActions !== null}
+        concealed={renderedOnly}
         additionalPlugins={editorPlugins}
         definitionTarget={currentActions ? definitionTarget : null}
         document={editorDocument}
@@ -246,15 +247,23 @@ export function FileEditorBody({
   // editor; the rendered-only page covers the editor in the source panel.
   const textBody = (
     <div className={fileBodyGridClass(currentReferences !== null)}>
-      <ResizablePanelGroup className='min-h-0 min-w-0' id='markdown-split'>
-        <ResizablePanel className='relative min-h-0 min-w-0' id='markdown-source' minSize={240}>
+      <ResizablePanelGroup className='min-h-0 min-w-0' id={`markdown-split-${tabId}`}>
+        <ResizablePanel
+          className='relative min-h-0 min-w-0'
+          id={`markdown-source-${tabId}`}
+          minSize={240}
+        >
           {editorColumn}
           {renderedOnly ? <div className='absolute inset-0'>{renderedPage}</div> : null}
         </ResizablePanel>
         {splitMarkdown ? (
           <>
-            <ResizableHandle id='markdown-split-handle' withHandle />
-            <ResizablePanel className='min-h-0 min-w-0' id='markdown-rendered' minSize={240}>
+            <ResizableHandle id={`markdown-split-handle-${tabId}`} withHandle />
+            <ResizablePanel
+              className='min-h-0 min-w-0'
+              id={`markdown-rendered-${tabId}`}
+              minSize={240}
+            >
               {renderedPage}
             </ResizablePanel>
           </>

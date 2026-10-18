@@ -7,7 +7,11 @@ import { Markdown } from '@workspace/markdown/components/markdown'
 import { MarkdownPreviewCodeBlock } from '@/features/workbench/components/markdown-preview-code-block'
 import { MarkdownPreviewImage } from '@/features/workbench/components/markdown-preview-image'
 import { MarkdownPreviewLink } from '@/features/workbench/components/markdown-preview-link'
-import { MarkdownPreviewSource } from '@/features/workbench/components/markdown-preview-source'
+import {
+  MarkdownPreviewPicture,
+  MarkdownPreviewSource,
+  sourceSetCandidates,
+} from '@/features/workbench/components/markdown-preview-source'
 import { MarkdownPreviewContext } from '@/features/workbench/providers/markdown-preview-context'
 import {
   sourceAnchors,
@@ -77,6 +81,46 @@ test.each(['light', 'dark'] as const)(
     expect(source?.getAttribute('media')).toBe(colorMode === 'light' ? 'all' : 'not all')
   },
 )
+
+test('splits a srcset the way browsers do, keeping the comma inside a data URL', () => {
+  expect(
+    sourceSetCandidates('data:image/png;base64,AAAA 1x, docs/logo.png 2x,img/plain.png'),
+  ).toEqual([
+    { url: 'data:image/png;base64,AAAA', descriptor: '1x' },
+    { url: 'docs/logo.png', descriptor: '2x' },
+    { url: 'img/plain.png', descriptor: '' },
+  ])
+})
+
+test('loads an external fallback beside a workspace source as a CORS request', async () => {
+  const { container } = render(
+    <MarkdownPreviewContext
+      value={{
+        documentPath: 'repo/README.md',
+        rootPath: 'repo',
+        origin: 'http://example.com',
+        openFile: () => {},
+        colorMode: 'dark',
+      }}
+    >
+      <Markdown
+        components={{
+          img: MarkdownPreviewImage,
+          picture: MarkdownPreviewPicture,
+          source: MarkdownPreviewSource,
+        }}
+        text={[
+          '<picture>',
+          '  <source srcset="./dark.png">',
+          '  <img alt="logo" src="https://cdn.example/logo.png">',
+          '</picture>',
+        ].join('\n')}
+      />
+    </MarkdownPreviewContext>,
+  )
+  await waitFor(() => expect(container.querySelector('img')).not.toBeNull())
+  expect(container.querySelector('img')?.getAttribute('crossorigin')).toBe('anonymous')
+})
 
 test('renders both source endpoints of a standalone fence for scroll sync', () => {
   const { container } = render(

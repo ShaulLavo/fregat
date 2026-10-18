@@ -9,7 +9,10 @@ import { MarkdownPreviewBlock } from '@/features/workbench/components/markdown-p
 import { MarkdownPreviewCodeBlock } from '@/features/workbench/components/markdown-preview-code-block'
 import { MarkdownPreviewImage } from '@/features/workbench/components/markdown-preview-image'
 import { MarkdownPreviewLink } from '@/features/workbench/components/markdown-preview-link'
-import { MarkdownPreviewSource } from '@/features/workbench/components/markdown-preview-source'
+import {
+  MarkdownPreviewPicture,
+  MarkdownPreviewSource,
+} from '@/features/workbench/components/markdown-preview-source'
 import { MarkdownPreviewContext } from '@/features/workbench/providers/markdown-preview-context'
 import type { MarkdownScrollSync } from '@/features/workbench/state/markdown-scroll-sync'
 import {
@@ -26,6 +29,7 @@ import { originForQueryClient } from '@/lib/environments/state/query-clients'
 const PREVIEW_COMPONENTS: MarkdownComponents = {
   a: MarkdownPreviewLink,
   img: MarkdownPreviewImage,
+  picture: MarkdownPreviewPicture,
   source: MarkdownPreviewSource,
   blockquote: MarkdownPreviewBlock,
   h1: MarkdownPreviewBlock,

@@ -5,7 +5,14 @@ import path from 'node:path'
 import type { Page } from 'playwright'
 
 import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
-import { focusEditor, openFileFromTree, runPaletteCommand, selectors } from '../selectors'
+import {
+  chords,
+  focusEditor,
+  openFileFromTree,
+  pressShortcut,
+  runPaletteCommand,
+  selectors,
+} from '../selectors'
 import type { Scenario } from './index'
 
 // A 1×1 PNG, so the rendered image has something real to load.
@@ -71,7 +78,7 @@ export const markdownSplitView: Scenario = {
 
       // Dragging the divider resizes both sides.
       const before = (await pane.boundingBox())!.width
-      const handle = page.locator('[data-slot="resizable-handle"][id="markdown-split-handle"]')
+      const handle = page.locator('[data-slot="resizable-handle"][id^="markdown-split-handle-"]')
       const grip = (await handle.boundingBox())!
       await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
       await page.mouse.down()
@@ -135,15 +142,38 @@ export const markdownSplitView: Scenario = {
       await step('source-only')
 
       // Live preview → plain source → the rendered page alone, then back to live preview.
+      await focusEditor(page)
+      await page.keyboard.press('Control+Home')
       await runPaletteCommand(page, 'Cycle markdown view')
       await runPaletteCommand(page, 'Cycle markdown view')
       await preview(page).getByRole('heading', { name: 'Guide', level: 1 }).waitFor()
       ok(!(await selectors.editorSurface(page).first().isVisible()), 'the editor is hidden')
       await step('rendered-only')
+      // Editor commands reach nothing while only the page shows; the palette may not offer them.
+      await pressShortcut(page, chords.commandPalette)
+      await selectors.paletteInput(page).fill('>Delete line')
+      const deleteLine = selectors.commandOption(page, 'Delete line').first()
+      if (await deleteLine.isVisible({ timeout: 2_000 }).catch(() => false))
+        await deleteLine.click()
+      else await page.keyboard.press('Escape')
       await runPaletteCommand(page, 'Cycle markdown view')
       await page.locator('[data-markdown-preview]').waitFor({ state: 'detached' })
       ok(await selectors.editorSurface(page).first().isVisible(), 'the editor is back')
       await page.getByText('const line1 = 1').first().waitFor()
+      // Live preview shows `# ` on the caret's line; a deleted line would leave the blank one on top.
+      const firstRow = await page
+        .locator('.editor-virtualized-row')
+        .evaluateAll(
+          (rows) =>
+            rows
+              .filter((row) => row.getBoundingClientRect().height > 0)
+              .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0]
+              ?.textContent,
+        )
+      ok(
+        firstRow?.includes('Guide'),
+        `the hidden editor kept its first line: ${JSON.stringify(firstRow)}`,
+      )
       await step('live-preview-again')
     } finally {
       await releaseFixture(fixture)
