@@ -363,15 +363,16 @@ test.each([
   },
 )
 
-test('automatic bump publication uses the matched Markdown source and immutable auto branches', () => {
+test('automatic bump publication reuses one rolling branch for manual merging', () => {
   const workflow = readWorkflow('editor-tree-sitter-x.yml')
   expect(workflow.jobs.publish!.needs).toBe('update')
   const publish = workflow.jobs.publish!.steps.find((step) => step.name === 'Open a pull request')
   expect(publish?.run).toBe('node scripts/ci/parser-pins.mjs publish')
 
   const source = readFileSync(new URL('../scripts/ci/parser-pins.mjs', import.meta.url), 'utf8')
-  expect(source).toContain("const prefix = 'tree-sitter-x/auto/'")
-  expect(source).toContain('`${prefix}${metadata.runtime}-${metadata.markdown}`')
+  expect(source).toContain("const branch = 'tree-sitter-x/updates'")
+  expect(source).toContain('This PR stays open for manual review and merging.')
+  expect(source).not.toContain('async function mergePins')
 })
 
 test('canonical ghostty CI verifies the separate line editor package', () => {

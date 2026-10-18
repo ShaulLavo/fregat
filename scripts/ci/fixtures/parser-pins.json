@@ -4,47 +4,23 @@
     "number": 42,
     "state": "open",
     "draft": false,
-    "user": { "id": 41898282, "login": "github-actions[bot]", "type": "Bot" },
-    "base": { "ref": "main", "repo": { "full_name": "fixture/parser" } },
+    "user": {
+      "id": 41898282,
+      "login": "github-actions[bot]",
+      "type": "Bot"
+    },
+    "base": {
+      "ref": "main",
+      "repo": {
+        "full_name": "fixture/parser"
+      }
+    },
     "head": {
-      "ref": "tree-sitter-x/auto/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "ref": "tree-sitter-x/updates",
       "sha": "cccccccccccccccccccccccccccccccccccccccc",
-      "repo": { "full_name": "fixture/parser" }
+      "repo": {
+        "full_name": "fixture/parser"
+      }
     }
-  },
-  "updater": {
-    "id": 10,
-    "path": ".github/workflows/editor-tree-sitter-x.yml",
-    "head_branch": "main",
-    "repository": { "full_name": "fixture/parser" },
-    "event": "schedule",
-    "status": "completed",
-    "conclusion": "success"
-  },
-  "ci": {
-    "id": 20,
-    "path": ".github/workflows/ci.yml",
-    "head_branch": "tree-sitter-x/auto/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "head_sha": "cccccccccccccccccccccccccccccccccccccccc",
-    "repository": { "full_name": "fixture/parser" },
-    "event": "workflow_dispatch",
-    "status": "completed",
-    "conclusion": "success",
-    "run_attempt": 2
-  },
-  "job": {
-    "id": 30,
-    "name": "CI",
-    "head_sha": "cccccccccccccccccccccccccccccccccccccccc",
-    "run_id": 20,
-    "run_attempt": 2,
-    "status": "completed",
-    "conclusion": "success"
-  },
-  "artifact": {
-    "name": "tree-sitter-pin-cccccccccccccccccccccccccccccccccccccccc",
-    "expired": false,
-    "workflow_run": { "id": 10 }
-  },
-  "files": [{ "filename": "package.json", "status": "modified" }]
+  }
 }
