@@ -115,8 +115,8 @@ set `VITEST_BROWSER_PORT` and `VITEST_BROWSER_FILE_SERVER_PORT` to free explicit
 A passing check is a development regression result, never a `VERIFIED` verdict or a promotion
 receipt. It does not open evaluation batches or run timing/resource/visual promotion jobs.
 The existing `markdown:qualify` command still fails without complete trusted identity-bound
-receipts. Nightly broad fuzz/visual/benchmark scheduling, independent evaluation, the full
-streaming/interaction/resource/native matrix, reviewed paired visuals and quiet-host timing
+receipts. Independent evaluation, the full streaming/interaction/resource/native matrix, reviewed paired
+visuals and quiet-host timing
 remain required before the coordinator can complete Q5 and authorize delivery.
 
 Production `AssistantMarkdown` selects tree-sitter through its local provider after the package
@@ -126,3 +126,58 @@ state, then uses the existing transforms and safe HAST renderer. An explicit
 Unscoped `Markdown`, including the file split preview, retains remark. Production remark
 packages remain installed for those consumers. This branch changes source wiring only; it does
 not establish qualification, deploy the change or verify the served release.
+
+## Broad nightly checks
+
+The Markdown workflow runs broad checks at 02:23 UTC daily and on manual dispatch. PR and main
+pushes retain the bounded `markdown:check`. Nightly jobs use only committed development/reference
+fixtures and deterministic generated inputs. They do not open held-out evaluation batches.
+
+Run the same checks locally with an owned output directory:
+
+```sh
+bun run markdown:nightly parity --out <evidence>/parity
+bun run markdown:nightly stream --out <evidence>/stream
+bun run markdown:nightly fuzz --out <evidence>/fuzz
+bun run markdown:nightly visual --browser chromium --out <evidence>/chromium
+bun run markdown:nightly visual --browser webkit --out <evidence>/webkit
+bun run markdown:nightly bench --out <evidence>/diagnostic-native
+bun run markdown:production:smoke --build <scratch>/build --directory <scratch>/build \
+  --port 5399 --out <evidence>/diagnostic-production
+```
+
+The default engine scope is paired. Correctness includes the frozen official and published reference
+sets and candidate cases, plus paired browser semantics, interactions, lifetime, hard-break layout
+and production-boundary checks. Streaming runs the existing exhaustive/seeded package schedules and both
+engines' real chat stream probes. Fuzzing runs seeds 176–239 with 64 insert/delete/undo operations per
+seed, in completed and live modes. Each incremental projection must equal a fresh projection, and
+candidate output must equal remark. Arbitrary UTF-16 edits are an adversarial API profile, separate
+from the transport-decoder streaming tests. `seeded-fuzz.json` preserves the seed and operation prefix
+through the first failure, with declared, executed and unexecuted revision counts. Further source/delimiter reduction remains an explicit gate.
+
+Visual jobs run both engines separately on Chromium and WebKit, retaining calibrated paired rasters,
+overlays, content assertions and the existing 128-state denominator on each browser. Automated raster
+success does not replace human review, frame-transition qualification or real iOS interaction checks.
+
+The diagnostic native job runs paired quick native trials and development-browser benchmark families.
+Production smoke builds the real production probe, runs two independent pairs on its small stream
+fixture with one warmup and negative controls, and retains traces and raw reports. It is not the full
+production workload matrix. Both jobs preserve performance failures as nonzero exits. Shared CI-host
+timings are diagnostic; no job runs the final twenty-pair qualification or creates promotion receipts.
+Only the final frozen candidate on an identified quiet host can qualify timing.
+
+`markdown:nightly` uses `--checks-only`. Its `qualification.json` has `reportScope: "checks-only"`
+and a separate `checkExecution` status/exit code. Missing candidates, failed suites, absent reports
+and partial or zero executed cases fail. Assertion rows and the declared-minus-accounted
+difference preserve pending denominators after bail; the original test JSON stays unchanged. Baseline-only, inspection and promotion/evaluation evidence arguments
+are rejected in this mode. Check success leaves the promotion verdict `NOT VERIFIED`; it cannot
+set the candidate to verified. `markdown:qualify` retains its default requirement for all fourteen
+trusted identity-bound gates. Frozen budgets and held-out batches are unchanged.
+
+Jobs have bounded wall times, at most two concurrent correctness jobs, two Vitest workers, explicit
+loopback ports and private temporary roots. Existing fixture helpers own browser/server/session
+teardown. Shell traps remove task builds and temporary profiles on success, failure and signals;
+the timeout sends TERM then kills the owned process group after 30 seconds. Always-run artifacts
+retain logs, JSON, raster images and failure replays for fourteen days. A cancelled hosted runner
+removes its remaining processes when the job ends. Setup failures remain failed jobs, even if no
+suite artifact could be produced.

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -105,7 +105,7 @@ test('chat Markdown CI runs bounded candidate checks without promotion receipts 
   expect(markdown.on.pull_request.paths).toContain('packages/markdown/**')
   expect(markdown.on.pull_request.paths).toContain('apps/web/src/features/chat/**')
   expect(markdown.on.pull_request.paths).not.toContain('apps/web/**')
-  expect(markdown.on).not.toHaveProperty('schedule')
+  expect(markdown.on.schedule).toEqual([{ cron: '23 2 * * *' }])
   const step = markdown.jobs['candidate-check'].steps.find((entry) => entry.run)
   expect(step.run).toBe('bun run markdown:check')
   expect(step.env).toMatchObject({
@@ -119,3 +119,99 @@ test('chat Markdown CI runs bounded candidate checks without promotion receipts 
     'vitest run --config vitest.markdown-qualification.config.ts --mode candidate qualification-semantics.browser.tsx qualification-production.browser.tsx',
   )
 })
+
+test('nightly Markdown checks pair development engines and keep diagnostic performance failures visible', async () => {
+  const markdown = YAML.parse(
+    await readFile(new URL('.github/workflows/markdown-chat.yml', root), 'utf8'),
+  )
+  const scripts = JSON.parse(manifest).scripts
+  expect(markdown.on).toHaveProperty('workflow_dispatch')
+  expect(scripts['markdown:nightly']).toBe('bun scripts/markdown/qualify.ts --checks-only')
+  expect(scripts['markdown:production:smoke']).toBe(
+    'bun scripts/markdown/production-browser.ts --smoke --trials 2 --warmups 1 --negative-controls',
+  )
+  const checks = markdown.jobs['nightly-checks']
+  expect(checks.strategy.matrix.include.map(({ suite, browser }) => `${suite}/${browser}`)).toEqual(
+    ['parity/chromium', 'stream/chromium', 'fuzz/chromium', 'visual/chromium', 'visual/webkit'],
+  )
+  expect(checks.strategy['max-parallel']).toBe(2)
+  const diagnostic = markdown.jobs['nightly-benchmark-smoke']
+  expect(diagnostic.strategy.matrix.runner).toEqual(['native', 'production'])
+  for (const job of [checks, diagnostic]) {
+    expect(job.if).toBe(
+      "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+    )
+    expect(job['timeout-minutes']).toBeLessThanOrEqual(55)
+    expect(job.strategy['fail-fast']).toBe(false)
+    expect(job).not.toHaveProperty('continue-on-error')
+    const run = job.steps.find((step) => step.run)
+    expect(run.env).toMatchObject({
+      VITEST_BROWSER_PORT: '5397',
+      VITEST_BROWSER_FILE_SERVER_PORT: '33497',
+    })
+    expect(run.run).toContain('set -euo pipefail')
+    expect(run.run).toContain('trap cleanup EXIT')
+    expect(run.run).toContain('rm -rf "$scratch"')
+    expect(run.run).toContain('test ! -e "$scratch"')
+    expect(run.run).toContain('timeout --signal=TERM --kill-after=30s')
+    expect(run.run).not.toMatch(/--baseline|--promotion-receipts|--evaluation|\|\| true|20.*trials/)
+    expect(run).not.toHaveProperty('continue-on-error')
+    const artifact = job.steps.find((step) => step.uses === 'actions/upload-artifact@v4')
+    expect(artifact.if).toBe('always()')
+    expect(artifact.with['if-no-files-found']).toBe('error')
+  }
+  const smoke = diagnostic.steps.find((step) => step.run).run
+  expect(smoke).toContain('"scope":"diagnostic-smoke"')
+  expect(smoke).toContain('"promotion":"NOT VERIFIED"')
+  expect(smoke).toContain('markdown:nightly bench')
+  expect(smoke).toContain('markdown:production:smoke')
+  expect(smoke).toContain('--port 5399')
+})
+
+test.each([
+  ['nightly-checks', 'visual', 'chromium', 0],
+  ['nightly-checks', 'fuzz', 'chromium', 1],
+  ['nightly-benchmark-smoke', 'native', 'chromium', 1],
+  ['nightly-benchmark-smoke', 'production', 'chromium', 1],
+])(
+  'nightly shell %s/%s preserves exit status and removes only its owned scratch',
+  async (jobId, suite, browser, status) => {
+    const markdown = YAML.parse(
+      await readFile(new URL('.github/workflows/markdown-chat.yml', root), 'utf8'),
+    )
+    const run = markdown.jobs[jobId].steps.find((step) => step.run).run
+    const directory = await mkdtemp(join(tmpdir(), 'markdown-workflow-'))
+    try {
+      await writeFile(
+        join(directory, 'bun'),
+        '#!/bin/sh\nprintf "%s" "$TMPDIR" > "$RUNNER_TEMP/owned-scratch"\nprintf "%s\\n" "$*" > "$RUNNER_TEMP/command"\necho diagnostic-output\nexit "$TEST_EXIT"\n',
+        { mode: 0o755 },
+      )
+      const result = spawnSync('bash', ['-euo', 'pipefail', '-c', run], {
+        cwd: directory,
+        env: {
+          ...process.env,
+          PATH: `${directory}:${process.env.PATH}`,
+          RUNNER_TEMP: directory,
+          SUITE: suite,
+          BROWSER: browser,
+          SMOKE_RUNNER: suite,
+          TEST_EXIT: String(status),
+        },
+        encoding: 'utf8',
+      })
+      expect(result.status, result.stdout + result.stderr).toBe(status)
+      const scratch = await readFile(join(directory, 'owned-scratch'), 'utf8')
+      await expect(stat(scratch)).rejects.toMatchObject({ code: 'ENOENT' })
+      const evidence = jobId === 'nightly-checks' ? `${suite}-${browser}` : suite
+      expect(
+        await readFile(join(directory, 'markdown-nightly', evidence, 'execution.log'), 'utf8'),
+      ).toContain('diagnostic-output')
+      expect(await readFile(join(directory, 'command'), 'utf8')).toContain(
+        suite === 'production' ? '--port 5399' : 'markdown:nightly',
+      )
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+)

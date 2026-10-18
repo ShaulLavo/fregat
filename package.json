@@ -129,6 +129,8 @@
     "markdown:visual": "bun scripts/markdown/qualify.ts visual --baseline",
     "markdown:bench": "bun scripts/markdown/qualify.ts bench --baseline",
     "markdown:qualify": "bun scripts/markdown/qualify.ts qualify",
+    "markdown:nightly": "bun scripts/markdown/qualify.ts --checks-only",
+    "markdown:production:smoke": "bun scripts/markdown/production-browser.ts --smoke --trials 2 --warmups 1 --negative-controls",
     "markdown:check": "bun run --cwd packages/markdown test qualification-candidate && bun run --cwd apps/web test:markdown"
   },
   "devDependencies": {

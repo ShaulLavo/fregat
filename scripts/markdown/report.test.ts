@@ -134,7 +134,7 @@ test('qualification modes select actual candidate configurations and preserve ba
   expect(qualificationMode({ candidate: true })).toBe('candidate')
   expect(() => qualificationMode({ baseline: true, candidate: true })).toThrow()
   const candidate = qualificationTestPlan('parity', 'candidate')
-  expect(candidate).toHaveLength(1)
+  expect(candidate).toHaveLength(2)
   expect(candidate[0].flags).toContain('qualification-candidate')
   const baseline = qualificationTestPlan('parity', 'baseline')
   expect(baseline[0].flags).toContain('**/qualification-candidate.test.ts')
