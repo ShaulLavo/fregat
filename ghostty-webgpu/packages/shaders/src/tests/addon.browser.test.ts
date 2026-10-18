@@ -7,8 +7,11 @@ import {
   type GhosttyWebGpuRendererFactory,
 } from '../../../../dist/index.js'
 import { WebGlTerminalRenderer } from '../../../../dist/render/webgl/renderer.js'
+import { FallbackTerminalRenderer } from '../../../../dist/render/shared/fallback.js'
 import { CanvasTerminalRenderer } from '../../../../dist/render/canvas/renderer.js'
 import { createShaderAddon, type CompiledShader } from '../../dist/index.js'
+import { Terminal as WorkerTerminal } from '../../../../dist/worker/index.js'
+import { testFontUrl } from '../../../../src/tests/fonts.js'
 import { copyShader, greenShader, language, uniformShader, timeShader } from './artifacts.js'
 
 const cleanups: (() => unknown)[] = []
@@ -24,7 +27,11 @@ afterAll(() => runtime.dispose())
 function factory(backend: 'webgpu' | 'webgl2' | 'canvas2d'): GhosttyWebGpuRendererFactory {
   if (backend === 'webgpu')
     return (options) => WebGpuTerminalRenderer.create({ ...options, adapterPolicy: 'any' })
-  if (backend === 'webgl2') return (options) => WebGlTerminalRenderer.create(options)
+  if (backend === 'webgl2')
+    return (options) =>
+      options.replaceCanvas
+        ? FallbackTerminalRenderer.create(options, options.replaceCanvas)
+        : WebGlTerminalRenderer.create(options)
   return (options) => CanvasTerminalRenderer.create(options)
 }
 
@@ -33,6 +40,7 @@ async function fixture(
   shader: CompiledShader = copyShader,
   beforeOpen = false,
   output?: 'webgpu' | 'webgl2',
+  existing = false,
 ) {
   const host = document.createElement('div')
   host.style.cssText = 'width:340px;height:180px'
@@ -63,11 +71,20 @@ async function fixture(
     onError: (error) => errors.push(error),
   })
   if (!beforeOpen) await terminal.open(host)
+  const content =
+    '\x1b[?25l\x1b[48;2;255;0;0m          \r\n\x1b[48;2;0;255;0m          \r\n\x1b[48;2;0;0;255m          '
+  if (existing) {
+    terminal.write(content)
+    const source = terminal.canvas
+    if (!source) throw new TypeError('Missing presented source')
+    await expect.poll(async () => pixel(await pixels(source), 0.5, 1 / 6)).toEqual([255, 0, 0])
+    await frames(2)
+  }
   const handle = terminal.use(addon)
   cleanups.push(() => handle.dispose())
   if (beforeOpen) await terminal.open(host)
   await handle.api.ready
-  terminal.write('\x1b[?25l\x1b[41m          \r\n\x1b[42m          \r\n\x1b[44m          ')
+  if (!existing) terminal.write(content)
   await expect
     .poll(
       () =>
@@ -105,6 +122,7 @@ it.each(['webgpu', 'webgl2'] satisfies ('webgpu' | 'webgl2')[])(
   async (backend) => {
     const f = await fixture(backend, copyShader, true)
     expect(f.canvas.dataset['backend']).toBe(backend)
+    await expect.poll(async () => pixel(await pixels(f.canvas), 0.5, 1 / 6)).toEqual([255, 0, 0])
     const image = await pixels(f.canvas)
     const top = pixel(image, 0.5, 1 / 6)
     const bottom = pixel(image, 0.5, 5 / 6)
@@ -112,6 +130,7 @@ it.each(['webgpu', 'webgl2'] satisfies ('webgpu' | 'webgl2')[])(
     expect(top[2]).toBeLessThan(30)
     expect(bottom[0]).toBeLessThan(30)
     expect(bottom[2]).toBeGreaterThan(100)
+    await page.screenshot({ element: f.host, path: `../../.artifacts/orientation-${backend}.png` })
     const source = f.terminal.canvas
     if (!source) throw new TypeError('Missing source')
     const sourceRect = source.getBoundingClientRect()
@@ -189,7 +208,6 @@ it('follows a replaced terminal canvas during renderer recovery', async () => {
   const lost = original?.getContext('webgl2')?.getExtension('WEBGL_lose_context')
   if (!lost) throw new TypeError('Missing source loss extension')
   lost.loseContext()
-  // The custom factory is intentionally strict; the terminal reports its recovery policy.
   await expect.poll(() => f.terminal.canvas).not.toBe(original)
   f.terminal.write('\x1b[H\x1b[45m          ')
   await expect.poll(async () => pixel(await pixels(f.canvas), 0.5, 1 / 6)[2]).toBeGreaterThan(100)
@@ -216,4 +234,126 @@ it('defaults full artifacts to WebGL2 when WebGPU is unavailable, with strict ex
   expect(pixel(image, 0.5, 5 / 6)[2]).toBeGreaterThan(100)
   await expect(fixture('canvas2d', copyShader, false, 'webgpu')).rejects.toThrow('unavailable')
   expect(f.errors).toEqual([])
+})
+
+async function frames(count: number): Promise<void> {
+  for (let frame = 0; frame < count; frame += 1)
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+it.each(['webgpu', 'webgl2'] satisfies ('webgpu' | 'webgl2')[])(
+  'captures an unchanged terminal installed after its source buffer was presented on %s',
+  async (backend) => {
+    const f = await fixture(backend, copyShader, false, undefined, true)
+    await expect.poll(async () => pixel(await pixels(f.canvas), 0.5, 1 / 6)).toEqual([255, 0, 0])
+    f.terminal.refresh(0, 2)
+    await frames(3)
+    expect(pixel(await pixels(f.canvas), 0.5, 1 / 6)).toEqual([255, 0, 0])
+  },
+)
+
+it('bounds unfinished WebGPU submissions and retains the latest source state', async () => {
+  const adapter = await navigator.gpu.requestAdapter()
+  if (!adapter) throw new TypeError('Missing test WebGPU adapter')
+  const device = await adapter.requestDevice()
+  cleanups.push(() => device.destroy())
+  let release = () => {}
+  const pending = new Promise<undefined>((resolve) => {
+    release = () => resolve(undefined)
+  })
+  cleanups.push(() => release())
+  const acquireAdapter = vi.spyOn(navigator.gpu, 'requestAdapter').mockResolvedValue(adapter)
+  const acquireDevice = vi.spyOn(adapter, 'requestDevice').mockResolvedValue(device)
+  const completed = device.queue.onSubmittedWorkDone.bind(device.queue)
+  const completion = vi.spyOn(device.queue, 'onSubmittedWorkDone').mockImplementation(completed)
+  completion.mockReturnValueOnce(pending)
+  const submits = vi.spyOn(device.queue, 'submit')
+  cleanups.push(() => {
+    acquireAdapter.mockRestore()
+    acquireDevice.mockRestore()
+    completion.mockRestore()
+    submits.mockRestore()
+  })
+  const f = await fixture('canvas2d', copyShader, false, 'webgpu')
+  f.terminal.write('\x1b[H\x1b[48;2;255;0;255m          ')
+  await frames(4)
+  expect(submits).toHaveBeenCalledTimes(1)
+  expect(completion).toHaveBeenCalledTimes(1)
+  await completed()
+  release()
+  await expect.poll(async () => pixel(await pixels(f.canvas), 0.5, 1 / 6)).toEqual([255, 0, 255])
+  expect(f.errors).toEqual([])
+})
+
+it('bounds unfinished WebGL2 submissions and retains the latest source state', async () => {
+  const wait = vi
+    .spyOn(WebGL2RenderingContext.prototype, 'clientWaitSync')
+    .mockReturnValue(WebGL2RenderingContext.TIMEOUT_EXPIRED)
+  const draws = vi.spyOn(WebGL2RenderingContext.prototype, 'drawArrays')
+  const uploads = vi.spyOn(WebGL2RenderingContext.prototype, 'texImage2D')
+  cleanups.push(() => {
+    wait.mockRestore()
+    draws.mockRestore()
+    uploads.mockRestore()
+  })
+  const f = await fixture('canvas2d', copyShader, false, 'webgl2')
+  f.terminal.write('\x1b[H\x1b[48;2;255;0;255m          ')
+  await frames(4)
+  expect(draws).toHaveBeenCalledTimes(1)
+  expect(uploads).toHaveBeenCalledTimes(1)
+  wait.mockRestore()
+  await expect.poll(async () => pixel(await pixels(f.canvas), 0.5, 1 / 6)).toEqual([255, 0, 255])
+  expect(f.errors).toEqual([])
+})
+
+it('removes failed output resources while keeping the source terminal alive', async () => {
+  const f = await fixture('webgl2')
+  const source = f.terminal.canvas
+  const lose = f.canvas.getContext('webgl2')?.getExtension('WEBGL_lose_context')
+  if (!lose) throw new TypeError('Missing output loss extension')
+  lose.loseContext()
+  await expect.poll(() => f.canvas.isConnected).toBe(false)
+  expect(f.errors).toMatchObject([{ code: 'gpu' }])
+  expect(f.terminal.canvas).toBe(source)
+  expect(f.terminal.lifecycle).toBe('open')
+  f.terminal.write('still alive')
+})
+
+it('freezes hidden effect time and presents terminal writes after visibility resumes', async () => {
+  const f = await fixture('webgl2', timeShader)
+  const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+  cleanups.push(() => hidden.mockRestore())
+  document.dispatchEvent(new Event('visibilitychange'))
+  await frames(2)
+  const stopped = await color(f.canvas)
+  await frames(4)
+  expect(await color(f.canvas)).toEqual(stopped)
+  f.terminal.write('\x1b[H\x1b[48;2;255;0;255m          ')
+  hidden.mockRestore()
+  document.dispatchEvent(new Event('visibilitychange'))
+  await f.handle.api.setShader(copyShader)
+  await expect.poll(async () => pixel(await pixels(f.canvas), 0.5, 1 / 6)).toEqual([255, 0, 255])
+  expect(f.errors).toEqual([])
+})
+
+it('clearly rejects asynchronous worker capture and removes its overlay', async () => {
+  const host = document.createElement('div')
+  host.style.cssText = 'width:340px;height:180px'
+  document.body.append(host)
+  cleanups.push(() => host.remove())
+  const terminal = await WorkerTerminal.create({
+    backend: 'webgl',
+    fonts: [{ family: 'ShaderWorkerTest', source: { url: testFontUrl } }],
+  })
+  cleanups.push(() => terminal.dispose())
+  await terminal.open(host)
+  const errors: unknown[] = []
+  const handle = await terminal.use(
+    createShaderAddon(copyShader, { onError: (error) => errors.push(error) }),
+  )
+  cleanups.push(() => handle.dispose())
+  await expect(handle.api.ready).rejects.toMatchObject({ code: 'worker' })
+  expect(errors).toMatchObject([{ code: 'worker' }])
+  expect(terminal.element?.querySelector('[data-ghostty-shader]')).toBeNull()
+  expect(terminal.lifecycle).toBe('open')
 })

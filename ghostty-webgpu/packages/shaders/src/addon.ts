@@ -96,6 +96,7 @@ class Controller implements ShaderAddonApi {
   #started = false
   #revision = 0
   #raf = 0
+  #resizeRaf = 0
   #paused: boolean
   #captured = false
   #upload = false
@@ -178,8 +179,8 @@ class Controller implements ShaderAddonApi {
     output.dataset['backend'] = pass.backend
     this.#available.resolve(pass)
     this.synchronize()
-    // Force a fresh synchronous frame when the extension is installed after presentation.
-    terminal.refresh(0, terminal.appearance.grid.rows - 1)
+    // A row refresh can submit no draw; rebuild once to capture an already-presented WebGL canvas.
+    terminal.clearTextureAtlas()
   }
 
   setShader(shader: CompiledShader): Promise<boolean> {
@@ -258,6 +259,12 @@ class Controller implements ShaderAddonApi {
   }
 
   readonly resized = (): void => {
+    if (this.#disposed || !this.#view || this.#resizeRaf) return
+    this.#resizeRaf = this.#view.requestAnimationFrame(this.refresh)
+  }
+
+  readonly refresh = (): void => {
+    this.#resizeRaf = 0
     if (this.#disposed) return
     this.layout()
     if (this.#terminal.lifecycle === 'open')
@@ -297,7 +304,7 @@ class Controller implements ShaderAddonApi {
       if (!context)
         throw new ShaderAddonError('capture', 'A Canvas2D snapshot context is unavailable.')
       // WebGL's non-preserved drawing buffer must be copied inside the frame callback.
-      context.clearRect(0, 0, copy.width, copy.height)
+      // A no-draw WebGL notification exposes transparent pixels; retain the last opaque snapshot.
       context.drawImage(source, 0, 0)
       this.#captured = true
       this.#upload = true
@@ -367,7 +374,9 @@ class Controller implements ShaderAddonApi {
     this.#installed.reject(error)
     this.#available.reject(error)
     this.#view?.cancelAnimationFrame(this.#raf)
+    this.#view?.cancelAnimationFrame(this.#resizeRaf)
     this.#raf = 0
+    this.#resizeRaf = 0
     this.#observer?.disconnect()
     for (const cleanup of this.#cleanup) cleanup()
     this.#cleanup = []

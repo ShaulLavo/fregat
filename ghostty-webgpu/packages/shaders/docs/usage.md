@@ -39,7 +39,7 @@ Main-thread WebGPU, WebGL2, and Canvas2D terminals are supported. DOM renderers 
 
 The addon inserts a `pointer-events: none`, `aria-hidden` overlay into `terminal.element`, before the terminal's input/composition elements. It follows the source content box, padding, backing dimensions, and DPR. Source canvas, focus, keyboard input, selection, and accessibility nodes stay owned by the terminal. Renderer recovery can replace the source canvas; the next submitted frame retargets capture and geometry.
 
-A synchronous public `frame` callback copies the source into an owned Canvas2D staging canvas. This preserves WebGL2 frames with `preserveDrawingBuffer: false`. The output then uploads that snapshot. This copy has a cost proportional to terminal pixel area; this package makes no hardware performance claim.
+A synchronous public `frame` callback copies the source into an owned Canvas2D staging canvas. This preserves WebGL2 frames with `preserveDrawingBuffer: false`. Transparent cleared-buffer copies leave the previous opaque terminal snapshot intact. Installation calls the public `clearTextureAtlas()` once to guarantee a fresh draw even for an unchanged, already-presented terminal. The output then uploads that snapshot. This copy has a cost proportional to terminal pixel area; this package makes no hardware performance claim.
 
 At most one output draw is submitted per animation frame and one unfinished effect frame is retained. WebGPU queue completion and WebGL2 fences gate uploads/draws. Busy output retains the latest snapshot and elapsed time. Pause and document visibility freeze effect time. Terminal changes can still redraw while paused; hidden documents resume with current terminal state.
 
