@@ -21,6 +21,7 @@ import type { Observation } from '../../../../packages/markdown/test/qualificati
 import { checkExpectations } from '../../../../packages/markdown/test/qualification'
 import type { Expectation } from '../../../../packages/markdown/test/fixtures/cases'
 import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../providers'
+import { highlightingService } from '@/lib/highlighting/state/service'
 import { TestEditorStateProvider } from './editor-state-provider'
 import { settingsSnapshot } from './settings'
 
@@ -292,16 +293,30 @@ export async function readyForScreenshot(host: HTMLElement): Promise<void> {
     if (expectedTheme && getComputedStyle(host).color.length === 0)
       throw createClientInvariantError('Markdown proof theme did not load')
   })
-  await vi.waitFor(() => assertHighlightedFences(host), { timeout: 10_000 })
+  await vi.waitFor(
+    async () => {
+      await highlightingService().awaitIdle()
+      assertHighlightedFences(host)
+    },
+    { timeout: 10_000 },
+  )
   await document.fonts.ready
   await paintedFrame()
 }
 
 function assertHighlightedFences(host: HTMLElement): void {
   for (const fence of host.querySelectorAll('[data-markdown="code-block"]')) {
+    if (fence.getAttribute('data-incomplete') === 'true') continue
+    const body = fence.querySelector('[data-markdown="code-block-body"]')
     const language = fence.getAttribute('data-language')
-    if (language !== 'ts' && language !== 'typescript') continue
-    if (!fence.querySelector('[data-markdown="code-block-body"] span[style]'))
+    if (
+      !body ||
+      !language ||
+      !body.textContent ||
+      highlightingService().grammarFor(language) === null
+    )
+      continue
+    if (!body.querySelector('span[style]'))
       throw createClientInvariantError('Markdown proof highlighting has not loaded')
   }
 }
