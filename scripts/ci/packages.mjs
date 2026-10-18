@@ -34,7 +34,10 @@ if (operation === 'build') {
   assert(['checks', 'tests', 'editor-tests'].includes(operation), 'Unknown CI package operation')
   for (const name of names) {
     const pkg = graph.packages.get(name)
-    if (operation === 'checks' && ['ghostty-webgpu', 'ghostty-webgpu-line-editor'].includes(name))
+    if (
+      operation === 'checks' &&
+      ['ghostty-webgpu', 'ghostty-webgpu-line-editor', 'ghostty-webgpu-shaders'].includes(name)
+    )
       continue
     const dedicatedTest =
       [
@@ -43,6 +46,7 @@ if (operation === 'build') {
         'tui',
         'ghostty-webgpu',
         'ghostty-webgpu-line-editor',
+        'ghostty-webgpu-shaders',
         'singapore-editor-site',
         'scripts',
       ].includes(name) ||

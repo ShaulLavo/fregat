@@ -215,7 +215,9 @@ test.each(['editor', 'ghostty-webgpu', 'hotkeys'])(
       ['bun install'].concat(
         browser,
         ['bun run build', 'bun run typecheck', 'bun run lint', 'bun run format:check'],
-        family === 'ghostty-webgpu' ? ['bun run --cwd packages/line-editor verify'] : [],
+        family === 'ghostty-webgpu'
+          ? ['bun run --cwd packages/line-editor verify', 'bun run --cwd packages/shaders verify']
+          : [],
       ),
     )
   },
@@ -399,4 +401,24 @@ test('line editor builds after the root terminal declarations', () => {
   expect(graph.tasks['ghostty-webgpu-line-editor#build'].dependsOn).toContain(
     'ghostty-webgpu#build',
   )
+})
+
+test('shader verification builds public artifacts and runs real browser checks', () => {
+  const steps = readWorkflow('workspace-libraries.yml').jobs.ghostty!.steps
+  expect(steps.map((step) => step.run)).toContain(
+    'bun run --cwd ghostty-webgpu/packages/shaders verify && bun run --cwd ghostty-webgpu/packages/shaders test:browser',
+  )
+  const graph = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'))
+  expect(graph.tasks['ghostty-webgpu-shaders#build'].dependsOn).toContain('ghostty-webgpu#build')
+  const root = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  expect(root.scripts['build:workspaces']).toContain('--filter=ghostty-webgpu-shaders')
+  const manifest = JSON.parse(
+    readFileSync(
+      new URL('../ghostty-webgpu/packages/shaders/package.json', import.meta.url),
+      'utf8',
+    ),
+  )
+  expect(manifest.private).toBeUndefined()
+  expect(manifest.dependencies).toBeUndefined()
+  expect(Object.keys(manifest.peerDependencies)).toEqual(['ghostty-webgpu'])
 })

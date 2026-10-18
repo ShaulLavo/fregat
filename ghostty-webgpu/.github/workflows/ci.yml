@@ -23,6 +23,8 @@ jobs:
       - run: bunx playwright install --with-deps chromium
       - name: Verify browser package
         run: bun run verify
+      - name: Verify compiled shader extension
+        run: bun run --cwd packages/shaders verify && bun run --cwd packages/shaders test:browser
       - name: Verify browser package with production npm settings
         env:
           NODE_ENV: production

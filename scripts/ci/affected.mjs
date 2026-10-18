@@ -180,7 +180,12 @@ export function selectAffected(graph, files, full = false) {
     code: tooling || packages.length > 0,
     shared:
       tooling ||
-      packages.some((name) => !['ghostty-webgpu', 'ghostty-webgpu-line-editor'].includes(name)),
+      packages.some(
+        (name) =>
+          !['ghostty-webgpu', 'ghostty-webgpu-line-editor', 'ghostty-webgpu-shaders'].includes(
+            name,
+          ),
+      ),
     tooling,
     packages,
     web: selected.has('web'),
@@ -194,7 +199,10 @@ export function selectAffected(graph, files, full = false) {
       files.some((file) => matches(file, editorHealthInputs)) ||
       familyChanged('editor') ||
       packages.some((name) => graph.packages.get(name).directory.startsWith('editor/examples/')),
-    ghostty: selected.has('ghostty-webgpu') || selected.has('ghostty-webgpu-line-editor'),
+    ghostty:
+      selected.has('ghostty-webgpu') ||
+      selected.has('ghostty-webgpu-line-editor') ||
+      selected.has('ghostty-webgpu-shaders'),
     hotkeys: familyChanged('hotkeys'),
     docs: files.some(rootDocument),
     docs_files: files.filter(
