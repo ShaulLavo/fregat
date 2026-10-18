@@ -254,6 +254,7 @@ import {
   csvPresentationFailure,
 } from './csv-table'
 import { markdownSplitView } from './markdown-split-view'
+import { markdownPreviewImages } from './markdown-preview-images'
 import { markdownAuthoring } from './markdown-authoring'
 import { markdownPreviewClobber } from './markdown-preview-clobber'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
@@ -711,6 +712,7 @@ export const scenarios: readonly Scenario[] = [
   csvPresentationReadiness,
   csvPresentationFailure,
   markdownSplitView,
+  markdownPreviewImages,
   markdownAuthoring,
   markdownPreviewClobber,
   gitOpenAllDiffsSpam,

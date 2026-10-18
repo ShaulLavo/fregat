@@ -500,9 +500,9 @@
     },
     "editor.markdownView": {
       "default": "preview",
-      "description": "Edit Markdown as plain source, or as a live preview that formats the text and shows the Markdown symbols near the cursor. The Cycle Markdown View command changes one file.",
-      "enum": ["preview", "source"],
-      "markdownDescription": "Edit Markdown as plain source, or as a live preview that formats the text and shows the Markdown symbols near the cursor. The Cycle Markdown View command changes one file.\n\nLive preview formats Markdown in place and reveals syntax near the caret. Plain source keeps Markdown syntax visible. The rendered side pane is a separate setting.",
+      "description": "Edit Markdown as plain source or as a live preview that formats the text and shows the Markdown symbols near the cursor, or read it as a rendered page. The Cycle Markdown View command changes one file.",
+      "enum": ["preview", "rendered", "source"],
+      "markdownDescription": "Edit Markdown as plain source or as a live preview that formats the text and shows the Markdown symbols near the cursor, or read it as a rendered page. The Cycle Markdown View command changes one file.\n\nLive preview formats Markdown in place and reveals syntax near the caret. Plain source keeps Markdown syntax visible. Rendered page shows only the finished page, for reading. The rendered side pane is a separate setting.",
       "type": "string"
     },
     "editor.maxTokenizationLineLength": {

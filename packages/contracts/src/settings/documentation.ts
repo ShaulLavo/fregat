@@ -463,12 +463,12 @@ export const SETTINGS_DOCUMENTATION = {
     keywords: ['undo', 'history', 'storage', 'budget', 'persist'],
   },
   'editor.markdownView': {
-    optionTitles: { source: 'Plain source', preview: 'Live preview' },
+    optionTitles: { source: 'Plain source', preview: 'Live preview', rendered: 'Rendered page' },
     title: 'Markdown editing style',
     details:
-      'Live preview formats Markdown in place and reveals syntax near the caret. Plain source keeps Markdown syntax visible. The rendered side pane is a separate setting.',
+      'Live preview formats Markdown in place and reveals syntax near the caret. Plain source keeps Markdown syntax visible. Rendered page shows only the finished page, for reading. The rendered side pane is a separate setting.',
     description:
-      'Edit Markdown as plain source, or as a live preview that formats the text and shows the Markdown symbols near the cursor. The Cycle Markdown View command changes one file.',
+      'Edit Markdown as plain source or as a live preview that formats the text and shows the Markdown symbols near the cursor, or read it as a rendered page. The Cycle Markdown View command changes one file.',
     keywords: ['markdown', 'preview', 'split', 'render'],
   },
   'editor.markdownRenderedPane': {

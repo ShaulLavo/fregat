@@ -72,6 +72,8 @@ const NO_ADDITIONAL_PLUGINS: readonly EditorPlugin[] = []
 type EditorProps = {
   settingsComparison?: SettingsComparisonPresentation | null
   active: boolean
+  /** Mounted but not shown, as under a rendered Markdown page: it takes no focus or commands. */
+  concealed?: boolean
   document: EditorRenderDocument | null
   /** Omitted means "no snapshot"; a null key would detach the document inside useEditor. */
   paintKey?: string
@@ -98,7 +100,8 @@ type EditorProps = {
 
 export function Editor({
   settingsComparison = null,
-  active,
+  active: shown,
+  concealed = false,
   additionalPlugins = NO_ADDITIONAL_PLUGINS,
   definitionTarget,
   document: suppliedDocument,
@@ -118,6 +121,7 @@ export function Editor({
   onTextChange,
 }: EditorProps) {
   const { keymap } = useCommand()
+  const active = shown && !concealed
   const [provisional, setProvisional] = useState(false)
   const [formattedDocument, setFormattedDocument] = useState<string | null>(null)
   const unavailable = useUnavailableEnvironment()
@@ -383,7 +387,7 @@ export function Editor({
     !provisional
   const focusTarget = useEditorFocusTarget({
     controller,
-    enabled: !comparison && !preparingMarkdown,
+    enabled: !comparison && !preparingMarkdown && !concealed,
     writable: editability === 'editable',
     id: {
       key,
@@ -403,7 +407,7 @@ export function Editor({
   )
 
   useEffect(() => {
-    if (comparison) {
+    if (comparison || concealed) {
       clearStatusBarSource(controller)
       return
     }
@@ -417,6 +421,7 @@ export function Editor({
   }, [
     active,
     comparison,
+    concealed,
     clearStatusBarSource,
     controller,
     languageServerStatusSource,

@@ -205,7 +205,8 @@ test('reload feedback stays visible until the browser replaces the document and 
   const safety = createStore(() => ({ dirtyFiles: [] as readonly string[] }))
   renderWithProviders(<ServerUpdateStatus reload={() => reloads++} safety={safety} />)
   const user = userEvent.setup()
-  await user.click(await screen.findByRole('button', { name: 'Reload app' }))
+  // The first release read goes to the server the fixture just restarted.
+  await user.click(await screen.findByRole('button', { name: 'Reload app' }, { timeout: 4000 }))
   await waitFor(() => expect(reloads).toBe(1))
   const reloading = screen.getByRole('button', { name: 'Reloading…' })
   expect(reloading).toBeDisabled()
