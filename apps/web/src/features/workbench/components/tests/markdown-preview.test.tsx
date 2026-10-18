@@ -7,6 +7,7 @@ import { Markdown } from '@workspace/markdown/components/markdown'
 import { MarkdownPreviewCodeBlock } from '@/features/workbench/components/markdown-preview-code-block'
 import { MarkdownPreviewImage } from '@/features/workbench/components/markdown-preview-image'
 import { MarkdownPreviewLink } from '@/features/workbench/components/markdown-preview-link'
+import { MarkdownPreviewSource } from '@/features/workbench/components/markdown-preview-source'
 import { MarkdownPreviewContext } from '@/features/workbench/providers/markdown-preview-context'
 import {
   sourceAnchors,
@@ -29,6 +30,7 @@ test('resolves reference images without changing a link sharing their definition
         rootPath: 'repo',
         origin: 'http://example.com',
         openFile: () => {},
+        colorMode: 'dark',
       }}
     >
       <Markdown
@@ -42,6 +44,39 @@ test('resolves reference images without changing a link sharing their definition
   )
   expect(container.querySelector('a')?.getAttribute('href')).toBe('./diagram.png')
 })
+
+test.each(['light', 'dark'] as const)(
+  'loads a <picture> source from the workspace and matches it to the %s app',
+  async (colorMode) => {
+    const { container } = render(
+      <MarkdownPreviewContext
+        value={{
+          documentPath: 'repo/README.md',
+          rootPath: 'repo',
+          origin: 'http://example.com',
+          openFile: () => {},
+          colorMode,
+        }}
+      >
+        <Markdown
+          components={{ img: MarkdownPreviewImage, source: MarkdownPreviewSource }}
+          text={[
+            '<picture>',
+            '  <source media="(prefers-color-scheme: light)" srcset="/docs/light.svg 1x, docs/light@2x.svg 2x">',
+            '  <img alt="logo" src="/docs/dark.svg">',
+            '</picture>',
+          ].join('\n')}
+        />
+      </MarkdownPreviewContext>,
+    )
+    await waitFor(() => expect(container.querySelector('source')).not.toBeNull())
+    const source = container.querySelector('source')
+    expect(source?.getAttribute('srcset')).toBe(
+      'http://example.com/fs/blob?path=repo%2Fdocs%2Flight.svg 1x, http://example.com/fs/blob?path=repo%2Fdocs%2Flight%402x.svg 2x',
+    )
+    expect(source?.getAttribute('media')).toBe(colorMode === 'light' ? 'all' : 'not all')
+  },
+)
 
 test('renders both source endpoints of a standalone fence for scroll sync', () => {
   const { container } = render(
@@ -68,6 +103,7 @@ test('raw HTML workspace images resolve after sanitizing the rendered tree', asy
         rootPath: 'repo',
         origin: 'http://example.com',
         openFile: () => {},
+        colorMode: 'dark',
       }}
     >
       <Markdown
@@ -90,6 +126,7 @@ test('out-of-workspace links and images render without a reachable URL', () => {
         rootPath: 'repo',
         origin: 'http://example.com',
         openFile: () => {},
+        colorMode: 'dark',
       }}
     >
       <Markdown

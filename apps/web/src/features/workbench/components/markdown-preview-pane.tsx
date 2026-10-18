@@ -2,7 +2,6 @@ import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import { useQueryClient } from '@tanstack/react-query'
 import { Markdown, type MarkdownComponents } from '@workspace/markdown/components/markdown'
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
-import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { useCallback, useDeferredValue, useEffect, useRef, useSyncExternalStore } from 'react'
 
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -10,6 +9,7 @@ import { MarkdownPreviewBlock } from '@/features/workbench/components/markdown-p
 import { MarkdownPreviewCodeBlock } from '@/features/workbench/components/markdown-preview-code-block'
 import { MarkdownPreviewImage } from '@/features/workbench/components/markdown-preview-image'
 import { MarkdownPreviewLink } from '@/features/workbench/components/markdown-preview-link'
+import { MarkdownPreviewSource } from '@/features/workbench/components/markdown-preview-source'
 import { MarkdownPreviewContext } from '@/features/workbench/providers/markdown-preview-context'
 import type { MarkdownScrollSync } from '@/features/workbench/state/markdown-scroll-sync'
 import {
@@ -20,11 +20,13 @@ import {
 import { serverEndpoint } from '@/lib/client'
 import { useCodeHighlighter } from '@/lib/code-highlight/hooks/use-code-highlighter'
 import { filesystemPath } from '@/lib/documents/utils/identity'
+import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 
 const PREVIEW_COMPONENTS: MarkdownComponents = {
   a: MarkdownPreviewLink,
   img: MarkdownPreviewImage,
+  source: MarkdownPreviewSource,
   blockquote: MarkdownPreviewBlock,
   h1: MarkdownPreviewBlock,
   h2: MarkdownPreviewBlock,
@@ -61,6 +63,7 @@ export function MarkdownPreviewPane({
   const deferredSnapshot = useDeferredValue(snapshot)
   const text = deferredSnapshot.readRange(0, deferredSnapshot.length)
   const highlighter = useCodeHighlighter()
+  const { colorMode } = useEditorColorTheme()
   const origin = serverEndpoint(originForQueryClient(useQueryClient()))
   const commands = useEditorCommands()
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -70,6 +73,7 @@ export function MarkdownPreviewPane({
     documentPath,
     rootPath,
     openFile: (path: string) => void commands.openFileSurface(filesystemPath(path)),
+    colorMode,
   }
 
   useEffect(
@@ -94,12 +98,9 @@ export function MarkdownPreviewPane({
   return (
     <section
       aria-label='Markdown preview'
-      className='bg-background flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
+      className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
       data-markdown-preview=''
     >
-      <PaneBar>
-        <span className='text-xs font-medium'>Preview</span>
-      </PaneBar>
       <div
         className='app-scrollbar-thin min-h-0 flex-1 overflow-auto px-6 py-4 text-sm leading-6'
         ref={scrollRef}

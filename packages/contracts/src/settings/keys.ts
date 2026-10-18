@@ -446,7 +446,7 @@ export const SETTINGS_REGISTRY = {
     dependsOn: 'editor.history.persist',
   }),
   'editor.markdownView': defineSetting({
-    schema: v.picklist(['source', 'preview'] as const),
+    schema: v.picklist(['source', 'preview', 'rendered'] as const),
     default: 'preview',
     scope: 'window',
   }),
