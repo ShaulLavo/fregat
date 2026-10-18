@@ -4,7 +4,7 @@ import { openFileByName, selectors } from '../selectors'
 import type { Scenario } from './index'
 
 type DragSnapshot = {
-  opacity: string
+  cursor: string | null
   previewCount: number
   groups: number
 }
@@ -20,6 +20,7 @@ export const editorSplitBlur: Scenario = {
     await openFileByName(page, file)
     const result: Inspection = { blur: [], stages: {} }
     inspections.set(page, result)
+    const restingCursor = (await dragSnapshot(page)).cursor
     await page.keyboard.down('Control')
     await startCopyDrag(page)
     await selectors.editorDropPreview(page).waitFor()
@@ -49,8 +50,12 @@ export const editorSplitBlur: Scenario = {
     await page.keyboard.up('Control')
     await selectors.editorGroups(page).nth(1).waitFor()
     result.stages.afterNextDrop = await dragSnapshot(page)
-    strictEqual(result.stages.dragging.opacity, '0.6')
-    strictEqual(result.stages.blurred.opacity, '1', 'window blur released the internal drag sensor')
+    strictEqual(result.stages.dragging.cursor, 'pointer')
+    strictEqual(
+      result.stages.blurred.cursor,
+      restingCursor,
+      'window blur restores the content cursor',
+    )
     strictEqual(result.stages.nextDrag.previewCount, 1, 'following drag can start immediately')
     strictEqual(result.stages.afterNextDrop.groups, 2, 'following drag completes its split')
     await step('following-drag-completed')
@@ -59,11 +64,11 @@ export const editorSplitBlur: Scenario = {
     await page.keyboard.press('Space')
     await page.waitForTimeout(150)
     result.stages.keyboardDragging = await dragSnapshot(page)
-    strictEqual(result.stages.keyboardDragging.opacity, '0.6')
+    strictEqual(result.stages.keyboardDragging.cursor, 'pointer')
     await blurIntoFrame(page)
     await page.waitForTimeout(100)
     result.stages.keyboardBlurred = await dragSnapshot(page)
-    strictEqual(result.stages.keyboardBlurred.opacity, '1', 'blur also cancels the keyboard sensor')
+    strictEqual(result.stages.keyboardBlurred.cursor, restingCursor)
     await selectors.editorBlurProbeFrame(page).evaluate((element) => element.remove())
     await step('keyboard-blur-cancelled')
   },
@@ -84,9 +89,17 @@ async function startCopyDrag(page: Page) {
 }
 
 async function dragSnapshot(page: Page): Promise<DragSnapshot> {
-  const tab = selectors.editorGroupTabs(page, 0).first()
+  const content = await selectors.editorGroupContent(page, 0).boundingBox()
+  ok(content)
+  const cursor = await page.evaluate(
+    ({ x, y }) => {
+      const target = document.elementFromPoint(x, y)
+      return target ? getComputedStyle(target).cursor : null
+    },
+    { x: content.x + content.width / 2, y: content.y + content.height / 2 },
+  )
   return {
-    opacity: await tab.evaluate((element) => getComputedStyle(element).opacity),
+    cursor,
     previewCount: await selectors.editorDropPreview(page).count(),
     groups: await selectors.editorGroups(page).count(),
   }
