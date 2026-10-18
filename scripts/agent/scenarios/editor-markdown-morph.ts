@@ -62,7 +62,12 @@ export const editorMarkdownMorph: Scenario = {
       .locator('.editor-virtualized-row', { hasText: 'Changesets applies the pending' })
       .first()
       .waitFor()
-    await page.waitForTimeout(1000)
+    // A cold first parse can take seconds; the edit has to land on the rendered preview.
+    await page.waitForFunction(
+      () => document.querySelector('.editor-virtualized-row')?.textContent === 'Releasing packages',
+      undefined,
+      { timeout: 30_000 },
+    )
     await step('opened')
     await selectors
       .editorSurface(page)
