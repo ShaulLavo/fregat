@@ -129,6 +129,39 @@ test('loads an external fallback normally when its workspace source is for the o
   expect(container.querySelector('img')?.getAttribute('crossorigin')).toBeNull()
 })
 
+test.each([['a width query', 'media="(min-width: 800px)"']])(
+  'loads an external fallback normally beside a workspace source with %s',
+  async (_, attribute) => {
+    const { container } = render(
+      <MarkdownPreviewContext
+        value={{
+          documentPath: 'repo/README.md',
+          rootPath: 'repo',
+          origin: 'http://example.com',
+          openFile: () => {},
+          colorMode: 'light',
+        }}
+      >
+        <Markdown
+          components={{
+            img: MarkdownPreviewImage,
+            picture: MarkdownPreviewPicture,
+            source: MarkdownPreviewSource,
+          }}
+          text={[
+            '<picture>',
+            `  <source ${attribute} srcset="./photo.heic">`,
+            '  <img alt="photo" src="https://cdn.example/photo.jpg">',
+            '</picture>',
+          ].join('\n')}
+        />
+      </MarkdownPreviewContext>,
+    )
+    await waitFor(() => expect(container.querySelector('img')).not.toBeNull())
+    expect(container.querySelector('img')?.getAttribute('crossorigin')).toBeNull()
+  },
+)
+
 test('loads an external fallback beside a workspace source as a CORS request', async () => {
   const { container } = render(
     <MarkdownPreviewContext

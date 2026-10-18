@@ -396,14 +396,6 @@ export function Editor({
       tabId,
     },
   })
-  // Coming back from under a rendered page, the editor takes the focus the page had.
-  const wasConcealed = useRef(concealed)
-  useEffect(() => {
-    const returning = wasConcealed.current && !concealed
-    wasConcealed.current = concealed
-    if (returning && shown) controller.commands.focus()
-  }, [concealed, controller, shown])
-
   // Manual memo: `selection` is a useEffect dependency, and the compiler's cache is a
   // cache, not an identity guarantee — when it recomputes, the useEffect re-runs.
   const selection = useMemo(

@@ -8,6 +8,7 @@ const SPACE = /\s/u
 
 type PreviewPaths = { readonly documentPath: string; readonly rootPath: string }
 type Preview = PreviewPaths & { readonly colorMode: 'light' | 'dark' }
+// The sanitizer keeps only `srcset` and `media` on a source, so a `type` never reaches the browser.
 type SourceNode = { readonly srcSet: string; readonly media: string | undefined }
 
 /**
@@ -49,9 +50,14 @@ export function MarkdownPreviewPicture({
 }: ComponentProps<'picture'> & { readonly node?: unknown }) {
   const preview = use(MarkdownPreviewContext)
   const chosen = preview
-    ? pictureSources(node).find((source) => applies(source, preview))
+    ? pictureSources(node).find((source) => applies(source, preview) !== false)
     : undefined
-  const workspace = preview && chosen ? loadsFromWorkspace(chosen.srcSet, preview) : false
+  // A source that depends on the screen (a width query) keeps the image's own request mode: an
+  // external fallback without CORS headers would otherwise fail.
+  const workspace =
+    preview && chosen && applies(chosen, preview) === true
+      ? loadsFromWorkspace(chosen.srcSet, preview)
+      : false
   return (
     <MarkdownPictureContext value={workspace}>
       <picture {...props} />
@@ -81,12 +87,12 @@ function loadsFromWorkspace(srcSet: string, preview: PreviewPaths) {
   )
 }
 
-/** Whether the browser would take this source now: its media query matches. */
-function applies(source: SourceNode, preview: Preview) {
+/** Whether the browser takes this source: known for colour-scheme queries, `undefined` otherwise. */
+function applies(source: SourceNode, preview: Preview): boolean | undefined {
   const media = previewMedia(source.media, preview.colorMode)
-  if (!media || media === 'all') return true
   if (media === 'not all') return false
-  return globalThis.matchMedia?.(media).matches ?? true
+  if (media && media !== 'all') return undefined
+  return true
 }
 
 /** Each `<source>` child of a rendered `<picture>` node, in document order. */
