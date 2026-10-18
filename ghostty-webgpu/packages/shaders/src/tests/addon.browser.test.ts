@@ -357,3 +357,44 @@ it('clearly rejects asynchronous worker capture and removes its overlay', async 
   expect(terminal.element?.querySelector('[data-ghostty-shader]')).toBeNull()
   expect(terminal.lifecycle).toBe('open')
 })
+
+it('disposes safely while a WebGPU replacement pipeline is compiling', async () => {
+  const adapter = await navigator.gpu.requestAdapter()
+  if (!adapter) throw new TypeError('Missing test WebGPU adapter')
+  const device = await adapter.requestDevice()
+  cleanups.push(() => device.destroy())
+  const acquireAdapter = vi.spyOn(navigator.gpu, 'requestAdapter').mockResolvedValue(adapter)
+  const acquireDevice = vi.spyOn(adapter, 'requestDevice').mockResolvedValue(device)
+  cleanups.push(() => {
+    acquireAdapter.mockRestore()
+    acquireDevice.mockRestore()
+  })
+  const f = await fixture('canvas2d', copyShader, false, 'webgpu')
+  let entered = () => {}
+  let release = () => {}
+  const started = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  const pending = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  cleanups.push(() => release())
+  const compile = device.createRenderPipelineAsync.bind(device)
+  const compiling = vi
+    .spyOn(device, 'createRenderPipelineAsync')
+    .mockImplementationOnce(async (descriptor) => {
+      const pipeline = await compile(descriptor)
+      entered()
+      await pending
+      return pipeline
+    })
+  cleanups.push(() => compiling.mockRestore())
+  const replacement = f.handle.api.setShader(greenShader)
+  await started
+  f.handle.dispose()
+  release()
+  expect(await replacement).toBe(false)
+  expect(f.canvas.isConnected).toBe(false)
+  expect(f.terminal.lifecycle).toBe('open')
+  expect(f.errors).toEqual([])
+})
