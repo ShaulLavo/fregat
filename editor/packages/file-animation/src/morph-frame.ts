@@ -11,6 +11,8 @@ export type MorphPiece = {
   readonly height: number
   /** Order of its row among the frame's rows, for staggering. */
   readonly row: number
+  /** Whitespace stands between this piece and the one before it on its row. */
+  readonly gapBefore: boolean
   readonly color: string | undefined
   readonly fontStyle: string | undefined
   readonly fontWeight: string | number | undefined
@@ -88,6 +90,7 @@ type RowInput = {
 
 function appendRowPieces(pieces: MorphPiece[], input: RowInput): void {
   let x = 0
+  let gapBefore = false
   for (const match of input.text.matchAll(PIECE)) {
     let segment = match[0]
     let column = match.index
@@ -97,6 +100,7 @@ function appendRowPieces(pieces: MorphPiece[], input: RowInput): void {
       const text = segment.slice(0, length)
       if (WHITESPACE.test(text)) {
         x = advanceWhitespace(x, text, input)
+        gapBefore = true
       } else {
         pieces.push({
           text,
@@ -105,11 +109,13 @@ function appendRowPieces(pieces: MorphPiece[], input: RowInput): void {
           top: input.top,
           height: input.height,
           row: input.row,
+          gapBefore,
           color: style?.color,
           fontStyle: style?.fontStyle,
           fontWeight: style?.fontWeight,
         })
         x += input.measurer.width(text)
+        gapBefore = false
       }
       segment = segment.slice(length)
       column += length

@@ -166,7 +166,7 @@ jobs:
       - name: Test (no browser)
         run: >-
           bun run test -- --concurrency=1
-          --filter=@singapore-editor/decode
+          --filter=@singapore-editor/file-animation
           --filter=@singapore-editor/diff
           --filter=@singapore-editor/gutters
           --filter=@singapore-editor/lsp
@@ -182,7 +182,7 @@ jobs:
         run: >-
           bun run test -- --concurrency=1
           --filter=!@singapore-editor/core
-          --filter=!@singapore-editor/decode
+          --filter=!@singapore-editor/file-animation
           --filter=!@singapore-editor/diff
           --filter=!@singapore-editor/gutters
           --filter=!@singapore-editor/lsp

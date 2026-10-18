@@ -326,6 +326,54 @@ describe('magic move', () => {
     second?.dispose()
   })
 
+  it('keeps a rendered row fading in after an overlay with nothing to draw is done', async () => {
+    const provider = registeredProvider(createFileTransitionPlugin({ mode: 'magicMove' }))
+    const context = { ...viewContext(), hasDocument: () => false }
+    populateRows(context.contentElement, snapshot({ text: 'heading\n' }))
+    // The whole file renders as something other than its source.
+    vi.spyOn(context, 'getInlineReplacementRanges').mockReturnValue([{ start: 0, end: 7 }])
+    const contribution = provider?.createContribution(context)
+    contribution?.update(snapshot({ documentId: 'heading', text: 'heading\n' }), 'document')
+    const fade = rowAnimations().find((entry) => entry.keyframes[0]?.opacity === 0)
+    expect(fade).toBeDefined()
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(fade!.cancel).not.toHaveBeenCalled()
+    contribution?.dispose()
+  })
+
+  it('slides a rendered row across from another editor beside this one', () => {
+    const provider = registeredProvider(createFileTransitionPlugin({ mode: 'magicMove' }))
+    const left = viewContext()
+    vi.spyOn(left.scrollElement, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 0, 400, 400),
+    )
+    document.body.append(left.scrollElement)
+    vi.spyOn(left, 'getInlineReplacementRanges').mockReturnValue([{ start: 0, end: 7 }])
+    const first = provider?.createContribution(left)
+    first?.update(snapshot({ documentId: 'left', text: 'heading\n' }), 'document')
+
+    const right = viewContext()
+    vi.spyOn(right.scrollElement, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(400, 0, 400, 400),
+    )
+    document.body.append(right.scrollElement)
+    vi.spyOn(right, 'getInlineReplacementRanges').mockReturnValue([{ start: 0, end: 7 }])
+    populateRows(right.contentElement, snapshot({ text: 'heading\n' }))
+    recorded = []
+    const second = provider?.createContribution(right)
+    second?.update(snapshot({ documentId: 'right', text: 'heading\n' }), 'document')
+
+    const slide = rowAnimations().find((entry) => entry.keyframes[0]?.translate !== undefined)
+    expect(slide?.keyframes[0]?.translate).toBe('-400px 0px')
+    first?.dispose()
+    second?.dispose()
+    left.scrollElement.remove()
+    right.scrollElement.remove()
+  })
+
   it('brings the first file in when nothing came before it', () => {
     const provider = registeredProvider(createFileTransitionPlugin({ mode: 'magicMove' }))
     const context = { ...viewContext(), hasDocument: () => false }
@@ -517,7 +565,7 @@ describe('createFileEditAnimationPlugin', () => {
 
     const moved = rowAnimations().find((entry) => entry.element.dataset.editorVirtualRow === '1')
     const rowHeight = next.metrics.rowHeight
-    expect(moved?.keyframes).toEqual([{ translate: `0 ${rowHeight}px` }, { translate: '0 0' }])
+    expect(moved?.keyframes).toEqual([{ translate: `0px ${rowHeight}px` }, { translate: '0 0' }])
     const covered = coverAnimations().map((entry) => entry.element.dataset.editorVirtualRow)
     expect(covered).not.toContain('1')
     expect(pieceSpans(context).map((span) => span.textContent)).not.toContain('y')

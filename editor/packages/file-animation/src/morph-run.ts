@@ -10,6 +10,7 @@ const LEAVE_BLUR_PX = 2
 /** Where a piece is on screen right now, which may be part way through an earlier morph. */
 export type VisualPiece = {
   readonly text: string
+  readonly gapBefore: boolean
   readonly x: number
   readonly top: number
   readonly height: number
@@ -245,6 +246,7 @@ export function restingPieces(frame: MorphFrame): VisualPiece[] {
 function visualOf(piece: MorphPiece, span: HTMLElement): Omit<VisualPiece, 'opacity' | 'blur'> {
   return {
     text: piece.text,
+    gapBefore: piece.gapBefore,
     x: piece.x,
     top: piece.top,
     height: piece.height,

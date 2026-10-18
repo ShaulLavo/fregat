@@ -16,7 +16,7 @@ import {
   type VisualPiece,
 } from './morph-run'
 import { drawableRows, reducedMotion, supportsLinearEasing, type TextOffsetRange } from './motion'
-import { RowMoves, rowMoves } from './row-moves'
+import { RowMoves, rowMoves, type ScreenShift } from './row-moves'
 import {
   resolveTransitionOptions,
   type FileTransitionPluginOptions,
@@ -62,7 +62,8 @@ type Handoff = { last: LastFile | null }
 
 /** The file opened last, as its editor shows it now, and where that editor's viewport sat. */
 type LastFile = {
-  readonly owner: FileTransitionViewContribution
+  /** The editor showing it, until that editor goes. */
+  readonly owner: FileTransitionViewContribution | null
   snapshot: EditorViewSnapshot
   replaced: readonly TextOffsetRange[]
   viewport: ScreenPoint
@@ -130,6 +131,10 @@ class FileTransitionViewContribution implements EditorViewContribution {
 
   public dispose(): void {
     this.finish()
+    // The file stays the one to move from, but this editor and its view are let go.
+    const last = this.handoff.last
+    if (last?.owner !== this) return
+    this.handoff.last = { ...last, owner: null, viewport: this.viewportOrigin() ?? last.viewport }
   }
 
   /** Where this editor's viewport sits on screen, while it is on screen. */
@@ -141,6 +146,8 @@ class FileTransitionViewContribution implements EditorViewContribution {
   }
 
   private remember(snapshot: EditorViewSnapshot): void {
+    // Only a magic move starts from the previous file; the reveals keep nothing.
+    if (this.options.mode !== 'magicMove') return
     this.handoff.last = {
       owner: this,
       snapshot,
@@ -204,7 +211,7 @@ class FileTransitionViewContribution implements EditorViewContribution {
     const real = new Set(Array.from(snapshot.visibleRows, (row) => row.index))
     for (const index of drawn) real.delete(index)
     const shift = previous ? this.screenShift(previous, snapshot) : { dx: 0, dy: 0 }
-    const { moves, taken } = rowMoves(previous?.snapshot ?? null, snapshot, real, shift.dy)
+    const { moves, taken } = rowMoves(previous?.snapshot ?? null, snapshot, real, shift)
     const rows = this.cover.collect(snapshot, drawn)
     const measurer = this.ensureMeasurer(snapshot, rows[0]?.presentation.element)
     const next = buildFrame(snapshot, measurer, MAX_PIECES, this.options.maxRows, (row) =>
@@ -231,8 +238,10 @@ class FileTransitionViewContribution implements EditorViewContribution {
     this.runFrame = next
     this.runSnapshot = snapshot
     this.runRows = drawn
+    // Rendered rows keep moving on their own after the overlay is done, which an overlay with no
+    // pieces is at once.
     this.run = new MorphRun(this.context.contentElement, next, from, pairs, timing, () =>
-      this.finish(),
+      this.settleOverlay(),
     )
     this.moves = new RowMoves(this.context, moves, timing)
     this.context.scrollElement.classList.add(ACTIVE_CLASS)
@@ -245,7 +254,7 @@ class FileTransitionViewContribution implements EditorViewContribution {
    * viewports may be different editors, and each file has its own scroll and gutter.
    */
   private screenShift(previous: LastFile, snapshot: EditorViewSnapshot) {
-    const before = previous.owner.viewportOrigin() ?? previous.viewport
+    const before = previous.owner?.viewportOrigin() ?? previous.viewport
     const now = this.viewportOrigin() ?? before
     const old = previous.snapshot
     return {
@@ -265,7 +274,7 @@ class FileTransitionViewContribution implements EditorViewContribution {
     previous: LastFile,
     measurer: TextMeasurer,
     moving: ReadonlySet<number>,
-    shift: { readonly dx: number; readonly dy: number },
+    shift: ScreenShift,
   ): VisualPiece[] | null {
     const drawn = drawableRows(previous.snapshot, previous.replaced)
     const frame = buildFrame(
@@ -284,13 +293,17 @@ class FileTransitionViewContribution implements EditorViewContribution {
   }
 
   private finish(): void {
+    this.moves?.cancel()
+    this.moves = null
+    this.settleOverlay()
+  }
+
+  private settleOverlay(): void {
     this.removeInputListeners()
     this.context.scrollElement.classList.remove(ACTIVE_CLASS)
     this.cover.showAll()
     this.run?.cancel()
     this.run = null
-    this.moves?.cancel()
-    this.moves = null
     this.runFrame = null
     this.runSnapshot = null
     this.runRows = undefined

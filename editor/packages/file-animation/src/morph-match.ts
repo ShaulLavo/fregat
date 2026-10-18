@@ -4,14 +4,15 @@ const WORD = /^[\p{L}\p{N}_$]{2,}$/u
 // pass pairs pieces. A full-viewport rewrite of ~1,500 pieces each side fits.
 const MAX_TABLE_CELLS = 2_500_000
 
-/** What matching reads of a piece: its text and the top of the line it sits on. */
+/** What matching reads of a piece: its text, the top of the line it sits on, and any gap before it. */
 export type MatchPiece = {
   readonly text: string
   readonly top: number
+  readonly gapBefore?: boolean
 }
 
 type Line = {
-  /** The line's text without whitespace, the same however highlighting split it into pieces. */
+  /** The line's text with one space for each gap, the same however highlighting split it. */
   readonly key: string
   readonly pieces: readonly number[]
   /** Where each piece starts in `key`. */
@@ -62,8 +63,10 @@ function linesOf(pieces: readonly MatchPiece[]): Line[] {
     const starts: number[] = []
     let key = ''
     for (const index of indices) {
+      const piece = pieces[index]
+      if (piece?.gapBefore && key.length > 0) key += ' '
       starts.push(key.length)
-      key += pieces[index]?.text ?? ''
+      key += piece?.text ?? ''
     }
     return {
       key,
