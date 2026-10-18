@@ -74,6 +74,15 @@ export type ProductionResourceTiming = {
   readonly decodedBodySize: number
 }
 
+export type ProductionResourceControlWindow = {
+  readonly cycles: number
+  readonly elapsedMs: number
+  readonly jsHeapUsedBeforeBytes: number | null
+  readonly jsHeapUsedAfterBytes: number | null
+  readonly backingStorageBeforeBytes: number | null
+  readonly backingStorageAfterBytes: number | null
+}
+
 export type ProductionResourceWindow = {
   readonly cycles: number
   readonly elapsedMs: number
@@ -147,7 +156,7 @@ type MarkdownProductionApi = {
   ) => Promise<ProductionTimingReceipt>
   readonly show: (source: string, live: boolean) => Promise<ProductionMarkdownFrame>
   readonly resources: (
-    source: string,
+    source: string | null,
     windows: readonly number[],
     simultaneousMessages?: number,
   ) => Promise<readonly ProductionResourceWindow[]>

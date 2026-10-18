@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 
 import type {
   ProductionMarkdownReceipt,
+  ProductionResourceControlWindow,
   ProductionResourceWindow,
   ProductionTimelineReceipt,
   ProductionTimingReceipt,
@@ -10,7 +11,12 @@ import { percentile } from './bench-types'
 import { pairedConfidence } from './paired-native'
 import frozenBudget from './promotion-budget.json'
 import { BENCHMARK_FAMILIES } from './workloads'
-import type { ProductionCpuMetrics, ProductionNetworkRequest } from './production-cdp'
+import { isSustainedProductStream } from './production-cdp'
+import type {
+  ProductionCpuMetrics,
+  ProductionNetworkRequest,
+  ProductionWorkerCpu,
+} from './production-cdp'
 import type { ProductionWorkload } from './production-workloads'
 
 export type ProductionTrial = {
@@ -51,8 +57,11 @@ export type ProductionTrial = {
     readonly active: number
   } | null
   readonly network: readonly ProductionNetworkRequest[] | null
+  readonly streamMainThreadCpuMs: number | null
+  readonly workerCpu: readonly ProductionWorkerCpu[] | null
   readonly timeline: ProductionTimelineReceipt | null
   readonly resourceWindows: readonly ProductionResourceWindow[] | null
+  readonly resourceControlWindows: readonly ProductionResourceControlWindow[] | null
 }
 
 export function productionPairFindings(
@@ -238,10 +247,30 @@ function trialMetric(
           trial.receipt.frames.map((frame) => frame.painted - frame.received),
           0.95,
         )
-  if (!trial.cpu || !trial.workers || trial.workers.created > 0) return null
-  const { before, after } = trial.cpu
-  if (before.mainThreadTaskCpuMs === null || after.mainThreadTaskCpuMs === null) return null
-  return after.mainThreadTaskCpuMs - before.mainThreadTaskCpuMs
+  if (!trial.workers || trial.workerCpu === null) return null
+  if (
+    trial.workerCpu.length !== trial.workers.created ||
+    trial.workers.active > trial.workers.created
+  )
+    return null
+  if (
+    trial.streamMainThreadCpuMs === null ||
+    !Number.isFinite(trial.streamMainThreadCpuMs) ||
+    trial.streamMainThreadCpuMs < 0
+  )
+    return null
+  if (
+    trial.workerCpu.some(
+      (worker) =>
+        worker.measurement !== 'complete' ||
+        worker.cpuMs === null ||
+        !Number.isFinite(worker.cpuMs) ||
+        worker.cpuMs < 0,
+    )
+  )
+    return null
+  const workerCpuMs = trial.workerCpu.reduce((sum, worker) => sum + (worker.cpuMs ?? 0), 0)
+  return trial.streamMainThreadCpuMs + workerCpuMs
 }
 
 export function ordinaryProductionFindings(
@@ -316,42 +345,124 @@ export function productionFamilyCoverage(
   })
 }
 
-export function productionResourcePlateau(windows: readonly ProductionResourceWindow[] | null) {
+export const PRODUCTION_RESOURCE_SCHEDULE = {
+  id: 'fixed-settle-2-tail-4-v1',
+  settlingBatches: 2,
+  tailBatches: 4,
+  simultaneousMessages: 4,
+} as const
+
+export function productionResourcePlateau(
+  windows: readonly ProductionResourceWindow[] | null,
+  controls: readonly ProductionResourceControlWindow[] | null = null,
+  wasmRequired = true,
+) {
+  const schedule = PRODUCTION_RESOURCE_SCHEDULE
+  const required = schedule.settlingBatches + schedule.tailBatches
   if (!windows || windows.length < 4)
-    return {
-      status: 'INCONCLUSIVE',
-      reason: 'Four disposed-message batches were not observed.',
-    }
-  const tail = windows.slice(1)
-  const live = tail.map((window) => window.jsHeapUsedAfterBytes)
-  const backing = tail.map((window) => window.backingStorageAfterBytes)
-  const reserved = windows.map((window) => window.peakWasmReservedBytes)
-  const hasGrowth = (values: readonly (number | null)[]) =>
-    values.every((value, index) => {
-      if (index === 0) return true
-      const previous = values[index - 1]
-      return value !== null && previous !== null && value > previous
-    })
+    return { status: 'INCONCLUSIVE', reason: 'Four disposed-message batches were not observed.' }
   const retained = windows.some(
     (window) =>
       window.retainedMessageNodes > 0 || window.queryObserversAfter > window.queryObserversBefore,
   )
-  const observedGrowth = hasGrowth(live) || hasGrowth(backing) || retained
-  const firstPeak = reserved[0]
+  const live = windows.map((window) => window.jsHeapUsedAfterBytes)
+  const backing = windows.map((window) => window.backingStorageAfterBytes)
+  const monotonicGrowth = strictlyGrowing(live.slice(-4)) || strictlyGrowing(backing.slice(-4))
+  const peaks = windows.map((window) => window.peakWasmReservedBytes)
+  const nativeGrowth = wasmRequired && strictlyGrowing(peaks.slice(-4))
+  const failed = retained || monotonicGrowth || nativeGrowth
+  if (failed)
+    return {
+      status: 'NOT VERIFIED',
+      reason: 'Retained nodes, observers, or monotonic post-GC live/native growth was observed.',
+      live,
+      backing,
+      peaks,
+    }
+  if (windows.length !== required || controls?.length !== required)
+    return {
+      status: 'INCONCLUSIVE',
+      reason: 'The fixed settling/tail schedule and matching no-op control were not completed.',
+      schedule,
+      live,
+      backing,
+      peaks,
+    }
+  const tail = windows.slice(schedule.settlingBatches)
+  const controlTail = controls.slice(schedule.settlingBatches)
+  const observations = tail
+    .flatMap((window) => [window.jsHeapUsedAfterBytes, window.backingStorageAfterBytes])
+    .concat(
+      controlTail.flatMap((window) => [
+        window.jsHeapUsedAfterBytes,
+        window.backingStorageAfterBytes,
+      ]),
+    )
+  if (observations.some((value) => value === null || !Number.isFinite(value)))
+    return {
+      status: 'INCONCLUSIVE',
+      reason: 'A required post-GC live/backing observation is unavailable.',
+      schedule,
+      live,
+      backing,
+      peaks,
+    }
+  const plateau =
+    allEqual(tail.map((window) => window.jsHeapUsedAfterBytes)) &&
+    allEqual(tail.map((window) => window.backingStorageAfterBytes)) &&
+    tail.every((window) => window.queryObserversAfter === tail[0].queryObserversAfter)
+  const controlPlateau =
+    allEqual(controlTail.map((window) => window.jsHeapUsedAfterBytes)) &&
+    allEqual(controlTail.map((window) => window.backingStorageAfterBytes))
   const wasmReuse =
-    firstPeak !== null && firstPeak !== undefined && reserved.every((value) => value !== null)
-      ? reserved.slice(1).every((value) => value !== null && value <= firstPeak)
-      : null
+    !wasmRequired ||
+    (tail.every(
+      (window) => window.peakWasmReservedBytes !== null && window.peakWasmReservedBytes > 0,
+    ) &&
+      allEqual(tail.map((window) => window.peakWasmReservedBytes)))
+  const scheduleValid =
+    windows.every(
+      (window) =>
+        Number.isInteger(window.cycles) &&
+        window.cycles > 0 &&
+        window.cycles === windows[0].cycles &&
+        window.simultaneousMessages === schedule.simultaneousMessages &&
+        window.peakMessageNodes === schedule.simultaneousMessages,
+    ) && controls.every((window) => window.cycles === windows[0].cycles)
+  const observedPlateau = plateau && controlPlateau && wasmReuse && scheduleValid
   return {
-    status: observedGrowth || wasmReuse === false ? 'NOT VERIFIED' : 'INCONCLUSIVE',
+    status: observedPlateau ? 'OBSERVED_PLATEAU' : 'INCONCLUSIVE',
+    schedule,
     jsLiveAfterGcBytes: live,
     backingStorageAfterGcBytes: backing,
-    wasmReservationPeakBytes: reserved,
-    observedPersistentGrowth: observedGrowth,
-    observedWasmHighWaterReuse: wasmReuse,
+    wasmReservationPeakBytes: peaks,
+    controlJsLiveAfterGcBytes: controls.map((window) => window.jsHeapUsedAfterBytes),
+    observedPersistentGrowth: observedPlateau ? false : null,
+    observedWasmHighWaterReuse: wasmRequired ? wasmReuse : null,
     reason:
-      'Reservations and post-GC live bytes are separate observations. Four windows do not by themselves establish that every reachable cache has plateaued.',
+      'A passing bounded observation requires four exactly stable post-GC live/backing windows after two settling batches, unchanged observers, repeated peak reservation reuse and a stable no-op control. No control subtraction or heap tolerance is applied. This does not certify unobserved future lifetimes.',
   }
+}
+
+function allEqual(values: readonly (number | null)[]) {
+  const first = values[0]
+  return (
+    first !== undefined &&
+    first !== null &&
+    Number.isFinite(first) &&
+    values.every((value) => value === first)
+  )
+}
+
+function strictlyGrowing(values: readonly (number | null)[]) {
+  return (
+    values.length >= 4 &&
+    values.every((value, index) => {
+      const previous = values[index - 1]
+      if (index === 0) return value !== null && Number.isFinite(value)
+      return value !== null && previous !== null && value > previous
+    })
+  )
 }
 
 export function productionTrialSummary(trial: ProductionTrial) {
@@ -375,7 +486,7 @@ export function productionTrialSummary(trial: ProductionTrial) {
     heldSyntaxReleaseMs: trial.receipt.heldSyntax
       ? trial.receipt.heldSyntax.released.painted - trial.receipt.heldSyntax.released.received
       : null,
-    streamMainThreadCpuMs: trialMetric(trial, 'streamCpu'),
+    streamCombinedCpuMs: trialMetric(trial, 'streamCpu'),
     transferred: payloadSummary(trial.network),
   }
 }
@@ -393,9 +504,16 @@ function distribution(values: readonly number[]) {
 function payloadSummary(network: readonly ProductionNetworkRequest[] | null) {
   if (network === null) return null
   return (['host', 'grammar', 'resolver', 'javascript', 'other'] as const).map((kind) => {
-    const requests = network.filter((request) => request.kind === kind)
+    const requests = network.filter(
+      (request) =>
+        request.kind === kind &&
+        request.resolvedByWorkerRequestId === null &&
+        !isSustainedProductStream(request),
+    )
     const missing = requests.filter(
-      (request) => request.transferredBytes === null || request.failure !== null,
+      (request) =>
+        (request.transferredBytes === null && request.resolvedByWorkerRequestId === null) ||
+        request.failure !== null,
     )
     return {
       kind,

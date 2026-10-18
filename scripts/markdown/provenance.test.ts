@@ -12,12 +12,15 @@ const fixtureFiles = [
   'packages/markdown/src/candidate.ts',
   'packages/markdown/test/control.json',
   'apps/web/src/features/chat/components/control.tsx',
+  'apps/web/src/features/chat/providers/control.tsx',
+  'apps/web/src/features/chat/state/control.ts',
   'apps/web/src/features/chat/utils/control.ts',
   'apps/web/src/features/chat/tests/control.ts',
   'scripts/markdown/control.ts',
   'apps/web/test/providers.tsx',
   'apps/web/test/factories/markdown-browser.tsx',
   'apps/web/test/factories/markdown-observation.ts',
+  'apps/web/test/factories/markdown-production-assets.ts',
   'apps/web/test/factories/markdown-production-types.ts',
   'apps/web/test/factories/markdown-production.tsx',
   'apps/web/test/factories/markdown-timeline-scene.tsx',
@@ -41,10 +44,18 @@ test('candidate source identity includes the production probe and its shared pro
         before.sources.some((entry) => entry.file === file),
         file,
       ).toBe(true)
-    await writeFile(path.join(root, 'apps/web/test/providers.tsx'), 'changed provider\n')
-    const after = await qualificationProvenance(root)
-    expect(after.revision).toBe(before.revision)
-    expect(after.sourceClosureSha256).not.toBe(before.sourceClosureSha256)
+    for (const file of [
+      'apps/web/test/providers.tsx',
+      'apps/web/src/features/chat/providers/control.tsx',
+      'apps/web/src/features/chat/state/control.ts',
+      'apps/web/test/factories/markdown-production-assets.ts',
+    ]) {
+      const current = await qualificationProvenance(root)
+      await writeFile(path.join(root, file), 'changed provider\n')
+      const after = await qualificationProvenance(root)
+      expect(after.revision).toBe(before.revision)
+      expect(after.sourceClosureSha256).not.toBe(current.sourceClosureSha256)
+    }
   } finally {
     await rm(root, { recursive: true, force: true })
   }

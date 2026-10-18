@@ -32,8 +32,11 @@ export function ProductionMarkdownTimeline({
         revertToCheckpoint={rejectAction}
       >
         <ChatProviderSignInProvider>
-          <section className='flex h-dvh min-h-0 flex-col' data-markdown-production-timeline='true'>
-            <div className='min-h-0 flex-1'>
+          <section
+            className='flex h-full min-h-0 flex-col'
+            data-markdown-production-timeline='true'
+          >
+            <div className='flex min-h-0 flex-1 flex-col'>
               <MessagesTimeline optimisticMessages={[]} session={session} />
             </div>
             <ChatComposerModesProvider

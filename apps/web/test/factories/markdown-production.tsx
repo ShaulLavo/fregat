@@ -1,7 +1,7 @@
 import { MarkdownSessionContext } from '@workspace/markdown/providers/session-context'
 import type { MarkdownSessionFactory } from '@workspace/markdown/utils/session'
 import { loadMarkdownExtension } from '@workspace/markdown/state/extensions'
-import { completedCodePrefix } from '@workspace/markdown/utils/highlight'
+import { highlightingService } from '@/lib/highlighting/state/service'
 import type { MarkdownBlock } from '@workspace/markdown/utils/blocks'
 import { useLayoutEffect } from 'react'
 import { flushSync } from 'react-dom'
@@ -126,6 +126,7 @@ export function createProductionMarkdownProbe({
     timeline = null
     simultaneousMessages = 1
     const started = performance.now()
+    performance.mark('markdown-stream-start')
     const samples = await Promise.all(
       updates.map((text, index) =>
         scheduledUpdate({
@@ -150,6 +151,7 @@ export function createProductionMarkdownProbe({
     if (!final) throw createClientInvariantError('Production timing recorded no final paint')
     const fullyReady = await waitForReady()
     const fullyReadyOutput = await readOutput()
+    performance.mark('markdown-stream-end')
     const ended = performance.now()
     performance.mark('markdown-timing-end')
     const heldSyntax = options.heldSyntax ? await measureHeldSyntax(options.heldSyntax) : null
@@ -230,7 +232,9 @@ export function createProductionMarkdownProbe({
       ),
     )
     const deadline = performance.now() + 15_000
-    while (!renderersReady(container, required)) {
+    while (true) {
+      await highlightingService().awaitIdle()
+      if (renderersReady(container, required)) break
       if (performance.now() >= deadline)
         throw createClientInvariantError('Required Markdown renderer did not become ready')
       await paintedFrame()
@@ -247,7 +251,7 @@ export function createProductionMarkdownProbe({
   }
 
   async function resources(
-    source: string,
+    source: string | null,
     windows: readonly number[],
     concurrentMessages = 1,
   ): Promise<readonly ProductionResourceWindow[]> {
@@ -340,7 +344,7 @@ export function createProductionMarkdownProbe({
     }
   }
 
-  async function resourceCycle(source: string, count: number) {
+  async function resourceCycle(source: string | null, count: number) {
     documentId += 1
     simultaneousMessages = count
     await update(source, true)
@@ -545,12 +549,10 @@ function renderersReady(container: HTMLElement, required: RequiredRenderers) {
     bodies.length > 0 &&
     Array.from(bodies).every((body) => {
       const language = body.closest('[data-language]')?.getAttribute('data-language')
-      if (language !== 'ts' && language !== 'typescript') return true
-      const text = body.textContent ?? ''
-      const highlightable = body.closest('[data-incomplete]')
-        ? completedCodePrefix(text).highlightable
-        : text
-      return highlightable.length === 0 || body.querySelector('span') !== null
+      if (!language || body.textContent?.length === 0) return true
+      if (body.closest('[data-incomplete]')?.getAttribute('data-incomplete') === 'true') return true
+      if (highlightingService().grammarFor(language) === null) return true
+      return body.querySelector('span[style]') !== null
     })
   )
 }
