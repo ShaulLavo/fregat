@@ -60,11 +60,25 @@ export function createFileTransitionPlugin(
 
 type Handoff = { last: LastFile | null }
 
+/**
+ * What a magic move reads of the previous file. Only these fields are kept: a whole snapshot would
+ * hold its document session alive for as long as the plugin exists.
+ */
+type FileFrame = Pick<
+  EditorViewSnapshot,
+  'documentId' | 'visibleRows' | 'tokens' | 'gutterWidth' | 'viewport'
+>
+
+function fileFrame(snapshot: EditorViewSnapshot): FileFrame {
+  const { documentId, visibleRows, tokens, gutterWidth, viewport } = snapshot
+  return { documentId, visibleRows, tokens, gutterWidth, viewport }
+}
+
 /** The file opened last, as its editor shows it now, and where that editor's viewport sat. */
 type LastFile = {
   /** The editor showing it, until that editor goes. */
   readonly owner: FileTransitionViewContribution | null
-  snapshot: EditorViewSnapshot
+  snapshot: FileFrame
   replaced: readonly TextOffsetRange[]
   viewport: ScreenPoint
 }
@@ -110,7 +124,7 @@ class FileTransitionViewContribution implements EditorViewContribution {
     // A tab switch clears the old editor first; the file it showed is still the one to move from.
     const last = this.handoff.last
     if (last?.owner === this && snapshot.documentId === last.snapshot.documentId) {
-      last.snapshot = snapshot
+      last.snapshot = fileFrame(snapshot)
       last.replaced = this.latestReplaced
     }
     const started = this.runSnapshot
@@ -150,7 +164,7 @@ class FileTransitionViewContribution implements EditorViewContribution {
     if (this.options.mode !== 'magicMove') return
     this.handoff.last = {
       owner: this,
-      snapshot,
+      snapshot: fileFrame(snapshot),
       replaced: this.latestReplaced,
       viewport: this.viewportOrigin() ?? { left: 0, top: 0 },
     }

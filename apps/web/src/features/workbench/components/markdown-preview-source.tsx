@@ -52,12 +52,13 @@ export function MarkdownPreviewPicture({
   const chosen = preview
     ? pictureSources(node).find((source) => applies(source, preview) !== false)
     : undefined
-  // A source that depends on the screen (a width query) keeps the image's own request mode: an
-  // external fallback without CORS headers would otherwise fail.
+  // The chosen source decides the request mode; with none, the image's own `src` does. A source
+  // that depends on the screen (a width query) asks for no CORS: an external image without CORS
+  // headers would otherwise fail.
   const workspace =
-    preview && chosen && applies(chosen, preview) === true
-      ? loadsFromWorkspace(chosen.srcSet, preview)
-      : false
+    preview && chosen
+      ? applies(chosen, preview) === true && loadsFromWorkspace(chosen.srcSet, preview)
+      : null
   return (
     <MarkdownPictureContext value={workspace}>
       <picture {...props} />

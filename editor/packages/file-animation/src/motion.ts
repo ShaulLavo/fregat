@@ -20,7 +20,7 @@ export function supportsLinearEasing(context: EditorViewContributionContext): bo
 
 /** Rows painted as their own source text, which the overlay can redraw. */
 export function drawableRows(
-  snapshot: EditorViewSnapshot,
+  snapshot: Pick<EditorViewSnapshot, 'visibleRows'>,
   replaced: readonly TextOffsetRange[],
 ): Set<number> {
   const rows = new Set<number>()
