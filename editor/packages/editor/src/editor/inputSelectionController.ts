@@ -470,6 +470,8 @@ export class InputSelectionController {
    */
   /** Set by {@link applyTypedText}, delivered by {@link applyChange} once the edit has landed. */
   private pendingTypedText: string | null = null
+  /** Set by the keyboard text paths, delivered by {@link applyChange} as the change's `typing`. */
+  private pendingKeyboardEdit = false
 
   private applyTypedText(session: DocumentSession, text: string): DocumentSessionChange {
     this.pendingTypedText = text
@@ -1174,6 +1176,8 @@ export class InputSelectionController {
     if (!this.options.canEditDocument()) return false
 
     const start = context.event ? eventStartMs(context.event) : nowMs()
+    // Deleting at carets is typing; deleting a selection takes a block of text away.
+    const atCarets = selectionsCollapsed(session)
     const selectionChange = this.selectionChangeBeforeEdit()
     const change =
       this.atomicDelete(session, direction) ??
@@ -1182,6 +1186,7 @@ export class InputSelectionController {
           this.mirrorBackspaceDelete(session) ??
           session.backspace(this.options.tabSize))
         : (this.mirrorSelectionDelete(session) ?? session.deleteSelection()))
+    this.pendingKeyboardEdit = atCarets
     this.applyChange(
       mergeChangeTimings(change, selectionChange),
       direction === 'backward' ? 'input.backspace' : 'input.delete',
@@ -1771,11 +1776,14 @@ export class InputSelectionController {
       options === undefined && change.edits.length > 0
         ? { revealOffset: this.primarySelectionHeadOffset(change) }
         : options
+    const sessionOptions = selectionRevealOptions(change, revealOptions)
+    const typing = this.pendingKeyboardEdit
+    this.pendingKeyboardEdit = false
     this.options.applySessionChange(
       change,
       totalName,
       totalStart,
-      selectionRevealOptions(change, revealOptions),
+      typing ? { ...sessionOptions, typing } : sessionOptions,
     )
 
     // After the edit, so a listener that asks for the document sees the typed character in it.
@@ -2993,6 +3001,7 @@ export class InputSelectionController {
     )
     event.preventDefault()
     this.transitionInputState({ text: inserted, type: 'beforeinput-pending' })
+    this.pendingKeyboardEdit = true
     // Only a plain typed character can auto-close; insertLineBreak also yields a 1-character
     // string, and composition results must never be rewritten.
     const textChange = measureEditorPerformance('session.applyText', () =>
@@ -3425,6 +3434,7 @@ export class InputSelectionController {
     if (!session) return
     if (!this.canTypeText()) return
 
+    this.pendingKeyboardEdit = true
     const selectionChange = measureEditorPerformance('input.selectionChangeBeforeEdit', () =>
       this.selectionChangeBeforeEdit(),
     )
@@ -3450,6 +3460,7 @@ export class InputSelectionController {
     start: number,
   ): void {
     this.transitionInputState({ text: deduced.text, type: 'deduced-input-pending' })
+    this.pendingKeyboardEdit = true
     const selectionChange = measureEditorPerformance('input.selectionChangeBeforeEdit', () =>
       this.selectionChangeBeforeEdit(),
     )
@@ -3536,6 +3547,7 @@ export class InputSelectionController {
     if (!this.canTypeText()) return
 
     this.transitionInputState({ text, type: 'composition-pending' })
+    this.pendingKeyboardEdit = true
     const selectionChange = this.selectionChangeBeforeEdit()
     const edit = textUpdateEdit(written, { text, rangeStart: range.start, rangeEnd: range.end })
     const textChange = this.replaceAroundSelections(session, edit)
@@ -3550,6 +3562,7 @@ export class InputSelectionController {
     if (text.length === 0) return
 
     this.transitionInputState({ text, type: 'composition-pending' })
+    this.pendingKeyboardEdit = true
     const selectionChange = measureEditorPerformance('input.selectionChangeBeforeEdit', () =>
       this.selectionChangeBeforeEdit(),
     )
@@ -4084,6 +4097,14 @@ function columnSelectionRowDelta(command: EditorCommandId, pageRows: number): nu
   if (command === 'cursorColumnSelectDown') return 1
   if (command === 'cursorColumnSelectPageUp') return -pageRows
   return pageRows
+}
+
+function selectionsCollapsed(session: DocumentSession): boolean {
+  const snapshot = session.getSnapshot()
+  return session.getSelections().selections.every((selection) => {
+    const resolved = resolveSelection(snapshot, selection)
+    return resolved.startOffset === resolved.endOffset
+  })
 }
 
 function selectionRevealOptions(

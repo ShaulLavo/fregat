@@ -23,7 +23,7 @@
     "@singapore-editor/core#typecheck": {
       "dependsOn": [
         "build",
-        "@singapore-editor/decode#build",
+        "@singapore-editor/file-animation#build",
         "@singapore-editor/diff#build",
         "@singapore-editor/find#build",
         "@singapore-editor/gutters#build",
@@ -125,6 +125,14 @@
       "dependsOn": ["^build", "build"],
       "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"]
+    },
+    "@singapore-editor/tree-sitter#test:memory:browser": {
+      "dependsOn": [
+        "^build",
+        "build",
+        "@singapore-editor/markdown#build",
+        "@singapore-editor/tree-sitter-languages#build"
+      ]
     },
     "@singapore-editor/tree-sitter#test:browser": {
       "dependsOn": [

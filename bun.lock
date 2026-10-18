@@ -155,8 +155,8 @@
         "@phosphor-icons/react": "^2.1.10",
         "@singapore-editor/collaboration": "workspace:*",
         "@singapore-editor/core": "workspace:*",
-        "@singapore-editor/decode": "workspace:*",
         "@singapore-editor/diff": "workspace:*",
+        "@singapore-editor/file-animation": "workspace:*",
         "@singapore-editor/find": "workspace:*",
         "@singapore-editor/gutters": "workspace:*",
         "@singapore-editor/highlighting": "workspace:*",
@@ -279,7 +279,7 @@
       "name": "@singapore-editor/stress",
       "dependencies": {
         "@singapore-editor/core": "workspace:*",
-        "@singapore-editor/decode": "workspace:*",
+        "@singapore-editor/file-animation": "workspace:*",
         "@singapore-editor/find": "workspace:*",
         "@singapore-editor/gutters": "workspace:*",
         "@singapore-editor/lsp": "workspace:*",
@@ -339,20 +339,6 @@
         "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#aab7db1518c19f61c1b13ec3f832b881cf5f1385",
       },
     },
-    "editor/packages/decode": {
-      "name": "@singapore-editor/decode",
-      "version": "0.2.9",
-      "dependencies": {
-        "@singapore-editor/core": "workspace:*",
-      },
-      "devDependencies": {
-        "happy-dom": "^20.14.5",
-        "oxfmt": "0.70.0",
-        "oxlint": "1.85.0",
-        "typescript": "7.0.2",
-        "vitest": "5.0.2",
-      },
-    },
     "editor/packages/diff": {
       "name": "@singapore-editor/diff",
       "version": "0.2.9",
@@ -392,6 +378,20 @@
         "typescript": "7.0.2",
         "typescript-api": "npm:typescript@6.0.3",
         "vite": "8.3.1",
+        "vitest": "5.0.2",
+      },
+    },
+    "editor/packages/file-animation": {
+      "name": "@singapore-editor/file-animation",
+      "version": "0.2.9",
+      "dependencies": {
+        "@singapore-editor/core": "workspace:*",
+      },
+      "devDependencies": {
+        "happy-dom": "^20.14.5",
+        "oxfmt": "0.70.0",
+        "oxlint": "1.85.0",
+        "typescript": "7.0.2",
         "vitest": "5.0.2",
       },
     },
@@ -761,8 +761,8 @@
       "dependencies": {
         "@singapore-editor/collab": "workspace:*",
         "@singapore-editor/core": "workspace:*",
-        "@singapore-editor/decode": "workspace:*",
         "@singapore-editor/diff": "workspace:*",
+        "@singapore-editor/file-animation": "workspace:*",
         "@singapore-editor/find": "workspace:*",
         "@singapore-editor/gutters": "workspace:*",
         "@singapore-editor/highlighting": "workspace:*",
@@ -864,6 +864,20 @@
       "optionalPeers": [
         "ghostty-webgpu",
       ],
+    },
+    "ghostty-webgpu/packages/shaders": {
+      "name": "ghostty-webgpu-shaders",
+      "version": "0.0.1",
+      "devDependencies": {
+        "@webgpu/types": "0.1.74",
+        "oxfmt": "0.70.0",
+        "oxlint": "1.85.0",
+        "typescript": "7.0.2",
+        "vitest": "5.0.2",
+      },
+      "peerDependencies": {
+        "ghostty-webgpu": "^0.3.24",
+      },
     },
     "ghostty-webgpu/site": {
       "name": "ghostty-webgpu-site",
@@ -2104,11 +2118,11 @@
 
     "@singapore-editor/core": ["@singapore-editor/core@workspace:editor/packages/editor"],
 
-    "@singapore-editor/decode": ["@singapore-editor/decode@workspace:editor/packages/decode"],
-
     "@singapore-editor/diff": ["@singapore-editor/diff@workspace:editor/packages/diff"],
 
     "@singapore-editor/example-app": ["@singapore-editor/example-app@workspace:editor/examples/app"],
+
+    "@singapore-editor/file-animation": ["@singapore-editor/file-animation@workspace:editor/packages/file-animation"],
 
     "@singapore-editor/find": ["@singapore-editor/find@workspace:editor/packages/find"],
 
@@ -2969,6 +2983,8 @@
     "ghostty-webgpu-demo": ["ghostty-webgpu-demo@workspace:ghostty-webgpu/demo"],
 
     "ghostty-webgpu-line-editor": ["ghostty-webgpu-line-editor@workspace:ghostty-webgpu/packages/line-editor"],
+
+    "ghostty-webgpu-shaders": ["ghostty-webgpu-shaders@workspace:ghostty-webgpu/packages/shaders"],
 
     "ghostty-webgpu-site": ["ghostty-webgpu-site@workspace:ghostty-webgpu/site"],
 

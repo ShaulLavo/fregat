@@ -13,9 +13,11 @@ import {
   inlinePointToBufferPoint,
   inlineReplacementsForBufferRow,
   inlineRowForBufferRow,
+  inlineSpecsAfterRewrite,
   revealInlineMap,
   updateInlineMapForEdit,
 } from '../src/inlineMap'
+import { createDocumentTextSnapshot } from '../src/documentTextSnapshot'
 
 const BOLD_LINE = 'a **bold** b\n'
 
@@ -23,6 +25,135 @@ const boldSpecs = (): InlineReplacementSpec[] => [
   { id: 'open', startIndex: 2, endIndex: 4, text: '', kind: 'marker', groupId: 'bold' },
   { id: 'close', startIndex: 8, endIndex: 10, text: '', kind: 'marker', groupId: 'bold' },
 ]
+
+describe('inlineSpecsAfterRewrite', () => {
+  it('moves the replacements of a line that a rewrite put back elsewhere', () => {
+    const text = 'plain\na **bold** b\n'
+    const before = createPieceTableSnapshot(text)
+    const map = createInlineMap(
+      before,
+      boldSpecs().map((spec) => ({
+        ...spec,
+        startIndex: spec.startIndex + 6,
+        endIndex: spec.endIndex + 6,
+      })),
+    )
+    // Moving the bold line up rewrites both lines in one edit.
+    const after = applyBatchToPieceTable(before, [
+      { from: 0, to: text.length, text: 'a **bold** b\nplain\n' },
+    ])
+
+    const specs = inlineSpecsAfterRewrite(
+      map,
+      createDocumentTextSnapshot(before),
+      after,
+      createDocumentTextSnapshot(after),
+    )
+
+    expect(specs.map((spec) => [spec.id, spec.startIndex, spec.endIndex])).toEqual([
+      ['open', 2, 4],
+      ['close', 8, 10],
+    ])
+  })
+
+  it('drops a group whose hidden markup the edit typed into', () => {
+    const before = createPieceTableSnapshot(BOLD_LINE)
+    const map = createInlineMap(before, boldSpecs())
+    // `x` lands between the two `*` of the opening marker.
+    const after = applyBatchToPieceTable(before, [{ from: 3, to: 3, text: 'x' }])
+
+    const specs = inlineSpecsAfterRewrite(
+      map,
+      createDocumentTextSnapshot(before),
+      after,
+      createDocumentTextSnapshot(after),
+    )
+
+    expect(specs).toEqual([])
+  })
+
+  it('keeps a group whole when one of its lines moves and the other changes', () => {
+    // One group across two lines: `[one` opens on the first, `](url)` closes on the second.
+    const text = '[one\ntwo](url)\n[one\ntwo](url)\n'
+    const before = createPieceTableSnapshot(text)
+    const map = createInlineMap(before, [
+      { id: 'open', startIndex: 0, endIndex: 1, text: '', kind: 'marker', groupId: 'link' },
+      { id: 'close', startIndex: 8, endIndex: 14, text: '', kind: 'marker', groupId: 'link' },
+    ])
+    // The first link's destination changes in the same edit that rewrites its first line.
+    const after = applyBatchToPieceTable(before, [{ from: 0, to: 15, text: '[one\ntwo](other)' }])
+
+    const specs = inlineSpecsAfterRewrite(
+      map,
+      createDocumentTextSnapshot(before),
+      after,
+      createDocumentTextSnapshot(after),
+    )
+
+    expect(specs).toEqual([])
+  })
+
+  it('moves a two-line group with its lines when they move together', () => {
+    const text = 'x\n[one\ntwo](url)\n'
+    const before = createPieceTableSnapshot(text)
+    const map = createInlineMap(before, [
+      { id: 'open', startIndex: 2, endIndex: 3, text: '', kind: 'marker', groupId: 'link' },
+      { id: 'close', startIndex: 10, endIndex: 16, text: '', kind: 'marker', groupId: 'link' },
+    ])
+    const after = applyBatchToPieceTable(before, [
+      { from: 0, to: text.length, text: '[one\ntwo](url)\nx\n' },
+    ])
+
+    const specs = inlineSpecsAfterRewrite(
+      map,
+      createDocumentTextSnapshot(before),
+      after,
+      createDocumentTextSnapshot(after),
+    )
+
+    expect(specs.map((spec) => [spec.id, spec.startIndex, spec.endIndex])).toEqual([
+      ['open', 0, 1],
+      ['close', 8, 14],
+    ])
+  })
+
+  it('drops a group whose phantom text the edit took away', () => {
+    const before = createPieceTableSnapshot(BOLD_LINE)
+    const map = createInlineMap(
+      before,
+      boldSpecs().concat([
+        { id: 'tip', startIndex: 6, endIndex: 6, text: '!', insertion: true, groupId: 'bold' },
+      ]),
+    )
+    const after = applyBatchToPieceTable(before, [{ from: 5, to: 7, text: 'X' }])
+
+    const specs = inlineSpecsAfterRewrite(
+      map,
+      createDocumentTextSnapshot(before),
+      after,
+      createDocumentTextSnapshot(after),
+    )
+
+    expect(specs).toEqual([])
+  })
+
+  it('drops the replacements of a line the edit changed', () => {
+    const before = createPieceTableSnapshot(BOLD_LINE)
+    const map = createInlineMap(before, boldSpecs())
+    const after = applyBatchToPieceTable(before, [
+      { from: 0, to: BOLD_LINE.length, text: 'a **bolder** b\n' },
+    ])
+
+    const specs = inlineSpecsAfterRewrite(
+      map,
+      createDocumentTextSnapshot(before),
+      after,
+      createDocumentTextSnapshot(after),
+    )
+
+    expect(specs).toEqual([])
+  })
+})
 
 describe('InlineMap', () => {
   it('anchors specs to single-line source spans', () => {

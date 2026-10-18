@@ -11,6 +11,10 @@ export const editorSplitDrag: Scenario = {
   async run(page, { file, step }) {
     await openFileByName(page, file)
     await step('one-group')
+    const content = await selectors.editorGroupContent(page, 0).boundingBox()
+    ok(content)
+    const point = { x: content.x + content.width - 12, y: content.y + content.height / 2 }
+    const restingCursor = await cursorAt(page, point)
     await dragTo(page, 0, 0, 'right')
     strictEqual(
       await selectors.editorDropPreview(page).count(),
@@ -23,6 +27,7 @@ export const editorSplitDrag: Scenario = {
     await selectors.editorDropPreview(page).waitFor({ state: 'hidden' })
     await page.mouse.up()
     strictEqual(await selectors.editorGroups(page).count(), 1)
+    strictEqual(await cursorAt(page, point), restingCursor, 'dropping restores the content cursor')
 
     await page.keyboard.down('Control')
     await dragTo(page, 0, 0, 'right')
@@ -118,6 +123,16 @@ export const editorSplitDrag: Scenario = {
     await page.keyboard.press('Escape')
     await page.mouse.up()
     strictEqual(await selectors.editorGroups(page).count(), 3, 'Escape leaves layout untouched')
+    const cancelledContent = await selectors.editorGroupContent(page, 0).boundingBox()
+    ok(cancelledContent)
+    strictEqual(
+      await cursorAt(page, {
+        x: cancelledContent.x + cancelledContent.width / 2,
+        y: cancelledContent.y + cancelledContent.height / 2,
+      }),
+      restingCursor,
+      'cancelling restores the content cursor',
+    )
     await dragTo(page, 2, 0, 'center')
     await page.mouse.up()
     await selectors.editorGroups(page).nth(2).waitFor({ state: 'hidden' })
@@ -151,7 +166,8 @@ async function dragTo(
   destination: number,
   edge: 'right' | 'bottom' | 'top' | 'center',
 ) {
-  const tab = await selectors.editorGroupTabs(page, source).first().boundingBox()
+  const sourceTab = selectors.editorGroupTabs(page, source).first()
+  const tab = await sourceTab.boundingBox()
   const target = await selectors.editorGroupContent(page, destination).boundingBox()
   if (!tab || !target) throw createScriptError('Editor drag target is not visible')
   const x = edge === 'right' ? target.x + target.width - 12 : target.x + target.width / 2
@@ -159,8 +175,30 @@ async function dragTo(
   if (edge === 'bottom') y = target.y + target.height - 12
   if (edge === 'top') y = target.y + 12
   await page.mouse.move(tab.x + 35, tab.y + tab.height / 2)
+  strictEqual(
+    await sourceTab.evaluate((element) => getComputedStyle(element).cursor),
+    'pointer',
+    'editor tabs show the pointing finger on hover',
+  )
   await page.mouse.down()
+  strictEqual(
+    await sourceTab.evaluate((element) => getComputedStyle(element).cursor),
+    'pointer',
+    'editor tabs keep the pointing finger while pressed',
+  )
   await page.mouse.move(tab.x + 50, tab.y + tab.height / 2 + 12, { steps: 4 })
   await page.mouse.move(x, y, { steps: 16 })
   await page.waitForTimeout(150)
+  strictEqual(
+    await cursorAt(page, { x, y }),
+    'pointer',
+    'the pointing finger follows the tab over editor content during a drag',
+  )
+}
+
+async function cursorAt(page: Page, point: { readonly x: number; readonly y: number }) {
+  return page.evaluate(({ x, y }) => {
+    const target = document.elementFromPoint(x, y)
+    return target ? getComputedStyle(target).cursor : null
+  }, point)
 }

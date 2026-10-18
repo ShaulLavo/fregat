@@ -6,6 +6,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 
 const root = path.resolve(import.meta.dirname, '../..')
 const ci = Bun.YAML.parse(readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8'))
+const baselineStep = ci.jobs.baseline.steps.find((step) => step.id === 'baseline')
 const plan = ci.jobs.changes.steps.find((step) => step.id === 'plan')
 const gitAvailable = Bun.which('git') !== null && Bun.which('bash') !== null
 if (!gitAvailable) console.info('Skipping event selection shell proof. Git and Bash are required.')
@@ -50,7 +51,12 @@ function runPlan({ event, beforeKind, ref, baseline = 'success' }) {
     let before = ''
     if (beforeKind === 'existing') before = previous
     if (beforeKind === 'initial') before = '0'.repeat(40)
-    const result = spawnSync('bash', ['-euo', 'pipefail', '-c', plan.run], {
+    const baselineRun =
+      beforeKind === 'existing' && event === 'push' && ref.startsWith('refs/heads/')
+    const run = baselineRun
+      ? `${baselineStep.run}\nBASELINE_SHA=$(sed -n 's/^sha=//p' "$GITHUB_OUTPUT")\n${plan.run}`
+      : plan.run
+    const result = spawnSync('bash', ['-euo', 'pipefail', '-c', run], {
       cwd: directory,
       env: {
         ...process.env,
@@ -64,6 +70,7 @@ function runPlan({ event, beforeKind, ref, baseline = 'success' }) {
         BASE_SHA: event === 'pull_request' ? verified : previous,
         HEAD_SHA: git('rev-parse', 'HEAD'),
         VERIFIED_SHA: baseline === 'success' ? verified : '',
+        BASELINE_SHA: '',
       },
       encoding: 'utf8',
     })

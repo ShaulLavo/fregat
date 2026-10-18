@@ -33,5 +33,5 @@ Regression evidence lives alongside the corresponding owners, including core
 [rowPresentation.browser.test.ts](../../packages/editor/test/rowPresentation.browser.test.ts),
 [themeColors.browser.test.ts](../../packages/editor/test/themeColors.browser.test.ts),
 [diffThemeBundle.node.test.ts](../../packages/editor/test/diffThemeBundle.node.test.ts),
-[decode tests](../../packages/decode/test/plugin.test.ts), and
+[file animation tests](../../packages/file-animation/test/plugins.test.ts), and
 [popup theme tests](../../packages/lsp-plugin/test/popupTheme.test.ts).

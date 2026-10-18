@@ -244,16 +244,16 @@
     },
     {
       "api": "requestAnimationFrame",
-      "file": "packages/decode/src/morph-run.ts",
-      "id": "packages/decode/src/morph-run.ts:requestAnimationFrame:d29155e202",
+      "file": "packages/file-animation/src/morph-run.ts",
+      "id": "packages/file-animation/src/morph-run.ts:requestAnimationFrame:dd4f2cadc9",
       "justification": "Colour changes ride a CSS transition, which needs the starting colour painted first. One frame per morph, cancelled with the run.",
       "line": 226,
       "snippet": "this.colorFrame = requestAnimationFrame(() => {"
     },
     {
       "api": "queueMicrotask",
-      "file": "packages/decode/src/piece-span.ts",
-      "id": "packages/decode/src/piece-span.ts:queueMicrotask:84e6525d24",
+      "file": "packages/file-animation/src/piece-span.ts",
+      "id": "packages/file-animation/src/piece-span.ts:queueMicrotask:756795f1da",
       "justification": "A run with nothing to animate still settles after its constructor returns, so the owner has stored the run before `onDone` tears it down. Guarded by `isCanceled`.",
       "line": 49,
       "snippet": "queueMicrotask(fire)"

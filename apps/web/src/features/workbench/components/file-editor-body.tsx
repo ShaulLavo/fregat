@@ -4,6 +4,12 @@ import { MarkdownPreviewPane } from '@/features/workbench/components/markdown-pr
 import { createMarkdownScrollSync } from '@/features/workbench/state/markdown-scroll-sync'
 import { fileBodyGridClass } from '@/features/workbench/utils/file-body-grid'
 import { useMarkdownRenderedPane } from '@/lib/markdown-mode/hooks/use-markdown-rendered-pane'
+import { useMarkdownView } from '@/lib/markdown-mode/hooks/use-markdown-view'
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@workspace/ui/components/resizable'
 import { isMarkdownPath } from '@/lib/markdown-mode/utils/mode'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import type { FilesystemPath, StandaloneDocumentRef, TabId } from '@/lib/documents/utils/types'
@@ -18,6 +24,7 @@ import { HistoryView } from '@/features/editor/components/history-view'
 import { Editor } from '@/features/editor/components/editor'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { Spinner } from '@workspace/ui/components/spinner'
+import { cn } from '@workspace/ui/lib/utils'
 import { LanguageServerReferencesPane } from '@/features/editor/components/language-server-references-pane'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import { DiffView } from '@/features/git/components/diff-view'
@@ -106,8 +113,12 @@ export function FileEditorBody({
   })
 
   const renderedPane = useMarkdownRenderedPane(key)
-  const splitMarkdown =
-    renderedPane && editorDocument !== null && resource !== null && isMarkdownPath(resource.path)
+  const markdownView = useMarkdownView(key)
+  const markdownFile = editorDocument !== null && resource !== null && isMarkdownPath(resource.path)
+  // The rendered page alone: the editor stays laid out underneath, invisible and inert, so switching
+  // back finds it as it was.
+  const renderedOnly = markdownFile && markdownView === 'rendered'
+  const splitMarkdown = markdownFile && renderedPane && !renderedOnly
   const [scrollSync] = useState(createMarkdownScrollSync)
   // Manual memo: plugin identity is the editor's registration lifetime; a new array re-registers
   // every plugin on each render.
@@ -171,58 +182,93 @@ export function FileEditorBody({
       />
     )
 
-  const textBody = (
-    <div className={fileBodyGridClass(splitMarkdown, currentReferences !== null)}>
-      <div className='relative flex min-h-0 min-w-0 flex-col overflow-hidden'>
-        {loadError && resource ? (
-          <FileLoadError
-            path={resource.path}
-            message={loadError}
-            hasContent
-            retained
-            onOpenReadOnly={() => setPagedKey(key)}
-          />
-        ) : null}
-        <Editor
-          active={active && currentActions !== null}
-          additionalPlugins={editorPlugins}
-          definitionTarget={currentActions ? definitionTarget : null}
-          document={editorDocument}
-          paintKey={visibleSnapshot.paintKey}
-          target={target}
-          snapshot={visibleSnapshot.snapshot}
-          onCaptureSourceChange={visibleSnapshot.onCaptureSourceChange}
-          rootPath={rootPath}
-          tabId={tabId}
-          onInitialPaint={recordInitialPaint}
-          onScrollPositionChange={
-            currentActions
-              ? (changedKey, scrollPosition, reopenScrollPosition) => {
-                  if (changedKey !== key) return
-                  currentActions.setScrollPosition(scrollPosition, reopenScrollPosition)
-                }
-              : undefined
-          }
-          onStatusSourceChange={currentActions?.setStatusSource}
-          onTextChange={currentActions?.handleTextChange}
-          onOpenDefinition={currentActions?.openDefinition}
-          onOpenReferences={currentActions?.openReferences}
-        />
-        {!editorDocument && fileState.status !== 'error' ? (
-          <div className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'>
-            <Spinner size='xs' label='Loading file' />
-            Loading file…
-          </div>
-        ) : null}
-      </div>
-      {splitMarkdown && editorDocument && resource ? (
-        <MarkdownPreviewPane
-          buffer={editorDocument.buffer}
-          documentPath={resource.path}
-          rootPath={rootPath}
-          sync={scrollSync}
+  const editorColumn = (
+    <div
+      className={cn(
+        'relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden',
+        renderedOnly && 'invisible',
+      )}
+      inert={renderedOnly}
+    >
+      {loadError && resource ? (
+        <FileLoadError
+          path={resource.path}
+          message={loadError}
+          hasContent
+          retained
+          onOpenReadOnly={() => setPagedKey(key)}
         />
       ) : null}
+      <Editor
+        active={active && currentActions !== null}
+        concealed={renderedOnly}
+        additionalPlugins={editorPlugins}
+        definitionTarget={currentActions ? definitionTarget : null}
+        document={editorDocument}
+        paintKey={visibleSnapshot.paintKey}
+        target={target}
+        snapshot={visibleSnapshot.snapshot}
+        onCaptureSourceChange={visibleSnapshot.onCaptureSourceChange}
+        rootPath={rootPath}
+        tabId={tabId}
+        onInitialPaint={recordInitialPaint}
+        onScrollPositionChange={
+          currentActions
+            ? (changedKey, scrollPosition, reopenScrollPosition) => {
+                if (changedKey !== key) return
+                currentActions.setScrollPosition(scrollPosition, reopenScrollPosition)
+              }
+            : undefined
+        }
+        onStatusSourceChange={currentActions?.setStatusSource}
+        onTextChange={currentActions?.handleTextChange}
+        onOpenDefinition={currentActions?.openDefinition}
+        onOpenReferences={currentActions?.openReferences}
+      />
+      {!editorDocument && fileState.status !== 'error' ? (
+        <div className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'>
+          <Spinner size='xs' label='Loading file' />
+          Loading file…
+        </div>
+      ) : null}
+    </div>
+  )
+  const renderedPage =
+    (splitMarkdown || renderedOnly) && editorDocument && resource ? (
+      <MarkdownPreviewPane
+        buffer={editorDocument.buffer}
+        documentPath={resource.path}
+        rootPath={rootPath}
+        sync={scrollSync}
+      />
+    ) : null
+
+  // One group whether or not the page shows beside the source, so toggling it never remounts the
+  // editor; the rendered-only page covers the editor in the source panel.
+  const textBody = (
+    <div className={fileBodyGridClass(currentReferences !== null)}>
+      <ResizablePanelGroup className='min-h-0 min-w-0' id={`markdown-split-${tabId}`}>
+        <ResizablePanel
+          className='relative min-h-0 min-w-0'
+          id={`markdown-source-${tabId}`}
+          minSize={240}
+        >
+          {editorColumn}
+          {renderedOnly ? <div className='absolute inset-0'>{renderedPage}</div> : null}
+        </ResizablePanel>
+        {splitMarkdown ? (
+          <>
+            <ResizableHandle id={`markdown-split-handle-${tabId}`} withHandle />
+            <ResizablePanel
+              className='min-h-0 min-w-0'
+              id={`markdown-rendered-${tabId}`}
+              minSize={240}
+            >
+              {renderedPage}
+            </ResizablePanel>
+          </>
+        ) : null}
+      </ResizablePanelGroup>
       {currentReferences && currentActions ? (
         <LanguageServerReferencesPane
           references={currentReferences}

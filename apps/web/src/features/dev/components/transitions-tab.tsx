@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@singapore-editor/core/editor'
-import type { DecodeMode } from '@singapore-editor/decode'
+import type { FileTransitionMode } from '@singapore-editor/file-animation'
 import { Button } from '@workspace/ui/components/button'
 import { Slider } from '@workspace/ui/components/slider'
 import { Switch } from '@workspace/ui/components/switch'
@@ -15,28 +15,31 @@ import {
 const BASE_DURATION_MS = 520
 const SLOW_MOTION = 4
 const STREAM_LINE_MS = 140
-const REVEALS: readonly { readonly mode: DecodeMode; readonly label: string }[] = [
+const REVEALS: readonly { readonly mode: FileTransitionMode; readonly label: string }[] = [
   { mode: 'autoregressive', label: 'Autoregressive' },
   { mode: 'parallel', label: 'Parallel' },
   { mode: 'token', label: 'Token' },
   { mode: 'diffusion', label: 'Diffusion' },
+  { mode: 'magicMove', label: 'Magic move' },
 ]
 
-/** Text changes in a real editor with the morph plugin: steps, undo, and a streamed write. */
+/** A real editor with both animations: edits (steps, undo, a streamed write) and file opens. */
 export function TransitionsTab() {
   const [step, setStep] = useState(0)
   const [slow, setSlow] = useState(false)
   const [bounce, setBounce] = useState(18)
-  const [reveal, setReveal] = useState<{ mode: DecodeMode; replay: number }>({
-    mode: 'autoregressive',
-    replay: 0,
-  })
+  const [reveal, setReveal] = useState<{
+    mode: FileTransitionMode
+    replay: number
+    text: string | null
+  }>({ mode: 'autoregressive', replay: 0, text: null })
   const scale = slow ? SLOW_MOTION : 1
   const { editor, containerRef } = useTransitionsEditor({
     durationMs: BASE_DURATION_MS * scale,
     bounce: bounce / 100,
     reveal: reveal.mode,
     replay: reveal.replay,
+    replayText: reveal.text,
     speed: 1 / scale,
   })
   const timers = useRef<number[]>([])
@@ -62,9 +65,13 @@ export function TransitionsTab() {
     timers.current = delays.map((delay, index) => window.setTimeout(() => run(index), delay))
   }
 
-  const openAs = (mode: DecodeMode) => {
+  // A magic move needs a different file to move from, so it opens the next step as one.
+  const openAs = (mode: FileTransitionMode) => {
     cancelPending()
-    setReveal((current) => ({ mode, replay: current.replay + 1 }))
+    const next = (step + 1) % TRANSITION_STEPS.length
+    const text = mode === 'magicMove' ? (TRANSITION_STEPS[next] ?? null) : null
+    if (text !== null) setStep(next)
+    setReveal((current) => ({ mode, replay: current.replay + 1, text }))
   }
 
   const runCommand = (command: 'undo' | 'redo') => {
@@ -93,8 +100,8 @@ export function TransitionsTab() {
   return (
     <div className='mx-auto flex max-w-3xl flex-col gap-6 p-(--density-section-padding)'>
       <Section
-        title='Morph'
-        detail='Text that survives an edit slides to its new place, removed text fades out, and new text streams in. Undo and redo morph too. Opening a file writes it in.'
+        title='File edit animation'
+        detail='Text that survives an edit slides to its new place, removed text fades out, and new text streams in. Undo and redo animate too. The file transition animation plays when a file opens.'
       >
         <div className='flex flex-wrap items-center gap-2'>
           <Button onClick={() => goTo(step - 1)}>Previous</Button>
@@ -116,7 +123,7 @@ export function TransitionsTab() {
           </Button>
         </div>
         <div className='flex flex-wrap items-center gap-2'>
-          <span className='text-muted-foreground text-xs'>Open the file as</span>
+          <span className='text-muted-foreground text-xs'>File transition</span>
           {REVEALS.map((entry) => (
             <Button key={entry.mode} variant='ghost' onClick={() => openAs(entry.mode)}>
               {entry.label}

@@ -430,12 +430,12 @@ export const SETTINGS_PRESENTATION = {
     category: 'Editor',
     requiresRestart: true,
   },
-  'editor.decode.mode': {
+  'editor.fileTransition.mode': {
     widget: 'enum',
     category: 'Editor',
     visibility: 'advanced',
   },
-  'editor.morph.enabled': {
+  'editor.fileEditAnimation.enabled': {
     widget: 'boolean',
     category: 'Editor',
   },

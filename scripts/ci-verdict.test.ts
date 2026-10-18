@@ -1,8 +1,9 @@
-import { readFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { expect, test } from 'vitest'
+import { expect, onTestFinished, test } from 'vitest'
 import { ciVerdict, type RunIdentity } from './ci-verdict'
+import { readWorkflow } from './workflow-fixtures'
 
 const root = path.resolve(import.meta.dirname, '..')
 const read = (file: string): unknown => Bun.YAML.parse(readFileSync(path.join(root, file), 'utf8'))
@@ -45,6 +46,7 @@ function fixture() {
   }
   const changes = { result: 'success', outputs }
   const needs: Record<string, { result: string; outputs?: Record<string, string> }> = {
+    baseline: { result: 'success' },
     changes,
     docs: { result: 'skipped' },
     lint: { result: 'success' },
@@ -58,6 +60,7 @@ function fixture() {
     libraries: { result: 'success' },
   }
   const names = [
+    'Successful main baseline',
     'Changes',
     'Docs format',
     'Format, lint, census',
@@ -126,10 +129,10 @@ test('terminal-only validation accepts its two verification jobs and rejects mis
   value.changes.outputs.packages = '["ghostty-webgpu"]'
   for (const id of Object.keys(value.needs))
     value.needs[id] = {
-      result: ['changes', 'docs', 'libraries'].includes(id) ? 'success' : 'skipped',
+      result: ['baseline', 'changes', 'docs', 'libraries'].includes(id) ? 'success' : 'skipped',
     }
   value.needs.changes = value.changes
-  const names = ['Changes', 'Docs format', 'Libraries / Ghostty tests']
+  const names = ['Successful main baseline', 'Changes', 'Docs format', 'Libraries / Ghostty tests']
   const jobs = value.jobs
     .filter((job) => names.includes(job.name))
     .map((job) => ({ ...job, conclusion: 'success', runner_id: 1 }))
@@ -229,11 +232,13 @@ test('plan-only selection runs formatting and permits skipped or absent disabled
       value.changes.outputs[key] = key === 'docs' ? 'true' : 'false'
   }
   for (const id of Object.keys(value.needs)) {
-    value.needs[id] = { result: ['changes', 'docs'].includes(id) ? 'success' : 'skipped' }
+    value.needs[id] = {
+      result: ['baseline', 'changes', 'docs'].includes(id) ? 'success' : 'skipped',
+    }
   }
   value.needs.changes = value.changes
   const jobs = value.jobs
-    .filter((job) => ['Changes', 'Docs format'].includes(job.name))
+    .filter((job) => ['Successful main baseline', 'Changes', 'Docs format'].includes(job.name))
     .map((job) => ({ ...job, conclusion: 'success', runner_id: 1 }))
   expect(value.evaluate(jobs)).toEqual({ passed: true, issues: [] })
   value.needs['mobile-layout'] = { result: 'success' }
@@ -425,5 +430,66 @@ test.each(['cancelled', 'success'])(
     if (!changes) return
     changes.conclusion = 'cancelled'
     expect(value.evaluate([changes]).passed).toBe(false)
+  },
+)
+
+const shellAvailable = Bun.which('bash') !== null
+if (!shellAvailable) console.info('Skipping trusted verifier CLI fixture: Bash is required.')
+
+test.skipIf(!shellAvailable)(
+  'trusted verifier reads candidate graph data without executing candidate code',
+  () => {
+    let directory: string | undefined
+    onTestFinished(() => {
+      if (directory) rmSync(directory, { recursive: true, force: true })
+    })
+    directory = mkdtempSync(path.join(tmpdir(), 'ci-trusted-verifier-'))
+    const value = fixture()
+    const candidate = path.join(directory, 'candidate')
+    const trusted = path.join(directory, 'trusted')
+    mkdirSync(path.join(candidate, '.github/workflows'), { recursive: true })
+    mkdirSync(path.join(candidate, 'scripts'), { recursive: true })
+    mkdirSync(path.join(trusted, 'scripts'), { recursive: true })
+    for (const file of ['ci.yml', 'workspace-libraries.yml'])
+      writeFileSync(
+        path.join(candidate, '.github/workflows', file),
+        readFileSync(path.join(root, '.github/workflows', file)),
+      )
+    writeFileSync(
+      path.join(trusted, 'scripts/ci-verdict.ts'),
+      readFileSync(path.join(root, 'scripts/ci-verdict.ts')),
+    )
+    writeFileSync(
+      path.join(candidate, 'scripts/ci-verdict.ts'),
+      `await Bun.write(${JSON.stringify(path.join(directory, 'candidate-executed'))}, 'executed'); process.exit(99)`,
+    )
+    writeFileSync(path.join(candidate, 'bunfig.toml'), 'preload = ["./scripts/ci-verdict.ts"]\n')
+    const jobs = path.join(directory, 'ci-jobs.json')
+    writeFileSync(jobs, JSON.stringify([{ jobs: value.jobs }]))
+    writeFileSync(path.join(directory, 'ci-run.json'), JSON.stringify(value.metadata))
+    const step = readWorkflow('ci.yml').jobs.verdict!.steps.find(
+      (entry) => entry.name === 'Verdict',
+    )!
+    const run = () =>
+      Bun.spawnSync(['bash', '-euo', 'pipefail', '-c', step.run!], {
+        cwd: directory,
+        env: {
+          PATH: process.env.PATH,
+          RUNNER_TEMP: directory,
+          CI_NEEDS_JSON: JSON.stringify(value.needs),
+          CI_SOURCE_SHA: value.identity.headSha,
+          GH_REPO: value.identity.repository,
+          RUN_ID: String(value.identity.runId),
+          RUN_ATTEMPT: String(value.identity.attempt),
+          GITHUB_EVENT_NAME: value.identity.event,
+        },
+      })
+    const result = run()
+    expect(result.exitCode, result.stderr.toString()).toBe(0)
+    expect(existsSync(path.join(directory, 'candidate-executed'))).toBe(false)
+    writeFileSync(jobs, JSON.stringify([{ jobs: value.jobs.slice(1) }]))
+    const incomplete = run()
+    expect(incomplete.exitCode).toBe(1)
+    expect(incomplete.stderr.toString()).toContain('lacks one successful execution')
   },
 )

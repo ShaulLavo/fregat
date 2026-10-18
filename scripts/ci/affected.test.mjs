@@ -61,6 +61,24 @@ test('PR 1208 selects terminal verification and patch-note formatting only', () 
   })
 })
 
+test('shader-only edits select the dedicated Ghostty library/browser gate', () => {
+  const plan = select(['ghostty-webgpu/packages/shaders/src/addon.ts'])
+  expect(plan).toMatchObject({
+    packages: ['ghostty-webgpu-shaders'],
+    ghostty: true,
+    shared: false,
+    tooling: false,
+    web: false,
+    server: false,
+    editor: false,
+  })
+  expect(requiredLibraries(graph, plan.packages)).toEqual([
+    '@fregat/hotkeys',
+    'ghostty-webgpu',
+    'ghostty-webgpu-shaders',
+  ])
+})
+
 test('a changeset by itself does not select application or library tests', () => {
   expect(select(['.changeset/patch.md'])).toMatchObject({
     packages: [],

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "manifestHash": "892de2372b6aa5163ba6c586688edbaf40192cc1f589baad9172064157bc72d8",
+  "manifestHash": "c826b8d9960715e8ac555a26a62d98091ae0bc6887d50a6de895f6b20c85b135",
   "languages": [
     {
       "id": "javascript",
@@ -720,16 +720,16 @@
       "parserABI": 15,
       "source": {
         "package": "tree-sitter-md",
-        "version": "0.1.6",
+        "version": "0.1.12",
         "repository": "https://github.com/ShaulLavo/tree-sitter-md",
-        "revision": "347a798ac598fbb4523ee83287a99df6ada42487",
+        "revision": "ef1452f6f1167504b3a2d227536b7235d9b77e69",
         "license": "MIT",
         "compiler": "wasi-sdk 34"
       },
       "sourceFiles": [
         {
           "file": "package.json",
-          "sha256": "8a29f536db976f1735a59a61b75471ac1ae8174ba373df39b0e26c3a354c74e8"
+          "sha256": "d83ec5c10da39cf098972480959297a9b3640e6a6b74672303f866461c75fd50"
         },
         {
           "file": "src/autolink.c",
@@ -737,15 +737,15 @@
         },
         {
           "file": "src/document.c",
-          "sha256": "5e37287e76ce28d248e6c2d7f03517960ad336c6d085e45ae350a5ba28cc3cb0"
+          "sha256": "2f3ee403823ec2e0365304ae515ff03dccf877480ae2c7718fbf8a92bd76a91c"
         },
         {
           "file": "src/footnote.c",
-          "sha256": "065d4a04a49a2c28a651d8475437513d410b02fdf01385688cf88eca31d0c807"
+          "sha256": "34a709daf3c8bd7de16e654b6ef3d4a0fd79fff6efb4463d0b3fcaea28778fdc"
         },
         {
           "file": "src/footnote.h",
-          "sha256": "992334722e7928da1b541902bd1727193405b84915741ec6a11a33130327e6d8"
+          "sha256": "cc74aea29233ca8c9227356453641450d5565d45003fdb4981dcb31c6d7d9dbc"
         },
         {
           "file": "src/highlight.c",
@@ -757,21 +757,21 @@
         },
         {
           "file": "src/leaf.c",
-          "sha256": "fa8e1a0764223d587d27bfa8956145e7b5fcedb5a5715b01200d0eabfca9fd1f"
+          "sha256": "6c0a58186daaf10a6338f6d3aa6f2e96171c6bf5fddd59095a334861b2ff33c3"
         },
         {
           "file": "src/resolver.h",
-          "sha256": "88e6ba47e70a412377e563b2676da503e8568c22fc9f751d093e03940a6e649a"
+          "sha256": "b31a702c9f0e17dacc58c2183b48705d41e4066d166a44a0ee2c00c0bc5e679b"
         },
         {
           "file": "src/semantic.c",
-          "sha256": "75ce08a044b5a048ec401ed364aa1c7cd0254b6b5b001e11f98761bb56980a72"
+          "sha256": "ffaf04ce9c1db27149cd4f8ec9efeb080a7dd77de932bee5f3d7120edb7fbf33"
         }
       ],
       "files": [
         {
           "file": "tree-sitter-md/tree-sitter-markdown.wasm",
-          "sha256": "88ea7fffcf9986016a33fff3220d4ce4d4d7f07e88b5b52fbe6a7c1c3997869c"
+          "sha256": "ee7057756019e009d613fd66854fdfe34b47a48f547cdfcea0062d2c0accaaa9"
         },
         {
           "file": "./queries/markdown-merge-units.scm",

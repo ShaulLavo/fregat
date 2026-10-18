@@ -44,7 +44,8 @@ import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
 import { editorTypography } from './editor-typography'
 import { editorWrappedGutter } from './editor-wrapped-gutter'
-import { editorDecodeReveal } from './editor-decode-reveal'
+import { editorFileTransition } from './editor-file-transition-reveal'
+import { editorMagicMove } from './editor-magic-move'
 import { devTransitions } from './dev-transitions'
 import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
@@ -253,6 +254,7 @@ import {
   csvPresentationFailure,
 } from './csv-table'
 import { markdownSplitView } from './markdown-split-view'
+import { markdownPreviewImages } from './markdown-preview-images'
 import { markdownAuthoring } from './markdown-authoring'
 import { markdownPreviewClobber } from './markdown-preview-clobber'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
@@ -428,6 +430,7 @@ import { markdownSourceEditing } from './markdown-source-editing'
 import { markdownLoadStability } from './markdown-load-stability'
 import { markdownLinks } from './markdown-links'
 import { editorTypeBurst } from './editor-type-burst'
+import { editorMarkdownEditAnimation } from './editor-markdown-edit-animation'
 import { editorTouchSelection } from './editor-touch-selection'
 import { editorUndoBarrier } from './editor-undo-barrier'
 import { editorUndoBranch } from './editor-undo-branch'
@@ -709,6 +712,7 @@ export const scenarios: readonly Scenario[] = [
   csvPresentationReadiness,
   csvPresentationFailure,
   markdownSplitView,
+  markdownPreviewImages,
   markdownAuthoring,
   markdownPreviewClobber,
   gitOpenAllDiffsSpam,
@@ -773,7 +777,8 @@ export const scenarios: readonly Scenario[] = [
   editorLspServerExit,
   editorTypography,
   editorWrappedGutter,
-  editorDecodeReveal,
+  editorFileTransition,
+  editorMagicMove,
   editorDefinitionCrlf,
   editorExternalDeletion,
   editorReadRecovery,
@@ -853,6 +858,7 @@ export const scenarios: readonly Scenario[] = [
   problemsPanelRows,
   problemsPanelWorkspace,
   editorTypeBurst,
+  editorMarkdownEditAnimation,
   editorTouchSelection,
   markdownSourceEditing,
   markdownLoadStability,

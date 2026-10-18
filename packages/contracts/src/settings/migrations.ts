@@ -106,6 +106,20 @@ export const SETTING_MIGRATIONS: readonly SettingMigration[] = [
     from: 'workbench.wallpaper.downloadTimeoutMs',
     reason: 'Wallpaper downloads run until GitHub answers.',
   },
+  {
+    kind: 'renamed',
+    from: 'editor.decode.mode',
+    to: 'editor.fileTransition.mode',
+    reason: 'The file-open animation is now called the file transition animation.',
+    samples: ['off', 'diffusion', 'autoregressive', 'parallel', 'token'],
+  },
+  {
+    kind: 'renamed',
+    from: 'editor.morph.enabled',
+    to: 'editor.fileEditAnimation.enabled',
+    reason: 'Animated edits are now called the file edit animation.',
+    samples: [true, false],
+  },
 ]
 
 const BY_FROM: ReadonlyMap<string, SettingMigration> = new Map(

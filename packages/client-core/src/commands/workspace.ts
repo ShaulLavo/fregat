@@ -430,7 +430,7 @@ export const workspaceCommandMetadata = {
   'workspace.cycleMarkdownView': defineMetadata({
     category: 'Editor',
     description:
-      'Switch this Markdown file between plain source and source-revealing live preview, keeping the rendered pane as it is.',
+      'Switch this Markdown file between source-revealing live preview, plain source and the rendered page alone, keeping the rendered side pane as it is.',
     id: 'workspace.cycleMarkdownView',
     execution: 'sync',
     target: 'workspace',

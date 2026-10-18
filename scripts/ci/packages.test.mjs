@@ -21,7 +21,13 @@ function runFixture(operation, names, failure = '') {
       path.join(root, 'task.mjs'),
       'import {appendFileSync} from "node:fs"; const task=process.argv.slice(2).join(" "); appendFileSync(process.env.RECEIPT,task+"\\n"); process.exit(task===process.env.FAIL_TASK?23:0)',
     )
-    for (const name of ['alpha', 'beta', 'ghostty-webgpu', 'ghostty-webgpu-line-editor']) {
+    for (const name of [
+      'alpha',
+      'beta',
+      'ghostty-webgpu',
+      'ghostty-webgpu-line-editor',
+      'ghostty-webgpu-shaders',
+    ]) {
       const directory = path.join(root, 'packages', name)
       mkdirSync(directory, { recursive: true })
       const scripts = Object.fromEntries(
@@ -78,8 +84,20 @@ test('empty package selection executes no commands', () => {
 
 test('family verification owns Ghostty checks without a duplicate package execution', () => {
   expect(
-    runFixture('checks', ['ghostty-webgpu', 'ghostty-webgpu-line-editor', '@workspace/alpha']),
+    runFixture('checks', [
+      'ghostty-webgpu',
+      'ghostty-webgpu-line-editor',
+      'ghostty-webgpu-shaders',
+      '@workspace/alpha',
+    ]),
   ).toMatchObject({ status: 0, calls: ['alpha format:check', 'alpha lint', 'alpha typecheck'] })
+})
+
+test('family verification owns shader tests without duplicate package execution', () => {
+  expect(runFixture('tests', ['ghostty-webgpu-shaders', '@workspace/beta'])).toMatchObject({
+    status: 0,
+    calls: ['beta test'],
+  })
 })
 
 test('package names are validated before command execution', () => {

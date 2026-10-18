@@ -1,0 +1,26 @@
+{
+  "repository": "fixture/parser",
+  "pull": {
+    "number": 42,
+    "state": "open",
+    "draft": false,
+    "user": {
+      "id": 41898282,
+      "login": "github-actions[bot]",
+      "type": "Bot"
+    },
+    "base": {
+      "ref": "main",
+      "repo": {
+        "full_name": "fixture/parser"
+      }
+    },
+    "head": {
+      "ref": "tree-sitter-x/updates",
+      "sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "repo": {
+        "full_name": "fixture/parser"
+      }
+    }
+  }
+}

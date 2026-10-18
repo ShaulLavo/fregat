@@ -1,4 +1,5 @@
 import { use, type ComponentProps } from 'react'
+import { MarkdownPictureContext } from '@/features/workbench/providers/markdown-picture-context'
 import { MarkdownPreviewContext } from '@/features/workbench/providers/markdown-preview-context'
 import { markdownPreviewImageSource } from '@/lib/markdown-mode/utils/paths'
 
@@ -12,6 +13,8 @@ export function MarkdownPreviewImage({
   ...props
 }: ComponentProps<'img'> & { readonly node?: unknown }) {
   const preview = use(MarkdownPreviewContext)
+  // A `<source>` the browser takes loads through this image's request mode, so it decides.
+  const pictureSource = use(MarkdownPictureContext)
   let source = typeof src === 'string' ? src : undefined
   if (source && preview)
     source = markdownPreviewImageSource(
@@ -25,9 +28,14 @@ export function MarkdownPreviewImage({
       {...props}
       alt={alt}
       className='max-w-full'
-      crossOrigin={source ? fsBlobCrossOrigin(source) : undefined}
+      crossOrigin={requestMode(pictureSource, source)}
       loading='lazy'
       src={source}
     />
   )
+}
+
+function requestMode(pictureSource: boolean | null, source: string | undefined) {
+  if (pictureSource !== null) return pictureSource ? 'anonymous' : undefined
+  return source ? fsBlobCrossOrigin(source) : undefined
 }

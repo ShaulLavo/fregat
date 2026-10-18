@@ -173,16 +173,16 @@ export const editorTokenPaintSelectors = {
     '.editor-virtualized-fold-placeholder,.editor-virtualized-gutter-row',
   highlightPrefix: sharedTokenHighlightPrefix,
 } as const
-/** The decode plugin's hidden-rows class, its diffusion overlay, and one overlay glyph. */
-export const decodeSelectors = {
-  active: '.editor-decode-active',
-  layer: '.editor-decode-layer',
+/** The file transition plugin's hidden-rows class, its diffusion overlay, and one overlay glyph. */
+export const fileTransitionSelectors = {
+  active: '.editor-file-transition-active',
+  layer: '.editor-file-transition-layer',
   piece: '.editor-morph-piece',
 } as const
-export const morphSelectors = {
+export const fileEditAnimationSelectors = {
   editor: (page: Page) => page.locator('[data-transitions-editor]'),
   layer: '.editor-morph-layer',
-  revealLayer: '.editor-decode-layer',
+  revealLayer: '.editor-file-transition-layer',
   piece: '.editor-morph-piece',
 } as const
 export const searchEditorSelector = '[aria-label="Search result editor"]'
