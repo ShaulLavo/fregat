@@ -1,4 +1,4 @@
-# @singapore-editor/decode
+# @singapore-editor/file-animation
 
 ## 0.2.9
 
@@ -68,3 +68,4 @@
 
 - Updated dependencies [8bd0e75]
   - @singapore-editor/core@0.2.1
+
