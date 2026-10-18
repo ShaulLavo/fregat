@@ -1,8 +1,8 @@
-import { ok, strictEqual } from 'node:assert/strict'
+import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 
 import type { Scenario } from './index'
-import { morphSelectors, selectors } from '../selectors'
+import { fileEditAnimationSelectors, selectors } from '../selectors'
 
 type Landing = {
   readonly pieces: number
@@ -73,6 +73,19 @@ function freezeAt(ms: number): number {
   return frozen
 }
 
+/** Page-side: freezes every animation at `ms` and names the pieces drawn part way transparent. */
+function fadingAt({ ms, selector }: { ms: number; selector: string }): string[] {
+  for (const animation of document.getAnimations()) {
+    const end = animation.effect?.getComputedTiming().endTime
+    if (typeof end !== 'number' || !Number.isFinite(end)) continue
+    animation.pause()
+    animation.currentTime = ms
+  }
+  return Array.from(document.querySelectorAll<HTMLElement>(selector))
+    .filter((piece) => Number(getComputedStyle(piece).opacity) < 0.99)
+    .map((piece) => piece.textContent ?? '')
+}
+
 function resume(): void {
   for (const animation of document.getAnimations()) animation.play()
 }
@@ -103,7 +116,7 @@ let report: unknown = null
 export const devTransitions: Scenario = {
   name: 'dev-transitions',
   description:
-    'Step the /dev transitions editor through a refactor and every file-open reveal in slow motion: pieces move mid-flight, land exactly on the real text, and the real rows come back when the animation ends.',
+    'Step the /dev transitions editor through a refactor, a typed key, an indent and every file-open reveal in slow motion: pieces move mid-flight, land exactly on the real text, typing stays instant, and the real rows come back when the animation ends.',
   capture: { width: 900, height: 900 },
   async run(page, { step }) {
     const url = new URL(page.url())
@@ -111,26 +124,34 @@ export const devTransitions: Scenario = {
     url.search = ''
     url.hash = ''
     await page.goto(url.href)
-    await morphSelectors.editor(page).locator('.editor-virtualized-row').first().waitFor()
+    await fileEditAnimationSelectors
+      .editor(page)
+      .locator('.editor-virtualized-row')
+      .first()
+      .waitFor()
     await page.waitForTimeout(1500)
     await step('start')
 
     await selectors.physicalSwitch(page, 'Slow motion').click()
     await selectors.physicalButton(page, 'Next').click()
-    await page.locator(morphSelectors.piece).first().waitFor({ state: 'attached' })
+    await page.locator(fileEditAnimationSelectors.piece).first().waitFor({ state: 'attached' })
     await filmstrip(page, step, 'next')
-    const landing = await page.evaluate(parkAndCompare, morphSelectors.piece)
+    const landing = await page.evaluate(parkAndCompare, fileEditAnimationSelectors.piece)
     await step('next-parked-at-end')
     await page.evaluate(resume)
-    await page.locator(morphSelectors.layer).waitFor({ state: 'detached', timeout: 10_000 })
+    await page
+      .locator(fileEditAnimationSelectors.layer)
+      .waitFor({ state: 'detached', timeout: 10_000 })
     await step('next-settled')
     ok((await editorText(page)).includes('items.reduce'), 'the editor holds step 2')
 
     await selectors.physicalButton(page, 'Undo').click()
-    await page.locator(morphSelectors.piece).first().waitFor({ state: 'attached' })
+    await page.locator(fileEditAnimationSelectors.piece).first().waitFor({ state: 'attached' })
     await filmstrip(page, step, 'undo')
     await page.evaluate(resume)
-    await page.locator(morphSelectors.layer).waitFor({ state: 'detached', timeout: 10_000 })
+    await page
+      .locator(fileEditAnimationSelectors.layer)
+      .waitFor({ state: 'detached', timeout: 10_000 })
     ok((await editorText(page)).includes('let sum = 0'), 'undo restores step 1')
 
     await selectors.physicalButton(page, 'Redo').click()
@@ -139,25 +160,77 @@ export const devTransitions: Scenario = {
     await selectors.physicalButton(page, 'Next').click()
     await page.waitForTimeout(600)
     await step('retarget-mid-flight')
-    await page.locator(morphSelectors.layer).waitFor({ state: 'detached', timeout: 10_000 })
+    await page
+      .locator(fileEditAnimationSelectors.layer)
+      .waitFor({ state: 'detached', timeout: 10_000 })
 
     await selectors.physicalButton(page, 'Stream a function').click()
     await page.waitForTimeout(1600)
     await step('stream-mid-flight')
     await page.waitForTimeout(1200)
     await step('stream-later')
-    await page.locator(morphSelectors.layer).waitFor({ state: 'detached', timeout: 20_000 })
+    await page
+      .locator(fileEditAnimationSelectors.layer)
+      .waitFor({ state: 'detached', timeout: 20_000 })
     await step('stream-settled')
     ok((await editorText(page)).includes('totalWithTax'), 'the streamed function landed')
+
+    // Keyboard text input stays instant; a command edit of any size morphs.
+    await fileEditAnimationSelectors
+      .editor(page)
+      .locator('.editor-virtualized-row', { hasText: 'const lineTotal' })
+      .click()
+    await page.keyboard.press('End')
+    await page.keyboard.type('x')
+    await page.keyboard.press('Backspace')
+    strictEqual(
+      await page.locator(fileEditAnimationSelectors.layer).count(),
+      0,
+      'typing stays instant',
+    )
+    await page.keyboard.press('Home')
+    await page.keyboard.press('Shift+ArrowDown')
+    await page.keyboard.press('Tab')
+    await page.locator(fileEditAnimationSelectors.piece).first().waitFor({ state: 'attached' })
+    await page.evaluate(freezeAt, 300)
+    await step('indent-mid-flight')
+    await page.evaluate(resume)
+    await page
+      .locator(fileEditAnimationSelectors.layer)
+      .waitFor({ state: 'detached', timeout: 10_000 })
+
+    // Swapped lines travel whole: no piece of either line fades out and back in.
+    await fileEditAnimationSelectors
+      .editor(page)
+      .locator('.editor-virtualized-row', { hasText: 'const gross' })
+      .click()
+    await page.keyboard.press('Alt+ArrowUp')
+    await page.locator(fileEditAnimationSelectors.piece).first().waitFor({ state: 'attached' })
+    const fading = await page.evaluate(fadingAt, {
+      ms: 300,
+      selector: fileEditAnimationSelectors.piece,
+    })
+    await step('swap-mid-flight')
+    await page.evaluate(resume)
+    await page
+      .locator(fileEditAnimationSelectors.layer)
+      .waitFor({ state: 'detached', timeout: 10_000 })
+    ok(
+      (await editorText(page)).includes('const gross = net * (1 + rate)\n  const net'),
+      'lines swapped',
+    )
+    deepStrictEqual(fading, [], 'no piece of a swapped line fades')
 
     const reveals: Record<string, Landing> = {}
     for (const mode of ['Autoregressive', 'Parallel', 'Token', 'Diffusion']) {
       await selectors.physicalButton(page, mode).click()
-      await page.locator(morphSelectors.revealLayer).waitFor({ state: 'attached' })
+      await page.locator(fileEditAnimationSelectors.revealLayer).waitFor({ state: 'attached' })
       await filmstrip(page, step, `open-${mode.toLowerCase()}`, [300, 1200, 2800, 4400])
-      reveals[mode] = await page.evaluate(parkAndCompare, morphSelectors.piece)
+      reveals[mode] = await page.evaluate(parkAndCompare, fileEditAnimationSelectors.piece)
       await page.evaluate(resume)
-      await page.locator(morphSelectors.revealLayer).waitFor({ state: 'detached', timeout: 20_000 })
+      await page
+        .locator(fileEditAnimationSelectors.revealLayer)
+        .waitFor({ state: 'detached', timeout: 20_000 })
     }
     await step('open-settled')
 

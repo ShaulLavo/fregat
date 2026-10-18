@@ -21,6 +21,7 @@ import {
   type TransformBias,
 } from './displayTransforms'
 
+import type { TextReadSnapshot } from './documentTextSnapshot'
 import type { TextOffsetRange } from './textRanges'
 
 declare const inlinePointBrand: unique symbol
@@ -141,6 +142,119 @@ export const inlineSpecsAtSnapshot = (
   snapshot: PieceTableSnapshot,
 ): readonly InlineReplacementSpec[] =>
   inlineMapFromRanges(snapshot, map.ranges).ranges.map(inlineSpecFromRange)
+
+// How far from its old line a rewritten line is looked for, in characters either way.
+const REWRITE_SEARCH_CHARS = 16_384
+
+/**
+ * {@link inlineSpecsAtSnapshot}, plus the replacements an edit rewrote away: one on a line the edit
+ * put back word for word nearby, as moving lines does, follows that line. A replacement whose text
+ * the edit changed is dropped, so typed text shows until the next parse. Groups stay whole: all
+ * carried, all moved with their lines, or gone. `source` is the text the map was built on and
+ * `text` the text at `snapshot`.
+ */
+export const inlineSpecsAfterRewrite = (
+  map: InlineMap,
+  source: TextReadSnapshot,
+  snapshot: PieceTableSnapshot,
+  text: TextReadSnapshot,
+): readonly InlineReplacementSpec[] => {
+  const carried = unchangedSpecs(map, source, inlineSpecsAtSnapshot(map, snapshot), text)
+  const kept = new Set(carried.map((spec) => spec.id))
+  const lost = map.ranges.filter((range) => !kept.has(range.id) && range.insertion !== true)
+  if (lost.length === 0) return wholeGroups(map, carried)
+
+  const taken = new Set(carried.map((spec) => text.lineAt(spec.startIndex)))
+  const moved = new Map<number, number | null>()
+  const relocated: InlineReplacementSpec[] = []
+  // A group moves as one block: every member by the same distance.
+  const groupShift = new Map<string, number | null>()
+  for (const range of lost) {
+    const oldLine = source.lineAt(range.startOffset)
+    if (!moved.has(oldLine)) moved.set(oldLine, rewrittenLineStart(source, oldLine, text, taken))
+    const lineStart = moved.get(oldLine)
+    if (lineStart === null || lineStart === undefined) continue
+    const delta = lineStart - source.lineStart(oldLine)
+    relocated.push(shiftedSpec(range, delta))
+    if (range.groupId === undefined) continue
+    const shift = groupShift.get(range.groupId)
+    groupShift.set(range.groupId, shift === undefined || shift === delta ? delta : null)
+  }
+  const together = relocated.filter(
+    (spec) => spec.groupId === undefined || groupShift.get(spec.groupId) !== null,
+  )
+  return wholeGroups(map, carried).concat(wholeGroups(map, together))
+}
+
+/** The carried specs whose source still reads as it did. */
+function unchangedSpecs(
+  map: InlineMap,
+  source: TextReadSnapshot,
+  carried: readonly InlineReplacementSpec[],
+  text: TextReadSnapshot,
+): readonly InlineReplacementSpec[] {
+  const before = new Map(map.ranges.map((range) => [range.id, range]))
+  return carried.filter((spec) => {
+    const old = before.get(spec.id)
+    const was = old ? source.readRange(old.startOffset, old.endOffset) : null
+    return was === text.readRange(spec.startIndex, spec.endIndex)
+  })
+}
+
+/** `specs` without any group that lost a member the map had, which would paint half a pair. */
+function wholeGroups(
+  map: InlineMap,
+  specs: readonly InlineReplacementSpec[],
+): readonly InlineReplacementSpec[] {
+  const present = new Set(specs.map((spec) => spec.id))
+  const broken = new Set<string>()
+  for (const range of map.ranges) {
+    if (range.groupId !== undefined && !present.has(range.id)) broken.add(range.groupId)
+  }
+  return specs.filter((spec) => spec.groupId === undefined || !broken.has(spec.groupId))
+}
+
+/** Where the old line's exact text now starts as a whole line, nearest first, or null. */
+function rewrittenLineStart(
+  source: TextReadSnapshot,
+  oldLine: number,
+  text: TextReadSnapshot,
+  taken: Set<number>,
+): number | null {
+  const { start, end } = source.lineRange(oldLine)
+  const line = source.readRange(start, end)
+  if (line.length === 0) return null
+  const windowStart = Math.max(0, start - REWRITE_SEARCH_CHARS)
+  const window = text.readRange(windowStart, Math.min(text.length, end + REWRITE_SEARCH_CHARS))
+  let best: number | null = null
+  for (let at = window.indexOf(line); at >= 0; at = window.indexOf(line, at + 1)) {
+    const lineStart = windowStart + at
+    const newLine = text.lineAt(lineStart)
+    const range = text.lineRange(newLine)
+    if (range.start !== lineStart || range.end !== lineStart + line.length) continue
+    if (taken.has(newLine)) continue
+    if (best === null || Math.abs(lineStart - start) < Math.abs(best - start)) best = lineStart
+  }
+  if (best !== null) taken.add(text.lineAt(best))
+  return best
+}
+
+function shiftedSpec(range: InlineReplacementRange, delta: number): InlineReplacementSpec {
+  const spec = inlineSpecFromRange(range)
+  return {
+    ...spec,
+    startIndex: spec.startIndex + delta,
+    endIndex: spec.endIndex + delta,
+    ...(range.revealRange === undefined
+      ? {}
+      : {
+          revealRange: {
+            start: range.revealRange.offsets.start + delta,
+            end: range.revealRange.offsets.end + delta,
+          },
+        }),
+  }
+}
 
 const inlineSpecFromRange = (range: InlineReplacementRange): InlineReplacementSpec => ({
   id: range.id,

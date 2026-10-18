@@ -184,6 +184,11 @@ export type EditorContributionChange = Omit<
   'snapshot' | 'textSnapshot' | 'transaction'
 > & {
   readonly textSnapshot: TextReadSnapshot
+  /**
+   * True when every edit in the change is keyboard text input: typed text, Enter, Backspace or
+   * Delete at a caret, or IME composition.
+   */
+  readonly typing?: boolean
 }
 
 export type EditorResolvedSelection = {

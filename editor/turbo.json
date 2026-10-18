@@ -23,7 +23,7 @@
     "@singapore-editor/core#typecheck": {
       "dependsOn": [
         "build",
-        "@singapore-editor/decode#build",
+        "@singapore-editor/file-animation#build",
         "@singapore-editor/diff#build",
         "@singapore-editor/find#build",
         "@singapore-editor/gutters#build",

@@ -390,17 +390,22 @@
       "enum": ["all", "relay-only"],
       "type": "string"
     },
-    "editor.decode.mode": {
-      "default": "off",
-      "description": "Animate a file as it opens, as if it were being written.",
-      "enum": ["autoregressive", "diffusion", "off", "parallel", "token"],
-      "markdownDescription": "Animate a file as it opens, as if it were being written.\n\nAutoregressive writes the file in reading order behind a caret. Parallel writes every line at once from staggered starts. Token stamps one token at a time, like a language model. Diffusion resolves scrambled text in clusters.",
-      "type": "string"
-    },
     "editor.diff.viewMode": {
       "default": "stacked",
       "description": "Show diffs side by side or stacked.",
       "enum": ["split", "stacked"],
+      "type": "string"
+    },
+    "editor.fileEditAnimation.enabled": {
+      "default": true,
+      "description": "Animate every edit except typing: undo, redo, paste, commands and generated code. Text that stays slides to its new place, removed text fades out, and new text streams in. Typing stays instant.",
+      "type": "boolean"
+    },
+    "editor.fileTransition.mode": {
+      "default": "off",
+      "description": "Animate a file as it opens, as if it were being written.",
+      "enum": ["autoregressive", "diffusion", "magicMove", "off", "parallel", "token"],
+      "markdownDescription": "Animate a file as it opens, as if it were being written.\n\nAutoregressive writes the file in reading order behind a caret. Parallel writes every line at once from staggered starts. Token stamps one token at a time, like a language model. Diffusion resolves scrambled text in clusters. Magic move slides the text two files share from where it stood in the previous file to its place in the new one.",
       "type": "string"
     },
     "editor.fontFamily": {
@@ -495,9 +500,9 @@
     },
     "editor.markdownView": {
       "default": "preview",
-      "description": "Edit Markdown as plain source, or as a live preview that formats the text and shows the Markdown symbols near the cursor. The Cycle Markdown View command changes one file.",
-      "enum": ["preview", "source"],
-      "markdownDescription": "Edit Markdown as plain source, or as a live preview that formats the text and shows the Markdown symbols near the cursor. The Cycle Markdown View command changes one file.\n\nLive preview formats Markdown in place and reveals syntax near the caret. Plain source keeps Markdown syntax visible. The rendered side pane is a separate setting.",
+      "description": "Edit Markdown as plain source or as a live preview that formats the text and shows the Markdown symbols near the cursor, or read it as a rendered page. The Cycle Markdown View command changes one file.",
+      "enum": ["preview", "rendered", "source"],
+      "markdownDescription": "Edit Markdown as plain source or as a live preview that formats the text and shows the Markdown symbols near the cursor, or read it as a rendered page. The Cycle Markdown View command changes one file.\n\nLive preview formats Markdown in place and reveals syntax near the caret. Plain source keeps Markdown syntax visible. Rendered page shows only the finished page, for reading. The rendered side pane is a separate setting.",
       "type": "string"
     },
     "editor.maxTokenizationLineLength": {
@@ -510,11 +515,6 @@
     "editor.minimap.enabled": {
       "default": true,
       "description": "Show the minimap beside the editor.",
-      "type": "boolean"
-    },
-    "editor.morph.enabled": {
-      "default": true,
-      "description": "Animate undo, redo, pasted and generated code: text that stays slides to its new place, removed text fades out, and new text streams in. Typing stays instant.",
       "type": "boolean"
     },
     "editor.retainedTextBudget": {

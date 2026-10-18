@@ -5,7 +5,14 @@ import path from 'node:path'
 import type { Page } from 'playwright'
 
 import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
-import { focusEditor, openFileFromTree, runPaletteCommand, selectors } from '../selectors'
+import {
+  chords,
+  focusEditor,
+  openFileFromTree,
+  pressShortcut,
+  runPaletteCommand,
+  selectors,
+} from '../selectors'
 import type { Scenario } from './index'
 
 // A 1×1 PNG, so the rendered image has something real to load.
@@ -38,7 +45,7 @@ function preview(page: Page) {
 export const markdownSplitView: Scenario = {
   name: 'markdown-split-view',
   description:
-    'Open a rendered pane beside Markdown editing: headings render, scrolling either side follows the other through a 100-line fence, workspace links open and images load; closing the pane preserves the editor.',
+    'Open a rendered pane beside Markdown editing: headings render, the page has no bar or background of its own, the divider resizes it, scrolling either side follows the other through a 100-line fence, workspace links open and images load; closing the pane preserves the editor, and the rendered-only view hides the editor.',
   async run(page, { step }) {
     const fixture = await mkdtemp(scratchPath('fregat-markdown-split-'))
     try {
@@ -59,6 +66,30 @@ export const markdownSplitView: Scenario = {
             : new Promise((resolve) => image.addEventListener('load', () => resolve(true))),
         )
       await step('split-view')
+
+      // The page sits on the app's background with no bar of its own.
+      const pane = page.locator('[data-markdown-preview]')
+      strictEqual(await pane.getByText('Preview', { exact: true }).count(), 0, 'no Preview label')
+      strictEqual(
+        await pane.evaluate((element) => getComputedStyle(element).backgroundColor),
+        'rgba(0, 0, 0, 0)',
+        'the page has no background of its own',
+      )
+
+      // Dragging the divider resizes both sides.
+      const before = (await pane.boundingBox())!.width
+      const handle = page.locator('[data-slot="resizable-handle"][id^="markdown-split-handle-"]')
+      const grip = (await handle.boundingBox())!
+      await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(grip.x + grip.width / 2 - 160, grip.y + grip.height / 2, { steps: 8 })
+      await page.mouse.up()
+      const after = (await pane.boundingBox())!.width
+      ok(
+        after > before + 100,
+        `Dragging the divider widened the page from ${before}px to ${after}px`,
+      )
+      await step('resized')
 
       // Editor → preview: the source scrolled into the fence puts the fence at the preview's top.
       await focusEditor(page)
@@ -109,6 +140,41 @@ export const markdownSplitView: Scenario = {
       await page.locator('[data-markdown-preview]').waitFor({ state: 'detached' })
       strictEqual(await page.locator('[data-markdown-preview]').count(), 0)
       await step('source-only')
+
+      // Live preview → plain source → the rendered page alone, then back to live preview.
+      await focusEditor(page)
+      await page.keyboard.press('Control+Home')
+      await runPaletteCommand(page, 'Cycle markdown view')
+      await runPaletteCommand(page, 'Cycle markdown view')
+      await preview(page).getByRole('heading', { name: 'Guide', level: 1 }).waitFor()
+      ok(!(await selectors.editorSurface(page).first().isVisible()), 'the editor is hidden')
+      await step('rendered-only')
+      // Editor commands reach nothing while only the page shows; the palette may not offer them.
+      await pressShortcut(page, chords.commandPalette)
+      await selectors.paletteInput(page).fill('>Delete line')
+      const deleteLine = selectors.commandOption(page, 'Delete line').first()
+      if (await deleteLine.isVisible({ timeout: 2_000 }).catch(() => false))
+        await deleteLine.click()
+      else await page.keyboard.press('Escape')
+      await runPaletteCommand(page, 'Cycle markdown view')
+      await page.locator('[data-markdown-preview]').waitFor({ state: 'detached' })
+      ok(await selectors.editorSurface(page).first().isVisible(), 'the editor is back')
+      await page.getByText('const line1 = 1').first().waitFor()
+      // Live preview shows `# ` on the caret's line; a deleted line would leave the blank one on top.
+      const firstRow = await page
+        .locator('.editor-virtualized-row')
+        .evaluateAll(
+          (rows) =>
+            rows
+              .filter((row) => row.getBoundingClientRect().height > 0)
+              .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0]
+              ?.textContent,
+        )
+      ok(
+        firstRow?.includes('Guide'),
+        `the hidden editor kept its first line: ${JSON.stringify(firstRow)}`,
+      )
+      await step('live-preview-again')
     } finally {
       await releaseFixture(fixture)
     }

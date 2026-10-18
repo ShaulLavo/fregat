@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "manifestHash": "9432f1df9945f8e93102b7269d2bab4ffeb8d62ddea70454a0a6dc6188c43180",
+  "manifestHash": "c826b8d9960715e8ac555a26a62d98091ae0bc6887d50a6de895f6b20c85b135",
   "languages": [
     {
       "id": "javascript",
@@ -720,16 +720,16 @@
       "parserABI": 15,
       "source": {
         "package": "tree-sitter-md",
-        "version": "0.1.10",
+        "version": "0.1.12",
         "repository": "https://github.com/ShaulLavo/tree-sitter-md",
-        "revision": "20981e83c31b78a917ce5747ee9e5205d69a5cd4",
+        "revision": "ef1452f6f1167504b3a2d227536b7235d9b77e69",
         "license": "MIT",
         "compiler": "wasi-sdk 34"
       },
       "sourceFiles": [
         {
           "file": "package.json",
-          "sha256": "b939dd91d34678d6e3467773c73806d8974ac0a8cc08b0302ec4255a1ba30ab5"
+          "sha256": "d83ec5c10da39cf098972480959297a9b3640e6a6b74672303f866461c75fd50"
         },
         {
           "file": "src/autolink.c",
@@ -741,11 +741,11 @@
         },
         {
           "file": "src/footnote.c",
-          "sha256": "5e82ffde7522b9b5bcf3757561d4d5635837389e8562c0fcd0ffc7e40395dab4"
+          "sha256": "34a709daf3c8bd7de16e654b6ef3d4a0fd79fff6efb4463d0b3fcaea28778fdc"
         },
         {
           "file": "src/footnote.h",
-          "sha256": "74704fdfaf3f15845ca88f0680a9ef14a7e2f6174396e73feb217f8aa5d78f58"
+          "sha256": "cc74aea29233ca8c9227356453641450d5565d45003fdb4981dcb31c6d7d9dbc"
         },
         {
           "file": "src/highlight.c",
@@ -765,13 +765,13 @@
         },
         {
           "file": "src/semantic.c",
-          "sha256": "c25762dfd555906a07951cf1aec004f6c0d41c5e1d1a6495be9153186901362b"
+          "sha256": "ffaf04ce9c1db27149cd4f8ec9efeb080a7dd77de932bee5f3d7120edb7fbf33"
         }
       ],
       "files": [
         {
           "file": "tree-sitter-md/tree-sitter-markdown.wasm",
-          "sha256": "0c7a3f7ee38196389a4061830ed227ccf4392852abf768d94f5cd3a2608efdb7"
+          "sha256": "ee7057756019e009d613fd66854fdfe34b47a48f547cdfcea0062d2c0accaaa9"
         },
         {
           "file": "./queries/markdown-merge-units.scm",

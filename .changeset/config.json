@@ -11,7 +11,7 @@
   "fixed": [
     [
       "@singapore-editor/core",
-      "@singapore-editor/decode",
+      "@singapore-editor/file-animation",
       "@singapore-editor/diff",
       "@singapore-editor/find",
       "@singapore-editor/gutters",

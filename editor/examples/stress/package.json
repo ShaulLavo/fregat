@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "@singapore-editor/core": "workspace:*",
-    "@singapore-editor/decode": "workspace:*",
+    "@singapore-editor/file-animation": "workspace:*",
     "@singapore-editor/find": "workspace:*",
     "@singapore-editor/gutters": "workspace:*",
     "@singapore-editor/lsp": "workspace:*",
