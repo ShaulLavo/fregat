@@ -78,7 +78,11 @@ export function frameUniforms(
   state.update(
     position,
     rgba(theme.cursor),
-    cursorStyle(terminal.appearance.cursor.style),
+    cursorStyle(
+      submitted?.paintedCursor?.style ??
+        submitted?.cursor.style ??
+        terminal.appearance.cursor.style,
+    ),
     frame.time,
   )
   const date = new Date()
@@ -108,7 +112,7 @@ export function frameUniforms(
     iPreviousCursorColor: state.previousColor,
     iCurrentCursorStyle: state.style,
     iPreviousCursorStyle: state.previousStyle,
-    iCursorVisible: submitted?.paintedCursor ? 1 : 0,
+    iCursorVisible: submitted?.paintedCursor?.visible ? 1 : 0,
     iTimeCursorChange: state.changedAt,
     iFocus: terminal.element?.contains(terminal.element.ownerDocument.activeElement) ? 1 : 0,
     iTimeFocus: state.focusAt,

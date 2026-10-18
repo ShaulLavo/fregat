@@ -10,6 +10,7 @@ import { WebGlTerminalRenderer } from '../../../../dist/render/webgl/renderer.js
 import { FallbackTerminalRenderer } from '../../../../dist/render/shared/fallback.js'
 import { CanvasTerminalRenderer } from '../../../../dist/render/canvas/renderer.js'
 import { createShaderAddon, type CompiledShader } from '../../dist/index.js'
+import { frameUniforms, UniformState } from '../../dist/terminal-uniforms.js'
 import { Terminal as WorkerTerminal } from '../../../../dist/worker/index.js'
 import { testFontUrl } from '../../../../src/tests/fonts.js'
 import { copyShader, greenShader, language, uniformShader, timeShader } from './artifacts.js'
@@ -186,6 +187,53 @@ it.each(['webgpu', 'webgl2'] satisfies ('webgpu' | 'webgl2')[])(
     f.terminal.dispose()
     expect(f.canvas.isConnected).toBe(false)
     expect(f.errors).toEqual([])
+  },
+)
+
+it.each(['webgpu', 'webgl2'] satisfies ('webgpu' | 'webgl2')[])(
+  'uses submitted cursor visibility for hidden and suppressed cursors on %s',
+  async (backend) => {
+    const f = await fixture(backend)
+    const state = new UniformState()
+    const read = () => frameUniforms(f.terminal, state, { time: 1, delta: 0, frame: 0 }, f.canvas)
+    await expect.poll(() => f.terminal.submittedFrame?.paintedCursor?.visible).toBe(false)
+    expect(read().iCursorVisible).toBe(0)
+    f.terminal.write('\x1b[?25h')
+    await expect.poll(() => f.terminal.submittedFrame?.paintedCursor?.visible).toBe(true)
+    expect(read().iCursorVisible).toBe(1)
+    f.terminal.setCursorInactiveStyle('none')
+    await expect.poll(() => f.terminal.submittedFrame?.paintedCursor?.visible).toBe(false)
+    expect(read().iCursorVisible).toBe(0)
+  },
+)
+
+it.each(['webgpu', 'webgl2'] satisfies ('webgpu' | 'webgl2')[])(
+  'tracks submitted cursor style transitions independently of appearance on %s',
+  async (backend) => {
+    const f = await fixture(backend)
+    const state = new UniformState()
+    const read = (time: number) =>
+      frameUniforms(f.terminal, state, { time, delta: 0, frame: 0 }, f.canvas)
+    f.terminal.setCursor({ style: 'block', blink: false })
+    f.terminal.write('\x1b[?25h')
+    await expect.poll(() => f.terminal.submittedFrame?.paintedCursor?.visible).toBe(true)
+    await expect.poll(() => f.terminal.submittedFrame?.paintedCursor?.style).toBe('block')
+    expect(read(1).iCurrentCursorStyle).toBe(0)
+    f.terminal.setCursorInactiveStyle('bar')
+    await expect.poll(() => f.terminal.submittedFrame?.paintedCursor?.style).toBe('bar')
+    expect(f.terminal.appearance.cursor.style).toBe('block')
+    expect(read(2)).toMatchObject({
+      iCurrentCursorStyle: 2,
+      iPreviousCursorStyle: 0,
+      iTimeCursorChange: 2,
+    })
+    f.terminal.setCursorInactiveStyle('underline')
+    await expect.poll(() => f.terminal.submittedFrame?.paintedCursor?.style).toBe('underline')
+    expect(read(3)).toMatchObject({
+      iCurrentCursorStyle: 3,
+      iPreviousCursorStyle: 2,
+      iTimeCursorChange: 3,
+    })
   },
 )
 
