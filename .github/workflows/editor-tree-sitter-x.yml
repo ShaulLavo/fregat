@@ -1,76 +1,92 @@
 name: tree-sitter-x
 
-# Keeps web-tree-sitter on the newest tree-sitter-x build: when the fork's web-tree-sitter branch
-# moves, this opens (or updates) a pull request with the new pin. Pull requests opened with the
-# workflow token do not trigger `pull_request` runs, so it starts CI on the branch itself.
-# Repository Actions settings must allow GitHub Actions to create and approve pull requests.
-
+# Generate with read access, publish data with write access, then merge only the exact head
+# recorded by this updater after its explicitly dispatched full CI verdict succeeds.
 on:
   schedule:
     - cron: '17 */3 * * *'
   workflow_dispatch:
 
-permissions:
-  actions: write
-  contents: write
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: tree-sitter-x-update
+  cancel-in-progress: false
 
 jobs:
   update:
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
-
+        with:
+          persist-credentials: false
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
-
       - uses: actions/setup-node@v4
         with:
           node-version: 26
-
       - name: Pin the newest build
         run: bun run --cwd editor tree-sitter-x:update
+      - name: Save the generated change
+        run: |
+          mkdir "$RUNNER_TEMP/pin-update"
+          git diff --binary > "$RUNNER_TEMP/pin-update/update.patch"
+          base=$(git rev-parse HEAD)
+          runtime=$(jq -r '.dependencies["web-tree-sitter"] | split("#")[1]' editor/packages/tree-sitter/package.json)
+          markdown=$(jq -r '.dependencies["tree-sitter-md"] | split("#")[1]' editor/packages/tree-sitter/package.json)
+          jq -n --arg base "$base" --arg runtime "$runtime" --arg markdown "$markdown" \
+            '{base: $base, runtime: $runtime, markdown: $markdown}' > "$RUNNER_TEMP/pin-update/metadata.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parser-pin-change
+          path: ${{ runner.temp }}/pin-update
+          retention-days: 1
 
+  publish:
+    needs: update
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      # Only trusted main code runs here. The generated patch is data, never executed.
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - uses: actions/download-artifact@v4
+        with:
+          name: parser-pin-change
+          path: pin-update
       - name: Open a pull request
-        shell: bash
+        id: publish
         env:
           GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/parser-pins.mjs publish
+      - name: Record the generated head
+        if: ${{ steps.publish.outputs.head != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-sitter-pin-${{ steps.publish.outputs.head }}
+          overwrite: true
+          path: pin-receipt.json
+          retention-days: 30
+      # GITHUB_TOKEN PRs do not start PR CI. Manual CI validates the entire repository.
+      - name: Dispatch full CI
+        if: ${{ steps.publish.outputs.head != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          branch: ${{ steps.publish.outputs.branch }}
+          commit: ${{ steps.publish.outputs.head }}
         run: |
-          if git diff --quiet; then exit 0; fi
-          pin=$(command grep -oh 'tree-sitter-x#[0-9a-f]*' editor/packages/tree-sitter/package.json | cut -d'#' -f2)
-          markdown=$(command grep -oh 'tree-sitter-md#[0-9a-f]*' editor/packages/tree-sitter/package.json | cut -d'#' -f2)
-          branch="tree-sitter-x/$pin-$markdown"
-          pull=$(gh api --method GET --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls" \
-            -f state=all -f base=main -f head="${GITHUB_REPOSITORY%%/*}:$branch" \
-            -f sort=created -f direction=desc -F per_page=100 |
-            jq -r --arg repository "$GITHUB_REPOSITORY" '
-              [.[][] | select(.head.repo.full_name == $repository)][0] |
-              if . == null then "" else [.number, (if .merged_at then "MERGED" else (.state | ascii_upcase) end)] | @tsv end')
-          read -r number state <<< "$pull"
-          if [ "$state" = CLOSED ] || [ "$state" = MERGED ]; then exit 0; fi
-          remote=$(git ls-remote origin "refs/heads/$branch")
-          if [ -z "$remote" ]; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git switch -c "$branch"
-            git commit -qam "Update tree-sitter-x to $pin"
-            git push -q origin "$branch"
-            commit=$(git rev-parse HEAD)
-          else
-            read -r commit _ <<< "$remote"
-          fi
-          title="Update tree-sitter-x to $pin"
-          body="Pins web-tree-sitter to [tree-sitter-x@$pin](https://github.com/ShaulLavo/tree-sitter-x/commit/$pin) and its matching required Markdown peer to [tree-sitter-md@$markdown](https://github.com/ShaulLavo/tree-sitter-md/commit/$markdown)."
-          if [ "$state" = OPEN ]; then
-            gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
-          else
-            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" --title "$title" --body "$body"
-          fi
-          runs=$(gh run list --workflow ci.yml --branch "$branch" --commit "$commit" --limit 1 --json databaseId -q length)
+          runs=$(gh run list --workflow ci.yml --branch "$branch" --commit "$commit" --event workflow_dispatch --limit 1 --json databaseId -q length)
           if [ "$runs" -eq 0 ]; then
             gh workflow run ci.yml --ref "$branch"
           fi
