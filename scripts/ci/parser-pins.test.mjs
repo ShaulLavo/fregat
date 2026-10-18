@@ -306,6 +306,12 @@ function publicationFixture() {
 test('creates one immutable branch and PR, and reuses it on the same pin pair rerun', async () => {
   const fixture = publicationFixture()
   const result = await fixture.publish()
+  expect(result.branch).toBe(
+    `tree-sitter-x/auto/${fixture.metadata.runtime}-${fixture.metadata.markdown}`,
+  )
+  expect(fixture.state.writes.find((write) => write.method === 'POST').body.head).toBe(
+    result.branch,
+  )
   const original = fixture.git('ls-remote', 'origin', `refs/heads/${result.branch}`)
   fixture.state.pull.head.sha = result.head
   fixture.state.artifact.name = `tree-sitter-pin-${result.head}`
