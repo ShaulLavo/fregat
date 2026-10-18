@@ -92,6 +92,43 @@ test('splits a srcset the way browsers do, keeping the comma inside a data URL',
   ])
 })
 
+test('keeps a comma inside a parenthesized srcset descriptor', () => {
+  expect(sourceSetCandidates('a.png 1x (foo,bar), b.png 2x')).toEqual([
+    { url: 'a.png', descriptor: '1x (foo,bar)' },
+    { url: 'b.png', descriptor: '2x' },
+  ])
+})
+
+test('loads an external fallback normally when its workspace source is for the other mode', async () => {
+  const { container } = render(
+    <MarkdownPreviewContext
+      value={{
+        documentPath: 'repo/README.md',
+        rootPath: 'repo',
+        origin: 'http://example.com',
+        openFile: () => {},
+        colorMode: 'light',
+      }}
+    >
+      <Markdown
+        components={{
+          img: MarkdownPreviewImage,
+          picture: MarkdownPreviewPicture,
+          source: MarkdownPreviewSource,
+        }}
+        text={[
+          '<picture>',
+          '  <source media="(prefers-color-scheme: dark)" srcset="./dark.png">',
+          '  <img alt="logo" src="https://cdn.example/logo.png">',
+          '</picture>',
+        ].join('\n')}
+      />
+    </MarkdownPreviewContext>,
+  )
+  await waitFor(() => expect(container.querySelector('img')).not.toBeNull())
+  expect(container.querySelector('img')?.getAttribute('crossorigin')).toBeNull()
+})
+
 test('loads an external fallback beside a workspace source as a CORS request', async () => {
   const { container } = render(
     <MarkdownPreviewContext

@@ -159,6 +159,11 @@ export const markdownSplitView: Scenario = {
       await runPaletteCommand(page, 'Cycle markdown view')
       await page.locator('[data-markdown-preview]').waitFor({ state: 'detached' })
       ok(await selectors.editorSurface(page).first().isVisible(), 'the editor is back')
+      await page.waitForFunction(
+        () => document.activeElement?.getAttribute('aria-label') === 'Editor input',
+        undefined,
+        { timeout: 5_000 },
+      )
       await page.getByText('const line1 = 1').first().waitFor()
       // Live preview shows `# ` on the caret's line; a deleted line would leave the blank one on top.
       const firstRow = await page

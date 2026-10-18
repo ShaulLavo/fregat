@@ -7,6 +7,8 @@ const COLOR_SCHEME_QUERY = /^\s*\(\s*prefers-color-scheme\s*:\s*(light|dark)\s*\
 const SPACE = /\s/u
 
 type PreviewPaths = { readonly documentPath: string; readonly rootPath: string }
+type Preview = PreviewPaths & { readonly colorMode: 'light' | 'dark' }
+type SourceNode = { readonly srcSet: string; readonly media: string | undefined }
 
 /**
  * A `<picture>` source in rendered markdown: its images load from the workspace like `<img>`,
@@ -20,25 +22,36 @@ export function MarkdownPreviewSource({
 }: ComponentProps<'source'> & { readonly node?: unknown }) {
   const preview = use(MarkdownPreviewContext)
   if (!preview) return <source {...props} media={media} srcSet={srcSet} />
-  const scheme = media ? COLOR_SCHEME_QUERY.exec(media)?.[1]?.toLowerCase() : undefined
   return (
     <source
       {...props}
-      media={scheme ? (scheme === preview.colorMode ? 'all' : 'not all') : media}
+      media={previewMedia(media, preview.colorMode)}
       srcSet={srcSet ? previewSourceSet(srcSet, preview) : undefined}
     />
   )
 }
 
-/** A `<picture>` in rendered markdown, which tells its `<img>` when a source is a workspace file. */
+/** A light or dark query answered by the app's colour mode; any other query left to the browser. */
+function previewMedia(media: string | undefined, colorMode: Preview['colorMode']) {
+  const scheme = media ? COLOR_SCHEME_QUERY.exec(media)?.[1]?.toLowerCase() : undefined
+  if (!scheme) return media
+  return scheme === colorMode ? 'all' : 'not all'
+}
+
+/**
+ * A `<picture>` in rendered markdown, which tells its `<img>` when the source the browser will pick
+ * is a workspace file: that request needs CORS, and an external image that sends no CORS headers
+ * would fail with it.
+ */
 export function MarkdownPreviewPicture({
   node,
   ...props
 }: ComponentProps<'picture'> & { readonly node?: unknown }) {
   const preview = use(MarkdownPreviewContext)
-  const workspace = preview
-    ? sourceSets(node).some((set) => loadsFromWorkspace(set, preview))
-    : false
+  const chosen = preview
+    ? pictureSources(node).find((source) => applies(source, preview))
+    : undefined
+  const workspace = preview && chosen ? loadsFromWorkspace(chosen.srcSet, preview) : false
   return (
     <MarkdownPictureContext value={workspace}>
       <picture {...props} />
@@ -68,15 +81,28 @@ function loadsFromWorkspace(srcSet: string, preview: PreviewPaths) {
   )
 }
 
-/** The `srcset` of each `<source>` child of a rendered `<picture>` node. */
-function sourceSets(node: unknown): string[] {
+/** Whether the browser would take this source now: its media query matches. */
+function applies(source: SourceNode, preview: Preview) {
+  const media = previewMedia(source.media, preview.colorMode)
+  if (!media || media === 'all') return true
+  if (media === 'not all') return false
+  return globalThis.matchMedia?.(media).matches ?? true
+}
+
+/** Each `<source>` child of a rendered `<picture>` node, in document order. */
+function pictureSources(node: unknown): SourceNode[] {
   const children = (node as { children?: readonly unknown[] } | undefined)?.children ?? []
   return children.flatMap((child) => {
-    const element = child as { tagName?: string; properties?: { srcSet?: unknown } }
+    const element = child as {
+      tagName?: string
+      properties?: { srcSet?: unknown; media?: unknown }
+    }
     if (element.tagName !== 'source') return []
-    const srcSet = element.properties?.srcSet
-    if (typeof srcSet === 'string') return [srcSet]
-    return Array.isArray(srcSet) ? [srcSet.join(', ')] : []
+    const raw = element.properties?.srcSet
+    const srcSet = Array.isArray(raw) ? raw.join(', ') : raw
+    if (typeof srcSet !== 'string') return []
+    const media = element.properties?.media
+    return [{ srcSet, media: typeof media === 'string' ? media : undefined }]
   })
 }
 
@@ -100,11 +126,24 @@ export function sourceSetCandidates(
       index = urlEnd
       continue
     }
-    const descriptorEnd = runEnd(srcSet, urlEnd, (char) => char === ',')
+    const descriptorEnd = descriptorRunEnd(srcSet, urlEnd)
     candidates.push({ url: raw, descriptor: srcSet.slice(urlEnd, descriptorEnd).trim() })
     index = descriptorEnd + 1
   }
   return candidates
+}
+
+/** Where a descriptor ends: the next comma outside parentheses, or the end. */
+function descriptorRunEnd(text: string, from: number) {
+  let depth = 0
+  let index = from
+  for (; index < text.length; index += 1) {
+    const char = text[index]
+    if (char === '(') depth += 1
+    if (char === ')') depth = Math.max(0, depth - 1)
+    if (char === ',' && depth === 0) break
+  }
+  return index
 }
 
 function skipSeparators(text: string, from: number) {
