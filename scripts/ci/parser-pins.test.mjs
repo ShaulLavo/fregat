@@ -12,254 +12,48 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, onTestFinished, test } from 'vitest'
-import { mergePins, publishPins } from './parser-pins.mjs'
+import { publishPins } from './parser-pins.mjs'
 
 function githubFixture() {
   const data = JSON.parse(
     readFileSync(new URL('./fixtures/parser-pins.json', import.meta.url), 'utf8'),
   )
-  const state = {
-    ...data,
-    pulls: [data.pull],
-    runs: [data.ci],
-    jobs: [data.job],
-    artifacts: [data.artifact],
-    writes: [],
-    reads: [],
-    current: data.pull,
-  }
+  const state = { ...data, pulls: [], writes: [], reads: [] }
   const api = {
-    get: async (endpoint) => {
-      state.reads.push(endpoint)
-      if (endpoint === 'actions/runs/10') return state.updater
-      if (endpoint === 'actions/runs/20') return state.ci
-      if (endpoint === 'pulls/42') return state.current
-      if (endpoint.startsWith('pulls/'))
-        return state.pulls.find((pull) => endpoint === `pulls/${pull.number}`)
-      assert.fail(endpoint)
-    },
     pages: async (endpoint) => {
       state.reads.push(endpoint)
-      if (endpoint.startsWith('pulls?state=open&'))
-        return state.pulls.filter((pull) => pull.state === 'open')
-      if (endpoint.startsWith('pulls?state=all&')) return state.pulls
-      if (endpoint.startsWith('actions/artifacts?')) return state.artifacts
-      if (endpoint.startsWith('actions/workflows/ci.yml/runs?')) return state.runs
-      if (endpoint.startsWith('actions/runs/20/jobs?')) return state.jobs
-      if (endpoint.endsWith('/files?per_page=100')) return state.files
-      assert.fail(endpoint)
+      const url = new URL(`https://fixture.invalid/${endpoint}`)
+      assert.equal(url.pathname, '/pulls')
+      assert.equal(url.searchParams.get('state'), 'open')
+      const head = url.searchParams.get('head')
+      return state.pulls.filter(
+        (pull) =>
+          pull.state === 'open' && `${state.repository.split('/')[0]}:${pull.head.ref}` === head,
+      )
     },
     write: async (endpoint, method, body) => {
       state.writes.push({ endpoint, method, body })
       if (endpoint === 'pulls') {
         const number = Math.max(41, ...state.pulls.map((pull) => pull.number)) + 1
-        const pull = { ...state.pull, number, head: { ...state.pull.head, ref: body.head } }
-        state.pulls.push(pull)
-        if (number === 42) {
-          state.pull = pull
-          state.current = pull
+        const pull = {
+          ...structuredClone(state.pull),
+          ...body,
+          number,
+          base: structuredClone(state.pull.base),
+          head: { ...state.pull.head, ref: body.head },
         }
+        state.pulls.push(pull)
         return { number }
       }
-      if (endpoint.endsWith('/merge')) state.current.state = 'closed'
-      if (method === 'PATCH')
-        state.pulls.find((pull) => endpoint === `pulls/${pull.number}`).state = body.state
-      return { merged: true }
+      assert.equal(method, 'PATCH')
+      const pull = state.pulls.find((pull) => endpoint === `pulls/${pull.number}`)
+      assert.ok(pull)
+      Object.assign(pull, body)
+      return pull
     },
   }
-  const merge = (id = 20) =>
-    mergePins({ api, repository: state.repository, event: { workflow_run: { id } } })
-  return { state, api, merge }
+  return { state, api }
 }
-
-test('squash-merges an authenticated head only after its full CI aggregate succeeds, once', async () => {
-  const fixture = githubFixture()
-  await fixture.merge()
-  await fixture.merge()
-  expect(fixture.state.writes).toEqual([
-    {
-      endpoint: 'pulls/42/merge',
-      method: 'PUT',
-      body: { merge_method: 'squash', sha: fixture.state.ci.head_sha },
-    },
-  ])
-})
-
-test.each(['failure', 'cancelled', 'neutral', 'skipped', null])(
-  'CI %s never merges',
-  async (conclusion) => {
-    const fixture = githubFixture()
-    fixture.state.ci.conclusion = conclusion
-    await fixture.merge()
-    expect(fixture.state.writes).toEqual([])
-  },
-)
-
-test.each(['queued', 'in_progress'])('CI %s never merges', async (status) => {
-  const fixture = githubFixture()
-  fixture.state.ci.status = status
-  await fixture.merge()
-  expect(fixture.state.writes).toEqual([])
-})
-
-test.each([
-  (state) => {
-    state.runs = []
-  },
-  (state) => {
-    state.jobs = []
-  },
-  (state) => {
-    state.jobs.push({ ...state.job })
-  },
-  (state) => {
-    state.job.conclusion = 'failure'
-  },
-  (state) => {
-    state.job.status = 'in_progress'
-  },
-  (state) => {
-    state.job.head_sha = 'd'.repeat(40)
-  },
-  (state) => {
-    state.job.run_attempt = 1
-  },
-  (state) => {
-    state.job.run_id = 21
-  },
-  (state) => {
-    state.ci.event = 'pull_request'
-  },
-  (state) => {
-    state.ci.path = '.github/workflows/other.yml'
-  },
-  (state) => {
-    state.ci.repository.full_name = 'fixture/fork'
-  },
-  (state) => {
-    state.ci.head_sha = 'd'.repeat(40)
-  },
-  (state) => {
-    state.ci.head_branch = 'human'
-  },
-])('missing, partial, foreign, or stale CI evidence blocks merge %#', async (mutate) => {
-  const fixture = githubFixture()
-  mutate(fixture.state)
-  await fixture.merge()
-  expect(fixture.state.writes).toEqual([])
-})
-
-test('a newer failed or pending full run blocks an older successful one', async () => {
-  const fixture = githubFixture()
-  fixture.state.runs.unshift({
-    ...fixture.state.ci,
-    id: 21,
-    status: 'in_progress',
-    conclusion: null,
-  })
-  await fixture.merge()
-  expect(fixture.state.writes).toEqual([])
-})
-
-test.each([
-  (state) => {
-    state.artifacts = []
-  },
-  (state) => {
-    state.artifact.expired = true
-  },
-  (state) => {
-    state.artifact.name = 'tree-sitter-pin-wrong'
-  },
-  (state) => {
-    state.updater.path = '.github/workflows/other.yml'
-  },
-  (state) => {
-    state.updater.head_branch = 'tree-sitter-x/auto/forged'
-  },
-  (state) => {
-    state.updater.event = 'pull_request'
-  },
-  (state) => {
-    state.updater.conclusion = 'failure'
-  },
-  (state) => {
-    state.updater.status = 'in_progress'
-  },
-  (state) => {
-    state.updater.repository.full_name = 'fixture/fork'
-  },
-  (state) => {
-    state.pull.user.id = 1
-  },
-  (state) => {
-    state.pull.user.login = 'other[bot]'
-  },
-  (state) => {
-    state.pull.user.type = 'User'
-  },
-  (state) => {
-    state.pull.head.repo.full_name = 'fixture/fork'
-  },
-  (state) => {
-    state.pull.base.ref = 'other'
-  },
-  (state) => {
-    state.pull.base.repo.full_name = 'fixture/fork'
-  },
-  (state) => {
-    state.pull.draft = true
-  },
-  (state) => {
-    state.pull.head.ref = 'changeset-release/main'
-  },
-  (state) => {
-    state.pull.head.ref = state.pull.head.ref.replace('/auto/', '/')
-  },
-  (state) => {
-    state.files = []
-  },
-  (state) => {
-    state.files[0].filename = '.github/workflows/ci.yml'
-  },
-  (state) => {
-    state.files[0].filename = 'scripts/ci/parser-pins.mjs'
-  },
-  (state) => {
-    state.files[0].status = 'added'
-  },
-  (state) => {
-    state.files[0].previous_filename = 'other'
-  },
-])('untrusted or irrelevant PRs never merge despite copied metadata %#', async (mutate) => {
-  const fixture = githubFixture()
-  mutate(fixture.state)
-  await fixture.merge()
-  expect(fixture.state.writes).toEqual([])
-})
-
-test('a changed head during the final read blocks merge', async () => {
-  const fixture = githubFixture()
-  fixture.state.current = structuredClone(fixture.state.pull)
-  fixture.state.current.head.sha = 'd'.repeat(40)
-  await fixture.merge()
-  expect(fixture.state.writes).toEqual([])
-})
-
-test('the expected head is sent to GitHub so a concurrent push cannot bypass the check', async () => {
-  const fixture = githubFixture()
-  fixture.api.write = async (_endpoint, _method, body) => {
-    expect(body.sha).toBe(fixture.state.pull.head.sha)
-    assert.fail('GitHub: 409 head changed')
-  }
-  await expect(fixture.merge()).rejects.toThrow('409 head changed')
-})
-
-test('updater completion reconciles already-successful CI after a dispatch recovery', async () => {
-  const fixture = githubFixture()
-  await fixture.merge(10)
-  expect(fixture.state.writes).toHaveLength(1)
-})
 
 function publicationFixture() {
   let root
@@ -304,14 +98,14 @@ function publicationFixture() {
   writeFileSync(path.join(directory, manifest), before)
   const fixture = githubFixture()
   fixture.state.pulls = []
-  fixture.state.artifacts = []
-  const publish = () =>
+  const publish = (options = {}) =>
     publishPins({
       api: fixture.api,
       repository: fixture.state.repository,
       directory,
       patch,
       metadata,
+      ...options,
     })
   return { ...fixture, root, directory, git, metadata, patch, publish, manifest, before }
 }
@@ -330,9 +124,7 @@ function cliPublicationFixture(historySize) {
     head: { ...fixture.state.pull.head, ref: `feature/${index}` },
     body: 'Build and test verification for this pull request.\n'.repeat(400),
   }))
-  const obsolete = structuredClone(fixture.state.pull)
-  obsolete.head.ref = obsolete.head.ref.replace('a'.repeat(40), 'd'.repeat(40))
-  fixture.state.pulls = history.concat([obsolete])
+  fixture.state.pulls = history
   writeFileSync(statePath, JSON.stringify(fixture.state))
   writeFileSync(path.join(pins, 'update.patch'), fixture.patch)
   writeFileSync(path.join(pins, 'metadata.json'), JSON.stringify(fixture.metadata))
@@ -359,10 +151,6 @@ if (route === 'pulls' && method === 'GET') {
   const body = JSON.parse(readFileSync(0, 'utf8'))
   result = { ...state.pull, number: 2000, head: { ...state.pull.head, ref: body.head } }
   state.pulls.push(result)
-} else if (route.endsWith('/files')) {
-  result = state.files
-} else if (route === 'actions/artifacts') {
-  result = { artifacts: state.artifacts }
 } else {
   result = state.pulls.find(pull => route === 'pulls/' + pull.number)
   assert.ok(result, endpoint)
@@ -404,222 +192,97 @@ process.stdout.write(JSON.stringify(result))
 }
 
 test.skipIf(process.platform === 'win32').each([0, 1300])(
-  'production CLI publishes once and reuses the exact branch with %i historical PRs',
+  'production CLI reuses one PR with %i historical PRs',
   (historySize) => {
     const fixture = cliPublicationFixture(historySize)
-    if (historySize)
-      expect(Buffer.byteLength(JSON.stringify(fixture.history))).toBeGreaterThan(16 * 1024 * 1024)
     fixture.run()
-    const receipt = JSON.parse(
-      readFileSync(path.join(fixture.directory, 'pin-receipt.json'), 'utf8'),
-    )
-    const state = fixture.read()
-    state.pulls.find((pull) => pull.number === receipt.number).head.sha = receipt.head
-    writeFileSync(fixture.statePath, JSON.stringify(state))
+    const output = readFileSync(path.join(fixture.root, 'output'), 'utf8')
     fixture.run()
-    expect(
-      JSON.parse(readFileSync(path.join(fixture.directory, 'pin-receipt.json'), 'utf8')),
-    ).toEqual(receipt)
+    expect(readFileSync(path.join(fixture.root, 'output'), 'utf8')).toBe(output + output)
     const final = fixture.read()
     expect(final.writes.filter((write) => write.method === 'POST')).toHaveLength(1)
     expect(final.writes.filter((write) => write.method === 'PATCH')).toHaveLength(1)
-    expect(final.pulls.find((pull) => pull.number === 42).state).toBe('closed')
-    expect(final.pulls.filter((pull) => pull.user.id === 1 && pull.state === 'open')).toHaveLength(
-      Math.min(historySize, 101),
-    )
-    if (!historySize) return
+    expect(final.pulls.filter((pull) => pull.user.id === 1)).toEqual(fixture.history)
     expect(final.reads).toContain(
-      `repos/fixture/parser/pulls?state=all&base=main&head=${encodeURIComponent(`fixture:${receipt.branch}`)}&per_page=100`,
+      `repos/fixture/parser/pulls?state=open&base=main&head=${encodeURIComponent('fixture:tree-sitter-x/updates')}&per_page=100`,
     )
     expect(final.reads).not.toContain('repos/fixture/parser/pulls?state=all&base=main&per_page=100')
   },
 )
 
-test.skipIf(process.platform === 'win32').each(['closed', 'merged'])(
-  'production CLI preserves a %s same-pin PR buried in large history',
-  (status) => {
-    const fixture = cliPublicationFixture(1300)
-    const state = fixture.read()
-    state.pulls.push({
-      ...state.pull,
-      number: 2001,
-      state: 'closed',
-      merged_at: status === 'merged' ? '2026-10-18T00:00:00Z' : null,
-    })
-    writeFileSync(fixture.statePath, JSON.stringify(state))
-    fixture.run()
-    expect(fixture.read().writes).toEqual([])
-    expect(fixture.git('ls-remote', 'origin')).toBe('')
-    expect(existsSync(path.join(fixture.directory, 'pin-receipt.json'))).toBe(false)
+function nextUpdate(fixture, runtime = 'd'.repeat(40), markdown = 'e'.repeat(40)) {
+  const before = fixture.git('show', `HEAD:${fixture.manifest}`)
+  const updated = before
+    .replace(/tree-sitter-x#[0-9a-f]{40}/g, `tree-sitter-x#${runtime}`)
+    .replace(/tree-sitter-md#[0-9a-f]{40}/g, `tree-sitter-md#${markdown}`)
+  writeFileSync(path.join(fixture.directory, fixture.manifest), updated)
+  const patch = fixture.git('diff') + '\n'
+  writeFileSync(path.join(fixture.directory, fixture.manifest), before)
+  return { patch, metadata: { base: fixture.git('rev-parse', 'HEAD'), runtime, markdown } }
+}
+
+test('same and newer pins reuse one PR and fast-forward its branch', async () => {
+  const fixture = publicationFixture()
+  const first = await fixture.publish()
+  expect(first.branch).toBe('tree-sitter-x/updates')
+  expect(await fixture.publish()).toEqual(first)
+  const next = nextUpdate(fixture)
+  const updated = await fixture.publish(next)
+  expect(updated.number).toBe(first.number)
+  expect(updated.head).not.toBe(first.head)
+  expect(fixture.git('merge-base', first.head, updated.head)).toBe(first.head)
+  expect(fixture.state.pulls).toHaveLength(1)
+  expect(fixture.state.pulls[0].body).toContain(next.metadata.markdown)
+  expect(fixture.state.writes.filter((write) => write.method === 'POST')).toHaveLength(1)
+})
+
+test('a main change is included while the rolling branch stays fast-forward', async () => {
+  const fixture = publicationFixture()
+  const first = await fixture.publish()
+  writeFileSync(path.join(fixture.directory, 'main.txt'), 'new main content')
+  fixture.git('add', 'main.txt')
+  fixture.git('commit', '-qm', 'advance main')
+  const updated = await fixture.publish(nextUpdate(fixture))
+  expect(fixture.git('show', `${updated.head}:main.txt`)).toBe('new main content')
+  expect(fixture.git('merge-base', first.head, updated.head)).toBe(first.head)
+  expect(fixture.git('merge-base', 'HEAD', updated.head)).toBe(fixture.git('rev-parse', 'HEAD'))
+  expect(updated.number).toBe(first.number)
+})
+
+test.each([false, true])(
+  'updates after manual squash merge with deleted branch %s',
+  async (deleted) => {
+    const fixture = publicationFixture()
+    const first = await fixture.publish()
+    fixture.git('merge', '--squash', first.head)
+    fixture.git('commit', '-qm', 'manually merge update')
+    fixture.state.pulls[0].state = 'closed'
+    if (deleted) fixture.git('push', '-q', 'origin', '--delete', first.branch)
+    const next = nextUpdate(fixture)
+    const updated = await fixture.publish(next)
+    expect(updated.branch).toBe(first.branch)
+    expect(updated.number).not.toBe(first.number)
+    expect(fixture.state.pulls.filter((pull) => pull.state === 'open')).toHaveLength(1)
+    expect(await fixture.publish(next)).toEqual(updated)
   },
 )
 
-test('creates one immutable branch and PR, and reuses it on the same pin pair rerun', async () => {
+test('an empty update creates no PR or branch', async () => {
   const fixture = publicationFixture()
-  const result = await fixture.publish()
-  expect(result.branch).toBe(
-    `tree-sitter-x/auto/${fixture.metadata.runtime}-${fixture.metadata.markdown}`,
-  )
-  expect(fixture.state.writes.find((write) => write.method === 'POST').body.head).toBe(
-    result.branch,
-  )
-  const original = fixture.git('ls-remote', 'origin', `refs/heads/${result.branch}`)
-  fixture.state.pull.head.sha = result.head
-  fixture.state.artifact.name = `tree-sitter-pin-${result.head}`
-  fixture.state.artifacts.push(fixture.state.artifact)
-  const repeated = await fixture.publish()
-  expect(repeated).toEqual(result)
-  expect(fixture.state.writes.filter((write) => write.method === 'POST')).toHaveLength(1)
-  expect(fixture.git('ls-remote', 'origin', `refs/heads/${result.branch}`)).toBe(original)
+  expect(await fixture.publish({ patch: '' })).toBeNull()
+  expect(fixture.state.writes).toEqual([])
+  expect(fixture.git('ls-remote', 'origin')).toBe('')
 })
 
-test('recovers denied PR creation without another commit or a force push', async () => {
+test('a retry after failed PR creation reuses the branch commit', async () => {
   const fixture = publicationFixture()
   const write = fixture.api.write
-  fixture.api.write = async () => {
-    assert.fail('creation denied')
-  }
+  fixture.api.write = async () => assert.fail('creation denied')
   await expect(fixture.publish()).rejects.toThrow('creation denied')
-  const before = fixture.git('ls-remote', 'origin')
+  const original = fixture.git('ls-remote', 'origin')
   fixture.api.write = write
-  const result = await fixture.publish()
-  expect(fixture.git('ls-remote', 'origin')).toBe(before)
-  expect(result.number).toBe(42)
-})
-
-test.each(['closed', 'merged'])('same pins preserve a %s PR', async (state) => {
-  const fixture = publicationFixture()
-  fixture.state.pull.state = state === 'merged' ? 'closed' : state
-  fixture.state.pulls = [fixture.state.pull]
-  expect(await fixture.publish()).toBeNull()
-  expect(fixture.git('ls-remote', 'origin')).toBe('')
-  expect(fixture.state.writes).toEqual([])
-})
-
-test('new pins close only obsolete authenticated bot PRs and leave unrelated PRs alone', async () => {
-  const fixture = publicationFixture()
-  const old = fixture.state.pull
-  old.head.ref = old.head.ref.replace('a'.repeat(40), 'd'.repeat(40))
-  fixture.state.pulls = [old, { ...old, number: 99, user: { id: 1 } }]
-  fixture.state.artifacts.push(fixture.state.artifact)
   await fixture.publish()
-  expect(fixture.state.writes.filter((write) => write.method === 'PATCH')).toEqual([
-    { endpoint: 'pulls/42', method: 'PATCH', body: { state: 'closed' } },
-  ])
-})
-
-test('new upstream pins leave one current PR even when multiple old receipts expired', async () => {
-  const fixture = publicationFixture()
-  fixture.state.pulls = ['d', 'e', 'f'].map((pin, index) => {
-    const pull = structuredClone(fixture.state.pull)
-    pull.number += index
-    pull.head.ref = pull.head.ref.replace('a'.repeat(40), pin.repeat(40))
-    return pull
-  })
-  fixture.state.current = fixture.state.pulls[0]
-  const result = await fixture.publish()
-  expect(
-    fixture.state.pulls.filter((pull) => pull.state === 'open').map((pull) => pull.number),
-  ).toEqual([result.number])
-  const current = fixture.state.pulls.find((pull) => pull.number === result.number)
-  current.head.sha = result.head
-  fixture.state.artifacts.push({
-    ...fixture.state.artifact,
-    name: `tree-sitter-pin-${result.head}`,
-  })
-  const repeated = await fixture.publish()
-  expect(repeated).toEqual(result)
-  expect(fixture.state.writes.filter((write) => write.method === 'POST')).toHaveLength(1)
-  expect(fixture.state.writes.filter((write) => write.method === 'PATCH')).toHaveLength(3)
-})
-
-test('already-current main closes obsolete authenticated pin PRs without publishing', async () => {
-  const fixture = publicationFixture()
-  fixture.state.pulls = [fixture.state.pull]
-  fixture.state.artifacts.push(fixture.state.artifact)
-  expect(
-    await publishPins({
-      api: fixture.api,
-      repository: fixture.state.repository,
-      directory: fixture.directory,
-      patch: '',
-      metadata: fixture.metadata,
-    }),
-  ).toBeNull()
-  expect(fixture.state.writes).toHaveLength(1)
-  expect(fixture.git('ls-remote', 'origin')).toBe('')
-})
-
-test.each(['expired', 'missing'])(
-  '%s receipts still allow obsolete bot PR cleanup',
-  async (receipt) => {
-    const fixture = publicationFixture()
-    fixture.state.pulls = [fixture.state.pull]
-    fixture.state.artifacts =
-      receipt === 'missing' ? [] : [{ ...fixture.state.artifact, expired: true }]
-    const result = await publishPins({
-      api: fixture.api,
-      repository: fixture.state.repository,
-      directory: fixture.directory,
-      patch: '',
-      metadata: fixture.metadata,
-    })
-    expect(result).toBeNull()
-    expect(fixture.state.writes).toContainEqual({
-      endpoint: 'pulls/42',
-      method: 'PATCH',
-      body: { state: 'closed' },
-    })
-  },
-)
-
-test.each([
-  (state) => {
-    state.pull.user.id = 1
-  },
-  (state) => {
-    state.pull.head.repo.full_name = 'fixture/fork'
-  },
-  (state) => {
-    state.pull.base.ref = 'release'
-  },
-  (state) => {
-    state.pull.head.ref = 'changeset-release/main'
-  },
-  (state) => {
-    state.pull.draft = true
-  },
-  (state) => {
-    state.files[0].filename = '.github/workflows/ci.yml'
-  },
-  (state) => {
-    state.files[0].status = 'added'
-  },
-  (state) => {
-    state.files[0].previous_filename = 'other'
-  },
-])('receipt-free cleanup preserves irrelevant or untrusted PRs %#', async (mutate) => {
-  const fixture = publicationFixture()
-  fixture.state.pulls = [fixture.state.pull]
-  mutate(fixture.state)
-  await publishPins({
-    api: fixture.api,
-    repository: fixture.state.repository,
-    directory: fixture.directory,
-    patch: '',
-    metadata: fixture.metadata,
-  })
-  expect(fixture.state.writes).toEqual([])
-})
-
-test('a preexisting contaminated branch is rejected and never overwritten', async () => {
-  const fixture = publicationFixture()
-  const branch = fixture.state.pull.head.ref
-  fixture.git('push', '-q', 'origin', `HEAD:refs/heads/${branch}`)
-  const before = fixture.git('ls-remote', 'origin')
-  await expect(fixture.publish()).rejects.toThrow('Existing branch must match the generated tree')
-  expect(fixture.git('ls-remote', 'origin')).toBe(before)
-  expect(fixture.state.writes).toEqual([])
+  expect(fixture.git('ls-remote', 'origin')).toBe(original)
 })
 
 test('a generated patch cannot add arbitrary workflow code or change manifest scripts', async () => {
@@ -926,7 +589,6 @@ test.skipIf(!shellAvailable)('foreign or stale successful CI does not suppress a
 test('workflow permissions and token boundaries keep branch code unprivileged', () => {
   const read = (file) => readFileSync(path.resolve(import.meta.dirname, '../..', file), 'utf8')
   const treeWorkflow = read('.github/workflows/editor-tree-sitter-x.yml')
-  const mergeWorkflow = read('.github/workflows/editor-parser-pin-merge.yml')
   const ci = Bun.YAML.parse(read('.github/workflows/ci.yml'))
   const libraries = Bun.YAML.parse(read('.github/workflows/workspace-libraries.yml'))
   expect(ci.permissions).toEqual({ contents: 'read' })
@@ -982,8 +644,9 @@ test('workflow permissions and token boundaries keep branch code unprivileged', 
   expect(treeWorkflow).toContain('persist-credentials: false')
   expect(treeWorkflow).toContain('contents: write')
   expect(treeWorkflow).toContain('gh workflow run ci.yml --ref "$branch"')
-  expect(mergeWorkflow).toContain('ref: refs/heads/main')
-  expect(mergeWorkflow).toContain('persist-credentials: false')
-  expect(mergeWorkflow).toContain('pull-requests: write')
-  expect(mergeWorkflow).toContain('workflow_run:')
+  expect(
+    existsSync(
+      path.resolve(import.meta.dirname, '../../.github/workflows/editor-parser-pin-merge.yml'),
+    ),
+  ).toBe(false)
 })

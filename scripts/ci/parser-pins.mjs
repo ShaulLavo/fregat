@@ -1,14 +1,12 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-const updater = '.github/workflows/editor-tree-sitter-x.yml'
-const ci = '.github/workflows/ci.yml'
 const bot = 41898282
-const prefix = 'tree-sitter-x/auto/'
+const branch = 'tree-sitter-x/updates'
 const sha = /^[0-9a-f]{40}$/
 const manifests = new Set([
   'package.json',
@@ -24,10 +22,6 @@ const generated = new Set([
   'editor/packages/tree-sitter-languages/src/catalog.generated.ts',
   'editor/packages/tree-sitter-languages/src/metadata.ts',
 ])
-
-function pinBranch(branch) {
-  return new RegExp(`^${prefix}([0-9a-f]{40})-([0-9a-f]{40})$`).exec(branch)
-}
 
 function allowedFile(file) {
   return (
@@ -46,121 +40,9 @@ function nativePull(pull, repository) {
     pull.base?.repo?.full_name === repository &&
     pull.base?.ref === 'main' &&
     sha.test(pull.head?.sha) &&
-    pinBranch(pull.head?.ref) &&
+    pull.head?.ref === branch &&
     !pull.draft
   )
-}
-
-// The artifact is an exact-head receipt from this updater on main. PR metadata cannot grant trust.
-async function hasReceipt(api, repository, head) {
-  const name = `tree-sitter-pin-${head}`
-  const artifacts = await api.pages(`actions/artifacts?name=${name}&per_page=100`, 'artifacts')
-  for (const artifact of artifacts) {
-    if (artifact.name !== name || artifact.expired || !artifact.workflow_run?.id) continue
-    const run = await api.get(`actions/runs/${artifact.workflow_run.id}`)
-    if (run.path !== updater || run.head_branch !== 'main' || run.status !== 'completed') continue
-    if (run.conclusion !== 'success' || run.repository?.full_name !== repository) continue
-    if (!['schedule', 'workflow_dispatch'].includes(run.event)) continue
-    return true
-  }
-  return false
-}
-
-async function allowedPull(api, repository, pull) {
-  if (!nativePull(pull, repository)) return false
-  const files = await api.pages(`pulls/${pull.number}/files?per_page=100`)
-  return (
-    files.length > 0 &&
-    files.every(
-      (file) => file.status === 'modified' && allowedFile(file.filename) && !file.previous_filename,
-    )
-  )
-}
-
-async function trustedPull(api, repository, pull) {
-  if (!(await allowedPull(api, repository, pull))) return false
-  return hasReceipt(api, repository, pull.head.sha)
-}
-
-async function fullCi(api, repository, pull) {
-  const runs = await api.pages(
-    `actions/workflows/ci.yml/runs?head_sha=${pull.head.sha}&event=workflow_dispatch&per_page=100`,
-    'workflow_runs',
-  )
-  const run = runs.find(
-    (candidate) =>
-      candidate.head_sha === pull.head.sha &&
-      candidate.head_branch === pull.head.ref &&
-      candidate.event === 'workflow_dispatch' &&
-      candidate.path === ci &&
-      candidate.repository?.full_name === repository,
-  )
-  if (!run || run.status !== 'completed' || run.conclusion !== 'success') return false
-  const jobs = await api.pages(`actions/runs/${run.id}/jobs?filter=latest&per_page=100`, 'jobs')
-  const verdicts = jobs.filter((job) => job.name === 'CI')
-  if (verdicts.length !== 1) return false
-  const verdict = verdicts[0]
-  return (
-    verdict.status === 'completed' &&
-    verdict.conclusion === 'success' &&
-    verdict.head_sha === pull.head.sha &&
-    verdict.run_id === run.id &&
-    verdict.run_attempt === run.run_attempt
-  )
-}
-
-async function closeObsolete(api, repository, pulls, keep) {
-  for (const pull of pulls) {
-    if (pull.number === keep || pull.state !== 'open') continue
-    if (!(await allowedPull(api, repository, pull))) continue
-    const current = await api.get(`pulls/${pull.number}`)
-    if (
-      current.state !== 'open' ||
-      current.head.sha !== pull.head.sha ||
-      !nativePull(current, repository)
-    )
-      continue
-    await api.write(`pulls/${pull.number}`, 'PATCH', { state: 'closed' })
-  }
-}
-
-export async function mergePins({ api, repository, event }) {
-  // Read the run from GitHub, not a PR-supplied payload or downloaded CI artifact.
-  const completed = await api.get(`actions/runs/${event.workflow_run.id}`)
-  if (
-    completed.repository?.full_name !== repository ||
-    completed.status !== 'completed' ||
-    completed.conclusion !== 'success'
-  )
-    return
-  const isCi =
-    completed.path === ci &&
-    completed.event === 'workflow_dispatch' &&
-    pinBranch(completed.head_branch)
-  const isUpdater =
-    completed.path === updater &&
-    completed.head_branch === 'main' &&
-    ['schedule', 'workflow_dispatch'].includes(completed.event)
-  if (!isCi && !isUpdater) return
-  const pulls = await api.pages('pulls?state=open&base=main&per_page=100')
-  for (const pull of pulls) {
-    if (isCi && (pull.head?.sha !== completed.head_sha || pull.head?.ref !== completed.head_branch))
-      continue
-    if (!(await trustedPull(api, repository, pull)) || !(await fullCi(api, repository, pull)))
-      continue
-    const current = await api.get(`pulls/${pull.number}`)
-    if (
-      current.state !== 'open' ||
-      current.head.sha !== pull.head.sha ||
-      !nativePull(current, repository)
-    )
-      continue
-    // GitHub's expected SHA makes the final head comparison atomic with the merge.
-    await api.write(`pulls/${pull.number}/merge`, 'PUT', {
-      merge_method: 'squash',
-      sha: pull.head.sha,
-    })
-  }
 }
 
 function shellGit(cwd, index) {
@@ -197,44 +79,32 @@ function validateManifests(git, files, metadata) {
   }
 }
 
-function branchPullsPath(repository, branch) {
-  const head = encodeURIComponent(`${repository.split('/')[0]}:${branch}`)
-  return `pulls?state=all&base=main&head=${head}&per_page=100`
-}
-
 export async function publishPins({ api, repository, directory, patch, metadata }) {
   assert.match(metadata.base, sha)
   assert.match(metadata.runtime, sha)
   assert.match(metadata.markdown, sha)
-  const branch = `${prefix}${metadata.runtime}-${metadata.markdown}`
-  const openPulls = await api.pages('pulls?state=open&base=main&per_page=100')
-  if (!patch.trim()) {
-    await closeObsolete(api, repository, openPulls)
-    return null
-  }
-  const branchPulls = await api.pages(branchPullsPath(repository, branch))
-  const existing = branchPulls.find(
-    (pull) => nativePull(pull, repository) && pull.head.ref === branch,
+  if (!patch.trim()) return null
+  const owner = repository.split('/')[0]
+  const pulls = await api.pages(
+    `pulls?state=open&base=main&head=${encodeURIComponent(`${owner}:${branch}`)}&per_page=100`,
   )
-  if (existing && existing.state !== 'open') return null
-  if (existing && (await trustedPull(api, repository, existing))) {
-    await closeObsolete(api, repository, openPulls, existing.number)
-    return { branch, head: existing.head.sha, number: existing.number }
-  }
+  assert.ok(
+    pulls.every((pull) => nativePull(pull, repository)),
+    'Rolling PR must belong to the updater',
+  )
+  assert.ok(pulls.length <= 1, 'Expected at most one rolling PR')
   const head = generatedHead({ directory, patch, metadata, branch })
-  if (existing) assert.equal(existing.head.sha, head)
-  let number = existing?.number
-  if (!number) {
-    const created = await api.write('pulls', 'POST', {
-      base: 'main',
-      head: branch,
-      title: 'Update Tree-sitter and Markdown pins',
-      body: `## Quick summary\n\nUpdates the editor's parser and matching Markdown grammar. This update merges automatically after full CI passes.\n\nRuntime: ${metadata.runtime}\nMarkdown: ${metadata.markdown}`,
-    })
-    number = created.number
+  const details = {
+    title: 'Update Tree-sitter and Markdown pins',
+    body: `## Quick summary\n\nUpdates the editor's parser and matching Markdown grammar. This PR stays open for manual review and merging.\n\nRuntime: ${metadata.runtime}\nMarkdown: ${metadata.markdown}`,
   }
-  await closeObsolete(api, repository, openPulls, number)
-  return { branch, head, number }
+  const existing = pulls[0]
+  if (existing) {
+    await api.write(`pulls/${existing.number}`, 'PATCH', details)
+    return { branch, head, number: existing.number }
+  }
+  const created = await api.write('pulls', 'POST', { base: 'main', head: branch, ...details })
+  return { branch, head, number: created.number }
 }
 
 function generatedHead({ directory, patch, metadata, branch }) {
@@ -277,20 +147,13 @@ function commitGenerated(git, patch, metadata, branch) {
   let head = remote
   if (remote) {
     git(['fetch', '--no-write-fetch-head', 'origin', `refs/heads/${branch}`])
-    assert.equal(
-      git(['rev-parse', `${remote}^{tree}`]),
-      tree,
-      'Existing branch must match the generated tree',
-    )
-    assert.equal(
-      git(['show', '-s', '--format=%P', remote]),
-      metadata.base,
-      'Existing branch must have the generated base',
-    )
+    if (git(['rev-parse', `${remote}^{tree}`]) === tree) return remote
+    const parents = remote === metadata.base ? ['-p', remote] : ['-p', remote, '-p', metadata.base]
+    head = git(['commit-tree', tree].concat(parents), `Update Tree-sitter and Markdown pins\n`)
   } else {
     head = git(['commit-tree', tree, '-p', metadata.base], `Update Tree-sitter and Markdown pins\n`)
-    git(['push', 'origin', `${head}:refs/heads/${branch}`])
   }
+  git(['push', 'origin', `${head}:refs/heads/${branch}`])
   return head
 }
 
@@ -310,7 +173,6 @@ function github(repository) {
       ),
     )
   return {
-    get: request,
     write: request,
     pages: (path, key) => {
       const pages = JSON.parse(
@@ -328,24 +190,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const repository = process.env.GITHUB_REPOSITORY
   assert.match(repository ?? '', /^[\w.-]+\/[\w.-]+$/)
   const api = github(repository)
-  if (process.argv[2] === 'merge') {
-    await mergePins({
-      api,
-      repository,
-      event: JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')),
-    })
-  } else {
-    assert.equal(process.argv[2], 'publish')
-    const result = await publishPins({
-      api,
-      repository,
-      directory: process.cwd(),
-      patch: readFileSync('pin-update/update.patch', 'utf8'),
-      metadata: JSON.parse(readFileSync('pin-update/metadata.json', 'utf8')),
-    })
-    if (result) {
-      writeFileSync('pin-receipt.json', JSON.stringify(result))
-      appendFileSync(process.env.GITHUB_OUTPUT, `branch=${result.branch}\nhead=${result.head}\n`)
-    }
+  assert.equal(process.argv[2], 'publish')
+  const result = await publishPins({
+    api,
+    repository,
+    directory: process.cwd(),
+    patch: readFileSync('pin-update/update.patch', 'utf8'),
+    metadata: JSON.parse(readFileSync('pin-update/metadata.json', 'utf8')),
+  })
+  if (result) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `branch=${result.branch}\nhead=${result.head}\n`)
   }
 }
