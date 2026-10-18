@@ -101,7 +101,7 @@ export function EditorTabButton({
       className={barTabClassName(
         tab.active,
         cn(
-          'group/proof-tab focus-ring-inset relative max-w-48 min-w-0 cursor-grab touch-none text-left outline-none active:cursor-grabbing',
+          'group/proof-tab focus-ring-inset relative max-w-48 min-w-0 cursor-pointer touch-none text-left outline-none',
           dragging && 'relative z-10 text-muted-foreground text-2xs',
         ),
       )}

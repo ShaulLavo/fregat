@@ -151,7 +151,8 @@ async function dragTo(
   destination: number,
   edge: 'right' | 'bottom' | 'top' | 'center',
 ) {
-  const tab = await selectors.editorGroupTabs(page, source).first().boundingBox()
+  const sourceTab = selectors.editorGroupTabs(page, source).first()
+  const tab = await sourceTab.boundingBox()
   const target = await selectors.editorGroupContent(page, destination).boundingBox()
   if (!tab || !target) throw createScriptError('Editor drag target is not visible')
   const x = edge === 'right' ? target.x + target.width - 12 : target.x + target.width / 2
@@ -159,7 +160,17 @@ async function dragTo(
   if (edge === 'bottom') y = target.y + target.height - 12
   if (edge === 'top') y = target.y + 12
   await page.mouse.move(tab.x + 35, tab.y + tab.height / 2)
+  strictEqual(
+    await sourceTab.evaluate((element) => getComputedStyle(element).cursor),
+    'pointer',
+    'editor tabs show the pointing finger on hover',
+  )
   await page.mouse.down()
+  strictEqual(
+    await sourceTab.evaluate((element) => getComputedStyle(element).cursor),
+    'pointer',
+    'editor tabs keep the pointing finger while pressed',
+  )
   await page.mouse.move(tab.x + 50, tab.y + tab.height / 2 + 12, { steps: 4 })
   await page.mouse.move(x, y, { steps: 16 })
   await page.waitForTimeout(150)

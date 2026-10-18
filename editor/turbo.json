@@ -126,6 +126,14 @@
       "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"]
     },
+    "@singapore-editor/tree-sitter#test:memory:browser": {
+      "dependsOn": [
+        "^build",
+        "build",
+        "@singapore-editor/markdown#build",
+        "@singapore-editor/tree-sitter-languages#build"
+      ]
+    },
     "@singapore-editor/tree-sitter#test:browser": {
       "dependsOn": [
         "^build",

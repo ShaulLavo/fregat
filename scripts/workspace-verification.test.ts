@@ -55,7 +55,7 @@ test.skipIf(!reportSupported)(
   'the verdict reports paginated queue timings without changing its gate',
   () => {
     const steps = readWorkflow('ci.yml').jobs.verdict!.steps
-    const producer = steps.find((entry) => entry.name === 'Verdict')!
+    const producer = steps.find((entry) => entry.name === 'Fetch CI metadata')!
     const step = steps.find((entry) => entry.name === 'Report queue and execution times')!
     expect(step['continue-on-error']).toBe(true)
     const root = mkdtempSync(path.join(tmpdir(), 'ci-timings-'))
@@ -363,10 +363,15 @@ test.each([
   },
 )
 
-test('automatic bump branches include the matched Markdown source', () => {
-  const steps = readWorkflow('editor-tree-sitter-x.yml').jobs.update!.steps
-  const branch = steps.find((step) => step.name === 'Open a pull request')
-  expect(branch?.run).toContain('branch="tree-sitter-x/$pin-$markdown"')
+test('automatic bump publication uses the matched Markdown source and immutable auto branches', () => {
+  const workflow = readWorkflow('editor-tree-sitter-x.yml')
+  expect(workflow.jobs.publish!.needs).toBe('update')
+  const publish = workflow.jobs.publish!.steps.find((step) => step.name === 'Open a pull request')
+  expect(publish?.run).toBe('node scripts/ci/parser-pins.mjs publish')
+
+  const source = readFileSync(new URL('../scripts/ci/parser-pins.mjs', import.meta.url), 'utf8')
+  expect(source).toContain("const prefix = 'tree-sitter-x/auto/'")
+  expect(source).toContain('`${prefix}${metadata.runtime}-${metadata.markdown}`')
 })
 
 test('canonical ghostty CI verifies the separate line editor package', () => {

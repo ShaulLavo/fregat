@@ -21,16 +21,38 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
+permissions:
+  contents: read
+
 jobs:
+  # API reads use a fresh runner with no checkout or repository code.
+  baseline:
+    name: Successful main baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      sha: ${{ steps.baseline.outputs.sha }}
+    steps:
+      - name: Read successful main baseline
+        id: baseline
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.event.before != '0000000000000000000000000000000000000000' }}
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          baseline=$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=20" --jq '[.workflow_runs[] | select(.event == "push" or .event == "schedule" or .event == "workflow_dispatch")][0].head_sha // empty')
+          echo "sha=$baseline" >> "$GITHUB_OUTPUT"
+
   # PRs and main pushes select affected packages; scheduled and manual runs validate everything.
   changes:
     name: Changes
+    needs: baseline
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: read
-      actions: read
     outputs:
       code: ${{ steps.plan.outputs.code }}
       shared: ${{ steps.plan.outputs.shared }}
@@ -58,6 +80,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -68,8 +91,7 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
+          BASELINE_SHA: ${{ needs.baseline.outputs.sha }}
         run: |
           MODE=full
           if [[ "$GITHUB_EVENT_NAME" == 'pull_request' ]]; then
@@ -78,9 +100,8 @@ jobs:
             MODE=changed
           fi
           if [[ "$GITHUB_EVENT_NAME" == 'push' && "$MODE" == 'changed' ]]; then
-            baseline=$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=20" --jq '[.workflow_runs[] | select(.event == "push" or .event == "schedule" or .event == "workflow_dispatch")][0].head_sha // empty')
-            if [[ -n "$baseline" ]] && git merge-base --is-ancestor "$baseline" "$HEAD_SHA"; then
-              BASE_SHA="$baseline"
+            if [[ -n "$BASELINE_SHA" ]] && git merge-base --is-ancestor "$BASELINE_SHA" "$HEAD_SHA"; then
+              BASE_SHA="$BASELINE_SHA"
             else
               MODE=full
             fi
@@ -97,6 +118,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -122,6 +145,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -178,6 +203,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -255,6 +282,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -287,6 +316,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -305,6 +336,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -323,6 +356,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -427,6 +462,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -494,6 +531,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -571,6 +610,7 @@ jobs:
     name: CI
     needs:
       [
+        baseline,
         changes,
         docs,
         lint,
@@ -590,23 +630,25 @@ jobs:
       actions: read
       contents: read
     steps:
-      - name: Checkout
+      # Execute only trusted main code; candidate workflows are parsed as data.
+      - name: Checkout trusted verifier
         uses: actions/checkout@v4
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
         with:
-          bun-version-file: package.json
-      - name: Verdict
+          ref: refs/heads/main
+          path: trusted
+          persist-credentials: false
+      - name: Checkout candidate graph
+        uses: actions/checkout@v4
+        with:
+          path: candidate
+          persist-credentials: false
+      - name: Fetch CI metadata
         env:
-          CI_NEEDS_JSON: ${{ toJSON(needs) }}
-          CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          # The jobs API can report a needed job as running for a few seconds after it finished; read it once
-          # it has caught up, and let the verdict judge whatever is still unfinished after a minute.
+          # The jobs API briefly lags dependency completion; unfinished jobs still fail the verdict.
           for attempt in $(seq 1 12); do
             gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" --paginate --slurp > "$RUNNER_TEMP/ci-jobs.json"
             pending=$(jq '[.[].jobs[] | select(.name != "CI" and .status != "completed")] | length' "$RUNNER_TEMP/ci-jobs.json")
@@ -614,13 +656,22 @@ jobs:
             sleep 5
           done
           gh api "repos/$GH_REPO/actions/runs/$RUN_ID" > "$RUNNER_TEMP/ci-run.json"
-          bun scripts/ci-verdict.ts .github/workflows/ci.yml "$RUNNER_TEMP/ci-jobs.json" "$RUNNER_TEMP/ci-run.json"
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: trusted/package.json
+      - name: Verdict
+        env:
+          CI_NEEDS_JSON: ${{ toJSON(needs) }}
+          CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: bun trusted/scripts/ci-verdict.ts candidate/.github/workflows/ci.yml "$RUNNER_TEMP/ci-jobs.json" "$RUNNER_TEMP/ci-run.json"
       - name: Report queue and execution times
         if: ${{ !cancelled() }}
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |

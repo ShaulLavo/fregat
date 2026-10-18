@@ -80,17 +80,23 @@ describe('published regression corpus', () => {
     for (const source of messages) checkCorpusStream(source)
   }, 30_000)
 
-  test('all repository documents settle after chunked streaming without losing complete-source content', () => {
-    const bytes = readFileSync(
-      new URL('../../../test/reference/repositories.json.gz', import.meta.url),
-    )
-    const documents: { name: string; text: string }[] = JSON.parse(
-      gunzipSync(bytes).toString('utf8'),
-    )
+  const documents: { name: string; text: string }[] = JSON.parse(
+    gunzipSync(
+      readFileSync(new URL('../../../test/reference/repositories.json.gz', import.meta.url)),
+    ).toString('utf8'),
+  )
+
+  test('repository corpus keeps all repository documents', () => {
     expect(documents).toHaveLength(497)
-    for (const document of documents)
-      checkCorpusStream(document.text, Math.max(2048, Math.ceil(document.text.length / 4)))
-  }, 60_000)
+  })
+
+  test.each(documents)(
+    '$name settles after chunked streaming without losing complete-source content',
+    ({ text }) => {
+      checkCorpusStream(text, Math.max(2048, Math.ceil(text.length / 4)))
+    },
+    60_000,
+  )
 })
 
 function checkCorpusStream(source: string, maxUnits = 24) {
