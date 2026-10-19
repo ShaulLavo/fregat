@@ -51,7 +51,7 @@
   },
   "dependencies": {
     "@singapore-editor/core": "workspace:*",
-    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#58d67a4563c3c5295f30a4d24d24de199049adc8",
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#1eaac42cc3a737356f69ab1ae8464f462e2d23e0",
     "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#aab7db1518c19f61c1b13ec3f832b881cf5f1385"
   },
   "devDependencies": {

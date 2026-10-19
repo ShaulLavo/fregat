@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "manifestHash": "b7f113a365843af9e08fd2b86bec98657c423567defbe930f254d5abca9fbce9",
+  "manifestHash": "21581320efff9089a164a65dbe435d8ab8da9076637769f90755dfb7e41505d2",
   "languages": [
     {
       "id": "javascript",
@@ -720,20 +720,24 @@
       "parserABI": 15,
       "source": {
         "package": "tree-sitter-md",
-        "version": "0.1.13",
+        "version": "0.1.14",
         "repository": "https://github.com/ShaulLavo/tree-sitter-md",
-        "revision": "58d67a4563c3c5295f30a4d24d24de199049adc8",
+        "revision": "1eaac42cc3a737356f69ab1ae8464f462e2d23e0",
         "license": "MIT",
         "compiler": "wasi-sdk 34"
       },
       "sourceFiles": [
         {
           "file": "package.json",
-          "sha256": "5bceb09d4ddc711e2bbc3346bccdb5c9b3a89afe77d8bdcc514aba61925c988f"
+          "sha256": "90bfee24cddbb5b016e61ab669f50e348c518b8408a033ed7299c4cfa3bc60ff"
         },
         {
           "file": "src/autolink.c",
-          "sha256": "ebf62bb4e32b240b840248b753eede1a07d9b725ae5d3ae9b1cb51e12fced043"
+          "sha256": "0e387cb099ade012253b29afdf7f4db87a1bd84e868e1ca41cc2a67243426390"
+        },
+        {
+          "file": "src/autolink.h",
+          "sha256": "88b65eebc24b8103cdf54744a919c47be49cb71a927c5bb1ebf7946448c76c52"
         },
         {
           "file": "src/document.c",
@@ -757,7 +761,7 @@
         },
         {
           "file": "src/leaf.c",
-          "sha256": "6c0a58186daaf10a6338f6d3aa6f2e96171c6bf5fddd59095a334861b2ff33c3"
+          "sha256": "9d5ba277e8eae1519e9b03c0b6fbf28c6beb0bdbbcf67cc38ead20d397e481f2"
         },
         {
           "file": "src/resolver.h",
@@ -765,7 +769,7 @@
         },
         {
           "file": "src/semantic.c",
-          "sha256": "ffaf04ce9c1db27149cd4f8ec9efeb080a7dd77de932bee5f3d7120edb7fbf33"
+          "sha256": "18f216d7160bb7299d42f0fb7d445e2adf886bfc36898d4094e5f48bbe0b2d11"
         }
       ],
       "files": [
