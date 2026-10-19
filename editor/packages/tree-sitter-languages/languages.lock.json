@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "manifestHash": "21581320efff9089a164a65dbe435d8ab8da9076637769f90755dfb7e41505d2",
+  "manifestHash": "f5ebf65b4d7f54edfb951b991cf3bdb6be6583f039bc9bf4287a9e15b8a63104",
   "languages": [
     {
       "id": "javascript",
@@ -720,20 +720,20 @@
       "parserABI": 15,
       "source": {
         "package": "tree-sitter-md",
-        "version": "0.1.14",
+        "version": "0.1.17",
         "repository": "https://github.com/ShaulLavo/tree-sitter-md",
-        "revision": "1eaac42cc3a737356f69ab1ae8464f462e2d23e0",
+        "revision": "215e491381b3534c4b00dea501749a5e7b766de4",
         "license": "MIT",
         "compiler": "wasi-sdk 34"
       },
       "sourceFiles": [
         {
           "file": "package.json",
-          "sha256": "90bfee24cddbb5b016e61ab669f50e348c518b8408a033ed7299c4cfa3bc60ff"
+          "sha256": "b618693c39358775461f350779eb35a27a8f2a9ee7d3a33ef01d6f7cc705bf73"
         },
         {
           "file": "src/autolink.c",
-          "sha256": "0e387cb099ade012253b29afdf7f4db87a1bd84e868e1ca41cc2a67243426390"
+          "sha256": "866c582f964d47a378661c2b225471b54c98f19786bfbe2fc95a38ed1eaa4edd"
         },
         {
           "file": "src/autolink.h",
@@ -741,11 +741,11 @@
         },
         {
           "file": "src/document.c",
-          "sha256": "2f3ee403823ec2e0365304ae515ff03dccf877480ae2c7718fbf8a92bd76a91c"
+          "sha256": "22ecb44d80ba59a9dd2710a24352716a2cc4b2082b13b8ef8ee960d7a205c05e"
         },
         {
           "file": "src/footnote.c",
-          "sha256": "34a709daf3c8bd7de16e654b6ef3d4a0fd79fff6efb4463d0b3fcaea28778fdc"
+          "sha256": "898abc9ad2560812cab0e8df2ae0c27a0892415c6dbd486d23ddbd2d505338d6"
         },
         {
           "file": "src/footnote.h",
@@ -757,7 +757,7 @@
         },
         {
           "file": "src/ids.h",
-          "sha256": "462745329047fbe091296af2251d66835b10fc1da9cc344782fd9a0d4cef9db4"
+          "sha256": "cf1fd8b7ce23f716609371f7a6cfd0c2c11746c07ecbe8183b9dfa75558fdc07"
         },
         {
           "file": "src/leaf.c",
@@ -769,7 +769,7 @@
         },
         {
           "file": "src/semantic.c",
-          "sha256": "18f216d7160bb7299d42f0fb7d445e2adf886bfc36898d4094e5f48bbe0b2d11"
+          "sha256": "baaec83c8a3a89eebd4401bc7ae0db8b881759cc8046430bab8b7b47dd15df42"
         }
       ],
       "files": [

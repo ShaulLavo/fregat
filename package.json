@@ -144,7 +144,7 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "pngjs": "7.0.0",
-    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#1eaac42cc3a737356f69ab1ae8464f462e2d23e0",
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#215e491381b3534c4b00dea501749a5e7b766de4",
     "turbo": "catalog:",
     "typescript": "catalog:",
     "typescript-api": "catalog:",
