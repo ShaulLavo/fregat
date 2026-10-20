@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "manifestHash": "d2d18c29d4a976bc41beefd104d4d70ba47aa2701abe854d855177621ae88aad",
+  "manifestHash": "0fadea9f3fa2a83a5b5090a79cb21aee3cfb2c030772fe6cdbb99d82af0d4fa3",
   "languages": [
     {
       "id": "javascript",
@@ -720,16 +720,16 @@
       "parserABI": 15,
       "source": {
         "package": "tree-sitter-md",
-        "version": "0.1.27",
+        "version": "0.1.31",
         "repository": "https://github.com/ShaulLavo/tree-sitter-md",
-        "revision": "946cae60e57d9da3417e051cbea61239022d8459",
+        "revision": "d75c7ea679ab21f740f67677aa19dbcc5a4141da",
         "license": "MIT",
         "compiler": "wasi-sdk 34"
       },
       "sourceFiles": [
         {
           "file": "package.json",
-          "sha256": "ea8b56fca0e07b359f2ab8de63009ef1c83af8e4412bd4e84b9fd5e7ac65f057"
+          "sha256": "9c731da15157fdf2a09cec688115d32f5ab4370b8ca03417eea447575ff9e952"
         },
         {
           "file": "src/autolink.c",
@@ -761,21 +761,21 @@
         },
         {
           "file": "src/leaf.c",
-          "sha256": "8bd44da545fe60c1913ed0d5a5912678194ca6c0f6c75a4c105f19493447ce16"
+          "sha256": "e689509711b1e5ca5ad48fcf3da56afe974e96b31b2965bcf08aceb7d69a8b90"
         },
         {
           "file": "src/resolver.h",
-          "sha256": "9194fce8cc48ed59afff5cc502102841ff3856494fd5c4f6b52f4999d5796fe7"
+          "sha256": "4486b61dfbf0ce7d3bd661045fc51c3f588f815bda8f8222f8144dfad8302cb5"
         },
         {
           "file": "src/semantic.c",
-          "sha256": "40d280198b7055832853cb53effb0efedaa4f93b32be508b02cd844444ef17a9"
+          "sha256": "16af8b36a3c19ead0c5b7fb1f116e030eb7ffa13287fb0db4a59a984ec1ca836"
         }
       ],
       "files": [
         {
           "file": "tree-sitter-md/tree-sitter-markdown.wasm",
-          "sha256": "d2aa39c242df88b46e9dc7342c2afde16b898c5cba51c3475e9add8c069cfa40"
+          "sha256": "48b2617c8847488771f1187ff1e32d25660782369ebcac0b3f5d73d4fc7870b7"
         },
         {
           "file": "./queries/markdown-merge-units.scm",
