@@ -1,5 +1,5 @@
 import { hash, randomUUID } from 'node:crypto'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import net from 'node:net'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
@@ -14,7 +14,7 @@ import {
 import { errorMessage } from '../../packages/contracts/src/error-fields'
 import { qualificationProvenance } from './provenance'
 import { isRecord } from './serialization'
-import { inspectRasterEvidence, rasterRecords } from './raster'
+import { inspectRasterEvidence, rasterRecords, type Visual } from './raster'
 import { compareRasterEvidence } from './paired-raster'
 import { createScriptError } from '../structured-errors'
 import { checkRunExitCode, qualificationExitCode, validateChecksOnly } from './check-exit'
@@ -48,8 +48,14 @@ const QUALIFICATION_ARTIFACT_ROLES = [
   'pairedRasterCalibration',
 ] as const
 type QualificationArtifactRole = (typeof QUALIFICATION_ARTIFACT_ROLES)[number]
-type QualificationArtifactBinding = {
-  readonly role: QualificationArtifactRole
+type QualificationArtifactIdentity =
+  | { readonly role: QualificationArtifactRole }
+  | {
+      readonly role: 'originalVisualImage'
+      readonly original: Visual
+      readonly sourceFileIdentity: string
+    }
+type QualificationArtifactBinding = QualificationArtifactIdentity & {
   readonly path: string
   readonly sha256: string
   readonly byteLength: number
@@ -61,10 +67,7 @@ export type QualificationArtifactRunBinding = {
   readonly artifacts: readonly QualificationArtifactBinding[]
 }
 
-type QualificationArtifactSource = {
-  readonly role: QualificationArtifactRole
-  readonly path: string
-}
+type QualificationArtifactSource = QualificationArtifactIdentity & { readonly path: string }
 
 export type TestRun = {
   readonly name: string
@@ -786,14 +789,22 @@ export async function captureQualificationArtifacts(
   runs: readonly TestRun[],
 ): Promise<readonly QualificationArtifactRunBinding[]> {
   assertStableQualificationSource(sourceBefore, sourceAfter)
-  const pending = qualificationRunArtifacts(runs).concat(await pairedRasterArtifacts(runs))
+  const pending = qualificationRunArtifacts(runs).concat(
+    await pairedRasterArtifacts(runs),
+    await originalVisualArtifacts(runs),
+  )
   const grouped = new Map<string, QualificationArtifactBinding[]>()
   for (const entry of pending) {
     const binding = await materializeQualificationArtifact(evidenceDirectory, entry)
     const artifacts = grouped.get(entry.runId) ?? []
     if (
       !artifacts.some(
-        (artifact) => artifact.role === binding.role && artifact.path === binding.path,
+        (artifact) =>
+          artifact.role === binding.role &&
+          artifact.path === binding.path &&
+          (artifact.role !== 'originalVisualImage' ||
+            binding.role !== 'originalVisualImage' ||
+            JSON.stringify(artifact.original) === JSON.stringify(binding.original)),
       )
     )
       artifacts.push(binding)
@@ -837,6 +848,27 @@ function qualificationRunArtifacts(runs: readonly TestRun[]) {
     if (run.name.startsWith('browser-')) artifacts.push({ role: 'frameLog', path: run.log })
     return artifacts.map((artifact) => ({ runId: run.name, ...artifact }))
   })
+}
+
+async function originalVisualArtifacts(
+  runs: readonly TestRun[],
+): Promise<readonly (QualificationArtifactSource & { readonly runId: string })[]> {
+  const artifacts: (QualificationArtifactSource & { readonly runId: string })[] = []
+  for (const run of runs.filter((entry) => entry.name.startsWith('browser-'))) {
+    const { images } = rasterRecords(await readFile(run.log, 'utf8'))
+    for (const original of images) {
+      const file = path.resolve(ROOT, original.screenshot)
+      const info = await stat(file, { bigint: true })
+      artifacts.push({
+        runId: run.name,
+        role: 'originalVisualImage',
+        path: file,
+        original,
+        sourceFileIdentity: `${info.dev}:${info.ino}`,
+      })
+    }
+  }
+  return artifacts
 }
 
 async function pairedRasterArtifacts(
@@ -901,12 +933,24 @@ async function materializeQualificationArtifact(
   let targetPath = sourcePath
   let relative = evidenceRelativePath(targetPath, root)
   if (!relative) {
-    relative = path.posix.join('captured', source.role, `${digest}-${path.basename(sourcePath)}`)
+    const identity =
+      source.role === 'originalVisualImage'
+        ? hash('sha256', JSON.stringify([source.runId, source.original]), 'hex')
+        : digest
+    relative = path.posix.join('captured', source.role, `${identity}-${path.basename(sourcePath)}`)
     targetPath = path.join(root, ...relative.split('/'))
     await mkdir(path.dirname(targetPath), { recursive: true })
     await writeFile(targetPath, bytes)
   }
-  return { role: source.role, path: relative, sha256: digest, byteLength: bytes.byteLength }
+  const identity: QualificationArtifactIdentity =
+    source.role === 'originalVisualImage'
+      ? {
+          role: source.role,
+          original: source.original,
+          sourceFileIdentity: source.sourceFileIdentity,
+        }
+      : { role: source.role }
+  return { ...identity, path: relative, sha256: digest, byteLength: bytes.byteLength }
 }
 
 async function verifyQualificationArtifact(

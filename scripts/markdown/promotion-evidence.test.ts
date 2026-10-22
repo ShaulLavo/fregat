@@ -2761,6 +2761,7 @@ test('binds re-encoded paired PNG pixels and retains original file digests', asy
   const reencoded = PNG.sync.write(PNG.sync.read(original), { deflateLevel: 0 })
   expect(reencoded.equals(original)).toBe(false)
   await writeFile(file, reencoded)
+  await control.recapture()
   const result = await assemblePromotionEvidence(control.manifest)
   expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe('passed')
   expect(
@@ -2775,7 +2776,7 @@ test('binds re-encoded paired PNG pixels and retains original file digests', asy
   )
 })
 
-test.each(['original', 'paired'] as const)(
+test.each(['original', 'paired', 'cross-role'] as const)(
   'rejects hard-linked %s images across visual capture identities',
   async (kind) => {
     const control = await producerQualificationFixture()
@@ -2794,6 +2795,8 @@ test.each(['original', 'paired'] as const)(
             path.join(control.root, raster.compared[0].baseline),
             path.join(control.root, raster.compared[1].candidate),
           ]
+    if (kind === 'cross-role')
+      files[0] = path.join(control.root, `remark-chromium-${VISUAL_STORY_IDS[0]}-390-light.png`)
     const first = files[0]!,
       second = files[1]!
     await rm(second)
@@ -2812,9 +2815,10 @@ test.each(['original', 'paired'] as const)(
   },
 )
 
-test('retains source-tree original screenshots through the actual producer after source removal', async () => {
+async function moveOriginalsToSourceTree(
+  control: Awaited<ReturnType<typeof producerQualificationFixture>>,
+) {
   const { rasterRecords } = await import('./raster')
-  const control = await producerQualificationFixture()
   const outside = await mkdtemp(path.join(tmpdir(), 'promotion-source-tree-'))
   temporary.add(outside)
   const runs = control.report.runs.filter((run) => run.name.startsWith('browser-'))
@@ -2837,6 +2841,12 @@ test('retains source-tree original screenshots through the actual producer after
     await writeFile(run.log, log)
     originalLogs.set(run.log, log)
   }
+  return { outside, runs, originalLogs }
+}
+
+test('retains source-tree original screenshots through the actual producer after source removal', async () => {
+  const control = await producerQualificationFixture()
+  const { outside, runs, originalLogs } = await moveOriginalsToSourceTree(control)
   await control.recapture()
   for (const run of runs) expect(await readFile(run.log, 'utf8')).toBe(originalLogs.get(run.log))
   const retained = control.report.artifactBindings
@@ -2848,4 +2858,86 @@ test('retains source-tree original screenshots through the actual producer after
   const result = await assemblePromotionEvidence(control.manifest)
   expect(result.report.gates.find((row) => row.gate === 'visual-states')?.failures).toEqual([])
   expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe('passed')
+})
+
+test.each(['source-hardlink', 'retained-hardlink', 'escaping-symlink'] as const)(
+  'retained source-tree originals reject %s after source removal',
+  async (fault) => {
+    const { rasterRecords } = await import('./raster')
+    const control = await producerQualificationFixture()
+    const { outside, runs } = await moveOriginalsToSourceTree(control)
+    const images = rasterRecords(await readFile(runs[0]!.log, 'utf8')).images
+    if (fault === 'source-hardlink') {
+      await rm(images[1]!.screenshot)
+      await link(images[0]!.screenshot, images[1]!.screenshot)
+    }
+    await control.recapture()
+    const retained = control.report.artifactBindings
+      .flatMap((binding) => binding.artifacts)
+      .filter((artifact) => artifact.role === 'originalVisualImage')
+    const first = path.join(control.root, retained[0]!.path)
+    const second = path.join(control.root, retained[1]!.path)
+    if (fault === 'retained-hardlink') {
+      await rm(second)
+      await link(first, second)
+    }
+    const escape = path.join(outside, 'escape.png')
+    if (fault === 'escaping-symlink') {
+      await writeFile(escape, await readFile(second))
+      await rm(second)
+      await symlink(escape, second)
+    }
+    if (fault !== 'escaping-symlink') await rm(outside, { recursive: true })
+    const result = await assemblePromotionEvidence(control.manifest)
+    expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+      'blocked',
+    )
+    const failures = result.report.gates
+      .find((row) => row.gate === 'visual-states')
+      ?.failures.join(' ')
+    expect(failures).toContain(
+      fault === 'escaping-symlink' ? 'outside evidenceDirectory' : 'reused',
+    )
+  },
+)
+
+test.each([
+  'missing',
+  'duplicate',
+  'engine',
+  'fixture',
+  'browser',
+  'width',
+  'theme',
+  'screenshot',
+  'sourceFileIdentity',
+] as const)('requires an exact retained-original capture binding: %s', async (fault) => {
+  const control = await producerQualificationFixture()
+  const index = control.report.artifactBindings.findIndex(
+    (binding) => binding.runId === 'browser-remark-qualify',
+  )
+  const binding = control.report.artifactBindings[index]!
+  const captured = binding.artifacts.find((artifact) => artifact.role === 'originalVisualImage')!
+  const changed = { ...captured, original: { ...captured.original } }
+  if (fault === 'engine') changed.original.engine = 'tree-sitter'
+  if (fault === 'fixture') changed.original.fixture = 'unrelated'
+  if (fault === 'browser') changed.original.browser = 'webkit'
+  if (fault === 'width') changed.original.width = 1440
+  if (fault === 'theme') changed.original.theme = 'dark'
+  if (fault === 'screenshot') changed.original.screenshot = 'unrelated.png'
+  if (fault === 'sourceFileIdentity') changed.sourceFileIdentity = ''
+  let artifacts = binding.artifacts.map((artifact) => (artifact === captured ? changed : artifact))
+  if (fault === 'missing') artifacts = binding.artifacts.filter((artifact) => artifact !== captured)
+  if (fault === 'duplicate') artifacts = binding.artifacts.concat(captured)
+  control.report.artifactBindings = control.report.artifactBindings.map((entry, at) =>
+    at === index ? { ...binding, artifacts } : entry,
+  )
+  await control.save()
+  const result = await assemblePromotionEvidence(control.manifest)
+  expect(
+    result.report.gates.find((row) => row.gate === 'visual-states')?.failures.join(' '),
+  ).toContain('retention binding is missing or ambiguous')
+  expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+    'blocked',
+  )
 })

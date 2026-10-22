@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readFile, realpath, writeFile } from 'node:fs/promises'
+import { readFile, realpath, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import {
@@ -1377,12 +1377,13 @@ function captureBindingFindings(
       .filter(isRecord)
       .map((artifact) => ({ artifact, runId }))
   })
+  const artifactsByPath = new Map(artifacts.map((artifact) => [artifact.path, artifact]))
   for (const { artifact, runId } of records) {
     const file = stringValue(artifact, 'path')
-    const actual = artifacts.find(
-      (entry) =>
-        file !== null && entry.path === normalizedArtifact(manifest.evidenceDirectory, file),
-    )
+    const actual =
+      file === null
+        ? undefined
+        : artifactsByPath.get(normalizedArtifact(manifest.evidenceDirectory, file))
     if (
       !actual ||
       actual.sha256 !== get(artifact, 'sha256') ||
@@ -1562,7 +1563,7 @@ async function visualCalibrationFindings(
   const raster = reports.get('paired-raster')
   for (const row of list(get(raster?.value ?? {}, 'compared')).filter(isRecord))
     findings.push(...(await visualPixelFindings(manifest, raster?.path ?? '', row, tolerances)))
-  const sources = await visualSourceFindings(manifest, raster, originals)
+  const sources = await visualSourceFindings(manifest, raster, originals, bindings)
   findings.push(...sources.findings)
   return {
     findings,
@@ -1574,6 +1575,7 @@ async function visualSourceFindings(
   manifest: PromotionEvidenceAssemblyManifest,
   report: LoadedReport | undefined,
   originals: readonly Visual[],
+  bindings: readonly RecordValue[],
 ) {
   const findings: string[] = []
   const artifacts: string[] = []
@@ -1589,7 +1591,7 @@ async function visualSourceFindings(
     index.set(key, (index.get(key) ?? []).concat(image))
   }
   const rows = list(get(report?.value ?? {}, 'compared')).filter(isRecord)
-  const files = { original: new Set<string>(), paired: new Set<string>() }
+  const files = { physical: new Map<string, string>(), source: new Set<string>() }
   for (const key of visualStateKeys()) {
     const selected = rows.filter((row) => stringValue(row, 'key') === key)
     if (selected.length !== 1) continue
@@ -1604,6 +1606,7 @@ async function visualSourceFindings(
         sources,
         engine,
         files,
+        bindings,
       )
       findings.push(...result.findings)
       artifacts.push(...result.artifacts)
@@ -1618,7 +1621,8 @@ async function visualSourcePair(
   row: RecordValue,
   sources: readonly Visual[],
   engine: Visual['engine'],
-  files: { readonly original: Set<string>; readonly paired: Set<string> },
+  files: { readonly physical: Map<string, string>; readonly source: Set<string> },
+  bindings: readonly RecordValue[],
 ): Promise<{ findings: string[]; artifacts: string[] }> {
   const key = stringValue(row, 'key') ?? ''
   const source = sources[0]
@@ -1629,18 +1633,43 @@ async function visualSourcePair(
     }
   try {
     const root = manifest.evidenceDirectory
-    const original = await resolveEvidencePath(
-      root,
-      path.resolve(manifest.trustedContext?.root ?? root, source.screenshot),
-    )
+    const captures = bindings
+      .filter((binding) => get(binding, 'runId') === `browser-${engine}-qualify`)
+      .flatMap((binding) => list(get(binding, 'artifacts')).filter(isRecord))
+      .filter(
+        (artifact) =>
+          get(artifact, 'role') === 'originalVisualImage' &&
+          Object.entries(source).every(
+            ([field, value]) => get(record(artifact, 'original') ?? {}, field) === value,
+          ),
+      )
+    const capture = captures[0]
+    const sourceIdentity = stringValue(capture ?? {}, 'sourceFileIdentity')
+    if (captures.length !== 1 || !capture || !sourceIdentity)
+      return {
+        findings: [
+          `visual-states: ${key} ${engine} original capture retention binding is missing or ambiguous.`,
+        ],
+        artifacts: [],
+      }
+    const original = await resolveEvidencePath(root, stringValue(capture, 'path') ?? '')
     const role = engine === 'remark' ? 'baseline' : 'candidate'
     const paired = await resolveEvidencePath(
       root,
       path.resolve(root, path.dirname(reportPath), stringValue(row, role) ?? ''),
     )
-    const reused = files.original.has(original) || files.paired.has(paired)
-    files.original.add(original)
-    files.paired.add(paired)
+    const originalInfo = await stat(original, { bigint: true })
+    const pairedInfo = await stat(paired, { bigint: true })
+    const originalIdentity = `${originalInfo.dev}:${originalInfo.ino}`
+    const pairedIdentity = `${pairedInfo.dev}:${pairedInfo.ino}`
+    const captureIdentity = JSON.stringify([key, engine])
+    const reused =
+      [originalIdentity, pairedIdentity].some(
+        (file) => files.physical.has(file) && files.physical.get(file) !== captureIdentity,
+      ) || files.source.has(sourceIdentity)
+    files.physical.set(originalIdentity, captureIdentity)
+    files.physical.set(pairedIdentity, captureIdentity)
+    files.source.add(sourceIdentity)
     if (reused)
       return {
         findings: [
