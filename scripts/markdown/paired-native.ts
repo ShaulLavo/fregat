@@ -678,12 +678,17 @@ async function* nativeWorkloadRecords(
   state: NativeWriteState,
 ): AsyncGenerator<NativePairRecord> {
   const warmupOrders = options.warmups === 0 ? [] : pairedTrialOrders(options.warmups, options.seed)
+  let mismatchedPairs = 0
   for (let warmup = 0; warmup < options.warmups; warmup++) {
-    captureNativeArms(entry, warmupOrders[warmup], -warmup - 1, options.capture, state)
-    if (state.failure) return
+    const trial = -warmup - 1
+    const order = warmupOrders[warmup]
+    const arms = captureNativeArms(entry, order, trial, options.capture, state)
+    if (!arms) return
+    const pair = nativePair(arms, order, trial)
+    if (pair.mismatchedRevisions.length > 0) mismatchedPairs++
+    yield { workload: entry.id, pair }
   }
   const metrics: NativeMetricPair[] = []
-  let mismatchedPairs = 0
   for (const [trial, order] of options.orders.entries()) {
     const arms = captureNativeArms(entry, order, trial, options.capture, state)
     if (!arms) return

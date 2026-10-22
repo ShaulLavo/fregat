@@ -3,7 +3,10 @@ import { healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { createMarkdownSession } from '@workspace/markdown/utils/session'
 
-import { createProductionMarkdownProbe } from './factories/markdown-production'
+import {
+  createProductionMarkdownProbe,
+  productionProbeLifecycle,
+} from './factories/markdown-production'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { activeServerOrigin, getClient } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
@@ -17,9 +20,12 @@ const ready = candidate
       factory: createMarkdownSession,
       parserMemoryBytes: null,
     })
-const probe = Promise.all([ready, confirmFixtureEnvironment()]).then(([options]) =>
-  createProductionMarkdownProbe(options),
+const lifecycle = productionProbeLifecycle(
+  Promise.all([ready, confirmFixtureEnvironment()]).then(([options]) =>
+    createProductionMarkdownProbe(options),
+  ),
 )
+const probe = lifecycle.ready
 window.markdownProductionProbe = {
   ready: probe.then(() => ({
     engine: candidate ? 'tree-sitter' : 'remark',
@@ -39,19 +45,15 @@ window.markdownProductionProbe = {
     return value.observeTimeline()
   },
   activity: () => {
-    if (!resolvedProbe) throw createClientInvariantError('Production probe is not ready')
-    return resolvedProbe.activity()
+    const current = lifecycle.current()
+    if (!current) throw createClientInvariantError('Production probe is not ready')
+    return current.activity()
   },
-  dispose: async () => (await probe).dispose(),
+  dispose: async () => lifecycle.dispose(),
 }
 
-let resolvedProbe: Awaited<typeof probe> | null = null
-void probe.then((value) => {
-  resolvedProbe = value
-})
-
 function probeSync() {
-  return resolvedProbe
+  return lifecycle.current()
 }
 
 async function candidateFactory() {

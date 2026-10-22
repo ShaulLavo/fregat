@@ -32,6 +32,7 @@ import {
   type ProductionTrial,
 } from './production-analysis.ts'
 import { withProductionDeadline } from './production-deadline'
+import { closeProductionPage, retainProductionFailure } from './production-capture-lifecycle'
 import { productionBrowserControls } from './production-controls.ts'
 import { measureProductionTimeline } from './production-scenes.ts'
 import { qualificationProvenance } from './provenance.ts'
@@ -187,6 +188,7 @@ export async function runProductionMarkdownPairs({
   readonly executablePath?: string
   readonly capture?: ProductionCapture
 }) {
+  output = path.resolve(output)
   if (
     capture.kind === 'promotion' &&
     (process.platform !== 'darwin' || headless || browserName !== 'chromium')
@@ -578,7 +580,7 @@ function incompleteNetworkEvidence(trial: ProductionTrial) {
   return []
 }
 
-async function retainBrowserMismatch(
+export async function retainBrowserMismatch(
   value: unknown,
   options: Omit<Parameters<typeof retainTimingOracleMismatch>[0], 'sample'>,
 ) {
@@ -598,11 +600,13 @@ async function retainBrowserMismatch(
     throw createScriptError('Production mismatch expectation is missing.')
   await retainTimingOracleMismatch({
     ...options,
+    root: path.resolve(options.root),
+    file: path.resolve(options.file),
     sample: { actual: record.frame, expected, expectedIndex },
   })
 }
 
-async function oneTrial({
+export async function oneTrial({
   browser,
   url,
   output,
@@ -625,6 +629,7 @@ async function oneTrial({
   readonly order: 'AB' | 'BA'
   readonly engine: (typeof ENGINES)[number]
 }): Promise<ProductionTrial> {
+  output = path.resolve(output)
   const directory = path.join(output, workload.id, `pair-${pair}-${engine}`)
   await mkdir(directory, { recursive: true })
   await trialStage(directory, 'oracle')
@@ -733,7 +738,6 @@ async function oneTrial({
     const resourceWindows = resourceObservation?.windows ?? null
     const resourceControlWindows = resourceObservation?.controls ?? null
     await trialStage(directory, 'trace')
-    const trace = await instrumentation?.finishTrace(directory)
     const failedRequests =
       instrumentation?.network().filter((request) => request.failure !== null) ?? []
     if (failedRequests.length > 0) errors.push(`${failedRequests.length} network requests failed`)
@@ -742,6 +746,7 @@ async function oneTrial({
         internal: { errors: errors.length },
       })
     await page.screenshot({ path: path.join(directory, 'final.png') })
+    const trace = await instrumentation?.finishTrace(directory)
     return {
       workload: workload.id,
       family: workload.family,
@@ -772,34 +777,22 @@ async function oneTrial({
       resourceControlWindows,
     }
   } catch (error) {
-    await writeFile(
-      path.join(directory, 'failure.json'),
-      JSON.stringify(
-        {
-          errors,
-          failure: error instanceof Error ? error.message : String(error),
-          network: instrumentation?.network() ?? null,
-          workers: instrumentation?.workers() ?? null,
-        },
-        null,
-        2,
-      ) + '\n',
-    )
-    await Promise.allSettled([
-      page.screenshot({
-        path: path.join(directory, 'failure.png'),
-        timeout: 5000,
-      }),
-      page.content().then((html) => writeFile(path.join(directory, 'failure.html'), html)),
-    ])
+    await retainProductionFailure({
+      page,
+      directory,
+      prefix: 'failure',
+      instrumentation,
+      diagnostic: {
+        errors,
+        failure: error instanceof Error ? error.message : String(error),
+        network: instrumentation?.network() ?? null,
+        workers: instrumentation?.workers() ?? null,
+      },
+    }).catch(() => undefined)
     throw error
   } finally {
     page.removeListener('pageerror', onError)
-    await page
-      .evaluate(async () => window.markdownProductionProbe?.dispose())
-      .catch(() => undefined)
-    await instrumentation?.close().catch(() => undefined)
-    await context.close()
+    await closeProductionPage(page, context, instrumentation, directory)
   }
 }
 
@@ -810,7 +803,7 @@ async function trialStage(directory: string, stage: string) {
   )
 }
 
-async function readOracle(
+export async function readOracle(
   browser: Browser,
   url: string,
   workload: ProductionWorkload,
@@ -818,6 +811,8 @@ async function readOracle(
   directory: string,
   output: string,
 ) {
+  output = path.resolve(output)
+  directory = path.resolve(directory)
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     colorScheme: 'dark',
@@ -862,30 +857,18 @@ async function readOracle(
       })
     return captured
   } catch (error) {
-    await writeFile(
-      path.join(directory, 'oracle-failure.json'),
-      JSON.stringify(
-        {
-          errors,
-          failure: error instanceof Error ? error.message : String(error),
-        },
-        null,
-        2,
-      ) + '\n',
-    )
-    await Promise.allSettled([
-      page.screenshot({
-        path: path.join(directory, 'oracle-failure.png'),
-        timeout: 5000,
-      }),
-      page.content().then((html) => writeFile(path.join(directory, 'oracle-failure.html'), html)),
-    ])
+    await retainProductionFailure({
+      page,
+      directory,
+      prefix: 'oracle-failure',
+      diagnostic: {
+        errors,
+        failure: error instanceof Error ? error.message : String(error),
+      },
+    }).catch(() => undefined)
     throw error
   } finally {
-    await page
-      .evaluate(async () => window.markdownProductionProbe?.dispose())
-      .catch(() => undefined)
-    await context.close()
+    await closeProductionPage(page, context, null, directory)
   }
 }
 

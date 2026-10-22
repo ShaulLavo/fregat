@@ -383,38 +383,45 @@ export function createProductionMarkdownProbe({
     timeline = null
     const results: ProductionResourceWindow[] = []
     await update(null, false)
-    for (const cycles of windows) {
-      const started = performance.now()
-      const before = resourceState()
-      let peakWasmReservedBytes = before.parserWasmReservedBytes
-      let peakMessageNodes = 0
-      for (let cycle = 0; cycle < cycles; cycle += 1) {
-        const peak = await resourceCycle(source, concurrentMessages)
-        peakWasmReservedBytes = maximumMemory(peakWasmReservedBytes, peak.parserWasmReservedBytes)
-        peakMessageNodes = Math.max(peakMessageNodes, peak.messageNodes)
-      }
-      await paintedFrame()
-      const after = resourceState()
-      results.push({
-        cycles,
-        elapsedMs: performance.now() - started,
-        parserWasmReservedBeforeBytes: before.parserWasmReservedBytes,
-        parserWasmReservedAfterBytes: after.parserWasmReservedBytes,
-        jsHeapUsedBeforeBytes: before.jsHeapUsedBytes,
-        jsHeapUsedAfterBytes: after.jsHeapUsedBytes,
-        jsHeapReservedBeforeBytes: before.jsHeapReservedBytes,
-        jsHeapReservedAfterBytes: after.jsHeapReservedBytes,
-        backingStorageBeforeBytes: null,
-        backingStorageAfterBytes: null,
-        queryObserversBefore: before.queryObservers,
-        queryObserversAfter: after.queryObservers,
-        retainedMessageNodes: after.messageNodes,
-        simultaneousMessages: concurrentMessages,
-        peakWasmReservedBytes,
-        peakMessageNodes,
-      })
-    }
+    for (const cycles of windows)
+      results.push(await resourceWindow(source, cycles, concurrentMessages))
     return results
+  }
+
+  async function resourceWindow(
+    source: string | null,
+    cycles: number,
+    concurrentMessages: number,
+  ): Promise<ProductionResourceWindow> {
+    const started = performance.now()
+    const before = resourceState()
+    let peakWasmReservedBytes = before.parserWasmReservedBytes
+    let peakMessageNodes = 0
+    for (let cycle = 0; cycle < cycles; cycle += 1) {
+      const peak = await resourceCycle(source, concurrentMessages)
+      peakWasmReservedBytes = maximumMemory(peakWasmReservedBytes, peak.parserWasmReservedBytes)
+      peakMessageNodes = Math.max(peakMessageNodes, peak.messageNodes)
+    }
+    await paintedFrame()
+    const after = resourceState()
+    return {
+      cycles,
+      elapsedMs: performance.now() - started,
+      parserWasmReservedBeforeBytes: before.parserWasmReservedBytes,
+      parserWasmReservedAfterBytes: after.parserWasmReservedBytes,
+      jsHeapUsedBeforeBytes: before.jsHeapUsedBytes,
+      jsHeapUsedAfterBytes: after.jsHeapUsedBytes,
+      jsHeapReservedBeforeBytes: before.jsHeapReservedBytes,
+      jsHeapReservedAfterBytes: after.jsHeapReservedBytes,
+      backingStorageBeforeBytes: null,
+      backingStorageAfterBytes: null,
+      queryObserversBefore: before.queryObservers,
+      queryObserversAfter: after.queryObservers,
+      retainedMessageNodes: after.messageNodes,
+      simultaneousMessages: concurrentMessages,
+      peakWasmReservedBytes,
+      peakMessageNodes,
+    }
   }
 
   async function mountTimeline(count: number, source: string) {
@@ -780,4 +787,30 @@ async function waitUntil(deadline: number) {
     await new Promise<void>((resolve) =>
       setTimeout(resolve, Math.max(1, deadline - performance.now())),
     )
+}
+
+export function productionProbeLifecycle<T extends { dispose(): void | Promise<void> }>(
+  pending: Promise<T>,
+) {
+  let current: T | null = null
+  let disposed = false
+  const ready = pending.then(async (value) => {
+    if (disposed) {
+      await value.dispose()
+      throw createClientInvariantError('Production probe was disposed during initialization')
+    }
+    current = value
+    return value
+  })
+  return {
+    ready,
+    current: () => current,
+    dispose: async () => {
+      if (disposed) return
+      disposed = true
+      const owner = current
+      current = null
+      await owner?.dispose()
+    },
+  }
 }
