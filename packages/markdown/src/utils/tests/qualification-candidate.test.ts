@@ -58,6 +58,30 @@ describe('Tree-sitter completed semantics against the official output', () => {
   })
 })
 
+describe('CHAT grammar matches the reviewed base spec output', () => {
+  const examples = commonmark
+    .map((example) => ({ ...example, gfm: false }))
+    .concat(gfm.map((example) => ({ ...example, gfm: true })))
+
+  test.each(examples)('$id preserves base semantics with gfm=$gfm', (example) => {
+    const base = parseTreeSitterMarkdown(example.source, { gfm: example.gfm })
+    const chat = parseTreeSitterMarkdown(example.source, {
+      gfm: example.gfm,
+      cjk: true,
+      math: true,
+    })
+    expect(canonicalMarkdownOutput(chat)).toEqual(canonicalMarkdownOutput(base))
+  })
+
+  test('the math control selects the CHAT grammar', () => {
+    const source = '$$x\ny\n$$'
+    expect(parseTreeSitterMarkdown(source, { math: false }).children[0]?.type).toBe('paragraph')
+    expect(parseTreeSitterMarkdown(source, { cjk: true, math: true }).children[0]?.type).toBe(
+      'math',
+    )
+  })
+})
+
 function candidateReplay() {
   const session = createTreeSitterMarkdownSession()
   return (text: string, live: boolean) => ({

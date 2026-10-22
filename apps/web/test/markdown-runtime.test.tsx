@@ -16,6 +16,9 @@ test('the DOM environment loads the real chat parser and settles its loading vie
   )
 
   expect(screen.getByLabelText('Loading message renderer')).toBeInTheDocument()
+  expect(document.querySelector('[data-chat-markdown-raw]')?.textContent).toBe(
+    '# Parsed heading\n\nA **formatted** answer.',
+  )
   expect(await screen.findByRole('heading', { name: 'Parsed heading' })).toBeInTheDocument()
   expect(screen.getByText('formatted', { selector: 'strong' })).toBeInTheDocument()
   expect(screen.queryByLabelText('Loading message renderer')).not.toBeInTheDocument()
