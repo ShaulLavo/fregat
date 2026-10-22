@@ -23,7 +23,15 @@ export type ProductionTimingFrame = ProductionProcessedUpdate & {
   readonly painted: number
   readonly paintedOutput: ProductionOutputReceipt
 }
+export type ProductionMismatchSample = {
+  readonly actual: ProductionMarkdownFrame
+  readonly expectedIndex: number
+  readonly expected: ProductionOutputReceipt
+}
+export type ProductionMismatchSink = (sample: ProductionMismatchSample) => Promise<void>
+
 export type ProductionTimingOptions = {
+  readonly onMismatch?: ProductionMismatchSink
   readonly arrival: 'paced' | 'burst-coalesced'
   readonly arrivalOffsetsMs: readonly number[]
   readonly expected: readonly ProductionOutputReceipt[]
@@ -143,12 +151,30 @@ export type ProductionTimelineReceipt = {
   readonly longTasks: readonly number[] | null
 }
 
+export type ProductionOracleSink = (
+  record:
+    | { readonly kind: 'frame'; readonly frame: ProductionMarkdownFrame }
+    | {
+        readonly kind: 'final'
+        readonly frame: ProductionMarkdownFrame
+        readonly fullyReady: number
+        readonly longTasks: ProductionMarkdownReceipt['longTasks']
+        readonly resources: ProductionMarkdownReceipt['resources']
+      }
+    | { readonly kind: 'fresh'; readonly frame: ProductionMarkdownFrame },
+) => Promise<void>
+
 type MarkdownProductionApi = {
   readonly ready: Promise<{
     readonly engine: string
     readonly initializationMs: number
   }>
   readonly run: (source: string, chunks: readonly string[]) => Promise<ProductionMarkdownReceipt>
+  readonly streamOracle: (
+    source: string,
+    chunks: readonly string[],
+    sink: ProductionOracleSink,
+  ) => Promise<void>
   readonly time: (
     source: string,
     chunks: readonly string[],
@@ -173,5 +199,7 @@ type MarkdownProductionApi = {
 declare global {
   interface Window {
     markdownProductionProbe: MarkdownProductionApi
+    markdownOracleFrame: ProductionOracleSink
+    markdownMismatchFrame: ProductionMismatchSink
   }
 }

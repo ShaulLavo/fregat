@@ -50,6 +50,7 @@ const sha = pipe(string(), regex(/^[a-f0-9]{64}$/u))
 const commit = pipe(string(), regex(/^[a-f0-9]{40}$/u))
 const artifactsSchema = object({
   grammarSha256: sha,
+  chatGrammarSha256: sha,
   resolverSha256: sha,
   runtimeWasmSha256: sha,
   runtimeBindingSha256: sha,
@@ -473,6 +474,7 @@ async function inspectCandidateIdentity(root: string): Promise<CandidateIdentity
     })
   const files = {
     grammarSha256: require.resolve('tree-sitter-md/tree-sitter-markdown.wasm'),
+    chatGrammarSha256: require.resolve('tree-sitter-md/tree-sitter-markdown-chat.wasm'),
     resolverSha256: require.resolve('tree-sitter-md/tree-sitter-md.wasm'),
     runtimeWasmSha256: require.resolve('web-tree-sitter/web-tree-sitter.wasm'),
     runtimeBindingSha256: runtime,
@@ -913,6 +915,7 @@ export async function readTrustedEvaluationContext(input: {
       candidateCommit: report.candidate.candidateCommit,
       candidateSourceSha256: report.candidate.candidateSourceSha256,
       grammarSha256: report.candidate.artifacts.grammarSha256,
+      chatGrammarSha256: report.candidate.artifacts.chatGrammarSha256,
       resolverSha256: report.candidate.artifacts.resolverSha256,
       lockfileSha256: report.candidate.artifacts.lockfileSha256,
     },

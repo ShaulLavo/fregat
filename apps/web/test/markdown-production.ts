@@ -26,6 +26,7 @@ window.markdownProductionProbe = {
     initializationMs: performance.now() - started,
   })),
   run: async (source, chunks) => (await probe).run(source, chunks),
+  streamOracle: async (source, chunks, sink) => (await probe).streamOracle(source, chunks, sink),
   time: async (source, chunks, options) => (await probe).time(source, chunks, options),
   show: async (source, live) => (await probe).show(source, live),
   resources: async (source, windows, simultaneous) =>
@@ -54,16 +55,18 @@ function probeSync() {
 }
 
 async function candidateFactory() {
-  const [module, parser, grammar, resolver, runtime] = await Promise.all([
+  const [module, parser, grammar, chatGrammar, resolver, runtime] = await Promise.all([
     import('@workspace/markdown/utils/tree-sitter-session'),
     import('web-tree-sitter/web-tree-sitter.wasm?url'),
     import('tree-sitter-md/tree-sitter-markdown.wasm?url'),
+    import('tree-sitter-md/tree-sitter-markdown-chat.wasm?url'),
     import('tree-sitter-md/tree-sitter-md.wasm?url'),
     import('tree-sitter-md'),
   ])
   await module.initializeTreeSitterMarkdown({
     parser: { locateFile: () => parser.default },
     grammar: grammar.default,
+    chatGrammar: chatGrammar.default,
     resolver: resolver.default,
   })
   return {

@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { isMainThread, parentPort, Worker, workerData } from 'node:worker_threads'
 import * as v from 'valibot'
 import { errorMessage } from '../../packages/contracts/src/error-fields'
 import { createScriptError } from '../structured-errors'
@@ -81,7 +82,7 @@ function digest(value: unknown): string {
 }
 
 type CandidateArtifact = {
-  readonly kind: 'grammar' | 'resolver' | 'binding' | 'semantic-binding' | 'runtime'
+  readonly kind: 'grammar' | 'chatGrammar' | 'resolver' | 'binding' | 'semantic-binding' | 'runtime'
   readonly file: string
   readonly bytes: number
   readonly sha256: string
@@ -104,7 +105,52 @@ export type CandidateInspection = {
   readonly reason: string
   readonly missing: readonly string[]
 }
-export type CandidateInspectionOptions = { readonly grammar?: string; readonly resolver?: string }
+export type CandidateInspectionOptions = {
+  readonly grammar?: string
+  readonly chatGrammar?: string
+  readonly resolver?: string
+}
+const candidateArtifactSchema = v.object({
+  kind: v.picklist([
+    'grammar',
+    'chatGrammar',
+    'resolver',
+    'binding',
+    'semantic-binding',
+    'runtime',
+  ]),
+  file: v.string(),
+  bytes: v.number(),
+  sha256: v.string(),
+})
+const candidateInspectionSchema = v.object({
+  engine: v.literal('tree-sitter-md'),
+  status: v.picklist(['available-unqualified', 'unavailable']),
+  version: v.nullable(v.string()),
+  methods: v.array(v.string()),
+  artifacts: v.array(candidateArtifactSchema),
+  profile: v.nullable(v.string()),
+  declaredCapabilities: v.nullable(v.record(v.string(), v.boolean())),
+  observedCapabilities: v.record(v.string(), v.boolean()),
+  semanticChecks: v.object({
+    executed: v.number(),
+    passed: v.number(),
+    failed: v.number(),
+    findings: v.array(v.string()),
+  }),
+  reason: v.string(),
+  missing: v.array(v.string()),
+})
+const candidateInspectionOptionsSchema = v.object({
+  grammar: v.optional(v.string()),
+  chatGrammar: v.optional(v.string()),
+  resolver: v.optional(v.string()),
+})
+const inspectionRequestSchema = v.object({
+  kind: v.literal('markdown-candidate-inspection'),
+  root: v.string(),
+  options: candidateInspectionOptionsSchema,
+})
 const snapshotSchema = v.object({
   profile: v.picklist(['commonmark', 'gfm', 'fregat-chat']),
   capabilities: v.object({
@@ -148,6 +194,38 @@ export async function inspectCandidate(
   root: string,
   options: CandidateInspectionOptions = {},
 ): Promise<CandidateInspection> {
+  // Native initialization is one-shot. A fresh realm binds every probe to this inspection's bytes.
+  let worker: Worker | undefined
+  try {
+    worker = new Worker(new URL(import.meta.url), {
+      workerData: { kind: 'markdown-candidate-inspection', root, options },
+    })
+    return v.parse(candidateInspectionSchema, await inspectionWorkerResult(worker))
+  } catch (failure) {
+    return unavailableInspection(failure)
+  } finally {
+    await worker?.terminate()
+  }
+}
+
+function inspectionWorkerResult(worker: Worker): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    worker.once('message', resolve)
+    worker.once('error', reject)
+    worker.once('exit', (code) => {
+      reject(
+        createScriptError('Candidate inspection worker exited.', {
+          internal: { exitCode: code },
+        }),
+      )
+    })
+  })
+}
+
+async function inspectCandidateInRealm(
+  root: string,
+  options: CandidateInspectionOptions,
+): Promise<CandidateInspection> {
   let version: string | null = null
   let methods: string[] = []
   const artifacts: CandidateArtifact[] = []
@@ -160,6 +238,9 @@ export async function inspectCandidate(
       grammar: options.grammar
         ? path.resolve(root, options.grammar)
         : require.resolve('tree-sitter-md/tree-sitter-markdown.wasm'),
+      chatGrammar: options.chatGrammar
+        ? path.resolve(root, options.chatGrammar)
+        : require.resolve('tree-sitter-md/tree-sitter-markdown-chat.wasm'),
       resolver: options.resolver
         ? path.resolve(root, options.resolver)
         : require.resolve('tree-sitter-md/tree-sitter-md.wasm'),
@@ -168,9 +249,17 @@ export async function inspectCandidate(
       runtime: require.resolve('web-tree-sitter/web-tree-sitter.wasm'),
     }
     const bytes = new Map<CandidateArtifact['kind'], Uint8Array>()
-    for (const kind of ['grammar', 'resolver', 'binding', 'semantic-binding', 'runtime'] as const) {
+    for (const kind of [
+      'grammar',
+      'chatGrammar',
+      'resolver',
+      'binding',
+      'semantic-binding',
+      'runtime',
+    ] as const) {
       const data = await readFile(files[kind])
-      if (kind === 'grammar' || kind === 'resolver' || kind === 'runtime') validateWasm(data, kind)
+      if (kind === 'grammar' || kind === 'chatGrammar' || kind === 'resolver' || kind === 'runtime')
+        validateWasm(data, kind)
       artifacts.push({
         kind,
         file: path.relative(root, files[kind]),
@@ -191,7 +280,11 @@ export async function inspectCandidate(
     runtimeMethod(prototype, 'dispose')
     runtimeMethod(prototype, 'semantics')
     await runtimeCall(module, 'init', [
-      { grammar: bytes.get('grammar'), resolver: bytes.get('resolver') },
+      {
+        grammar: bytes.get('grammar'),
+        chatGrammar: bytes.get('chatGrammar'),
+        resolver: bytes.get('resolver'),
+      },
     ])
     const document = runtimeObject(
       Reflect.construct(constructor, [{ gfm: true, frontmatter: false, cjk: true, math: true }]),
@@ -238,23 +331,32 @@ export async function inspectCandidate(
       missing: failed.map((check) => check.name).concat(['complete promotion receipts']),
     }
   } catch (failure) {
-    return {
-      engine: 'tree-sitter-md',
-      status: 'unavailable',
-      version,
-      methods,
-      artifacts,
-      profile: null,
-      declaredCapabilities: null,
-      observedCapabilities: {},
-      semanticChecks: { executed: 0, passed: 0, failed: 0, findings: [errorMessage(failure)] },
-      reason: 'Candidate artifact initialization or semantic inspection failed.',
-      missing: [
-        'executed native semantic snapshot',
-        'executed renderer adapter',
-        'complete promotion receipts',
-      ],
-    }
+    return unavailableInspection(failure, { version, methods, artifacts })
+  }
+}
+
+function unavailableInspection(
+  failure: unknown,
+  identity: Pick<CandidateInspection, 'version' | 'methods' | 'artifacts'> = {
+    version: null,
+    methods: [],
+    artifacts: [],
+  },
+): CandidateInspection {
+  return {
+    engine: 'tree-sitter-md',
+    status: 'unavailable',
+    ...identity,
+    profile: null,
+    declaredCapabilities: null,
+    observedCapabilities: {},
+    semanticChecks: { executed: 0, passed: 0, failed: 0, findings: [errorMessage(failure)] },
+    reason: 'Candidate artifact initialization or semantic inspection failed.',
+    missing: [
+      'executed native semantic snapshot',
+      'executed renderer adapter',
+      'complete promotion receipts',
+    ],
   }
 }
 
@@ -271,6 +373,7 @@ async function inspectAdapter(
     {
       parser: { locateFile: () => runtime },
       grammar: bytes.get('grammar'),
+      chatGrammar: bytes.get('chatGrammar'),
       resolver: bytes.get('resolver'),
     },
   ])
@@ -361,7 +464,7 @@ function runtimeMethod(value: object, name: string): Function {
 function runtimeCall(value: object, name: string, args: readonly unknown[]): unknown {
   return Reflect.apply(runtimeMethod(value, name), value, args)
 }
-function validateWasm(bytes: Uint8Array, kind: string) {
+function validateWasm(bytes: Uint8Array, kind: 'grammar' | 'chatGrammar' | 'resolver' | 'runtime') {
   if (
     !(
       bytes.length >= 8 &&
@@ -383,12 +486,18 @@ function validateWasm(bytes: Uint8Array, kind: string) {
       .filter((entry) => entry.kind === 'function')
       .map((entry) => entry.name),
   )
-  const required =
-    kind === 'grammar'
-      ? ['tree_sitter_markdown']
-      : kind === 'resolver'
-        ? ['tsmd_new', 'tsmd_free', 'tsmd_semantics', 'tsmd_semantic_out', 'tsmd_semantic_release']
-        : ['ts_parser_new']
+  const required = {
+    grammar: ['tree_sitter_markdown'],
+    chatGrammar: ['tree_sitter_markdown_chat'],
+    resolver: [
+      'tsmd_new',
+      'tsmd_free',
+      'tsmd_semantics',
+      'tsmd_semantic_out',
+      'tsmd_semantic_release',
+    ],
+    runtime: ['ts_parser_new'],
+  }[kind]
   if (required.some((name) => !names.has(name)))
     throw createScriptError('Candidate artifact lacks required parser exports.', {
       internal: { artifactKind: kind, requiredExportCount: required.length },
@@ -430,3 +539,9 @@ export function promotionVerdict(
     },
   }
 }
+
+const inspectionRequest = v.safeParse(inspectionRequestSchema, workerData)
+if (!isMainThread && parentPort && inspectionRequest.success)
+  parentPort.postMessage(
+    await inspectCandidateInRealm(inspectionRequest.output.root, inspectionRequest.output.options),
+  )

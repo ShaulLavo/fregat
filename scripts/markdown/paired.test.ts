@@ -1,3 +1,7 @@
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { lstat, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import type { blockToHast } from '../../packages/markdown/src/utils/hast'
 import { expect, test } from 'vitest'
 import { createMarkdownSession } from '../../packages/markdown/src/utils/session'
@@ -8,7 +12,10 @@ import {
   nativePairWorkloads,
   pairedConfidence,
   pairedTrialOrders,
+  publishNativeReport,
   runNativeTrial,
+  writeNativePairs,
+  type NativeTrial,
   type NativeRevision,
 } from './paired-native'
 
@@ -332,4 +339,425 @@ test('retained old output, skipped revisions and changed coverage fail pair comp
   ).toEqual([0])
   expect(mismatchedRevisions([revision], [{ ...revision, offset: 9 }])).toEqual([0])
   expect(mismatchedRevisions([revision], [{ ...revision, phase: 'settlement' }])).toEqual([0])
+})
+
+function artifactNativeTrial(engine: NativeTrial['engine'], trial: number): NativeTrial {
+  return {
+    engine,
+    trial,
+    mountMs: 2,
+    streamCpuMs: 3,
+    revisions: [
+      {
+        revision: 0,
+        offset: 1,
+        phase: 'update',
+        parseMs: 1,
+        projectionMs: 1,
+        wallMs: 2,
+        cpuMs: 2,
+        convertedBlocks: 1,
+        reusedBlocks: 0,
+        outputDigest: 'complete',
+        sourceCoordinatesDigest: 'coordinates',
+        sourceCoordinateFailures: [],
+        positionedNodes: 1,
+        unchangedProjection: false,
+      },
+    ],
+  }
+}
+
+test('artifact streaming native writes complete pairs in actual order and scalar summaries', async () => {
+  const output = await mkdtemp(path.join(tmpdir(), 'native-artifacts-'))
+  try {
+    const workload = nativePairWorkloads('quick')[0]
+    const orders = pairedTrialOrders(2, 176)
+    const calls: string[] = []
+    const summary = await writeNativePairs({
+      output,
+      workloads: [workload],
+      orders,
+      warmups: 1,
+      seed: 176,
+      mode: 'quick',
+      capture: ({ engine, trial }) => {
+        if (trial >= 0 && calls.length % 2 === 0) assertNativeWrittenPairs(output, trial)
+        calls.push(`${trial}/${engine}`)
+        return artifactNativeTrial(engine, trial)
+      },
+    })
+    const raw: unknown[] = (await readFile(path.join(output, summary.pairsArtifact.path), 'utf8'))
+      .trimEnd()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+    expect(raw).toEqual(
+      orders.map((order, trial) => ({
+        workload: workload.id,
+        pair: {
+          trial,
+          order,
+          remark: artifactNativeTrial('remark', trial),
+          candidate: artifactNativeTrial('tree-sitter', trial),
+          mismatchedRevisions: [],
+        },
+      })),
+    )
+    expect(calls).toEqual(
+      pairedTrialOrders(1, 176)[0]
+        .map((engine) => `-1/${engine}`)
+        .concat(orders.flatMap((order, trial) => order.map((engine) => `${trial}/${engine}`))),
+    )
+    expect(summary.workloads[0]).toMatchObject({ observedPairs: 2, mismatchedPairs: 0 })
+    expect(summary.workloads[0]).not.toHaveProperty('pairs')
+    expect(summary.workloads[0].comparisons).toEqual(
+      (['updateP95', 'settlementP95', 'mountP95', 'streamCpu'] as const).map((metric) =>
+        pairedConfidence({
+          workload: workload.id,
+          metric,
+          baseline: metric === 'streamCpu' ? [3, 3] : metric === 'settlementP95' ? [0, 0] : [2, 2],
+          candidate: metric === 'streamCpu' ? [3, 3] : metric === 'settlementP95' ? [0, 0] : [2, 2],
+          seed: 176,
+          resamples: 256,
+        }),
+      ),
+    )
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('artifact streaming native preserves partial first arm and original exception', async () => {
+  const output = await mkdtemp(path.join(tmpdir(), 'native-partial-'))
+  try {
+    const workload = nativePairWorkloads('quick')[0]
+    const exception = new TypeError('native second arm failed')
+    let count = 0
+    const result = writeNativePairs({
+      output,
+      workloads: [workload],
+      orders: pairedTrialOrders(2, 176),
+      warmups: 0,
+      seed: 176,
+      mode: 'quick',
+      capture: ({ engine, trial }) => {
+        count++
+        if (count === 4) throw exception
+        return artifactNativeTrial(engine, trial)
+      },
+    })
+    await expect(result).rejects.toBe(exception)
+    const completed = (await readFile(path.join(output, 'raw-native-pairs.jsonl'), 'utf8'))
+      .trimEnd()
+      .split('\n')
+    expect(completed).toHaveLength(1)
+    const diagnostic = JSON.parse(
+      await readFile(path.join(output, 'native-pair-failure.json'), 'utf8'),
+    )
+    expect(diagnostic.completed).toEqual([artifactNativeTrial(pairedTrialOrders(2, 176)[1][0], 1)])
+    expect(diagnostic.error.message).toBe(exception.message)
+    expect(await readdir(output)).not.toContain('paired-native.json')
+    expect((await readdir(output)).some((file) => file.startsWith('.timing-'))).toBe(false)
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+function assertNativeWrittenPairs(output: string, pairs: number) {
+  const temporary = readdirSync(output).find((name) => name.startsWith('.timing-artifact-'))
+  if (!temporary) throw new TypeError('Missing native output stream')
+  expect(
+    readFileSync(path.join(output, temporary, 'partial.jsonl'), 'utf8').split('\n').length - 1,
+  ).toBe(pairs)
+  expect(readdirSync(output)).not.toContain('raw-native-pairs.jsonl')
+}
+
+test('artifact streaming native preserves a failed warmup arm but invents no raw warmups', async () => {
+  const output = await mkdtemp(path.join(tmpdir(), 'native-warmup-failure-'))
+  try {
+    const workload = nativePairWorkloads('quick')[0]
+    const error = new TypeError('warmup second arm failed')
+    let calls = 0
+    await expect(
+      writeNativePairs({
+        output,
+        workloads: [workload],
+        orders: pairedTrialOrders(1, 176),
+        warmups: 1,
+        seed: 176,
+        mode: 'quick',
+        capture: ({ engine, trial }) => {
+          calls++
+          if (calls === 2) throw error
+          return artifactNativeTrial(engine, trial)
+        },
+      }),
+    ).rejects.toBe(error)
+    expect(await readFile(path.join(output, 'raw-native-pairs.jsonl'), 'utf8')).toBe('')
+    const diagnostic = JSON.parse(
+      await readFile(path.join(output, 'native-pair-failure.json'), 'utf8'),
+    )
+    expect(diagnostic.trial).toBe(-1)
+    expect(diagnostic.completed).toHaveLength(1)
+    expect(diagnostic.pairsArtifact.recordCount).toBe(0)
+    expect(calls).toBe(2)
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('artifact streaming native keeps mismatch counts and every failed revision fact', async () => {
+  const output = await mkdtemp(path.join(tmpdir(), 'native-mismatch-'))
+  try {
+    const workload = nativePairWorkloads('quick')[0]
+    const summary = await writeNativePairs({
+      output,
+      workloads: [workload],
+      orders: pairedTrialOrders(1, 176),
+      warmups: 0,
+      seed: 176,
+      mode: 'qualification',
+      capture: ({ engine, trial }) => {
+        const raw = artifactNativeTrial(engine, trial)
+        return engine === 'remark'
+          ? raw
+          : {
+              ...raw,
+              revisions: raw.revisions.map((revision) => ({
+                ...revision,
+                sourceCoordinateFailures: ['bad coordinate'],
+                outputDigest: 'changed',
+              })),
+            }
+      },
+    })
+    expect(summary.workloads[0].mismatchedPairs).toBe(1)
+    expect(summary.workloads[0].observedPairs).toBe(1)
+    expect(summary.workloads[0].comparisons.every((entry) => entry.resamples === 4096)).toBe(true)
+    const raw = JSON.parse(await readFile(path.join(output, summary.pairsArtifact.path), 'utf8'))
+    expect(raw.pair.mismatchedRevisions).toEqual([0])
+    expect(raw.pair.candidate.revisions[0].sourceCoordinateFailures).toEqual(['bad coordinate'])
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('scalar observations native frozen population remains 75 workloads and 1500 complete pairs', () => {
+  expect(nativePairWorkloads('qualification')).toHaveLength(75)
+  expect(pairedTrialOrders(20, 176)).toHaveLength(20)
+  expect(75 * 20).toBe(1500)
+  expect(75 * 20 * 2).toBe(3000)
+})
+
+function nativeArtifactOptions(output: string) {
+  return {
+    output,
+    workloads: [nativePairWorkloads('quick')[0]],
+    orders: pairedTrialOrders(1, 176),
+    warmups: 0,
+    seed: 176,
+    mode: 'quick' as const,
+  }
+}
+
+test.each(['raw-native-pairs.jsonl', 'paired-native.json'])(
+  'native publication rejects existing %s before any capture',
+  async (file) => {
+    const output = await mkdtemp(path.join(tmpdir(), 'native-owned-'))
+    try {
+      await writeFile(path.join(output, file), 'owner bytes\n')
+      const calls: string[] = []
+      await expect(
+        writeNativePairs({
+          ...nativeArtifactOptions(output),
+          capture: ({ engine, trial }) => {
+            calls.push(engine)
+            return artifactNativeTrial(engine, trial)
+          },
+        }),
+      ).rejects.toThrow()
+      expect(calls).toEqual([])
+      expect(await readFile(path.join(output, file), 'utf8')).toBe('owner bytes\n')
+      expect(await readdir(output)).toEqual([file])
+    } finally {
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test.each([false, true])(
+  'native publication preserves destination symlink, dangling=%s',
+  async (dangling) => {
+    const output = await mkdtemp(path.join(tmpdir(), 'native-symlink-'))
+    try {
+      const owner = path.join(output, 'owner')
+      if (!dangling) await writeFile(owner, 'owner bytes\n')
+      await symlink(owner, path.join(output, 'paired-native.json'))
+      const calls: string[] = []
+      await expect(
+        writeNativePairs({
+          ...nativeArtifactOptions(output),
+          capture: ({ engine, trial }) => {
+            calls.push(engine)
+            return artifactNativeTrial(engine, trial)
+          },
+        }),
+      ).rejects.toThrow()
+      expect(calls).toEqual([])
+      await expect(publishNativeReport(output, { status: 'fixture' })).rejects.toThrow()
+      expect((await lstat(path.join(output, 'paired-native.json'))).isSymbolicLink()).toBe(true)
+      if (!dangling) expect(await readFile(owner, 'utf8')).toBe('owner bytes\n')
+      if (dangling) await expect(lstat(owner)).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally {
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test('native publication refuses a late existing envelope without overwriting it', async () => {
+  const output = await mkdtemp(path.join(tmpdir(), 'native-envelope-'))
+  try {
+    await writeFile(path.join(output, 'paired-native.json'), 'owner envelope\n')
+    await expect(publishNativeReport(output, { status: 'fixture' })).rejects.toThrow()
+    expect(await readFile(path.join(output, 'paired-native.json'), 'utf8')).toBe('owner envelope\n')
+    expect(await readdir(output)).toEqual(['paired-native.json'])
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('native publication capture exception survives raw seal failure with first-arm diagnostic', async () => {
+  const output = await mkdtemp(path.join(tmpdir(), 'native-double-failure-'))
+  try {
+    const exception = new TypeError('capture failed before raw seal collision')
+    const order = pairedTrialOrders(1, 176)[0]
+    let calls = 0
+    await expect(
+      writeNativePairs({
+        ...nativeArtifactOptions(output),
+        capture: ({ engine, trial }) => {
+          calls++
+          if (calls === 1) return artifactNativeTrial(engine, trial)
+          writeFileSync(path.join(output, 'raw-native-pairs.jsonl'), 'late owner bytes\n')
+          throw exception
+        },
+      }),
+    ).rejects.toBe(exception)
+    expect(calls).toBe(2)
+    const diagnostic = JSON.parse(
+      await readFile(path.join(output, 'native-pair-failure.json'), 'utf8'),
+    )
+    expect(diagnostic.completed).toEqual([artifactNativeTrial(order[0], 0)])
+    expect(diagnostic.error.message).toBe(exception.message)
+    expect(diagnostic).not.toHaveProperty('pairsArtifact')
+    expect(await readFile(path.join(output, 'raw-native-pairs.jsonl'), 'utf8')).toBe(
+      'late owner bytes\n',
+    )
+    expect((await readdir(output)).sort()).toEqual([
+      'native-pair-failure.json',
+      'raw-native-pairs.jsonl',
+    ])
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test.each([false, true])(
+  'native publication preserves capture identity when diagnostics fail, sealFailure=%s',
+  async (sealFailure) => {
+    const output = await mkdtemp(path.join(tmpdir(), 'native-diagnostic-failure-'))
+    try {
+      const exception = new TypeError('capture and diagnostic failed')
+      let calls = 0
+      await expect(
+        writeNativePairs({
+          ...nativeArtifactOptions(output),
+          capture: ({ engine, trial }) => {
+            calls++
+            if (calls === 1) return artifactNativeTrial(engine, trial)
+            mkdirSync(path.join(output, 'native-pair-failure.json'))
+            if (sealFailure)
+              writeFileSync(path.join(output, 'raw-native-pairs.jsonl'), 'late owner bytes\n')
+            throw exception
+          },
+        }),
+      ).rejects.toBe(exception)
+      expect(calls).toBe(2)
+      expect((await lstat(path.join(output, 'native-pair-failure.json'))).isDirectory()).toBe(true)
+      expect((await readdir(output)).sort()).toEqual([
+        'native-pair-failure.json',
+        'raw-native-pairs.jsonl',
+      ])
+    } finally {
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test('native publication propagates raw I/O error when capture succeeds', async () => {
+  const output = await mkdtemp(path.join(tmpdir(), 'native-io-failure-'))
+  try {
+    let calls = 0
+    await expect(
+      writeNativePairs({
+        ...nativeArtifactOptions(output),
+        capture: ({ engine, trial }) => {
+          calls++
+          writeFileSync(path.join(output, 'raw-native-pairs.jsonl'), 'late owner bytes\n')
+          return artifactNativeTrial(engine, trial)
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'EEXIST' })
+    expect(calls).toBe(2)
+    expect(await readdir(output)).toEqual(['raw-native-pairs.jsonl'])
+    expect(await readFile(path.join(output, 'raw-native-pairs.jsonl'), 'utf8')).toBe(
+      'late owner bytes\n',
+    )
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('native publication publishes complete envelope after raw seal and removes temporary files', async () => {
+  const output = await mkdtemp(path.join(tmpdir(), 'native-published-'))
+  try {
+    const observed = await writeNativePairs({
+      ...nativeArtifactOptions(output),
+      capture: ({ engine, trial }) => artifactNativeTrial(engine, trial),
+    })
+    const report = {
+      schemaVersion: 2,
+      pairsArtifact: observed.pairsArtifact,
+      workloads: observed.workloads,
+    }
+    expect(await readdir(output)).toEqual(['raw-native-pairs.jsonl'])
+    await publishNativeReport(output, report)
+    expect(JSON.parse(await readFile(path.join(output, 'paired-native.json'), 'utf8'))).toEqual(
+      report,
+    )
+    expect((await readdir(output)).sort()).toEqual(['paired-native.json', 'raw-native-pairs.jsonl'])
+    const raw = await readFile(path.join(output, observed.pairsArtifact.path))
+    expect(raw.byteLength).toBe(observed.pairsArtifact.byteLength)
+    expect(raw.toString().split('\n')).toHaveLength(2)
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('native publication exposes no partial envelope when serialization fails', async () => {
+  const output = await mkdtemp(path.join(tmpdir(), 'native-unpublished-'))
+  try {
+    const exception = new TypeError('envelope serialization failed')
+    await expect(
+      publishNativeReport(output, {
+        toJSON() {
+          expect(readdirSync(output)).not.toContain('paired-native.json')
+          throw exception
+        },
+      }),
+    ).rejects.toBe(exception)
+    expect(await readdir(output)).toEqual([])
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
 })

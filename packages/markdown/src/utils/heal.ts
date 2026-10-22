@@ -1,7 +1,15 @@
-import remend from 'remend'
 import type { Nodes, Paragraph, RootContent, Text } from 'mdast'
 
 import { lastBlock, lastLeaf } from './hold'
+import {
+  beginRepair,
+  copy,
+  insert,
+  rewrite,
+  toAuthoredOffset,
+  type TrackedText,
+} from './repair-origin'
+import { remendWithOrigins } from './remend-origin'
 
 /**
  * Closes syntax the stream has not finished: `**bol` renders bold instead of
@@ -9,7 +17,9 @@ import { lastBlock, lastLeaf } from './hold'
  * from here, because remend would append the closers inside the code.
  */
 export function healMarkdown(text: string): string {
-  return remend(text)
+  return remendWithOrigins(
+    beginRepair({ text, start: toAuthoredOffset(0), point: { line: 1, column: 1, offset: 0 } }),
+  ).text
 }
 
 export function visibleRepairIsLiteral(
@@ -102,4 +112,18 @@ function strongCanOpen(source: string, index: number, marker: string): boolean {
   const beforeBoundary = !before || /[\s\p{P}\p{S}]/u.test(before)
   if (marker === '__' && !beforeBoundary) return false
   return !/[\p{P}\p{S}]/u.test(after) || beforeBoundary
+}
+
+export function insertNestedCloser(
+  input: TrackedText,
+  repair: { readonly offset: number; readonly closers: string },
+): TrackedText {
+  const offset = repair.offset - input.window.start
+  return rewrite({
+    input,
+    owner: 'nestedStrongRepair',
+    site: 'nestedStrongRepair.close',
+    parts: [copy(input, 0, offset), insert(input, repair.closers, offset), copy(input, offset)],
+    expected: input.text.slice(0, offset) + repair.closers + input.text.slice(offset),
+  })
 }

@@ -1,5 +1,7 @@
 import type { Nodes, RootContent } from 'mdast'
 
+import { copy, rewrite, type TrackedText } from './repair-origin'
+
 /** Blockquote markers and indentation in front of a line's own syntax. */
 const LINE_PREFIX = /^(?:[ \t]*>)*[ \t]*/u
 const HEADING_MARKS = /^#+[ \t]*$/u
@@ -18,12 +20,14 @@ const CONTAINER_BLOCKS = new Set(['blockquote', 'footnoteDefinition', 'list', 'l
  * parsed as it stands.
  */
 export function holdAmbiguousTail(source: string, nodes: readonly RootContent[]): string {
+  return source.slice(0, heldTailEnd(source, nodes))
+}
+
+function heldTailEnd(source: string, nodes: readonly RootContent[]): number {
   const block = lastBlock(nodes)
-  if (!block || LITERAL_BLOCKS.has(block.type)) return source
-
+  if (!block || LITERAL_BLOCKS.has(block.type)) return source.length
   const lineHeld = source.slice(0, lineHoldStart(source, block))
-
-  return lineHeld.slice(0, tableHoldStart(lineHeld, block.type === 'table'))
+  return tableHoldStart(lineHeld, block.type === 'table')
 }
 
 /** Where a held `#` line, list marker or backtick run on the last line starts. */
@@ -90,4 +94,16 @@ export function lastLeaf(node: Nodes): Nodes {
   }
 
   return leaf
+}
+
+export function holdTail(input: TrackedText, nodes: readonly RootContent[]): TrackedText {
+  const end = heldTailEnd(input.text, nodes)
+  if (end === input.text.length) return input
+  return rewrite({
+    input,
+    owner: 'hold',
+    site: 'hold.tail',
+    parts: [copy(input, 0, end)],
+    expected: input.text.slice(0, end),
+  })
 }

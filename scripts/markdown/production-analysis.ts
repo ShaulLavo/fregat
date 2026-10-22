@@ -1,17 +1,17 @@
 import { createHash } from 'node:crypto'
 
 import type {
-  ProductionMarkdownReceipt,
   ProductionResourceControlWindow,
   ProductionResourceWindow,
   ProductionTimelineReceipt,
   ProductionTimingReceipt,
 } from '../../apps/web/test/factories/markdown-production-types'
-import { percentile } from './bench-types'
+import type { ProductionOracle, ProductionOracleIdentity } from './production-oracle'
+import { distribution, percentile } from './bench-types'
 import { pairedConfidence } from './paired-native'
 import frozenBudget from './promotion-budget.json'
 import { BENCHMARK_FAMILIES } from './workloads'
-import { isSustainedProductStream, reconcileProductionNetworkRequests } from './production-cdp'
+import { productionPayloadSummary } from './production-network-summary'
 import type {
   ProductionCpuMetrics,
   ProductionNetworkRequest,
@@ -42,8 +42,8 @@ export type ProductionTrial = {
     }[]
   }
   readonly receipt: ProductionTimingReceipt
-  readonly correctness: ProductionMarkdownReceipt
-  readonly freshCompleted: ProductionMarkdownReceipt['final']
+  readonly correctness: ProductionOracle
+  readonly freshCompleted: ProductionOracleIdentity
   readonly cpu: {
     readonly before: ProductionCpuMetrics
     readonly after: ProductionCpuMetrics
@@ -76,19 +76,8 @@ export function productionPairFindings(
     validateRevisionReceipts(candidate, expectedInputs),
   )
   for (const trial of [baseline, candidate]) {
-    if (
-      digestObservation(trial.freshCompleted) !== digestObservation(trial.correctness.final) ||
-      trial.freshCompleted.paintedOutput.digest !== digestObservation(trial.freshCompleted)
-    )
+    if (trial.freshCompleted.paintedOutput.digest !== trial.correctness.final.paintedOutput.digest)
       failures.push(`${trial.engine}: streamed final differs from a fresh completed message.`)
-    if (
-      trial.correctness.frames.some(
-        (frame) => frame.paintedOutput.digest !== digestObservation(frame),
-      )
-    )
-      failures.push(
-        `${trial.engine}: expected projection digest does not match the recorded output.`,
-      )
   }
   const first = baseline.correctness.frames
   const second = candidate.correctness.frames
@@ -99,10 +88,14 @@ export function productionPairFindings(
       failures.push(`Revision ${index + 1}: paired product projections differ.`)
   }
   if (
-    digestObservation(baseline.correctness.final) !== digestObservation(candidate.correctness.final)
+    baseline.correctness.final.paintedOutput.digest !==
+    candidate.correctness.final.paintedOutput.digest
   )
     failures.push('Completed product projections differ.')
-  if (baseline.correctness.final.text.length === 0 || candidate.correctness.final.text.length === 0)
+  if (
+    baseline.correctness.final.paintedOutput.textBytes === 0 ||
+    candidate.correctness.final.paintedOutput.textBytes === 0
+  )
     failures.push('Completed projection is empty.')
   return failures
 }
@@ -183,10 +176,6 @@ export function productionDigest(source: string | Buffer) {
   return createHash('sha256').update(source).digest('hex')
 }
 
-function digestObservation(frame: ProductionMarkdownReceipt['final']) {
-  return productionDigest(JSON.stringify({ text: frame.text, elements: frame.elements }))
-}
-
 type ProductionComparisonExclusion = {
   readonly pair: number
   readonly engine: ProductionTrial['engine']
@@ -198,8 +187,30 @@ type MetricObservation = {
   readonly reason: string | null
 }
 
+export type ProductionMetricObservation = Pick<
+  ProductionTrial,
+  'workload' | 'family' | 'pair' | 'engine'
+> & {
+  readonly metrics: Readonly<Record<ProductionMetric, MetricObservation>>
+}
+
+export function productionMetricObservation(trial: ProductionTrial): ProductionMetricObservation {
+  return {
+    workload: trial.workload,
+    family: trial.family,
+    pair: trial.pair,
+    engine: trial.engine,
+    metrics: {
+      updateP95: metricObservation(trial, 'updateP95'),
+      settlementP95: metricObservation(trial, 'settlementP95'),
+      mountP95: metricObservation(trial, 'mountP95'),
+      streamCpu: metricObservation(trial, 'streamCpu'),
+    },
+  }
+}
+
 export function productionComparisons(
-  trials: readonly ProductionTrial[],
+  trials: readonly ProductionMetricObservation[],
   workloads: readonly ProductionWorkload[],
 ) {
   return workloads.flatMap((workload, index) => {
@@ -216,7 +227,7 @@ export function productionComparisons(
 type ProductionMetric = Parameters<typeof metricObservation>[1]
 
 function compareProductionMetric(
-  selected: readonly ProductionTrial[],
+  selected: readonly ProductionMetricObservation[],
   pairs: readonly number[],
   workload: string,
   workloadIndex: number,
@@ -254,7 +265,7 @@ function compareProductionMetric(
 }
 
 function observedMetricPair(
-  selected: readonly ProductionTrial[],
+  selected: readonly ProductionMetricObservation[],
   pair: number,
   metric: ProductionMetric,
   excludedPairs: ProductionComparisonExclusion[],
@@ -269,8 +280,8 @@ function observedMetricPair(
     })
     return []
   }
-  const left = metricObservation(baseline, metric)
-  const right = metricObservation(candidate, metric)
+  const left = baseline.metrics[metric]
+  const right = candidate.metrics[metric]
   for (const [trial, observation] of [
     [baseline, left],
     [candidate, right],
@@ -407,7 +418,7 @@ export function ordinaryProductionFindings(
 }
 
 export function productionFamilyCoverage(
-  trials: readonly ProductionTrial[],
+  trials: readonly Pick<ProductionTrial, 'workload' | 'family' | 'pair' | 'engine'>[],
   workloads: readonly ProductionWorkload[],
 ) {
   return BENCHMARK_FAMILIES.map((family) => {
@@ -597,51 +608,6 @@ export function productionTrialSummary(trial: ProductionTrial) {
       ? trial.receipt.heldSyntax.released.painted - trial.receipt.heldSyntax.released.received
       : null,
     streamCombinedCpuMs: trialMetric(trial, 'streamCpu'),
-    transferred: payloadSummary(trial.network),
+    transferred: productionPayloadSummary(trial.network),
   }
-}
-
-function distribution(values: readonly number[]) {
-  if (values.length === 0) return null
-  return {
-    samples: values.length,
-    p50: percentile(values, 0.5),
-    p95: percentile(values, 0.95),
-    maximum: Math.max(...values),
-  }
-}
-
-function payloadSummary(network: readonly ProductionNetworkRequest[] | null) {
-  if (network === null) return null
-  const reconciled = reconcileProductionNetworkRequests(network)
-  return (['host', 'grammar', 'resolver', 'javascript', 'other'] as const).map((kind) => {
-    const requests = reconciled.filter(
-      (request) =>
-        request.kind === kind &&
-        request.resolvedByWorkerRequestId === null &&
-        !isSustainedProductStream(request),
-    )
-    const missing = requests.filter(
-      (request) =>
-        (request.transferredBytes === null && request.resolvedByWorkerRequestId === null) ||
-        request.failure !== null ||
-        Boolean(request.transferReceiptError),
-    )
-    const observedDataReceived = requests.filter((request) => request.dataReceivedBytes !== null)
-    return {
-      kind,
-      requests: requests.length,
-      cacheHits: requests.filter((request) => request.fromCache).length,
-      transferredBytes:
-        missing.length > 0
-          ? null
-          : requests.reduce((sum, request) => sum + (request.transferredBytes ?? 0), 0),
-      dataReceivedBytes:
-        observedDataReceived.length === requests.length
-          ? observedDataReceived.reduce((sum, request) => sum + (request.dataReceivedBytes ?? 0), 0)
-          : null,
-      dataReceivedRequestCount: observedDataReceived.length,
-      incompleteRequests: missing.length,
-    }
-  })
 }

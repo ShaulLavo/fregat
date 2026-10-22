@@ -7,7 +7,7 @@ bun install --frozen-lockfile
 bun run build:workspaces
 ```
 
-Run each baseline suite with an evidence directory you own:
+Run each suite with an evidence directory you own:
 
 ```sh
 bun run markdown:parity --out <evidence>/parity
@@ -26,8 +26,8 @@ The browser runs use the existing isolated fixture server and production React C
 Each invocation selects free loopback ports. The runner records test failures, closes its owned
 browser/server through the existing teardown and stops subsequent suites after interruption.
 Screenshots are copied into the report's `images/` directory. Review the images before accepting
-a visual baseline. Repeated-capture variance above 0.1% fails calibration; candidate pixel comparisons
-remain a later gate.
+a visual comparison. Repeated-capture variance above 0.1% fails calibration. Paired comparisons require
+both engines' captures and their content assertions.
 
 Run all current checks and obtain the cutover verdict:
 
@@ -35,10 +35,118 @@ Run all current checks and obtain the cutover verdict:
 bun run markdown:qualify --out <evidence>/qualification
 ```
 
-The current verdict is `NOT VERIFIED` and this command exits nonzero. The installed parser needs
-a renderer-facing semantic adapter, paired candidate browser measurements and frozen independent
-evaluation. Baseline commands exit successfully when their test runners and output controls pass,
+The current verdict is `NOT VERIFIED` and this command exits nonzero without complete trusted
+receipts. The candidate adapter and evidence readers exist. Final identity-bound captures, independent
+evaluation, reviewed visuals, and passing timing/resource budgets remain required. Baseline commands exit successfully when their test runners and output controls pass,
 while preserving independently recorded baseline defects in `baseline-checks.json`.
+
+## Finish Q5 from a frozen candidate
+
+Run development checks while disjoint writers work. Final captures require the coordinator's clean,
+committed source freeze. Run each command through the execution host's shared queue with a two-hour
+outer deadline and teardown. Keep evidence outside the checkout. Stop at failed suites or controls.
+
+### Check the fourteen trusted gates
+
+Every row needs matching evidence for the final candidate. The registry is `PROMOTION_GATES` in
+`scripts/markdown/promotion.ts`. Current matrices contain 75 native cells and 86 production cells.
+
+| Gate                            | Required evidence                                                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `candidate-capabilities`        | Eight capability probes and actual base grammar, CHAT grammar, and resolver bytes.                                 |
+| `native-development-semantics`  | At least 652 CommonMark, 672 GFM, and 102 owned cases with raw assertions.                                         |
+| `browser-development-semantics` | At least 102 real-component cases per engine.                                                                      |
+| `native-heldout-semantics`      | Complete fresh 100-message batch, frozen candidate, and original stream denominators.                              |
+| `browser-heldout-semantics`     | Same batch and schedules through the frozen build, attached to the native receipt.                                 |
+| `streaming-correctness`         | 56 package and 32 browser cases per engine, with revision and completion receipts.                                 |
+| `interactions`                  | Exact `FROZEN_SCENARIOS.interactions` names per engine, including selection, copy, and activation.                 |
+| `safety`                        | Exact `FROZEN_SCENARIOS.safety` names per engine, including delayed-stage isolation.                               |
+| `visual-states`                 | 128 calibrated paired states, actual images and overlays, and changed-image review. Include WebKit.                |
+| `frame-probes`                  | All 32 named stories per engine, actual frame logs, zero flashes or settled-color drops.                           |
+| `resources`                     | Browser 20/100/500-cycle windows and unmount assertions, repeated native windows, and actual native assets.        |
+| `benchmark-coverage`            | All 86 production cells across nine families, with every required field measured.                                  |
+| `native-paired`                 | All 75 cells, 20 independent pairs, three warmups, raw samples, invocation, and source/host records.               |
+| `production-timing`             | All 86 cells, 20 independent pairs, three warmups, headed Mac Chromium, and raw oracle/CPU/paint/transfer records. |
+
+### Capture in order
+
+Set `E` to an owned evidence directory, `BUILD` to an owned production-build directory, and `PORT`
+to a verified free loopback port. Set `LEDGER` to the coordinator's authoritative exposure ledger.
+Select `BATCH` from that ledger. A manifest's `sealed` label alone does not establish independence.
+Never initialize a new ledger to reuse exposed messages.
+
+1. Check tooling now. Inspection exits 1 with `NOT VERIFIED` and executes no suites.
+
+   ```sh
+   bun --bun vitest run --config vitest.scripts.config.mjs --cache=false --maxWorkers=2 scripts/markdown
+   bun x tsc --noEmit -p scripts/tsconfig.json --incremental false
+   bun scripts/markdown/qualify.ts qualify --inspect-only --out "$E/inspection"
+   ```
+
+2. After the source freeze, run the smallest browser capture. Its two-pair timings are diagnostic.
+   An oracle mismatch blocks the larger matrix. Preserve raw reports, traces, and cleanup records.
+
+   ```sh
+   test -z "$(git status --porcelain=v1 --untracked-files=all)"
+   bun scripts/markdown/production-browser.ts --build "$BUILD" --directory "$BUILD" \
+       --port "$PORT" --out "$E/smoke" --smoke --trials 2 --warmups 1 --negative-controls
+   ```
+
+3. Capture development correctness, visuals, resources, and timing. `qualify` remains nonzero until
+   trusted receipts pass. Run timing on an identified quiet host. Set `HOST_EVIDENCE` to actual host
+   observations. The production promotion collector requires macOS.
+
+   ```sh
+   bun scripts/markdown/qualify.ts qualify --out "$E/qualification"
+   bun scripts/markdown/qualify.ts visual --browser webkit --out "$E/webkit"
+   bun scripts/markdown/native-resources.ts --windows 4 --out "$E/native-resources"
+   bun scripts/markdown/paired-native.ts --mode qualification --out "$E/native"
+   bun scripts/markdown/production-browser.ts --directory "$BUILD" --port "$PORT" \
+       --out "$E/production" --trials 20 --warmups 3 --negative-controls \
+       --browser chromium --headed --capture promotion --host-evidence "$HOST_EVIDENCE"
+   ```
+
+   Preserve full source closure, native invocation, WASM/lockfile/budget bytes, build files, browser
+   arguments, and fonts. Host observations must cover before/during/after with gaps of at most five
+   seconds. Collectors do not create every reconciliation sidecar. Missing records remain blockers.
+
+4. After all tuning stops, evaluate the selected complete batch. Any fix informed by that batch
+   retires the entire batch. Preserve its original failures before selecting another batch.
+
+   ```sh
+   test -z "$(git status --porcelain=v1 --untracked-files=all)"
+   SHA=$(git rev-parse HEAD)
+   bun scripts/markdown/evaluate-heldout.ts --fingerprint > "$E/candidate.json"
+   bun scripts/markdown/evaluate-heldout.ts --candidate-commit "$SHA" \
+       --artifact-manifest "$E/candidate.json" --batch "$BATCH" --ledger "$LEDGER" --out "$E/heldout"
+   bun scripts/markdown/evaluate-heldout-browser.ts --input "$E/heldout/browser-input.json" \
+       --build "$BUILD" --port "$PORT" --out "$E/heldout/browser-receipt.json"
+   BUILD_SHA=$(bun -e 'console.log((await Bun.file(process.argv[1]).json()).productionBuildSha256)' "$E/heldout/browser-receipt.json")
+   bun scripts/markdown/evaluate-heldout.ts --candidate-commit "$SHA" \
+       --native-receipt "$E/heldout/heldout-native.json" --ledger "$LEDGER" \
+       --attach-browser "$E/heldout/browser-receipt.json" --production-build-sha256 "$BUILD_SHA" \
+       --out "$E/heldout/heldout-complete.json"
+   ```
+
+5. Populate `PromotionEvidenceAssemblyManifest` from actual captures. Include qualification, held-out,
+   native, production, paired-raster, and native-resource reports, raw assertions, frame logs, artifacts,
+   frozen provenance, fonts, and both timing manifests. Bind `trustedContext` to the clean checkout,
+   completed evaluation receipt, and authoritative ledger. Keep artifact paths inside the evidence root.
+
+   ```sh
+   bun scripts/markdown/production-reconciliation.ts --manifest "$E/native-timing-manifest.json" --out "$E/native-reconciled.json"
+   bun scripts/markdown/production-reconciliation.ts --manifest "$E/production-timing-manifest.json" --out "$E/production-reconciled.json"
+   bun scripts/markdown/promotion-evidence.ts --manifest "$E/assembly.json" --out "$E/promotion.json" --report "$E/assembly-report.json"
+   bun scripts/markdown/promotion.ts --input "$E/promotion.json" --root "$PWD" \
+       --evaluation-receipt "$E/heldout/heldout-complete.json" --evaluation-ledger "$LEDGER" --out "$E/verdict.json"
+   ```
+
+Reuse evidence only when the clean commit, full source closure, lockfile, both grammars,
+resolver/runtime/bindings, budgets, workloads, and unretired evaluation identity match. Rehash actual
+raw files and captured assets. Preserve original counts, failed/skipped rows, warmups, capture bindings,
+host/font/build records, and cleanup receipts. Dirty captures, summaries alone, missing bytes, and
+synthetic fixtures cannot qualify. All fourteen gates and the plan's frozen budgets must pass.
+The coordinator owns real iOS coverage, release verification, review, commits, and delivery.
 
 ## Read the evidence
 
@@ -120,12 +228,18 @@ visuals and quiet-host timing
 remain required before the coordinator can complete Q5 and authorize delivery.
 
 Production `AssistantMarkdown` selects tree-sitter through its local provider after the package
-initializer loads the grammar, resolver and runtime URLs. Until that succeeds it shows a loading
+initializer loads the base grammar, CHAT grammar, resolver and host runtime URLs. Until that succeeds it shows a loading
 state, then uses the existing transforms and safe HAST renderer. An explicit
 `MarkdownSessionContext` factory takes precedence, keeping the remark oracle independent.
 Unscoped `Markdown`, including the file split preview, retains remark. Production remark
 packages remain installed for those consumers. This branch changes source wiring only; it does
 not establish qualification, deploy the change or verify the served release.
+
+Qualification identities bind the base grammar as `grammarSha256` and CHAT independently as
+`chatGrammarSha256`, alongside `resolverSha256` and the existing runtime, binding and source
+hashes. Both grammar files must be captured and verified against their actual bytes. CHAT uses
+the candidate artifact role `chatGrammar` and source-capture key `files.chatGrammar`. Missing or
+malformed CHAT identities reject old receipts without changing their schema-version envelopes.
 
 ## Broad nightly checks
 

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { hash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import net from 'node:net'
 import path from 'node:path'
@@ -13,7 +13,8 @@ import {
 } from './promotion'
 import { errorMessage } from '../../packages/contracts/src/error-fields'
 import { qualificationProvenance } from './provenance'
-import { inspectRasterEvidence } from './raster'
+import { isRecord } from './serialization'
+import { inspectRasterEvidence, rasterRecords } from './raster'
 import { compareRasterEvidence } from './paired-raster'
 import { createScriptError } from '../structured-errors'
 import { checkRunExitCode, qualificationExitCode, validateChecksOnly } from './check-exit'
@@ -25,14 +26,47 @@ import {
   initializeTreeSitterMarkdown,
 } from '../../packages/markdown/src/utils/tree-sitter-session'
 import { readyRemarkExtensions } from '../../packages/markdown/test/qualification'
-import { digestProjection } from './paired-native'
+import { digestProjection, inspectSourceCorrespondence } from './paired-native'
 
 const ROOT = path.resolve(import.meta.dirname, '../..')
 const SUITES = ['parity', 'stream', 'fuzz', 'visual', 'bench', 'qualify'] as const
 type Suite = (typeof SUITES)[number]
 export type QualificationMode = 'baseline' | 'candidate' | 'paired'
 
-type TestRun = {
+export type QualificationSourceContext = {
+  readonly revision: string
+  readonly cleanTrackedDiff: string
+  readonly lock: string
+  readonly sourceClosure: string
+}
+
+const QUALIFICATION_ARTIFACT_ROLES = [
+  'rawQualificationReport',
+  'frameLog',
+  'pairedRasterReport',
+  'pairedRasterImage',
+  'pairedRasterCalibration',
+] as const
+type QualificationArtifactRole = (typeof QUALIFICATION_ARTIFACT_ROLES)[number]
+type QualificationArtifactBinding = {
+  readonly role: QualificationArtifactRole
+  readonly path: string
+  readonly sha256: string
+  readonly byteLength: number
+}
+export type QualificationArtifactRunBinding = {
+  readonly runId: string
+  readonly sourceBefore: QualificationSourceContext
+  readonly sourceAfter: QualificationSourceContext
+  readonly artifacts: readonly QualificationArtifactBinding[]
+}
+
+type QualificationArtifactSource = {
+  readonly role: QualificationArtifactRole
+  readonly path: string
+}
+
+export type TestRun = {
   readonly name: string
   readonly exitCode: number
   readonly tests: number
@@ -41,6 +75,7 @@ type TestRun = {
   readonly pending: number
   readonly todo: number
   readonly log: string
+  readonly rawReport?: string
 }
 
 async function main() {
@@ -87,7 +122,12 @@ async function main() {
   await writeFile(path.join(output, 'baseline-checks.json'), `${JSON.stringify(rows, null, 2)}\n`)
   const candidate = await inspectCandidate(ROOT)
   const provenance = await qualificationProvenance(ROOT)
+  const sourceBefore = qualificationSourceContext(provenance)
   const runs = values['inspect-only'] ? [] : await runSuites(suite, output, mode, values.browser)
+  const sourceAfter = qualificationSourceContext(await qualificationProvenance(ROOT))
+  const artifactBindings = values['inspect-only']
+    ? []
+    : await captureQualificationArtifacts(output, sourceBefore, sourceAfter, runs)
   const browser = runs.some((run) => run.name.startsWith('browser-'))
   const evaluated = await suppliedPromotion({
     receipts: values['promotion-receipts'],
@@ -132,6 +172,7 @@ async function main() {
     },
     gateEvidence: evaluated,
     provenance,
+    artifactBindings,
     promotion,
     runs,
   }
@@ -140,6 +181,27 @@ async function main() {
     `${JSON.stringify({ evidence: output, verdict: promotion.verdict, reportScope: report.reportScope, checkExecution: report.checkExecution, baselineExpectations: promotion.counts, testRuns: runs.map(({ name, exitCode, tests, passed, failed, pending, todo }) => ({ name, exitCode, declared: tests, executed: passed + failed, passed, failed, pending, todo })) })}\n`,
   )
   process.exitCode = exitCode
+}
+
+export function pairedNativeTestRun(
+  report: Pick<
+    Awaited<ReturnType<typeof import('./paired-native').runPairedNative>>,
+    'status' | 'workloads'
+  >,
+  output: string,
+): TestRun {
+  const pairs = report.workloads.reduce((sum, entry) => sum + entry.observedPairs, 0)
+  const mismatched = report.workloads.reduce((sum, entry) => sum + entry.mismatchedPairs, 0)
+  return {
+    name: 'paired-native-output',
+    exitCode: report.status === 'FAILED' || pairs === 0 ? 1 : 0,
+    tests: pairs + 1,
+    passed: pairs - mismatched + (report.status === 'FAILED' ? 0 : 1),
+    failed: mismatched + (report.status === 'FAILED' ? 1 : 0),
+    pending: 0,
+    todo: 0,
+    log: path.join(output, 'paired-native.json'),
+  }
 }
 
 async function runSuites(
@@ -156,24 +218,8 @@ async function runSuites(
   if (suite === 'bench' || suite === 'qualify') {
     if (mode !== 'baseline') {
       const { runPairedNative } = await import('./paired-native')
-      const report = await runPairedNative({ mode: 'quick' })
-      await writeFile(
-        path.join(output, 'paired-native.json'),
-        `${JSON.stringify(report, null, 2)}\n`,
-      )
-      const pairs = report.workloads.flatMap((entry) => entry.pairs)
-      const mismatched = pairs.filter((pair) => pair.mismatchedRevisions.length > 0).length
-      const tests = pairs.length + 1
-      runs.push({
-        name: 'paired-native-output',
-        exitCode: report.status === 'FAILED' || pairs.length === 0 ? 1 : 0,
-        tests,
-        passed: pairs.length - mismatched + (report.status === 'FAILED' ? 0 : 1),
-        failed: mismatched + (report.status === 'FAILED' ? 1 : 0),
-        pending: 0,
-        todo: 0,
-        log: path.join(output, 'paired-native.json'),
-      })
+      const report = await runPairedNative({ mode: 'quick', output })
+      runs.push(pairedNativeTestRun(report, output))
     } else {
       const { runMarkdownBenchmarks } = await import('./bench')
       const browserLog = await browserLogs(runs)
@@ -278,12 +324,18 @@ type Edit = { readonly source: string; readonly operation: string }
 type Factory = typeof createMarkdownSession
 
 type FuzzFailure = {
-  readonly engine: 'remark' | 'tree-sitter' | 'paired'
   readonly live: boolean
   readonly revision: number
   readonly expected: string
   readonly observed: string
-}
+} & (
+  | { readonly kind: 'mismatch'; readonly engine: 'remark' | 'tree-sitter' | 'paired' }
+  | {
+      readonly kind: 'exception'
+      readonly engine: 'remark' | 'tree-sitter'
+      readonly phase: 'incremental' | 'fresh'
+    }
+)
 
 export function seededEdits(seed: number, count: number): Edit[] {
   let state = seed >>> 0
@@ -317,13 +369,44 @@ export function seededEdits(seed: number, count: number): Edit[] {
   return edits
 }
 
+type FuzzRoot = ReturnType<typeof blockToHast>
+type FuzzParse =
+  | ({
+      readonly kind: 'parsed'
+      readonly outputDigest: string
+      readonly hast: FuzzRoot
+    } & ReturnType<typeof inspectSourceCorrespondence>)
+  | { readonly kind: 'exception'; readonly error: string; readonly stack: string | null }
+type FuzzEngineObservation = {
+  readonly incremental: FuzzParse
+  readonly fresh: FuzzParse
+}
+type FuzzEngineReader = {
+  readonly incremental: () => FuzzRoot
+  readonly fresh: () => FuzzRoot
+}
+export type FuzzRevisionObservation = {
+  readonly revision: number
+  readonly live: boolean
+  readonly source: string
+  readonly operation: string
+  readonly sourceIdentity: {
+    readonly utf16Units: number
+    readonly utf16LeSha256: string
+    readonly sourceJsonSha256: string
+  }
+  readonly remark: FuzzEngineObservation
+  readonly candidate: FuzzEngineObservation | null
+  readonly failures: readonly FuzzFailure[]
+}
+
 function project(
   session: ReturnType<Factory>,
   processor: ReturnType<typeof createHastProcessor>,
   source: string,
   live: boolean,
-) {
-  return digestProjection({
+): FuzzRoot {
+  return structuredClone({
     type: 'root',
     children: session
       .update(source, { heal: live })
@@ -331,7 +414,7 @@ function project(
   })
 }
 
-function freshDigest(
+function freshProjection(
   factory: Factory,
   processor: ReturnType<typeof createHastProcessor>,
   source: string,
@@ -346,6 +429,141 @@ function freshDigest(
   }
 }
 
+function observeFuzzParse(read: () => FuzzRoot, source: string): FuzzParse {
+  try {
+    const hast = read()
+    return {
+      kind: 'parsed',
+      outputDigest: digestProjection(hast),
+      hast,
+      ...inspectSourceCorrespondence(hast, source),
+    }
+  } catch (error) {
+    return {
+      kind: 'exception',
+      error: errorMessage(error),
+      stack: error instanceof Error ? (error.stack ?? null) : null,
+    }
+  }
+}
+
+function observeFuzzEngine(reader: FuzzEngineReader, source: string): FuzzEngineObservation {
+  return {
+    incremental: observeFuzzParse(reader.incremental, source),
+    fresh: observeFuzzParse(reader.fresh, source),
+  }
+}
+
+function fuzzParseFailure(
+  engine: 'remark' | 'tree-sitter',
+  phase: 'incremental' | 'fresh',
+  parse: FuzzParse,
+  live: boolean,
+  revision: number,
+): FuzzFailure[] {
+  if (parse.kind !== 'exception') return []
+  return [
+    {
+      kind: 'exception',
+      engine,
+      phase,
+      live,
+      revision,
+      expected: 'successful parse',
+      observed: JSON.stringify(parse.error),
+    },
+  ]
+}
+
+function fuzzComparisonFailure(
+  engine: FuzzFailure['engine'],
+  expected: FuzzParse,
+  observed: FuzzParse,
+  live: boolean,
+  revision: number,
+): FuzzFailure[] {
+  if (expected.kind !== 'parsed' || observed.kind !== 'parsed') return []
+  if (expected.outputDigest === observed.outputDigest) return []
+  return [
+    {
+      kind: 'mismatch',
+      engine,
+      live,
+      revision,
+      expected: expected.outputDigest,
+      observed: observed.outputDigest,
+    },
+  ]
+}
+
+function fuzzEngineFailures(
+  engine: 'remark' | 'tree-sitter',
+  observation: FuzzEngineObservation,
+  live: boolean,
+  revision: number,
+): FuzzFailure[] {
+  return fuzzParseFailure(engine, 'incremental', observation.incremental, live, revision).concat(
+    fuzzParseFailure(engine, 'fresh', observation.fresh, live, revision),
+    fuzzComparisonFailure(engine, observation.fresh, observation.incremental, live, revision),
+  )
+}
+
+export function observeFuzzRevision(input: {
+  readonly remark: FuzzEngineReader
+  readonly candidate: FuzzEngineReader | null
+  readonly edit: Edit
+  readonly live: boolean
+  readonly revision: number
+}): FuzzRevisionObservation {
+  const { edit, live, revision } = input
+  const remark = observeFuzzEngine(input.remark, edit.source)
+  const candidate = input.candidate ? observeFuzzEngine(input.candidate, edit.source) : null
+  const remarkFailures = fuzzEngineFailures('remark', remark, live, revision)
+  const failures = candidate
+    ? remarkFailures.concat(
+        fuzzEngineFailures('tree-sitter', candidate, live, revision),
+        fuzzComparisonFailure('paired', remark.incremental, candidate.incremental, live, revision),
+      )
+    : remarkFailures
+  return {
+    revision,
+    live,
+    ...edit,
+    sourceIdentity: {
+      utf16Units: edit.source.length,
+      utf16LeSha256: hash('sha256', Buffer.from(edit.source, 'utf16le'), 'hex'),
+      sourceJsonSha256: hash('sha256', JSON.stringify(edit.source), 'hex'),
+    },
+    remark,
+    candidate,
+    failures,
+  }
+}
+
+export function collectFuzzSchedule(
+  edits: readonly Edit[],
+  observe: (edit: Edit, revision: number) => FuzzRevisionObservation,
+) {
+  const observations: FuzzRevisionObservation[] = []
+  for (const [revision, edit] of edits.entries()) {
+    const observation = observe(edit, revision)
+    observations.push(observation)
+    if (observation.failures.some((failure) => failure.kind === 'exception')) break
+  }
+  const failures = observations.flatMap((observation) => observation.failures)
+  const failure = failures[0] ?? null
+  return {
+    declaredRevisions: edits.length,
+    executedRevisions: observations.length,
+    unexecutedRevisions: edits.length - observations.length,
+    scheduleSha256: hash('sha256', JSON.stringify(edits), 'hex'),
+    failure,
+    replay: failure ? edits.slice(0, failure.revision + 1) : [],
+    failures,
+    observations,
+  }
+}
+
 function fuzzSeed(
   edits: readonly Edit[],
   processor: ReturnType<typeof createHastProcessor>,
@@ -355,38 +573,28 @@ function fuzzSeed(
   const remark = createMarkdownSession()
   const candidate = paired ? createTreeSitterMarkdownSession() : null
   try {
-    for (const [revision, edit] of edits.entries()) {
-      const failure = fuzzRevision({ remark, candidate, processor, edit, live, revision })
-      if (failure) return { failure, replay: edits.slice(0, revision + 1) }
-    }
-    return { failure: null, replay: [] }
+    return collectFuzzSchedule(edits, (edit, revision) =>
+      observeFuzzRevision({
+        remark: {
+          incremental: () => project(remark, processor, edit.source, live),
+          fresh: () => freshProjection(createMarkdownSession, processor, edit.source, live),
+        },
+        candidate: candidate
+          ? {
+              incremental: () => project(candidate, processor, edit.source, live),
+              fresh: () =>
+                freshProjection(createTreeSitterMarkdownSession, processor, edit.source, live),
+            }
+          : null,
+        edit,
+        live,
+        revision,
+      }),
+    )
   } finally {
     remark.update('', { heal: false })
     candidate?.update('', { heal: false })
   }
-}
-
-function fuzzRevision(input: {
-  readonly remark: ReturnType<Factory>
-  readonly candidate: ReturnType<typeof createTreeSitterMarkdownSession> | null
-  readonly processor: ReturnType<typeof createHastProcessor>
-  readonly edit: Edit
-  readonly live: boolean
-  readonly revision: number
-}): FuzzFailure | null {
-  const { remark, candidate, processor, edit, live, revision } = input
-  const baseline = project(remark, processor, edit.source, live)
-  const baselineFresh = freshDigest(createMarkdownSession, processor, edit.source, live)
-  if (baseline !== baselineFresh)
-    return { engine: 'remark', live, revision, expected: baselineFresh, observed: baseline }
-  if (!candidate) return null
-  const observed = project(candidate, processor, edit.source, live)
-  const fresh = freshDigest(createTreeSitterMarkdownSession, processor, edit.source, live)
-  if (observed !== fresh)
-    return { engine: 'tree-sitter', live, revision, expected: fresh, observed }
-  if (observed !== baseline)
-    return { engine: 'paired', live, revision, expected: baseline, observed }
-  return null
 }
 
 function fuzzProfile(
@@ -396,15 +604,30 @@ function fuzzProfile(
   live: boolean,
   paired: boolean,
 ) {
-  const result = fuzzSeed(edits, processor, live, paired)
-  const executedRevisions = result.failure ? result.failure.revision + 1 : edits.length
+  return { seed, live, ...fuzzSeed(edits, processor, live, paired) }
+}
+
+function fuzzParseCounts(
+  observations: readonly FuzzRevisionObservation[],
+  engine: 'remark' | 'candidate',
+) {
+  const parses = observations.flatMap((observation) => {
+    const result = observation[engine]
+    return result ? [result.incremental, result.fresh] : []
+  })
+  const parsed = parses.filter((parse) => parse.kind === 'parsed')
   return {
-    seed,
-    live,
-    declaredRevisions: edits.length,
-    executedRevisions,
-    unexecutedRevisions: edits.length - executedRevisions,
-    ...result,
+    attempted: parses.length,
+    parsed: parsed.length,
+    exceptions: parses.length - parsed.length,
+    incrementalFreshComparisons: observations.filter((observation) => {
+      const result = observation[engine]
+      return result?.incremental.kind === 'parsed' && result.fresh.kind === 'parsed'
+    }).length,
+    sourceCoordinateFailures: parsed.reduce(
+      (count, parse) => count + parse.sourceCoordinateFailures.length,
+      0,
+    ),
   }
 }
 
@@ -415,6 +638,8 @@ export async function runSeededFuzz(paired: boolean, seeds = 64, operations = 64
     const edits = seededEdits(seed, operations)
     return [false, true].map((live) => fuzzProfile(seed, edits, processor, live, paired))
   })
+  const observations = cases.flatMap((entry) => entry.observations)
+  const rawFailures = observations.flatMap((observation) => observation.failures)
   return {
     schemaVersion: 1,
     scope: 'development-seeded-edit-fuzz',
@@ -425,8 +650,32 @@ export async function runSeededFuzz(paired: boolean, seeds = 64, operations = 64
     maxSourceUnits: 4096 + Math.max(...ATOMS.map((atom) => atom.length)),
     cases,
     failures: cases.filter((entry) => entry.failure !== null).length,
+    declaredRevisions: cases.reduce((count, entry) => count + entry.declaredRevisions, 0),
+    executedRevisions: observations.length,
+    unexecutedRevisions: cases.reduce((count, entry) => count + entry.unexecutedRevisions, 0),
+    rawFailedRevisions: observations.filter((observation) => observation.failures.length > 0)
+      .length,
+    rawFailures: rawFailures.length,
+    pairedComparisons: observations.filter(
+      (observation) =>
+        observation.remark.incremental.kind === 'parsed' &&
+        observation.candidate?.incremental.kind === 'parsed',
+    ).length,
+    pairedMismatchingRevisions: rawFailures.filter((failure) => failure.engine === 'paired').length,
+    engineDrift: {
+      remark: rawFailures.filter(
+        (failure) => failure.engine === 'remark' && failure.kind === 'mismatch',
+      ).length,
+      candidate: rawFailures.filter(
+        (failure) => failure.engine === 'tree-sitter' && failure.kind === 'mismatch',
+      ).length,
+    },
+    parseChecks: {
+      remark: fuzzParseCounts(observations, 'remark'),
+      candidate: fuzzParseCounts(observations, 'candidate'),
+    },
     limitation:
-      'First-failing operation-prefix replays are retained. Source/delimiter minimization remains a separate gate.',
+      'All bounded revisions are observed until a parser exception stops that profile. First-failure prefix replays remain separate from per-revision findings. Coordinate receipts are diagnostic. Source/delimiter minimization remains a separate gate.',
   }
 }
 
@@ -514,6 +763,189 @@ async function engineBrowserLog(runs: readonly TestRun[], engine: 'remark' | 'tr
         .map((run) => readFile(run.log, 'utf8')),
     )
   ).join('\n')
+}
+
+export function qualificationSourceContext(
+  provenance: Pick<
+    Awaited<ReturnType<typeof qualificationProvenance>>,
+    'revision' | 'trackedDiffSha256' | 'lockfileSha256' | 'sourceClosureSha256'
+  >,
+): QualificationSourceContext {
+  return {
+    revision: provenance.revision,
+    cleanTrackedDiff: provenance.trackedDiffSha256,
+    lock: provenance.lockfileSha256,
+    sourceClosure: provenance.sourceClosureSha256,
+  }
+}
+
+export async function captureQualificationArtifacts(
+  evidenceDirectory: string,
+  sourceBefore: QualificationSourceContext,
+  sourceAfter: QualificationSourceContext,
+  runs: readonly TestRun[],
+): Promise<readonly QualificationArtifactRunBinding[]> {
+  assertStableQualificationSource(sourceBefore, sourceAfter)
+  const pending = qualificationRunArtifacts(runs).concat(await pairedRasterArtifacts(runs))
+  const grouped = new Map<string, QualificationArtifactBinding[]>()
+  for (const entry of pending) {
+    const binding = await materializeQualificationArtifact(evidenceDirectory, entry)
+    const artifacts = grouped.get(entry.runId) ?? []
+    if (
+      !artifacts.some(
+        (artifact) => artifact.role === binding.role && artifact.path === binding.path,
+      )
+    )
+      artifacts.push(binding)
+    grouped.set(entry.runId, artifacts)
+  }
+  return runs
+    .filter((run) => grouped.has(run.name))
+    .map((run) => ({
+      runId: run.name,
+      sourceBefore,
+      sourceAfter,
+      artifacts: grouped.get(run.name) ?? [],
+    }))
+}
+
+export async function verifyQualificationArtifactBindings(
+  evidenceDirectory: string,
+  bindings: readonly QualificationArtifactRunBinding[],
+): Promise<void> {
+  for (const binding of bindings) {
+    assertStableQualificationSource(binding.sourceBefore, binding.sourceAfter)
+    for (const artifact of binding.artifacts)
+      await verifyQualificationArtifact(evidenceDirectory, artifact)
+  }
+}
+
+function assertStableQualificationSource(
+  sourceBefore: QualificationSourceContext,
+  sourceAfter: QualificationSourceContext,
+) {
+  if (JSON.stringify(sourceBefore) === JSON.stringify(sourceAfter)) return
+  throw createScriptError('Qualification source changed during capture.', {
+    internal: { field: 'artifactBindings.sourceBefore/sourceAfter' },
+  })
+}
+
+function qualificationRunArtifacts(runs: readonly TestRun[]) {
+  return runs.flatMap((run) => {
+    const artifacts: QualificationArtifactSource[] = []
+    if (run.rawReport) artifacts.push({ role: 'rawQualificationReport', path: run.rawReport })
+    if (run.name.startsWith('browser-')) artifacts.push({ role: 'frameLog', path: run.log })
+    return artifacts.map((artifact) => ({ runId: run.name, ...artifact }))
+  })
+}
+
+async function pairedRasterArtifacts(
+  runs: readonly TestRun[],
+): Promise<readonly (QualificationArtifactSource & { readonly runId: string })[]> {
+  const run = runs.find((entry) => entry.name === 'paired-raster')
+  if (!run) return []
+  const reportPath = path.resolve(run.log)
+  const report = JSON.parse(await readFile(reportPath, 'utf8')) as unknown
+  const images = pairedRasterImagePaths(report, reportPath).map((file) => ({
+    runId: run.name,
+    role: 'pairedRasterImage' as const,
+    path: file,
+  }))
+  const calibrations = await pairedRasterCalibrationPaths(runs)
+  const reportArtifact: QualificationArtifactSource & { readonly runId: string } = {
+    runId: run.name,
+    role: 'pairedRasterReport',
+    path: reportPath,
+  }
+  return [reportArtifact].concat(
+    images,
+    calibrations.map((file) => ({
+      runId: run.name,
+      role: 'pairedRasterCalibration' as const,
+      path: file,
+    })),
+  )
+}
+
+function pairedRasterImagePaths(report: unknown, reportPath: string): string[] {
+  if (!isRecord(report) || !Array.isArray(report.compared)) return []
+  return report.compared.flatMap((entry) => {
+    if (!isRecord(entry)) return []
+    return ['baseline', 'candidate', 'overlay'].flatMap((key) => {
+      const file = entry[key]
+      return typeof file === 'string' ? [path.resolve(path.dirname(reportPath), file)] : []
+    })
+  })
+}
+
+async function pairedRasterCalibrationPaths(runs: readonly TestRun[]): Promise<string[]> {
+  const logs = await Promise.all(
+    runs.filter((run) => run.name.startsWith('browser-')).map((run) => readFile(run.log, 'utf8')),
+  )
+  return logs
+    .flatMap((log) => rasterRecords(log).calibration)
+    .flatMap((record) => [record.first, record.repeated])
+    .map((file) => (path.isAbsolute(file) ? path.resolve(file) : path.resolve(ROOT, file)))
+}
+
+async function materializeQualificationArtifact(
+  evidenceDirectory: string,
+  source: QualificationArtifactSource & { readonly runId: string },
+): Promise<QualificationArtifactBinding> {
+  const bytes = await readQualificationArtifactBytes(source.path)
+  const digest = hash('sha256', bytes, 'hex')
+  const root = path.resolve(evidenceDirectory)
+  const sourcePath = path.isAbsolute(source.path)
+    ? path.resolve(source.path)
+    : path.resolve(ROOT, source.path)
+  let targetPath = sourcePath
+  let relative = evidenceRelativePath(targetPath, root)
+  if (!relative) {
+    relative = path.posix.join('captured', source.role, `${digest}-${path.basename(sourcePath)}`)
+    targetPath = path.join(root, ...relative.split('/'))
+    await mkdir(path.dirname(targetPath), { recursive: true })
+    await writeFile(targetPath, bytes)
+  }
+  return { role: source.role, path: relative, sha256: digest, byteLength: bytes.byteLength }
+}
+
+async function verifyQualificationArtifact(
+  evidenceDirectory: string,
+  artifact: QualificationArtifactBinding,
+) {
+  const root = path.resolve(evidenceDirectory)
+  const file = resolveEvidenceArtifactPath(root, artifact.path)
+  const bytes = await readFile(file)
+  const digest = hash('sha256', bytes, 'hex')
+  if (bytes.byteLength !== artifact.byteLength || digest !== artifact.sha256)
+    throw createScriptError('Qualification artifact bytes changed after capture.', {
+      internal: { role: artifact.role, path: artifact.path },
+    })
+}
+
+async function readQualificationArtifactBytes(file: string): Promise<Buffer> {
+  return readFile(path.isAbsolute(file) ? file : path.resolve(ROOT, file))
+}
+
+function evidenceRelativePath(file: string, root: string): string | null {
+  const relative = path.relative(root, path.resolve(file))
+  if (
+    !relative ||
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  )
+    return null
+  return relative.split(path.sep).join('/')
+}
+
+function resolveEvidenceArtifactPath(root: string, file: string): string {
+  const resolved = path.isAbsolute(file) ? path.resolve(file) : path.resolve(root, file)
+  if (!evidenceRelativePath(resolved, root))
+    throw createScriptError('Qualification artifact path escapes the evidence directory.', {
+      internal: { path: file },
+    })
+  return resolved
 }
 
 async function suppliedPromotion(options: {
@@ -622,6 +1054,7 @@ async function runTests(
     pending: result.numPendingTests,
     todo: result.numTodoTests,
     log,
+    rawReport: jsonFile,
   }
 }
 

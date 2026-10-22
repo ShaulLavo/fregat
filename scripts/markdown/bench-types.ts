@@ -157,3 +157,13 @@ function summarizeGroup(samples: readonly BenchmarkSample[]): BenchmarkSummary {
         : true,
   }
 }
+
+export function distribution(values: readonly number[]) {
+  if (values.length === 0) return null
+  return {
+    samples: values.length,
+    p50: percentile(values, 0.5),
+    p95: percentile(values, 0.95),
+    maximum: Math.max(...values),
+  }
+}

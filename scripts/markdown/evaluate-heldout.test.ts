@@ -12,6 +12,7 @@ import {
   evaluateNativeMessage,
   evaluationCounts,
   heldoutSchedules,
+  parseBrowserInput,
   parseBrowserReceipt,
   parseReport,
   reserveEvaluationExposure,
@@ -35,6 +36,7 @@ const fingerprint: CandidateIdentity = {
   candidateSourceSha256: hash('owned-source'),
   artifacts: {
     grammarSha256: hash('grammar'),
+    chatGrammarSha256: hash('chat-grammar'),
     resolverSha256: hash('resolver'),
     runtimeWasmSha256: hash('runtime-wasm'),
     runtimeBindingSha256: hash('runtime-binding'),
@@ -108,6 +110,45 @@ test('the frozen candidate rejects changes to commits, installed WASM and bindin
       fingerprint,
     ),
   ).toThrow()
+})
+
+test.each(['grammarSha256', 'chatGrammarSha256'] as const)(
+  'the frozen identity independently rejects changed %s',
+  (field) => {
+    expect(() =>
+      assertFrozenIdentity(
+        {
+          ...fingerprint,
+          artifacts: { ...fingerprint.artifacts, [field]: hash('changed grammar') },
+        },
+        fingerprint,
+      ),
+    ).toThrow()
+  },
+)
+
+test.each([undefined, null, '', 'not-a-hash', 'A'.repeat(64), 42])(
+  'raw browser identities reject missing or malformed CHAT hash %s',
+  (chatGrammarSha256) => {
+    const candidate = {
+      ...fingerprint,
+      artifacts: { ...fingerprint.artifacts, chatGrammarSha256 },
+    }
+    expect(() =>
+      parseBrowserInput({ ...browserInput(messages, fingerprint, batch()), candidate }),
+    ).toThrow()
+    expect(() => parseBrowserReceipt({ ...browserReceipt(), candidate })).toThrow()
+  },
+)
+
+test('raw browser parsers retain the separate CHAT identity without stripping it', () => {
+  const input = parseBrowserInput(browserInput(messages, fingerprint, batch()))
+  const receipt = parseBrowserReceipt(browserReceipt())
+  expect(input.candidate).toEqual(fingerprint)
+  expect(receipt.candidate).toEqual(fingerprint)
+  expect(input.candidate.artifacts.chatGrammarSha256).not.toBe(
+    input.candidate.artifacts.grammarSha256,
+  )
 })
 
 test('exposure is durable before content access and prevents reused or changed candidates', async () => {

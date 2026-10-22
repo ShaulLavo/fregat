@@ -22,6 +22,8 @@ import {
   ordinaryProductionFindings,
   productionDigest,
   productionComparisons,
+  productionMetricObservation,
+  type ProductionMetricObservation,
   productionFamilyCoverage,
   productionPairFindings,
   productionTrialSummary,
@@ -36,6 +38,14 @@ import { qualificationProvenance } from './provenance.ts'
 import { createScriptError } from '../structured-errors.ts'
 import { absent, listenerAbsent } from './production-cleanup.ts'
 import { isRecord } from './serialization.ts'
+import { writeJsonl } from './timing-artifacts'
+import {
+  oracleCallbackRecords,
+  parseProductionOracleRecord,
+  writeProductionOracle,
+  retainPairedOracleMismatch,
+  retainTimingOracleMismatch,
+} from './production-oracle'
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const WEB = path.join(ROOT, 'apps/web')
@@ -44,6 +54,53 @@ const ENGINES = ['remark', 'tree-sitter'] as const
 type ProductionCapture =
   | { readonly kind: 'diagnostic' }
   | { readonly kind: 'promotion'; readonly hostEvidenceFile: string }
+type ProductionReplayInput = {
+  readonly source: string
+  readonly encodedInputs: readonly (number | string)[]
+}
+
+export function encodeProductionInputs(
+  source: string,
+  inputs: readonly string[],
+): (number | string)[] {
+  return inputs.map((input) => (source.startsWith(input) ? input.length : input))
+}
+
+export function replayProductionOracle({ source, encodedInputs }: ProductionReplayInput) {
+  const chunks = encodedInputs.map((input) =>
+    typeof input === 'number' ? source.slice(0, input) : input,
+  )
+  return window.markdownProductionProbe.streamOracle(source, chunks, (record) =>
+    window.markdownOracleFrame(record),
+  )
+}
+
+export async function replayProductionTiming({
+  source,
+  encodedInputs,
+  arrival,
+  arrivalOffsetsMs,
+  expected,
+}: ProductionReplayInput &
+  Pick<
+    Parameters<Window['markdownProductionProbe']['time']>[2],
+    'arrival' | 'arrivalOffsetsMs' | 'expected'
+  >) {
+  const chunks = encodedInputs.map((input) =>
+    typeof input === 'number' ? source.slice(0, input) : input,
+  )
+  return window.markdownProductionProbe.time(source, chunks, {
+    arrival,
+    arrivalOffsetsMs,
+    expected,
+    onMismatch: (sample) => window.markdownMismatchFrame(sample),
+    heldSyntax: {
+      held: 'Stable\n\n## ',
+      released: 'Stable\n\n## Ready',
+    },
+  })
+}
+
 export async function buildMarkdownProductionProbe(output: string) {
   const sourceBefore = await qualificationProvenance(ROOT)
   const { build, loadConfigFromFile } = await import('vite')
@@ -167,8 +224,6 @@ export async function runProductionMarkdownPairs({
     executablePath,
   })
   let actualBrowserArgs: readonly string[] | null = null
-  const results: ProductionTrial[] = []
-  const warmupResults: ProductionTrial[] = []
   const failures: string[] = []
   const interrupt = () => {
     void browser.close()
@@ -176,6 +231,7 @@ export async function runProductionMarkdownPairs({
   process.once('SIGINT', interrupt)
   process.once('SIGTERM', interrupt)
   let controls: Awaited<ReturnType<typeof productionBrowserControls>> | null = null
+  let observed: Awaited<ReturnType<typeof writeProductionTrials>>
   try {
     actualBrowserArgs = await readBrowserArguments(browser)
     if (negativeControls)
@@ -184,43 +240,37 @@ export async function runProductionMarkdownPairs({
         'negative controls',
         45_000,
       )
-    for (const workload of workloads)
-      await measureWorkload({
-        browser,
-        url,
-        output,
-        workload,
+    observed = await writeProductionTrials({
+      output,
+      workloads,
+      available,
+      records: productionTrialRecords({
+        workloads,
         trials,
         warmups,
-        results,
-        warmupResults,
         failures,
-        expectedSource,
-        expectedBudgetSha256,
-        onServedBuild: (identity) => {
-          servedBuild ??= identity
-        },
-      })
+        retainMismatch: (results) => retainPairMismatch(output, results),
+        capture: (trial) =>
+          oneTrial({
+            browser,
+            url,
+            output,
+            ...trial,
+            expectedSource,
+            expectedBudgetSha256,
+            onServedBuild: (identity) => {
+              servedBuild ??= identity
+            },
+          }),
+      }),
+    })
   } finally {
     process.removeListener('SIGINT', interrupt)
     process.removeListener('SIGTERM', interrupt)
     await browser.close()
   }
-  const comparisons = productionComparisons(results, workloads)
-  const ordinaryFindings = ordinaryProductionFindings(results, workloads)
+  const { comparisons, resourcePlateaus, ordinaryFindings, incompleteEvidence } = observed
   const failedComparisons = comparisons.filter((comparison) => comparison.status === 'failed')
-  const resourcePlateaus = results
-    .filter((trial) => trial.family === 'resources')
-    .map((trial) => ({
-      workload: trial.workload,
-      pair: trial.pair,
-      engine: trial.engine,
-      ...productionResourcePlateau(
-        trial.resourceWindows,
-        trial.resourceControlWindows,
-        trial.engine === 'tree-sitter',
-      ),
-    }))
   if (
     controls &&
     (controls.knownGood.expected !== controls.knownGood.observed ||
@@ -233,24 +283,6 @@ export async function runProductionMarkdownPairs({
     failures.push(
       'A production measurement negative control was accepted or the known-good control failed.',
     )
-  const incompleteEvidence = results.flatMap((trial) => {
-    if (trial.family !== 'resources' && trial.family !== 'payload') return []
-    if (trial.network === null)
-      return [`${trial.workload}/${trial.engine}: browser resource receipts are unavailable.`]
-    if (
-      trial.network.some(
-        (request) =>
-          request.transferredBytes === null &&
-          request.failure === null &&
-          request.resolvedByWorkerRequestId === null &&
-          !isSustainedProductStream(request),
-      )
-    )
-      return [
-        `${trial.workload}/${trial.engine}: browser resource transfer receipts are incomplete.`,
-      ]
-    return []
-  })
   const reportFailures = failures.concat(
     incompleteEvidence,
     ordinaryFindings,
@@ -274,7 +306,7 @@ export async function runProductionMarkdownPairs({
       ),
   )
   const report = {
-    schemaVersion: 1,
+    schemaVersion: 2 as const,
     build: 'production',
     timingStatus: capture.kind === 'promotion' ? 'PROMOTION_CAPTURE_UNRECONCILED' : 'EXPLORATORY',
     capture: { ...capture, hostEvidence },
@@ -310,13 +342,12 @@ export async function runProductionMarkdownPairs({
     })),
     trials,
     warmups,
-    rawTrials: results,
-    sampleSummaries: results.map(productionTrialSummary),
+    trialsArtifact: observed.trialsArtifact,
+    sampleSummaries: observed.sampleSummaries,
     controls,
-    warmupResults,
     comparisons,
     resourcePlateaus,
-    familyCoverage: productionFamilyCoverage(results, available),
+    familyCoverage: observed.familyCoverage,
     failures: reportFailures,
     boundaries: {
       receiptToPaint:
@@ -344,10 +375,6 @@ export async function runProductionMarkdownPairs({
   await writeFile(
     path.join(output, 'production-browser.json'),
     JSON.stringify(report, null, 2) + '\n',
-  )
-  await writeFile(
-    path.join(output, 'raw-production-trials.jsonl'),
-    results.map((trial) => JSON.stringify(trial)).join('\n') + '\n',
   )
   return report
 }
@@ -383,46 +410,196 @@ async function readBrowserArguments(browser: Browser): Promise<readonly string[]
   }
 }
 
-type MeasureWorkloadOptions = {
-  readonly browser: Browser
-  readonly url: string
-  readonly output: string
+type ProductionTrialCapture = (input: {
   readonly workload: ProductionWorkload
+  readonly pair: number
+  readonly order: ProductionTrial['order']
+  readonly engine: ProductionTrial['engine']
+}) => Promise<ProductionTrial>
+
+type ProductionRecordsOptions = {
+  readonly workloads: readonly ProductionWorkload[]
   readonly trials: number
   readonly warmups: number
-  readonly results: ProductionTrial[]
-  readonly warmupResults: ProductionTrial[]
   readonly failures: string[]
-  readonly expectedSource: Awaited<ReturnType<typeof qualificationProvenance>>
-  readonly expectedBudgetSha256: string
-  readonly onServedBuild: (identity: ServedBuildIdentity) => void
+  readonly capture: ProductionTrialCapture
+  readonly retainMismatch?: (trials: readonly ProductionTrial[]) => Promise<void>
 }
 
-async function measureWorkload(options: MeasureWorkloadOptions) {
+export async function* productionTrialRecords(
+  options: ProductionRecordsOptions,
+): AsyncGenerator<ProductionTrial> {
+  for (const workload of options.workloads) yield* measureWorkload(workload, options)
+}
+
+async function* measureWorkload(
+  workload: ProductionWorkload,
+  options: ProductionRecordsOptions,
+): AsyncGenerator<ProductionTrial> {
   for (let pair = -options.warmups; pair < options.trials; pair += 1) {
-    const order = Math.abs(pair) % 2 === 0 ? 'AB' : 'BA'
-    const results: ProductionTrial[] = []
-    try {
-      for (const engine of order === 'AB' ? ENGINES : ENGINES.toReversed())
-        results.push(await oneTrial({ ...options, pair, order, engine }))
-      const chunks = productionUpdates(options.workload)
-      const expected = chunks.concat([options.workload.source])
-      options.failures.push(
-        ...productionPairFindings(results, expected).map(
-          (finding) => `${options.workload.id}/pair-${pair}: ${finding}`,
-        ),
-      )
-      if (pair < 0) options.warmupResults.push(...results)
-      else options.results.push(...results)
-    } catch (error) {
-      if (pair < 0) options.warmupResults.push(...results)
-      else options.results.push(...results)
-      options.failures.push(
-        `${options.workload.id}/pair-${pair}: ${error instanceof Error ? error.message : String(error)}`,
-      )
-      return
-    }
+    const result = yield* measureProductionPair(workload, pair, options)
+    if (!result) return
   }
+}
+
+async function* measureProductionPair(
+  workload: ProductionWorkload,
+  pair: number,
+  options: ProductionRecordsOptions,
+): AsyncGenerator<ProductionTrial, boolean> {
+  const order = Math.abs(pair) % 2 === 0 ? 'AB' : 'BA'
+  const results: ProductionTrial[] = []
+  try {
+    for (const engine of order === 'AB' ? ENGINES : ENGINES.toReversed()) {
+      const trial = await options.capture({ workload, pair, order, engine })
+      results.push(trial)
+      yield trial
+    }
+    const expected = productionUpdates(workload).concat([workload.source])
+    options.failures.push(
+      ...productionPairFindings(results, expected).map(
+        (finding) => `${workload.id}/pair-${pair}: ${finding}`,
+      ),
+    )
+    await options.retainMismatch?.(results)
+    return true
+  } catch (error) {
+    options.failures.push(
+      `${workload.id}/pair-${pair}: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return false
+  }
+}
+
+async function retainPairMismatch(output: string, trials: readonly ProductionTrial[]) {
+  const first = trials.find((trial) => trial.engine === 'remark')
+  const second = trials.find((trial) => trial.engine === 'tree-sitter')
+  if (!first || !second) return
+  if (
+    first.correctness.frames.every(
+      (frame, index) =>
+        frame.paintedOutput.digest === second.correctness.frames[index]?.paintedOutput.digest,
+    ) &&
+    first.correctness.final.paintedOutput.digest === second.correctness.final.paintedOutput.digest
+  )
+    return
+  await retainPairedOracleMismatch({
+    root: output,
+    file: path.join(path.dirname(second.correctness.artifact.path), 'paired-mismatch.json'),
+    first,
+    second,
+  })
+}
+
+type ProductionWriteOptions = {
+  readonly output: string
+  readonly workloads: readonly ProductionWorkload[]
+  readonly available: readonly ProductionWorkload[]
+  readonly records: AsyncIterable<ProductionTrial>
+}
+type ProductionWriteState = {
+  readonly observations: ProductionMetricObservation[]
+  readonly sampleSummaries: ReturnType<typeof productionTrialSummary>[]
+  readonly resourcePlateaus: ReturnType<typeof resourceObservation>[]
+  readonly ordinaryFindings: string[]
+  readonly incompleteEvidence: string[]
+}
+
+export async function writeProductionTrials(options: ProductionWriteOptions) {
+  const state: ProductionWriteState = {
+    observations: [],
+    sampleSummaries: [],
+    resourcePlateaus: [],
+    ordinaryFindings: [],
+    incompleteEvidence: [],
+  }
+  const trialsArtifact = await writeJsonl({
+    root: options.output,
+    file: 'raw-production-trials.jsonl',
+    records: observedProductionRecords(options, state),
+  })
+  return {
+    ...state,
+    trialsArtifact,
+    comparisons: productionComparisons(state.observations, options.workloads),
+    familyCoverage: productionFamilyCoverage(state.observations, options.available),
+  }
+}
+
+async function* observedProductionRecords(
+  options: ProductionWriteOptions,
+  state: ProductionWriteState,
+) {
+  for await (const trial of options.records) {
+    if (trial.pair >= 0) observeProductionTrial(trial, options.workloads, state)
+    yield trial
+  }
+}
+
+function observeProductionTrial(
+  trial: ProductionTrial,
+  workloads: readonly ProductionWorkload[],
+  state: ProductionWriteState,
+) {
+  state.observations.push(productionMetricObservation(trial))
+  state.sampleSummaries.push(productionTrialSummary(trial))
+  state.ordinaryFindings.push(...ordinaryProductionFindings([trial], workloads))
+  state.incompleteEvidence.push(...incompleteNetworkEvidence(trial))
+  if (trial.family === 'resources') state.resourcePlateaus.push(resourceObservation(trial))
+}
+
+function resourceObservation(trial: ProductionTrial) {
+  return {
+    workload: trial.workload,
+    pair: trial.pair,
+    engine: trial.engine,
+    ...productionResourcePlateau(
+      trial.resourceWindows,
+      trial.resourceControlWindows,
+      trial.engine === 'tree-sitter',
+    ),
+  }
+}
+
+function incompleteNetworkEvidence(trial: ProductionTrial) {
+  if (trial.family !== 'resources' && trial.family !== 'payload') return []
+  if (trial.network === null)
+    return [`${trial.workload}/${trial.engine}: browser resource receipts are unavailable.`]
+  if (
+    trial.network.some(
+      (request) =>
+        request.transferredBytes === null &&
+        request.failure === null &&
+        request.resolvedByWorkerRequestId === null &&
+        !isSustainedProductStream(request),
+    )
+  )
+    return [`${trial.workload}/${trial.engine}: browser resource transfer receipts are incomplete.`]
+  return []
+}
+
+async function retainBrowserMismatch(
+  value: unknown,
+  options: Omit<Parameters<typeof retainTimingOracleMismatch>[0], 'sample'>,
+) {
+  if (!isRecord(value)) throw createScriptError('Production mismatch payload is malformed.')
+  const record = parseProductionOracleRecord({ kind: 'frame', frame: value.actual })
+  const expectedIndex = value.expectedIndex
+  if (typeof expectedIndex !== 'number' || !Number.isInteger(expectedIndex))
+    throw createScriptError('Production mismatch expectation index is malformed.')
+  const expected = options.oracle.frames[expectedIndex]?.paintedOutput
+  if (
+    !expected ||
+    !isRecord(value.expected) ||
+    value.expected.digest !== expected.digest ||
+    value.expected.textBytes !== expected.textBytes ||
+    value.expected.elementCount !== expected.elementCount
+  )
+    throw createScriptError('Production mismatch expectation is missing.')
+  await retainTimingOracleMismatch({
+    ...options,
+    sample: { actual: record.frame, expected, expectedIndex },
+  })
 }
 
 async function oneTrial({
@@ -436,7 +613,14 @@ async function oneTrial({
   expectedSource,
   expectedBudgetSha256,
   onServedBuild,
-}: MeasureWorkloadOptions & {
+}: {
+  readonly browser: Browser
+  readonly url: string
+  readonly output: string
+  readonly workload: ProductionWorkload
+  readonly expectedSource: Awaited<ReturnType<typeof qualificationProvenance>>
+  readonly expectedBudgetSha256: string
+  readonly onServedBuild: (identity: ServedBuildIdentity) => void
   readonly pair: number
   readonly order: 'AB' | 'BA'
   readonly engine: (typeof ENGINES)[number]
@@ -450,6 +634,7 @@ async function oneTrial({
     workload,
     engine,
     directory,
+    output,
   )
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
@@ -498,30 +683,26 @@ async function oneTrial({
         ),
         'warmup',
       )
-    const chunks = productionUpdates(workload)
+    const encodedInputs = encodeProductionInputs(workload.source, productionUpdates(workload))
+    await page.exposeBinding('markdownMismatchFrame', async (_source, value: unknown) =>
+      retainBrowserMismatch(value, {
+        root: output,
+        file: path.join(directory, 'timing-mismatch.json'),
+        engine,
+        oracle: correctness,
+      }),
+    )
     await trialStage(directory, 'timing')
     instrumentation?.setPhase('measurement')
     const cpuBefore = await instrumentation?.read()
     const receipt = await withProductionDeadline(
-      page.evaluate(
-        async ({ source, chunks, arrival, arrivalOffsetsMs, expected }) =>
-          window.markdownProductionProbe.time(source, chunks, {
-            arrival,
-            arrivalOffsetsMs,
-            expected,
-            heldSyntax: {
-              held: 'Stable\n\n## ',
-              released: 'Stable\n\n## Ready',
-            },
-          }),
-        {
-          source: workload.source,
-          chunks,
-          arrival: workload.arrival,
-          arrivalOffsetsMs: productionArrivalOffsets(workload),
-          expected: correctness.frames.map((frame) => frame.paintedOutput),
-        },
-      ),
+      page.evaluate(replayProductionTiming, {
+        source: workload.source,
+        encodedInputs,
+        arrival: workload.arrival,
+        arrivalOffsetsMs: productionArrivalOffsets(workload),
+        expected: correctness.frames.map((frame) => frame.paintedOutput),
+      }),
       'timing replay',
       1_200_000,
     )
@@ -635,6 +816,7 @@ async function readOracle(
   workload: ProductionWorkload,
   engine: string,
   directory: string,
+  output: string,
 ) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
@@ -656,23 +838,29 @@ async function readOracle(
         page.evaluate((source) => window.markdownProductionProbe.run(source, []), workload.source),
         'oracle warmup',
       )
-    const correctness = await withProductionDeadline(
-      page.evaluate(({ source, chunks }) => window.markdownProductionProbe.run(source, chunks), {
-        source: workload.source,
-        chunks: productionUpdates(workload),
+    const captured = await writeProductionOracle({
+      root: output,
+      file: path.join(directory, 'oracle.jsonl'),
+      engine,
+      records: oracleCallbackRecords(async (emit) => {
+        await page.exposeBinding('markdownOracleFrame', async (_source, value: unknown) =>
+          emit(parseProductionOracleRecord(value)),
+        )
+        await withProductionDeadline(
+          page.evaluate(replayProductionOracle, {
+            source: workload.source,
+            encodedInputs: encodeProductionInputs(workload.source, productionUpdates(workload)),
+          }),
+          'independent projection replay',
+          1_200_000,
+        )
       }),
-      'independent projection replay',
-      1_200_000,
-    )
-    const completed = await withProductionDeadline(
-      page.evaluate((source) => window.markdownProductionProbe.run(source, []), workload.source),
-      'fresh completed projection',
-    )
+    })
     if (errors.length > 0)
       throw createScriptError('The independent production oracle reported a page error.', {
         internal: { errors },
       })
-    return { correctness, freshCompleted: completed.final }
+    return captured
   } catch (error) {
     await writeFile(
       path.join(directory, 'oracle-failure.json'),
@@ -694,6 +882,9 @@ async function readOracle(
     ])
     throw error
   } finally {
+    await page
+      .evaluate(async () => window.markdownProductionProbe?.dispose())
+      .catch(() => undefined)
     await context.close()
   }
 }
@@ -984,5 +1175,25 @@ export async function main() {
   if (report.failures.length > 0) process.exitCode = 1
 }
 
+export async function finalizeProductionCli(run: () => Promise<void>): Promise<never> {
+  try {
+    await run()
+  } catch (error) {
+    process.exitCode = 1
+    process.stderr.write(
+      `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+    )
+  }
+  await Promise.all([flushProductionOutput(process.stdout), flushProductionOutput(process.stderr)])
+  process.exit(process.exitCode ?? 0)
+}
+
+function flushProductionOutput(stream: NodeJS.WriteStream) {
+  return new Promise<void>((resolve, reject) => {
+    stream.once('error', reject)
+    stream.end(resolve)
+  })
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
-  await main()
+  await finalizeProductionCli(main)

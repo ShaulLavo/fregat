@@ -17,6 +17,7 @@ it('keeps the actual shared parser heap attached after allocation and disposal',
   )
   await init({
     grammar,
+    chatGrammar: await readFile(require.resolve('tree-sitter-md/tree-sitter-markdown-chat.wasm')),
     resolver: await readFile(require.resolve('tree-sitter-md/tree-sitter-md.wasm')),
   })
   verifySharedHeapGrowth()

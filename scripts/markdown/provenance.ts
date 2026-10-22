@@ -76,6 +76,9 @@ async function sourceFiles(root: string): Promise<string[]> {
     'apps/web/vitest.markdown-qualification.config.ts',
     'apps/web/vite.config.ts',
     'apps/web/vitest.browser.config.ts',
+    'editor/packages/tree-sitter/src/treeSitter/markdown.ts',
+    'editor/packages/tree-sitter/test/wasm-memory.browser.test.ts',
+    'editor/packages/tree-sitter/test/wasm-memory.test.ts',
     'package.json',
   )
   return files.sort()

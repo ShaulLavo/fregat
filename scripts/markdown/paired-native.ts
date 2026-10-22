@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { hash } from 'node:crypto'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { cpus, hostname } from 'node:os'
 import path from 'node:path'
@@ -12,6 +12,7 @@ import type { MarkdownSession } from '../../packages/markdown/src/utils/session'
 import { readyRemarkExtensions } from '../../packages/markdown/test/qualification'
 import { createScriptError } from '../structured-errors'
 import { percentile } from './bench-types'
+import { writeJsonl, type RawTimingRef } from './timing-artifacts'
 import frozenBudget from './promotion-budget.json'
 import { metricBudget } from './promotion'
 import {
@@ -70,7 +71,7 @@ export type PairedComparison = {
   readonly upperMarginMs: number
   readonly status: 'passed' | 'failed' | 'inconclusive'
 }
-export type NativePair = {
+type NativePair = {
   readonly trial: number
   readonly order: PairOrder
   readonly remark: NativeTrial
@@ -78,10 +79,25 @@ export type NativePair = {
   readonly mismatchedRevisions: readonly number[]
 }
 export type PairedNativeOptions = {
+  readonly output: string
   readonly mode: 'quick' | 'qualification'
   readonly seed?: number
   readonly fixtureIds?: readonly string[]
 }
+export type NativePairRecord = {
+  readonly workload: NativePairWorkload['id']
+  readonly pair: NativePair
+}
+export type NativeWorkloadSummary = Pick<
+  NativePairWorkload,
+  'id' | 'family' | 'sourceBytes' | 'scheduleUnits'
+> & {
+  readonly sourceSha256: string
+  readonly comparisons: readonly PairedComparison[]
+  readonly observedPairs: number
+  readonly mismatchedPairs: number
+}
+
 type BenchmarkSession = MarkdownSession & { dispose?(): void }
 type SessionFactory = () => BenchmarkSession
 type Extensions = Parameters<typeof createHastProcessor>[0]
@@ -470,9 +486,17 @@ export async function runPairedNative(options: PairedNativeOptions) {
     remark: () => createMarkdownSession(),
     'tree-sitter': () => createTreeSitterMarkdownSession(),
   }
-  const results = workloads.map((entry) =>
-    runWorkloadPairs(entry, orders, profile.warmups, extensions, factories, seed, options.mode),
-  )
+  await mkdir(options.output, { recursive: true })
+  const observed = await writeNativePairs({
+    output: options.output,
+    workloads,
+    orders,
+    warmups: profile.warmups,
+    seed,
+    mode: options.mode,
+    capture: (trial) => runNativeTrial({ ...trial, factory: factories[trial.engine], extensions }),
+  })
+  const results = observed.workloads
   const missing = [
     'Production browser build, quiet-host timing qualification and paint completion receipts',
     'Cold process import/WASM initialization/asset fetch and true cold mount',
@@ -483,8 +507,8 @@ export async function runPairedNative(options: PairedNativeOptions) {
     '1/8-unit schedules above 8 KiB and fine-grained pathological streaming schedules',
   ]
   if (workloads.length !== allWorkloads.length) missing.push('Unselected native workload cells')
-  return {
-    schemaVersion: 1,
+  const report = {
+    schemaVersion: 2 as const,
     verdict: 'NOT VERIFIED',
     scope: 'paired-native-source',
     status: nativeStatus(results),
@@ -527,77 +551,214 @@ export async function runPairedNative(options: PairedNativeOptions) {
       ...(await provenance()),
     },
     workloads: results,
+    pairsArtifact: observed.pairsArtifact,
     missing,
     resources: {
       created: ['In-process message sessions and projection caches'],
       cleanup: ['Every trial clears source and disposes available native handles in finally'],
-      retained: ['Returned raw samples and report; caller owns retention'],
+      retained: [
+        'Sealed canonical raw pairs on disk; compact scalar comparisons and workload summaries',
+      ],
     },
+  }
+  await publishNativeReport(options.output, report)
+  return report
+}
+
+export async function publishNativeReport(output: string, report: unknown) {
+  await writeJsonl({
+    root: output,
+    file: 'paired-native.json',
+    records: (async function* () {
+      yield report
+    })(),
+  })
+}
+
+type NativeTrialCapture = (
+  input: Pick<Parameters<typeof runNativeTrial>[0], 'engine' | 'trial' | 'workload'>,
+) => NativeTrial
+type NativeCaptureFailure = {
+  readonly workload: string
+  readonly trial: number
+  readonly order: PairOrder
+  readonly completed: readonly NativeTrial[]
+  readonly error: unknown
+}
+type NativeMetricPair = {
+  readonly baseline: Readonly<Record<PairedMetric, number>>
+  readonly candidate: Readonly<Record<PairedMetric, number>>
+}
+type NativeWriteOptions = {
+  readonly output: string
+  readonly workloads: readonly NativePairWorkload[]
+  readonly orders: readonly PairOrder[]
+  readonly warmups: number
+  readonly seed: number
+  readonly mode: PairedNativeOptions['mode']
+  readonly capture: NativeTrialCapture
+}
+type NativeWriteState = {
+  readonly workloads: NativeWorkloadSummary[]
+  failure: NativeCaptureFailure | null
+}
+
+export async function writeNativePairs(options: NativeWriteOptions) {
+  await requireMissingNativeOutput(path.join(options.output, 'raw-native-pairs.jsonl'))
+  await requireMissingNativeOutput(path.join(options.output, 'paired-native.json'))
+  const state: NativeWriteState = { workloads: [], failure: null }
+  let pairsArtifact: RawTimingRef
+  try {
+    pairsArtifact = await writeJsonl({
+      root: options.output,
+      file: 'raw-native-pairs.jsonl',
+      records: nativePairRecords(options, state),
+    })
+  } catch (error) {
+    if (state.failure) await preserveNativeFailure(options.output, state.failure)
+    throw error
+  }
+  if (state.failure) await preserveNativeFailure(options.output, state.failure, pairsArtifact)
+  return { pairsArtifact, workloads: state.workloads }
+}
+
+async function requireMissingNativeOutput(file: string) {
+  try {
+    await lstat(file)
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return
+    throw error
+  }
+  throw createScriptError('Native output destination already exists.', { internal: { file } })
+}
+
+async function preserveNativeFailure(
+  output: string,
+  failure: NativeCaptureFailure,
+  pairsArtifact?: RawTimingRef,
+): Promise<never> {
+  const { error, ...context } = failure
+  try {
+    await writeFile(
+      path.join(output, 'native-pair-failure.json'),
+      `${JSON.stringify(
+        {
+          ...context,
+          pairsArtifact,
+          error:
+            error instanceof Error
+              ? { name: error.name, message: error.message, stack: error.stack }
+              : { message: String(error) },
+        },
+        null,
+        2,
+      )}\n`,
+      { flag: 'wx' },
+    )
+  } catch {
+    // Diagnostic write failure must not replace the original capture exception.
+    throw error
+  }
+  throw error
+}
+
+async function* nativePairRecords(
+  options: NativeWriteOptions,
+  state: NativeWriteState,
+): AsyncGenerator<NativePairRecord> {
+  for (const entry of options.workloads) {
+    yield* nativeWorkloadRecords(entry, options, state)
+    if (state.failure) return
   }
 }
 
-function runWorkloadPairs(
+async function* nativeWorkloadRecords(
   entry: NativePairWorkload,
-  orders: readonly PairOrder[],
-  warmups: number,
-  extensions: Extensions,
-  factories: Record<PairOrder[number], SessionFactory>,
-  seed: number,
-  mode: PairedNativeOptions['mode'],
-) {
-  for (let warmup = 0; warmup < warmups; warmup += 1) {
-    for (const engine of pairedTrialOrders(warmups, seed)[warmup])
-      runNativeTrial({
-        factory: factories[engine],
-        engine,
-        trial: -warmup - 1,
-        workload: entry,
-        extensions,
-      })
+  options: NativeWriteOptions,
+  state: NativeWriteState,
+): AsyncGenerator<NativePairRecord> {
+  const warmupOrders = options.warmups === 0 ? [] : pairedTrialOrders(options.warmups, options.seed)
+  for (let warmup = 0; warmup < options.warmups; warmup++) {
+    captureNativeArms(entry, warmupOrders[warmup], -warmup - 1, options.capture, state)
+    if (state.failure) return
   }
-  const pairs = orders.map((order, trial) => runPair(entry, order, trial, extensions, factories))
-  const metrics: readonly PairedMetric[] = ['updateP95', 'settlementP95', 'mountP95', 'streamCpu']
+  const metrics: NativeMetricPair[] = []
+  let mismatchedPairs = 0
+  for (const [trial, order] of options.orders.entries()) {
+    const arms = captureNativeArms(entry, order, trial, options.capture, state)
+    if (!arms) return
+    const pair = nativePair(arms, order, trial)
+    metrics.push({
+      baseline: nativeTrialMetrics(pair.remark),
+      candidate: nativeTrialMetrics(pair.candidate),
+    })
+    if (pair.mismatchedRevisions.length > 0) mismatchedPairs++
+    yield { workload: entry.id, pair }
+  }
+  state.workloads.push(nativeWorkloadSummary(entry, metrics, mismatchedPairs, options))
+}
+
+function nativeTrialMetrics(trial: NativeTrial): Readonly<Record<PairedMetric, number>> {
+  return {
+    updateP95: trialMetric(trial, 'updateP95'),
+    settlementP95: trialMetric(trial, 'settlementP95'),
+    mountP95: trialMetric(trial, 'mountP95'),
+    streamCpu: trialMetric(trial, 'streamCpu'),
+  }
+}
+
+function nativeWorkloadSummary(
+  entry: NativePairWorkload,
+  metrics: readonly NativeMetricPair[],
+  mismatchedPairs: number,
+  options: NativeWriteOptions,
+): NativeWorkloadSummary {
   return {
     id: entry.id,
     family: entry.family,
     sourceBytes: entry.sourceBytes,
     sourceSha256: hash('sha256', entry.source, 'hex'),
     scheduleUnits: entry.scheduleUnits,
-    pairs,
-    comparisons: metrics.map((metric) =>
+    observedPairs: metrics.length,
+    mismatchedPairs,
+    comparisons: (['updateP95', 'settlementP95', 'mountP95', 'streamCpu'] as const).map((metric) =>
       pairedConfidence({
         workload: entry.id,
         metric,
-        baseline: pairs.map((pair) => trialMetric(pair.remark, metric)),
-        candidate: pairs.map((pair) => trialMetric(pair.candidate, metric)),
-        seed,
-        resamples: mode === 'qualification' ? 4096 : 256,
+        baseline: metrics.map((pair) => pair.baseline[metric]),
+        candidate: metrics.map((pair) => pair.candidate[metric]),
+        seed: options.seed,
+        resamples: options.mode === 'qualification' ? 4096 : 256,
       }),
     ),
   }
 }
 
-function runPair(
+function captureNativeArms(
   entry: NativePairWorkload,
   order: PairOrder,
   trial: number,
-  extensions: Extensions,
-  factories: Record<PairOrder[number], SessionFactory>,
+  capture: NativeTrialCapture,
+  state: NativeWriteState,
+): readonly [NativeTrial, NativeTrial] | null {
+  const completed: NativeTrial[] = []
+  try {
+    const first = capture({ engine: order[0], trial, workload: entry })
+    completed.push(first)
+    const second = capture({ engine: order[1], trial, workload: entry })
+    completed.push(second)
+    return [first, second]
+  } catch (error) {
+    state.failure = { workload: entry.id, trial, order, completed, error }
+    return null
+  }
+}
+
+function nativePair(
+  [first, second]: readonly [NativeTrial, NativeTrial],
+  order: PairOrder,
+  trial: number,
 ): NativePair {
-  const first = runNativeTrial({
-    factory: factories[order[0]],
-    engine: order[0],
-    trial,
-    workload: entry,
-    extensions,
-  })
-  const second = runNativeTrial({
-    factory: factories[order[1]],
-    engine: order[1],
-    trial,
-    workload: entry,
-    extensions,
-  })
   const remark = first.engine === 'remark' ? first : second
   const candidate = first.engine === 'tree-sitter' ? first : second
   return {
@@ -642,14 +803,8 @@ function trialMetric(trial: NativeTrial, metric: PairedMetric) {
   )
 }
 
-function nativeStatus(
-  results: readonly {
-    readonly pairs: readonly NativePair[]
-    readonly comparisons: readonly PairedComparison[]
-  }[],
-) {
-  if (results.some((result) => result.pairs.some((pair) => pair.mismatchedRevisions.length > 0)))
-    return 'FAILED'
+function nativeStatus(results: readonly NativeWorkloadSummary[]) {
+  if (results.some((result) => result.mismatchedPairs > 0)) return 'FAILED'
   if (
     results.some((result) =>
       result.comparisons.some((comparison) => comparison.status === 'failed'),
@@ -693,11 +848,12 @@ async function provenance() {
     'scripts/markdown/promotion.ts',
     'scripts/markdown/workloads.ts',
   ]
-  const [revision, lockfile, budget, grammar, resolver, sources] = await Promise.all([
+  const [revision, lockfile, budget, grammar, chatGrammar, resolver, sources] = await Promise.all([
     execute('git', ['rev-parse', 'HEAD'], { cwd: checkout }),
     readFile(path.join(checkout, 'bun.lock')),
     readFile(new URL('./promotion-budget.json', import.meta.url)),
     readFile(require.resolve('tree-sitter-md/tree-sitter-markdown.wasm')),
+    readFile(require.resolve('tree-sitter-md/tree-sitter-markdown-chat.wasm')),
     readFile(require.resolve('tree-sitter-md/tree-sitter-md.wasm')),
     Promise.all(
       sourcePaths.map(async (file) => ({
@@ -714,6 +870,7 @@ async function provenance() {
     lockfileSha256: hash('sha256', lockfile, 'hex'),
     budgetSha256: hash('sha256', budget, 'hex'),
     grammarSha256: hash('sha256', grammar, 'hex'),
+    chatGrammarSha256: hash('sha256', chatGrammar, 'hex'),
     resolverSha256: hash('sha256', resolver, 'hex'),
   }
 }
@@ -759,15 +916,11 @@ if (import.meta.main) {
       internal: { argument: 'out or mode' },
     })
   const report = await runPairedNative({
+    output: values.out,
     mode: values.mode,
     seed: Number(values.seed),
     fixtureIds: values.fixture,
   })
-  await mkdir(values.out, { recursive: true })
-  await writeFile(
-    path.join(values.out, 'paired-native.json'),
-    `${JSON.stringify(report, null, 2)}\n`,
-  )
   process.stdout.write(
     `${JSON.stringify({ verdict: report.verdict, status: report.status, evidence: values.out, workloads: report.workloads.length })}\n`,
   )

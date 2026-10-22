@@ -1,5 +1,6 @@
 import { CAPTURES, init, Kind, MarkdownDocument } from 'tree-sitter-md'
 import grammar from 'tree-sitter-md/tree-sitter-markdown.wasm?url'
+import chatGrammar from 'tree-sitter-md/tree-sitter-markdown-chat.wasm?url'
 import resolver from 'tree-sitter-md/tree-sitter-md.wasm?url'
 import { Language, type Node, type Range } from 'web-tree-sitter'
 import type { TextEdit } from '@singapore-editor/core/document'
@@ -8,7 +9,13 @@ import type { FoldRange, TreeSitterCapture, TreeSitterSyntaxRange } from './type
 let initialization: Promise<void> | undefined
 export const initializeMarkdown = (): Promise<void> => {
   initialization ??= Language.load(grammar)
-    .then((language) => init({ grammar: language, resolver: new URL(resolver, import.meta.url) }))
+    .then((language) =>
+      init({
+        grammar: language,
+        chatGrammar: new URL(chatGrammar, import.meta.url),
+        resolver: new URL(resolver, import.meta.url),
+      }),
+    )
     .catch((error) => {
       initialization = undefined
       throw error

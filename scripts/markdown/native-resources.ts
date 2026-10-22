@@ -226,7 +226,25 @@ async function runWindow(input: {
   }
 }
 
-async function candidateIdentity(root: string) {
+export async function captureNativeResourceAssets(root: string, outputDirectory: string) {
+  const require = createRequire(path.join(root, 'packages/markdown/package.json'))
+  const directory = path.join(outputDirectory, 'native-assets')
+  await mkdir(directory, { recursive: true })
+  const assets: { asset: string; file: string; bytes: number; sha256: string }[] = []
+  for (const asset of [
+    'tree-sitter-markdown.wasm',
+    'tree-sitter-markdown-chat.wasm',
+    'tree-sitter-md.wasm',
+  ]) {
+    const bytes = await readFile(require.resolve(`tree-sitter-md/${asset}`))
+    const file = path.join('native-assets', asset)
+    await writeFile(path.join(outputDirectory, file), bytes)
+    assets.push({ asset, file, bytes: bytes.length, sha256: hash('sha256', bytes, 'hex') })
+  }
+  return assets
+}
+
+async function candidateIdentity(root: string, outputDirectory: string) {
   const require = createRequire(path.join(root, 'packages/markdown/package.json'))
   const packageFile = require.resolve('tree-sitter-md/package.json')
   const metadata: unknown = JSON.parse(await readFile(packageFile, 'utf8'))
@@ -241,12 +259,7 @@ async function candidateIdentity(root: string) {
     })
   const entry = require.resolve('tree-sitter-md')
   const module = await import(pathToFileURL(entry).href)
-  const assets = await Promise.all(
-    ['tree-sitter-md.wasm', 'tree-sitter-markdown.wasm'].map(async (asset) => ({
-      asset,
-      sha256: hash('sha256', await readFile(require.resolve(`tree-sitter-md/${asset}`)), 'hex'),
-    })),
-  )
+  const assets = await captureNativeResourceAssets(root, outputDirectory)
   if (typeof module.memoryBytes !== 'function')
     throw createScriptError('The candidate must expose native memory accounting.', {
       internal: { boundary: 'candidate-memory-export' },
@@ -285,9 +298,9 @@ async function measureScale(input: {
   return rows
 }
 
-async function runNativeResourceProbe(root: string, windows = 4) {
+async function runNativeResourceProbe(root: string, outputDirectory: string, windows = 4) {
   const provenance = await qualificationProvenance(root)
-  const candidate = await candidateIdentity(root)
+  const candidate = await candidateIdentity(root, outputDirectory)
   await initializeTreeSitterMarkdown()
   const extensions = await readyRemarkExtensions()
   const sources = MARKDOWN_CASES.map(({ id, source }) => ({
@@ -351,7 +364,7 @@ async function runNativeResourceProbe(root: string, windows = 4) {
       stopped: ['all cycle consumers before session reset/cache release'],
       retained: [
         'shared initialized WASM runtime until this finite process exits',
-        'requested report and raw samples',
+        'requested report, raw samples and captured native assets',
       ],
       ownerDataAccessed: false,
     },
@@ -368,7 +381,7 @@ async function main() {
       internal: { boundary: 'native-resource-arguments' },
     })
   const root = path.resolve(import.meta.dirname, '../..')
-  const report = await runNativeResourceProbe(root, windows)
+  const report = await runNativeResourceProbe(root, values.out, windows)
   await mkdir(values.out, { recursive: true })
   await writeFile(
     path.join(values.out, 'native-resources.json'),

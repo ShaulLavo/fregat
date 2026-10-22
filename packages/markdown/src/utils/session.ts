@@ -4,20 +4,31 @@ import type { PluggableList } from 'unified'
 import {
   endsInUnclosedFence,
   groupRootNodes,
+  publishBlock,
+  retainBlockSources,
   markIncompleteLinks,
   scanNodeFeatures,
   type MarkdownBlock,
   type NodeGroup,
 } from './blocks'
 import {
-  healMarkdown,
+  insertNestedCloser,
   insertedRepairIsLiteral,
   nestedStrongRepair,
   visibleRepairIsLiteral,
 } from './heal'
-import { holdAmbiguousTail } from './hold'
-import { countLines, shiftPositions } from './positions'
+import { holdTail } from './hold'
+import {
+  countLines,
+  resolveParsedPositions,
+  resolvePositions,
+  shiftPositions,
+  sourcePoint,
+} from './positions'
+import { beginRepair, toAuthoredOffset, type TrackedText } from './repair-origin'
+import { remendWithOrigins } from './remend-origin'
 import { createRemarkProcessor } from './processor'
+import { captureCodeSources } from './inline-code-source'
 
 export type MarkdownSessionOptions = {
   readonly remarkPlugins?: PluggableList
@@ -47,6 +58,7 @@ type LastUpdate = {
 }
 
 type Tail = {
+  readonly input: TrackedText
   readonly fileValue: string
   readonly nodes: RootContent[]
   readonly start: number
@@ -113,7 +125,12 @@ export function createMarkdownSession(options: MarkdownSessionOptions = {}): Mar
       settled.push(settledBlock(group, text, settled.at(-1)?.endLine ?? 0))
     }
     const tailStart = settled.at(-1)?.end ?? prefixEnd
-    const tail: Tail = { fileValue: text, nodes: groups.at(-1)?.nodes ?? [], start: tailStart }
+    const tail: Tail = {
+      input: identityInput(text, tailStart),
+      fileValue: text,
+      nodes: groups.at(-1)?.nodes ?? [],
+      start: tailStart,
+    }
     const tailLine = (prefix?.endLine ?? 0) + countLines(text.slice(prefixEnd, tailStart))
 
     return settled.concat([tailBlock(heal ? healedTail(processor, tail, tailLine) : tail, heal)])
@@ -177,18 +194,30 @@ function parseFrom(
   offset: number,
   lines: number,
 ): RootContent[] {
-  const root = processor.parse(fileValue.slice(offset))
+  const suffix = fileValue.slice(offset)
+  const root = processor.parse(suffix)
+  resolveParsedPositions(root, suffix)
   if (offset > 0) shiftPositions(root, offset, lines)
 
-  return transform(processor, root, fileValue).children
+  const sources = captureCodeSources(root)
+  const transformed = transform(processor, root, fileValue)
+  retainBlockSources(transformed.children, sources)
+  return transformed.children
 }
 
 function transform(processor: MarkdownParser, root: Root, fileValue: string): Root {
-  return processor.runSync(root, fileValue)
+  const transformed = processor.runSync(root, fileValue)
+  resolvePositions(transformed, fileValue)
+  return transformed
 }
 
 function wholeDocument(processor: MarkdownParser, text: string, heal: boolean): MarkdownBlock {
-  const tail: Tail = { fileValue: text, nodes: parseFrom(processor, text, 0, 0), start: 0 }
+  const tail: Tail = {
+    input: identityInput(text, 0),
+    fileValue: text,
+    nodes: parseFrom(processor, text, 0, 0),
+    start: 0,
+  }
 
   return tailBlock(heal ? healedTail(processor, tail, 0) : tail, heal)
 }
@@ -202,17 +231,14 @@ function healedTail(processor: MarkdownParser, tail: Tail, line: number): Tail {
   if (endsInUnclosedFence(tail.nodes, tail.fileValue)) return tail
 
   const source = tail.fileValue.slice(tail.start)
-  const held = holdAmbiguousTail(source, tail.nodes)
-  const healed = healMarkdown(held)
-  let prepared = healed === source ? tail : parseTail(processor, tail, healed, line)
-  if (visibleTailRepairIsLiteral(held, healed, prepared.nodes))
+  const held = holdTail(tail.input, tail.nodes)
+  const healed = remendWithOrigins(held)
+  let prepared = healed.text === source ? tail : parseTail(processor, tail, healed, line)
+  if (visibleTailRepairIsLiteral(held.text, healed.text, prepared.nodes))
     prepared = parseTail(processor, tail, held, line)
   const repair = nestedStrongRepair(prepared.fileValue, prepared.nodes)
   if (!repair) return prepared
-  const repaired =
-    prepared.fileValue.slice(tail.start, repair.offset) +
-    repair.closers +
-    prepared.fileValue.slice(repair.offset)
+  const repaired = insertNestedCloser(prepared.input, repair)
   const result = parseTail(processor, prepared, repaired, line)
   return insertedRepairIsLiteral(result.nodes, repair.offset, repair.offset + repair.closers.length)
     ? prepared
@@ -242,45 +268,50 @@ function lastAuthoredLeaf(node: Nodes | undefined): Nodes | undefined {
   return child ? lastAuthoredLeaf(child) : node
 }
 
-function parseTail(processor: MarkdownParser, tail: Tail, source: string, line: number): Tail {
-  const fileValue = tail.fileValue.slice(0, tail.start) + source
-  return { fileValue, nodes: parseFrom(processor, fileValue, tail.start, line), start: tail.start }
+function parseTail(processor: MarkdownParser, tail: Tail, input: TrackedText, line: number): Tail {
+  const fileValue = tail.fileValue.slice(0, tail.start) + input.text
+  return {
+    input,
+    fileValue,
+    nodes: parseFrom(processor, fileValue, tail.start, line),
+    start: tail.start,
+  }
 }
 
 function settledBlock(group: NodeGroup, text: string, lineBefore: number): MarkdownBlock {
   const source = text.slice(group.start, group.end)
   const features = scanNodeFeatures(group.nodes)
 
-  return {
-    end: group.end,
+  return publishBlock(identityInput(text, group.start, group.end), group.nodes, {
     endLine: lineBefore + countLines(source),
     hasHtml: features.html,
     hasMath: features.math,
     key: group.start,
     lastNodeType: group.nodes.at(-1)?.type ?? null,
-    nodes: group.nodes,
     openFence: false,
     settled: true,
-    source,
-    start: group.start,
-  }
+  })
 }
 
-function tailBlock({ fileValue, nodes, start }: Tail, streaming: boolean): MarkdownBlock {
+function tailBlock({ input, fileValue, nodes, start }: Tail, streaming: boolean): MarkdownBlock {
   if (streaming) markIncompleteLinks(nodes)
   const features = scanNodeFeatures(nodes)
 
-  return {
-    end: fileValue.length,
+  return publishBlock(input, nodes, {
     endLine: 0,
     hasHtml: features.html,
     hasMath: features.math,
     key: start,
     lastNodeType: nodes.at(-1)?.type ?? null,
-    nodes,
     openFence: streaming && endsInUnclosedFence(nodes, fileValue),
     settled: false,
-    source: fileValue.slice(start),
-    start,
-  }
+  })
+}
+
+function identityInput(fileValue: string, start: number, end = fileValue.length): TrackedText {
+  return beginRepair({
+    text: fileValue.slice(start, end),
+    start: toAuthoredOffset(start),
+    point: sourcePoint(fileValue, start),
+  })
 }

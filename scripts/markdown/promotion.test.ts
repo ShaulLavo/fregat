@@ -14,16 +14,19 @@ import {
 } from './promotion'
 import { BENCHMARK_FAMILIES } from './workloads'
 import { nativePairWorkloads } from './paired-native'
+import { productionBrowserWorkloads, productionTimingManifest } from './production-workloads'
 
 const budgetHash = 'a'.repeat(64)
 const artifactHash = 'b'.repeat(64)
 const grammarHash = '1'.repeat(64)
+const chatGrammarHash = '7'.repeat(64)
 const resolverHash = '2'.repeat(64)
 const evaluationHash = '4'.repeat(64)
 const verified = new Map([
   ['evaluation.json', evaluationHash],
   ['receipts.json', artifactHash],
   ['grammar.wasm', grammarHash],
+  ['chat-grammar.wasm', chatGrammarHash],
   ['resolver.wasm', resolverHash],
 ])
 
@@ -31,6 +34,7 @@ function evidence(): PromotionEvidence {
   const identity = {
     candidateCommit: '3'.repeat(40),
     grammarSha256: grammarHash,
+    chatGrammarSha256: chatGrammarHash,
     resolverSha256: resolverHash,
     candidateSourceSha256: 'c'.repeat(64),
     lockfileSha256: 'd'.repeat(64),
@@ -137,6 +141,7 @@ function evidence(): PromotionEvidence {
         { path: 'receipts.json', sha256: artifactHash },
         { path: 'evaluation.json', sha256: evaluationHash },
         { path: 'grammar.wasm', sha256: grammarHash },
+        { path: 'chat-grammar.wasm', sha256: chatGrammarHash },
         { path: 'resolver.wasm', sha256: resolverHash },
       ],
       counts: { executed: 2000, failed: 0, skipped: 0 },
@@ -228,6 +233,69 @@ test('complete receipts require independently supplied authoritative context and
     'NOT VERIFIED',
   )
   expect(verify(evidence(), budgetHash, new Map()).verdict).toBe('NOT VERIFIED')
+})
+
+test.each([undefined, null, '', 'invalid', 'A'.repeat(64), 42])(
+  'strict promotion identities reject missing or malformed CHAT hash %s at every boundary',
+  (chatGrammarSha256) => {
+    const data = evidence()
+    const top = verify({ ...data, identity: { ...data.identity, chatGrammarSha256 } })
+    expect(top.verdict).toBe('NOT VERIFIED')
+    expect(top.findings.some((finding) => finding.includes('chatGrammarSha256'))).toBe(true)
+    const nested = verify({
+      ...data,
+      receipts: data.receipts.map((receipt) => ({
+        ...receipt,
+        identity: { ...receipt.identity, chatGrammarSha256 },
+      })),
+    })
+    expect(nested.verdict).toBe('NOT VERIFIED')
+    expect(nested.findings.some((finding) => finding.includes('chatGrammarSha256'))).toBe(true)
+  },
+)
+
+test.each(['grammarSha256', 'chatGrammarSha256'] as const)(
+  'promotion binds %s independently in receipts and trusted context',
+  (field) => {
+    const data = evidence()
+    gate(data, 'candidate-capabilities').identity[field] = '9'.repeat(64)
+    const result = verify(data)
+    expect(result.gates.find((entry) => entry.gate === 'candidate-capabilities')?.status).toBe(
+      'blocked',
+    )
+    expect(
+      result.gates.flatMap((entry) => entry.findings).some((finding) => finding.includes(field)),
+    ).toBe(true)
+    const changedContext = {
+      ...authoritative,
+      identity: { ...authoritative.identity, [field]: '9'.repeat(64) },
+    }
+    expect(evaluatePromotion(evidence(), budgetHash, verified, changedContext).verdict).toBe(
+      'NOT VERIFIED',
+    )
+  },
+)
+
+test.each([grammarHash, chatGrammarHash])(
+  'capability receipts require each actual pinned grammar artifact %s',
+  (hash) => {
+    const data = evidence()
+    gate(data, 'candidate-capabilities').artifacts = gate(
+      data,
+      'candidate-capabilities',
+    ).artifacts.filter((artifact) => artifact.sha256 !== hash)
+    expect(
+      verify(data).gates.find((entry) => entry.gate === 'candidate-capabilities')?.status,
+    ).toBe('blocked')
+  },
+)
+
+test('trusted contexts reject a stripped CHAT identity', () => {
+  const context = trusted()
+  Reflect.deleteProperty(context.identity, 'chatGrammarSha256')
+  expect(evaluatePromotion(evidence(), budgetHash, verified, context).findings).toContain(
+    'Trusted promotion identity is missing or invalid.',
+  )
 })
 
 test.each(PROMOTION_GATES)('missing %s remains a cutover blocker', (id) => {
@@ -324,6 +392,11 @@ test('artifact verification hashes actual files and preserves missing evidence a
     const artifacts = await verifyPromotionArtifacts(evidence(), directory)
     expect(artifacts.get('receipts.json')).toBe(createHash('sha256').update(body).digest('hex'))
     expect(verify(evidence(), budgetHash, artifacts).verdict).toBe('NOT VERIFIED')
+    const changed = 'changed test bytes'
+    await writeFile(path.join(directory, 'receipts.json'), changed)
+    const rehashed = await verifyPromotionArtifacts(evidence(), directory)
+    expect(rehashed.get('receipts.json')).toBe(createHash('sha256').update(changed).digest('hex'))
+    expect(rehashed.get('receipts.json')).not.toBe(artifacts.get('receipts.json'))
     await rm(path.join(directory, 'receipts.json'))
     expect((await verifyPromotionArtifacts(evidence(), directory)).size).toBe(0)
   } finally {
@@ -403,4 +476,98 @@ test('missing input completions and invented paint coverage block production tim
   const nativeCoverage = evidence()
   gate(nativeCoverage, 'benchmark-coverage').metrics['streaming-replay.domain'] = 'native'
   expect(verify(nativeCoverage).verdict).toBe('NOT VERIFIED')
+})
+
+const nativePathological = nativePairWorkloads('qualification').filter(
+  (entry) => entry.family === 'pathological-scaling',
+)
+test.each(nativePathological)('native gate still requires pathological cell $id', (workload) => {
+  expect(nativePathological).toHaveLength(48)
+  const data = evidence()
+  const native = gate(data, 'native-paired')
+  native.comparisons = native.comparisons!.filter((entry) => entry.workload !== workload.id)
+  const result = verify(data)
+  expect(result.gates.find((entry) => entry.gate === 'native-paired')!.status).toBe('blocked')
+  expect(
+    result.gates.find((entry) => entry.gate === 'native-paired')!.findings.join(' '),
+  ).toContain(workload.id)
+})
+
+test('browser pathological coverage requires all24 browser cells independently of native48', () => {
+  const data = evidence()
+  const original = trusted(data)
+  const context = {
+    ...original,
+    benchmarkCells: { ...original.benchmarkCells, 'pathological-scaling': 24 },
+  }
+  const browser = gate(data, 'benchmark-coverage')
+  browser.metrics['pathological-scaling.measuredCells'] = 24
+  expect(
+    evaluatePromotion(data, budgetHash, verified, context).gates.find(
+      (entry) => entry.gate === 'benchmark-coverage',
+    )!.status,
+  ).toBe('passed')
+  expect(
+    evaluatePromotion(data, budgetHash, verified, context).gates.find(
+      (entry) => entry.gate === 'native-paired',
+    )!.status,
+  ).toBe('passed')
+  browser.metrics['pathological-scaling.measuredCells'] = 23
+  expect(
+    evaluatePromotion(data, budgetHash, verified, context).gates.find(
+      (entry) => entry.gate === 'benchmark-coverage',
+    )!.status,
+  ).toBe('blocked')
+  browser.metrics['pathological-scaling.measuredCells'] = 48
+  browser.metrics['pathological-scaling.domain'] = 'native'
+  expect(
+    evaluatePromotion(data, budgetHash, verified, context).gates.find(
+      (entry) => entry.gate === 'benchmark-coverage',
+    )!.status,
+  ).toBe('blocked')
+})
+
+test('production gate still requires every browser24 pathological cell in the full86 matrix', () => {
+  const data = evidence()
+  data.expectedWorkloads = productionTimingManifest().workloads.map((row) => ({
+    ...row,
+    metrics: row.metrics.slice(),
+  }))
+  const receipt = gate(data, 'production-timing')
+  const templates = receipt.comparisons!
+  for (const workload of data.expectedWorkloads) {
+    Object.assign(receipt.metrics, {
+      [`${workload.id}.processedInputs`]: workload.expectedInputUpdates,
+      [`${workload.id}.completionReceipts`]: workload.expectedInputUpdates,
+      [`${workload.id}.paintedUpdates`]: workload.expectedInputUpdates,
+      [`${workload.id}.unpaintedUpdates`]: 0,
+      [`${workload.id}.prefixProjectionP95Ms`]: 10,
+      [`${workload.id}.heldSyntaxReleaseP95Ms`]: 10,
+      [`${workload.id}.mainThreadP95Ms`]: 2,
+      [`${workload.id}.maximumAttributableTaskMs`]: 20,
+    })
+  }
+  receipt.comparisons = data.expectedWorkloads.flatMap((workload) =>
+    templates.map((row) => ({ ...row, workload: workload.id })),
+  )
+  const context = trusted(data)
+  expect(
+    evaluatePromotion(data, budgetHash, verified, context).gates.find(
+      (entry) => entry.gate === 'production-timing',
+    )!.status,
+  ).toBe('passed')
+  const complete = receipt.comparisons
+  const pathological = productionBrowserWorkloads().filter(
+    (row) => row.family === 'pathological-scaling',
+  )
+  expect(pathological).toHaveLength(24)
+  expect(data.expectedWorkloads).toHaveLength(86)
+  for (const workload of pathological) {
+    receipt.comparisons = complete.filter((row) => row.workload !== workload.id)
+    const gate = evaluatePromotion(data, budgetHash, verified, context).gates.find(
+      (entry) => entry.gate === 'production-timing',
+    )!
+    expect(gate.status).toBe('blocked')
+    expect(gate.findings.join(' ')).toContain(workload.id)
+  }
 })

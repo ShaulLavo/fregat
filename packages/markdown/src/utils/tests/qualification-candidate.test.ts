@@ -10,17 +10,29 @@ import {
   referenceOutput,
 } from '../../../test/reference/oracle'
 import { MARKDOWN_CASES } from '../../../test/fixtures/cases'
-import { checkExpectations, observeHast, renderRemark } from '../../../test/qualification'
+import { checkExpectations, observeHast, createRemarkReplay } from '../../../test/qualification'
 import { seededChunks, adversarialUtf16, everyPrefix } from '../../../test/schedules'
-import { blockToHast, createHastProcessor } from '../hast'
+import {
+  blockToHast,
+  createHastProcessor,
+  loadRawHastExtension,
+  type HastProcessor,
+  type HastExtensions,
+} from '../hast'
 import {
   createTreeSitterMarkdownSession,
   initializeTreeSitterMarkdown,
   parseTreeSitterMarkdown,
 } from '../tree-sitter-session'
-import rehypeRaw from 'rehype-raw'
+let safeProcessor: HastProcessor
+let loadedHtml: HastExtensions
 
-beforeAll(() => initializeTreeSitterMarkdown())
+beforeAll(async () => {
+  await initializeTreeSitterMarkdown()
+  const { default: raw } = await loadRawHastExtension()
+  loadedHtml = { raw, math: null }
+  safeProcessor = createHastProcessor(loadedHtml)
+})
 
 describe('Tree-sitter completed semantics against the official output', () => {
   test.each(commonmark)('$id CommonMark includes decoded text and complete nesting', (example) => {
@@ -46,7 +58,6 @@ describe('Tree-sitter completed semantics against the official output', () => {
   })
 })
 
-const safeProcessor = createHastProcessor({ raw: rehypeRaw, math: null })
 function candidateReplay() {
   const session = createTreeSitterMarkdownSession()
   return (text: string, live: boolean) => ({
@@ -63,7 +74,9 @@ describe('Tree-sitter actual product semantics', () => {
     (fixture) => {
       const actual = candidateReplay()(fixture.source, false)
       expect(checkExpectations(observeHast(actual), fixture.expected)).toEqual([])
-      expect(observeHast(actual)).toEqual(observeHast(renderRemark(fixture.source, false)))
+      expect(observeHast(actual)).toEqual(
+        observeHast(createRemarkReplay({ extensions: loadedHtml }).update(fixture.source, false)),
+      )
     },
   )
 
@@ -103,7 +116,7 @@ describe('Tree-sitter actual product semantics', () => {
       const replay = candidateReplay()
       for (const revision of everyPrefix(fixture.source)) {
         expect(observeHast(replay(revision.text, true)), `prefix ${revision.offset}`).toEqual(
-          observeHast(renderRemark(revision.text, true)),
+          observeHast(createRemarkReplay({ extensions: loadedHtml }).update(revision.text, true)),
         )
       }
     },

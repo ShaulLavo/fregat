@@ -1,12 +1,13 @@
 import { createHash } from 'node:crypto'
 import { readFile, realpath, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import * as v from 'valibot'
 import { createScriptError } from '../structured-errors'
-import { BENCHMARK_FAMILIES, BENCHMARK_PROFILES } from './workloads'
+import { BENCHMARK_FAMILIES, type BenchmarkFamily } from './workloads'
 import frozenBudget from './promotion-budget.json'
+import { hashFile } from './timing-artifacts'
 
 export const PROMOTION_GATES = [
   'candidate-capabilities',
@@ -33,6 +34,7 @@ const metric = v.picklist(['updateP95', 'settlementP95', 'mountP95', 'streamCpu'
 const identitySchema = v.strictObject({
   candidateCommit: v.pipe(v.string(), v.regex(/^[a-f0-9]{40}$/u)),
   grammarSha256: hashSchema,
+  chatGrammarSha256: hashSchema,
   resolverSha256: hashSchema,
   candidateSourceSha256: hashSchema,
   lockfileSha256: hashSchema,
@@ -150,8 +152,8 @@ export type PromotionResult = {
 }
 
 export async function frozenBudgetSha256(): Promise<string> {
-  const bytes = await readFile(new URL('./promotion-budget.json', import.meta.url))
-  return createHash('sha256').update(bytes).digest('hex')
+  const file = fileURLToPath(new URL('./promotion-budget.json', import.meta.url))
+  return (await hashFile({ root: path.dirname(file), file })).sha256
 }
 
 export function evaluatePromotion(
@@ -248,6 +250,7 @@ function receiptFindings(receipt: PromotionReceipt, identity: PromotionEvidence[
   const identityFields = [
     'candidateCommit',
     'grammarSha256',
+    'chatGrammarSha256',
     'resolverSha256',
     'candidateSourceSha256',
     'lockfileSha256',
@@ -335,9 +338,13 @@ function capabilityFindings(receipt: PromotionReceipt, identity: PromotionEviden
   const findings = ['commonmark', 'gfm', 'math', 'footnotes', 'cjkFlanking'].flatMap((field) =>
     requireBoolean(receipt, field),
   )
-  for (const hash of [identity.grammarSha256, identity.resolverSha256]) {
+  for (const [role, hash] of [
+    ['base grammar', identity.grammarSha256],
+    ['CHAT grammar', identity.chatGrammarSha256],
+    ['resolver', identity.resolverSha256],
+  ] as const) {
     if (!receipt.artifacts.some((artifact) => artifact.sha256 === hash))
-      findings.push('candidate-capabilities: missing actual pinned WASM artifact.')
+      findings.push(`candidate-capabilities: missing actual pinned ${role} WASM artifact.`)
   }
   return findings
 }
@@ -626,12 +633,7 @@ export async function verifyPromotionArtifacts(
   )
   for (const file of paths) {
     try {
-      verified.set(
-        file,
-        createHash('sha256')
-          .update(await readFile(await evidencePath(root, file)))
-          .digest('hex'),
-      )
+      verified.set(file, (await hashFile({ root, file: await evidencePath(root, file) })).sha256)
     } catch {
       // Missing or unreadable artifacts remain absent and block their owning gates.
     }
@@ -662,6 +664,8 @@ async function evidencePath(root: string, file: string) {
 }
 
 function trustedContextFindings(evidence: PromotionEvidence, context: TrustedPromotionContext) {
+  if (!v.safeParse(identitySchema, context.identity).success)
+    return ['Trusted promotion identity is missing or invalid.']
   const findings: string[] = []
   if (
     Object.entries(context.identity).some(
@@ -787,11 +791,8 @@ export async function createTrustedPromotionContext(
       .digest('hex'),
   }
   const scenarios = FROZEN_SCENARIOS
-  const sourceBytes = await readFile(path.join(options.root, 'scripts/markdown/workloads.ts'))
-  if (
-    createHash('sha256').update(sourceBytes).digest('hex') !==
-    '47188894711f5e468868c14dbfd16e6e27cfd35d058413b4a509c879d928455f'
-  )
+  const source = await hashFile({ root: options.root, file: 'scripts/markdown/workloads.ts' })
+  if (source.sha256 !== '47188894711f5e468868c14dbfd16e6e27cfd35d058413b4a509c879d928455f')
     throw createScriptError('The frozen qualification workload source changed.', {
       internal: { boundary: 'workload-manifest' },
     })
@@ -799,18 +800,37 @@ export async function createTrustedPromotionContext(
     throw createScriptError('The qualification timing matrix changed its frozen denominator.', {
       internal: { expected: 75, observed: matrix.length },
     })
-  const sourceSizes = BENCHMARK_PROFILES.promotion
+  const browserBuilder: unknown = Reflect.get(production, 'productionBrowserWorkloads')
+  if (typeof browserBuilder !== 'function')
+    throw createScriptError('The production browser workload builder is unavailable.', {
+      internal: { boundary: 'production-workloads' },
+    })
+  const browserWorkloads = v.parse(
+    v.array(v.object({ id: label, family: v.picklist(BENCHMARK_FAMILIES) })),
+    Reflect.apply(browserBuilder, production, []),
+  )
+  if (
+    JSON.stringify(browserWorkloads.map((entry) => entry.id)) !==
+    JSON.stringify(expectedWorkloads.map((entry) => entry.id))
+  )
+    throw createScriptError(
+      'The production browser family cells differ from its timing manifest.',
+      {
+        internal: { boundary: 'production-workloads' },
+      },
+    )
+  const browserCells = (family: BenchmarkFamily) =>
+    browserWorkloads.filter((entry) => entry.family === family).length
   const benchmarkCells = {
-    'cold-mount': 4,
-    'warm-completed': 8 + sourceSizes.completedBytes.length,
-    'streaming-replay': matrix.filter((entry) => entry.family === 'streaming-replay').length + 4,
-    'pathological-scaling': matrix.filter((entry) => entry.family === 'pathological-scaling')
-      .length,
-    'reference-invalidation': 5,
-    'highlighting-extensions': 5,
-    'timeline-input': sourceSizes.timelineCounts.length,
-    resources: sourceSizes.cycleCounts.length,
-    payload: 2,
+    'cold-mount': browserCells('cold-mount'),
+    'warm-completed': browserCells('warm-completed'),
+    'streaming-replay': browserCells('streaming-replay'),
+    'pathological-scaling': browserCells('pathological-scaling'),
+    'reference-invalidation': browserCells('reference-invalidation'),
+    'highlighting-extensions': browserCells('highlighting-extensions'),
+    'timeline-input': browserCells('timeline-input'),
+    resources: browserCells('resources'),
+    payload: browserCells('payload'),
   }
   return {
     identity,

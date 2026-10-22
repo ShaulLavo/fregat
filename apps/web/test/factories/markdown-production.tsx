@@ -12,6 +12,9 @@ import { ChatWorkspaceRootContext } from '@/features/chat/providers/workspace-ro
 import { createClientInvariantError } from '@/lib/structured-errors'
 import type {
   ProductionMarkdownFrame,
+  ProductionMismatchSink,
+  ProductionMismatchSample,
+  ProductionOracleSink,
   ProductionMarkdownReceipt,
   ProductionOutputReceipt,
   ProductionResourceTiming,
@@ -35,6 +38,44 @@ import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../providers
 import { TestEditorStateProvider } from './editor-state-provider'
 import { observeMarkdownSemantics } from './markdown-observation'
 
+async function observePaintReceipt(
+  container: HTMLElement,
+  readRevision: () => number,
+  processed: ProductionProcessedUpdate,
+  expectation?: Pick<ProductionMismatchSample, 'expected' | 'expectedIndex'>,
+  onMismatch?: ProductionMismatchSink,
+): Promise<ProductionTimingFrame> {
+  const deadline = performance.now() + 15_000
+  while (true) {
+    await paintedFrame()
+    const observedRevision = readRevision()
+    const painted = performance.now()
+    const observation = observeMarkdownSemantics(container)
+    const paintedOutput = await outputReceipt(observation)
+    // Preserve only a terminal mismatch. Transient readiness polling stays uninstrumented.
+    if (
+      expectation &&
+      (paintedOutput.digest !== expectation.expected.digest ||
+        observedRevision !== processed.revision) &&
+      (observedRevision !== processed.revision || performance.now() >= deadline)
+    )
+      await onMismatch?.({
+        actual: { ...processed, observedRevision, painted, paintedOutput, ...observation },
+        ...expectation,
+      })
+    if (
+      !expectation ||
+      paintedOutput.digest === expectation.expected.digest ||
+      observedRevision !== processed.revision
+    )
+      return { ...processed, observedRevision, painted, paintedOutput }
+    if (performance.now() >= deadline)
+      throw createClientInvariantError(
+        'Production revision never matched its independent expected projection',
+      )
+  }
+}
+
 export function createProductionMarkdownProbe({
   factory,
   parserMemoryBytes = null,
@@ -51,6 +92,7 @@ export function createProductionMarkdownProbe({
   seedHtmlTheme('dark')
   let documentId = 0
   let revision = 0
+  const paintReceipt = observePaintReceipt.bind(null, container, () => revision)
   let disposed = false
   let timeline: ChatSession | null = null
   let simultaneousMessages = 1
@@ -106,6 +148,49 @@ export function createProductionMarkdownProbe({
     }
   }
 
+  async function streamOracle(
+    source: string,
+    chunks: readonly string[],
+    sink: ProductionOracleSink,
+  ): Promise<void> {
+    ensureLive()
+    documentId += 1
+    timeline = null
+    const started = performance.now()
+    const updates = chunks.length > 0 ? chunks : [source]
+    for (let index = 0; index < updates.length; index += 1)
+      await emitOracleUpdate(
+        updates[index],
+        chunks.length > 0,
+        chunks.length === 0 && index === updates.length - 1,
+        started,
+        sink,
+      )
+    if (chunks.length > 0) await emitOracleUpdate(source, false, true, started, sink)
+    documentId += 1
+    timeline = null
+    await sink({ kind: 'fresh', frame: await update(source, false) })
+  }
+
+  async function emitOracleUpdate(
+    text: string,
+    live: boolean,
+    final: boolean,
+    started: number,
+    sink: ProductionOracleSink,
+  ) {
+    const frame = await update(text, live)
+    await sink({ kind: 'frame', frame })
+    if (final)
+      await sink({
+        kind: 'final',
+        frame,
+        fullyReady: frame.painted,
+        longTasks: longTasks.read(started),
+        resources: resourceTimings(started),
+      })
+  }
+
   async function time(
     source: string,
     chunks: readonly string[],
@@ -121,6 +206,12 @@ export function createProductionMarkdownProbe({
       throw createClientInvariantError(
         'Production timing requires one frozen expectation and deadline per input',
       )
+    let mismatchReported = false
+    const onMismatch: ProductionMismatchSink = async (sample) => {
+      if (mismatchReported || !options.onMismatch) return
+      mismatchReported = true
+      await options.onMismatch(sample)
+    }
     const inputDigests = await Promise.all(updates.map(textDigest))
     documentId += 1
     timeline = null
@@ -135,6 +226,8 @@ export function createProductionMarkdownProbe({
           scheduled: started + options.arrivalOffsetsMs[index],
           inputSha256: inputDigests[index],
           expected: options.expected[index],
+          expectedIndex: index,
+          onMismatch,
           paint:
             options.arrival === 'paced' || (index + 1) % 32 === 0 || index + 1 === updates.length,
         }),
@@ -145,12 +238,32 @@ export function createProductionMarkdownProbe({
     if (chunks.length > 0) {
       const settled = await commit(source, false)
       processed.push(settled)
-      frames.push(await paintReceipt(settled, options.expected.at(-1)))
+      const expected = options.expected.at(-1)
+      frames.push(
+        await paintReceipt(
+          settled,
+          expected
+            ? {
+                expected,
+                expectedIndex: options.expected.length - 1,
+              }
+            : undefined,
+          onMismatch,
+        ),
+      )
     }
     const final = frames.at(-1)
     if (!final) throw createClientInvariantError('Production timing recorded no final paint')
     const fullyReady = await waitForReady()
-    const fullyReadyOutput = await readOutput()
+    const readyObservation = observeMarkdownSemantics(container)
+    const fullyReadyOutput = await outputReceipt(readyObservation)
+    const readyExpected = options.expected.at(-1)
+    if (readyExpected && fullyReadyOutput.digest !== readyExpected.digest)
+      await onMismatch({
+        actual: { ...final, ...readyObservation, paintedOutput: fullyReadyOutput },
+        expected: readyExpected,
+        expectedIndex: options.expected.length - 1,
+      })
     performance.mark('markdown-stream-end')
     const ended = performance.now()
     performance.mark('markdown-timing-end')
@@ -178,11 +291,22 @@ export function createProductionMarkdownProbe({
     scheduled: number
     inputSha256: string
     expected: ProductionOutputReceipt
+    expectedIndex: number
+    onMismatch: ProductionMismatchSink
     paint: boolean
   }) {
     await waitUntil(input.scheduled)
     const processed = await commit(input.text, input.live, input.scheduled, input.inputSha256)
-    const frame = input.paint ? await paintReceipt(processed, input.expected) : null
+    const frame = input.paint
+      ? await paintReceipt(
+          processed,
+          {
+            expected: input.expected,
+            expectedIndex: input.expectedIndex,
+          },
+          input.onMismatch,
+        )
+      : null
     return { processed, frame }
   }
 
@@ -409,29 +533,6 @@ export function createProductionMarkdownProbe({
     return { ...tick, ...observed }
   }
 
-  async function paintReceipt(
-    processed: ProductionProcessedUpdate,
-    expected?: ProductionOutputReceipt,
-  ): Promise<ProductionTimingFrame> {
-    const deadline = performance.now() + 15_000
-    while (true) {
-      await paintedFrame()
-      const observedRevision = revision
-      const painted = performance.now()
-      const paintedOutput = await readOutput()
-      if (
-        !expected ||
-        paintedOutput.digest === expected.digest ||
-        observedRevision !== processed.revision
-      )
-        return { ...processed, observedRevision, painted, paintedOutput }
-      if (performance.now() >= deadline)
-        throw createClientInvariantError(
-          'Production revision never matched its independent expected projection',
-        )
-    }
-  }
-
   async function commit(
     text: string | null,
     live: boolean,
@@ -504,6 +605,7 @@ export function createProductionMarkdownProbe({
 
   return {
     run,
+    streamOracle,
     time,
     show,
     resources,
@@ -612,7 +714,7 @@ function browserMemory(): {
   return { usedJSHeapSize: used, totalJSHeapSize: total }
 }
 
-async function outputReceipt(observation: Observation): Promise<ProductionOutputReceipt> {
+export async function outputReceipt(observation: Observation): Promise<ProductionOutputReceipt> {
   const bytes = new TextEncoder().encode(JSON.stringify(observation))
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return {

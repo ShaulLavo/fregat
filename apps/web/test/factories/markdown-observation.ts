@@ -29,7 +29,11 @@ function logicalAttributes(element: Element): Record<string, string> {
     element.style.textAlign
   )
     attributes.align = element.style.textAlign
-  return attributes
+  return Object.fromEntries(
+    Object.entries(attributes).sort(([first], [second]) =>
+      first < second ? -1 : Number(first > second),
+    ),
+  )
 }
 
 /** Preserves content, classes and whitespace; normalizes only React ids and declared host chrome. */

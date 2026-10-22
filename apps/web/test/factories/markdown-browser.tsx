@@ -151,15 +151,17 @@ export async function createMarkdownBrowser({
 
 async function qualificationSessionFactory(): Promise<MarkdownSessionFactory> {
   if (inject('markdownEngine') !== 'tree-sitter') return createMarkdownSession
-  const [candidate, parser, grammar, resolver] = await Promise.all([
+  const [candidate, parser, grammar, chatGrammar, resolver] = await Promise.all([
     import('@workspace/markdown/utils/tree-sitter-session'),
     import('web-tree-sitter/web-tree-sitter.wasm?url'),
     import('tree-sitter-md/tree-sitter-markdown.wasm?url'),
+    import('tree-sitter-md/tree-sitter-markdown-chat.wasm?url'),
     import('tree-sitter-md/tree-sitter-md.wasm?url'),
   ])
   await candidate.initializeTreeSitterMarkdown({
     parser: { locateFile: () => parser.default },
     grammar: grammar.default,
+    chatGrammar: chatGrammar.default,
     resolver: resolver.default,
   })
   return candidate.createTreeSitterMarkdownSession

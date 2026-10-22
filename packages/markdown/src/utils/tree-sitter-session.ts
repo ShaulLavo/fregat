@@ -13,6 +13,7 @@ import { Parser } from 'web-tree-sitter'
 
 import { remarkCjkAutolinkBoundaries } from './cjk-autolinks'
 import { remarkCodeMeta } from './code-meta'
+import { attachInlineCodeSource } from './inline-code-source'
 import { createMarkdownSession, type MarkdownSessionOptions } from './session'
 
 export type TreeSitterMarkdownOptions = {
@@ -29,8 +30,9 @@ type SourcePositions = { readonly lines: readonly number[]; readonly source: str
 type MdastBlock = ListItem['children'][number]
 
 export async function initializeTreeSitterMarkdown(options: TreeSitterMarkdownInitOptions = {}) {
-  await Parser.init(options.parser)
-  await init({ grammar: options.grammar, resolver: options.resolver })
+  const { parser, ...nativeOptions } = options
+  await Parser.init(parser)
+  await init(nativeOptions)
 }
 
 /** Each parse owns its native handle, including parses from speculative React renders. */
@@ -118,7 +120,7 @@ function blockToMdast(node: SemanticBlock, positions: SourcePositions): MdastBlo
         type: 'math',
         position,
         value: node.value,
-        meta: null,
+        meta: node.meta,
         data: {
           hName: 'pre',
           hChildren: [
@@ -220,7 +222,7 @@ function inlineToMdast(node: SemanticInline, positions: SourcePositions): Phrasi
     case 'html':
       return { type: node.type, position, value: node.value }
     case 'code':
-      return { type: 'inlineCode', position, value: node.sourceValue }
+      return codeToMdast(node, positions)
     case 'math':
       return {
         type: 'inlineMath',
@@ -281,6 +283,19 @@ function inlineToMdast(node: SemanticInline, positions: SourcePositions): Phrasi
       return exhaustive
     }
   }
+}
+
+function codeToMdast(
+  node: Extract<SemanticInline, { type: 'code' }>,
+  positions: SourcePositions,
+): Extract<PhrasingContent, { type: 'inlineCode' }> {
+  const result: Extract<PhrasingContent, { type: 'inlineCode' }> = {
+    type: 'inlineCode',
+    position: nodePosition(node.range, positions),
+    value: node.sourceValue,
+  }
+  attachInlineCodeSource(result, node.sourceMap)
+  return result
 }
 
 function itemToMdast(node: SemanticListItem, positions: SourcePositions): ListItem {

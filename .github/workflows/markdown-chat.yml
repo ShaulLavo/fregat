@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'packages/markdown/**'
+      - 'editor/packages/tree-sitter/src/treeSitter/markdown.ts'
+      - 'editor/packages/tree-sitter/test/wasm-memory.browser.test.ts'
+      - 'editor/packages/tree-sitter/test/wasm-memory.test.ts'
       - 'apps/web/src/features/chat/**'
       - 'apps/web/src/features/workbench/components/markdown-preview*'
       - 'apps/web/test/factories/markdown*'
@@ -22,6 +25,9 @@ on:
     branches: [main]
     paths:
       - 'packages/markdown/**'
+      - 'editor/packages/tree-sitter/src/treeSitter/markdown.ts'
+      - 'editor/packages/tree-sitter/test/wasm-memory.browser.test.ts'
+      - 'editor/packages/tree-sitter/test/wasm-memory.test.ts'
       - 'apps/web/src/features/chat/**'
       - 'apps/web/src/features/workbench/components/markdown-preview*'
       - 'apps/web/test/factories/markdown*'
