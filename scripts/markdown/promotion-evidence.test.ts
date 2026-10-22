@@ -32,6 +32,8 @@ import { reconcileProductionOracles } from './production-oracle'
 import { hashFile } from './timing-artifacts'
 import type { NativeWorkloadSummary } from './paired-native'
 import { createScriptError } from '../structured-errors'
+import { EXCLUSION_GROUPS, sourceIdentity } from './evaluation-custody'
+import { encoded } from './serialization'
 import {
   browserInput,
   evaluationCounts,
@@ -1621,12 +1623,72 @@ function syntheticBatch() {
   }
 }
 
+async function syntheticCustody(
+  root: string,
+  manifest: Parameters<typeof sourceIdentity>[0],
+  candidate: CandidateIdentity,
+) {
+  const time = '2026-01-01T00:00:00.000Z'
+  const exclusions = {
+    schemaVersion: 1,
+    complete: true,
+    recordedAt: time,
+    groups: EXCLUSION_GROUPS.map((name) => ({ name, sourceSha256: [] })),
+  }
+  const evaluation = path.join(root, 'packages/markdown/test/evaluation')
+  await writeFile(path.join(evaluation, 'LICENSE'), 'synthetic-license')
+  await writeFile(path.join(root, 'scripts/markdown/snapshot-evaluation.ts'), 'synthetic-selector')
+  await writeFile(
+    path.join(evaluation, 'custody.json'),
+    encoded({
+      schemaVersion: 1,
+      legacyManifestSha256: sha('synthetic legacy manifest'),
+      records: [
+        {
+          kind: 'prospective-registration',
+          batch: manifest.batches[0],
+          source: sourceIdentity(manifest),
+          licenseSha256: sha('synthetic-license'),
+          selectorSha256: sha('synthetic-selector'),
+          exclusions,
+          exclusionsSha256: sha(encoded(exclusions)),
+          freeze: {
+            curator: 'synthetic-control',
+            custodyStartedAt: time,
+            ledgerDirectory: path.join(root, 'evidence/ledger'),
+            parserFreeze: {
+              commit: candidate.candidateCommit,
+              sourceSha256: candidate.candidateSourceSha256,
+              artifactsSha256: sha(encoded(candidate.artifacts)),
+              frozenAt: time,
+            },
+          },
+          selectionStartedAt: time,
+          selectionCompletedAt: time,
+          registeredAt: time,
+          invocation: ['synthetic-control'],
+        },
+      ],
+    }),
+  )
+}
+
+function syntheticProvenance(root: string) {
+  const module = fileURLToPath(new URL('./provenance.ts', import.meta.url))
+  return JSON.parse(
+    fixtureCommand(root, 'bun', [
+      '--eval',
+      `import {qualificationProvenance} from ${JSON.stringify(module)}; process.stdout.write(JSON.stringify(await qualificationProvenance(${JSON.stringify(root)})))`,
+    ]),
+  )
+}
+
 async function trustedSyntheticFixture() {
   const root = await mkdtemp(path.join(tmpdir(), 'promotion-trusted-'))
   temporary.add(root)
   await writeSyntheticTree(root)
   const batch = syntheticBatch()
-  const manifest = {
+  const manifest: Parameters<typeof sourceIdentity>[0] = {
     schemaVersion: 1,
     dataset: 'owned-synthetic-controls',
     revision: 'b'.repeat(40),
@@ -1652,13 +1714,7 @@ async function trustedSyntheticFixture() {
     '-m',
     'Synthetic source fixture',
   ])
-  const module = fileURLToPath(new URL('./provenance.ts', import.meta.url))
-  const captured = JSON.parse(
-    fixtureCommand(root, 'bun', [
-      '--eval',
-      `import {qualificationProvenance} from ${JSON.stringify(module)}; process.stdout.write(JSON.stringify(await qualificationProvenance(${JSON.stringify(root)})))`,
-    ]),
-  )
+  const captured = syntheticProvenance(root)
   const candidate: CandidateIdentity = {
     candidateCommit: captured.revision,
     candidateSourceSha256: captured.sourceClosureSha256,
@@ -1674,6 +1730,23 @@ async function trustedSyntheticFixture() {
       lockfileSha256: sha('lockfile'),
     },
   }
+  await syntheticCustody(root, manifest, candidate)
+  fixtureCommand(root, 'git', ['add', '.'])
+  fixtureCommand(root, 'git', [
+    '-c',
+    'user.name=Synthetic fixture',
+    '-c',
+    'user.email=fixture@example.test',
+    '-c',
+    'core.hooksPath=/dev/null',
+    'commit',
+    '--quiet',
+    '-m',
+    'Synthetic custody registration',
+  ])
+  const registered = syntheticProvenance(root)
+  candidate.candidateCommit = registered.revision
+  candidate.candidateSourceSha256 = registered.sourceClosureSha256
   const evaluation = await syntheticTrustedEvaluation(root, sha(manifestBytes), batch, candidate)
   const options = {
     root,
@@ -1683,8 +1756,30 @@ async function trustedSyntheticFixture() {
   }
   if (!('Bun' in globalThis)) Object.assign(globalThis, { Bun: { version: '1.3.fixture' } })
   const context = await createTrustedPromotionContext(options)
-  return { root, context, options, captured, evaluation }
+  return { root, context, options, captured: registered, evaluation, candidate }
 }
+
+test('trusted synthetic context binds prospective custody to its original ledger and artifacts', async () => {
+  const fixture = await trustedSyntheticFixture()
+  const custodyFile = path.join(fixture.root, 'packages/markdown/test/evaluation/custody.json')
+  const original = await readFile(custodyFile, 'utf8')
+  const custody = JSON.parse(original)
+  const registered = custody.records[0]
+  expect(registered.freeze.ledgerDirectory).toBe(fixture.options.evaluationLedger)
+  expect(registered.freeze.parserFreeze.artifactsSha256).toBe(
+    sha(encoded(fixture.candidate.artifacts)),
+  )
+  await rm(custodyFile)
+  await expect(createTrustedPromotionContext(fixture.options)).rejects.toThrow()
+  await writeFile(custodyFile, original)
+  expect(fixtureCommand(fixture.root, 'git', ['status', '--porcelain=v1'])).toBe('')
+  await expect(
+    createTrustedPromotionContext({
+      ...fixture.options,
+      evaluationLedger: path.join(fixture.root, 'different-ledger'),
+    }),
+  ).rejects.toThrow()
+})
 
 test('uses an actual clean disposable candidate and completed synthetic100 ledger as trusted context', async () => {
   const fixture = await trustedSyntheticFixture()
