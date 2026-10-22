@@ -1,7 +1,9 @@
+import { MARKDOWN_CASES } from '../../packages/markdown/test/fixtures/cases'
 import { createHash, hash } from 'node:crypto'
 import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { ProductionTrial } from './production-analysis'
+import type { productionBrowserControls } from './production-controls'
 import { writeProductionOracle, type ProductionOracleRecord } from './production-oracle'
 import type { ProductionMarkdownFrame } from '../../apps/web/test/factories/markdown-production-types'
 import {
@@ -96,6 +98,17 @@ function projection(input: string) {
     elementCount: 0,
   }
   return { inputSha256: hash('sha256', input), paintedOutput: output, ...content }
+}
+export function syntheticProductionControls(): Awaited<
+  ReturnType<typeof productionBrowserControls>
+> {
+  const digest = hash('sha256', 'synthetic control output')
+  return {
+    knownGood: { expected: digest, observed: digest, revision: 2, observedRevision: 2 },
+    missingExpectation: { rejected: true, reason: 'Synthetic missing expectation rejected' },
+    wrongExpectation: { rejected: true, reason: 'Synthetic wrong output rejected' },
+    longTask: { supported: true, observed: [80] },
+  }
 }
 type ProductionTemplate = Omit<ProductionTrial, 'correctness' | 'freshCompleted'>
 export function syntheticProductionTemplate(
@@ -228,11 +241,12 @@ export async function writeSyntheticProductionArm(
   })
   return { ...row, ...captured }
 }
-function syntheticNativeTrial(
+export function syntheticNativeTrial(
   workload: NativePairWorkload,
   trial: number,
   engine: 'remark' | 'tree-sitter',
 ): NativeTrial {
+  const timing = trial < 0 ? 11 : 1
   const updates =
     workload.revisions ??
     (workload.scheduleUnits > 0
@@ -242,37 +256,37 @@ function syntheticNativeTrial(
     revision,
     offset: source.length,
     phase: 'update',
-    parseMs: 1,
+    parseMs: timing,
     projectionMs: 0,
     convertedBlocks: 1,
     reusedBlocks: 0,
     sourceCoordinatesDigest: hash('sha256', source),
     positionedNodes: 1,
     unchangedProjection: false,
-    wallMs: 1,
-    cpuMs: 1,
+    wallMs: timing,
+    cpuMs: timing,
     outputDigest: hash('sha256', source),
     sourceCoordinateFailures: [],
   }))
   return {
     engine,
     trial,
-    mountMs: 1,
-    streamCpuMs: 2,
+    mountMs: timing,
+    streamCpuMs: timing * 2,
     revisions: revisions.concat([
       {
         revision: updates.length,
         offset: workload.source.length,
         phase: 'settlement',
-        parseMs: 1,
+        parseMs: timing,
         projectionMs: 0,
         convertedBlocks: 1,
         reusedBlocks: 0,
         sourceCoordinatesDigest: hash('sha256', workload.source),
         positionedNodes: 1,
         unchangedProjection: false,
-        wallMs: 1,
-        cpuMs: 1,
+        wallMs: timing,
+        cpuMs: timing,
         outputDigest: hash('sha256', workload.source),
         sourceCoordinateFailures: [],
       },
@@ -459,6 +473,7 @@ async function writeProduction(
     schemaVersion: 2,
     build: 'production',
     timingStatus: 'PROMOTION_CAPTURE_UNRECONCILED',
+    controls: syntheticProductionControls(),
     capture: {
       kind: 'promotion',
       hostEvidence: { sha256: hash('sha256', JSON.stringify(host)), observation: host },
@@ -691,4 +706,82 @@ export async function fullAssemblySummary(manifestPath: string) {
     artifacts: report.artifacts.length,
     files: await Promise.all(files.map((file) => hashFile({ root: directory, file }))),
   }
+}
+
+export async function syntheticNativeResources(
+  directory: string,
+  provenance: Pick<
+    Source,
+    'revision' | 'trackedDiffSha256' | 'lockfileSha256' | 'sourceClosureSha256' | 'sources'
+  >,
+) {
+  const assets: { asset: string; file: string; sha256: string; bytes: number }[] = []
+  for (const [asset, file] of [
+    ['tree-sitter-markdown.wasm', 'grammar.wasm'],
+    ['tree-sitter-markdown-chat.wasm', 'chat-grammar.wasm'],
+    ['tree-sitter-md.wasm', 'resolver.wasm'],
+  ] as const) {
+    const bytes = await readFile(path.join(directory, file))
+    assets.push({ asset, file, sha256: hash('sha256', bytes), bytes: bytes.length })
+  }
+  const rawWindows = [20, 100, 500].flatMap((cycles) =>
+    (['remark', 'tree-sitter'] as const).flatMap((engine) =>
+      Array.from({ length: 4 }, (_, window) => ({
+        engine,
+        cycles,
+        window,
+        before: {
+          heapUsedBytes: 1000,
+          rssBytes: 2000,
+          wasmReservedBytes: 65536,
+          gcPerformed: true,
+        },
+        after: { heapUsedBytes: 1000, rssBytes: 2000, wasmReservedBytes: 65536, gcPerformed: true },
+        outputFailures: Array<string>(),
+        cleanupFailures: Array<string>(),
+        clearedSessions: cycles,
+        clearedProjectionEntries: cycles,
+      })),
+    ),
+  )
+  const summaries = [20, 100, 500].flatMap((cycles) =>
+    ['remark', 'tree-sitter'].map((engine) => ({
+      engine,
+      cycles,
+      windows: 4,
+      status: 'OBSERVED_PLATEAU',
+      gcStatus: 'POST_GC',
+      heapAfterReleaseBytes: [1000, 1000, 1000, 1000],
+      rssAfterReleaseBytes: [2000, 2000, 2000, 2000],
+      wasmReservedBytes: [65536, 65536, 65536, 65536],
+      heapWindowDeltasBytes: [0, 0, 0],
+      rssWindowDeltasBytes: [0, 0, 0],
+      wasmWindowDeltasBytes: [0, 0, 0],
+      heapObservedRangeBytes: 0,
+      wasmHighWaterReuseObserved: true,
+    })),
+  )
+  const report = {
+    schemaVersion: 1,
+    verdict: 'NOT VERIFIED',
+    nativeStatus: 'OBSERVED_PLATEAU',
+    browser: { status: 'NOT_MEASURED' },
+    provenance,
+    candidate: { assets },
+    sources: MARKDOWN_CASES.map(({ id, source }) => ({
+      id,
+      sha256: hash('sha256', source),
+      sourceBytes: Buffer.byteLength(source),
+    })),
+    rawWindows,
+    summaries,
+    failures: Array<string>(),
+    exclusions: Array<string>(),
+  }
+  await save(directory, 'native-resources.json', report)
+  await writeFile(
+    path.join(directory, 'native-resources.jsonl'),
+    rawWindows.map((row) => JSON.stringify(row)).join('\n') + '\n',
+  )
+  return report
 }
