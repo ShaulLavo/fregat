@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { hash } from 'node:crypto'
-import { mkdir, open, readFile, realpath, writeFile } from 'node:fs/promises'
+import { mkdir, open, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { setTimeout as delay } from 'node:timers/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -529,7 +530,9 @@ export async function reserveEvaluationExposure(input: {
     retirementReason: '',
   }
   try {
-    await writeDurableExposure(ledgerPath(input.ledgerDirectory, input.batch), encoded(ledger))
+    await withEvaluationLedgerLock(input.ledgerDirectory, input.batch, () =>
+      writeDurableExposure(ledgerPath(input.ledgerDirectory, input.batch), encoded(ledger)),
+    )
   } catch (error) {
     throw createScriptError(
       'This evaluation batch already has an exposure ledger or its ledger could not be reserved.',
@@ -553,6 +556,10 @@ async function writeDurableExposure(file: string, bytes: string) {
   } finally {
     await handle.close()
   }
+  await syncLedgerDirectory(file)
+}
+
+async function syncLedgerDirectory(file: string) {
   if (process.platform === 'win32') return
   const directory = await open(path.dirname(file), 'r')
   try {
@@ -562,18 +569,91 @@ async function writeDurableExposure(file: string, bytes: string) {
   }
 }
 
+async function acquireLedgerLock(file: string) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try {
+      return await open(file, 'wx')
+    } catch (error) {
+      if (!(error instanceof Error) || !('code' in error) || error.code !== 'EEXIST') throw error
+    }
+    await delay(10)
+  }
+  throw createScriptError('The evaluation ledger has an active or interrupted transition.', {
+    internal: { boundary: 'evaluation-ledger-lock' },
+    fix: 'Preserve the ledger and receipts. Resolve the lock owner before retrying the transition.',
+  })
+}
+
+export async function withEvaluationLedgerLock<T>(
+  directory: string,
+  batch: EvaluationBatch,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const file = `${ledgerPath(directory, batch)}.lock`
+  const handle = await acquireLedgerLock(file)
+  try {
+    return await operation()
+  } finally {
+    await handle.close()
+    await rm(file)
+  }
+}
+
+async function replaceLedger(file: string, ledger: Ledger) {
+  const pending = `${file}.next`
+  await writeDurableExposure(pending, encoded(ledger))
+  try {
+    await rename(pending, file)
+    await syncLedgerDirectory(file)
+  } finally {
+    await rm(pending, { force: true })
+  }
+}
+
+export async function completeEvaluationCapture(input: {
+  readonly ledgerDirectory: string
+  readonly expected: Ledger
+  readonly receiptPath: string
+  readonly receiptSha256: string
+}) {
+  return withEvaluationLedgerLock(input.ledgerDirectory, input.expected.batch, async () => {
+    const file = ledgerPath(input.ledgerDirectory, input.expected.batch)
+    const current = parse(ledgerSchema, JSON.parse(await readFile(file, 'utf8')))
+    if (current.state === 'retired' || stable(current) !== stable(input.expected))
+      throw createScriptError('The evaluation ledger changed during capture.', {
+        internal: { boundary: 'evaluation-ledger-transition', state: current.state },
+        fix: 'Preserve the original receipts and retirement reason. Use a fresh eligible batch.',
+      })
+    const next: Ledger = {
+      ...current,
+      state: 'completed',
+      receiptPath: path.resolve(input.receiptPath),
+      receiptSha256: parse(sha, input.receiptSha256),
+    }
+    await replaceLedger(file, next)
+    return next
+  })
+}
+
 export async function retireEvaluationBatch(
   ledgerDirectory: string,
   batch: EvaluationBatch,
   reason: string,
 ) {
-  const file = ledgerPath(ledgerDirectory, batch)
-  const ledger = parse(ledgerSchema, JSON.parse(await readFile(file, 'utf8')))
   if (!reason.trim())
     throw createScriptError('Retiring an evaluation batch requires a reason.', {
       internal: { boundary: 'batch-retirement' },
     })
-  await writeFile(file, encoded({ ...ledger, state: 'retired', retirementReason: reason }))
+  await withEvaluationLedgerLock(ledgerDirectory, batch, async () => {
+    const file = ledgerPath(ledgerDirectory, batch)
+    const current = parse(ledgerSchema, JSON.parse(await readFile(file, 'utf8')))
+    if (stable(current.batch) !== stable(batch))
+      throw createScriptError('The retirement batch differs from its exposure ledger.', {
+        internal: { boundary: 'batch-retirement-identity' },
+      })
+    if (current.state === 'retired') return
+    await replaceLedger(file, { ...current, state: 'retired', retirementReason: reason })
+  })
 }
 function ledgerPath(directory: string, batch: EvaluationBatch) {
   return path.join(directory, `${batch.assetSha256}.json`)
@@ -772,7 +852,7 @@ async function attachBrowserEvaluation(input: {
 }) {
   const reportBytes = await readFile(input.receiptPath)
   const report = parseReport(JSON.parse(reportBytes.toString('utf8')))
-  await trustedLedger(input, report, reportBytes)
+  const ledger = await trustedLedger(input, report, reportBytes)
   const browserInputBytes = await readFile(report.browser.inputPath)
   if (hash('sha256', browserInputBytes) !== report.browser.inputSha256)
     throw createScriptError('The frozen browser input has changed.', {
@@ -805,18 +885,12 @@ async function attachBrowserEvaluation(input: {
   }
   const combinedBytes = encoded(combined)
   await writeFile(input.outputPath, combinedBytes, { flag: 'wx' })
-  const ledger = parse(
-    ledgerSchema,
-    JSON.parse(await readFile(ledgerPath(input.ledgerDirectory, report.batch), 'utf8')),
-  )
-  await writeFile(
-    ledgerPath(input.ledgerDirectory, report.batch),
-    encoded({
-      ...ledger,
-      receiptPath: path.resolve(input.outputPath),
-      receiptSha256: hash('sha256', combinedBytes),
-    }),
-  )
+  await completeEvaluationCapture({
+    ledgerDirectory: input.ledgerDirectory,
+    expected: ledger,
+    receiptPath: input.outputPath,
+    receiptSha256: hash('sha256', combinedBytes),
+  })
   return combined
 }
 
@@ -1279,10 +1353,12 @@ async function main() {
   }
   const receipt = encoded(report)
   await writeFile(receiptPath, receipt, { flag: 'wx' })
-  await writeFile(
-    ledgerPath(values.ledger, batch),
-    encoded({ ...ledger, state: 'completed', receiptSha256: hash('sha256', receipt) }),
-  )
+  await completeEvaluationCapture({
+    ledgerDirectory: values.ledger,
+    expected: ledger,
+    receiptPath,
+    receiptSha256: hash('sha256', receipt),
+  })
   process.stdout.write(
     encoded({
       evidence: output,

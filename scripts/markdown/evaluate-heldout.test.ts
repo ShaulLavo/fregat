@@ -9,6 +9,8 @@ import {
   assertFrozenIdentity,
   browserInput,
   compareProjections,
+  completeEvaluationCapture,
+  withEvaluationLedgerLock,
   evaluateNativeMessage,
   evaluationCounts,
   heldoutSchedules,
@@ -201,7 +203,7 @@ test('raw browser parsers retain the separate CHAT identity without stripping it
   )
 })
 
-test('exposure is durable before content access and prevents reused or changed candidates', async () => {
+async function syntheticExposure() {
   const directory = await scratch()
   const selected = batch()
   const evaluation = path.join(directory, 'packages/markdown/test/evaluation')
@@ -265,6 +267,11 @@ test('exposure is durable before content access and prevents reused or changed c
   }
   const custodyFile = path.join(evaluation, 'custody.json')
   const custodyBytes = await readFile(custodyFile, 'utf8')
+  return { directory, selected, input, custodyFile, custodyBytes }
+}
+
+test('exposure is durable before content access and prevents reused or changed candidates', async () => {
+  const { directory, selected, input, custodyFile, custodyBytes } = await syntheticExposure()
   await rm(custodyFile)
   await expect(reserveEvaluationExposure(input)).rejects.toThrow()
   await writeFile(
@@ -303,6 +310,121 @@ test('exposure is durable before content access and prevents reused or changed c
   )
   expect(JSON.parse(await readFile(file, 'utf8')).state).toBe('retired')
   await expect(reserveEvaluationExposure(input)).rejects.toThrow()
+})
+
+test.each(['native', 'browser'] as const)(
+  '%s completion preserves concurrent terminal retirement and original receipts',
+  async (phase) => {
+    const { directory, selected, input } = await syntheticExposure()
+    const reserved = await reserveEvaluationExposure(input)
+    const nativeBytes = 'synthetic original failure receipt'
+    await writeFile(input.receiptPath, nativeBytes, { flag: 'wx' })
+    const expected =
+      phase === 'native'
+        ? reserved
+        : await completeEvaluationCapture({
+            ledgerDirectory: directory,
+            expected: reserved,
+            receiptPath: input.receiptPath,
+            receiptSha256: hash(nativeBytes),
+          })
+    const receiptPath = path.join(directory, `${phase}-finished.json`)
+    await writeFile(receiptPath, 'synthetic finished receipt', { flag: 'wx' })
+    const gate = Promise.withResolvers<void>()
+    const capture = gate.promise.then(() =>
+      completeEvaluationCapture({
+        ledgerDirectory: directory,
+        expected,
+        receiptPath,
+        receiptSha256: hash('synthetic finished receipt'),
+      }),
+    )
+    await retireEvaluationBatch(directory, selected, 'independence invalidated during capture')
+    gate.resolve()
+    await expect(capture).rejects.toThrow('The evaluation ledger changed during capture.')
+    await retireEvaluationBatch(directory, selected, 'replacement reason must be ignored')
+    const file = path.join(directory, `${selected.assetSha256}.json`)
+    const retired = JSON.parse(await readFile(file, 'utf8'))
+    expect(retired.state).toBe('retired')
+    expect(retired.retirementReason).toBe('independence invalidated during capture')
+    expect(retired.receiptSha256).toBe(expected.receiptSha256)
+    expect(await readFile(input.receiptPath, 'utf8')).toBe(nativeBytes)
+    expect(await readFile(receiptPath, 'utf8')).toBe('synthetic finished receipt')
+    await expect(readFile(`${file}.lock`)).rejects.toThrow()
+    await expect(readFile(`${file}.next`)).rejects.toThrow()
+  },
+)
+
+test('per-batch lock serializes competing completion and retirement against current state', async () => {
+  const { directory, selected, input } = await syntheticExposure()
+  const reserved = await reserveEvaluationExposure(input)
+  const entered = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  const holding = withEvaluationLedgerLock(directory, selected, async () => {
+    entered.resolve()
+    await release.promise
+  })
+  await entered.promise
+  const retirement = retireEvaluationBatch(directory, selected, 'concurrent invalidation')
+  const completion = completeEvaluationCapture({
+    ledgerDirectory: directory,
+    expected: reserved,
+    receiptPath: input.receiptPath,
+    receiptSha256: hash('synthetic receipt'),
+  })
+  const outcomes = Promise.allSettled([retirement, completion])
+  release.resolve()
+  await holding
+  const results = await outcomes
+  expect(results[0].status).toBe('fulfilled')
+  const file = path.join(directory, `${selected.assetSha256}.json`)
+  const retired = JSON.parse(await readFile(file, 'utf8'))
+  expect(retired.state).toBe('retired')
+  expect(retired.retirementReason).toBe('concurrent invalidation')
+  await expect(readFile(`${file}.lock`)).rejects.toThrow()
+  await expect(readFile(`${file}.next`)).rejects.toThrow()
+})
+
+test('an interrupted transition lock fails closed and preserves ledger and pending bytes', async () => {
+  const { directory, selected, input } = await syntheticExposure()
+  await reserveEvaluationExposure(input)
+  const file = path.join(directory, `${selected.assetSha256}.json`)
+  const original = await readFile(file, 'utf8')
+  await writeFile(`${file}.lock`, 'synthetic interrupted owner', { flag: 'wx' })
+  await writeFile(`${file}.next`, 'synthetic interrupted update', { flag: 'wx' })
+  await expect(retireEvaluationBatch(directory, selected, 'new reason')).rejects.toThrow(
+    'The evaluation ledger has an active or interrupted transition.',
+  )
+  expect(await readFile(file, 'utf8')).toBe(original)
+  expect(await readFile(`${file}.lock`, 'utf8')).toBe('synthetic interrupted owner')
+  expect(await readFile(`${file}.next`, 'utf8')).toBe('synthetic interrupted update')
+})
+
+test('completed receipt pointers use CAS and cannot discard another attachment', async () => {
+  const { directory, input } = await syntheticExposure()
+  const reserved = await reserveEvaluationExposure(input)
+  const native = await completeEvaluationCapture({
+    ledgerDirectory: directory,
+    expected: reserved,
+    receiptPath: input.receiptPath,
+    receiptSha256: hash('native'),
+  })
+  const attached = await completeEvaluationCapture({
+    ledgerDirectory: directory,
+    expected: native,
+    receiptPath: path.join(directory, 'combined.json'),
+    receiptSha256: hash('combined'),
+  })
+  await expect(
+    completeEvaluationCapture({
+      ledgerDirectory: directory,
+      expected: native,
+      receiptPath: path.join(directory, 'stale.json'),
+      receiptSha256: hash('stale'),
+    }),
+  ).rejects.toThrow('The evaluation ledger changed during capture.')
+  const file = path.join(directory, `${reserved.batch.assetSha256}.json`)
+  expect(JSON.parse(await readFile(file, 'utf8'))).toEqual(attached)
 })
 
 test('the loader preserves all raw authored source and rejects denominator/hash changes', () => {
