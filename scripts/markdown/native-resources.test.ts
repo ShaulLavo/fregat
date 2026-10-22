@@ -94,6 +94,132 @@ test('resource summaries retain actual growth and distinguish allocator reuse fr
   ).toBe('NOT_MEASURED')
 })
 
+function plateauWindows(): ResourceWindow[] {
+  return [row(0, 140, 64), row(1, 120, 64), row(2, 110, 64), row(3, 100, 64)]
+}
+
+function replaceWindow(
+  rows: readonly ResourceWindow[],
+  index: number,
+  patch: Partial<ResourceWindow>,
+): ResourceWindow[] {
+  return rows.map((entry, offset) => (offset === index ? { ...entry, ...patch } : entry))
+}
+
+test('post-GC native plateaus have a conclusive native-only status with unchanged raw summaries', () => {
+  const rows = plateauWindows()
+  const original = structuredClone(rows)
+  expect(summarizeResourceWindows(rows)).toEqual([
+    {
+      engine: 'tree-sitter',
+      cycles: 20,
+      windows: 4,
+      status: 'OBSERVED_PLATEAU',
+      gcStatus: 'POST_GC',
+      heapAfterReleaseBytes: [140, 120, 110, 100],
+      rssAfterReleaseBytes: [280, 240, 220, 200],
+      wasmReservedBytes: [64, 64, 64, 64],
+      heapWindowDeltasBytes: [-20, -10, -10],
+      rssWindowDeltasBytes: [-40, -20, -20],
+      wasmWindowDeltasBytes: [0, 0, 0],
+      heapObservedRangeBytes: 40,
+      wasmHighWaterReuseObserved: true,
+      reason: expect.any(String),
+    },
+  ])
+  expect(rows).toEqual(original)
+})
+
+test('native plateau uses only the last two heap and WASM deltas and treats RSS descriptively', () => {
+  const rows = [row(0, 90, 32), row(1, 120, 64), row(2, 110, 64), row(3, 110, 64)]
+  const risingRss = rows.map((entry, index) => ({
+    ...entry,
+    after: { ...entry.after, rssBytes: 1000 * (index + 1) },
+  }))
+  const summary = summarizeResourceWindows(risingRss)[0]
+  expect(summary?.status).toBe('OBSERVED_PLATEAU')
+  expect(summary?.heapWindowDeltasBytes).toEqual([30, -10, 0])
+  expect(summary?.wasmWindowDeltasBytes).toEqual([32, 0, 0])
+  expect(summary?.rssWindowDeltasBytes).toEqual([1000, 1000, 1000])
+})
+
+test.each([3, 8])('native plateaus accept %i consecutive windows', (windows) => {
+  const rows = Array.from({ length: windows }, (_, index) => row(index, 100, 64))
+  expect(summarizeResourceWindows(rows)[0]?.status).toBe('OBSERVED_PLATEAU')
+})
+
+const incompleteGroups: readonly {
+  name: string
+  rows: readonly ResourceWindow[]
+}[] = [
+  { name: 'heap growth', rows: replaceWindow(plateauWindows(), 3, { after: reading(115, 64) }) },
+  {
+    name: 'earlier final heap growth',
+    rows: [row(0, 90, 64), row(1, 100, 64), row(2, 110, 64), row(3, 100, 64)],
+  },
+  { name: 'WASM growth', rows: replaceWindow(plateauWindows(), 3, { after: reading(100, 128) }) },
+  { name: 'WASM shrinkage', rows: replaceWindow(plateauWindows(), 3, { after: reading(100, 32) }) },
+  {
+    name: 'zero WASM reservation',
+    rows: plateauWindows().map((entry) => ({ ...entry, after: reading(100, 0) })),
+  },
+  {
+    name: 'before GC missing',
+    rows: replaceWindow(plateauWindows(), 0, { before: reading(100, 64, false) }),
+  },
+  {
+    name: 'after GC missing',
+    rows: replaceWindow(plateauWindows(), 0, { after: reading(100, 64, false) }),
+  },
+  { name: 'too few windows', rows: plateauWindows().slice(0, 2) },
+  { name: 'too many windows', rows: Array.from({ length: 9 }, (_, index) => row(index, 100, 64)) },
+  { name: 'duplicate window', rows: replaceWindow(plateauWindows(), 2, { window: 1 }) },
+  { name: 'missing window', rows: replaceWindow(plateauWindows(), 3, { window: 4 }) },
+  {
+    name: 'missing initial window',
+    rows: plateauWindows().map((entry) => ({ ...entry, window: entry.window + 1 })),
+  },
+  { name: 'fractional window', rows: replaceWindow(plateauWindows(), 1, { window: 1.5 }) },
+  {
+    name: 'unsupported scale',
+    rows: plateauWindows().map((entry) => ({ ...entry, cycles: 99, clearedSessions: 99 })),
+  },
+  { name: 'negative heap', rows: replaceWindow(plateauWindows(), 0, { before: reading(-1, 64) }) },
+  {
+    name: 'nonfinite heap',
+    rows: replaceWindow(plateauWindows(), 0, { after: reading(Number.NaN, 64) }),
+  },
+  {
+    name: 'nonfinite RSS',
+    rows: replaceWindow(plateauWindows(), 0, {
+      after: { ...reading(100, 64), rssBytes: Infinity },
+    }),
+  },
+  {
+    name: 'fractional WASM',
+    rows: replaceWindow(plateauWindows(), 0, { before: reading(100, 64.5) }),
+  },
+]
+
+test.each(incompleteGroups)('native plateau stays inconclusive for $name', ({ rows }) => {
+  expect(summarizeResourceWindows(rows)[0]?.status).toBe('INCONCLUSIVE')
+})
+
+const failedGroups: readonly { name: string; patch: Partial<ResourceWindow> }[] = [
+  { name: 'output failure', patch: { outputFailures: ['source'] } },
+  { name: 'cleanup failure', patch: { cleanupFailures: ['source'] } },
+  { name: 'uncleared session', patch: { clearedSessions: 19 } },
+  { name: 'extra cleared session', patch: { clearedSessions: 21 } },
+  { name: 'zero cleared projections', patch: { clearedProjectionEntries: 0 } },
+  { name: 'fractional cleared projections', patch: { clearedProjectionEntries: 1.5 } },
+]
+
+test.each(failedGroups)('native plateau fails for $name', ({ patch }) => {
+  expect(summarizeResourceWindows(replaceWindow(plateauWindows(), 0, patch))[0]?.status).toBe(
+    'FAILED',
+  )
+})
+
 const temporary = new Set<string>()
 afterEach(async () => {
   for (const directory of temporary) await rm(directory, { recursive: true, force: true })
