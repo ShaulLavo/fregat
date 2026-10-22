@@ -2439,3 +2439,148 @@ test('synthetic native warmups preserve correctness with distinct excluded timin
     measured.revisions,
   )
 })
+
+test.each([
+  'remark-only',
+  'hidden-candidate',
+  'cross-profile',
+  'missing-webkit',
+  'duplicate-source',
+  'wrong-engine',
+  'wrong-fixture',
+  'wrong-profile',
+] as const)('binds visual rows to original captures: %s', async (fault) => {
+  const control = await producerQualificationFixture()
+  const positive = await assemblePromotionEvidence(control.manifest)
+  expect(positive.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+    'passed',
+  )
+  const file = path.join(control.root, 'paired-raster.json')
+  const raster = JSON.parse(await readFile(file, 'utf8'))
+  const row = raster.compared.find((entry: { key: string }) => {
+    const tuple = JSON.parse(entry.key)
+    return tuple[1] === 'webkit' && tuple[0] !== VISUAL_STORY_IDS[0]
+  })
+  const tuple = JSON.parse(row.key)
+  if (fault === 'hidden-candidate') {
+    const changed = PNG.sync.read(syntheticPng())
+    changed.data[0] = 127
+    await writeFile(
+      path.join(control.root, `tree-sitter-webkit-${tuple[0]}-${tuple[2]}-${tuple[3]}.png`),
+      PNG.sync.write(changed),
+    )
+  }
+  if (fault === 'remark-only' || fault === 'hidden-candidate') {
+    row.candidate = row.baseline
+    row.overlay = row.baseline
+  }
+  if (fault === 'cross-profile') {
+    row.baseline = raster.compared[0].baseline
+    row.candidate = raster.compared[0].candidate
+    row.overlay = raster.compared[0].overlay
+  }
+  await writeFile(file, JSON.stringify(raster))
+  const run = control.report.runs.find((entry) => entry.name === 'browser-tree-sitter-qualify')!
+  const lines = (await readFile(run.log, 'utf8')).split('\n')
+  const marker = 'MARKDOWN_BROWSER_VISUAL '
+  const original = lines.find(
+    (line) =>
+      line.startsWith(marker) &&
+      line.includes(`"fixture":"${tuple[0]}"`) &&
+      line.includes('"browser":"webkit"'),
+  )!
+  const record = JSON.parse(original.slice(marker.length))
+  if (fault === 'missing-webkit')
+    await writeFile(
+      run.log,
+      lines
+        .filter((line) => !(line.startsWith(marker) && line.includes('"browser":"webkit"')))
+        .join('\n'),
+    )
+  if (fault === 'duplicate-source') await writeFile(run.log, lines.concat(original).join('\n'))
+  if (fault === 'wrong-engine') record.engine = 'remark'
+  if (fault === 'wrong-fixture') record.fixture = 'unknown-fixture'
+  if (fault === 'wrong-profile') record.theme = 'dark'
+  if (fault === 'wrong-engine' || fault === 'wrong-fixture' || fault === 'wrong-profile')
+    await writeFile(
+      run.log,
+      lines.map((line) => (line === original ? marker + JSON.stringify(record) : line)).join('\n'),
+    )
+  await control.recapture()
+  const result = await assemblePromotionEvidence(control.manifest)
+  expect(result.validation.gates.find((entry) => entry.gate === 'visual-states')?.status).toBe(
+    'blocked',
+  )
+})
+
+test('rejects absolute native asset declarations inside the evidence root', async () => {
+  const control = await nativeResourceFixture()
+  for (const asset of control.report.candidate.assets)
+    asset.file = path.join(control.directory, asset.file)
+  await control.save()
+  const result = await assemblePromotionEvidence(control.manifest)
+  const findings = result.report.findings.filter((row) => row.startsWith('native-resources:'))
+  expect(findings.some((row) => row.includes('relative'))).toBe(true)
+})
+
+test('preserves relative nested native assets when the evidence root moves', async () => {
+  const control = await nativeResourceFixture()
+  const nested = path.join(control.directory, 'nested')
+  await mkdir(nested)
+  const report = {
+    ...control.report,
+    candidate: {
+      assets: control.report.candidate.assets.map((row) => ({ ...row, file: `../${row.file}` })),
+    },
+  }
+  await writeFile(path.join(nested, 'renamed.json'), JSON.stringify(report))
+  await writeFile(
+    path.join(nested, 'native-resources.jsonl'),
+    report.rawWindows.map((row) => JSON.stringify(row)).join('\n') + '\n',
+  )
+  const relocated = await mkdtemp(path.join(tmpdir(), 'promotion-relocated-'))
+  temporary.add(relocated)
+  const { cp } = await import('node:fs/promises')
+  await cp(control.directory, relocated, { recursive: true })
+  for (const evidenceDirectory of [control.directory, relocated]) {
+    const result = await assemblePromotionEvidence({
+      ...control.manifest,
+      evidenceDirectory,
+      reports: { 'native-resources': 'nested/renamed.json' },
+    })
+    expect(result.report.findings.filter((row) => row.startsWith('native-resources:'))).toEqual([])
+  }
+})
+
+test('rejects malformed UTF-8 in an otherwise matching native raw string field', async () => {
+  const control = await nativeResourceFixture()
+  const report = {
+    ...control.report,
+    rawWindows: control.report.rawWindows.map((row, index) =>
+      index === 0 ? { ...row, extra: '\uFFFD' } : row,
+    ),
+  }
+  await writeFile(path.join(control.directory, 'native-resources.json'), JSON.stringify(report))
+  const text = report.rawWindows.map((row) => JSON.stringify(row)).join('\n') + '\n'
+  const bytes = Buffer.from(text)
+  const marker = Buffer.from('\uFFFD')
+  const index = bytes.indexOf(marker)
+  expect(index).toBeGreaterThan(-1)
+  await writeFile(path.join(control.directory, 'native-resources.jsonl'), bytes)
+  const positive = await assemblePromotionEvidence(control.manifest)
+  expect(positive.report.findings.filter((row) => row.startsWith('native-resources:'))).toEqual([])
+  await writeFile(
+    path.join(control.directory, 'native-resources.jsonl'),
+    Buffer.concat([
+      bytes.subarray(0, index),
+      Buffer.from([0xff]),
+      bytes.subarray(index + marker.length),
+    ]),
+  )
+  const result = await assemblePromotionEvidence(control.manifest)
+  expect(
+    result.report.findings.some(
+      (row) => row.startsWith('native-resources:') && row.includes('invalid'),
+    ),
+  ).toBe(true)
+})
