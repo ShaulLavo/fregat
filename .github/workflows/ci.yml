@@ -193,7 +193,6 @@ jobs:
       - name: Unused code
         run: bun run unused:check
 
-  # Package tests share this runner with typechecking and generated checks.
   typecheck:
     name: Typecheck, generated, packages
     needs: changes
@@ -211,6 +210,22 @@ jobs:
         with:
           # Script tests import runtime code across the repository.
           build-packages: ${{ needs.changes.outputs.tooling == 'true' && 'all' || needs.changes.outputs.packages }}
+
+      - name: Archive script test builds
+        if: ${{ needs.changes.outputs.tooling == 'true' }}
+        run: |
+          find editor/packages packages hotkeys ghostty-webgpu -name node_modules -prune -o -type d -name dist -prune -print0 |
+            tar --null -T - -czf "$RUNNER_TEMP/script-test-builds.tar.gz"
+
+      - name: Share script test builds
+        if: ${{ needs.changes.outputs.tooling == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: script-test-builds
+          compression-level: 0
+          path: ${{ runner.temp }}/script-test-builds.tar.gz
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Validate dev task graph
         if: ${{ needs.changes.outputs.web == 'true' }}
@@ -258,13 +273,43 @@ jobs:
       # Script tests inspect the whole repository; package source readers are declared in Turbo.
       - name: Script tests
         if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
-        run: bun run test:scripts
+        run: bun run test:scripts --exclude scripts/markdown/promotion-evidence.test.ts
 
       - name: Package tests
         if: ${{ !cancelled() }}
         env:
           CI_PACKAGES: ${{ needs.changes.outputs.packages }}
         run: bun scripts/ci/packages.mjs tests "$CI_PACKAGES"
+
+  # The complete synthetic promotion controls need their own runner and full job budget.
+  test-promotion-evidence:
+    name: Script tests (promotion evidence)
+    needs: [changes, typecheck]
+    if: ${{ needs.changes.outputs.tooling == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          build-packages: '[]'
+
+      - name: Download script test builds
+        uses: actions/download-artifact@v4
+        with:
+          name: script-test-builds
+          path: ${{ runner.temp }}
+
+      - name: Restore script test builds
+        run: tar -xzf "$RUNNER_TEMP/script-test-builds.tar.gz"
+
+      - name: Script tests
+        run: bun run test:scripts scripts/markdown/promotion-evidence.test.ts
 
   # Web is most of the time, so it is sharded by file, balanced by recorded durations
   # (`apps/web/test/shard-sequencer.ts`). The `test` scripts in `apps/web` and `packages/tree`
@@ -615,6 +660,7 @@ jobs:
         docs,
         lint,
         typecheck,
+        test-promotion-evidence,
         test-web,
         test-server,
         test-tui,

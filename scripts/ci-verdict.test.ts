@@ -51,6 +51,7 @@ function fixture() {
     docs: { result: 'skipped' },
     lint: { result: 'success' },
     typecheck: { result: 'success' },
+    'test-promotion-evidence': { result: 'success' },
     'test-web': { result: 'success' },
     'test-server': { result: 'success' },
     'test-tui': { result: 'success' },
@@ -65,6 +66,7 @@ function fixture() {
     'Docs format',
     'Format, lint, census',
     'Typecheck, generated, packages',
+    'Script tests (promotion evidence)',
     'Test (web 1/4)',
     'Test (web 2/4)',
     'Test (web 3/4)',
@@ -487,9 +489,53 @@ test.skipIf(!shellAvailable)(
     const result = run()
     expect(result.exitCode, result.stderr.toString()).toBe(0)
     expect(existsSync(path.join(directory, 'candidate-executed'))).toBe(false)
+    for (const conclusion of ['failure', 'cancelled', 'skipped', 'missing']) {
+      const changed = value.jobs.flatMap((job) => {
+        if (job.name !== 'Script tests (promotion evidence)') return [job]
+        return conclusion === 'missing' ? [] : [{ ...job, conclusion }]
+      })
+      writeFileSync(jobs, JSON.stringify([{ jobs: changed }]))
+      const blocked = run()
+      expect(blocked.exitCode, conclusion + blocked.stderr.toString()).toBe(1)
+    }
     writeFileSync(jobs, JSON.stringify([{ jobs: value.jobs.slice(1) }]))
     const incomplete = run()
     expect(incomplete.exitCode).toBe(1)
     expect(incomplete.stderr.toString()).toContain('lacks one successful execution')
   },
 )
+
+test.each(['failure', 'cancelled', 'skipped', 'missing'])(
+  'promotion evidence job %s blocks the aggregate',
+  (conclusion) => {
+    const value = fixture()
+    if (conclusion === 'missing') {
+      expect(
+        value.evaluate(value.jobs.filter((job) => job.name !== 'Script tests (promotion evidence)'))
+          .passed,
+      ).toBe(false)
+      return
+    }
+    const job = value.jobs.find((entry) => entry.name === 'Script tests (promotion evidence)')
+    if (!job) return
+    job.conclusion = conclusion
+    expect(value.run().passed).toBe(false)
+  },
+)
+
+test('promotion evidence job skips only when tooling is unaffected', () => {
+  const value = fixture()
+  for (const key of Object.keys(value.changes.outputs)) {
+    if (value.changes.outputs[key] === 'true') value.changes.outputs[key] = 'false'
+  }
+  for (const id of Object.keys(value.needs)) {
+    value.needs[id] = { result: ['baseline', 'changes'].includes(id) ? 'success' : 'skipped' }
+  }
+  value.needs.changes = value.changes
+  for (const job of value.jobs) {
+    if (!['Successful main baseline', 'Changes'].includes(job.name)) job.conclusion = 'skipped'
+  }
+  expect(value.run()).toEqual({ passed: true, issues: [] })
+  value.changes.outputs.tooling = 'true'
+  expect(value.run().passed).toBe(false)
+})
