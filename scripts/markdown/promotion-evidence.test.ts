@@ -2941,3 +2941,101 @@ test.each([
     'blocked',
   )
 })
+
+async function relocatedVisualEvidence(
+  control: Awaited<ReturnType<typeof producerQualificationFixture>>,
+  mode: 'in-place' | 'relocated',
+) {
+  if (mode === 'in-place') return control.manifest
+  control.report.runs = control.report.runs.map((run) => ({
+    ...run,
+    log: path.relative(control.root, run.log),
+    ...(run.rawReport ? { rawReport: path.relative(control.root, run.rawReport) } : {}),
+  }))
+  await control.save()
+  const directory = await mkdtemp(path.join(tmpdir(), 'promotion-relocated-'))
+  temporary.add(directory)
+  const { cp } = await import('node:fs/promises')
+  await cp(control.root, directory, { recursive: true })
+  await rm(control.root, { recursive: true })
+  return { ...control.manifest, evidenceDirectory: directory }
+}
+
+test.each(['in-place', 'relocated'] as const)(
+  'retains distinct equal-pixel captures with historical identities %s',
+  async (mode) => {
+    const control = await producerQualificationFixture()
+    const { outside } = await moveOriginalsToSourceTree(control)
+    await control.recapture()
+    const retained = control.report.artifactBindings
+      .flatMap((binding) => binding.artifacts)
+      .filter((artifact) => artifact.role === 'originalVisualImage')
+    expect(retained).toHaveLength(512)
+    expect(new Set(retained.map((artifact) => artifact.path)).size).toBe(512)
+    const physical = new Set<string>()
+    const pixels = new Set<string>()
+    for (const artifact of retained) {
+      const file = path.join(control.root, artifact.path)
+      const info = await stat(file, { bigint: true })
+      physical.add(`${info.dev}:${info.ino}`)
+      pixels.add(sha(PNG.sync.read(await readFile(file)).data))
+    }
+    expect(physical.size).toBe(512)
+    expect(pixels.size).toBe(1)
+    await rm(outside, { recursive: true })
+    const manifest = await relocatedVisualEvidence(control, mode)
+    const result = await assemblePromotionEvidence(manifest)
+    expect(result.report.gates.find((row) => row.gate === 'visual-states')).toMatchObject({
+      selected: 128,
+      attempted: 128,
+      complete: 128,
+      failed: 0,
+      skipped: 0,
+      failures: [],
+    })
+    expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+      'passed',
+    )
+  },
+)
+
+test.each(['in-place', 'relocated'] as const)(
+  'rejects historical cross-role aliases after source removal %s',
+  async (mode) => {
+    const { rasterRecords } = await import('./raster')
+    const control = await producerQualificationFixture()
+    const positive = await assemblePromotionEvidence(control.manifest)
+    expect(positive.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+      'passed',
+    )
+    const { outside, runs } = await moveOriginalsToSourceTree(control)
+    const original = rasterRecords(await readFile(runs[0]!.log, 'utf8')).images[0]!
+    const raster = JSON.parse(await readFile(path.join(control.root, 'paired-raster.json'), 'utf8'))
+    const paired = path.join(control.root, raster.compared[1].candidate)
+    await rm(original.screenshot)
+    await link(paired, original.screenshot)
+    const sourceInfo = await stat(original.screenshot, { bigint: true })
+    const sourceIdentity = `${sourceInfo.dev}:${sourceInfo.ino}`
+    const pairedInfo = await stat(paired, { bigint: true })
+    expect(sourceIdentity).toBe(`${pairedInfo.dev}:${pairedInfo.ino}`)
+    await control.recapture()
+    const retained = control.report.artifactBindings
+      .flatMap((binding) => binding.artifacts)
+      .find(
+        (artifact) =>
+          artifact.role === 'originalVisualImage' &&
+          artifact.original.screenshot === original.screenshot,
+      )!
+    const retainedInfo = await stat(path.join(control.root, retained.path), { bigint: true })
+    expect(`${retainedInfo.dev}:${retainedInfo.ino}`).not.toBe(sourceIdentity)
+    await rm(outside, { recursive: true })
+    const manifest = await relocatedVisualEvidence(control, mode)
+    const result = await assemblePromotionEvidence(manifest)
+    expect(
+      result.report.gates.find((row) => row.gate === 'visual-states')?.failures.join(' '),
+    ).toContain('reused')
+    expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+      'blocked',
+    )
+  },
+)
