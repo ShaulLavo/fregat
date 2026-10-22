@@ -1,7 +1,18 @@
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { mkdtemp, mkdir, open, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import {
+  link,
+  mkdtemp,
+  mkdir,
+  open,
+  readFile,
+  rename,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
@@ -2762,4 +2773,79 @@ test('binds re-encoded paired PNG pixels and retains original file digests', asy
   expect(mutated.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
     'blocked',
   )
+})
+
+test.each(['original', 'paired'] as const)(
+  'rejects hard-linked %s images across visual capture identities',
+  async (kind) => {
+    const control = await producerQualificationFixture()
+    const positive = await assemblePromotionEvidence(control.manifest)
+    expect(positive.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+      'passed',
+    )
+    const raster = JSON.parse(await readFile(path.join(control.root, 'paired-raster.json'), 'utf8'))
+    const files: string[] =
+      kind === 'original'
+        ? [
+            path.join(control.root, `remark-chromium-${VISUAL_STORY_IDS[0]}-390-light.png`),
+            path.join(control.root, `tree-sitter-webkit-${WEBKIT_CRITICAL_IDS[1]}-390-light.png`),
+          ]
+        : [
+            path.join(control.root, raster.compared[0].baseline),
+            path.join(control.root, raster.compared[1].candidate),
+          ]
+    const first = files[0]!,
+      second = files[1]!
+    await rm(second)
+    await link(first, second)
+    const firstStat = await stat(first),
+      secondStat = await stat(second)
+    expect(first).not.toBe(second)
+    expect([firstStat.dev, firstStat.ino]).toEqual([secondStat.dev, secondStat.ino])
+    const result = await assemblePromotionEvidence(control.manifest)
+    expect(
+      result.report.gates.find((row) => row.gate === 'visual-states')?.failures.join(' '),
+    ).toContain('reused')
+    expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+      'blocked',
+    )
+  },
+)
+
+test('retains source-tree original screenshots through the actual producer after source removal', async () => {
+  const { rasterRecords } = await import('./raster')
+  const control = await producerQualificationFixture()
+  const outside = await mkdtemp(path.join(tmpdir(), 'promotion-source-tree-'))
+  temporary.add(outside)
+  const runs = control.report.runs.filter((run) => run.name.startsWith('browser-'))
+  const originalLogs = new Map<string, string>()
+  for (const run of runs) {
+    let log = await readFile(run.log, 'utf8')
+    const parsed = rasterRecords(log)
+    const files = new Set(
+      parsed.images
+        .map((image) => image.screenshot)
+        .concat(parsed.calibration.flatMap((row) => [row.first, row.repeated])),
+    )
+    for (const file of files) {
+      const match = /^(remark|tree-sitter)-(chromium|webkit)-(.+)$/.exec(path.basename(file))!
+      const target = path.join(outside, `markdown-${match[1]}`, match[2]!, match[3]!)
+      await mkdir(path.dirname(target), { recursive: true })
+      await rename(file, target)
+      log = log.replaceAll(file, target)
+    }
+    await writeFile(run.log, log)
+    originalLogs.set(run.log, log)
+  }
+  await control.recapture()
+  for (const run of runs) expect(await readFile(run.log, 'utf8')).toBe(originalLogs.get(run.log))
+  const retained = control.report.artifactBindings
+    .flatMap((binding) => binding.artifacts)
+    .filter((artifact) => String(artifact.role) === 'originalVisualImage')
+  expect(retained).toHaveLength(512)
+  expect(new Set(retained.map((artifact) => artifact.path)).size).toBe(512)
+  await rm(outside, { recursive: true })
+  const result = await assemblePromotionEvidence(control.manifest)
+  expect(result.report.gates.find((row) => row.gate === 'visual-states')?.failures).toEqual([])
+  expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe('passed')
 })
