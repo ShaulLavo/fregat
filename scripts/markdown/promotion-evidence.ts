@@ -26,10 +26,22 @@ import { BENCHMARK_FAMILIES } from './workloads'
 import { reconcileTimingManifest, type TimingFreeze } from './production-reconciliation'
 import { productionResourcePlateau } from './production-analysis'
 import * as v from 'valibot'
-import { MARKDOWN_CASES, VISUAL_STORY_IDS } from '../../packages/markdown/test/fixtures/cases'
-import { isRecord } from './serialization'
+import {
+  MARKDOWN_CASES,
+  VISUAL_STORY_IDS,
+  WEBKIT_CRITICAL_IDS,
+} from '../../packages/markdown/test/fixtures/cases'
+import { isRecord, stable } from './serialization'
 import { checkRunExitCode } from './check-exit'
-import { rasterRecords } from './raster'
+import {
+  rasterRecords,
+  readBitmap,
+  pixelDifference,
+  nonblankPixels,
+  type Calibration,
+  type Bitmap,
+} from './raster'
+import { reconcileNativeResources } from './native-resource-evidence'
 import { createScriptError } from '../structured-errors'
 import { hashFile } from './timing-artifacts'
 
@@ -427,7 +439,8 @@ function heldoutObservations(
 function visualObservation(report: LoadedReport | undefined): Observation {
   if (!report) return missing('Paired raster report is missing.')
   if (!report.value) return invalid(report.error ?? 'Paired raster report is invalid.')
-  const rows = list(get(report.value, 'compared')).filter(isRecord)
+  const rawRows = list(get(report.value, 'compared'))
+  const rows = rawRows.filter(isRecord)
   const failures = strings(get(report.value, 'findings'))
   const failed = rows.filter((row) => stringValue(row, 'status') !== 'passed').length
   const parserArms = new Set<string>()
@@ -443,43 +456,38 @@ function visualObservation(report: LoadedReport | undefined): Observation {
     addParserArm(parserArms, get(row, 'baseline'))
     addParserArm(parserArms, get(row, 'candidate'))
   }
+  const required = visualStateKeys()
   const keys = rows.map((row) => stringValue(row, 'key'))
-  const profiles = new Map<string, Set<string>>()
-  for (const row of rows) {
-    const key = stringValue(row, 'key')
-    const parsed = key ? parseVisualTuple(key) : null
-    if (!Array.isArray(parsed) || parsed.length !== 4 || typeof parsed[0] !== 'string') {
-      failures.push('Visual row key is invalid.')
-      continue
-    }
-    const profile = JSON.stringify(parsed.slice(1))
-    const fixtures = profiles.get(profile) ?? new Set<string>()
-    fixtures.add(parsed[0])
-    profiles.set(profile, fixtures)
-  }
-  const required = VISUAL_STORY_IDS
   if (
-    new Set(keys).size !== rows.length ||
-    profiles.size !== 4 ||
-    !Array.from(profiles.values()).every(
-      (fixtures) => fixtures.size === required.length && required.every((id) => fixtures.has(id)),
-    )
+    rawRows.length !== rows.length ||
+    rows.length !== required.length ||
+    new Set(keys).size !== required.length ||
+    !required.every((key) => keys.includes(key))
   )
-    failures.push('Visual matrix omits or repeats frozen fixture/profile states.')
+    failures.push(
+      'Visual matrix requires exact Chromium 128 and critical WebKit 32 fixture/profile states.',
+    )
+  const chromiumRows = rows.filter(
+    (row) => parseVisualKey(stringValue(row, 'key') ?? '')?.browser === 'chromium',
+  )
+  const webkitRows = rows.filter(
+    (row) => parseVisualKey(stringValue(row, 'key') ?? '')?.browser === 'webkit',
+  )
   const controlsPassed = booleanValue(report.value, 'controlsPassed') === true
   const pairedEngineCount = parserArms.size
   return observation({
     selected: 128,
-    attempted: rows.length,
-    complete: rows.length,
+    attempted: chromiumRows.length,
+    complete: chromiumRows.length,
     failed,
-    skipped: Math.max(0, 128 - rows.length),
+    skipped: Math.max(0, 128 - chromiumRows.length),
     metrics: {
       ...(numberValue(report.value, 'unexplainedChangedStates') === failed
         ? { unexplainedChangedStates: failed }
         : {}),
       rasterControlsCalibrated: failures.length === 0 && controlsPassed,
       pairedEngineCount,
+      webkitCriticalStates: webkitRows.length,
       themeCount: themes.size,
       viewportWidthCount: widths.size,
     },
@@ -490,6 +498,16 @@ function visualObservation(report: LoadedReport | undefined): Observation {
         : 'Paired raster rows do not expose both remark and tree-sitter image identities.',
     forceInconclusive: pairedEngineCount !== 2 || failures.length > 0,
   })
+}
+function visualStateKeys(): string[] {
+  return VISUAL_STORY_IDS.flatMap((fixture) => visualProfileKeys(fixture, 'chromium')).concat(
+    WEBKIT_CRITICAL_IDS.flatMap((fixture) => visualProfileKeys(fixture, 'webkit')),
+  )
+}
+function visualProfileKeys(fixture: string, browser: 'chromium' | 'webkit'): string[] {
+  return [390, 1440].flatMap((width) =>
+    ['light', 'dark'].map((theme) => JSON.stringify([fixture, browser, width, theme])),
+  )
 }
 function addParserArm(arms: Set<string>, value: unknown): void {
   if (typeof value !== 'string') return
@@ -567,6 +585,26 @@ function timingObservation(
 }
 
 function resourceObservation(
+  report: LoadedReport | undefined,
+  timing: TimingReconciliationResult | undefined,
+  scenarios: Observation,
+  nativeReport: LoadedReport | undefined,
+): Observation {
+  const browser = browserResourceObservation(report, timing, scenarios)
+  const native = reconcileNativeResources(nativeReport?.value)
+  return observation({
+    ...browser,
+    failed: browser.failed + native.failures.length,
+    failures: browser.failures.concat(native.failures),
+    exclusions: browser.exclusions.concat(native.exclusions),
+    metrics: { ...browser.metrics, nativeResourcesReconciled: native.complete },
+    reason:
+      browser.reason ??
+      (native.complete ? null : 'Native resource evidence is incomplete or failed.'),
+    forceInconclusive: browser.status !== 'complete' || !native.complete,
+  })
+}
+function browserResourceObservation(
   report: LoadedReport | undefined,
   timing: TimingReconciliationResult | undefined,
   scenarios: Observation,
@@ -1172,13 +1210,14 @@ function observeGate(
       return visualObservation(reports.get('paired-raster'))
     case 'resources':
       return resourceObservation(
-        reports.get('production-browser') ?? reports.get('native-resources'),
+        reports.get('production-browser'),
         timing.get('production'),
         scenarioObservation(
           reports.get('qualification'),
           resourceScenarioRaw(manifest, reports, raw),
           'resources',
         ),
+        reports.get('native-resources'),
       )
     case 'benchmark-coverage':
       return benchmarkObservation(
@@ -1223,7 +1262,10 @@ function referencedArtifacts(
     result.push(...bindingArtifactPaths(reports).map((file) => normalizedArtifact(root, file)))
   const native = reports.get('native-resources')
   if (gate === 'resources' && native) {
-    result.push(normalizedArtifact(root, native.path))
+    result.push(
+      normalizedArtifact(root, native.path),
+      normalizedArtifact(root, path.join(path.dirname(native.path), 'native-resources.jsonl')),
+    )
     const candidate = record(native.value ?? {}, 'candidate')
     result.push(
       ...list(get(candidate ?? {}, 'assets'))
@@ -1280,6 +1322,25 @@ function bindingArtifactPaths(reports: LoadedReports): string[] {
         ),
     )
 }
+function bindingPathFindings(
+  manifest: PromotionEvidenceAssemblyManifest,
+  artifact: RecordValue,
+  run: RecordValue | undefined,
+  runId: string | null,
+  gate: Gate,
+): string[] {
+  const role = get(artifact, 'role')
+  if (role !== 'rawQualificationReport' && role !== 'frameLog') return []
+  const expected = stringValue(run ?? {}, role === 'rawQualificationReport' ? 'rawReport' : 'log')
+  const actual = stringValue(artifact, 'path') ?? ''
+  if (
+    expected &&
+    normalizedArtifact(manifest.evidenceDirectory, expected) ===
+      normalizedArtifact(manifest.evidenceDirectory, actual)
+  )
+    return []
+  return [`${gate}: ${runId} authoritative ${String(role)} path differs from capture binding.`]
+}
 function captureBindingFindings(
   manifest: PromotionEvidenceAssemblyManifest,
   reports: LoadedReports,
@@ -1312,24 +1373,11 @@ function captureBindingFindings(
       findings.push(`${gate}: ${runId} capture source or run identity is invalid.`)
     const run = runs.find((entry) => get(entry, 'name') === runId)
     const runArtifacts = list(get(binding, 'artifacts')).filter(isRecord)
-    for (const artifact of runArtifacts) {
-      const role = get(artifact, 'role')
-      const expectedPath =
-        role === 'rawQualificationReport'
-          ? stringValue(run ?? {}, 'rawReport')
-          : role === 'frameLog'
-            ? stringValue(run ?? {}, 'log')
-            : null
-      if (
-        (role === 'rawQualificationReport' || role === 'frameLog') &&
-        (!expectedPath ||
-          normalizedArtifact(manifest.evidenceDirectory, expectedPath) !==
-            normalizedArtifact(manifest.evidenceDirectory, stringValue(artifact, 'path') ?? ''))
-      )
-        findings.push(
-          `${gate}: ${runId} authoritative ${String(role)} path differs from capture binding.`,
-        )
-    }
+    findings.push(
+      ...runArtifacts.flatMap((artifact) =>
+        bindingPathFindings(manifest, artifact, run, runId, gate),
+      ),
+    )
     return list(get(binding, 'artifacts'))
       .filter(isRecord)
       .map((artifact) => ({ artifact, runId }))
@@ -1442,6 +1490,7 @@ async function visualCalibrationFindings(
     .filter((entry) => get(entry, 'role') === 'pairedRasterCalibration')
   const findings: string[] = []
   const profiles: string[] = []
+  const tolerances = new Map<string, number>()
   for (const run of runs) {
     const name = stringValue(run, 'name') ?? '',
       file = stringValue(run, 'log')
@@ -1467,6 +1516,19 @@ async function visualCalibrationFindings(
         JSON.stringify([entry.engine, entry.browser, entry.width, entry.theme]),
       ),
     )
+    for (const calibration of captured.records) {
+      const calibrated = await calibrationTolerance(manifest, artifacts, calibration)
+      findings.push(...calibrated.findings)
+      tolerances.set(
+        JSON.stringify([
+          calibration.engine,
+          calibration.browser,
+          calibration.width,
+          calibration.theme,
+        ]),
+        calibrated.tolerance,
+      )
+    }
     findings.push(
       ...captured.records.flatMap((calibration) =>
         calibrationArtifactFindings(manifest, artifacts, calibration.first, calibration.repeated),
@@ -1485,13 +1547,16 @@ async function visualCalibrationFindings(
         : []
     })
   if (
-    profiles.length !== 8 ||
-    new Set(profiles).size !== 8 ||
+    profiles.length !== 16 ||
+    new Set(profiles).size !== 16 ||
     !expected.every((profile) => profiles.includes(profile))
   )
     findings.push(
       'visual-states: declared paired raster calibration profiles are missing, duplicate or differ from the visual matrix.',
     )
+  const raster = reports.get('paired-raster')
+  for (const row of list(get(raster?.value ?? {}, 'compared')).filter(isRecord))
+    findings.push(...(await visualPixelFindings(manifest, raster?.path ?? '', row, tolerances)))
   return findings
 }
 async function calibrationRecords(root: string, file: string) {
@@ -1502,34 +1567,138 @@ async function calibrationRecords(root: string, file: string) {
     return { records: [], failure: errorText(failure) }
   }
 }
+function calibrationArtifactPath(
+  manifest: PromotionEvidenceAssemblyManifest,
+  artifacts: readonly RecordValue[],
+  file: string,
+): string | null {
+  const declared = path.resolve(manifest.trustedContext?.root ?? manifest.evidenceDirectory, file)
+  const relative = path.relative(manifest.evidenceDirectory, declared)
+  const inside =
+    relative !== '' &&
+    !path.isAbsolute(relative) &&
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`)
+  const matches = artifacts.filter((entry) => {
+    const actual = stringValue(entry, 'path'),
+      digest = stringValue(entry, 'sha256')
+    if (!actual || !digest) return false
+    const expected = inside
+      ? relative.split(path.sep).join('/')
+      : path.posix.join(
+          'captured',
+          'pairedRasterCalibration',
+          `${digest}-${path.basename(declared)}`,
+        )
+    return normalizedArtifact(manifest.evidenceDirectory, actual) === expected
+  })
+  return matches.length === 1 ? stringValue(matches[0] ?? {}, 'path') : null
+}
 function calibrationArtifactFindings(
   manifest: PromotionEvidenceAssemblyManifest,
   artifacts: readonly RecordValue[],
   ...files: readonly string[]
 ): string[] {
-  return Array.from(new Set(files)).flatMap((file) => {
-    const declared = path.resolve(manifest.trustedContext?.root ?? manifest.evidenceDirectory, file)
-    const relative = path.relative(manifest.evidenceDirectory, declared)
-    const inside =
-      relative !== '' &&
-      !path.isAbsolute(relative) &&
-      relative !== '..' &&
-      !relative.startsWith(`..${path.sep}`)
-    const matches = artifacts.filter((entry) => {
-      const actual = stringValue(entry, 'path'),
-        digest = stringValue(entry, 'sha256')
-      if (!actual || !digest) return false
-      const expected = inside
-        ? relative.split(path.sep).join('/')
-        : path.posix.join(
-            'captured',
-            'pairedRasterCalibration',
-            `${digest}-${path.basename(declared)}`,
-          )
-      return normalizedArtifact(manifest.evidenceDirectory, actual) === expected
-    })
-    return matches.length === 1 ? [] : [`visual-states: unbound paired raster calibration ${file}.`]
-  })
+  return Array.from(new Set(files)).flatMap((file) =>
+    calibrationArtifactPath(manifest, artifacts, file)
+      ? []
+      : [`visual-states: unbound paired raster calibration ${file}.`],
+  )
+}
+async function calibrationTolerance(
+  manifest: PromotionEvidenceAssemblyManifest,
+  artifacts: readonly RecordValue[],
+  calibration: Calibration,
+) {
+  try {
+    const first = calibrationArtifactPath(manifest, artifacts, calibration.first)
+    const repeated = calibrationArtifactPath(manifest, artifacts, calibration.repeated)
+    if (!first || !repeated)
+      return { tolerance: -1, findings: ['visual-states: calibration image bytes are unbound.'] }
+    const root = manifest.evidenceDirectory
+    const difference = pixelDifference(
+      await readBitmap(await resolveEvidencePath(root, first), root),
+      await readBitmap(await resolveEvidencePath(root, repeated), root),
+    )
+    if (difference.status !== 'compared' || difference.ratio > 0.001)
+      return {
+        tolerance: -1,
+        findings: [
+          `visual-states: ${calibration.browser} calibration exceeds repeated-capture variance.`,
+        ],
+      }
+    return { tolerance: difference.ratio, findings: [] }
+  } catch {
+    return {
+      tolerance: -1,
+      findings: ['visual-states: calibration image bytes are missing or invalid.'],
+    }
+  }
+}
+async function visualPixelFindings(
+  manifest: PromotionEvidenceAssemblyManifest,
+  reportPath: string,
+  row: RecordValue,
+  tolerances: ReadonlyMap<string, number>,
+): Promise<string[]> {
+  const key = stringValue(row, 'key') ?? '',
+    tuple = parseVisualTuple(key)
+  if (!tuple) return [`visual-states: invalid pixel identity ${key}.`]
+  const profiles = ['remark', 'tree-sitter'].map((engine) =>
+    JSON.stringify(Array.of<unknown>(engine).concat(tuple.slice(1))),
+  )
+  const values = profiles.map((profile) => tolerances.get(profile))
+  if (values.some((value) => value === undefined || value < 0))
+    return [`visual-states: ${key} browser-specific pixel calibration is missing.`]
+  const tolerance = Math.max(...values.filter((value): value is number => value !== undefined))
+  try {
+    const root = manifest.evidenceDirectory
+    const bitmap = async (role: string) =>
+      readBitmap(
+        await resolveEvidencePath(
+          root,
+          path.resolve(root, path.dirname(reportPath), stringValue(row, role) ?? ''),
+        ),
+        root,
+      )
+    const baseline = await bitmap('baseline'),
+      candidate = await bitmap('candidate')
+    const difference = pixelDifference(baseline, candidate)
+    const overlay = await bitmap('overlay')
+    if (!validOverlay(baseline, candidate, overlay))
+      return [`visual-states: ${key} overlay differs from paired image bytes.`]
+    if (
+      difference.status !== 'compared' ||
+      difference.ratio > tolerance ||
+      nonblankPixels(baseline) < 8 ||
+      nonblankPixels(candidate) < 8 ||
+      get(row, 'tolerance') !== tolerance ||
+      get(row, 'ratio') !== difference.ratio ||
+      get(row, 'changedPixels') !== difference.changedPixels
+    )
+      return [`visual-states: ${key} paired image bytes differ from calibrated comparison.`]
+    return []
+  } catch {
+    return [`visual-states: ${key} paired image bytes are missing or invalid.`]
+  }
+}
+
+function validOverlay(first: Bitmap, second: Bitmap, overlay: Bitmap): boolean {
+  if (
+    overlay.width !== first.width ||
+    overlay.height !== first.height ||
+    first.width !== second.width ||
+    first.height !== second.height
+  )
+    return false
+  for (let offset = 0; offset < overlay.data.length; offset += 4) {
+    const unchanged = [0, 1, 2, 3].every(
+      (channel) => first.data[offset + channel] === second.data[offset + channel],
+    )
+    const expected = unchanged ? first.data.subarray(offset, offset + 4) : [255, 0, 70, 255]
+    if (!expected.every((value, channel) => value === overlay.data[offset + channel])) return false
+  }
+  return true
 }
 
 async function rawRunFindings(
@@ -1824,11 +1993,35 @@ const nativeAssetRoles = [
   { asset: 'tree-sitter-md.wasm', field: 'resolverSha256' },
 ] as const
 
+async function nativeResourceRawFindings(
+  manifest: PromotionEvidenceAssemblyManifest,
+  report: LoadedReport | undefined,
+): Promise<string[]> {
+  if (!report?.value) return []
+  const file = path.join(path.dirname(report.path), 'native-resources.jsonl')
+  try {
+    const text = await readFile(await resolveEvidencePath(manifest.evidenceDirectory, file), 'utf8')
+    if (!text.endsWith('\n'))
+      return ['native-resources: original raw sidecar needs a final LF terminator.']
+    const rows: unknown[] = text
+      .slice(0, -1)
+      .split('\n')
+      .map((line) => JSON.parse(line))
+    if (stable(rows) !== stable(get(report.value, 'rawWindows')))
+      return ['native-resources: original raw sidecar windows differ from report.rawWindows.']
+    return []
+  } catch {
+    return [
+      'native-resources: original raw sidecar is missing, invalid or outside evidenceDirectory.',
+    ]
+  }
+}
+
 async function nativeResourceAssetFindings(
   manifest: PromotionEvidenceAssemblyManifest,
   report: LoadedReport | undefined,
 ): Promise<string[]> {
-  if (!report) return []
+  if (!report) return ['native-resources: required native resource report is missing.']
   const candidate = record(report.value ?? {}, 'candidate')
   const raw = get(candidate ?? {}, 'assets')
   const assets = list(raw).filter(isRecord)
@@ -2253,7 +2446,10 @@ export async function assemblePromotionEvidence(
     manifest,
     reports.get('native-resources'),
   )
-  const sourceFindings = sourceIdentityFindings(manifest, reports).concat(resourceAssets)
+  const sourceFindings = sourceIdentityFindings(manifest, reports).concat(
+    resourceAssets,
+    await nativeResourceRawFindings(manifest, reports.get('native-resources')),
+  )
   const timingArtifactFindings = Array.from(timing.values()).flatMap((result) =>
     result.artifacts.flatMap((artifact) =>
       artifactData.hashes.get(normalizedArtifact(root, artifact.path)) === artifact.sha256

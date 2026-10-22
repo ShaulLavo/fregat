@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { mkdtemp, mkdir, open, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, open, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
@@ -16,8 +16,11 @@ import {
 } from './promotion'
 import {
   fullAssemblySummary,
+  syntheticNativeResources,
   writeFullSyntheticTiming,
   syntheticProductionTemplate,
+  syntheticProductionControls,
+  syntheticNativeTrial,
   writeSyntheticProductionArm,
 } from './promotion-evidence-full-assembly-fixture'
 import {
@@ -27,6 +30,7 @@ import {
 } from './production-workloads'
 import { reconcileProductionOracles } from './production-oracle'
 import { hashFile } from './timing-artifacts'
+import type { NativeWorkloadSummary } from './paired-native'
 import { createScriptError } from '../structured-errors'
 import {
   browserInput,
@@ -36,7 +40,11 @@ import {
   type EvaluationMessage,
 } from './evaluate-heldout'
 import { collectBrowserEvaluation } from './evaluate-heldout-browser'
-import { MARKDOWN_CASES, VISUAL_STORY_IDS } from '../../packages/markdown/test/fixtures/cases'
+import {
+  MARKDOWN_CASES,
+  VISUAL_STORY_IDS,
+  WEBKIT_CRITICAL_IDS,
+} from '../../packages/markdown/test/fixtures/cases'
 import {
   assemblePromotionEvidence,
   parsePromotionEvidenceAssemblyManifest,
@@ -633,21 +641,17 @@ test.each(['grammar.wasm', 'chat-grammar.wasm'])(
 
 async function nativeResourceFixture() {
   const control = await fixture()
-  const assets: { asset: string; file: string; sha256: string; bytes: number }[] = []
-  for (const [asset, file] of [
-    ['tree-sitter-markdown.wasm', 'grammar.wasm'],
-    ['tree-sitter-markdown-chat.wasm', 'chat-grammar.wasm'],
-    ['tree-sitter-md.wasm', 'resolver.wasm'],
-  ] as const) {
-    const bytes = await readFile(path.join(control.directory, file))
-    assets.push({ asset, file, sha256: sha(bytes), bytes: bytes.length })
-  }
-  const report = { provenance, candidate: { assets } }
+  const report = await syntheticNativeResources(control.directory, provenance)
   const manifest = await parsePromotionEvidenceAssemblyManifest(
     control.manifest({ 'native-resources': 'native-resources.json' }),
   )
-  const save = () =>
-    writeFile(path.join(control.directory, 'native-resources.json'), JSON.stringify(report))
+  const save = async () => {
+    await writeFile(path.join(control.directory, 'native-resources.json'), JSON.stringify(report))
+    await writeFile(
+      path.join(control.directory, 'native-resources.jsonl'),
+      report.rawWindows.map((row) => JSON.stringify(row)).join('\n') + '\n',
+    )
+  }
   await save()
   return { ...control, report, manifest, save }
 }
@@ -662,6 +666,7 @@ test('native resource consumer binds exactly the three native roles and actual c
   expect(receipt?.artifacts.map((row) => row.path)).toEqual(
     expect.arrayContaining([
       'native-resources.json',
+      'native-resources.jsonl',
       'grammar.wasm',
       'chat-grammar.wasm',
       'resolver.wasm',
@@ -682,6 +687,10 @@ test('native resource sidecars resolve relative to their report directory', asyn
   await writeFile(
     path.join(control.directory, 'resources/native-resources.json'),
     JSON.stringify(report),
+  )
+  await writeFile(
+    path.join(control.directory, 'resources/native-resources.jsonl'),
+    await readFile(path.join(control.directory, 'native-resources.jsonl')),
   )
   const manifest = await parsePromotionEvidenceAssemblyManifest({
     ...control.manifest,
@@ -964,6 +973,7 @@ async function producerQualificationFixture(
   const rawQualificationReports: { engine: 'remark' | 'tree-sitter'; path: string }[] = []
   const frameLogs: string[] = []
   const browserLogs = new Map<'remark' | 'tree-sitter', string>()
+  const webkitLogs = new Map<'remark' | 'tree-sitter', string>()
   const frameAssertions = [
     'retains settled code state and every painted token color through append and completion',
     'the frame palette check rejects a changed color with the same token count',
@@ -972,6 +982,8 @@ async function producerQualificationFixture(
   for (const engine of ['remark', 'tree-sitter'] as const) {
     const log = await syntheticVisualLog(root, engine, calibrationRoot)
     browserLogs.set(engine, log)
+    const webkitLog = await syntheticVisualLog(root, engine, calibrationRoot, 'webkit')
+    webkitLogs.set(engine, webkitLog)
     for (const domain of ['package', 'browser'] as const) {
       const name = domain === 'package' ? `package-${engine}` : `browser-${engine}-qualify`
       const selected =
@@ -998,7 +1010,10 @@ async function producerQualificationFixture(
       const rawReport = path.join(root, `${name}-raw.json`)
       const logPath = path.join(root, `${name}.log`)
       await writeFile(rawReport, JSON.stringify(rawAssertions(names)))
-      await writeFile(logPath, domain === 'browser' ? frameLog(engine) + '\n' + log : '')
+      await writeFile(
+        logPath,
+        domain === 'browser' ? frameLog(engine) + '\n' + log + '\n' + webkitLog : '',
+      )
       runs.push({
         name,
         tests: total,
@@ -1021,8 +1036,26 @@ async function producerQualificationFixture(
     root,
   )
   expect(raster.status).toBe('passed')
+  const webkitRaster = await compareRasterEvidence(
+    webkitLogs.get('remark') ?? '',
+    webkitLogs.get('tree-sitter') ?? '',
+    path.dirname(root),
+    path.join(root, 'webkit'),
+  )
+  expect(webkitRaster.status).toBe('passed')
+  const supplemental = webkitRaster.compared
+    .filter((row) => WEBKIT_CRITICAL_IDS.includes(JSON.parse(row.key)[0]))
+    .map((row) => ({
+      ...row,
+      baseline: `webkit/${row.baseline}`,
+      candidate: `webkit/${row.candidate}`,
+      overlay: `webkit/${row.overlay}`,
+    }))
   const rasterPath = path.join(root, 'paired-raster.json')
-  await writeFile(rasterPath, JSON.stringify(raster))
+  await writeFile(
+    rasterPath,
+    JSON.stringify({ ...raster, compared: raster.compared.concat(supplemental) }),
+  )
   runs.push({
     name: 'paired-raster',
     log: rasterPath,
@@ -1077,6 +1110,7 @@ async function syntheticVisualLog(
   root: string,
   engine: 'remark' | 'tree-sitter',
   calibrationRoot: string,
+  browser = 'chromium',
 ) {
   const lines: string[] = []
   const bytes = syntheticPng()
@@ -1087,17 +1121,20 @@ async function syntheticVisualLog(
     [1440, 'dark'],
   ] as const) {
     for (const fixture of VISUAL_STORY_IDS) {
-      const screenshot = path.join(root, `${engine}-${fixture}-${width}-${theme}.png`)
+      const screenshot = path.join(root, `${engine}-${browser}-${fixture}-${width}-${theme}.png`)
       await writeFile(screenshot, bytes)
       lines.push(
-        `MARKDOWN_BROWSER_VISUAL ${JSON.stringify({ engine, fixture, browser: 'chromium', width, theme, screenshot })}`,
+        `MARKDOWN_BROWSER_VISUAL ${JSON.stringify({ engine, fixture, browser, width, theme, screenshot })}`,
       )
     }
-    const first = path.join(root, `${engine}-${VISUAL_STORY_IDS[0]}-${width}-${theme}.png`)
-    const repeated = path.join(calibrationRoot, `${engine}-repeat-${width}-${theme}.png`)
+    const first = path.join(
+      root,
+      `${engine}-${browser}-${VISUAL_STORY_IDS[0]}-${width}-${theme}.png`,
+    )
+    const repeated = path.join(calibrationRoot, `${engine}-${browser}-repeat-${width}-${theme}.png`)
     await writeFile(repeated, bytes)
     lines.push(
-      `MARKDOWN_BROWSER_CALIBRATION ${JSON.stringify({ engine, fixture: VISUAL_STORY_IDS[0], browser: 'chromium', width, theme, first, repeated })}`,
+      `MARKDOWN_BROWSER_CALIBRATION ${JSON.stringify({ engine, fixture: VISUAL_STORY_IDS[0], browser, width, theme, first, repeated })}`,
     )
   }
   return lines.join('\n')
@@ -1747,6 +1784,7 @@ test('verifies all fourteen gates from complete synthetic producer files and rej
     provenance: trusted.captured,
     resources: resourceEvidence(),
   })
+  await syntheticNativeResources(fixture.root, trusted.captured)
   const manifest = await parsePromotionEvidenceAssemblyManifest({
     ...fixture.manifest,
     fontFingerprint: timing.fontFingerprint,
@@ -1754,6 +1792,7 @@ test('verifies all fourteen gates from complete synthetic producer files and rej
       ...fixture.manifest.reports,
       heldout: 'heldout.json',
       'paired-native': 'paired-native.json',
+      'native-resources': 'native-resources.json',
       'production-browser': 'production-browser.json',
     },
     timingManifests: { native: 'native-input.json', production: 'production-input.json' },
@@ -1797,7 +1836,7 @@ async function fullAssemblyPositive(
     )
     .toEqual([
       ['production', 'VERIFIED', 3440, 516, 344],
-      ['native', 'VERIFIED', 3000, 0, 300],
+      ['native', 'VERIFIED', 3000, 450, 300],
     ])
   expect
     .soft(result.receipts.find((entry) => entry.gate === 'native-paired')?.counts)
@@ -1807,10 +1846,25 @@ async function fullAssemblyPositive(
     .toEqual({ executed: 1720, failed: 0, skipped: 0 })
   const native = JSON.parse(await readFile(path.join(root, 'paired-native.json'), 'utf8'))
   const production = JSON.parse(await readFile(path.join(root, 'production-browser.json'), 'utf8'))
-  expect.soft(native.pairsArtifact.recordCount).toBe(1500)
+  expect.soft(native.pairsArtifact.recordCount).toBe(1725)
+  expect
+    .soft(
+      native.workloads.every(
+        (row: NativeWorkloadSummary) =>
+          row.observedPairs === 20 &&
+          row.mismatchedPairs === 0 &&
+          row.comparisons.every(
+            (comparison) =>
+              comparison.independentTrials === 20 &&
+              comparison.baselineMs === (comparison.metric === 'streamCpu' ? 2 : 1) &&
+              comparison.candidateMs === comparison.baselineMs,
+          ),
+      ),
+    )
+    .toBe(true)
   expect
     .soft(result.timing.find((entry) => entry.kind === 'native')?.metrics.observedWarmupTrials)
-    .toBeNull()
+    .toBe(225)
   expect.soft(production.trialsArtifact.recordCount).toBe(3956)
   expect.soft(manifest.expectedWorkloads).toEqual(productionTimingManifest().workloads)
   console.log(
@@ -2055,4 +2109,333 @@ test('streams unique oracle files for synthetic measured and warmup arms', async
       inputs,
     }),
   ).rejects.toThrow()
+})
+
+test('requires supplemental WebKit while retaining the exact Chromium 128-state denominator', async () => {
+  const control = await producerQualificationFixture()
+  const positive = await assemblePromotionEvidence(control.manifest)
+  expect(positive.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+    'passed',
+  )
+  expect(positive.report.gates.find((row) => row.gate === 'visual-states')).toMatchObject({
+    selected: 128,
+    complete: 128,
+  })
+  const file = path.join(control.root, 'paired-raster.json')
+  const raster = JSON.parse(await readFile(file, 'utf8'))
+  raster.compared = raster.compared.filter(
+    (row: { key: string }) => JSON.parse(row.key)[1] === 'chromium',
+  )
+  await writeFile(file, JSON.stringify(raster))
+  await control.recapture()
+  const omitted = await assemblePromotionEvidence(control.manifest)
+  expect(omitted.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+    'blocked',
+  )
+  expect(
+    omitted.report.gates.find((row) => row.gate === 'visual-states')?.failures.join(' '),
+  ).toContain('exact Chromium 128 and critical WebKit 32')
+})
+
+test.each([
+  'missing-state',
+  'duplicate-state',
+  'wrong-browser',
+  'extra-state',
+  'nonrecord-state',
+  'swapped-profile',
+] as const)('rejects freshly bound WebKit %s', async (fault) => {
+  const control = await producerQualificationFixture()
+  const file = path.join(control.root, 'paired-raster.json')
+  const raster = JSON.parse(await readFile(file, 'utf8'))
+  const index = raster.compared.findIndex(
+    (row: { key: string }) => JSON.parse(row.key)[1] === 'webkit',
+  )
+  const row = raster.compared[index]
+  if (fault === 'missing-state') raster.compared.splice(index, 1)
+  if (fault === 'duplicate-state') raster.compared[index + 1] = { ...row }
+  if (fault === 'extra-state')
+    raster.compared.push({ ...row, key: JSON.stringify(['extra-story', 'webkit', 390, 'light']) })
+  if (fault === 'nonrecord-state') raster.compared.push(null)
+  if (fault === 'wrong-browser') row.key = row.key.replace('webkit', 'firefox')
+  if (fault === 'swapped-profile') row.key = row.key.replace('390', '391')
+  await writeFile(file, JSON.stringify(raster))
+  await control.recapture()
+  const result = await assemblePromotionEvidence(control.manifest)
+  expect(result.validation.gates.find((entry) => entry.gate === 'visual-states')?.status).toBe(
+    'blocked',
+  )
+})
+
+test.each([
+  'missing-webkit-calibration',
+  'calibration-bytes',
+  'candidate-bytes',
+  'overlay-bytes',
+] as const)('rejects freshly rebound %s independently of producer success', async (fault) => {
+  const control = await producerQualificationFixture()
+  const run = control.report.runs.find((row) => row.name === 'browser-remark-qualify')!
+  if (fault === 'missing-webkit-calibration') {
+    const log = await readFile(run.log, 'utf8')
+    await writeFile(
+      run.log,
+      log
+        .split('\n')
+        .filter(
+          (line) => !line.includes('MARKDOWN_BROWSER_CALIBRATION ') || !line.includes('webkit'),
+        )
+        .join('\n'),
+    )
+  }
+  const file = path.join(control.root, 'paired-raster.json')
+  const raster = JSON.parse(await readFile(file, 'utf8'))
+  const row = raster.compared.find((row: { key: string }) => JSON.parse(row.key)[1] === 'webkit')
+  const changed = PNG.sync.read(syntheticPng())
+  changed.data[0] = 127
+  if (fault === 'calibration-bytes')
+    await writeFile(
+      path.join(control.root, 'remark-webkit-repeat-390-light.png'),
+      PNG.sync.write(changed),
+    )
+  if (fault === 'candidate-bytes')
+    await writeFile(path.join(control.root, row.candidate), PNG.sync.write(changed))
+  if (fault === 'overlay-bytes')
+    await writeFile(path.join(control.root, row.overlay), PNG.sync.write(changed))
+  await control.recapture()
+  const result = await assemblePromotionEvidence(control.manifest)
+  expect(result.validation.gates.find((entry) => entry.gate === 'visual-states')?.status).toBe(
+    'blocked',
+  )
+  expect(
+    result.report.gates.find((entry) => entry.gate === 'visual-states')?.failures.join(' '),
+  ).toMatch(/calibration|image bytes|overlay/)
+})
+
+test('requires native resources separately while a production browser report is present', async () => {
+  const control = await producerQualificationFixture()
+  await writeFile(
+    path.join(control.root, 'production-browser.json'),
+    JSON.stringify({
+      ...resourceEvidence(),
+      provenance,
+      frozenBudgetSha256: control.manifest.identity.budgetSha256,
+    }),
+  )
+  const manifest = {
+    ...control.manifest,
+    reports: { ...control.manifest.reports, 'production-browser': 'production-browser.json' },
+  }
+  const result = await assemblePromotionEvidence(manifest)
+  expect(
+    result.evidence.receipts.find((row) => row.gate === 'resources')?.metrics
+      .nativeResourcesReconciled,
+  ).toBe(false)
+  expect(result.report.gates.find((row) => row.gate === 'resources')?.failures.join(' ')).toContain(
+    'native-resources:',
+  )
+  expect(result.report.findings).toContain(
+    'native-resources: required native resource report is missing.',
+  )
+})
+
+test('reconciles complete synthetic native windows without qualifying absent browser proof', async () => {
+  const control = await nativeResourceFixture()
+  const result = await assemblePromotionEvidence(control.manifest)
+  const gate = result.report.gates.find((row) => row.gate === 'resources')!
+  expect(gate.failures.filter((failure) => failure.startsWith('native-resources:'))).toEqual([])
+  expect(
+    result.evidence.receipts.find((row) => row.gate === 'resources')?.metrics
+      .nativeResourcesReconciled,
+  ).toBe(true)
+  expect(result.validation.gates.find((row) => row.gate === 'resources')?.status).toBe('blocked')
+})
+
+test.each([
+  'failed-status',
+  'inconclusive-status',
+  'missing-window',
+  'duplicate-window',
+  'failed-output',
+  'failed-cleanup',
+  'retained-session',
+  'zero-projections',
+  'missing-group',
+  'too-few-windows',
+  'too-many-windows',
+  'failed-summary',
+  'duplicate-summary',
+  'heap-growth',
+  'wasm-growth',
+  'missing-gc',
+  'zero-before-wasm',
+  'forged-summary',
+  'exclusion',
+  'wrong-source',
+  'raw-failure',
+] as const)(
+  'native resource consumer independently rejects %s with browser report present',
+  async (fault) => {
+    const control = await nativeResourceFixture()
+    const report = control.report
+    const row = report.rawWindows[3]!
+    if (fault === 'failed-status') report.nativeStatus = 'FAILED'
+    if (fault === 'inconclusive-status') report.nativeStatus = 'INCONCLUSIVE'
+    if (fault === 'missing-window') report.rawWindows.splice(3, 1)
+    if (fault === 'duplicate-window') report.rawWindows[3] = report.rawWindows[2]!
+    if (fault === 'failed-output') row.outputFailures.push('original output mismatch')
+    if (fault === 'failed-cleanup') row.cleanupFailures.push('original cleanup failure')
+    if (fault === 'retained-session') row.clearedSessions--
+    if (fault === 'zero-projections') row.clearedProjectionEntries = 0
+    if (fault === 'missing-group') report.rawWindows.splice(0, 4)
+    if (fault === 'too-few-windows') report.rawWindows.splice(0, 2)
+    if (fault === 'too-many-windows')
+      report.rawWindows.push(
+        ...Array.from({ length: 5 }, (_, index) => ({ ...row, window: index + 4 })),
+      )
+    if (fault === 'failed-summary') report.summaries[0]!.status = 'FAILED'
+    if (fault === 'duplicate-summary') report.summaries[0] = report.summaries[1]!
+    if (fault === 'heap-growth') row.after.heapUsedBytes++
+    if (fault === 'wasm-growth') row.after.wasmReservedBytes++
+    if (fault === 'missing-gc') row.before.gcPerformed = false
+    if (fault === 'zero-before-wasm') row.before.wasmReservedBytes = 0
+    if (fault === 'forged-summary') report.summaries[0]!.heapWindowDeltasBytes[2] = 1
+    if (fault === 'exclusion') report.exclusions.push('window intentionally omitted')
+    if (fault === 'wrong-source') report.sources[0]!.sha256 = sha('wrong source')
+    if (fault === 'raw-failure') report.failures.push('candidate retains every session')
+    await control.save()
+    await writeFile(
+      path.join(control.directory, 'production-browser.json'),
+      JSON.stringify({
+        ...resourceEvidence(),
+        provenance,
+        frozenBudgetSha256: control.manifest.identity.budgetSha256,
+      }),
+    )
+    const manifest = {
+      ...control.manifest,
+      reports: { ...control.manifest.reports, 'production-browser': 'production-browser.json' },
+    }
+    const result = await assemblePromotionEvidence(manifest)
+    const gate = result.report.gates.find((entry) => entry.gate === 'resources')!
+    expect(
+      gate.failures
+        .concat(gate.exclusions)
+        .some((finding) => finding.startsWith('native-resources:')),
+    ).toBe(true)
+    expect(result.validation.gates.find((entry) => entry.gate === 'resources')?.status).toBe(
+      'blocked',
+    )
+    if (fault === 'raw-failure')
+      expect(gate.failures).toContain('native-resources: candidate retains every session')
+    if (fault === 'exclusion')
+      expect(gate.exclusions).toContain('native-resources: window intentionally omitted')
+  },
+)
+
+test.each(['missing', 'changed', 'missing-LF', 'extra-row', 'escaping-symlink'] as const)(
+  'native resource consumer binds the original raw sidecar with %s rejection',
+  async (fault) => {
+    const control = await nativeResourceFixture()
+    const file = path.join(control.directory, 'native-resources.jsonl')
+    const original = await readFile(file, 'utf8')
+    if (fault === 'missing' || fault === 'escaping-symlink') await rm(file)
+    if (fault === 'changed') await writeFile(file, original.replace('1000', '1001'))
+    if (fault === 'missing-LF') await writeFile(file, original.slice(0, -1))
+    if (fault === 'extra-row') await writeFile(file, original + original.split('\n')[0] + '\n')
+    if (fault === 'escaping-symlink') {
+      const external = await mkdtemp(path.join(tmpdir(), 'native-raw-outside-'))
+      temporary.add(external)
+      await writeFile(path.join(external, 'raw.jsonl'), original)
+      await symlink(path.join(external, 'raw.jsonl'), file)
+    }
+    const result = await assemblePromotionEvidence(control.manifest)
+    expect(
+      result.report.findings.some((finding) =>
+        finding.startsWith('native-resources: original raw sidecar'),
+      ),
+    ).toBe(true)
+    expect(result.validation.gates.find((row) => row.gate === 'resources')?.status).toBe('blocked')
+  },
+)
+
+test('full synthetic producer fixture supplies explicitly synthetic production controls', () => {
+  const controls = syntheticProductionControls()
+  expect(controls.knownGood).toEqual({
+    expected: sha('synthetic control output'),
+    observed: sha('synthetic control output'),
+    revision: 2,
+    observedRevision: 2,
+  })
+  expect(controls.missingExpectation.rejected).toBe(true)
+  expect(controls.wrongExpectation.rejected).toBe(true)
+  expect(controls.longTask).toEqual({ supported: true, observed: [80] })
+})
+
+test('malformed native windows preserve original failure and exclusion evidence', async () => {
+  const control = await nativeResourceFixture()
+  const report = {
+    ...control.report,
+    rawWindows: null,
+    failures: ['original native output failure'],
+    exclusions: ['original excluded native observation'],
+  }
+  await writeFile(path.join(control.directory, 'native-resources.json'), JSON.stringify(report))
+  const result = await assemblePromotionEvidence(control.manifest)
+  const gate = result.report.gates.find((row) => row.gate === 'resources')!
+  expect(gate.failures).toContain('native-resources: original native output failure')
+  expect(gate.exclusions).toContain('native-resources: original excluded native observation')
+  expect(result.validation.gates.find((row) => row.gate === 'resources')?.status).toBe('blocked')
+})
+
+test.each([3, 8])(
+  'reconciles the native %i-window boundary from complete original data',
+  async (windows) => {
+    const control = await nativeResourceFixture()
+    control.report.rawWindows = control.report.rawWindows
+      .filter((row) => row.window === 0)
+      .flatMap((row) => Array.from({ length: windows }, (_, window) => ({ ...row, window })))
+    control.report.summaries = control.report.summaries.map((summary) => ({
+      ...summary,
+      windows,
+      heapAfterReleaseBytes: Array<number>(windows).fill(1000),
+      rssAfterReleaseBytes: Array<number>(windows).fill(2000),
+      wasmReservedBytes: Array<number>(windows).fill(65536),
+      heapWindowDeltasBytes: Array<number>(windows - 1).fill(0),
+      rssWindowDeltasBytes: Array<number>(windows - 1).fill(0),
+      wasmWindowDeltasBytes: Array<number>(windows - 1).fill(0),
+    }))
+    await control.save()
+    const result = await assemblePromotionEvidence(control.manifest)
+    expect(
+      result.evidence.receipts.find((row) => row.gate === 'resources')?.metrics
+        .nativeResourcesReconciled,
+    ).toBe(true)
+    expect(
+      result.report.gates
+        .find((row) => row.gate === 'resources')
+        ?.failures.filter((failure) => failure.startsWith('native-resources:')),
+    ).toEqual([])
+  },
+)
+
+test('synthetic native warmups preserve correctness with distinct excluded timings', () => {
+  const workload = {
+    id: 'synthetic-native',
+    family: 'warm-completed' as const,
+    source: '**synthetic**',
+    sourceBytes: 13,
+    shape: 'mixed' as const,
+    scheduleUnits: 4,
+  }
+  const warmup = syntheticNativeTrial(workload, -1, 'remark')
+  const measured = syntheticNativeTrial(workload, 0, 'remark')
+  expect(warmup.trial).toBe(-1)
+  expect(measured.trial).toBe(0)
+  expect(warmup.mountMs).toBe(11)
+  expect(measured.mountMs).toBe(1)
+  expect(warmup.streamCpuMs).toBe(22)
+  expect(measured.streamCpuMs).toBe(2)
+  expect(warmup.revisions.map((row) => ({ ...row, parseMs: 1, wallMs: 1, cpuMs: 1 }))).toEqual(
+    measured.revisions,
+  )
 })
