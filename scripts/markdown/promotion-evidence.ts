@@ -2115,7 +2115,7 @@ async function nativeResourceRawFindings(
   const file = path.join(path.dirname(report.path), 'native-resources.jsonl')
   try {
     const bytes = await readFile(await resolveEvidencePath(manifest.evidenceDirectory, file))
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
     if (!text.endsWith('\n'))
       return ['native-resources: original raw sidecar needs a final LF terminator.']
     const rows: unknown[] = text
