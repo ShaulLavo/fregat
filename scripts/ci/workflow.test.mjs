@@ -215,3 +215,84 @@ test.each([
     }
   },
 )
+
+test('script test partition discovers every file once and reuses built outputs', async () => {
+  const original = workflow.jobs.typecheck
+  const isolated = workflow.jobs['test-promotion-evidence']
+  expect(isolated).toBeDefined()
+  expect(isolated.needs).toEqual(['changes', 'typecheck'])
+  expect(isolated.if).toBe("${{ needs.changes.outputs.tooling == 'true' }}")
+  expect(isolated['timeout-minutes']).toBe(20)
+  expect(original['timeout-minutes']).toBe(20)
+  expect(workflow.jobs.verdict.needs).toContain('test-promotion-evidence')
+  expect(workflow.jobs.verdict.if).toBe('${{ always() }}')
+  const commands = [original, isolated].map(
+    (job) => job.steps.find((step) => step.name === 'Script tests').run,
+  )
+  const discover = (command) => {
+    const run = command.replace(
+      'bun run test:scripts',
+      'bun --bun vitest list --config vitest.scripts.config.mjs',
+    )
+    const result = spawnSync('bash', ['-euo', 'pipefail', '-c', `${run} --filesOnly --json`], {
+      cwd: fileURLToPath(root),
+      encoding: 'utf8',
+      timeout: 30_000,
+    })
+    expect(result.status, result.stdout + result.stderr).toBe(0)
+    return JSON.parse(result.stdout)
+      .map((entry) => entry.file)
+      .sort()
+  }
+  const all = discover('bun run test:scripts')
+  const general = discover(commands[0])
+  const promotion = discover(commands[1])
+  expect(promotion).toEqual([
+    fileURLToPath(new URL('scripts/markdown/promotion-evidence.test.ts', root)),
+  ])
+  expect(general.concat(promotion).sort()).toEqual(all)
+  expect(new Set(general.concat(promotion)).size).toBe(all.length)
+  expect(original.steps.find((step) => step.name === 'Package tests').run).toBe(
+    'bun scripts/ci/packages.mjs tests "$CI_PACKAGES"',
+  )
+  expect(isolated.steps.find((step) => step.name === 'Setup').with['build-packages']).toBe('[]')
+  const upload = original.steps.find((step) => step.uses === 'actions/upload-artifact@v4')
+  const download = isolated.steps.find((step) => step.uses === 'actions/download-artifact@v4')
+  expect(upload.with.name).toBe(download.with.name)
+  expect(upload.with['if-no-files-found']).toBe('error')
+  expect(upload.if).toBe(isolated.if)
+  const directory = await mkdtemp(join(tmpdir(), 'ci-build-transfer-'))
+  try {
+    const source = join(directory, 'source')
+    const destination = join(directory, 'destination')
+    await mkdir(destination)
+    for (const base of ['editor/packages', 'packages', 'hotkeys', 'ghostty-webgpu']) {
+      await mkdir(join(source, base), { recursive: true })
+    }
+    for (const file of ['editor/packages/parser/dist/parser.wasm', 'hotkeys/core/dist/index.js']) {
+      await mkdir(dirname(join(source, file)), { recursive: true })
+      await writeFile(join(source, file), 'built output')
+    }
+    const archive = original.steps.find((step) => step.name === 'Archive script test builds')
+    const restore = isolated.steps.find((step) => step.name === 'Restore script test builds')
+    for (const [cwd, step] of [
+      [source, archive],
+      [destination, restore],
+    ]) {
+      const result = spawnSync('bash', ['-euo', 'pipefail', '-c', step.run], {
+        cwd,
+        env: { ...process.env, RUNNER_TEMP: directory },
+        encoding: 'utf8',
+      })
+      expect(result.status, result.stdout + result.stderr).toBe(0)
+    }
+    expect(
+      await readFile(join(destination, 'editor/packages/parser/dist/parser.wasm'), 'utf8'),
+    ).toBe('built output')
+    expect(await readFile(join(destination, 'hotkeys/core/dist/index.js'), 'utf8')).toBe(
+      'built output',
+    )
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
