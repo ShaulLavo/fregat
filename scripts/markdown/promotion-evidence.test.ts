@@ -2443,11 +2443,15 @@ test('synthetic native warmups preserve correctness with distinct excluded timin
 test.each([
   'remark-only',
   'hidden-candidate',
+  'original-candidate-bytes',
   'cross-profile',
   'missing-webkit',
+  'wrong-run',
   'duplicate-source',
   'wrong-engine',
   'wrong-fixture',
+  'wrong-browser',
+  'wrong-width',
   'wrong-profile',
 ] as const)('binds visual rows to original captures: %s', async (fault) => {
   const control = await producerQualificationFixture()
@@ -2462,7 +2466,7 @@ test.each([
     return tuple[1] === 'webkit' && tuple[0] !== VISUAL_STORY_IDS[0]
   })
   const tuple = JSON.parse(row.key)
-  if (fault === 'hidden-candidate') {
+  if (fault === 'hidden-candidate' || fault === 'original-candidate-bytes') {
     const changed = PNG.sync.read(syntheticPng())
     changed.data[0] = 127
     await writeFile(
@@ -2498,10 +2502,21 @@ test.each([
         .join('\n'),
     )
   if (fault === 'duplicate-source') await writeFile(run.log, lines.concat(original).join('\n'))
+  if (fault === 'wrong-run')
+    control.report.runs[control.report.runs.indexOf(run)] = {
+      ...run,
+      name: 'browser-unrelated-qualify',
+    }
   if (fault === 'wrong-engine') record.engine = 'remark'
   if (fault === 'wrong-fixture') record.fixture = 'unknown-fixture'
+  if (fault === 'wrong-browser') record.browser = 'chromium'
+  if (fault === 'wrong-width') record.width = 1440
   if (fault === 'wrong-profile') record.theme = 'dark'
-  if (fault === 'wrong-engine' || fault === 'wrong-fixture' || fault === 'wrong-profile')
+  if (
+    ['wrong-engine', 'wrong-fixture', 'wrong-browser', 'wrong-width', 'wrong-profile'].includes(
+      fault,
+    )
+  )
     await writeFile(
       run.log,
       lines.map((line) => (line === original ? marker + JSON.stringify(record) : line)).join('\n'),
@@ -2513,15 +2528,21 @@ test.each([
   )
 })
 
-test('rejects absolute native asset declarations inside the evidence root', async () => {
-  const control = await nativeResourceFixture()
-  for (const asset of control.report.candidate.assets)
-    asset.file = path.join(control.directory, asset.file)
-  await control.save()
-  const result = await assemblePromotionEvidence(control.manifest)
-  const findings = result.report.findings.filter((row) => row.startsWith('native-resources:'))
-  expect(findings.some((row) => row.includes('relative'))).toBe(true)
-})
+test.each(['posix', 'drive', 'unc'] as const)(
+  'rejects absolute native asset declarations: %s',
+  async (style) => {
+    const control = await nativeResourceFixture()
+    for (const asset of control.report.candidate.assets) {
+      if (style === 'posix') asset.file = path.join(control.directory, asset.file)
+      if (style === 'drive') asset.file = `C:\\evidence\\${asset.file}`
+      if (style === 'unc') asset.file = `\\\\capture\\evidence\\${asset.file}`
+    }
+    await control.save()
+    const result = await assemblePromotionEvidence(control.manifest)
+    const findings = result.report.findings.filter((row) => row.startsWith('native-resources:'))
+    expect(new Set(findings.filter((row) => row.includes('must be relative'))).size).toBe(3)
+  },
+)
 
 test('preserves relative nested native assets when the evidence root moves', async () => {
   const control = await nativeResourceFixture()
@@ -2529,6 +2550,7 @@ test('preserves relative nested native assets when the evidence root moves', asy
   await mkdir(nested)
   const report = {
     ...control.report,
+    rawWindows: control.report.rawWindows.toReversed(),
     candidate: {
       assets: control.report.candidate.assets.map((row) => ({ ...row, file: `../${row.file}` })),
     },
@@ -2550,6 +2572,20 @@ test('preserves relative nested native assets when the evidence root moves', asy
     })
     expect(result.report.findings.filter((row) => row.startsWith('native-resources:'))).toEqual([])
   }
+  await writeFile(
+    path.join(nested, 'native-resources.jsonl'),
+    report.rawWindows
+      .toReversed()
+      .map((row) => JSON.stringify(row))
+      .join('\n') + '\n',
+  )
+  const reordered = await assemblePromotionEvidence({
+    ...control.manifest,
+    reports: { 'native-resources': 'nested/renamed.json' },
+  })
+  expect(reordered.report.findings).toContain(
+    'native-resources: original raw sidecar windows differ from report.rawWindows.',
+  )
 })
 
 test('rejects malformed UTF-8 in an otherwise matching native raw string field', async () => {
@@ -2583,4 +2619,42 @@ test('rejects malformed UTF-8 in an otherwise matching native raw string field',
       (row) => row.startsWith('native-resources:') && row.includes('invalid'),
     ),
   ).toBe(true)
+})
+
+test.each(['remark', 'tree-sitter'] as const)(
+  'requires original %s screenshot bytes even when the paired files pass',
+  async (engine) => {
+    const control = await producerQualificationFixture()
+    const source = `${engine}-webkit-${WEBKIT_CRITICAL_IDS[1]}-390-light.png`
+    await rm(path.join(control.root, source))
+    const result = await assemblePromotionEvidence(control.manifest)
+    expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+      'blocked',
+    )
+    expect(
+      result.report.gates.find((row) => row.gate === 'visual-states')?.failures.join(' '),
+    ).toContain(`${engine} original capture image bytes`)
+  },
+)
+
+test('binds re-encoded paired PNG pixels and retains original file digests', async () => {
+  const control = await producerQualificationFixture()
+  const source = `tree-sitter-webkit-${WEBKIT_CRITICAL_IDS[1]}-390-light.png`
+  const file = path.join(control.root, source)
+  const original = await readFile(file)
+  const reencoded = PNG.sync.write(PNG.sync.read(original), { deflateLevel: 0 })
+  expect(reencoded.equals(original)).toBe(false)
+  await writeFile(file, reencoded)
+  const result = await assemblePromotionEvidence(control.manifest)
+  expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe('passed')
+  expect(
+    result.evidence.receipts.find((row) => row.gate === 'visual-states')?.artifacts,
+  ).toContainEqual({ path: source, sha256: sha(reencoded) })
+  const changed = PNG.sync.read(reencoded)
+  changed.data[0] = 127
+  await writeFile(file, PNG.sync.write(changed))
+  const mutated = await assemblePromotionEvidence(control.manifest)
+  expect(mutated.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+    'blocked',
+  )
 })
