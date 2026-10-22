@@ -1,3 +1,4 @@
+import { commands } from 'vitest/browser'
 import { createMarkdownSession } from '@workspace/markdown/utils/session'
 import { expect, test } from '../../../../test/fixtures'
 import { createProductionMarkdownProbe } from '../../../../test/factories/markdown-production'
@@ -25,6 +26,35 @@ function mountProbe() {
     },
   }
 }
+test('cold oracle settles appearance before recording exact revision digests', async ({
+  onTestFinished,
+}) => {
+  await commands.delayRequest({ ms: 500, path: '/themes/palettes' })
+  const mounted = mountProbe()
+  onTestFinished(mounted.dispose)
+  const source = 'Known **ready** message.'
+  const first = await mounted.probe.run(source, [])
+  const second = await mounted.probe.run(source, [])
+  expect(first.final.elements[0].attributes['aria-busy']).toBe('false')
+  expect(first.final.output).toEqual(second.final.output)
+  expect(first.final.paintedOutput).toEqual(second.final.paintedOutput)
+  expect(first.final.elements).toEqual(second.final.elements)
+})
+
+test('production readiness prepares providers without consuming an input revision', async ({
+  onTestFinished,
+}) => {
+  const mounted = mountProbe()
+  onTestFinished(mounted.dispose)
+  await mounted.probe.ready
+  expect(mounted.host.querySelector('[aria-busy]')?.getAttribute('aria-busy')).toBe('false')
+  expect(mounted.host.querySelector('[data-chat-markdown]')).toBeNull()
+  const receipt = await mounted.probe.run('Ready.', [])
+  expect(receipt.frames).toHaveLength(1)
+  expect(receipt.final.revision).toBe(1)
+  expect(receipt.final.parseCalls).toBe(1)
+})
+
 for (const streaming of [true, false]) {
   test(`streamed independent oracle matches bounded run and fresh completion, streamed=${streaming}`, async ({
     onTestFinished,
