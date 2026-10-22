@@ -39,6 +39,7 @@ import {
   pixelDifference,
   nonblankPixels,
   type Calibration,
+  type Visual,
   type Bitmap,
 } from './raster'
 import { reconcileNativeResources } from './native-resource-evidence'
@@ -436,14 +437,16 @@ function heldoutObservations(
   }
 }
 
-function visualObservation(report: LoadedReport | undefined): Observation {
+function visualObservation(
+  report: LoadedReport | undefined,
+  pairedEngineCount: number,
+): Observation {
   if (!report) return missing('Paired raster report is missing.')
   if (!report.value) return invalid(report.error ?? 'Paired raster report is invalid.')
   const rawRows = list(get(report.value, 'compared'))
   const rows = rawRows.filter(isRecord)
   const failures = strings(get(report.value, 'findings'))
   const failed = rows.filter((row) => stringValue(row, 'status') !== 'passed').length
-  const parserArms = new Set<string>()
   const themes = new Set<string>()
   const widths = new Set<number>()
   for (const row of rows) {
@@ -453,8 +456,6 @@ function visualObservation(report: LoadedReport | undefined): Observation {
     if (!parsed) continue
     themes.add(parsed.theme)
     widths.add(parsed.width)
-    addParserArm(parserArms, get(row, 'baseline'))
-    addParserArm(parserArms, get(row, 'candidate'))
   }
   const required = visualStateKeys()
   const keys = rows.map((row) => stringValue(row, 'key'))
@@ -474,7 +475,6 @@ function visualObservation(report: LoadedReport | undefined): Observation {
     (row) => parseVisualKey(stringValue(row, 'key') ?? '')?.browser === 'webkit',
   )
   const controlsPassed = booleanValue(report.value, 'controlsPassed') === true
-  const pairedEngineCount = parserArms.size
   return observation({
     selected: 128,
     attempted: chromiumRows.length,
@@ -495,7 +495,7 @@ function visualObservation(report: LoadedReport | undefined): Observation {
     reason:
       pairedEngineCount === 2
         ? null
-        : 'Paired raster rows do not expose both remark and tree-sitter image identities.',
+        : 'Original captures must bind both parser engines to every visual state.',
     forceInconclusive: pairedEngineCount !== 2 || failures.length > 0,
   })
 }
@@ -508,12 +508,6 @@ function visualProfileKeys(fixture: string, browser: 'chromium' | 'webkit'): str
   return [390, 1440].flatMap((width) =>
     ['light', 'dark'].map((theme) => JSON.stringify([fixture, browser, width, theme])),
   )
-}
-function addParserArm(arms: Set<string>, value: unknown): void {
-  if (typeof value !== 'string') return
-  const normalized = value.replaceAll('\\', '/')
-  if (/(?:^|[\\/_-])remark(?:[-_.\\/]|$)/u.test(normalized)) arms.add('remark')
-  if (/(?:^|[\\/_-])tree-sitter(?:[-_.\\/]|$)/u.test(normalized)) arms.add('tree-sitter')
 }
 function parseVisualTuple(value: string): readonly unknown[] | null {
   try {
@@ -1186,6 +1180,7 @@ function observeGate(
   heldout: ReturnType<typeof heldoutObservations>,
   raw: RawEvidence,
   timing: ReadonlyMap<'production' | 'native', TimingReconciliationResult>,
+  visualEngineCount: number,
 ): Observation {
   const report = reports.get(reportForGate(gate))
   switch (gate) {
@@ -1207,7 +1202,7 @@ function observeGate(
     case 'frame-probes':
       return frameObservation(report, raw)
     case 'visual-states':
-      return visualObservation(reports.get('paired-raster'))
+      return visualObservation(reports.get('paired-raster'), visualEngineCount)
     case 'resources':
       return resourceObservation(
         reports.get('production-browser'),
@@ -1477,12 +1472,17 @@ function captureBindingFindings(
 async function visualCalibrationFindings(
   manifest: PromotionEvidenceAssemblyManifest,
   reports: LoadedReports,
-): Promise<string[]> {
-  if (!reports.get('paired-raster')?.value) return []
+) {
+  if (!reports.get('paired-raster')?.value)
+    return { findings: [], artifacts: [], pairedEngineCount: 0 }
   const qualification = reports.get('qualification')?.value ?? {}
   const runs = list(get(qualification, 'runs'))
     .filter(isRecord)
-    .filter((run) => stringValue(run, 'name')?.startsWith('browser-'))
+    .filter((run) =>
+      ['browser-remark-qualify', 'browser-tree-sitter-qualify'].includes(
+        stringValue(run, 'name') ?? '',
+      ),
+    )
   const bindings = list(get(qualification, 'artifactBindings')).filter(isRecord)
   const rasterBinding = bindings.find((entry) => get(entry, 'runId') === 'paired-raster') ?? {}
   const artifacts = list(get(rasterBinding, 'artifacts'))
@@ -1491,6 +1491,7 @@ async function visualCalibrationFindings(
   const findings: string[] = []
   const profiles: string[] = []
   const tolerances = new Map<string, number>()
+  const originals: Visual[] = []
   for (const run of runs) {
     const name = stringValue(run, 'name') ?? '',
       file = stringValue(run, 'log')
@@ -1511,6 +1512,10 @@ async function visualCalibrationFindings(
     const captured = await calibrationRecords(manifest.evidenceDirectory, file)
     if (captured.failure)
       findings.push(`visual-states: ${name} calibration log is invalid: ${captured.failure}`)
+    const expectedEngine = name === 'browser-remark-qualify' ? 'remark' : 'tree-sitter'
+    if (captured.images.some((image) => image.engine !== expectedEngine))
+      findings.push(`visual-states: ${name} original capture engine differs from its browser run.`)
+    originals.push(...captured.images.filter((image) => image.engine === expectedEngine))
     profiles.push(
       ...captured.records.map((entry) =>
         JSON.stringify([entry.engine, entry.browser, entry.width, entry.theme]),
@@ -1557,14 +1562,123 @@ async function visualCalibrationFindings(
   const raster = reports.get('paired-raster')
   for (const row of list(get(raster?.value ?? {}, 'compared')).filter(isRecord))
     findings.push(...(await visualPixelFindings(manifest, raster?.path ?? '', row, tolerances)))
-  return findings
+  const sources = await visualSourceFindings(manifest, raster, originals)
+  findings.push(...sources.findings)
+  return {
+    findings,
+    artifacts: sources.artifacts,
+    pairedEngineCount: sources.findings.length === 0 ? 2 : 0,
+  }
 }
+async function visualSourceFindings(
+  manifest: PromotionEvidenceAssemblyManifest,
+  report: LoadedReport | undefined,
+  originals: readonly Visual[],
+) {
+  const findings: string[] = []
+  const artifacts: string[] = []
+  const index = new Map<string, Visual[]>()
+  for (const image of originals) {
+    const key = JSON.stringify([
+      image.fixture,
+      image.browser,
+      image.width,
+      image.theme,
+      image.engine,
+    ])
+    index.set(key, (index.get(key) ?? []).concat(image))
+  }
+  const rows = list(get(report?.value ?? {}, 'compared')).filter(isRecord)
+  const files = { original: new Set<string>(), paired: new Set<string>() }
+  for (const key of visualStateKeys()) {
+    const selected = rows.filter((row) => stringValue(row, 'key') === key)
+    if (selected.length !== 1) continue
+    const row = selected[0] ?? {}
+    for (const engine of ['remark', 'tree-sitter'] as const) {
+      const identity = JSON.stringify((parseVisualTuple(key) ?? []).concat(engine))
+      const sources = index.get(identity) ?? []
+      const result = await visualSourcePair(
+        manifest,
+        report?.path ?? '',
+        row,
+        sources,
+        engine,
+        files,
+      )
+      findings.push(...result.findings)
+      artifacts.push(...result.artifacts)
+    }
+  }
+  return { findings, artifacts }
+}
+
+async function visualSourcePair(
+  manifest: PromotionEvidenceAssemblyManifest,
+  reportPath: string,
+  row: RecordValue,
+  sources: readonly Visual[],
+  engine: Visual['engine'],
+  files: { readonly original: Set<string>; readonly paired: Set<string> },
+): Promise<{ findings: string[]; artifacts: string[] }> {
+  const key = stringValue(row, 'key') ?? ''
+  const source = sources[0]
+  if (sources.length !== 1 || !source)
+    return {
+      findings: [`visual-states: ${key} requires exactly one original ${engine} capture.`],
+      artifacts: [],
+    }
+  try {
+    const root = manifest.evidenceDirectory
+    const original = await resolveEvidencePath(
+      root,
+      path.resolve(manifest.trustedContext?.root ?? root, source.screenshot),
+    )
+    const role = engine === 'remark' ? 'baseline' : 'candidate'
+    const paired = await resolveEvidencePath(
+      root,
+      path.resolve(root, path.dirname(reportPath), stringValue(row, role) ?? ''),
+    )
+    const reused = files.original.has(original) || files.paired.has(paired)
+    files.original.add(original)
+    files.paired.add(paired)
+    if (reused)
+      return {
+        findings: [
+          `visual-states: ${key} ${engine} image file is reused across original capture identities.`,
+        ],
+        artifacts: [],
+      }
+    const first = await readBitmap(original, root)
+    const second = await readBitmap(paired, root)
+    if (
+      first.width !== second.width ||
+      first.height !== second.height ||
+      !first.data.every((byte, offset) => byte === second.data[offset])
+    )
+      return {
+        findings: [
+          `visual-states: ${key} ${engine} paired image bytes differ from its original capture.`,
+        ],
+        artifacts: [],
+      }
+    return { findings: [], artifacts: [normalizedArtifact(root, original)] }
+  } catch {
+    return {
+      findings: [
+        `visual-states: ${key} ${engine} original capture image bytes are missing, invalid or outside evidenceDirectory.`,
+      ],
+      artifacts: [],
+    }
+  }
+}
+
 async function calibrationRecords(root: string, file: string) {
   try {
     const log = await readFile(await resolveEvidencePath(root, file), 'utf8')
-    return { records: rasterRecords(log).calibration, failure: null }
+    const parsed = rasterRecords(log)
+    return { records: parsed.calibration, images: parsed.images, failure: null }
   } catch (failure) {
-    return { records: [], failure: errorText(failure) }
+    return { records: [], images: [], failure: errorText(failure) }
   }
 }
 function calibrationArtifactPath(
@@ -2000,7 +2114,8 @@ async function nativeResourceRawFindings(
   if (!report?.value) return []
   const file = path.join(path.dirname(report.path), 'native-resources.jsonl')
   try {
-    const text = await readFile(await resolveEvidencePath(manifest.evidenceDirectory, file), 'utf8')
+    const bytes = await readFile(await resolveEvidencePath(manifest.evidenceDirectory, file))
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
     if (!text.endsWith('\n'))
       return ['native-resources: original raw sidecar needs a final LF terminator.']
     const rows: unknown[] = text
@@ -2062,6 +2177,8 @@ async function nativeResourceAssetBytes(input: {
     return [
       `native-resources: ${asset} candidate asset differs from sealed identity or lacks a file.`,
     ]
+  if (path.isAbsolute(file) || path.win32.isAbsolute(file))
+    return [`native-resources: ${asset} candidate asset file must be relative to its report.`]
   try {
     const declared = path.resolve(manifest.evidenceDirectory, path.dirname(reportPath), file)
     const resolved = await resolveEvidencePath(manifest.evidenceDirectory, declared)
@@ -2412,17 +2529,26 @@ export async function assemblePromotionEvidence(
   const heldoutValues = heldoutObservations(heldout, heldoutError, browserReceipt, browserInput)
   const rawEvidence = await loadRawEvidence(manifest)
   const rawRunErrors = await rawRunFindings(manifest, reports)
-  const calibrationErrors = await visualCalibrationFindings(manifest, reports)
+  const visual = await visualCalibrationFindings(manifest, reports)
   const { results: timing, findings: timingFindings } = await reconcileTimings(manifest, reports)
   const observations = new Map(
     PROMOTION_GATES.map((gate) => [
       gate,
-      observeGate(gate, reports, manifest, heldoutValues, rawEvidence, timing),
+      observeGate(
+        gate,
+        reports,
+        manifest,
+        heldoutValues,
+        rawEvidence,
+        timing,
+        visual.pairedEngineCount,
+      ),
     ]),
   )
   const references = new Map(
     PROMOTION_GATES.map((gate) => [gate, referencedArtifacts(manifest, reports, gate)]),
   )
+  references.set('visual-states', (references.get('visual-states') ?? []).concat(visual.artifacts))
   for (const [kind, result] of timing) {
     const gate = kind === 'production' ? 'production-timing' : 'native-paired'
     references.set(
@@ -2475,7 +2601,7 @@ export async function assemblePromotionEvidence(
     const all = findings.concat(
       gateSourceFindings,
       runErrors,
-      gate === 'visual-states' ? calibrationErrors : [],
+      gate === 'visual-states' ? visual.findings : [],
     )
     const value = observations.get(gate) ?? EMPTY
     if (all.length > 0)
