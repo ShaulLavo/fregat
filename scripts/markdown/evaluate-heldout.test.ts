@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeAll, expect, test } from 'vitest'
@@ -16,13 +16,18 @@ import {
   parseBrowserReceipt,
   parseReport,
   reserveEvaluationExposure,
+  readTrustedEvaluationContext,
   retireEvaluationBatch,
   validateBrowserEvaluation,
   validateEvaluationMessages,
   type CandidateIdentity,
   type EvaluationBatch,
   type EvaluationMessage,
+  type HeldoutReport,
 } from './evaluate-heldout'
+
+import { EXCLUSION_GROUPS, sourceIdentity } from './evaluation-custody'
+import { encoded } from './serialization'
 
 const temporary = new Set<string>()
 afterEach(async () => {
@@ -82,6 +87,51 @@ function manifest() {
     assetSha256: hash('asset'),
     selection: 'Owned controls only',
     batches: [batch()],
+  }
+}
+function syntheticReport(manifestSha256: string): HeldoutReport {
+  const check = (offset: number, live: boolean) => ({
+    offset,
+    live,
+    status: 'passed' as const,
+    baselineDigest: hash('synthetic projection'),
+    candidateDigest: hash('synthetic projection'),
+    failures: [],
+    freshDigests: null,
+    difference: null,
+  })
+  const cases = messages.map((entry) => ({
+    id: entry.id,
+    sourceSha256: entry.sha256,
+    completed: check(entry.source.length, false),
+    streams: heldoutSchedules(entry.source).map((schedule) => ({
+      schedule,
+      checks: schedule.offsets
+        .map((offset) => check(offset, true))
+        .concat([check(entry.source.length, false)]),
+    })),
+  }))
+  return {
+    schemaVersion: 1,
+    status: 'passed',
+    verdict: 'NOT VERIFIED',
+    generatedAt: '2026-01-01T00:00:00.000Z',
+    candidate: fingerprint,
+    batch: batch(),
+    manifestSha256,
+    originalDenominator: 100,
+    cases,
+    counters: { ...evaluationCounts(cases), browserCases: { total: 100, passed: 0, failed: 100 } },
+    browser: {
+      inputSha256: '',
+      receiptSha256: null,
+      productionBuildSha256: null,
+      receiptPath: null,
+      inputPath: '',
+      failures: [],
+    },
+    missing: ['Synthetic refusal control'],
+    fatal: null,
   }
 }
 async function scratch() {
@@ -154,13 +204,87 @@ test('raw browser parsers retain the separate CHAT identity without stripping it
 test('exposure is durable before content access and prevents reused or changed candidates', async () => {
   const directory = await scratch()
   const selected = batch()
+  const evaluation = path.join(directory, 'packages/markdown/test/evaluation')
+  await mkdir(evaluation, { recursive: true })
+  await mkdir(path.join(directory, 'scripts/markdown'), { recursive: true })
+  const manifestBytes = encoded(manifest())
+  const time = '2026-01-01T00:00:00.000Z'
+  const exclusions = {
+    schemaVersion: 1,
+    complete: true,
+    recordedAt: time,
+    groups: EXCLUSION_GROUPS.map((name) => ({ name, sourceSha256: [] })),
+  }
+  const source = sourceIdentity(manifest())
+  await writeFile(path.join(evaluation, 'manifest.json'), manifestBytes)
+  await writeFile(path.join(evaluation, 'LICENSE'), 'synthetic-license')
+  await writeFile(
+    path.join(directory, 'scripts/markdown/snapshot-evaluation.ts'),
+    'synthetic-selector',
+  )
+  await writeFile(
+    path.join(evaluation, 'custody.json'),
+    encoded({
+      schemaVersion: 1,
+      legacyManifestSha256: hash('synthetic-legacy'),
+      records: [
+        {
+          kind: 'prospective-registration',
+          batch: selected,
+          source,
+          licenseSha256: hash('synthetic-license'),
+          selectorSha256: hash('synthetic-selector'),
+          exclusions,
+          exclusionsSha256: hash(encoded(exclusions)),
+          freeze: {
+            curator: 'synthetic-control',
+            custodyStartedAt: time,
+            ledgerDirectory: directory,
+            parserFreeze: {
+              commit: fingerprint.candidateCommit,
+              sourceSha256: fingerprint.candidateSourceSha256,
+              artifactsSha256: hash(encoded(fingerprint.artifacts)),
+              frozenAt: time,
+            },
+          },
+          selectionStartedAt: time,
+          selectionCompletedAt: time,
+          registeredAt: time,
+          invocation: ['synthetic-control'],
+        },
+      ],
+    }),
+  )
   const input = {
+    root: directory,
     ledgerDirectory: directory,
     batch: selected,
-    manifestSha256: hash('manifest'),
+    manifestSha256: hash(manifestBytes),
     candidate: fingerprint,
     receiptPath: path.join(directory, 'receipt.json'),
   }
+  const custodyFile = path.join(evaluation, 'custody.json')
+  const custodyBytes = await readFile(custodyFile, 'utf8')
+  await rm(custodyFile)
+  await expect(reserveEvaluationExposure(input)).rejects.toThrow()
+  await writeFile(
+    custodyFile,
+    encoded({
+      schemaVersion: 1,
+      legacyManifestSha256: hash('synthetic-legacy'),
+      records: [{ kind: 'legacy-unknown', eligible: false, batch: selected }],
+    }),
+  )
+  await expect(reserveEvaluationExposure(input)).rejects.toThrow()
+  const receiptPath = path.join(directory, 'synthetic-receipt.json')
+  const receiptBytes = encoded(syntheticReport(input.manifestSha256))
+  await writeFile(receiptPath, receiptBytes)
+  await expect(
+    readTrustedEvaluationContext({ root: directory, receiptPath, ledgerDirectory: directory }),
+  ).rejects.toThrow('Evaluation custody requires a complete matching prospective registration.')
+  expect(await readFile(receiptPath, 'utf8')).toBe(receiptBytes)
+  await expect(readFile(path.join(directory, `${selected.assetSha256}.json`))).rejects.toThrow()
+  await writeFile(custodyFile, custodyBytes)
   const ledger = await reserveEvaluationExposure(input)
   expect(ledger.state).toBe('exposed')
   const file = path.join(directory, `${selected.assetSha256}.json`)

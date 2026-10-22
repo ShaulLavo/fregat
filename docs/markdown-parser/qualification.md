@@ -68,6 +68,52 @@ Every row needs matching evidence for the final candidate. The registry is `PROM
 | `native-paired`                 | All 75 cells, 20 independent pairs, three warmups, raw samples, invocation, and source/host records.               |
 | `production-timing`             | All 86 cells, 20 independent pairs, three warmups, headed Mac Chromium, and raw oracle/CPU/paint/transfer records. |
 
+### Register a prospective batch
+
+Batches 001 through 003 have unknown historical exposure. `custody.json` permanently classifies
+all 300 sources as `legacy-unknown`, with `eligible: false`. Keep those records and the original
+manifest entries unchanged. The evaluator checks the sibling custody inventory before reserving
+an opening and when trusting native or browser receipts.
+
+After tuning and tooling review finish, record the parser freeze and close the development
+exclusion inventory. Selection is automated curation access; it makes no claim about earlier
+archive access. Supply these JSON inputs using actual UTC timestamps:
+
+- `exclusions.json`: `schemaVersion: 1`, `complete: true`, `recordedAt`, and `groups`.
+  Each group has `name` and `sourceSha256`, containing hashes of exact input strings.
+  Include every group in `EXCLUSION_GROUPS`: `commonmark`, `gfm`, `chat`, `owned-cases`,
+  `repositories`, `regressions`, `messages`, `stories`, and `workloads`.
+  The selector verifies the five built-in sets and automatically excludes every prior batch.
+  The curator owns collection of all subsequent regression, message, story, and workload inputs.
+  `complete` declares that collection finished; the tool cannot discover omitted historical inputs.
+- `freeze.json`: `curator`, `custodyStartedAt`, the canonical absolute `ledgerDirectory`, and
+  `parserFreeze` with `commit`, `sourceSha256`, `artifactsSha256`, and `frozenAt`.
+  Use the preselection candidate fingerprint. Hash its `artifacts` object as two-space JSON plus
+  a trailing newline. The evaluator enforces that artifact digest. Verify the parser source remains
+  unchanged when committing registration metadata. Record freeze, custody start, exclusion completion,
+  and selection in that order. Preserve the authoritative ledger throughout later openings.
+
+Run the prospective selector into an absent destination owned by this task:
+
+```sh
+bun scripts/markdown/snapshot-evaluation.ts --asset <pinned-archive> --license <license> \
+    --expected-asset-sha256 <archive-sha256> --exclude-manifest <exclusions.json> \
+    --freeze-manifest <freeze.json> --first-batch 4 --batches 1 --out <new-directory>
+```
+
+The command verifies the pinned archive and committed license before decoding. It keeps the fixed
+ordering and filters and requires 100 eligible unique sources per batch. Existing output paths,
+used batch names, duplicate message IDs, and insufficient capacity fail. It writes new assets,
+appendable `manifest.json` and `custody.json`, the byte-exact `previous-manifest.json`, license,
+and `selection.json` with eligibility, invocation, actual times, selector identity, and canonical
+exclusions digest. It presents counts without message previews and imports no candidate parser.
+
+Preserve the previous manifest as historical evidence. Integrate only the new assets and appended
+metadata, then commit before the final fingerprint and production build. Freeze the inventory
+thereafter. Registration changes the source closure, so earlier captures need fresh identities.
+An informed fix retires the whole batch and requires another complete selection. Never reset or
+relocate its authoritative ledger to reopen it. Preserve failed receipts and all original denominators.
+
 ### Capture in order
 
 Set `E` to an owned evidence directory, `BUILD` to an owned production-build directory, and `PORT`
