@@ -20,8 +20,9 @@ import {
 } from '../../../../test/factories/markdown-browser'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { renderWithProviders } from '../../../../test/render'
+import { observeMarkdownSemantics } from '../../../../test/factories/markdown-observation'
 
-test('split preview stays on remark while cold production chat loads tree-sitter without raw syntax', async () => {
+test('split preview stays on remark while cold production chat preserves pending source and settles exactly', async () => {
   expect(resourceQueryClient.getQueryData(chatMarkdownQueryKeys.runtime)).toBeUndefined()
   const preview = renderWithProviders(
     <TestEditorStateProvider>
@@ -43,17 +44,26 @@ test('split preview stays on remark while cold production chat loads tree-sitter
   const grammar = new URL(grammarUrl, location.href)
   await commands.delayRequest({ ms: 750, path: `${grammar.pathname}${grammar.search}` })
   const proof = await createMarkdownBrowser({ sessionFactory: null })
-  const observations: string[] = []
+  const source = '**production**\n\n-       aligned bullet\n\n[docs](https://example.com)'
+  const observations: {
+    readonly raw: string | null
+    readonly pending: boolean
+    readonly observation: ReturnType<typeof observeMarkdownSemantics>
+  }[] = []
   const observer = new MutationObserver(() => {
     const message = proof.host.querySelector('[data-chat-markdown]')
-    if (message) observations.push(message.textContent ?? '')
+    if (!(message instanceof HTMLElement)) return
+    observations.push({
+      raw: message.querySelector('[data-chat-markdown-raw]')?.textContent ?? null,
+      pending: message.querySelector('[role="status"]') !== null,
+      observation: observeMarkdownSemantics(message),
+    })
   })
   observer.observe(proof.host, { childList: true, characterData: true, subtree: true })
   onTestFinished(() => observer.disconnect())
-  await proof.update(
-    '**production**\n\n-       aligned bullet\n\n[docs](https://example.com)',
-    false,
-  )
+  await proof.update(source, false)
+  expect(proof.message().textContent).toBe(source)
+  expect(proof.message().querySelector('[data-chat-markdown-raw]')?.textContent).toBe(source)
   expect(proof.message().querySelector('strong')).toBeNull()
   expect(proof.message().querySelector('[role="status"]')).not.toBeNull()
   await expect.poll(() => proof.message().querySelector('strong')?.textContent).toBe('production')
@@ -64,7 +74,28 @@ test('split preview stays on remark while cold production chat loads tree-sitter
   expect(proof.message().querySelector('li')?.textContent).toBe('aligned bullet')
   expect(proof.message().querySelector('a')?.getAttribute('href')).toBe('https://example.com')
   expect(observations.length).toBeGreaterThan(0)
-  expect(observations.every((text) => !text.includes('**') && !text.includes('[docs]'))).toBe(true)
+  const remark = await createMarkdownBrowser({ sessionFactory: createMarkdownSession })
+  await remark.update(source, false)
+  const settled = observeMarkdownSemantics(remark.message())
+  expect(observeMarkdownSemantics(proof.message())).toEqual(settled)
+  expect(proof.message().querySelector('[data-chat-markdown-raw]')).toBeNull()
+  expect(proof.message().querySelector('[role="status"]')).toBeNull()
+  expect(proof.message().textContent).not.toContain('**')
+  expect(proof.message().textContent).not.toContain('[docs]')
+  const pending = observations.filter((entry) => entry.raw !== null)
+  const ready = observations.filter((entry) => entry.raw === null)
+  expect(pending.length).toBeGreaterThan(0)
+  expect(ready.length).toBeGreaterThan(0)
+  for (const entry of pending) {
+    expect(entry.raw).toBe(source)
+    expect(entry.observation.text).toBe(source)
+    expect(entry.pending).toBe(true)
+    expect(entry.observation.elements.some((element) => element.tag === 'strong')).toBe(false)
+  }
+  for (const entry of ready) {
+    expect(entry.pending).toBe(false)
+    expect(entry.observation).toEqual(settled)
+  }
   expect(
     resourceQueryClient
       .getMutationCache()

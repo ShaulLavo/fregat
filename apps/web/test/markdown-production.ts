@@ -27,10 +27,13 @@ const lifecycle = productionProbeLifecycle(
 )
 const probe = lifecycle.ready
 window.markdownProductionProbe = {
-  ready: probe.then(() => ({
-    engine: candidate ? 'tree-sitter' : 'remark',
-    initializationMs: performance.now() - started,
-  })),
+  ready: probe.then(async (value) => {
+    await value.ready
+    return {
+      engine: candidate ? 'tree-sitter' : 'remark',
+      initializationMs: performance.now() - started,
+    }
+  }),
   run: async (source, chunks) => (await probe).run(source, chunks),
   streamOracle: async (source, chunks, sink) => (await probe).streamOracle(source, chunks, sink),
   time: async (source, chunks, options) => (await probe).time(source, chunks, options),

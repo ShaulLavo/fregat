@@ -94,6 +94,7 @@ export function createProductionMarkdownProbe({
   let revision = 0
   const paintReceipt = observePaintReceipt.bind(null, container, () => revision)
   let disposed = false
+  let preparation: Promise<number> | null = null
   let timeline: ChatSession | null = null
   let simultaneousMessages = 1
   let parseCalls = 0
@@ -129,7 +130,7 @@ export function createProductionMarkdownProbe({
     source: string,
     chunks: readonly string[],
   ): Promise<ProductionMarkdownReceipt> {
-    ensureLive()
+    await prepare()
     documentId += 1
     timeline = null
     const started = performance.now()
@@ -153,7 +154,7 @@ export function createProductionMarkdownProbe({
     chunks: readonly string[],
     sink: ProductionOracleSink,
   ): Promise<void> {
-    ensureLive()
+    await prepare()
     documentId += 1
     timeline = null
     const started = performance.now()
@@ -196,7 +197,7 @@ export function createProductionMarkdownProbe({
     chunks: readonly string[],
     options: ProductionTimingOptions,
   ): Promise<ProductionTimingReceipt> {
-    ensureLive()
+    await prepare()
     const updates = chunks.length > 0 ? chunks : [source]
     const expectedCount = updates.length + Number(chunks.length > 0)
     if (
@@ -358,7 +359,8 @@ export function createProductionMarkdownProbe({
     const deadline = performance.now() + 15_000
     while (true) {
       await highlightingService().awaitIdle()
-      if (renderersReady(container, required)) break
+      if (!container.querySelector('[aria-busy="true"]') && renderersReady(container, required))
+        break
       if (performance.now() >= deadline)
         throw createClientInvariantError('Required Markdown renderer did not become ready')
       await paintedFrame()
@@ -425,7 +427,7 @@ export function createProductionMarkdownProbe({
   }
 
   async function mountTimeline(count: number, source: string) {
-    ensureLive()
+    await prepare()
     clearTimelineReload(TEST_ENVIRONMENT_ID)
     timeline = session({
       latestTurn: null,
@@ -546,6 +548,7 @@ export function createProductionMarkdownProbe({
     scheduled?: number,
     inputDigest?: string,
   ): Promise<ProductionProcessedUpdate> {
+    await prepare()
     const inputText = timeline?.messages.at(-1)?.text ?? text ?? ''
     const inputSha256 = inputDigest ?? (await textDigest(inputText))
     lastInputSha256 = inputSha256
@@ -553,11 +556,35 @@ export function createProductionMarkdownProbe({
     const current = revision
     const received = performance.now()
     performance.mark(`markdown-update-${current}-start`)
-    const committed = Promise.withResolvers<number>()
     parseCalls = 0
     parserWallMs = 0
     if (text === null && !timeline)
       required.raw = required.math = required.code = required.mermaid = false
+    const committedAt = await render(text, live, current)
+    performance.mark(`markdown-update-${current}-commit`)
+    const parser = { parseCalls, parserWallMs }
+    return {
+      revision: current,
+      inputSha256,
+      inputUtf16Units: inputText.length,
+      live,
+      scheduled: scheduled ?? received,
+      received,
+      committed: committedAt,
+      ...parser,
+      output: await readOutput(),
+    }
+  }
+
+  async function prepare() {
+    ensureLive()
+    preparation ??= render(null, false, 0).then(waitForReady)
+    await preparation
+    ensureLive()
+  }
+
+  async function render(text: string | null, live: boolean, current: number) {
+    const committed = Promise.withResolvers<number>()
     flushSync(() => {
       root.render(
         <MarkdownSessionContext value={trackedFactory}>
@@ -586,20 +613,7 @@ export function createProductionMarkdownProbe({
         </MarkdownSessionContext>,
       )
     })
-    const committedAt = await committed.promise
-    performance.mark(`markdown-update-${current}-commit`)
-    const parser = { parseCalls, parserWallMs }
-    return {
-      revision: current,
-      inputSha256,
-      inputUtf16Units: inputText.length,
-      live,
-      scheduled: scheduled ?? received,
-      received,
-      committed: committedAt,
-      ...parser,
-      output: await readOutput(),
-    }
+    return committed.promise
   }
 
   function ensureLive() {
@@ -611,6 +625,9 @@ export function createProductionMarkdownProbe({
   }
 
   return {
+    get ready() {
+      return prepare()
+    },
     run,
     streamOracle,
     time,
