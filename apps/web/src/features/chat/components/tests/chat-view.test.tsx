@@ -77,7 +77,7 @@ test('selecting a cached session keeps its transcript readable and resumes detai
   const view = renderCachedChatSelection(cached.id)
   try {
     fireEvent.click(view.getByRole('button', { name: 'Open cached session' }))
-    expect(view.getByText('Cached question')).toBeInTheDocument()
+    expect(await view.findByText('Cached question')).toBeInTheDocument()
     expect(view.getByText('Connection closed')).toBeInTheDocument()
     expect(view.getByRole('textbox', { name: 'Message' })).toHaveAttribute(
       'contenteditable',

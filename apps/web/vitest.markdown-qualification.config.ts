@@ -4,7 +4,6 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import { createScriptError } from '../../scripts/structured-errors'
 import base from './vitest.browser.config'
-import { mockQualificationImages } from './test/factories/qualification-image-command'
 
 const require = createRequire(import.meta.url)
 const parserRoots = ['tree-sitter-md', 'web-tree-sitter'].map(parserPackageRoot)
@@ -43,7 +42,6 @@ export default defineConfig(({ mode }) => {
       provide: { markdownEngine: engine },
       browser: {
         ...base.test?.browser,
-        commands: { ...base.test?.browser?.commands, mockQualificationImages },
         instances: [{ browser, viewport: { height: 700, width: 900 } }],
       },
     },

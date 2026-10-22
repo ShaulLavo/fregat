@@ -1,3 +1,4 @@
+import { mockQualificationImages } from './test/factories/qualification-image-command.ts'
 import { rendererLifecycleControl } from './src/state/tests/renderer-lifecycle.command.ts'
 import { browserTestResponses } from '../../editor/scripts/browser-test-responses.ts'
 import fs from 'node:fs'
@@ -96,6 +97,7 @@ export default defineConfig({
     browser: {
       commands: {
         rendererLifecycleControl,
+        mockQualificationImages,
         delayRequest,
         diffMouseWheel,
         proofContextClick,
