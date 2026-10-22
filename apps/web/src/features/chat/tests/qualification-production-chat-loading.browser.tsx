@@ -31,6 +31,7 @@ test('cold production chat waits for CHAT grammar after the base grammar loads',
     .toBeGreaterThan(0)
   expect(performance.getEntriesByName(chatGrammar.href)).toHaveLength(0)
   expect(resourceQueryClient.getQueryData(chatMarkdownQueryKeys.runtime)).toBeUndefined()
+  expect(proof.message().textContent).toBe('**production**\n\n$$x + y$$')
   expect(proof.message().querySelector('strong')).toBeNull()
   expect(proof.message().querySelector('[role="status"]')).not.toBeNull()
   await expect
@@ -38,7 +39,9 @@ test('cold production chat waits for CHAT grammar after the base grammar loads',
     .toBe('production')
   await expect.poll(() => proof.message().querySelector('.katex')).not.toBeNull()
   expect(observations.length).toBeGreaterThan(0)
-  expect(observations.every((text) => !text.includes('**') && !text.includes('$$'))).toBe(true)
+  expect(observations.some((text) => text.includes('**production**'))).toBe(true)
+  expect(proof.message().textContent).not.toContain('**')
+  expect(proof.message().textContent).not.toContain('$$')
   const candidate = await import('@workspace/markdown/utils/tree-sitter-session')
   const runtime = resourceQueryClient.getQueryData(chatMarkdownQueryOptions().queryKey)
   expect(runtime?.createSession).toBe(candidate.createTreeSitterMarkdownSession)

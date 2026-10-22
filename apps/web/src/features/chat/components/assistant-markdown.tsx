@@ -111,7 +111,17 @@ export function AssistantMarkdown({
 
   return (
     <div className='min-w-0' data-chat-markdown='true' onCopy={handleCopy}>
-      <ChatMarkdownProvider>
+      <ChatMarkdownProvider
+        fallback={
+          <div
+            className={cn('max-w-full min-w-0 break-words whitespace-pre-wrap', className)}
+            data-chat-markdown-raw='true'
+            onCopy={(event) => event.stopPropagation()}
+          >
+            {text}
+          </div>
+        }
+      >
         <MarkdownFileLinkContext value={fileLinkActions}>
           <CodeHighlighterContext value={highlighter}>
             <MarkdownDiagramContext value={mermaid}>
