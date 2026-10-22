@@ -2714,6 +2714,16 @@ test('rejects malformed UTF-8 in an otherwise matching native raw string field',
       (row) => row.startsWith('native-resources:') && row.includes('invalid'),
     ),
   ).toBe(true)
+  await writeFile(
+    path.join(control.directory, 'native-resources.jsonl'),
+    Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), bytes]),
+  )
+  const bom = await assemblePromotionEvidence(control.manifest)
+  expect(
+    bom.report.findings.some(
+      (row) => row.startsWith('native-resources:') && row.includes('invalid'),
+    ),
+  ).toBe(true)
 })
 
 test.each(['remark', 'tree-sitter'] as const)(
