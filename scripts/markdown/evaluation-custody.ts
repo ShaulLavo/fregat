@@ -92,7 +92,7 @@ const registrationSchema = object({
   registeredAt: time,
   invocation: array(string()),
 })
-export const custodySchema = object({
+const custodySchema = object({
   schemaVersion: literal(1),
   legacyManifestSha256: sha,
   records: array(union([legacySchema, registrationSchema])),
