@@ -1,5 +1,6 @@
 import { MARKDOWN_CASES } from '../../packages/markdown/test/fixtures/cases'
 import { createHash, hash } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { ProductionTrial } from './production-analysis'
@@ -15,7 +16,8 @@ import {
   type NativeRevision,
 } from './paired-native'
 import { productionTrialRecords, writeProductionTrials } from './production-browser'
-import { foldJsonl, hashFile, type RawTimingRef } from './timing-artifacts'
+import { hashFile, type RawTimingRef } from './timing-artifacts'
+import { createScriptError } from '../structured-errors'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import {
@@ -444,6 +446,7 @@ async function writeProduction(
   let current: ProductionWorkload | undefined
   let template: ProductionTemplate
   const failures: string[] = []
+  const statisticsRows: Pick<ProductionTrial, 'pair' | 'family'>[] = []
   const observed = await writeProductionTrials({
     output: directory,
     workloads,
@@ -464,11 +467,12 @@ async function writeProduction(
           order,
           engine,
         })
+        statisticsRows.push({ pair: captured.pair, family: captured.family })
         return resourceTrial(captured, resources)
       },
     }),
   })
-  await recordStatistics(directory, observed.trialsArtifact)
+  await recordStatistics(directory, observed.trialsArtifact, statisticsRows)
   const report = {
     schemaVersion: 2,
     build: 'production',
@@ -570,55 +574,53 @@ export async function writeFullSyntheticTiming(options: {
   return { fontFingerprint }
 }
 
-async function recordStatistics(root: string, reference: RawTimingRef) {
+export async function recordStatistics(
+  root: string,
+  reference: RawTimingRef,
+  rows?: readonly Pick<ProductionTrial, 'pair' | 'family'>[],
+) {
   let largestRecord = 0
-  let pendingRecords = 0
-  let maximumPendingRecords = 0
-  let byteOffset = 0
+  let byteLength = 0
+  let recordCount = 0
   let lastWarmup: { offset: number; bytes: number } | null = null
   let firstResource: { offset: number; bytes: number } | null = null
   let lastRecord = { offset: 0, bytes: 0 }
-  await foldJsonl({
-    root,
-    file: reference.path,
-    expected: reference,
-    parse: (value) => value,
-    consume: async (value) => {
-      pendingRecords++
-      maximumPendingRecords = Math.max(maximumPendingRecords, pendingRecords)
-      const bytes = Buffer.byteLength(JSON.stringify(value)) + 1
+  const digest = createHash('sha256')
+  for await (const chunk of createReadStream(path.join(root, reference.path))) {
+    digest.update(chunk)
+    for (let end = chunk.indexOf(10); end !== -1; end = chunk.indexOf(10, end + 1)) {
+      const offset = lastRecord.offset + lastRecord.bytes
+      const bytes = byteLength + end + 1 - offset
+      const row = rows?.[recordCount]
+      lastRecord = { offset, bytes }
       largestRecord = Math.max(largestRecord, bytes)
-      if (
-        typeof value === 'object' &&
-        value !== null &&
-        'pair' in value &&
-        typeof value.pair === 'number' &&
-        value.pair < 0
-      )
-        lastWarmup = { offset: byteOffset, bytes }
-      if (
-        typeof value === 'object' &&
-        value !== null &&
-        'family' in value &&
-        value.family === 'resources' &&
-        'pair' in value &&
-        typeof value.pair === 'number' &&
-        value.pair >= 0
-      )
-        firstResource ??= { offset: byteOffset, bytes }
-      lastRecord = { offset: byteOffset, bytes }
-      byteOffset += bytes
-      await Promise.resolve()
-      pendingRecords--
-    },
-  })
+      if (row && row.pair < 0) lastWarmup = lastRecord
+      if (row && row.pair >= 0 && row.family === 'resources') firstResource ??= lastRecord
+      recordCount++
+    }
+    byteLength += chunk.length
+  }
+  if (lastRecord.offset + lastRecord.bytes !== byteLength)
+    throw createScriptError('Fixture statistics require a final LF terminator.', {
+      internal: { byteLength, terminatedBytes: lastRecord.offset + lastRecord.bytes },
+    })
+  const sha256 = digest.digest('hex')
+  if (
+    sha256 !== reference.sha256 ||
+    byteLength !== reference.byteLength ||
+    recordCount !== reference.recordCount ||
+    (rows !== undefined && rows.length !== recordCount)
+  )
+    throw createScriptError('Fixture statistics differ from the raw artifact reference.', {
+      internal: { byteLength, recordCount, observedRows: rows?.length },
+    })
   const statistics = {
     ...reference,
     largestRecord,
     lastWarmup,
     firstResource,
     lastRecord,
-    maximumPendingRecords,
+    maximumPendingRecords: recordCount > 0 ? 1 : 0,
   }
   await save(root, `${reference.path}.statistics.json`, statistics)
   return statistics
