@@ -1591,7 +1591,16 @@ async function visualSourceFindings(
     index.set(key, (index.get(key) ?? []).concat(image))
   }
   const rows = list(get(report?.value ?? {}, 'compared')).filter(isRecord)
-  const files = { physical: new Map<string, string>(), source: new Set<string>() }
+  const files = { physical: new Map<string, string>(), source: new Map<string, string>() }
+  const pairedCaptures = new Map<string, RecordValue[]>()
+  const pairedArtifacts = bindings
+    .filter((binding) => get(binding, 'runId') === 'paired-raster')
+    .flatMap((binding) => list(get(binding, 'artifacts')).filter(isRecord))
+    .filter((artifact) => get(artifact, 'role') === 'pairedRasterImage')
+  for (const artifact of pairedArtifacts) {
+    const file = normalizedArtifact(manifest.evidenceDirectory, stringValue(artifact, 'path') ?? '')
+    pairedCaptures.set(file, (pairedCaptures.get(file) ?? []).concat(artifact))
+  }
   for (const key of visualStateKeys()) {
     const selected = rows.filter((row) => stringValue(row, 'key') === key)
     if (selected.length !== 1) continue
@@ -1607,6 +1616,7 @@ async function visualSourceFindings(
         engine,
         files,
         bindings,
+        pairedCaptures,
       )
       findings.push(...result.findings)
       artifacts.push(...result.artifacts)
@@ -1621,8 +1631,9 @@ async function visualSourcePair(
   row: RecordValue,
   sources: readonly Visual[],
   engine: Visual['engine'],
-  files: { readonly physical: Map<string, string>; readonly source: Set<string> },
+  files: { readonly physical: Map<string, string>; readonly source: Map<string, string> },
   bindings: readonly RecordValue[],
+  pairedCaptures: ReadonlyMap<string, readonly RecordValue[]>,
 ): Promise<{ findings: string[]; artifacts: string[] }> {
   const key = stringValue(row, 'key') ?? ''
   const source = sources[0]
@@ -1654,10 +1665,17 @@ async function visualSourcePair(
       }
     const original = await resolveEvidencePath(root, stringValue(capture, 'path') ?? '')
     const role = engine === 'remark' ? 'baseline' : 'candidate'
-    const paired = await resolveEvidencePath(
-      root,
-      path.resolve(root, path.dirname(reportPath), stringValue(row, role) ?? ''),
-    )
+    const pairedPath = path.resolve(root, path.dirname(reportPath), stringValue(row, role) ?? '')
+    const paired = await resolveEvidencePath(root, pairedPath)
+    const pairedBindings = pairedCaptures.get(normalizedArtifact(root, pairedPath)) ?? []
+    const pairedSourceIdentity = stringValue(pairedBindings[0] ?? {}, 'sourceFileIdentity')
+    if (pairedBindings.length !== 1 || !pairedSourceIdentity)
+      return {
+        findings: [
+          `visual-states: ${key} ${engine} paired capture retention binding is missing or ambiguous.`,
+        ],
+        artifacts: [],
+      }
     const originalInfo = await stat(original, { bigint: true })
     const pairedInfo = await stat(paired, { bigint: true })
     const originalIdentity = `${originalInfo.dev}:${originalInfo.ino}`
@@ -1666,10 +1684,14 @@ async function visualSourcePair(
     const reused =
       [originalIdentity, pairedIdentity].some(
         (file) => files.physical.has(file) && files.physical.get(file) !== captureIdentity,
-      ) || files.source.has(sourceIdentity)
+      ) ||
+      [sourceIdentity, pairedSourceIdentity].some(
+        (file) => files.source.has(file) && files.source.get(file) !== captureIdentity,
+      )
     files.physical.set(originalIdentity, captureIdentity)
     files.physical.set(pairedIdentity, captureIdentity)
-    files.source.add(sourceIdentity)
+    files.source.set(sourceIdentity, captureIdentity)
+    files.source.set(pairedSourceIdentity, captureIdentity)
     if (reused)
       return {
         findings: [

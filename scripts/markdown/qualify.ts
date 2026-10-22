@@ -49,7 +49,8 @@ const QUALIFICATION_ARTIFACT_ROLES = [
 ] as const
 type QualificationArtifactRole = (typeof QUALIFICATION_ARTIFACT_ROLES)[number]
 type QualificationArtifactIdentity =
-  | { readonly role: QualificationArtifactRole }
+  | { readonly role: Exclude<QualificationArtifactRole, 'pairedRasterImage'> }
+  | { readonly role: 'pairedRasterImage'; readonly sourceFileIdentity: string }
   | {
       readonly role: 'originalVisualImage'
       readonly original: Visual
@@ -878,18 +879,25 @@ async function pairedRasterArtifacts(
   if (!run) return []
   const reportPath = path.resolve(run.log)
   const report = JSON.parse(await readFile(reportPath, 'utf8')) as unknown
-  const images = pairedRasterImagePaths(report, reportPath).map((file) => ({
-    runId: run.name,
-    role: 'pairedRasterImage' as const,
-    path: file,
-  }))
+  const images = await Promise.all(
+    pairedRasterImagePaths(report, reportPath).map(async (file) => {
+      const info = await stat(file, { bigint: true })
+      return {
+        runId: run.name,
+        role: 'pairedRasterImage' as const,
+        path: file,
+        sourceFileIdentity: `${info.dev}:${info.ino}`,
+      }
+    }),
+  )
   const calibrations = await pairedRasterCalibrationPaths(runs)
   const reportArtifact: QualificationArtifactSource & { readonly runId: string } = {
     runId: run.name,
     role: 'pairedRasterReport',
     path: reportPath,
   }
-  return [reportArtifact].concat(
+  const artifacts: (QualificationArtifactSource & { readonly runId: string })[] = [reportArtifact]
+  return artifacts.concat(
     images,
     calibrations.map((file) => ({
       runId: run.name,
@@ -924,32 +932,23 @@ async function materializeQualificationArtifact(
   evidenceDirectory: string,
   source: QualificationArtifactSource & { readonly runId: string },
 ): Promise<QualificationArtifactBinding> {
-  const bytes = await readQualificationArtifactBytes(source.path)
+  const { path: file, runId, ...identity } = source
+  const bytes = await readQualificationArtifactBytes(file)
   const digest = hash('sha256', bytes, 'hex')
   const root = path.resolve(evidenceDirectory)
-  const sourcePath = path.isAbsolute(source.path)
-    ? path.resolve(source.path)
-    : path.resolve(ROOT, source.path)
+  const sourcePath = path.isAbsolute(file) ? path.resolve(file) : path.resolve(ROOT, file)
   let targetPath = sourcePath
   let relative = evidenceRelativePath(targetPath, root)
   if (!relative) {
-    const identity =
-      source.role === 'originalVisualImage'
-        ? hash('sha256', JSON.stringify([source.runId, source.original]), 'hex')
+    const address =
+      identity.role === 'originalVisualImage'
+        ? hash('sha256', JSON.stringify([runId, identity.original]), 'hex')
         : digest
-    relative = path.posix.join('captured', source.role, `${identity}-${path.basename(sourcePath)}`)
+    relative = path.posix.join('captured', identity.role, `${address}-${path.basename(sourcePath)}`)
     targetPath = path.join(root, ...relative.split('/'))
     await mkdir(path.dirname(targetPath), { recursive: true })
     await writeFile(targetPath, bytes)
   }
-  const identity: QualificationArtifactIdentity =
-    source.role === 'originalVisualImage'
-      ? {
-          role: source.role,
-          original: source.original,
-          sourceFileIdentity: source.sourceFileIdentity,
-        }
-      : { role: source.role }
   return { ...identity, path: relative, sha256: digest, byteLength: bytes.byteLength }
 }
 

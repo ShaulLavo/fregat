@@ -2993,6 +2993,17 @@ test.each(['in-place', 'relocated'] as const)(
       skipped: 0,
       failures: [],
     })
+    expect(
+      result.evidence.receipts.find((row) => row.gate === 'visual-states')?.metrics,
+    ).toMatchObject({
+      pairedEngineCount: 2,
+      webkitCriticalStates: 32,
+      selectedCases: 128,
+      attemptedCases: 128,
+      completeCases: 128,
+      failedCases: 0,
+      skippedCases: 0,
+    })
     expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
       'passed',
     )
@@ -3019,13 +3030,15 @@ test.each(['in-place', 'relocated'] as const)(
     const pairedInfo = await stat(paired, { bigint: true })
     expect(sourceIdentity).toBe(`${pairedInfo.dev}:${pairedInfo.ino}`)
     await control.recapture()
-    const retained = control.report.artifactBindings
-      .flatMap((binding) => binding.artifacts)
-      .find(
-        (artifact) =>
-          artifact.role === 'originalVisualImage' &&
-          artifact.original.screenshot === original.screenshot,
-      )!
+    const artifacts = control.report.artifactBindings.flatMap((binding) => binding.artifacts)
+    const retained = artifacts
+      .filter((artifact) => artifact.role === 'originalVisualImage')
+      .find((artifact) => artifact.original.screenshot === original.screenshot)!
+    const pairedCapture = artifacts
+      .filter((artifact) => artifact.role === 'pairedRasterImage')
+      .find((artifact) => artifact.path === raster.compared[1].candidate)!
+    expect(pairedCapture.sourceFileIdentity).toBe(sourceIdentity)
+    expect(retained.sourceFileIdentity).toBe(sourceIdentity)
     const retainedInfo = await stat(path.join(control.root, retained.path), { bigint: true })
     expect(`${retainedInfo.dev}:${retainedInfo.ino}`).not.toBe(sourceIdentity)
     await rm(outside, { recursive: true })
@@ -3034,6 +3047,71 @@ test.each(['in-place', 'relocated'] as const)(
     expect(
       result.report.gates.find((row) => row.gate === 'visual-states')?.failures.join(' '),
     ).toContain('reused')
+    expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+      'blocked',
+    )
+  },
+)
+
+test.each(['in-place', 'relocated'] as const)(
+  'rejects historical paired aliases after independent retained copies %s',
+  async (mode) => {
+    const control = await producerQualificationFixture()
+    const raster = JSON.parse(await readFile(path.join(control.root, 'paired-raster.json'), 'utf8'))
+    const first = path.join(control.root, raster.compared[0].baseline)
+    const second = path.join(control.root, raster.compared[1].candidate)
+    await rm(second)
+    await link(first, second)
+    await control.recapture()
+    for (const file of [first, second]) {
+      await writeFile(`${file}.copy`, await readFile(file))
+      await rename(`${file}.copy`, file)
+    }
+    const firstInfo = await stat(first, { bigint: true })
+    const secondInfo = await stat(second, { bigint: true })
+    expect(`${firstInfo.dev}:${firstInfo.ino}`).not.toBe(`${secondInfo.dev}:${secondInfo.ino}`)
+    const manifest = await relocatedVisualEvidence(control, mode)
+    const result = await assemblePromotionEvidence(manifest)
+    expect(
+      result.report.gates.find((row) => row.gate === 'visual-states')?.failures.join(' '),
+    ).toContain('reused')
+    expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
+      'blocked',
+    )
+  },
+)
+
+test.each(['missing', 'empty', 'duplicate', 'wrong-run'] as const)(
+  'requires an exact paired capture historical binding: %s',
+  async (fault) => {
+    const control = await producerQualificationFixture()
+    const binding = control.report.artifactBindings.find((row) => row.runId === 'paired-raster')!
+    const captured = binding.artifacts.find((artifact) => artifact.role === 'pairedRasterImage')!
+    const changed: Record<string, unknown> = { ...captured }
+    if (fault === 'missing') delete changed.sourceFileIdentity
+    if (fault === 'empty') changed.sourceFileIdentity = ''
+    let artifacts = binding.artifacts.map((artifact) =>
+      artifact === captured ? changed : artifact,
+    )
+    if (fault === 'duplicate') artifacts = artifacts.concat(captured)
+    const updated = {
+      ...binding,
+      artifacts,
+      runId: fault === 'wrong-run' ? 'unrelated' : binding.runId,
+    }
+    await writeFile(
+      path.join(control.root, 'qualification.json'),
+      JSON.stringify({
+        ...control.report,
+        artifactBindings: control.report.artifactBindings.map((row) =>
+          row === binding ? updated : row,
+        ),
+      }),
+    )
+    const result = await assemblePromotionEvidence(control.manifest)
+    expect(
+      result.report.gates.find((row) => row.gate === 'visual-states')?.failures.join(' '),
+    ).toContain('paired capture retention binding is missing or ambiguous')
     expect(result.validation.gates.find((row) => row.gate === 'visual-states')?.status).toBe(
       'blocked',
     )
