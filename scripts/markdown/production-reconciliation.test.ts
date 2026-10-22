@@ -111,12 +111,12 @@ async function writeFixture(directory: string, input: TimingReconciliationInput)
   } else {
     raw.pairsArtifact = reference
     raw.workloads = raw.workloads.map(
-      (row: { id: string; pairs: { mismatchedRevisions: unknown[] }[] }) => {
+      (row: { id: string; pairs: { trial: number; mismatchedRevisions: unknown[] }[] }) => {
         const { pairs, ...summary } = row
         return {
           ...summary,
           family: input.frozen.nativeWorkloads.find((workload) => workload.id === row.id)?.family,
-          observedPairs: pairs.length,
+          observedPairs: pairs.filter((pair) => pair.trial >= 0).length,
           mismatchedPairs: pairs.filter((pair) => pair.mismatchedRevisions.length > 0).length,
           comparisons: nativeComparisons(row.id, raw.metadata.seed),
         }
@@ -615,7 +615,6 @@ function nativeInput(
     candidateSourceSha256: hash(JSON.stringify(sourceFiles)),
     revision: frozen.provenance.revision,
   }
-  const orders = pairedTrialOrders(20, metadata.seed)
   const report = artifact('paired-native.json', {
     schemaVersion: 1,
     scope: 'paired-native-source',
@@ -626,13 +625,7 @@ function nativeInput(
       sourceBytes: workload.sourceBytes,
       sourceSha256: hash(workload.source),
       scheduleUnits: workload.scheduleUnits,
-      pairs: orders.map((order, trial) => ({
-        trial,
-        order,
-        remark: syntheticNativeTrial(workload, trial, 'remark'),
-        candidate: syntheticNativeTrial(workload, trial, 'tree-sitter'),
-        mismatchedRevisions: [],
-      })),
+      pairs: syntheticNativePairs(workload, metadata.seed),
     })),
   })
   return {
@@ -687,6 +680,18 @@ function nativeInput(
   }
 }
 
+function syntheticNativePairs(workload: NativePairWorkload, seed: number) {
+  const warmups = pairedTrialOrders(3, seed).map((order, index) => ({ trial: -index - 1, order }))
+  const measured = pairedTrialOrders(20, seed).map((order, trial) => ({ trial, order }))
+  return warmups.concat(measured).map(({ trial, order }) => ({
+    trial,
+    order,
+    remark: syntheticNativeTrial(workload, trial, 'remark'),
+    candidate: syntheticNativeTrial(workload, trial, 'tree-sitter'),
+    mismatchedRevisions: [],
+  }))
+}
+
 function syntheticNativeTrial(
   workload: NativePairWorkload,
   trial: number,
@@ -697,27 +702,29 @@ function syntheticNativeTrial(
     (workload.scheduleUnits > 0
       ? Array.from(fixedChunks(workload.source, workload.scheduleUnits), (frame) => frame.text)
       : [workload.source])
+  const warmupTiming = engine === 'remark' ? 100 : 1000
+  const timing = trial < 0 ? warmupTiming : 1
   const revisions = updates.map((source, revision) => ({
     revision,
     offset: source.length,
     phase: 'update',
-    wallMs: 1,
-    cpuMs: 1,
+    wallMs: timing,
+    cpuMs: timing,
     outputDigest: hash(source),
     sourceCoordinateFailures: [],
   }))
   return {
     engine,
     trial,
-    mountMs: 1,
-    streamCpuMs: 2,
+    mountMs: timing,
+    streamCpuMs: 2 * timing,
     revisions: revisions.concat([
       {
         revision: updates.length,
         offset: workload.source.length,
         phase: 'settlement',
-        wallMs: 1,
-        cpuMs: 1,
+        wallMs: timing,
+        cpuMs: timing,
         outputDigest: hash(workload.source),
         sourceCoordinateFailures: [],
       },
@@ -1205,7 +1212,7 @@ test('actual native pair order remains authoritative after rehash', async () => 
   })
   expect(result.verdict).toBe('NOT VERIFIED')
   expect(result.findings.some((finding) => finding.path === 'trials.record.0.identity')).toBe(true)
-  expect(result.metrics.observedWarmupTrials).toBeNull()
+  expect(result.metrics.observedWarmupTrials).toBe(3)
 })
 
 test('released producer encounter order reconciles from the actual sealed raw file', async () => {
@@ -1416,12 +1423,19 @@ test('input identity, painted count, transfer completion and missing ordinary la
   ).toBeNull()
 })
 
-test('native positive path needs no invented warmup rows, browser, fonts or realm identities', async () => {
+test('native positive path retains raw warmups and compares only 20 measured pairs', async () => {
   const result = await reconcileTimingEvidence(nativeInput())
   expect(result.findings).toEqual([])
   expect(result.timingStatus).toBe('NATIVE_CAPTURE_RECONCILED')
   expect(result.metrics.configuredWarmups).toBe(3)
-  expect(result.metrics.observedWarmupTrials).toBeNull()
+  expect(result.metrics.observedWarmupTrials).toBe(3)
+  expect(result.samples.filter((sample) => sample.warmup)).toHaveLength(6)
+  expect(result.samples.filter((sample) => !sample.warmup)).toHaveLength(40)
+  expect(result.samples.filter((sample) => sample.warmup).map((sample) => sample.pair)).toEqual([
+    -1, -1, -2, -2, -3, -3,
+  ])
+  expect(result.comparisons).toHaveLength(4)
+  expect(result.comparisons.every((comparison) => comparison.independentTrials === 20)).toBe(true)
   expect(result.metrics.quietHostEstablished).toBe(true)
 })
 
@@ -1652,20 +1666,10 @@ async function writeNativeCapture(directory: string) {
   }
   const raw = JSON.parse(input.report.contents)
   raw.metadata.workloadManifestSha256 = workloadManifestSha256
-  const orders = pairedTrialOrders(20, raw.metadata.seed)
   async function* records() {
     for (const workload of workloads) {
-      for (const [trial, order] of orders.entries())
-        yield {
-          workload: workload.id,
-          pair: {
-            trial,
-            order,
-            remark: syntheticNativeTrial(workload, trial, 'remark'),
-            candidate: syntheticNativeTrial(workload, trial, 'tree-sitter'),
-            mismatchedRevisions: [],
-          },
-        }
+      for (const pair of syntheticNativePairs(workload, raw.metadata.seed))
+        yield { workload: workload.id, pair }
     }
   }
   const pairsArtifact = await writeJsonl({
@@ -1759,7 +1763,8 @@ test('full native CLI verifies actual source closure and binary bytes then rejec
     expect(positive.findings).toEqual([])
     expect(positive.timingStatus).toBe('NATIVE_CAPTURE_RECONCILED')
     expect(positive.measured).toBe(3000)
-    expect(positive.warmup).toBe(0)
+    expect(positive.warmup).toBe(450)
+    expect(positive.metrics.observedWarmupTrials).toBe(225)
     expect(positive.comparisons).toBe(300)
     console.log('SYNTHETIC_FULL_NATIVE', JSON.stringify(positive))
     const source = path.join(
@@ -2004,4 +2009,90 @@ test('promotion controls retain a detected long task among short observations', 
   )
   expect(result.findings).toEqual([])
   expect(result.verdict).toBe('VERIFIED')
+})
+
+test.each([
+  { name: 'missing first warmup', index: 0, replacement: null },
+  { name: 'missing middle warmup', index: 1, replacement: null },
+  { name: 'missing last warmup', index: 2, replacement: null },
+  { name: 'duplicate warmup', index: 1, replacement: -1 },
+  { name: 'unexpected negative ID', index: 0, replacement: -4 },
+  { name: 'fractional warmup ID', index: 0, replacement: -1.5 },
+  { name: 'measured ID substituted for warmup', index: 0, replacement: 0 },
+])('actual native raw rejects $name after rehash', async ({ index, replacement }) => {
+  const result = await mutateFileFixture({
+    kind: 'native',
+    rebind: true,
+    mutate: (lines) => {
+      if (replacement === null) return lines.filter((_, line) => line !== index)
+      const row = JSON.parse(lines[index])
+      row.pair.trial = replacement
+      row.pair.remark.trial = replacement
+      row.pair.candidate.trial = replacement
+      lines[index] = JSON.stringify(row)
+      return lines
+    },
+  })
+  expect(result.verdict).toBe('NOT VERIFIED')
+  expect(result.findings.some((finding) => finding.path.startsWith('trials.record.'))).toBe(true)
+})
+
+test('actual native raw rejects an extra warmup after rehash', async () => {
+  const result = await mutateFileFixture({
+    kind: 'native',
+    rebind: true,
+    mutate: (lines) => [lines[0]].concat(lines),
+  })
+  expect(result.verdict).toBe('NOT VERIFIED')
+  expect(result.findings.some((finding) => finding.path === 'native.pairKeys')).toBe(true)
+  expect(result.metrics.observedWarmupTrials).toBe(4)
+})
+
+test.each(['remark', 'candidate'] as const)(
+  'actual native warmup validates %s arm identity after rehash',
+  async (arm) => {
+    const result = await mutateFileFixture({
+      kind: 'native',
+      rebind: true,
+      mutate: (lines) => {
+        const row = JSON.parse(lines[0])
+        row.pair[arm].trial = 0
+        lines[0] = JSON.stringify(row)
+        return lines
+      },
+    })
+    expect(result.verdict).toBe('NOT VERIFIED')
+    expect(result.findings.some((finding) => finding.path.endsWith('.identity'))).toBe(true)
+  },
+)
+
+test.each([
+  { name: 'order', field: 'order', expected: '.order' },
+  { name: 'missing revisions', field: 'revisions', expected: '.candidate.revisions' },
+  { name: 'wrong output', field: 'outputDigest', expected: '.outputs' },
+  { name: 'source coordinates', field: 'sourceCoordinateFailures', expected: '.sourceCoordinates' },
+  { name: 'revision identity', field: 'offset', expected: '.candidate.revisions' },
+  { name: 'reported mismatch', field: 'mismatchedRevisions', expected: '.mismatchedRevisions' },
+])('actual native warmup rejects $name hidden by a clean summary', async ({ field, expected }) => {
+  const result = await mutateFileFixture({
+    kind: 'native',
+    rebind: true,
+    mutate: (lines) => {
+      const row = JSON.parse(lines[2])
+      if (field === 'order') row.pair.order.reverse()
+      if (field === 'revisions') row.pair.candidate.revisions = []
+      if (field === 'outputDigest') row.pair.candidate.revisions[0].outputDigest = hash('wrong')
+      if (field === 'sourceCoordinateFailures')
+        row.pair.candidate.revisions[0].sourceCoordinateFailures = ['out of bounds']
+      if (field === 'offset') row.pair.candidate.revisions[0].offset++
+      if (field === 'mismatchedRevisions') row.pair.mismatchedRevisions = [0]
+      lines[2] = JSON.stringify(row)
+      return lines
+    },
+  })
+  expect(result.verdict).toBe('NOT VERIFIED')
+  expect(result.findings.some((finding) => finding.path.endsWith(expected))).toBe(true)
+  if (field !== 'order')
+    expect(result.findings.some((finding) => finding.path.endsWith('.mismatchedPairs'))).toBe(true)
+  expect(result.comparisons.every((comparison) => comparison.independentTrials === 20)).toBe(true)
 })

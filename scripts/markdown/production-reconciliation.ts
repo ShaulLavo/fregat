@@ -340,7 +340,7 @@ const nativeTrial = v.object({
   revisions: v.array(nativeRevision),
 })
 const nativePair = v.object({
-  trial: count,
+  trial: v.pipe(finite, v.integer(), v.minValue(-3), v.maxValue(19)),
   order: v.pipe(v.array(engine), v.length(2)),
   remark: nativeTrial,
   candidate: nativeTrial,
@@ -1740,22 +1740,25 @@ async function reconcileNative(raw: unknown, state: State) {
       [sha(workload.source), workload.sourceBytes, workload.scheduleUnits, workload.family],
     )
   }
+  const trialIds = [-1, -2, -3].concat(Array.from({ length: 20 }, (_, trial) => trial))
   const keys: string[] = []
+  let observedWarmups = 0
   await foldTimingRecords(report.pairsArtifact, nativePairRecord, state, (record, index) => {
-    const workload = workloads[Math.floor(index / 20)]
+    const workload = workloads[Math.floor(index / trialIds.length)]
     same(
       state,
       `trials.record.${index}.identity`,
       [record.workload, record.pair.trial],
-      [workload?.id, index % 20],
+      [workload?.id, trialIds[index % trialIds.length]],
     )
     keys.push(`${record.workload}/${record.pair.trial}`)
+    if (record.pair.trial < 0) observedWarmups++
     const selected = workloads.find((entry) => entry.id === record.workload)
     if (!selected) return
     const previous = counts.get(record.workload) ?? { observed: 0, mismatched: 0 }
     counts.set(record.workload, {
-      observed: previous.observed + 1,
-      mismatched: previous.mismatched + Number(record.pair.mismatchedRevisions.length > 0),
+      observed: previous.observed + Number(record.pair.trial >= 0),
+      mismatched: previous.mismatched + Number(nativePairHasMismatches(record.pair)),
     })
     reconcileNativePair(record.pair, selected, metadata.seed, state)
   })
@@ -1763,9 +1766,7 @@ async function reconcileNative(raw: unknown, state: State) {
     state,
     'native.pairKeys',
     keys.toSorted(),
-    workloads
-      .flatMap((workload) => Array.from({ length: 20 }, (_, pair) => `${workload.id}/${pair}`))
-      .sort(),
+    workloads.flatMap((workload) => trialIds.map((trial) => `${workload.id}/${trial}`)).sort(),
   )
   for (const row of report.workloads) {
     const observed = counts.get(row.id)
@@ -1786,7 +1787,23 @@ async function reconcileNative(raw: unknown, state: State) {
   state.metrics.hostId = metadata.host
   state.metrics.runtimeVersion = metadata.runtime
   state.metrics.configuredWarmups = metadata.warmups
-  state.metrics.observedWarmupTrials = null
+  state.metrics.observedWarmupTrials = observedWarmups
+}
+function nativePairHasMismatches(pair: v.InferOutput<typeof nativePair>) {
+  if (pair.mismatchedRevisions.length > 0) return true
+  if (pair.remark.revisions.length !== pair.candidate.revisions.length) return true
+  return pair.remark.revisions.some((left, index) => {
+    const right = pair.candidate.revisions[index]
+    if (!right) return true
+    return (
+      left.revision !== right.revision ||
+      left.offset !== right.offset ||
+      left.phase !== right.phase ||
+      left.outputDigest !== right.outputDigest ||
+      left.sourceCoordinateFailures.length > 0 ||
+      right.sourceCoordinateFailures.length > 0
+    )
+  })
 }
 function reconcileNativePair(
   pair: v.InferOutput<typeof nativePair>,
@@ -1798,7 +1815,9 @@ function reconcileNativePair(
     state,
     `${workload.id}/${pair.trial}.order`,
     pair.order,
-    pairedTrialOrders(20, seed)[pair.trial],
+    pair.trial < 0
+      ? pairedTrialOrders(3, seed)[-pair.trial - 1]
+      : pairedTrialOrders(20, seed)[pair.trial],
   )
   const expectedRevisions = nativeExpectedRevisions(workload)
   same(
@@ -1847,7 +1866,7 @@ function nativeSample(
     workload,
     pair,
     engine: trial.engine,
-    warmup: false,
+    warmup: pair < 0,
     processedInputs: trial.revisions.length,
     paintedUpdates: null,
     unpaintedUpdates: null,
