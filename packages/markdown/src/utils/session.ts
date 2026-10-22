@@ -86,6 +86,7 @@ export function createMarkdownSession(options: MarkdownSessionOptions = {}): Mar
     update(text, { heal }) {
       if (last && last.text === text && last.heal === heal) return last.blocks
 
+      if (text.length === 0) settled = []
       const blocks = text.length === 0 ? [] : parse(text, heal)
       last = { blocks, heal, text }
 
