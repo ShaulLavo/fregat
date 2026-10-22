@@ -569,13 +569,19 @@ async function syncLedgerDirectory(file: string) {
   }
 }
 
+async function tryLedgerLock(file: string) {
+  try {
+    return await open(file, 'wx')
+  } catch (error) {
+    if (!(error instanceof Error) || !('code' in error) || error.code !== 'EEXIST') throw error
+    return null
+  }
+}
+
 async function acquireLedgerLock(file: string) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
-    try {
-      return await open(file, 'wx')
-    } catch (error) {
-      if (!(error instanceof Error) || !('code' in error) || error.code !== 'EEXIST') throw error
-    }
+    const handle = await tryLedgerLock(file)
+    if (handle) return handle
     await delay(10)
   }
   throw createScriptError('The evaluation ledger has an active or interrupted transition.', {
