@@ -145,6 +145,42 @@ for (const token of ['é', '😀', '"', '\\']) {
   })
 }
 
+test('folds large records across chunks with short records on both sides', async ({ root }) => {
+  const values = [
+    { text: 'before' },
+    { text: 'é😀\n"\\'.repeat(180_000) },
+    { text: 'between' },
+    { text: 'x'.repeat(8 * 1024 * 1024) },
+    { text: 'after' },
+  ]
+  const contents = values.map((value) => `${JSON.stringify(value)}\r\n`).join('')
+  const options = await capture(evidence(root), contents, values.length)
+  let consumed = 0
+  await expect(
+    foldJsonl({
+      ...options,
+      consume: async (value, index) => {
+        expect(index).toBe(consumed)
+        expect(value).toEqual(values[index])
+        await new Promise<void>((resolve) => setImmediate(resolve))
+        consumed++
+      },
+    }),
+  ).resolves.toEqual(options.expected)
+  expect(consumed).toBe(values.length)
+})
+
+test('rejects oversized unterminated records before decoding trailing invalid bytes', async ({
+  root,
+}) => {
+  const bytes = Buffer.alloc(65 * 1024 * 1024, 0x78)
+  bytes[bytes.length - 1] = 0xff
+  const options = await capture(evidence(root), bytes)
+  await expect(foldJsonl({ ...options, consume: () => {} })).rejects.toThrow(
+    /record exceeds the 64 MiB byte limit/i,
+  )
+})
+
 test('accepts CRLF split between chunks and requires final LF', async ({ root }) => {
   const value = 'x'.repeat(65_536 - Buffer.byteLength('{"text":""}') - 1)
   const options = await capture(evidence(root), `${JSON.stringify({ text: value })}\r\n`)
@@ -154,6 +190,7 @@ test('accepts CRLF split between chunks and requires final LF', async ({ root })
 })
 
 const malformed = [
+  Buffer.from('\ufeff{"ok":true}\n'),
   Buffer.from([0x22, 0xc3, 0x28, 0x22, 0x0a]),
   Buffer.from([0x22, 0xe2, 0x82]),
   Buffer.from('{"broken":\n'),

@@ -110,18 +110,32 @@ function parseLine(line: string, file: string, recordIndex: number): unknown {
   }
 }
 
-type Lines = { pending: string; recordCount: number }
-async function drainLines<T>(lines: Lines, options: FoldOptions<T>) {
-  let end = lines.pending.indexOf('\n')
+// A production row can exceed 10 MiB; malformed rows must still have a finite bound.
+const MAX_RECORD_BYTES = 64 * 1024 * 1024
+type Lines = { pending: string[]; pendingBytes: number; recordCount: number }
+
+function appendFragment(lines: Lines, fragment: string, file: string) {
+  lines.pendingBytes += Buffer.byteLength(fragment, 'utf8')
+  if (lines.pendingBytes > MAX_RECORD_BYTES)
+    throw failure('record exceeds the 64 MiB byte limit', file, lines.recordCount)
+  lines.pending.push(fragment)
+}
+async function drainLines<T>(lines: Lines, chunk: string, options: FoldOptions<T>) {
+  let start = 0
+  let end = chunk.indexOf('\n', start)
   while (end !== -1) {
-    const line = lines.pending.slice(0, end)
-    lines.pending = lines.pending.slice(end + 1)
+    appendFragment(lines, chunk.slice(start, end), options.file)
+    const line = lines.pending.join('')
+    lines.pending.length = 0
+    lines.pendingBytes = 0
     const index = lines.recordCount
     const record = options.parse(parseLine(line, options.file, index), index)
     await options.consume(record, index)
     lines.recordCount++
-    end = lines.pending.indexOf('\n')
+    start = end + 1
+    end = chunk.indexOf('\n', start)
   }
+  if (start < chunk.length) appendFragment(lines, chunk.slice(start), options.file)
 }
 
 function checkReference(actual: RawTimingRef, expected: RawTimingRef) {
@@ -135,16 +149,15 @@ function checkReference(actual: RawTimingRef, expected: RawTimingRef) {
 
 export async function foldJsonl<T>(options: FoldOptions<T>): Promise<RawTimingRef> {
   const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
-  const lines: Lines = { pending: '', recordCount: 0 }
+  const lines: Lines = { pending: [], pendingBytes: 0, recordCount: 0 }
   const artifact = await readObserved(
     options,
     async (bytes) => {
-      lines.pending += decoder.decode(bytes, { stream: true })
-      await drainLines(lines, options)
+      await drainLines(lines, decoder.decode(bytes, { stream: true }), options)
     },
     options.expected.path,
   )
-  lines.pending += decoder.decode()
+  await drainLines(lines, decoder.decode(), options)
   if (lines.pending.length)
     throw failure('requires a final LF terminator', options.file, lines.recordCount)
   const actual = { ...artifact, recordCount: lines.recordCount }
