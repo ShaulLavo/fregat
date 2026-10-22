@@ -222,7 +222,7 @@ const resourceWindow = v.object({
   peakWasmReservedBytes: v.nullable(nonnegative),
   peakMessageNodes: nonnegative,
 })
-const productionTrial = v.object({
+export const productionTrial = v.object({
   workload: label,
   family: label,
   resourceWindows: v.nullable(v.array(resourceWindow)),
@@ -255,6 +255,10 @@ const productionTrial = v.object({
   network: v.nullable(v.array(network)),
 })
 type ProductionRow = v.InferOutput<typeof productionTrial>
+type ProductionInput = Pick<
+  ProductionRow['receipt']['processed'][number],
+  'inputSha256' | 'inputUtf16Units'
+>
 const hostObservation = v.object({
   observedAt: label,
   loadAverage: v.pipe(v.array(nonnegative), v.length(3)),
@@ -533,10 +537,15 @@ function field(value: unknown, key: string): unknown {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
   return Reflect.get(value, key)
 }
-function finding(state: State, path: string, kind: TimingFinding['kind'], reason: string) {
+function finding(
+  state: Pick<State, 'findings'>,
+  path: string,
+  kind: TimingFinding['kind'],
+  reason: string,
+) {
   state.findings.push({ path, kind, reason })
 }
-function same(state: State, path: string, actual: unknown, expected: unknown) {
+function same(state: Pick<State, 'findings'>, path: string, actual: unknown, expected: unknown) {
   if (stable(actual) !== stable(expected))
     finding(
       state,
@@ -980,6 +989,7 @@ async function reconcileProductionRows(
   let pending: ProductionRow | null = null
   let currentWorkload: ProductionWorkload | undefined
   let inputs: readonly string[] = []
+  let expectedInputs: readonly ProductionInput[] = []
   let measured = 0
   await foldTimingRecords(report.trialsArtifact, productionTrial, state, async (row, index) => {
     const expectedWorkload = workloads[Math.floor(index / 46)]
@@ -1008,8 +1018,9 @@ async function reconcileProductionRows(
     if (currentWorkload !== workload) {
       currentWorkload = workload
       inputs = productionUpdates(workload).concat([workload.source])
+      expectedInputs = inputs.map(productionInput)
     }
-    reconcileProductionRow(row, workload, inputs, fonts, state)
+    reconcileProductionRow(row, workload, expectedInputs, fonts, state)
     if (row.pair >= 0) {
       same(
         state,
@@ -1163,10 +1174,13 @@ async function foldTimingRecords<T extends v.BaseSchema<unknown, unknown, v.Base
     )
   }
 }
+function productionInput(source: string): ProductionInput {
+  return { inputSha256: sha(source), inputUtf16Units: source.length }
+}
 function reconcileProductionRow(
   row: ProductionRow,
   workload: ProductionWorkload,
-  inputs: readonly string[],
+  inputs: readonly ProductionInput[],
   fonts: v.InferOutput<typeof fontsArtifact> | null,
   state: State,
 ) {
@@ -1239,7 +1253,11 @@ function productionWorkloadMetrics(workload: string, state: State) {
   state.metrics[`${workload}.paintedUpdates`] = first?.paintedUpdates ?? null
   state.metrics[`${workload}.unpaintedUpdates`] = first?.unpaintedUpdates ?? null
 }
-function validateProductionReceipt(row: ProductionRow, inputs: readonly string[], state: State) {
+export function validateProductionReceipt(
+  row: ProductionRow,
+  inputs: readonly ProductionInput[],
+  state: Pick<State, 'findings'>,
+) {
   const key = productionKey(row)
   const receipt = row.receipt
   same(state, `${key}.inputCount`, receipt.processed.length, inputs.length)
@@ -1258,15 +1276,20 @@ function validateProductionReceipt(row: ProductionRow, inputs: readonly string[]
     receipt.frames.map((tick) => tick.revision),
     required,
   )
+  const requiredRevisions = new Set(required)
   same(
     state,
     `${key}.skippedPaintRevisions`,
     receipt.skippedPaintRevisions,
     receipt.processed
-      .filter((tick) => !required.includes(tick.revision))
+      .filter((tick) => !requiredRevisions.has(tick.revision))
       .map((tick) => tick.revision),
   )
-  for (const tick of receipt.frames) checkPaint(row, tick, state)
+  const processedIndexes = new Map<number, number>()
+  receipt.processed.forEach((tick, index) => {
+    if (!processedIndexes.has(tick.revision)) processedIndexes.set(tick.revision, index)
+  })
+  for (const tick of receipt.frames) checkPaint(row, tick, processedIndexes, state)
   same(state, `${key}.final`, receipt.final, receipt.frames.at(-1))
   same(state, `${key}.finalRevision`, receipt.final.revision, receipt.processed.at(-1)?.revision)
   same(
@@ -1298,9 +1321,9 @@ function validateProductionReceipt(row: ProductionRow, inputs: readonly string[]
 function checkProcessed(
   row: ProductionRow,
   tick: ProductionRow['receipt']['processed'][number],
-  input: string | undefined,
+  input: ProductionInput | undefined,
   index: number,
-  state: State,
+  state: Pick<State, 'findings'>,
 ) {
   const key = `${productionKey(row)}.processed.${index}`
   same(
@@ -1309,7 +1332,7 @@ function checkProcessed(
     [tick.inputSha256, tick.inputUtf16Units, tick.live],
     input === undefined
       ? null
-      : [sha(input), input.length, index + 1 < row.receipt.processed.length],
+      : [input.inputSha256, input.inputUtf16Units, index + 1 < row.receipt.processed.length],
   )
   const oracle = row.correctness.frames[index]
   same(state, `${key}.oracleInput`, oracle?.inputSha256, tick.inputSha256)
@@ -1324,9 +1347,10 @@ function checkProcessed(
 function checkPaint(
   row: ProductionRow,
   tick: ProductionRow['receipt']['frames'][number],
-  state: State,
+  processedIndexes: ReadonlyMap<number, number>,
+  state: Pick<State, 'findings'>,
 ) {
-  const index = row.receipt.processed.findIndex((entry) => entry.revision === tick.revision)
+  const index = processedIndexes.get(tick.revision) ?? -1
   const processed = row.receipt.processed[index]
   const oracle = row.correctness.frames[index]
   const { observedRevision, painted, paintedOutput, ...completion } = tick
