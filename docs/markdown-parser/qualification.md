@@ -113,6 +113,12 @@ metadata, then commit before the final fingerprint and production build. Freeze 
 thereafter. Registration changes the source closure, so earlier captures need fresh identities.
 An informed fix retires the whole batch and requires another complete selection. Never reset or
 relocate its authoritative ledger to reopen it. Preserve failed receipts and all original denominators.
+Ledger reservations, completion, attachment, and retirement serialize through an exclusive per-batch
+lock. Completion and attachment compare the current ledger with their captured state before atomic
+replacement. Retirement is terminal and keeps its first reason; original receipts remain on disk
+when a later transition fails. A lock left by interruption fails closed. Preserve its ledger, receipt,
+and pending-update bytes, establish that its writer has stopped, and record recovery before removing
+that lock. Never remove an active writer's lock or reset an exposure to recover a failed capture.
 
 ### Capture in order
 
