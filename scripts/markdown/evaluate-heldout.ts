@@ -43,6 +43,11 @@ import { createScriptError } from '../structured-errors'
 import { canonicalProjection, digestProjection, inspectSourceCorrespondence } from './paired-native'
 import { qualificationProvenance } from './provenance'
 import { encoded, stable } from './serialization'
+import {
+  evaluationBatchSchema as batchSchema,
+  evaluationManifestSchema as manifestSchema,
+  requireEvaluationCustody,
+} from './evaluation-custody'
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const execute = promisify(execFile)
@@ -63,24 +68,6 @@ const identitySchema = object({
   candidateCommit: commit,
   candidateSourceSha256: sha,
   artifacts: artifactsSchema,
-})
-const batchSchema = object({
-  file: pipe(string(), regex(/^oasst1-batch-[0-9]{3}\.json\.gz$/u)),
-  messages: literal(100),
-  sourceSha256: array(sha),
-  assetSha256: sha,
-  uncompressedSha256: sha,
-  status: picklist(['sealed', 'exposed', 'retired', 'development']),
-})
-const manifestSchema = object({
-  schemaVersion: literal(1),
-  dataset: string(),
-  revision: commit,
-  license: string(),
-  asset: string(),
-  assetSha256: sha,
-  selection: string(),
-  batches: array(batchSchema),
 })
 const messageSchema = object({
   id: string(),
@@ -514,12 +501,17 @@ export async function verifyCandidate(root: string, expected: CandidateIdentity)
 }
 
 export async function reserveEvaluationExposure(input: {
+  readonly root: string
   readonly ledgerDirectory: string
   readonly batch: EvaluationBatch
   readonly manifestSha256: string
   readonly candidate: CandidateIdentity
   readonly receiptPath: string
 }): Promise<Ledger> {
+  await requireEvaluationCustody({
+    ...input,
+    artifactsSha256: hash('sha256', encoded(input.candidate.artifacts)),
+  })
   if (input.batch.status !== 'sealed')
     throw createScriptError('Choose a sealed evaluation batch.', {
       internal: { batchState: input.batch.status },
@@ -833,6 +825,12 @@ async function trustedLedger(
   report: HeldoutReport,
   bytes: Uint8Array,
 ) {
+  await requireEvaluationCustody({
+    ...input,
+    batch: report.batch,
+    manifestSha256: report.manifestSha256,
+    artifactsSha256: hash('sha256', encoded(report.candidate.artifacts)),
+  })
   if (report.fatal !== null)
     throw createScriptError('An interrupted or invalid evaluation cannot certify a candidate.', {
       internal: { boundary: 'trusted-evaluation-fatal' },
@@ -1197,6 +1195,13 @@ async function main() {
     throw createScriptError('Choose a complete batch from the frozen manifest.', {
       internal: { boundary: 'evaluation-batch' },
     })
+  await requireEvaluationCustody({
+    root: ROOT,
+    batch,
+    manifestSha256: hash('sha256', manifestBytes),
+    ledgerDirectory: values.ledger,
+    artifactsSha256: hash('sha256', encoded(frozen.artifacts)),
+  })
   await initializeTreeSitterMarkdown()
   await readyRemarkExtensions()
   const output = path.resolve(values.out)
@@ -1204,6 +1209,7 @@ async function main() {
   const receiptPath = path.join(output, 'heldout-native.json')
   await verifyCandidate(ROOT, frozen)
   const ledger = await reserveEvaluationExposure({
+    root: ROOT,
     ledgerDirectory: path.resolve(values.ledger),
     batch,
     manifestSha256: hash('sha256', manifestBytes),
