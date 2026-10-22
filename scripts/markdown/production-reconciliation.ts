@@ -266,10 +266,28 @@ const rawTimingRef = v.strictObject({
   byteLength: count,
   recordCount: count,
 })
+const measurementControls = v.object({
+  knownGood: v.object({
+    expected: digest,
+    observed: digest,
+    revision: v.pipe(count, v.minValue(1)),
+    observedRevision: v.pipe(count, v.minValue(1)),
+  }),
+  missingExpectation: v.object({
+    rejected: v.boolean(),
+    reason: v.pipe(v.string(), v.trim(), v.minLength(1)),
+  }),
+  wrongExpectation: v.object({
+    rejected: v.boolean(),
+    reason: v.pipe(v.string(), v.trim(), v.minLength(1)),
+  }),
+  longTask: v.object({ supported: v.boolean(), observed: v.array(nonnegative) }),
+})
 const productionReport = v.object({
   schemaVersion: v.literal(2),
   build: v.literal('production'),
   timingStatus: label,
+  controls: measurementControls,
   capture: v.object({
     kind: label,
     hostEvidence: v.nullable(v.object({ sha256: digest, observation: v.unknown() })),
@@ -619,10 +637,44 @@ function checkFreeze(state: State) {
     finding(state, 'freeze.trials', 'mismatch', 'The frozen independent-pair denominator changed.')
 }
 
+function checkMeasurementControls(
+  controls: v.InferOutput<typeof measurementControls>,
+  state: State,
+) {
+  same(
+    state,
+    'report.controls.knownGood.observed',
+    controls.knownGood.observed,
+    controls.knownGood.expected,
+  )
+  same(
+    state,
+    'report.controls.knownGood.observedRevision',
+    controls.knownGood.observedRevision,
+    controls.knownGood.revision,
+  )
+  same(
+    state,
+    'report.controls.missingExpectation.rejected',
+    controls.missingExpectation.rejected,
+    true,
+  )
+  same(state, 'report.controls.wrongExpectation.rejected', controls.wrongExpectation.rejected, true)
+  same(state, 'report.controls.longTask.supported', controls.longTask.supported, true)
+  if (!controls.longTask.observed.some((duration) => duration > 50))
+    finding(
+      state,
+      'report.controls.longTask.observed',
+      'failure',
+      'The measurement control observed no task longer than 50 milliseconds.',
+    )
+}
+
 async function reconcileProduction(raw: unknown, state: State) {
   preserveFailures(raw, state)
   const report = parse(productionReport, raw, 'report', state)
   if (!report) return
+  checkMeasurementControls(report.controls, state)
   checkFreeze(state)
   same(state, 'report.capture.kind', report.capture.kind, 'promotion')
   same(state, 'report.timingStatus', report.timingStatus, 'PROMOTION_CAPTURE_UNRECONCILED')

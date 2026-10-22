@@ -376,6 +376,19 @@ function productionRow(pair: number, engine: ProductionTrial['engine']): InlineP
     resourceControlWindows: null,
   }
 }
+function fixtureControls() {
+  return {
+    knownGood: {
+      expected: hash('control output'),
+      observed: hash('control output'),
+      revision: 2,
+      observedRevision: 2,
+    },
+    missingExpectation: { rejected: true, reason: 'Missing expectation rejected' },
+    wrongExpectation: { rejected: true, reason: 'Wrong output rejected' },
+    longTask: { supported: true, observed: [80] },
+  }
+}
 function reportFixture() {
   const frozen = freeze()
   const host = artifact('host.json', { host: 'fixture-host', observedAt: instant(0) })
@@ -412,6 +425,7 @@ function reportFixture() {
     schemaVersion: 1,
     build: 'production',
     timingStatus: 'PROMOTION_CAPTURE_UNRECONCILED',
+    controls: fixtureControls(),
     capture: {
       kind: 'promotion',
       hostEvidence: { sha256: host.sha256, observation: JSON.parse(host.contents) },
@@ -1885,4 +1899,109 @@ test('actual reader rejects reuse of an earlier arm oracle after raw and envelop
   })
   expect(result.verdict).toBe('NOT VERIFIED')
   expect(result.findings.some((finding) => finding.path.endsWith('.oraclePath'))).toBe(true)
+})
+
+const invalidControls: readonly { readonly name: string; readonly controls: unknown }[] = [
+  { name: 'missing record', controls: undefined },
+  { name: 'null record', controls: null },
+  { name: 'empty record', controls: {} },
+  { name: 'missing known-good output', controls: { ...fixtureControls(), knownGood: {} } },
+  {
+    name: 'wrong known-good output',
+    controls: {
+      ...fixtureControls(),
+      knownGood: { ...fixtureControls().knownGood, observed: hash('wrong output') },
+    },
+  },
+  {
+    name: 'malformed matching output digests',
+    controls: {
+      ...fixtureControls(),
+      knownGood: { ...fixtureControls().knownGood, expected: 'wrong', observed: 'wrong' },
+    },
+  },
+  {
+    name: 'wrong known-good revision',
+    controls: {
+      ...fixtureControls(),
+      knownGood: { ...fixtureControls().knownGood, observedRevision: 1 },
+    },
+  },
+  {
+    name: 'unobserved matching revisions',
+    controls: {
+      ...fixtureControls(),
+      knownGood: { ...fixtureControls().knownGood, revision: 0, observedRevision: 0 },
+    },
+  },
+  {
+    name: 'accepted missing expectation',
+    controls: {
+      ...fixtureControls(),
+      missingExpectation: { rejected: false, reason: 'Missing expectation accepted' },
+    },
+  },
+  {
+    name: 'accepted wrong expectation',
+    controls: {
+      ...fixtureControls(),
+      wrongExpectation: { rejected: false, reason: 'Wrong output accepted' },
+    },
+  },
+  {
+    name: 'missing rejection evidence',
+    controls: { ...fixtureControls(), wrongExpectation: { rejected: true, reason: null } },
+  },
+  {
+    name: 'empty rejection evidence',
+    controls: { ...fixtureControls(), missingExpectation: { rejected: true, reason: '  ' } },
+  },
+  {
+    name: 'malformed rejection result',
+    controls: { ...fixtureControls(), wrongExpectation: { rejected: 'true', reason: 'Rejected' } },
+  },
+  {
+    name: 'unsupported long-task observation',
+    controls: { ...fixtureControls(), longTask: { supported: false, observed: [80] } },
+  },
+  {
+    name: 'missing long-task observations',
+    controls: { ...fixtureControls(), longTask: { supported: true, observed: null } },
+  },
+  {
+    name: 'empty long-task observations',
+    controls: { ...fixtureControls(), longTask: { supported: true, observed: [] } },
+  },
+  {
+    name: 'no detected long task',
+    controls: { ...fixtureControls(), longTask: { supported: true, observed: [49, 50] } },
+  },
+  {
+    name: 'invalid long-task duration',
+    controls: { ...fixtureControls(), longTask: { supported: true, observed: [-1, 80] } },
+  },
+]
+
+test.each(invalidControls)(
+  'promotion controls reject $name despite an empty producer failure summary',
+  async ({ controls }) => {
+    const input = productionInput((report) => {
+      Reflect.set(report, 'controls', controls)
+    })
+    const result = await reconcileTimingEvidence(input)
+    expect(result.rawFailures).toEqual([])
+    expect(result.verdict).not.toBe('VERIFIED')
+    expect(result.timingStatus).toBe('PROMOTION_CAPTURE_UNRECONCILED')
+    expect(result.findings.some((entry) => entry.path.startsWith('report.controls'))).toBe(true)
+  },
+)
+
+test('promotion controls retain a detected long task among short observations', async () => {
+  const result = await reconcileTimingEvidence(
+    productionInput((report) => {
+      report.controls.longTask.observed = [0, 49, 50, 80]
+    }),
+  )
+  expect(result.findings).toEqual([])
+  expect(result.verdict).toBe('VERIFIED')
 })
