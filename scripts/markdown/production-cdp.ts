@@ -256,19 +256,25 @@ async function initializeProductionCdp(page: Page, session: CDPSession) {
       targets: Array.from(workers.values(), ({ sessionId: _sessionId, ...target }) => target),
       urls: Array.from(workers.values(), (worker) => worker.url),
     }),
-    finishTrace: (output: string) => trace(output),
+    finishTrace: (output: string, outcome: 'completed' | 'failed' = 'completed') =>
+      trace(output, outcome),
     close: async () => {
       const error = createScriptError('Production worker instrumentation closed.')
       for (const commands of workerCommands.values()) rejectWorkerCommands(commands.values(), error)
       workerCommands.clear()
-      await session
-        .send('Target.setAutoAttach', {
-          autoAttach: false,
-          waitForDebuggerOnStart: false,
-          flatten: false,
-        })
-        .catch(() => undefined)
-      await session.detach()
+      try {
+        await withProductionDeadline(
+          session.send('Target.setAutoAttach', {
+            autoAttach: false,
+            waitForDebuggerOnStart: false,
+            flatten: false,
+          }),
+          'worker instrumentation shutdown',
+          5000,
+        ).catch(() => undefined)
+      } finally {
+        await withProductionDeadline(session.detach(), 'CDP detach', 5000)
+      }
     },
   }
 }
@@ -497,6 +503,13 @@ function metricMilliseconds(values: ReadonlyMap<string, number>, key: string) {
   return value === undefined ? null : value * 1000
 }
 
+type ProductionTraceCapture = {
+  readonly status: 'complete' | 'data-loss' | 'incomplete'
+  readonly outcome: 'completed' | 'failed'
+  readonly dataLossOccurred: boolean | null
+  readonly failure: string | null
+}
+
 async function traceTasks(
   session: CDPSession,
   workers: ReadonlyMap<string, WorkerTarget>,
@@ -507,39 +520,107 @@ async function traceTasks(
   const capture = (chunk: { readonly value: readonly unknown[] }) => {
     for (const event of chunk.value) events.push(event)
   }
+  const completed = (event: { readonly dataLossOccurred: boolean }) => completion.resolve(event)
   session.on('Tracing.dataCollected', capture)
-  session.once('Tracing.tracingComplete', (event) => completion.resolve(event))
-  await session.send('Tracing.start', {
-    perfettoConfig: productionWorkerTraceConfig(),
-    transferMode: 'ReportEvents',
-  })
-  return async (output: string) => {
-    try {
-      await session.send('Tracing.end')
-      const finished = await withProductionDeadline(
-        completion.promise,
-        'Chrome trace completion',
-        15_000,
-      )
-      if (finished.dataLossOccurred)
-        throw createScriptError('Chrome trace lost events; accounting is incomplete.')
-      completeTransfers(events)
-      const raw = JSON.stringify({ traceEvents: events })
-      await writeFile(path.join(output, 'production-trace.json'), raw)
-      const summary = {
-        ...summarizeTrace(raw),
-        updateCpu: updateCpuReceipts(events),
-        workerCpu: workerCpuReceipts(events, Array.from(workers.values())),
-        streamMainThreadCpuMs: streamMainThreadCpu(events),
-      }
-      await writeFile(
-        path.join(output, 'production-trace-summary.json'),
-        JSON.stringify(summary, null, 2) + '\n',
-      )
-      return summary
-    } finally {
+  session.once('Tracing.tracingComplete', completed)
+  try {
+    await session.send('Tracing.start', {
+      perfettoConfig: productionWorkerTraceConfig(),
+      transferMode: 'ReportEvents',
+    })
+  } catch (error) {
+    session.removeListener('Tracing.dataCollected', capture)
+    session.removeListener('Tracing.tracingComplete', completed)
+    throw error
+  }
+  let finalization: ReturnType<typeof finishProductionTrace> | null = null
+  return (output: string, outcome: ProductionTraceCapture['outcome']) => {
+    finalization ??= finishProductionTrace({
+      session,
+      workers,
+      events,
+      completion: completion.promise,
+      completeTransfers,
+      output,
+      outcome,
+    }).finally(() => {
       session.removeListener('Tracing.dataCollected', capture)
+      session.removeListener('Tracing.tracingComplete', completed)
+    })
+    return finalization
+  }
+}
+
+async function finishProductionTrace({
+  session,
+  workers,
+  events,
+  completion,
+  completeTransfers,
+  output,
+  outcome,
+}: {
+  readonly session: CDPSession
+  readonly workers: ReadonlyMap<string, WorkerTarget>
+  readonly events: readonly unknown[]
+  readonly completion: Promise<{ readonly dataLossOccurred: boolean }>
+  readonly completeTransfers: (events: readonly unknown[]) => void
+  readonly output: string
+  readonly outcome: ProductionTraceCapture['outcome']
+}) {
+  let capture: ProductionTraceCapture = {
+    status: 'incomplete',
+    outcome,
+    dataLossOccurred: null,
+    failure: null,
+  }
+  try {
+    const finished = await withProductionDeadline(
+      session.send('Tracing.end').then(() => completion),
+      'Chrome trace completion',
+      15_000,
+    )
+    capture = {
+      status: finished.dataLossOccurred ? 'data-loss' : 'complete',
+      outcome,
+      dataLossOccurred: finished.dataLossOccurred,
+      failure: null,
     }
+    if (finished.dataLossOccurred)
+      throw createScriptError('Chrome trace lost events; accounting is incomplete.')
+    const raw = JSON.stringify({ traceEvents: events, capture })
+    await writeFile(path.join(output, 'production-trace.json'), raw)
+    completeTransfers(events)
+    const summary = {
+      ...summarizeTrace(raw),
+      capture,
+      updateCpu: updateCpuReceipts(events),
+      workerCpu: workerCpuReceipts(events, Array.from(workers.values())),
+      streamMainThreadCpuMs: streamMainThreadCpu(events),
+    }
+    await writeFile(
+      path.join(output, 'production-trace-summary.json'),
+      JSON.stringify(summary, null, 2) + '\n',
+    )
+    return summary
+  } catch (error) {
+    capture = {
+      ...capture,
+      status: capture.dataLossOccurred ? 'data-loss' : 'incomplete',
+      outcome: 'failed',
+      failure: error instanceof Error ? error.message : String(error),
+    }
+    await Promise.allSettled([
+      writeFile(
+        path.join(output, 'production-trace.json'),
+        JSON.stringify({ traceEvents: events, capture }),
+      ),
+      writeFile(
+        path.join(output, 'production-trace-summary.json'),
+        JSON.stringify({ capture, eventCount: events.length }, null, 2) + '\n',
+      ),
+    ])
+    throw error
   }
 }
 

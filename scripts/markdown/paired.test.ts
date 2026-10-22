@@ -382,7 +382,7 @@ test('artifact streaming native writes complete pairs in actual order and scalar
       seed: 176,
       mode: 'quick',
       capture: ({ engine, trial }) => {
-        if (trial >= 0 && calls.length % 2 === 0) assertNativeWrittenPairs(output, trial)
+        if (trial >= 0 && calls.length % 2 === 0) assertNativeWrittenPairs(output, trial + 1)
         calls.push(`${trial}/${engine}`)
         return artifactNativeTrial(engine, trial)
       },
@@ -392,16 +392,21 @@ test('artifact streaming native writes complete pairs in actual order and scalar
       .split('\n')
       .map((line) => JSON.parse(line))
     expect(raw).toEqual(
-      orders.map((order, trial) => ({
-        workload: workload.id,
-        pair: {
-          trial,
-          order,
-          remark: artifactNativeTrial('remark', trial),
-          candidate: artifactNativeTrial('tree-sitter', trial),
-          mismatchedRevisions: [],
-        },
-      })),
+      pairedTrialOrders(1, 176)
+        .concat(orders)
+        .map((order, index) => {
+          const trial = index - 1
+          return {
+            workload: workload.id,
+            pair: {
+              trial,
+              order,
+              remark: artifactNativeTrial('remark', trial),
+              candidate: artifactNativeTrial('tree-sitter', trial),
+              mismatchedRevisions: [],
+            },
+          }
+        }),
     )
     expect(calls).toEqual(
       pairedTrialOrders(1, 176)[0]
@@ -761,3 +766,56 @@ test('native publication exposes no partial envelope when serialization fails', 
     await rm(output, { recursive: true, force: true })
   }
 })
+
+test.each(['output', 'coordinates'] as const)(
+  'native warmup %s failures remain raw evidence and invalidate correctness',
+  async (defect) => {
+    const output = await mkdtemp(path.join(tmpdir(), 'native-warmup-mismatch-'))
+    try {
+      const summary = await writeNativePairs({
+        output,
+        workloads: [nativePairWorkloads('quick')[0]],
+        orders: pairedTrialOrders(2, 176),
+        warmups: 3,
+        seed: 176,
+        mode: 'quick',
+        capture: warmupMismatchCapture(defect),
+      })
+      const rows = (await readFile(path.join(output, summary.pairsArtifact.path), 'utf8'))
+        .trimEnd()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+      expect(rows.map((row) => row.pair.trial)).toEqual([-1, -2, -3, 0, 1])
+      expect(rows.map((row) => row.pair.mismatchedRevisions)).toEqual([[], [0], [], [], []])
+      expect(summary.workloads[0]).toMatchObject({ observedPairs: 2, mismatchedPairs: 1 })
+      expect(summary.workloads[0].comparisons.every((row) => row.independentTrials === 2)).toBe(
+        true,
+      )
+      expect(
+        summary.workloads[0].comparisons.find((row) => row.metric === 'mountP95'),
+      ).toMatchObject({ baselineMs: 2, candidateMs: 2 })
+      expect(summary.pairsArtifact.recordCount).toBe(5)
+    } finally {
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+function warmupMismatchCapture(defect: 'output' | 'coordinates') {
+  return ({ engine, trial }: { engine: NativeTrial['engine']; trial: number }): NativeTrial => {
+    const captured = artifactNativeTrial(engine, trial)
+    if (trial >= 0) return captured
+    const fails = trial === -2 && engine === 'tree-sitter'
+    return {
+      ...captured,
+      mountMs: 99_999,
+      streamCpuMs: 99_999,
+      revisions: captured.revisions.map((revision) => ({
+        ...revision,
+        wallMs: 99_999,
+        outputDigest: fails && defect === 'output' ? 'wrong output' : revision.outputDigest,
+        sourceCoordinateFailures: fails && defect === 'coordinates' ? ['outside source'] : [],
+      })),
+    }
+  }
+}
