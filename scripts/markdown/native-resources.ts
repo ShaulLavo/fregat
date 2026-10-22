@@ -27,6 +27,9 @@ import { qualificationProvenance } from './provenance'
 import { createScriptError } from '../structured-errors'
 
 type Engine = 'remark' | 'tree-sitter'
+type NativeStatus = 'FAILED' | 'INCONCLUSIVE' | 'OBSERVED_PLATEAU'
+const RESOURCE_ENGINES: readonly Engine[] = ['remark', 'tree-sitter']
+const RESOURCE_CYCLES: readonly number[] = [20, 100, 500]
 type Root = ReturnType<typeof blockToHast>
 type ResourceSource = { readonly id: string; readonly source: string; readonly sha256: string }
 type MemoryReading = {
@@ -142,6 +145,66 @@ function memory(readWasm: () => number): MemoryReading {
   }
 }
 
+function validMemoryReading(reading: MemoryReading): boolean {
+  return (
+    Number.isSafeInteger(reading.heapUsedBytes) &&
+    reading.heapUsedBytes >= 0 &&
+    Number.isSafeInteger(reading.rssBytes) &&
+    reading.rssBytes >= 0 &&
+    Number.isSafeInteger(reading.wasmReservedBytes) &&
+    reading.wasmReservedBytes > 0
+  )
+}
+
+function resourceGroupObservation(input: {
+  readonly group: readonly ResourceWindow[]
+  readonly heapWindowDeltasBytes: readonly number[]
+  readonly wasmHighWaterReuseObserved: boolean
+}): { status: NativeStatus; reason: string } {
+  const { group } = input
+  const failed = group.some(
+    (row) =>
+      row.outputFailures.length > 0 ||
+      row.cleanupFailures.length > 0 ||
+      row.clearedSessions !== row.cycles ||
+      !Number.isSafeInteger(row.clearedProjectionEntries) ||
+      row.clearedProjectionEntries <= 0,
+  )
+  if (failed)
+    return { status: 'FAILED', reason: 'At least one source projection or cleanup check failed.' }
+  const complete =
+    group.length >= 3 &&
+    group.length <= 8 &&
+    group.every(
+      (row, index) =>
+        row.window === index &&
+        RESOURCE_ENGINES.includes(row.engine) &&
+        RESOURCE_CYCLES.includes(row.cycles) &&
+        row.before.gcPerformed === true &&
+        row.after.gcPerformed === true &&
+        validMemoryReading(row.before) &&
+        validMemoryReading(row.after),
+    )
+  if (!complete)
+    return {
+      status: 'INCONCLUSIVE',
+      reason: 'Native observation needs 3–8 consecutive windows with complete post-GC readings.',
+    }
+  if (
+    !input.wasmHighWaterReuseObserved ||
+    !input.heapWindowDeltasBytes.slice(-2).every((bytes) => bytes <= 0)
+  )
+    return {
+      status: 'INCONCLUSIVE',
+      reason: 'The final two native post-release windows still show heap or WASM changes.',
+    }
+  return {
+    status: 'OBSERVED_PLATEAU',
+    reason:
+      'The final two native post-GC heap deltas are nonpositive and positive WASM reservations are stable. Browser resources require separate measurement.',
+  }
+}
+
 export function summarizeResourceWindows(rows: readonly ResourceWindow[]) {
   const groups = new Map<string, ResourceWindow[]>()
   for (const row of rows) {
@@ -159,33 +222,54 @@ export function summarizeResourceWindows(rows: readonly ResourceWindow[]) {
     const reserved = after.map((row) => row.wasmReservedBytes)
     const delta = (field: keyof Omit<MemoryReading, 'gcPerformed'>) =>
       tail.map((row, index) => row.after[field] - (group[index]?.after[field] ?? row.after[field]))
-    const failed = group.some(
-      (row) => row.outputFailures.length > 0 || row.cleanupFailures.length > 0,
-    )
+    const heapWindowDeltasBytes = delta('heapUsedBytes')
+    const wasmWindowDeltasBytes = delta('wasmReservedBytes')
+    const wasmHighWaterReuseObserved =
+      group.length >= 3 &&
+      reserved.every((bytes) => bytes > 0) &&
+      wasmWindowDeltasBytes.slice(-2).every((bytes) => bytes === 0)
+    const observation = resourceGroupObservation({
+      group,
+      heapWindowDeltasBytes,
+      wasmHighWaterReuseObserved,
+    })
     return {
       engine: first?.engine,
       cycles: first?.cycles,
       windows: group.length,
-      status: failed ? 'FAILED' : 'INCONCLUSIVE',
-      gcStatus: after.every((row) => row.gcPerformed) ? 'POST_GC' : 'NOT_MEASURED',
+      status: observation.status,
+      gcStatus: group.every((row) => row.before.gcPerformed && row.after.gcPerformed)
+        ? 'POST_GC'
+        : 'NOT_MEASURED',
       heapAfterReleaseBytes: heaps,
       rssAfterReleaseBytes: after.map((row) => row.rssBytes),
       wasmReservedBytes: reserved,
-      heapWindowDeltasBytes: delta('heapUsedBytes'),
+      heapWindowDeltasBytes,
       rssWindowDeltasBytes: delta('rssBytes'),
-      wasmWindowDeltasBytes: delta('wasmReservedBytes'),
+      wasmWindowDeltasBytes,
       heapObservedRangeBytes: Math.max(...heaps) - Math.min(...heaps),
-      wasmHighWaterReuseObserved:
-        group.length >= 3 &&
-        reserved.every((bytes) => bytes > 0) &&
-        delta('wasmReservedBytes')
-          .slice(-2)
-          .every((bytes) => bytes === 0),
-      reason: failed
-        ? 'At least one source projection or cleanup check failed.'
-        : 'Raw process-wide readings quantify reuse and growth; native samples do not prove browser retained-object or memory budgets.',
+      wasmHighWaterReuseObserved,
+      reason: observation.reason,
     }
   })
+}
+
+export function summarizeNativeResources(rows: readonly ResourceWindow[]) {
+  const summaries = summarizeResourceWindows(rows)
+  const complete =
+    summaries.length === RESOURCE_ENGINES.length * RESOURCE_CYCLES.length &&
+    summaries.every(
+      (summary) =>
+        summary.engine !== undefined &&
+        RESOURCE_ENGINES.includes(summary.engine) &&
+        summary.cycles !== undefined &&
+        RESOURCE_CYCLES.includes(summary.cycles),
+    )
+  let nativeStatus: NativeStatus = 'INCONCLUSIVE'
+  if (complete && summaries.every((summary) => summary.status === 'OBSERVED_PLATEAU'))
+    nativeStatus = 'OBSERVED_PLATEAU'
+  if (summaries.some((summary) => summary.status === 'FAILED')) nativeStatus = 'FAILED'
+  return { nativeStatus, summaries }
 }
 
 async function runWindow(input: {
@@ -318,7 +402,7 @@ async function runNativeResourceProbe(root: string, outputDirectory: string, win
     }
   }
   let rows: ResourceWindow[] = []
-  for (const cycles of [20, 100, 500])
+  for (const cycles of RESOURCE_CYCLES)
     rows = rows.concat(
       await measureScale({
         cycles,
@@ -329,13 +413,11 @@ async function runNativeResourceProbe(root: string, outputDirectory: string, win
         readWasm: candidate.readWasm,
       }),
     )
-  const summaries = summarizeResourceWindows(rows)
+  const native = summarizeNativeResources(rows)
   return {
     schemaVersion: 1,
     verdict: 'NOT VERIFIED',
-    nativeStatus: summaries.some((summary) => summary.status === 'FAILED')
-      ? 'FAILED'
-      : 'INCONCLUSIVE',
+    nativeStatus: native.nativeStatus,
     provenance,
     candidate: candidate.identity,
     sources: sources.map(({ id, source, sha256 }) => ({
@@ -346,7 +428,7 @@ async function runNativeResourceProbe(root: string, outputDirectory: string, win
     measurementBoundary:
       'One realm initializes the parser and HTML/math stages once. Both engines use actual sessions and safe HAST transforms. Every cycle streams, settles, clears its session and releases projection roots/cache. Candidate parse handles dispose inside the production adapter. WASM reserved bytes describe the shared runtime, including during remark windows. RSS and JS heap are process-wide. Raw GC readings retain no DOM or browser claims.',
     rawWindows: rows,
-    summaries,
+    summaries: native.summaries,
     browser: {
       status: 'NOT_MEASURED',
       fields: [

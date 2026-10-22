@@ -8,6 +8,7 @@ import {
   captureNativeResourceAssets,
   resourceSession,
   summarizeResourceWindows,
+  summarizeNativeResources,
   type ResourceWindow,
 } from './native-resources'
 import { createScriptError } from '../structured-errors'
@@ -218,6 +219,65 @@ test.each(failedGroups)('native plateau fails for $name', ({ patch }) => {
   expect(summarizeResourceWindows(replaceWindow(plateauWindows(), 0, patch))[0]?.status).toBe(
     'FAILED',
   )
+})
+
+function completePlateauWindows(): ResourceWindow[] {
+  const groups: readonly Pick<ResourceWindow, 'engine' | 'cycles'>[] = [
+    { engine: 'remark', cycles: 20 },
+    { engine: 'remark', cycles: 100 },
+    { engine: 'remark', cycles: 500 },
+    { engine: 'tree-sitter', cycles: 20 },
+    { engine: 'tree-sitter', cycles: 100 },
+    { engine: 'tree-sitter', cycles: 500 },
+  ]
+  return groups.flatMap((group) =>
+    plateauWindows().map((entry) => ({ ...entry, ...group, clearedSessions: group.cycles })),
+  )
+}
+
+test('native report status requires all six engine and cycle plateaus', () => {
+  const rows = completePlateauWindows()
+  const original = structuredClone(rows)
+  const summary = summarizeNativeResources(rows)
+  expect(summary.nativeStatus).toBe('OBSERVED_PLATEAU')
+  expect(summary.summaries).toHaveLength(6)
+  expect(summary.summaries.every((group) => group.status === 'OBSERVED_PLATEAU')).toBe(true)
+  expect(rows).toEqual(original)
+  expect(summarizeNativeResources(rows.toReversed()).nativeStatus).toBe('OBSERVED_PLATEAU')
+  expect(summarizeNativeResources([])).toEqual({ nativeStatus: 'INCONCLUSIVE', summaries: [] })
+})
+
+test.each([
+  { engine: 'remark', cycles: 20 },
+  { engine: 'remark', cycles: 100 },
+  { engine: 'remark', cycles: 500 },
+  { engine: 'tree-sitter', cycles: 20 },
+  { engine: 'tree-sitter', cycles: 100 },
+  { engine: 'tree-sitter', cycles: 500 },
+])('native report is inconclusive with missing $engine/$cycles group', ({ engine, cycles }) => {
+  const rows = completePlateauWindows().filter(
+    (entry) => entry.engine !== engine || entry.cycles !== cycles,
+  )
+  expect(summarizeNativeResources(rows).nativeStatus).toBe('INCONCLUSIVE')
+})
+
+test.each(incompleteGroups)('one $name group blocks the native report plateau', ({ rows }) => {
+  const rest = completePlateauWindows().filter(
+    (entry) => entry.engine !== 'tree-sitter' || entry.cycles !== 20,
+  )
+  expect(summarizeNativeResources(rest.concat(rows)).nativeStatus).toBe('INCONCLUSIVE')
+})
+
+test.each(failedGroups)('one $name fails the native report', ({ patch }) => {
+  const rows = replaceWindow(completePlateauWindows(), 0, patch)
+  expect(summarizeNativeResources(rows).nativeStatus).toBe('FAILED')
+})
+
+test('extra unsupported groups and duplicated raw rows block the native report plateau', () => {
+  const rows = completePlateauWindows()
+  const extra = plateauWindows().map((entry) => ({ ...entry, cycles: 99, clearedSessions: 99 }))
+  expect(summarizeNativeResources(rows.concat(extra)).nativeStatus).toBe('INCONCLUSIVE')
+  expect(summarizeNativeResources(rows.concat(rows)).nativeStatus).toBe('INCONCLUSIVE')
 })
 
 const temporary = new Set<string>()
