@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { lstat, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { nativeShardSelections } from './production-shards'
 import type { blockToHast } from '../../packages/markdown/src/utils/hast'
 import { expect, test } from 'vitest'
 import { createMarkdownSession } from '../../packages/markdown/src/utils/session'
@@ -10,6 +11,10 @@ import {
   inspectSourceCorrespondence,
   mismatchedRevisions,
   nativePairWorkloads,
+  createNativeCapturePlan,
+  nativeShardSelection,
+  validateNativeCapturePlan,
+  writeNativeLaunchPreparation,
   pairedConfidence,
   pairedTrialOrders,
   publishNativeReport,
@@ -819,3 +824,200 @@ function warmupMismatchCapture(defect: 'output' | 'coordinates') {
     }
   }
 }
+
+test('native plan preserves all original counted identities and full revision denominator', () => {
+  const selections = nativeShardSelections(nativePairWorkloads('qualification'))
+  const workloads = nativePairWorkloads('qualification')
+  expect(selections).toHaveLength(1725)
+  expect(new Set(selections.map((entry) => JSON.stringify(entry))).size).toBe(1725)
+  expect(selections.slice(0, 5).map((entry) => entry.pair)).toEqual([-1, -2, -3, 0, 1])
+  expect(selections.filter((entry) => entry.pair < 0)).toHaveLength(225)
+  expect(selections.filter((entry) => entry.pair >= 0)).toHaveLength(1500)
+  const revisions = workloads.reduce((total, entry) => {
+    const updates =
+      entry.revisions?.length ??
+      (entry.scheduleUnits > 0 ? Math.ceil(entry.source.length / entry.scheduleUnits) : 1)
+    return total + (updates + 1) * 23 * 2
+  }, 0)
+  expect(revisions).toBe(1128794)
+  expect(selections.at(-1)).toEqual({ workload: workloads.at(-1)?.id, pair: 19 })
+})
+
+test('native immutable plan validates the complete identity and ordered original population', async () => {
+  const plan = await createNativeCapturePlan(176, 'development')
+  expect(validateNativeCapturePlan(JSON.parse(JSON.stringify(plan)), plan)).toBe(plan)
+  expect(plan.metadata.qualification).toHaveProperty('sourceClosureSha256')
+  expect(() => validateNativeCapturePlan({ ...plan, shards: plan.shards.slice(1) }, plan)).toThrow()
+  expect(() =>
+    validateNativeCapturePlan({ ...plan, shards: plan.shards.toReversed() }, plan),
+  ).toThrow()
+  expect(() =>
+    validateNativeCapturePlan({ ...plan, metadata: { ...plan.metadata, seed: 177 } }, plan),
+  ).toThrow()
+  expect(() =>
+    validateNativeCapturePlan(
+      { ...plan, metadata: { ...plan.metadata, qualification: null } },
+      plan,
+    ),
+  ).toThrow()
+  const digest = 'a'.repeat(64)
+  expect(nativeShardSelection(plan, 2, digest, 'launch-2')).toEqual({
+    ...plan.shards[2],
+    index: 2,
+    planSha256: digest,
+    launchId: 'launch-2',
+  })
+  expect(nativeShardSelection(plan, 22, digest, 'launch-22').pair).toBe(19)
+  for (const index of [-1, 1725, 0.5, NaN])
+    expect(() => nativeShardSelection(plan, index, digest, 'launch')).toThrow()
+  expect(() => nativeShardSelection(plan, 0, digest, '')).toThrow()
+  expect(() => nativeShardSelection(plan, 0, 'bad-digest', 'launch')).toThrow()
+})
+
+test.each([-1, -2, -3, 0, 7, 19])(
+  'native selection retains original pair %s and arm order',
+  async (pair) => {
+    const output = await mkdtemp(path.join(tmpdir(), 'native-selected-'))
+    try {
+      const orders = pairedTrialOrders(20, 176)
+      const calls: string[] = []
+      const result = await writeNativePairs({
+        ...nativeArtifactOptions(output),
+        orders,
+        warmups: 3,
+        pair,
+        mode: 'qualification',
+        capture: ({ engine, trial }) => {
+          calls.push(`${engine}:${trial}`)
+          return artifactNativeTrial(engine, trial)
+        },
+      })
+      const order = pair < 0 ? pairedTrialOrders(3, 176)[-pair - 1] : orders[pair]
+      expect(calls).toEqual(order.map((engine) => `${engine}:${pair}`))
+      expect(result.pairsArtifact.recordCount).toBe(1)
+      const row = JSON.parse(await readFile(path.join(output, result.pairsArtifact.path), 'utf8'))
+      expect(row.pair.trial).toBe(pair)
+      expect(row.pair.remark.trial).toBe(pair)
+      expect(row.pair.candidate.trial).toBe(pair)
+      expect(result.workloads[0].observedPairs).toBe(pair < 0 ? 0 : 1)
+      if (pair < 0) expect(result.workloads[0].comparisons).toEqual([])
+      else
+        expect(
+          result.workloads[0].comparisons.every((entry) => entry.independentTrials === 1),
+        ).toBe(true)
+    } finally {
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test.each([-4, 20, 0.5, NaN])(
+  'native rejects invalid original pair %s before capture',
+  async (pair) => {
+    const output = await mkdtemp(path.join(tmpdir(), 'native-selection-invalid-'))
+    try {
+      let calls = 0
+      await expect(
+        writeNativePairs({
+          ...nativeArtifactOptions(output),
+          orders: pairedTrialOrders(20, 176),
+          warmups: 3,
+          pair,
+          capture: ({ engine, trial }) => {
+            calls++
+            return artifactNativeTrial(engine, trial)
+          },
+        }),
+      ).rejects.toThrow()
+      expect(calls).toBe(0)
+      expect(await readdir(output)).toEqual([])
+    } finally {
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test('native launch preparation is retained separately from the one original counted pair', async () => {
+  const output = await mkdtemp(path.join(tmpdir(), 'native-prepared-'))
+  try {
+    const calls: string[] = []
+    const options = {
+      ...nativeArtifactOptions(output),
+      orders: pairedTrialOrders(20, 176),
+      warmups: 3,
+      pair: -2,
+      capture: ({ engine, trial }: { engine: NativeTrial['engine']; trial: number }) => {
+        calls.push(`${engine}:${trial}`)
+        return artifactNativeTrial(engine, trial)
+      },
+    }
+    const preparation = await writeNativeLaunchPreparation(options)
+    expect(preparation).toMatchObject({
+      policy: 'paired-full-workload-three-replays-v1',
+      pairs: 3,
+      arms: 6,
+      trialIds: [0, 1, 2],
+      orderSeed: 176,
+      mismatchedPairs: 0,
+    })
+    expect(preparation.durationMs).toBeGreaterThan(0)
+    expect(preparation.artifact.recordCount).toBe(3)
+    const rows = (await readFile(path.join(output, preparation.artifact.path), 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+    expect(rows.map((row) => [row.role, row.preparation, row.pair.trial])).toEqual([
+      ['launch-preparation', 0, 0],
+      ['launch-preparation', 1, 1],
+      ['launch-preparation', 2, 2],
+    ])
+    expect(calls).toEqual(
+      pairedTrialOrders(3, 176).flatMap((order, trial) =>
+        order.map((engine) => `${engine}:${trial}`),
+      ),
+    )
+    const counted = await writeNativePairs(options)
+    expect(counted.pairsArtifact.recordCount).toBe(1)
+    const row = JSON.parse(await readFile(path.join(output, counted.pairsArtifact.path), 'utf8'))
+    expect(row.pair.trial).toBe(-2)
+    expect(row.role).toBeUndefined()
+    expect(calls).toHaveLength(8)
+    await expect(writeNativeLaunchPreparation(options)).rejects.toThrow()
+    expect(calls).toHaveLength(8)
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('native failed preparation retains prior full pairs and completed first arm with original error', async () => {
+  const output = await mkdtemp(path.join(tmpdir(), 'native-preparation-failed-'))
+  const error = new TypeError('preparation second arm failed')
+  try {
+    let calls = 0
+    await expect(
+      writeNativeLaunchPreparation({
+        ...nativeArtifactOptions(output),
+        capture: ({ engine, trial }) => {
+          calls++
+          if (calls === 4) throw error
+          return artifactNativeTrial(engine, trial)
+        },
+      }),
+    ).rejects.toBe(error)
+    const rows = (await readFile(path.join(output, 'raw-native-preparation.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+    expect(rows).toHaveLength(1)
+    const failure = JSON.parse(
+      await readFile(path.join(output, 'native-preparation-failure.json'), 'utf8'),
+    )
+    expect(failure.role).toBe('launch-preparation')
+    expect(failure.trial).toBe(1)
+    expect(failure.completed).toHaveLength(1)
+    expect(failure.pairsArtifact.recordCount).toBe(1)
+    expect(failure.error.message).toBe(error.message)
+    expect(await readdir(output)).not.toContain('raw-native-pairs.jsonl')
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
