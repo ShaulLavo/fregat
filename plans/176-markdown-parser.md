@@ -486,3 +486,31 @@ do not establish a parser defect or replace the chat qualification gates.
       `packages/markdown/src/utils/blocks.ts:161–189`. The existing review found these work
       patterns, not a measured budget failure. Extend Issue 856's bounded workloads, retain
       fresh-prefix equality and source positions, and tune only a demonstrated bottleneck.
+
+### Copied rich HTML metadata, 2026-10-23
+
+Status: Approved bounded follow-up. Existing qualification gates and budgets stay unchanged.
+
+Native iOS development proof at `8f31c210f1791cfe642e45f44ad102fde87f5142` copied
+`Read [the docs](https://example.com/guide) for **detail**.` correctly with both engines.
+UIKit rich paste preserved the visible sentence, link destination, and bold text. The trusted
+copy receipts also contain `id="base-ui-_r_1_"`, `data-base-ui-tooltip-trigger`,
+`data-slot="tooltip-trigger"`, source-line attributes, and utility classes. This establishes
+exported UI metadata. It does not establish a recipient-side defect.
+
+Evidence: `/work/reports/wave-20261022/fregat/resume-ios-driver/native-proof/report.md`
+and `runs/r3/control.jsonl`, lines 23 and 47, under that report's directory. The bounded
+investigation and replay commands are in
+`/work/reports/wave-20261022/fregat/resume-clipboard-html/report.md`.
+`AssistantMarkdownLink` wraps external anchors in a tooltip. At the copy boundary,
+`apps/web/src/features/chat/utils/markdown-clipboard.ts:58` removes controls from a cloned
+selection and exports the remaining attributes. Current source behavior is unchanged.
+
+- [ ] Test an isolated rich-paste recipient if a concrete metadata-related failure is reported.
+      Replay the retained HTML through `chatMarkdownClipboardPayload`, then identify the
+      recipient's actual changed formatting, reference resolution, or interaction. Preserve
+      exact plain Markdown and the live selection. If a fix is justified, change the copy
+      boundary and add that recipient's minimal regression. Distinguish host-owned attributes
+      from authored fragment IDs, names, reference attributes, language classes, and math
+      formatting. Do not strip attributes by prefix or remove every class, ID, or data attribute.
+      Close this item without a behavior change if the bounded recipient check finds no defect.
