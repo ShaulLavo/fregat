@@ -14,6 +14,7 @@ import time
 import unittest
 from pathlib import Path
 
+from host_telemetry import Collector
 from host_telemetry_os import cpu_interval, host_identity, snapshot
 
 CLI = Path(__file__).with_name("host-telemetry.py")
@@ -143,6 +144,16 @@ class TelemetryTests(unittest.TestCase):
             .read_text()
             .splitlines()
         ]
+
+    def test_capture_interruption_escapes_os_error_handlers(self):
+        out = self.root / "interruption"
+        out.mkdir()
+        collector = Collector(out, [])
+        self.addCleanup(collector.close)
+        with self.assertRaises(Exception) as interrupted:
+            collector.interrupt(signal.SIGTERM, None)
+        self.assertNotIsInstance(interrupted.exception, OSError)
+        self.assertEqual(str(interrupted.exception), "Capture received signal 15")
 
     def test_native_observer_sees_real_process_identity_and_cpu(self):
         before = snapshot()
