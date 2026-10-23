@@ -117,6 +117,8 @@ class Collector:
         self.capture_owned: set[tuple[int, int]] = set()
         self.stop = threading.Event()
         self.thread = None
+        self.monitor_starting = False
+        self.after_attempted = False
         self.journal = (out / "observations.jsonl").open("x", buffering=1)
         self.own_pid = os.getpid()
         self.cleaning = False
@@ -208,25 +210,42 @@ class Collector:
 
     def start(self, group: int, interval: float) -> None:
         self.group = group
-        self.thread = threading.Thread(
-            target=self.monitor, args=(interval,), daemon=True
-        )
-        self.thread.start()
+        # Defer cancellation through the bootstrap handshake and thread publication.
+        self.monitor_starting = True
+        try:
+            thread = threading.Thread(
+                target=self.monitor, args=(interval,), daemon=True
+            )
+            thread.start()
+            self.thread = thread
+        finally:
+            self.monitor_starting = False
+        if self.interrupted:
+            raise CaptureInterrupted("Capture interrupted during monitor startup")
 
-    def finish(self) -> None:
+    def stop_monitor(self) -> None:
         self.stop.set()
         if self.thread is not None:
             self.thread.join()
+
+    def finish(self) -> None:
+        self.stop_monitor()
+        if self.after_attempted:
+            return
+        self.after_attempted = True
         self.sample("after")
 
     def interrupt(self, signum, _frame) -> None:
         self.interrupted = True
-        if self.cleaning:
+        if self.cleaning or self.monitor_starting:
             return
         raise CaptureInterrupted(f"Capture received signal {signum}")
 
     def close(self) -> None:
-        self.journal.close()
+        try:
+            self.stop_monitor()
+        finally:
+            self.journal.close()
 
 
 def validate_coverage(observations: list[dict], start: float, end: float) -> None:
@@ -360,10 +379,13 @@ def run_capture(args) -> int:
         )
         return 143
     finally:
-        collector.stop.set()
-        if collector.thread is not None:
-            collector.thread.join()
+        close_capture(collector, previous_handlers)
+
+
+def close_capture(collector: Collector, previous_handlers: dict) -> None:
+    try:
         collector.close()
+    finally:
         for signum, handler in previous_handlers.items():
             signal.signal(signum, handler)
 
