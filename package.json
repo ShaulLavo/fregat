@@ -144,7 +144,7 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "pngjs": "7.0.0",
-    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#7e84c579018564b64c023a60008f2a45157a6ef1",
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#6889cfde712bbc1f189eab4821e895590226faaf",
     "turbo": "catalog:",
     "typescript": "catalog:",
     "typescript-api": "catalog:",
@@ -161,7 +161,7 @@
   "engines": {
     "node": ">=26.0.0"
   },
-  "packageManager": "bun@1.4.2",
+  "packageManager": "bun@1.4.4",
   "patchedDependencies": {
     "@vitest/browser-playwright@5.0.2": "patches/@vitest%2Fbrowser-playwright@5.0.2.patch",
     "vitest@5.0.2": "patches/vitest@5.0.2.patch",
