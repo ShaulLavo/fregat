@@ -3,6 +3,12 @@ import path from 'node:path'
 import { PNG } from 'pngjs'
 import { createScriptError } from '../structured-errors'
 
+export function visualProfileKeys(fixture: string, browser: string): string[] {
+  return [390, 1440].flatMap((width) =>
+    ['light', 'dark'].map((theme) => JSON.stringify([fixture, browser, width, theme])),
+  )
+}
+
 export type Bitmap = { readonly width: number; readonly height: number; readonly data: Uint8Array }
 export type Visual = {
   readonly engine: 'remark' | 'tree-sitter'

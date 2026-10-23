@@ -238,3 +238,17 @@ test.each(['missing', 'duplicate', 'changed-plan', 'changed-freeze', 'wrong-doma
     await expect(assembleTimingShards(options)).rejects.toThrow()
   },
 )
+
+test.each(['native', 'production'] as const)(
+  'assembly rejects a reused actual %s launch identity across distinct selections',
+  async (kind) => {
+    const options = await fixture(kind)
+    const filename = path.join(options.root, 'launches/1/report.json')
+    const report = JSON.parse(await readFile(filename, 'utf8'))
+    report.shard.launchId = 'actual-0'
+    await writeFile(filename, JSON.stringify(report))
+    await expect(assembleTimingShards(options)).rejects.toThrow(
+      'Assembly requires a distinct actual launch identity for every shard.',
+    )
+  },
+)

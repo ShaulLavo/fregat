@@ -1403,3 +1403,25 @@ test('artifact streaming production retains later workloads after a partial pair
     await rm(output, { recursive: true, force: true })
   }
 })
+
+test('a production shard captures exactly its original pair without renumbering or reversing its arms', async () => {
+  const workload = { ...productionBrowserWorkloads()[0], source: 'Actual' }
+  const calls: string[] = []
+  const failures: string[] = []
+  const records = productionTrialRecords({
+    workloads: [workload],
+    trials: 20,
+    warmups: 3,
+    shardPair: 7,
+    failures,
+    capture: async ({ pair, order, engine }) => {
+      calls.push(`${pair}/${order}/${engine}`)
+      return { ...trial(engine), pair, order }
+    },
+  })
+  const rows = []
+  for await (const record of records) rows.push(record)
+  expect(rows).toHaveLength(2)
+  expect(calls).toEqual(['7/BA/tree-sitter', '7/BA/remark'])
+  expect(failures).toEqual([])
+})

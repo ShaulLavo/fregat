@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import * as v from 'valibot'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { cpus, hostname, loadavg, release, totalmem } from 'node:os'
 import path from 'node:path'
@@ -11,6 +13,12 @@ import type {
 } from '../../apps/web/test/factories/markdown-production-types'
 import { startProductionCdp, isSustainedProductStream } from './production-cdp.ts'
 import { mixedWorkload } from './workloads.ts'
+import {
+  productionCapturePlan,
+  productionShardSelections,
+  type ProductionShard,
+} from './production-shards'
+import { stable } from './serialization'
 import {
   productionBrowserWorkloads,
   productionTimingManifest,
@@ -53,7 +61,7 @@ const WEB = path.join(ROOT, 'apps/web')
 const ENGINES = ['remark', 'tree-sitter'] as const
 
 type ProductionCapture =
-  | { readonly kind: 'diagnostic' }
+  | { readonly kind: 'diagnostic'; readonly hostEvidenceFile?: string }
   | { readonly kind: 'promotion'; readonly hostEvidenceFile: string }
 type ProductionReplayInput = {
   readonly source: string
@@ -174,6 +182,7 @@ export async function runProductionMarkdownPairs({
   browserArgs = [],
   executablePath,
   capture = { kind: 'diagnostic' },
+  shard,
 }: {
   readonly url: string
   readonly output: string
@@ -187,6 +196,7 @@ export async function runProductionMarkdownPairs({
   readonly browserArgs?: readonly string[]
   readonly executablePath?: string
   readonly capture?: ProductionCapture
+  readonly shard?: ProductionShard
 }) {
   output = path.resolve(output)
   if (
@@ -196,8 +206,9 @@ export async function runProductionMarkdownPairs({
     throw createScriptError(
       'Promotion capture requires headed Chromium on the identified Mac host.',
     )
-  const hostEvidence =
-    capture.kind === 'promotion' ? await readHostEvidence(capture.hostEvidenceFile) : null
+  const hostEvidence = capture.hostEvidenceFile
+    ? await readHostEvidence(capture.hostEvidenceFile)
+    : null
   const hostBefore = observeHost()
   const available = productionBrowserWorkloads()
   const selected = source === undefined ? available : customWorkload(source)
@@ -211,7 +222,18 @@ export async function runProductionMarkdownPairs({
     throw createScriptError('Production workload selection is empty or unknown.', {
       internal: { boundary: 'production-workloads' },
     })
+  if (
+    shard &&
+    (trials !== 20 || warmups !== 3 || workloads.length !== 1 || workloads[0].id !== shard.workload)
+  )
+    throw createScriptError(
+      'A production shard requires one planned workload and the frozen pair population.',
+    )
   await mkdir(output, { recursive: true })
+  if (shard)
+    await writeFile(path.join(output, 'capture-start.json'), JSON.stringify(shard) + '\n', {
+      flag: 'wx',
+    })
   const expectedSource = await qualificationProvenance(ROOT)
   const expectedBudgetSha256 = productionDigest(
     await readFile(new URL('./promotion-budget.json', import.meta.url)),
@@ -225,6 +247,14 @@ export async function runProductionMarkdownPairs({
         : Array.from(browserArgs),
     executablePath,
   })
+  const deadline = shard
+    ? setTimeout(
+        () => {
+          void browser.close()
+        },
+        110 * 60 * 1000,
+      )
+    : undefined
   let actualBrowserArgs: readonly string[] | null = null
   const failures: string[] = []
   const interrupt = () => {
@@ -236,7 +266,7 @@ export async function runProductionMarkdownPairs({
   let observed: Awaited<ReturnType<typeof writeProductionTrials>>
   try {
     actualBrowserArgs = await readBrowserArguments(browser)
-    if (negativeControls)
+    if (negativeControls || shard)
       controls = await withProductionDeadline(
         productionBrowserControls(browser, url),
         'negative controls',
@@ -250,6 +280,7 @@ export async function runProductionMarkdownPairs({
         workloads,
         trials,
         warmups,
+        shardPair: shard?.pair,
         failures,
         retainMismatch: (results) => retainPairMismatch(output, results),
         capture: (trial) =>
@@ -267,12 +298,15 @@ export async function runProductionMarkdownPairs({
       }),
     })
   } finally {
+    clearTimeout(deadline)
     process.removeListener('SIGINT', interrupt)
     process.removeListener('SIGTERM', interrupt)
     await browser.close()
   }
   const { comparisons, resourcePlateaus, ordinaryFindings, incompleteEvidence } = observed
-  const failedComparisons = comparisons.filter((comparison) => comparison.status === 'failed')
+  const failedComparisons = shard
+    ? []
+    : comparisons.filter((comparison) => comparison.status === 'failed')
   if (
     controls &&
     (controls.knownGood.expected !== controls.knownGood.observed ||
@@ -309,6 +343,7 @@ export async function runProductionMarkdownPairs({
   )
   const report = {
     schemaVersion: 2 as const,
+    ...(shard ? { shard } : {}),
     build: 'production',
     timingStatus: capture.kind === 'promotion' ? 'PROMOTION_CAPTURE_UNRECONCILED' : 'EXPLORATORY',
     capture: { ...capture, hostEvidence },
@@ -424,6 +459,7 @@ type ProductionRecordsOptions = {
   readonly trials: number
   readonly warmups: number
   readonly failures: string[]
+  readonly shardPair?: number
   readonly capture: ProductionTrialCapture
   readonly retainMismatch?: (trials: readonly ProductionTrial[]) => Promise<void>
 }
@@ -438,7 +474,9 @@ async function* measureWorkload(
   workload: ProductionWorkload,
   options: ProductionRecordsOptions,
 ): AsyncGenerator<ProductionTrial> {
-  for (let pair = -options.warmups; pair < options.trials; pair += 1) {
+  const first = options.shardPair ?? -options.warmups
+  const end = options.shardPair === undefined ? options.trials : options.shardPair + 1
+  for (let pair = first; pair < end; pair += 1) {
     const result = yield* measureProductionPair(workload, pair, options)
     if (!result) return
   }
@@ -819,6 +857,7 @@ export async function readOracle(
   })
   const page = await context.newPage()
   const errors: string[] = []
+  let invalidOracleRecord: unknown
   page.on('pageerror', (error) => errors.push(error.message))
   try {
     const target = new URL(url)
@@ -838,9 +877,14 @@ export async function readOracle(
       file: path.join(directory, 'oracle.jsonl'),
       engine,
       records: oracleCallbackRecords(async (emit) => {
-        await page.exposeBinding('markdownOracleFrame', async (_source, value: unknown) =>
-          emit(parseProductionOracleRecord(value)),
-        )
+        await page.exposeBinding('markdownOracleFrame', async (_source, value: unknown) => {
+          try {
+            await emit(parseProductionOracleRecord(value))
+          } catch (error) {
+            invalidOracleRecord = value
+            throw error
+          }
+        })
         await withProductionDeadline(
           page.evaluate(replayProductionOracle, {
             source: workload.source,
@@ -863,6 +907,7 @@ export async function readOracle(
       prefix: 'oracle-failure',
       diagnostic: {
         errors,
+        invalidOracleRecord,
         failure: error instanceof Error ? error.message : String(error),
       },
     }).catch(() => undefined)
@@ -1055,6 +1100,81 @@ function customWorkload(source: string): ProductionWorkload[] {
   ]
 }
 
+async function capturePlanIdentity(directory: string) {
+  const provenance = await qualificationProvenance(ROOT)
+  const metadata = await readFile(path.join(directory, 'markdown-probe-build.json'), 'utf8')
+  const build = JSON.parse(metadata)
+  const manifest = await readFile(path.join(directory, '.vite/manifest.json'))
+  if (
+    stable(build.sourceAfter) !== stable(provenance) ||
+    stable(build.sourceBefore) !== stable(provenance) ||
+    !build.sourceConsistent
+  )
+    throw createScriptError('Capture planning requires a build of the current unchanged source.')
+  return {
+    provenance,
+    budgetSha256: productionDigest(
+      await readFile(new URL('./promotion-budget.json', import.meta.url)),
+    ),
+    build: {
+      metadataSha256: productionDigest(metadata),
+      manifestSha256: productionDigest(manifest),
+    },
+    workloadManifest: productionTimingManifest(),
+    shards: productionShardSelections(productionBrowserWorkloads()),
+  }
+}
+
+async function writeCapturePlan(directory: string, output: string, promotion: boolean) {
+  const identity = await capturePlanIdentity(directory)
+  if (promotion && identity.provenance.trackedDiffSha256 !== productionDigest(''))
+    throw createScriptError('A promotion capture plan requires the clean committed source freeze.')
+  const plan = v.parse(productionCapturePlan, {
+    schemaVersion: 1,
+    kind: 'production-capture-plan',
+    purpose: promotion ? 'promotion' : 'development',
+    ...identity,
+  })
+  await writeFile(output, JSON.stringify(plan, null, 2) + '\n', { flag: 'wx' })
+}
+
+async function readPlannedShard(
+  planFile: string | undefined,
+  indexValue: string | undefined,
+  directory: string | undefined,
+  capture: ProductionCapture,
+): Promise<ProductionShard | undefined> {
+  if (planFile === undefined && indexValue === undefined) return
+  if (!planFile || indexValue === undefined || !directory)
+    throw createScriptError(
+      'A shard requires its immutable plan, index and production build directory.',
+    )
+  const bytes = await readFile(planFile, 'utf8')
+  const plan = v.parse(productionCapturePlan, JSON.parse(bytes))
+  const expected = {
+    provenance: plan.provenance,
+    budgetSha256: plan.budgetSha256,
+    build: plan.build,
+    workloadManifest: plan.workloadManifest,
+    shards: plan.shards,
+  }
+  const actual = await capturePlanIdentity(directory)
+  if (
+    stable(expected) !== stable(actual) ||
+    (capture.kind === 'promotion' && plan.purpose !== 'promotion')
+  )
+    throw createScriptError('The capture plan differs from this source or build.')
+  const index = Number(indexValue)
+  if (!Number.isInteger(index) || index < 0 || index >= plan.shards.length)
+    throw createScriptError('Choose an existing capture-plan shard index.')
+  return {
+    ...plan.shards[index],
+    index,
+    planSha256: productionDigest(bytes),
+    launchId: randomUUID(),
+  }
+}
+
 export async function main() {
   const { values } = parseArgs({
     options: {
@@ -1074,9 +1194,18 @@ export async function main() {
       'browser-executable': { type: 'string' },
       capture: { type: 'string', default: 'diagnostic' },
       'host-evidence': { type: 'string' },
+      'plan-out': { type: 'string' },
+      plan: { type: 'string' },
+      shard: { type: 'string' },
     },
   })
   if (values.build) await buildMarkdownProductionProbe(values.build)
+  if (values['plan-out']) {
+    if (!values.directory)
+      throw createScriptError('Capture planning requires the production build directory.')
+    await writeCapturePlan(values.directory, values['plan-out'], values.capture === 'promotion')
+    return
+  }
   if (!values.url && !values.directory) return
   if (!values.out) throw createScriptError('Choose an output directory for the production probe.')
   const trials = Number(values.trials)
@@ -1090,13 +1219,17 @@ export async function main() {
   const capture: ProductionCapture =
     values.capture === 'promotion' && values['host-evidence']
       ? { kind: 'promotion', hostEvidenceFile: values['host-evidence'] }
-      : { kind: 'diagnostic' }
+      : { kind: 'diagnostic', hostEvidenceFile: values['host-evidence'] }
   if (values.browser !== 'chromium' && values.browser !== 'webkit')
     throw createScriptError('Unknown production browser.')
   const port = Number(values.port)
   if (values.directory && (!Number.isInteger(port) || port < 1 || port > 65535))
     throw createScriptError('Choose an explicit free loopback port for the production probe.')
-  await mkdir(values.out, { recursive: true })
+  const shard = await readPlannedShard(values.plan, values.shard, values.directory, capture)
+  if (shard && (values.smoke || values.workload))
+    throw createScriptError('A planned shard selects its workload from the immutable plan.')
+  await mkdir(path.dirname(path.resolve(values.out)), { recursive: true })
+  await mkdir(values.out, { recursive: !shard })
   await writeFile(
     path.join(values.out, 'resource-ownership.json'),
     JSON.stringify(
@@ -1125,13 +1258,14 @@ export async function main() {
       trials,
       warmups,
       browserName: values.browser,
-      workloadIds: values.workload,
+      workloadIds: shard ? [shard.workload] : values.workload,
       source: values.smoke ? mixedWorkload(256).source : undefined,
       negativeControls: values['negative-controls'],
       headless: !values.headed,
       browserArgs: values['browser-arg'],
       executablePath: values['browser-executable'],
       capture,
+      shard,
     })
   } finally {
     await gateway?.close()

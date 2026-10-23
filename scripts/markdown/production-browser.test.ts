@@ -1,12 +1,17 @@
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { runInNewContext } from 'node:vm'
 import type { Browser } from 'playwright'
 import { expect, test, vi } from 'vitest'
-import { oneTrial, readOracle, retainBrowserMismatch } from './production-browser'
+import {
+  oneTrial,
+  readOracle,
+  retainBrowserMismatch,
+  runProductionMarkdownPairs,
+} from './production-browser'
 import { productionBrowserWorkloads } from './production-workloads'
 import type { ProductionMarkdownFrame } from '../../apps/web/test/factories/markdown-production-types'
 import type { ProductionOracleRecord } from './production-oracle'
@@ -50,6 +55,7 @@ function browserFixture(options: {
   readonly globals?: Readonly<Record<string, unknown>>
   readonly probe?: Readonly<Record<string, unknown>>
   readonly cdp?: EventEmitter
+  readonly records?: readonly unknown[]
 }) {
   const initialization = Promise.withResolvers<void>()
   const diagnostics = Promise.withResolvers<void>()
@@ -69,9 +75,9 @@ function browserFixture(options: {
       streamOracle: async (
         _source: string,
         _chunks: readonly string[],
-        sink: (record: ProductionOracleRecord) => Promise<void>,
+        sink: (record: unknown) => Promise<void>,
       ) => {
-        for (const record of records) await sink(record)
+        for (const record of options.records ?? records) await sink(record)
       },
     },
   }
@@ -308,3 +314,44 @@ test.each(['replay', 'scene', 'replay-with-trace-data-loss'] as const)(
     }
   },
 )
+
+test('invalid oracle callbacks retain their original record before rejecting the capture', async () => {
+  const output = await mkdtemp(path.join(tmpdir(), 'oracle-invalid-record-'))
+  const invalid = { kind: 'final', frame: observed, fullyReady: -1, longTasks: [], resources: [] }
+  const fixture = browserFixture({
+    ready: Promise.resolve({}),
+    dispose: async () => {},
+    records: [invalid],
+  })
+  try {
+    await expect(
+      readOracle(fixture.browser, 'https://fixture.invalid/', workload, 'remark', output, output),
+    ).rejects.toThrow('record shape is invalid')
+    const diagnostic = JSON.parse(await readFile(path.join(output, 'oracle-failure.json'), 'utf8'))
+    expect(diagnostic.invalidOracleRecord).toEqual(invalid)
+    expect(fixture.closed()).toBe(true)
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('diagnostic captures validate supplied actual host evidence before selecting workloads', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'production-host-evidence-'))
+  try {
+    const file = path.join(directory, 'host.json')
+    await writeFile(
+      file,
+      JSON.stringify({ host: 'different-host', observedAt: new Date().toISOString() }),
+    )
+    await expect(
+      runProductionMarkdownPairs({
+        url: 'http://127.0.0.1:1',
+        output: path.join(directory, 'capture'),
+        workloadIds: [],
+        capture: { kind: 'diagnostic', hostEvidenceFile: file },
+      }),
+    ).rejects.toThrow('Timing-host evidence must name this actual host')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})

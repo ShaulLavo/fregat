@@ -24,6 +24,7 @@ import {
 } from './evaluate-heldout'
 import { BENCHMARK_FAMILIES } from './workloads'
 import { reconcileTimingManifest, type TimingFreeze } from './production-reconciliation'
+import { productionShardIndex, nativeShardIndex } from './production-shards'
 import { productionResourcePlateau } from './production-analysis'
 import * as v from 'valibot'
 import {
@@ -35,6 +36,7 @@ import { isRecord, stable } from './serialization'
 import { checkRunExitCode } from './check-exit'
 import {
   rasterRecords,
+  visualProfileKeys,
   readBitmap,
   pixelDifference,
   nonblankPixels,
@@ -504,11 +506,6 @@ function visualStateKeys(): string[] {
     WEBKIT_CRITICAL_IDS.flatMap((fixture) => visualProfileKeys(fixture, 'webkit')),
   )
 }
-function visualProfileKeys(fixture: string, browser: 'chromium' | 'webkit'): string[] {
-  return [390, 1440].flatMap((width) =>
-    ['light', 'dark'].map((theme) => JSON.stringify([fixture, browser, width, theme])),
-  )
-}
 function parseVisualTuple(value: string): readonly unknown[] | null {
   try {
     const result: unknown = JSON.parse(value)
@@ -578,13 +575,33 @@ function timingObservation(
   })
 }
 
+export function productionObservationReport(
+  report: LoadedReport | undefined,
+  timing: Pick<TimingReconciliationResult, 'productionSummary'> | undefined,
+): LoadedReport | undefined {
+  if (get(report?.value ?? {}, 'kind') !== 'production-shards') return report
+  if (!timing?.productionSummary)
+    return (
+      report && {
+        ...report,
+        value: null,
+        error: 'Browser shard index requires reconciled original launch reports.',
+      }
+    )
+  return report && { ...report, value: timing.productionSummary }
+}
+
 function resourceObservation(
   report: LoadedReport | undefined,
   timing: TimingReconciliationResult | undefined,
   scenarios: Observation,
   nativeReport: LoadedReport | undefined,
 ): Observation {
-  const browser = browserResourceObservation(report, timing, scenarios)
+  const browser = browserResourceObservation(
+    productionObservationReport(report, timing),
+    timing,
+    scenarios,
+  )
   const native = reconcileNativeResources(nativeReport?.value)
   return observation({
     ...browser,
@@ -701,7 +718,10 @@ function reconcileResourceRow(
   const exclusions: string[] = []
   const matches = rawTrials.filter(
     (trial) =>
-      trial.workload === workload && trial.engine === engine && trial.pair === get(row, 'pair'),
+      trial.workload === workload &&
+      trial.engine === engine &&
+      trial.pair === get(row, 'pair') &&
+      trial.launchReport === get(row, 'launchReport'),
   )
   const trial = matches[0]
   if (!trial || matches.length !== 1 || (engine !== 'remark' && engine !== 'tree-sitter'))
@@ -752,6 +772,7 @@ function benchmarkObservation(
   report: LoadedReport | undefined,
   timing: TimingReconciliationResult | undefined,
 ): Observation {
+  report = productionObservationReport(report, timing)
   if (!report) return missing('Benchmark report is missing.')
   if (!report.value) return invalid(report.error ?? 'Benchmark report is invalid.')
   const coverage = list(get(report.value, 'familyCoverage')).filter(isRecord)
@@ -1999,7 +2020,7 @@ async function loadReports(manifest: PromotionEvidenceAssemblyManifest): Promise
       const parsed: unknown = JSON.parse(contents)
       if (
         (kind === 'production-browser' || kind === 'paired-native') &&
-        !validTimingEnvelope(parsed)
+        !validTimingEnvelope(parsed, kind)
       )
         throw createScriptError('Timing report requires a schema-2 file-backed envelope.')
       loaded.set(kind, {
@@ -2020,7 +2041,9 @@ async function loadReports(manifest: PromotionEvidenceAssemblyManifest): Promise
   }
   return loaded
 }
-function validTimingEnvelope(value: unknown) {
+export function validTimingEnvelope(value: unknown, kind: 'production-browser' | 'paired-native') {
+  if (kind === 'production-browser' && v.safeParse(productionShardIndex, value).success) return true
+  if (kind === 'paired-native' && v.safeParse(nativeShardIndex, value).success) return true
   if (
     !isRecord(value) ||
     value.schemaVersion !== 2 ||
@@ -2247,6 +2270,7 @@ async function nativeResourceAssetBytes(input: {
 function sourceIdentityFindings(
   manifest: PromotionEvidenceAssemblyManifest,
   reports: LoadedReports,
+  timing: ReadonlyMap<'production' | 'native', TimingReconciliationResult>,
 ): string[] {
   const frozen = manifest.frozenProvenance
   if (!frozen) return ['Frozen qualification source provenance is missing.']
@@ -2260,7 +2284,12 @@ function sourceIdentityFindings(
       'Frozen source context differs from sealed candidate/lock or contains a tracked diff.',
     )
   for (const kind of ['qualification', 'production-browser', 'native-resources'] as const) {
-    const report = reports.get(kind)?.value
+    const loaded = reports.get(kind)
+    const report = (
+      kind === 'production-browser'
+        ? productionObservationReport(loaded, timing.get('production'))
+        : loaded
+    )?.value
     if (!report) continue
     const actual = record(report, 'provenance') ?? {}
     for (const [field, expected] of Object.entries(frozen)) {
@@ -2287,7 +2316,10 @@ function sourceIdentityFindings(
         `qualification: ${kind} candidate artifact differs from sealed identity or is missing.`,
       )
   }
-  const production = reports.get('production-browser')?.value
+  const production = productionObservationReport(
+    reports.get('production-browser'),
+    timing.get('production'),
+  )?.value
   if (production && get(production, 'frozenBudgetSha256') !== manifest.identity.budgetSha256)
     findings.push('production-browser: frozen budget differs from sealed identity.')
   return findings
@@ -2623,7 +2655,7 @@ export async function assemblePromotionEvidence(
     manifest,
     reports.get('native-resources'),
   )
-  const sourceFindings = sourceIdentityFindings(manifest, reports).concat(
+  const sourceFindings = sourceIdentityFindings(manifest, reports, timing).concat(
     resourceAssets,
     await nativeResourceRawFindings(manifest, reports.get('native-resources')),
   )

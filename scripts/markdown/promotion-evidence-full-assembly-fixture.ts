@@ -341,7 +341,11 @@ async function writeNative(
   })
   await recordStatistics(directory, observed.pairsArtifact)
   const reportSha256 = await fileHash(file)
-  await save(directory, 'native-quiet.json', quietHost(file, reportSha256))
+  await save(
+    directory,
+    'native-quiet.json',
+    quietHost(path.relative(directory, file).split(path.sep).join('/'), reportSha256),
+  )
   await save(directory, 'native-source-capture.json', {
     reportSha256,
     sourceRoot: 'source',

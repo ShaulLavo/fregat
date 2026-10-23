@@ -62,6 +62,8 @@ import {
 } from '../../packages/markdown/test/fixtures/cases'
 import {
   assemblePromotionEvidence,
+  productionObservationReport,
+  validTimingEnvelope,
   parsePromotionEvidenceAssemblyManifest,
   type PromotionEvidenceAssemblyManifest,
 } from './promotion-evidence'
@@ -3138,3 +3140,104 @@ test.each(['missing', 'empty', 'duplicate', 'wrong-run'] as const)(
     )
   },
 )
+
+test('shard observation adapter keeps the original index identity and original resource realms', () => {
+  const index = {
+    path: 'assembly/production-shards.json',
+    sha256: sha('index'),
+    value: { schemaVersion: 1, kind: 'production-shards' },
+    error: null,
+  }
+  const plateau = {
+    workload: 'resource-cycles-20',
+    pair: 0,
+    engine: 'tree-sitter',
+    launchReport: 'launch-3/production-browser.json',
+    status: 'INCONCLUSIVE',
+    reason: 'Missing actual windows.',
+  }
+  const summary = {
+    provenance,
+    frozenBudgetSha256: sha('budget'),
+    familyCoverage: [],
+    resourcePlateaus: [plateau],
+    failures: ['original launch failure'],
+    missing: ['original limitation'],
+  }
+  expect(productionObservationReport(index, { productionSummary: summary })).toEqual({
+    ...index,
+    value: summary,
+  })
+  expect(productionObservationReport(index, undefined)).toMatchObject({
+    path: index.path,
+    sha256: index.sha256,
+    value: null,
+  })
+  const original = {
+    ...index,
+    value: { schemaVersion: 2, provenance, resourcePlateaus: [plateau] },
+  }
+  expect(productionObservationReport(original, { productionSummary: summary })).toBe(original)
+})
+
+test('loads domain-specific strict shard indexes and preserves original single-launch envelopes', () => {
+  const index = {
+    schemaVersion: 1,
+    kind: 'production-shards',
+    plan: { path: 'capture-plan.json', sha256: sha('plan') },
+    shards: [
+      {
+        report: { path: 'launch/production-browser.json', sha256: sha('launch') },
+        artifacts: {
+          host: null,
+          quietHost: null,
+          build: null,
+          buildManifest: null,
+          browser: null,
+          fonts: null,
+          sourceCapture: null,
+          trials: 'raw-trials.jsonl',
+        },
+      },
+    ],
+  }
+  expect(validTimingEnvelope(index, 'production-browser')).toBe(true)
+  expect(validTimingEnvelope(index, 'paired-native')).toBe(false)
+  expect(validTimingEnvelope({ ...index, rawTrials: [] }, 'production-browser')).toBe(false)
+  expect(
+    validTimingEnvelope(
+      { ...index, shards: [index.shards[0], { report: { path: 'broken', sha256: 'invalid' } }] },
+      'production-browser',
+    ),
+  ).toBe(false)
+  expect(validTimingEnvelope({ schemaVersion: 2, workloads: [] }, 'paired-native')).toBe(true)
+  expect(
+    validTimingEnvelope({ schemaVersion: 2, workloads: [{ pairs: [] }] }, 'paired-native'),
+  ).toBe(false)
+})
+
+test('native shard index retains an explicit original-launch artifact set', () => {
+  const index = {
+    schemaVersion: 1,
+    kind: 'native-shards',
+    plan: { path: 'native-plan.json', sha256: sha('native plan') },
+    shards: [
+      {
+        report: { path: 'native/0/paired-native.json', sha256: sha('original native') },
+        artifacts: {
+          host: 'host.json',
+          quietHost: 'quiet-host.json',
+          build: null,
+          buildManifest: null,
+          browser: null,
+          fonts: null,
+          sourceCapture: 'source-capture.json',
+          trials: 'raw-native-pairs.jsonl',
+        },
+      },
+    ],
+  }
+  expect(validTimingEnvelope(index, 'paired-native')).toBe(true)
+  expect(validTimingEnvelope(index, 'production-browser')).toBe(false)
+  expect(validTimingEnvelope({ ...index, nativeInvocation: {} }, 'paired-native')).toBe(false)
+})
