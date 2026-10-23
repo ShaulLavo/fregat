@@ -16,7 +16,13 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test as base } from 'vitest'
 import { createScriptError } from '../structured-errors'
-import { foldJsonl, hashFile, writeJsonl, type RawTimingRef } from './timing-artifacts'
+import {
+  foldJsonl,
+  hashFile,
+  readArtifactBytes,
+  writeJsonl,
+  type RawTimingRef,
+} from './timing-artifacts'
 
 const test = base.extend<{ root: string }>({
   // oxlint-disable-next-line no-empty-pattern -- Vitest discovers fixture dependencies from this pattern.
@@ -378,4 +384,21 @@ test('seals and reads an empty raw stream without inventing records', async ({ r
     }),
   ).resolves.toEqual(expected)
   expect(observed).toBe(0)
+})
+
+test('reads captured bytes and their identity from one handle, including multiple chunks and empty files', async ({
+  root,
+}) => {
+  const bytes = Buffer.from('é😀\r\n'.repeat(20_000))
+  const file = path.join(evidence(root), 'capture.json')
+  await writeFile(file, bytes)
+  expect(await readArtifactBytes({ root: evidence(root), file })).toEqual({
+    reference: { path: 'capture.json', sha256: digest(bytes), byteLength: bytes.length },
+    bytes,
+  })
+  await writeFile(file, '')
+  expect(await readArtifactBytes({ root: evidence(root), file })).toEqual({
+    reference: { path: 'capture.json', sha256: digest(Buffer.alloc(0)), byteLength: 0 },
+    bytes: Buffer.alloc(0),
+  })
 })

@@ -98,6 +98,14 @@ async function readObserved(
   }
 }
 
+export async function readArtifactBytes(options: FileOptions) {
+  const buffers: Buffer[] = []
+  const reference = await readObserved(options, async (bytes) => {
+    buffers.push(Buffer.from(bytes))
+  })
+  return { reference, bytes: Buffer.concat(buffers) }
+}
+
 export async function hashFile(options: FileOptions): Promise<ArtifactRef> {
   return readObserved(options, async () => {})
 }
