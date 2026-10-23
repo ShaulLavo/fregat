@@ -1,3 +1,4 @@
+import { DEVELOPMENT_POLICY_SHA256 } from './development-exclusions'
 import { hash } from 'node:crypto'
 import { expect, test } from 'vitest'
 import { selectEvaluationMessages } from './snapshot-evaluation'
@@ -72,11 +73,17 @@ test('prospective curation writes a fresh whole batch and refuses capacity, pins
     const directory = path.join(root, 'packages/markdown/test/evaluation')
     await mkdir(directory, { recursive: true })
     await mkdir(path.join(root, 'scripts/markdown'), { recursive: true })
+    for (const name of ['development-exclusions.ts', 'development-exclusion-policy.json'])
+      await writeFile(
+        path.join(root, 'scripts/markdown', name),
+        await readFile(new URL(name, import.meta.url)),
+      )
     const selector = await readFile(new URL('./snapshot-evaluation.ts', import.meta.url))
     await writeFile(path.join(root, 'scripts/markdown/snapshot-evaluation.ts'), selector)
     const raw = Array.from({ length: 201 }, (_, index) =>
       message(`fresh-${index}`, { text: source + index }),
     )
+    raw.push(message('runtime-family', { text: `See [the log](${'runtime/'.repeat(30)}).` }))
     const bytes = gzipSync(raw.map((row) => JSON.stringify(row)).join('\n'))
     const asset = path.join(root, 'source.gz')
     await writeFile(asset, bytes)
@@ -110,7 +117,11 @@ test('prospective curation writes a fresh whole batch and refuses capacity, pins
       excludeManifest,
       encoded({
         schemaVersion: 1,
-        complete: true,
+        complete: false,
+        conservativeCoverage: {
+          reviewEvidenceSha256: hash('sha256', 'synthetic coverage review'),
+          unresolvedSources: [],
+        },
         recordedAt: time,
         groups: EXCLUSION_GROUPS.map((name) => ({
           name,
@@ -123,6 +134,7 @@ test('prospective curation writes a fresh whole batch and refuses capacity, pins
     await writeFile(
       freezeManifest,
       encoded({
+        developmentPolicySha256: DEVELOPMENT_POLICY_SHA256,
         curator: 'synthetic-control',
         custodyStartedAt: time,
         ledgerDirectory,
@@ -236,4 +248,22 @@ test('seeded selection keeps the same attribution when duplicate-source rows are
   const selected = selectEvaluationMessages(encoded(rows), new Set())
   expect(selected).toHaveLength(1)
   expect(selectEvaluationMessages(encoded(rows.toReversed()), new Set())).toEqual(selected)
+})
+
+test('runtime-dependent development families are rejected before source ranking', () => {
+  const runtime = 'unrecorded-runtime-value/'.repeat(15)
+  const sources = [
+    `See [the log](${runtime}).`,
+    `See [notes](${runtime}).`,
+    `<div id="base-ui-_r_123_">User namespace</div>\n\n<span id="_r_abc_">User identity</span>\n\n![source image](${runtime})\n\n[link](https://example.com/docs)`,
+    `<div id="base-ui-_r_123_">User namespace</div>\n\n<span id="_r_xyz_">User identity</span>\n\n![source image](${runtime})\n\n[link](https://example.com/docs)`,
+    `![Answer](${runtime}/icons/fregat-favicon.svg)`,
+  ]
+  const rows = sources.map((text, index) => message(`runtime-${index}`, { text }))
+  rows.push(message('independent', { text: source + 'independent' }))
+  expect(
+    selectEvaluationMessages(rows.map((row) => JSON.stringify(row)).join('\n'), new Set()).map(
+      (row) => row.id,
+    ),
+  ).toEqual(['independent'])
 })

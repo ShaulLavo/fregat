@@ -14,6 +14,7 @@ import {
   curationFreezeSchema,
   exclusionsSchema,
   exclusionHashes,
+  requireExclusionCoverage,
   evaluationManifestSchema,
   sourceIdentity,
   validateCustodyInventory,
@@ -22,6 +23,7 @@ import {
   type Exclusions,
   type ProspectiveRegistration,
 } from './evaluation-custody'
+import { runtimeSourceExcluded } from './development-exclusions'
 import { encoded } from './serialization'
 
 const DATASET = {
@@ -75,7 +77,7 @@ export function selectEvaluationMessages(raw: string, excluded: ReadonlySet<stri
         internal: { boundary: 'selection-message-id' },
       })
     ids.add(message.message_id)
-    if (seen.has(sha256)) continue
+    if (seen.has(sha256) || runtimeSourceExcluded(message.text)) continue
     candidates.push({
       priority: hash('sha256', `fregat-chat-evaluation-v1:${message.message_id}`, 'hex'),
       row: {
@@ -141,6 +143,7 @@ export async function curateEvaluationSnapshot(input: {
     JSON.parse(await readFile(input.freezeManifest, 'utf8')),
   )
   validateCurationProtocol(freeze, exclusions, selectionStartedAt)
+  requireExclusionCoverage(exclusions)
   const excluded = exclusionHashes(exclusions)
   if (Array.from(input.builtInExcluded).some((source) => !excluded.has(source)))
     throw createScriptError(

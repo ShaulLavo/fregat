@@ -10,11 +10,13 @@ import {
   curationFreezeSchema,
   evaluationManifestSchema,
   exclusionHashes,
+  unresolvedExclusionSources,
   exclusionsSchema,
   sourceIdentity,
   validateCurationProtocol,
   validateCustodyInventory,
 } from './evaluation-custody'
+import { DEVELOPMENT_POLICY_SHA256 } from './development-exclusions'
 import { encoded } from './serialization'
 import { builtInExclusions } from './snapshot-evaluation'
 
@@ -70,7 +72,12 @@ export async function prepareEvaluation(input: {
   const missingInputs: string[] = []
   if (!freeze) missingInputs.push('final-parser-freeze')
   if (!exclusions) missingInputs.push('complete-development-exclusions')
+  const unresolvedSources = exclusions ? unresolvedExclusionSources(exclusions) : []
+  if (unresolvedSources.length) missingInputs.push('unresolved-development-sources')
   return {
+    developmentPolicySha256: DEVELOPMENT_POLICY_SHA256,
+    exactHashInventoryComplete: exclusions?.complete ?? null,
+    unresolvedSources,
     schemaVersion: 1,
     status: missingInputs.length ? 'awaiting-inputs' : 'metadata-validated',
     inspectedAt,

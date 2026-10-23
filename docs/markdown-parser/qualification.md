@@ -110,10 +110,24 @@ archive access. Supply these JSON inputs using actual UTC timestamps:
   `repositories`, `regressions`, `messages`, `stories`, and `workloads`.
   The selector verifies the five built-in sets and automatically excludes every prior batch.
   The curator owns collection of all subsequent regression, message, story, and workload inputs.
-  `complete` declares that collection finished; the tool cannot discover omitted historical inputs.
-- `freeze.json`: `curator`, `custodyStartedAt`, the canonical absolute `ledgerDirectory`, and
+  `complete: true` declares a complete exact-hash collection. The tool cannot discover omitted historical inputs.
+  Keep a partial collection at `complete: false` and supply `conservativeCoverage` with
+  `reviewEvidenceSha256` and `unresolvedSources`. The review evidence must account for each known
+  historical source through exact hashes or a proved conservative family. Selection and registration
+  refuse any unresolved source. An empty list is a reviewed curator assertion, not automatic discovery.
+  Metadata preparation reports unresolved sources without decoding. Never close a missing recipe merely
+  because a later recipe, new execution receipt, or synthetic control passes.
+- The committed `development-exclusion-policy.json` rejects five pinned generator families using exact
+  prefix and suffix text around an arbitrary runtime string. Its immutable recipe provenance covers
+  two file-link paths, both source-image user-ID variants, and the final warmup image recipe.
+  False-positive exclusion is allowed. Every possible output of a covered generator must be rejected.
+  Earlier warmup remote/data controls remain unresolved until their own recipes are covered.
+  Keep unrelated missing historical inputs open. These five families do not establish global completeness.
+- `freeze.json`: `developmentPolicySha256`, `curator`, `custodyStartedAt`, the canonical absolute `ledgerDirectory`, and
   `parserFreeze` with `commit`, `sourceSha256`, `artifactsSha256`, and `frozenAt`.
-  Use the preselection candidate fingerprint. Hash its `artifacts` object as two-space JSON plus
+  Copy `developmentPolicySha256` from the preparation receipt. It binds the exact matcher bytes and
+  canonical rules, including immutable source-recipe provenance. Registration and downstream evaluation
+  require the same policy. Use the preselection candidate fingerprint. Hash its `artifacts` object as two-space JSON plus
   a trailing newline. The evaluator enforces that artifact digest. Verify the parser source remains
   unchanged when committing registration metadata. Record freeze, custody start, exclusion completion,
   and selection in that order. Preserve the authoritative ledger throughout later openings.
@@ -132,7 +146,9 @@ the attributable message with the lowest seeded priority, independently of archi
 Existing output paths, used batch names, duplicate message IDs, and insufficient capacity fail. It writes new assets,
 appendable `manifest.json` and `custody.json`, the byte-exact `previous-manifest.json`, license,
 and `selection.json` with eligibility, invocation, actual times, selector identity, and canonical
-exclusions digest. It presents counts without message previews and imports no candidate parser.
+exclusions digest. The runtime policy filters sources before selection and ranking. Downstream evaluation
+checks the decoded, digest-bound whole batch against both the exact hashes and runtime families after
+reserving exposure, and repeats that check before trusting receipts. It presents counts without message previews and imports no candidate parser.
 
 Preserve the previous manifest as historical evidence. Integrate only the new assets and appended
 metadata, then commit before the final fingerprint and production build. Freeze the inventory

@@ -1,6 +1,7 @@
 import { hash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { gunzipSync } from 'node:zlib'
 import {
   array,
   literal,
@@ -14,6 +15,11 @@ import {
   type InferOutput,
 } from 'valibot'
 import { createScriptError } from '../structured-errors'
+import {
+  DEVELOPMENT_POLICY_SHA256,
+  requireDevelopmentPolicy,
+  runtimeSourceExcluded,
+} from './development-exclusions'
 import { encoded, stable } from './serialization'
 
 const sha = pipe(string(), regex(/^[a-f0-9]{64}$/u))
@@ -51,18 +57,21 @@ export const EXCLUSION_GROUPS = [
   'stories',
   'workloads',
 ] as const
-export const exclusionsSchema = object({
-  schemaVersion: literal(1),
-  complete: literal(true),
+const exclusionEntries = {
   recordedAt: time,
-  groups: array(
-    object({
-      name: picklist(EXCLUSION_GROUPS),
-      sourceSha256: array(sha),
-    }),
-  ),
-})
+  groups: array(object({ name: picklist(EXCLUSION_GROUPS), sourceSha256: array(sha) })),
+}
+export const exclusionsSchema = union([
+  object({ schemaVersion: literal(1), complete: literal(true), ...exclusionEntries }),
+  object({
+    schemaVersion: literal(1),
+    complete: literal(false),
+    ...exclusionEntries,
+    conservativeCoverage: object({ reviewEvidenceSha256: sha, unresolvedSources: array(string()) }),
+  }),
+])
 export const curationFreezeSchema = object({
+  developmentPolicySha256: sha,
   curator: string(),
   custodyStartedAt: time,
   ledgerDirectory: string(),
@@ -120,11 +129,54 @@ export function exclusionHashes(exclusions: Exclusions) {
   return new Set(exclusions.groups.flatMap((group) => group.sourceSha256))
 }
 
+export function unresolvedExclusionSources(exclusions: Exclusions) {
+  return exclusions.complete ? [] : exclusions.conservativeCoverage.unresolvedSources
+}
+
+export function requireExclusionCoverage(exclusions: Exclusions) {
+  if (unresolvedExclusionSources(exclusions).length) refuse('unresolved-development-sources')
+}
+
+function validateSelectedSourceDisjointness(
+  record: ProspectiveRegistration,
+  sources: readonly string[],
+) {
+  const excluded = exclusionHashes(record.exclusions)
+  if (
+    sources.length !== 100 ||
+    sources.some((source) => excluded.has(hash('sha256', source)) || runtimeSourceExcluded(source))
+  )
+    refuse('selected-development-overlap')
+  if (sources.some((source, index) => hash('sha256', source) !== record.batch.sourceSha256[index]))
+    refuse('selected-source-identity')
+}
+
+export async function readDisjointEvaluationBatch(
+  root: string,
+  record: ProspectiveRegistration,
+): Promise<unknown> {
+  const compressed = await readFile(
+    path.join(root, 'packages/markdown/test/evaluation', record.batch.file),
+  )
+  if (hash('sha256', compressed) !== record.batch.assetSha256) refuse('selected-asset-identity')
+  const bytes = gunzipSync(compressed)
+  if (hash('sha256', bytes) !== record.batch.uncompressedSha256) refuse('selected-payload-identity')
+  const value: unknown = JSON.parse(bytes.toString('utf8'))
+  const messages = parse(array(object({ source: string() })), value)
+  validateSelectedSourceDisjointness(
+    record,
+    messages.map((message) => message.source),
+  )
+  return value
+}
+
 export function validateCurationProtocol(
   freeze: CurationFreeze,
   exclusions: Exclusions,
   selectionStartedAt: string,
 ) {
+  if (freeze.developmentPolicySha256 !== DEVELOPMENT_POLICY_SHA256)
+    refuse('development-policy-freeze')
   const times = [
     freeze.parserFreeze.frozenAt,
     freeze.custodyStartedAt,
@@ -148,6 +200,7 @@ export function validateCurationProtocol(
 
 function validateRegistration(record: ProspectiveRegistration) {
   validateCurationProtocol(record.freeze, record.exclusions, record.selectionStartedAt)
+  requireExclusionCoverage(record.exclusions)
   const excluded = exclusionHashes(record.exclusions)
   if (hash('sha256', encoded(record.exclusions)) !== record.exclusionsSha256)
     refuse('exclusions-identity')
@@ -221,6 +274,7 @@ export async function requireEvaluationCustody(input: {
   const record = inventory.records.find((entry) => entry.batch.file === input.batch.file)
   if (!record || record.kind !== 'prospective-registration')
     refuse('prospective-registration-required')
+  requireDevelopmentPolicy(input.root, record.freeze.developmentPolicySha256)
   if (record.freeze.parserFreeze.artifactsSha256 !== input.artifactsSha256)
     refuse('preselection-artifacts')
   if (stable(record.batch) !== stable(input.batch)) refuse('registered-batch-mismatch')
