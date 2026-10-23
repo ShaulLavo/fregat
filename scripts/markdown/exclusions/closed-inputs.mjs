@@ -65,7 +65,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
   const checker = program.getTypeChecker()
   const calls = new Map()
   const identifiers = new Map()
-  const changed = new Set()
+  const changed = new Map()
   const aliases = []
   for (const sf of files.values()) index(sf)
   for (let pass = 0; pass < aliases.length; pass += 1) propagateWrites()
@@ -77,6 +77,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     ts.forEachChild(node, index)
   }
   function rootSymbol(node) {
+    if (!node) return undefined
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
       return rootSymbol(node.expression)
     return ts.isIdentifier(node) ? symbol(node) : undefined
@@ -87,12 +88,12 @@ export function closedInputReader(ts, sources, imported = new Map()) {
       node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
       node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
     )
-      changed.add(rootSymbol(node.left))
+      markWrite(node.left, node)
     if (
       (ts.isPostfixUnaryExpression(node) || ts.isPrefixUnaryExpression(node)) &&
       [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator)
     )
-      changed.add(rootSymbol(node.operand))
+      markWrite(node.operand, node)
     if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
@@ -112,21 +113,72 @@ export function closedInputReader(ts, sources, imported = new Map()) {
         'clear',
       ].includes(node.expression.name.text)
     )
-      changed.add(rootSymbol(node.expression.expression))
+      markWrite(node.expression.expression, node)
+    if (ts.isDeleteExpression(node)) markWrite(node.expression, node)
     if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.initializer &&
-      ts.isIdentifier(node.initializer)
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.expression.getText() === 'Object' &&
+      ['assign', 'defineProperty', 'defineProperties'].includes(node.expression.name.text)
     )
-      aliases.push([symbol(node.name), symbol(node.initializer)])
+      markWrite(node.arguments[0], node)
+    if (ts.isVariableDeclaration(node) && node.initializer)
+      indexAliases(node.name, node.initializer)
+  }
+  function markWrite(target, node) {
+    const key = rootSymbol(target)
+    if (!key) return
+    if (!changed.has(key)) changed.set(key, new Set())
+    changed.get(key).add(node)
+  }
+  function bindingSymbols(name) {
+    if (ts.isIdentifier(name)) return [symbol(name)]
+    return name.elements.flatMap((entry) => (entry.name ? bindingSymbols(entry.name) : []))
+  }
+  function referenceRoots(node) {
+    if (ts.isIdentifier(node)) return declaration(node) ? [symbol(node)] : []
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
+      return referenceRoots(node.expression)
+    if (
+      ts.isParenthesizedExpression(node) ||
+      ts.isAsExpression(node) ||
+      ts.isSatisfiesExpression(node)
+    )
+      return referenceRoots(node.expression)
+    if (ts.isArrayLiteralExpression(node)) return node.elements.flatMap(referenceRoots)
+    if (ts.isObjectLiteralExpression(node)) return node.properties.flatMap(referenceRoots)
+    if (ts.isShorthandPropertyAssignment(node)) return referenceRoots(node.name)
+    if (ts.isPropertyAssignment(node)) return referenceRoots(node.initializer)
+    if (ts.isSpreadElement(node) || ts.isSpreadAssignment(node))
+      return referenceRoots(node.expression)
+    return []
+  }
+  function indexAliases(name, initializer) {
+    const roots = referenceRoots(initializer).filter(Boolean)
+    for (const key of bindingSymbols(name).filter(Boolean))
+      for (const root of roots) aliases.push([key, root])
   }
   function propagateWrites() {
     for (const [left, right] of aliases) {
-      if (!changed.has(left) && !changed.has(right)) continue
-      changed.add(left)
-      changed.add(right)
+      const writes = new Set(
+        Array.from(changed.get(left) ?? []).concat(Array.from(changed.get(right) ?? [])),
+      )
+      if (!writes.size) continue
+      changed.set(left, writes)
+      changed.set(right, writes)
     }
+  }
+  function contextCounterWrite(key, write) {
+    const loop = write.parent
+    if (!ts.isForStatement(loop) || loop.incrementor !== write) return false
+    const name = loop.initializer?.declarations?.[0]?.name
+    return name && ts.isIdentifier(name) && symbol(name) === key
+  }
+  function checkWrites(key, node, env) {
+    const writes = changed.get(key)
+    if (!writes) return
+    if (env.has(key) && Array.from(writes).every((write) => contextCounterWrite(key, write))) return
+    return fail(node, `mutable binding ${node.text}`)
   }
   function symbol(node) {
     if (node.parent && ts.isShorthandPropertyAssignment(node.parent))
@@ -155,8 +207,8 @@ export function closedInputReader(ts, sources, imported = new Map()) {
   }
   function readIdentifier(node, env, active) {
     const key = symbol(node)
+    checkWrites(key, node, env)
     if (env.has(key)) return env.get(key)
-    if (key && changed.has(key)) return fail(node, `mutable binding ${node.text}`)
     const declared = declaration(node)
     if (!declared && Object.hasOwn(globals, node.text)) return globals[node.text]
     if (!declared) return fail(node, `unbound ${node.text}`)
@@ -174,15 +226,15 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     return Symbol(`unreviewed import ${node.name.text}`)
   }
   function readBinding(node, env, active) {
-    const parent = node.parent.parent
-    if (!ts.isVariableDeclaration(parent)) return fail(node, 'unbound destructuring')
-    const value = evaluate(parent.initializer, env, active)
-    const key = ts.isArrayBindingPattern(node.parent)
-      ? node.parent.elements.indexOf(node)
-      : (node.propertyName ?? node.name).getText()
-    return value[key]
+    let parent = node.parent
+    while (parent && !ts.isVariableDeclaration(parent)) parent = parent.parent
+    if (!parent?.initializer) return fail(node, 'unbound destructuring')
+    const result = new Map(env)
+    bind(parent.name, evaluate(parent.initializer, env, active), result, active)
+    return result.get(symbol(node.name))
   }
   function property(value, key, node) {
+    if (typeof key === 'symbol') return fail(node, 'unknown property key')
     if (forbiddenKeys.has(key)) return fail(node, 'forbidden property')
     if (typeof value === 'symbol') return fail(node, 'unreviewed receiver')
     if (value === undefined || value === null) return fail(node, 'missing receiver')
@@ -338,9 +390,9 @@ export function closedInputReader(ts, sources, imported = new Map()) {
       receiver === Math &&
       ['min', 'max', 'floor', 'ceil', 'trunc', 'abs', 'round', 'imul', 'pow', 'sqrt'].includes(name)
     )
-      return Math[name](...args)
+      return Math[name](...knownValue(args, node))
     if (receiver === Object && ['keys', 'values', 'entries'].includes(name))
-      return Object[name](...args)
+      return Object[name](...knownValue(args, node))
     if (receiver === Array && name === 'from')
       return Array.from(
         args[0],
@@ -350,43 +402,62 @@ export function closedInputReader(ts, sources, imported = new Map()) {
       Array.isArray(receiver) &&
       ['map', 'flatMap', 'filter', 'find', 'some', 'every'].includes(name)
     )
-      return receiver[name]((value, index) => invoke(args[0], [value, index], active))
+      return receiver[name]((value, index) => {
+        const result = invoke(args[0], [value, index], active)
+        return ['map', 'flatMap'].includes(name) ? result : condition(result, node)
+      })
+    if (Array.isArray(receiver) && name === 'concat') return receiver.concat(...args)
     if (Array.isArray(receiver) && name === 'entries') return Array.from(receiver.entries())
     if (name === 'join' && Array.isArray(receiver))
       receiver.forEach((value) => primitiveText(value, node))
     if (['replace', 'replaceAll'].includes(name) && args[1]?.functionNode)
       return fail(node, 'unsupported replacement callback')
     if ((typeof receiver === 'string' || Array.isArray(receiver)) && methods.has(name))
-      return receiver[name](...args)
+      return receiver[name](...knownValue(args, node))
     return fail(node, `unreviewed method ${name}`)
   }
-  function bind(name, value, env) {
+  function bindingKey(entry, index, env, active) {
+    if (ts.isArrayBindingPattern(entry.parent)) return index
+    const key = entry.propertyName ?? entry.name
+    if (ts.isComputedPropertyName(key)) return evaluate(key.expression, env, active)
+    if (ts.isIdentifier(key) || ts.isStringLiteralLike(key) || ts.isNumericLiteral(key))
+      return key.text
+    return fail(entry, 'unsupported binding key')
+  }
+  function bindElement(entry, index, value, env, active) {
+    if (ts.isOmittedExpression(entry)) return
+    if (entry.dotDotDotToken) return fail(entry, 'unsupported rest binding')
+    const member = property(value, bindingKey(entry, index, env, active), entry)
+    bind(
+      entry.name,
+      member === undefined ? evaluate(entry.initializer, env, active) : member,
+      env,
+      active,
+    )
+  }
+  function bind(name, value, env, active = new Set()) {
     if (ts.isIdentifier(name)) {
       env.set(symbol(name), value)
       return
     }
-    if (ts.isArrayBindingPattern(name)) {
-      name.elements.forEach((entry, index) => bind(entry.name, value?.[index], env))
-      return
-    }
-    if (ts.isObjectBindingPattern(name)) {
-      name.elements.forEach((entry) =>
-        bind(entry.name, value?.[(entry.propertyName ?? entry.name).text], env),
-      )
-      return
-    }
-    return fail(name, 'unsupported binding')
+    if (!ts.isArrayBindingPattern(name) && !ts.isObjectBindingPattern(name))
+      return fail(name, 'unsupported binding')
+    if (ts.isArrayBindingPattern(name) && !Array.isArray(value))
+      return fail(name, 'unsupported iterable binding')
+    name.elements.forEach((entry, index) => bindElement(entry, index, value, env, active))
+  }
+  function bindParameter(parameter, value, env, active = new Set()) {
+    if (parameter.dotDotDotToken) return fail(parameter, 'unsupported rest parameter')
+    bind(
+      parameter.name,
+      value === undefined ? evaluate(parameter.initializer, env, active) : value,
+      env,
+      active,
+    )
   }
   function invoke(fn, args, active) {
     const node = fn.functionNode
-    const env = new Map(fn.env)
-    node.parameters.forEach((parameter, index) =>
-      bind(
-        parameter.name,
-        args[index] === undefined ? evaluate(parameter.initializer, env, active) : args[index],
-        env,
-      ),
-    )
+    const env = bindParameters(node, args, fn.env, active)
     if (!ts.isBlock(node.body)) return evaluate(node.body, env, active)
     return statements(node.body.statements, env, active)?.value
   }
@@ -478,7 +549,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     for (let value = start; result.length < 100000; value += loopStep(node, env)) {
       const current = new Map(env)
       bind(decl.name, value, current)
-      if (!evaluate(node.condition, current)) return result
+      if (!condition(evaluate(node.condition, current), node)) return result
       result.push(current)
     }
     return fail(node, 'unbounded loop')
@@ -519,9 +590,11 @@ export function closedInputReader(ts, sources, imported = new Map()) {
   function callbackRows(node, values, env) {
     return Array.from(values, (value, index) => bindParameters(node, [value, index], env))
   }
-  function bindParameters(node, args, env) {
+  function bindParameters(node, args, env, active = new Set()) {
     const result = new Map(env)
-    node.parameters.forEach((parameter, index) => bind(parameter.name, args[index], result))
+    node.parameters.forEach((parameter, index) =>
+      bindParameter(parameter, args[index], result, active),
+    )
     return result
   }
   function callerContexts(node, env, trail) {
@@ -542,7 +615,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
   }
   function bindArgument(parameter, argument, result, context) {
     try {
-      bind(parameter.name, evaluate(argument ?? parameter.initializer, context), result)
+      bindParameter(parameter, evaluate(argument, context), result)
     } catch (error) {
       if (!(error instanceof Unresolved)) throw error
     }
@@ -551,9 +624,16 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     if (typeof value === 'symbol') return fail(node, 'unknown condition')
     return value
   }
+  function knownValue(value, node) {
+    if (typeof value === 'symbol') return fail(node, 'unknown value')
+    if (value?.functionNode) return fail(node, 'unevaluated function')
+    if (value && typeof value === 'object')
+      Object.values(value).forEach((entry) => knownValue(entry, node))
+    return value
+  }
   function resolve(node) {
     try {
-      return { values: [evaluate(node)], failures: [], contexts: 1 }
+      return { values: [knownValue(evaluate(node), node)], failures: [], contexts: 1 }
     } catch {
       /* Finite caller bindings may resolve the expression. */
     }
@@ -570,7 +650,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
   }
   function resolveOne(node, env, values, failures) {
     try {
-      values.push(evaluate(node, env))
+      values.push(knownValue(evaluate(node, env), node))
     } catch (error) {
       failures.add(error.message)
     }

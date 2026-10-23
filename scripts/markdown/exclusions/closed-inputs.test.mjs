@@ -142,3 +142,137 @@ test('rejects replacement callbacks and assertion-named side effects', () => {
   assert.ok(rows.every((row) => row.failures.length > 0))
   assert.ok(rows.every((row) => row.values.length === 0))
 })
+
+test.each([
+  ['unsupported import', "import { source } from './external'; owner.update(source)"],
+  [
+    'unknown filter',
+    "import { choice } from './external'; owner.update(['a','b'].filter(() => choice).join(''))",
+  ],
+  [
+    'unknown find',
+    "import { choice } from './external'; owner.update(['a','b'].find(() => choice) ?? 'fallback')",
+  ],
+  [
+    'loop binding write',
+    "for (const row of [{source:'before'}]) { row.source='after'; owner.update(row.source) }",
+  ],
+  [
+    'delete write',
+    "const row={source:'before'}; delete row.source; owner.update(row.source ?? 'after')",
+  ],
+  [
+    'nested alias write',
+    "const row={source:'before'}; const alias={row}; alias.row.source='after'; owner.update(row.source)",
+  ],
+  [
+    'Object.assign write',
+    "const row={source:'before'}; Object.assign(row,{source:'after'}); owner.update(row.source)",
+  ],
+])('keeps %s explicitly unresolved', (_name, source) => {
+  const [row] = inputs(source)
+  assert.ok(row.failures.length > 0)
+  assert.deepEqual(row.values, [])
+})
+
+test.each([
+  ['quoted key', "const {'source': text}={source:'actual'}; owner.update(text)", 'actual'],
+  [
+    'parameter default',
+    "function replay(source='fallback') { owner.update(source) }; replay(undefined)",
+    'fallback',
+  ],
+  [
+    'destructuring default',
+    "function replay({source='fallback'}) { owner.update(source) }; replay({})",
+    'fallback',
+  ],
+  [
+    'test.each default',
+    "test.each([undefined])('row',(source='fallback')=>owner.update(source))",
+    'fallback',
+  ],
+])('resolves %s with exact binding semantics', (_name, source, expected) => {
+  const [row] = inputs(source)
+  assert.deepEqual(row.failures, [])
+  assert.deepEqual(row.values, [expected])
+})
+
+test.each([
+  "import { source } from './external'; owner.update([source])",
+  "import { source } from './external'; owner.update({source})",
+  "import { choice } from './external'; owner.update(['a'].some(() => choice))",
+  "import { choice } from './external'; owner.update(['a'].every(() => choice))",
+  "import { choice } from './external'; owner.update('a'.slice(choice))",
+  "for (let i=0;i<1;i++) { i=2; owner.update('row ' + i) }",
+  "test.each([{source:'before'}])('row', row => { row.source='after'; owner.update(row.source) })",
+  "function replay(row) { delete row.source; owner.update(row.source) }; replay({source:'before'})",
+  "const row={source:'before'}; const box=[{row}]; const alias=box; alias[0].row.source='after'; owner.update(row.source)",
+  "const row={source:'before'}; const box={row}; const {row:alias}=box; Object.assign(alias,{source:'after'}); owner.update(row.source)",
+])('rejects dependent unknown or mutated values in %s', (source) => {
+  const [row] = inputs(source)
+  assert.ok(row.failures.length > 0)
+  assert.deepEqual(row.values, [])
+})
+
+test.each([
+  ["const {'source': text='fallback'}={}; owner.update(text)", ['fallback']],
+  ["const {nested:{'source':text='fallback'}}={nested:{}}; owner.update(text)", ['fallback']],
+  ["const [,text='fallback']=['ignore']; owner.update(text)", ['fallback']],
+  [
+    "function replay(first='fall', source=first+'back') { owner.update(source) }; replay(undefined,undefined)",
+    ['fallback'],
+  ],
+  [
+    "function replay({source}={source:'fallback'}) { owner.update(source) }; replay()",
+    ['fallback'],
+  ],
+  [
+    "test.each([undefined,null,''])('row',(source='fallback')=>owner.update(source))",
+    ['fallback', null, ''],
+  ],
+  [
+    "function replay({source='fallback'}) { return source }; owner.update(replay({}))",
+    ['fallback'],
+  ],
+  [
+    "import { metadata } from './external'; const row={source:'actual',metadata}; owner.update(row.source)",
+    ['actual'],
+  ],
+  ["for (let i=0;i<2;i++) owner.update('row '+i)", ['row 0', 'row 1']],
+  ["owner.update(['a','b'].filter(value=>value==='b').join(''))", ['b']],
+  ["owner.update(['a','b'].find(value=>value==='b'))", ['b']],
+])('preserves exact supported bindings and independent values in %s', (source, expected) => {
+  const [row] = inputs(source)
+  assert.deepEqual(row.failures, [])
+  assert.deepEqual(row.values, expected)
+})
+
+test('keeps opaque concatenated engine identities independent of source rows and globals', () => {
+  const rows = inputs(`
+    import { externalEngine } from './external'
+    const engines = [['local', () => {}]].concat([['external', externalEngine]])
+    test.each(engines)('engine', (_name, engine) => {
+      for (const row of [{text:'actual'}]) owner.update(row.text)
+    })
+    const object = {source: 'old'}; object.source = 'new'
+    owner.update(undefined)
+    owner.update(() => 'callback')
+  `)
+  assert.deepEqual(rows[0].failures, [])
+  assert.deepEqual(rows[0].values, ['actual', 'actual'])
+  assert.deepEqual(rows[1].failures, [])
+  assert.deepEqual(rows[1].values, [undefined])
+  assert.deepEqual(rows[2].values, [])
+  assert.match(rows[2].failures[0], /unevaluated function/)
+})
+
+test('does not propagate container writes to immutable globals', () => {
+  const rows = inputs(`
+    const row = {source: undefined}; row.source = 'after'
+    const shorthand = {undefined}; delete shorthand.undefined
+    owner.update(undefined)
+  `)
+  assert.deepEqual(rows[0].failures, [])
+  assert.deepEqual(rows[0].values, [undefined])
+})
