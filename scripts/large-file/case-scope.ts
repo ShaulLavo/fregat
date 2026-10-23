@@ -27,16 +27,15 @@ export function caseScopeCommand(scope: CaseScope) {
   ].concat(
     scope.slice ? [`--slice=${scope.slice}`] : [],
     [
-      '-p',
-      `MemoryMax=${scope.memoryMiB}M`,
-      '-p',
-      'MemorySwapMax=0', // On OOM the kernel kills the offender alone; systemd's default reaction would stop the
+      '-p', // The shim caps the case in a child cgroup and stays outside that cap itself.
+      'Delegate=yes',
+      '-p', // On OOM the kernel kills the offender alone; systemd's default reaction would stop the
       // scope and, on a second OOM event, SIGKILL the shim before it writes the case's totals.
-      '-p',
       'OOMPolicy=continue',
       'bash',
       SCOPE_SHIM,
       scope.accountingFile,
+      `${scope.memoryMiB}M`,
     ],
     scope.command,
   )
