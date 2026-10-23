@@ -1,0 +1,77 @@
+name: Case scope verification (throwaway)
+on:
+  workflow_dispatch:
+jobs:
+  typecheck:
+    name: Typecheck, generated, packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          # Script tests import runtime code across the repository.
+          build-packages: all
+
+      - name: Validate dev task graph
+        if: ${{ true }}
+        env:
+          TURBO_TELEMETRY_DISABLED: '1'
+        run: bun run dev:web -- --dry-run=json > /dev/null
+
+      - name: Install Linux webview build dependencies
+        if: ${{ false }}
+        uses: ./.github/actions/linux-webview-deps
+
+      - name: Build Linux webview host
+        if: ${{ false }}
+        run: bun run --cwd apps/desktop build:native
+
+      - name: Package checks
+        env:
+          CI_PACKAGES: '["@singapore-editor/core","@singapore-editor/markdown","@singapore-editor/tree-sitter","@singapore-editor/tree-sitter-languages","@workspace/client-core","@workspace/markdown","scripts","web"]'
+        run: bun scripts/ci/packages.mjs checks "$CI_PACKAGES"
+
+      - name: Check script types
+        if: ${{ true }}
+        run: bun run --cwd scripts typecheck
+
+      - name: Check Hotkeys documentation
+        if: ${{ false }}
+        run: bun run --cwd hotkeys docs:check
+
+      - name: Check generated artifacts
+        if: ${{ true }}
+        run: bun run generated:check
+
+      # The one benchmark that survives a shared runner. Its thresholds are
+      # ratios (remount speedup >= 0.2, cold slowdown <= 0.15), so runner speed
+      # cancels out, and it is pure in-process: no browser, no server, no sibling
+      # Editor checkout. ~4s, currently passing with ~4x margin. Every other
+      # bench here gates on absolute milliseconds calibrated on one developer
+      # machine, and `bench:editor-open:gate` cannot run in CI at all — its
+      # calibration identity is a hash of `apps/web/src`, so any PR invalidates
+      # it before a measurement happens.
+      - name: Benchmark gate (file tree prepared input)
+        if: ${{ true }}
+        run: bun run --cwd apps/web bench:file-tree-prepared-input:gate
+
+      # Script tests inspect the whole repository; package source readers are declared in Turbo.
+      - name: Script tests
+        if: ${{ !cancelled() && true }}
+        run: bun run test:scripts
+
+      - name: Old versus new shim under the same runner state
+        if: always()
+        run: bun .github/case-scope-diag/ab.ts
+      - name: Kernel OOM summary
+        if: always()
+        run: |
+          sudo dmesg | grep -cE 'invoked oom-killer' || true
+          sudo dmesg | grep -E 'Killed process' | sed -E 's/total-vm.*//' | awk '{print $NF, $(NF-1)}' | sort | uniq -c
+          systemctl --user list-units --all 'case-scope-ab-*' 'large-file-scope-test-*' --no-legend | wc -l
