@@ -1,5 +1,5 @@
 name: Install browsers
-description: Installs workspace Playwright browsers with cached Ubuntu dependency archives.
+description: Installs workspace Playwright browsers with shared browser payloads and Ubuntu dependency archives.
 
 inputs:
   playwright:
@@ -15,6 +15,46 @@ runs:
     - name: Verify Ubuntu package source setup
       shell: bash
       run: bun --bun vitest run "$GITHUB_ACTION_PATH/action.test.ts" --environment node
+
+    - name: Resolve Playwright payload cache
+      id: payloads
+      shell: bash
+      env:
+        PLAYWRIGHT: ${{ inputs.playwright }}
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        set -euo pipefail
+        read -r -a browsers <<< "$BROWSERS"
+        test "${#browsers[@]}" -gt 0
+        plan=$("$PLAYWRIGHT" install --dry-run)
+        requested=$("$PLAYWRIGHT" install --dry-run "${browsers[@]}")
+        locations=$(printf '%s\n' "$requested" | sed -n 's/^  Install location: *//p')
+        test -n "$locations"
+        cache=$(while IFS= read -r location; do dirname "$location"; done <<< "$locations" | sort -u)
+        test "$(printf '%s\n' "$cache" | wc -l)" -eq 1
+        # Download URLs include platform-specific revisions; locations vary by runner home.
+        fingerprint() {
+          local downloads directories
+          downloads=$(printf '%s\n' "$1" | sed -n 's/^  Download url: *//p' | sort -u)
+          directories=$(printf '%s\n' "$1" | sed -n 's|^  Install location: .*/||p' | sort -u)
+          test -n "$downloads"
+          test -n "$directories"
+          printf '%s\n' "$downloads" "$directories" | sha256sum | cut -d ' ' -f 1
+        }
+        revision=$(fingerprint "$plan")
+        selection=$(fingerprint "$requested")
+        prefix="playwright-payloads-v1-${RUNNER_OS}-${RUNNER_ARCH}-${revision}-"
+        echo "path=$cache" >> "$GITHUB_OUTPUT"
+        echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+        echo "key=$prefix$selection" >> "$GITHUB_OUTPUT"
+
+    - name: Restore Playwright payloads
+      id: payload-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.payloads.outputs.path }}
+        key: ${{ steps.payloads.outputs.key }}
+        restore-keys: ${{ steps.payloads.outputs.prefix }}
 
     - name: Configure Ubuntu package downloads
       id: apt
@@ -61,3 +101,10 @@ runs:
       with:
         path: /tmp/playwright-apt/*.deb
         key: ${{ steps.apt.outputs.key }}
+
+    - name: Save Playwright payloads
+      if: ${{ steps.payload-cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.payloads.outputs.path }}
+        key: ${{ steps.payloads.outputs.key }}
