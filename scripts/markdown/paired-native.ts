@@ -223,14 +223,15 @@ function checkPoint(
     failures.push(`${path}: source offset is absent or outside projection text.`)
     return
   }
-  let low = 0
-  let high = lines.length
-  while (low + 1 < high) {
-    const middle = Math.floor((low + high) / 2)
-    if (lines[middle] <= offset) low = middle
-    else high = middle
-  }
-  if (point.line !== low + 1 || point.column !== offset - lines[low] + 1)
+  const lineIndex = Number.isSafeInteger(point.line) ? point.line - 1 : -1
+  const start = lines[lineIndex]
+  const next = lines[lineIndex + 1]
+  if (
+    start === undefined ||
+    offset < start ||
+    (next !== undefined && offset >= next) ||
+    point.column !== offset - start + 1
+  )
     failures.push(`${path}: UTF-16 offset disagrees with its source line or column.`)
 }
 
