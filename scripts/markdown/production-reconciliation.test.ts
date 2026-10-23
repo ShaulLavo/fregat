@@ -92,11 +92,7 @@ async function writeFixture(directory: string, input: TimingReconciliationInput)
       : raw.workloads.flatMap((row: { id: string; pairs: unknown[] }) =>
           row.pairs.map((pair) => ({ workload: row.id, pair })),
         )
-  if (input.kind === 'production') {
-    const compact: ProductionTrial[] = []
-    for (const row of rows) compact.push(await spillFixtureOracle(directory, row))
-    rows = compact
-  }
+  if (input.kind === 'production') rows = await spillFixtureOracles(directory, rows)
   const contents = rows.map((row: unknown) => JSON.stringify(row)).join('\n') + '\n'
   await writeFile(path.join(directory, rawPath), contents)
   const reference = {
@@ -168,6 +164,23 @@ async function writeFixture(directory: string, input: TimingReconciliationInput)
     await writeFile(path.join(directory, file.path), file.bytes)
   }
   return files
+}
+
+async function spillFixtureOracles(directory: string, rows: readonly InlineProductionTrial[]) {
+  const compact: ProductionTrial[] = []
+  // Batch independent files so fixture setup does not serialize every durable flush.
+  for (let offset = 0; offset < rows.length; offset += 8) {
+    const batch = await Promise.allSettled(
+      rows.slice(offset, offset + 8).map((row) => spillFixtureOracle(directory, row)),
+    )
+    compact.push(...batch.map(fixtureOracleResult))
+  }
+  return compact
+}
+
+function fixtureOracleResult(result: PromiseSettledResult<ProductionTrial>) {
+  if (result.status === 'rejected') throw result.reason
+  return result.value
 }
 
 type InlineProductionTrial = Omit<ProductionTrial, 'correctness' | 'freshCompleted'> & {
@@ -1265,6 +1278,26 @@ test('released producer encounter order reconciles from the actual sealed raw fi
   }
 })
 
+test('oracle fixture batches settle every started writer before returning a failure', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'markdown-reader-fixture-failure-'))
+  try {
+    const { report } = reportFixture()
+    const rows = report.warmupResults.concat(report.rawTrials)
+    expect(rows).toHaveLength(46)
+    rows[0] = { ...rows[0], correctness: { ...rows[0].correctness, frames: [] } }
+    await expect(spillFixtureOracles(directory, rows)).rejects.toThrow('unexpected final')
+    const files = await readdir(directory)
+    expect(files.sort()).toEqual(
+      rows
+        .slice(1, 8)
+        .map((row) => `oracle-${row.pair}-${row.engine}.jsonl`)
+        .sort(),
+    )
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('complete actual-shaped production artifacts reconcile 20 pairs and three independent warmups', async () => {
   const result = await reconcileTimingEvidence(productionInput())
   expect(result.findings).toEqual([])
@@ -1274,6 +1307,11 @@ test('complete actual-shaped production artifacts reconcile 20 pairs and three i
   expect('rawReport' in result).toBe(false)
   expect(JSON.stringify(result)).not.toContain('correctness')
   expect(result.samples).toHaveLength(46)
+  const oracles = result.artifacts.filter((entry) =>
+    path.basename(entry.path).startsWith('oracle-'),
+  )
+  expect(oracles).toHaveLength(46)
+  expect(new Set(oracles.map((entry) => entry.path)).size).toBe(46)
   expect(result.comparisons).toHaveLength(4)
   expect(result.comparisons.every((entry) => entry.independentTrials === 20)).toBe(true)
 })
