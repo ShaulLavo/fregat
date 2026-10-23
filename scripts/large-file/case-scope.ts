@@ -72,7 +72,20 @@ export async function runCaseScope(run: CaseRun): Promise<CaseOutcome> {
   const started = performance.now()
   const exitCode = await child.exited
   const exitedAt = performance.now() - started
-  const diag = { unit: run.unit, exitCode, signal: child.signalCode, exitedAt, existsAtExit: existsSync(run.accountingFile), dirExists: existsSync(path.dirname(run.accountingFile)), contentAtExit: existsSync(run.accountingFile) ? readFileSync(run.accountingFile, 'utf8') : null, stderr: existsSync(run.stderr) ? readFileSync(run.stderr, 'utf8') : null, stdout: existsSync(run.stdout) ? readFileSync(run.stdout, 'utf8') : null, bun: Bun.version, pid: process.pid, cgroup: readFileSync('/proc/self/cgroup', 'utf8') }
+  const diag = {
+    unit: run.unit,
+    exitCode,
+    signal: child.signalCode,
+    exitedAt,
+    existsAtExit: existsSync(run.accountingFile),
+    dirExists: existsSync(path.dirname(run.accountingFile)),
+    contentAtExit: existsSync(run.accountingFile) ? readFileSync(run.accountingFile, 'utf8') : null,
+    stderr: existsSync(run.stderr) ? readFileSync(run.stderr, 'utf8') : null,
+    stdout: existsSync(run.stdout) ? readFileSync(run.stdout, 'utf8') : null,
+    bun: Bun.version,
+    pid: process.pid,
+    cgroup: readFileSync('/proc/self/cgroup', 'utf8'),
+  }
   console.error('CASE-SCOPE-DIAG', JSON.stringify(diag))
   clearTimeout(timeout)
   // A scope that failed or hit its cap stays loaded until reset.
