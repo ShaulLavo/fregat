@@ -7,7 +7,7 @@ python3 scripts/markdown/host-telemetry.py --kind native \
   --evidence-root "$E" --out "$E/telemetry/$INDEX" \
   --report "$E/shards/$INDEX/paired-native.json" \
   --adapter-config "$HOST_ADAPTER" --timeout-seconds 6600 -- \
-  "$BUN" scripts/markdown/paired-native.ts \
+  "$BUN" scripts/markdown/paired-native.ts --mode qualification \
     --capture-plan "$PLAN" --selection-index "$INDEX" \
     --launch-id "$LAUNCH_ID" --out "$E/shards/$INDEX"
 ```

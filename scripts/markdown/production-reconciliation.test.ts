@@ -1,13 +1,17 @@
+import { finalizeNativeLaunch, finalizeProductionLaunch } from './production-capture-artifacts'
+import { assembleTimingShards } from './production-shards'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, readdir, writeFile, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 import {
   productionTrialSummary,
   productionFamilyCoverage,
+  productionComparisons,
+  productionMetricObservation,
   type ProductionTrial,
 } from './production-analysis'
 import {
@@ -146,7 +150,7 @@ async function writeFixture(directory: string, input: TimingReconciliationInput)
       sidecar.reportSha256 =
         input.report.sha256 === hash(input.report.contents) ? report.sha256 : input.report.sha256
       if (name === 'quietHost' && sidecar.nativeInvocation)
-        sidecar.nativeInvocation.reportPath = path.join(directory, report.path)
+        sidecar.nativeInvocation.reportPath = report.path
       value = JSON.stringify(sidecar)
     }
     await mkdir(path.dirname(path.join(directory, file.path)), { recursive: true })
@@ -252,7 +256,7 @@ function nativeManifestHash() {
     ]),
   )
 }
-function freeze(): TimingFreeze {
+function freeze(workload = fixtureWorkload()): TimingFreeze {
   return {
     identity: {
       candidateCommit: 'a'.repeat(40),
@@ -271,7 +275,7 @@ function freeze(): TimingFreeze {
       sourceClosureSha256: hash('closure'),
       lockfileSha256: hash('lock'),
     },
-    productionWorkloads: [fixtureWorkload()],
+    productionWorkloads: [workload],
     nativeWorkloads: [nativeWorkload],
     fontFingerprint,
   }
@@ -285,8 +289,11 @@ function projection(input: string) {
   }
   return { inputSha256: hash(input), paintedOutput: output, ...content }
 }
-function productionRow(pair: number, engine: ProductionTrial['engine']): InlineProductionTrial {
-  const workload = fixtureWorkload()
+function productionRow(
+  pair: number,
+  engine: ProductionTrial['engine'],
+  workload = fixtureWorkload(),
+): InlineProductionTrial {
   const inputs = productionUpdates(workload).concat([workload.source])
   const frames = inputs.map((input, index) => ({
     revision: index + 1,
@@ -389,8 +396,8 @@ function fixtureControls() {
     longTask: { supported: true, observed: [80] },
   }
 }
-function reportFixture() {
-  const frozen = freeze()
+function reportFixture(workload = fixtureWorkload()) {
+  const frozen = freeze(workload)
   const host = artifact('host.json', { host: 'fixture-host', observedAt: instant(0) })
   const buildManifest = artifact('manifest.json', { 'index.html': { file: 'assets/main.js' } })
   const artifacts = [
@@ -415,10 +422,9 @@ function reportFixture() {
     .concat(Array.from({ length: 20 }, (_, pair) => pair))
     .flatMap((pair) =>
       Math.abs(pair) % 2 === 0
-        ? [productionRow(pair, 'remark'), productionRow(pair, 'tree-sitter')]
-        : [productionRow(pair, 'tree-sitter'), productionRow(pair, 'remark')],
+        ? [productionRow(pair, 'remark', workload), productionRow(pair, 'tree-sitter', workload)]
+        : [productionRow(pair, 'tree-sitter', workload), productionRow(pair, 'remark', workload)],
     )
-  const workload = fixtureWorkload()
   const failures: unknown[] = []
   const comparisons: unknown[] = fixtureProductionComparisons(workload.id)
   const report = {
@@ -525,8 +531,9 @@ function quietArtifact(report: TimingArtifact) {
 }
 function productionInput(
   change: (report: ReturnType<typeof reportFixture>['report']) => void = () => {},
+  workload = fixtureWorkload(),
 ): TimingReconciliationInput {
-  const fixture = reportFixture()
+  const fixture = reportFixture(workload)
   change(fixture.report)
   const report = artifact('production-browser.json', fixture.report)
   const contents = fixture.report.rawTrials.map((row) => JSON.stringify(row)).join('\n') + '\n'
@@ -1698,7 +1705,7 @@ async function writeNativeCapture(directory: string) {
   capture.reportSha256 = report.sha256
   const artifacts = {
     ...input.artifacts,
-    quietHost: quietArtifact(report),
+    quietHost: quietArtifact({ ...report, path: input.report.path }),
     trials: null,
     sourceCapture: artifact('source-capture.json', capture),
   }
@@ -2095,4 +2102,727 @@ test.each([
   if (field !== 'order')
     expect(result.findings.some((finding) => finding.path.endsWith('.mismatchedPairs'))).toBe(true)
   expect(result.comparisons.every((comparison) => comparison.independentTrials === 20)).toBe(true)
+})
+
+async function writeProductionShardFixture(directory: string, indices?: readonly number[]) {
+  const workload = productionBrowserWorkloads().find(
+    (entry) => entry.id === 'cold-mount-plain-paragraph',
+  )
+  if (!workload) throw new TypeError('Missing cold production workload')
+  const baseInput = productionInput(() => {}, workload)
+  const original = JSON.parse(baseInput.report.contents)
+  const sources = [
+    { file: 'scripts/markdown/production-browser.ts', sha256: hash('fixture producer') },
+  ]
+  const sourceClosureSha256 = hash(JSON.stringify(sources))
+  const input = {
+    ...baseInput,
+    frozen: {
+      ...baseInput.frozen,
+      provenance: { ...baseInput.frozen.provenance, sourceClosureSha256 },
+      identity: { ...baseInput.frozen.identity, candidateSourceSha256: sourceClosureSha256 },
+    },
+  }
+  original.provenance.sources = sources
+  original.provenance.sourceClosureSha256 = sourceClosureSha256
+  original.servedBuild.sourceClosureSha256 = sourceClosureSha256
+  const build = JSON.parse(input.artifacts.build?.contents ?? '{}')
+  build.sourceBefore = input.frozen.provenance
+  build.sourceAfter = input.frozen.provenance
+  const fixtureInput = {
+    ...input,
+    artifacts: {
+      ...input.artifacts,
+      build: artifact('markdown-probe-build.json', build),
+      sourceCapture: artifact('source-capture.json', {
+        reportSha256: input.report.sha256,
+        sourceRoot: 'source',
+        provenance: { ...input.frozen.provenance, sources },
+        files: {
+          lockfile: 'bun.lock',
+          grammar: 'assets/tree-sitter-markdown.wasm',
+          chatGrammar: 'assets/tree-sitter-markdown-chat.wasm',
+          resolver: 'assets/tree-sitter-md.wasm',
+          budget: 'promotion-budget.json',
+        },
+      }),
+    },
+    capturedFiles: [
+      {
+        path: 'source/scripts/markdown/production-browser.ts',
+        bytes: new TextEncoder().encode('fixture producer'),
+      },
+      { path: 'bun.lock', bytes: new TextEncoder().encode('lock') },
+      { path: 'promotion-budget.json', bytes: new TextEncoder().encode('budget') },
+    ],
+  }
+  const plan = {
+    schemaVersion: 1,
+    kind: 'production-capture-plan',
+    purpose: 'promotion',
+    provenance: original.provenance,
+    budgetSha256: input.frozen.identity.budgetSha256,
+    build: {
+      metadataSha256: fixtureInput.artifacts.build.sha256,
+      manifestSha256: input.artifacts.buildManifest?.sha256,
+    },
+    workloadManifest: original.workloadManifest,
+    shards: Array.from({ length: 23 }, (_, index) => ({
+      workload: workload.id,
+      pair: index - 3,
+    })),
+  }
+  const planFile = artifact('capture-plan.json', plan)
+  await writeFile(path.join(directory, planFile.path), planFile.contents)
+  const selections = Array.from(plan.shards.entries()).filter(
+    ([index]) => !indices || indices.includes(index),
+  )
+  const shards = await Promise.all(
+    selections.map(async ([index, selection]) => {
+      const folder = path.join(directory, `shard-${index}`)
+      await mkdir(folder)
+      const report = {
+        ...original,
+        shard: {
+          ...selection,
+          index,
+          planSha256: planFile.sha256,
+          launchId: `launch-${index}`,
+        },
+        rawTrials: original.rawTrials.filter((row: ProductionTrial) => row.pair === selection.pair),
+        warmupResults: original.warmupResults.filter(
+          (row: ProductionTrial) => row.pair === selection.pair,
+        ),
+        comparisons: [],
+      }
+      report.host = JSON.parse(JSON.stringify(original.host))
+      report.host.before.observedAt = instant(index * 20 + 1)
+      report.host.after.observedAt = instant(index * 20 + 9)
+      report.browser = {
+        ...original.browser,
+        actualArgs: original.browser.actualArgs.map((arg: string) =>
+          arg.startsWith('--user-data-dir=') ? `--user-data-dir=/fixture/profile-${index}` : arg,
+        ),
+      }
+      const files = await writeFixture(folder, {
+        ...fixtureInput,
+        report: artifact(input.report.path, report),
+      })
+      const filename = path.join(folder, input.report.path)
+      const compact = JSON.parse(await readFile(filename, 'utf8'))
+      const trials: ProductionTrial[] = (
+        await readFile(path.join(folder, 'raw-production-trials.jsonl'), 'utf8')
+      )
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+      compact.comparisons = productionComparisons(
+        trials.filter((row) => row.pair >= 0).map(productionMetricObservation),
+        input.frozen.productionWorkloads,
+      )
+      const actual = artifact(input.report.path, compact)
+      await writeFile(filename, actual.contents)
+      const quiet = JSON.parse(await readFile(path.join(folder, files.quietHost ?? ''), 'utf8'))
+      quiet.reportSha256 = actual.sha256
+      quiet.observations = [0, 1, 5, 9, 10].map((seconds) => ({
+        ...quiet.observations[0],
+        observedAt: instant(index * 20 + seconds),
+      }))
+      await writeFile(path.join(folder, files.quietHost ?? ''), JSON.stringify(quiet))
+      const browser = JSON.parse(await readFile(path.join(folder, files.browser ?? ''), 'utf8'))
+      browser.args = report.browser.actualArgs
+      await writeFile(path.join(folder, files.browser ?? ''), JSON.stringify(browser))
+      const source = JSON.parse(
+        await readFile(path.join(folder, files.sourceCapture ?? ''), 'utf8'),
+      )
+      source.reportSha256 = actual.sha256
+      await writeFile(path.join(folder, files.sourceCapture ?? ''), JSON.stringify(source))
+      return {
+        report: { path: `shard-${index}/${actual.path}`, sha256: actual.sha256 },
+        artifacts: files,
+      }
+    }),
+  )
+  const index = {
+    schemaVersion: 1,
+    kind: 'production-shards',
+    plan: { path: planFile.path, sha256: planFile.sha256 },
+    shards,
+  }
+  const writeIndex = () =>
+    writeFile(path.join(directory, 'production-shards.json'), JSON.stringify(index))
+  await writeIndex()
+  const read = async () =>
+    reconcileFiles({
+      root: directory,
+      kind: 'production',
+      report: 'production-shards.json',
+      frozen: input.frozen,
+      artifacts: {
+        host: null,
+        quietHost: null,
+        build: null,
+        buildManifest: null,
+        browser: null,
+        fonts: null,
+        sourceCapture: null,
+        trials: 'production-shards.json',
+      },
+    })
+  return { index, read, writeIndex, frozen: input.frozen }
+}
+
+test('bounded production shards reconcile separate launches before the exact twenty-pair comparison', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'production-shard-reader-'))
+  try {
+    const fixture = await writeProductionShardFixture(directory)
+    const result = await fixture.read()
+    expect(result.findings).toEqual([])
+    expect(result.verdict).toBe('VERIFIED')
+    expect(result.samples).toHaveLength(46)
+    expect(result.productionSummary?.provenance).toEqual(
+      JSON.parse(await readFile(path.join(directory, 'capture-plan.json'), 'utf8')).provenance,
+    )
+    expect(result.productionSummary?.familyCoverage).toContainEqual({
+      family: fixture.frozen.productionWorkloads[0].family,
+      selectedCells: 1,
+      pairedObservedCells: 1,
+      status: 'EXPLORATORY',
+    })
+    expect(result.productionSummary?.failures).toEqual([])
+    expect(result.comparisons).toHaveLength(4)
+    expect(result.comparisons.every((row) => row.independentTrials === 20)).toBe(true)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('assembly rejects missing warmup and measured shard coverage', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'production-shard-missing-'))
+  try {
+    const fixture = await writeProductionShardFixture(directory, [0])
+    const missing = await fixture.read()
+    expect(missing.verdict).not.toBe('VERIFIED')
+    expect(missing.findings.some((row) => row.path === 'shardCoverage')).toBe(true)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test.each([
+  { name: 'duplicate launch', change: 'duplicate', expected: 'shards.1.launchId' },
+  { name: 'report hash', change: 'hash', expected: 'report.sha256' },
+  { name: 'changed plan', change: 'plan', expected: 'planSha256' },
+  { name: 'wrong pair selection', change: 'pair', expected: 'selection' },
+  { name: 'another browser profile', change: 'profile', expected: 'browser.args' },
+  { name: 'changed runtime cohort', change: 'runtime', expected: 'cohort' },
+  { name: 'failed controls', change: 'control', expected: 'controls.knownGood' },
+  { name: 'retained launch failure', change: 'failure', expected: 'report.failures.0' },
+  { name: 'missing pair arm', change: 'arm', expected: 'report.trialKeys' },
+  { name: 'mutated source bytes', change: 'source', expected: 'sourceCapture.bytes' },
+  { name: 'copied quiet receipt', change: 'quiet', expected: 'quietHost.reportSha256' },
+])('shard assembly rejects $name', async ({ change, expected }) => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'production-shard-reject-'))
+  try {
+    const fixture = await writeProductionShardFixture(directory, [0, 1])
+    const entry = fixture.index.shards[1]
+    const filename = path.join(directory, entry.report.path)
+    const report = JSON.parse(await readFile(filename, 'utf8'))
+    if (change === 'duplicate') report.shard.launchId = 'launch-0'
+    if (change === 'hash') entry.report.sha256 = hash('changed report')
+    if (change === 'plan') report.shard.planSha256 = hash('changed plan')
+    if (change === 'pair') report.shard.pair = -3
+    if (change === 'profile') report.browser.actualArgs = ['another actual browser profile']
+    if (change === 'runtime') report.provenance.runtime.bun = 'changed runtime'
+    if (change === 'control') report.controls.knownGood.observed = 'wrong control'
+    if (change === 'failure') report.failures = ['original launch failure']
+    if (change === 'source')
+      await writeFile(
+        path.join(directory, 'shard-1/source/scripts/markdown/production-browser.ts'),
+        'changed bytes',
+      )
+    if (change === 'quiet')
+      await writeFile(
+        path.join(directory, 'shard-1/quiet-host.json'),
+        await readFile(path.join(directory, 'shard-0/quiet-host.json')),
+      )
+    if (change === 'arm') {
+      const trialFile = path.join(directory, 'shard-1/raw-production-trials.jsonl')
+      const line = (await readFile(trialFile, 'utf8')).trim().split('\n')[0] + '\n'
+      await writeFile(trialFile, line)
+      report.trialsArtifact = {
+        ...report.trialsArtifact,
+        recordCount: 1,
+        byteLength: Buffer.byteLength(line),
+        sha256: hash(line),
+      }
+    }
+    await writeFile(filename, JSON.stringify(report))
+    if (change !== 'hash') entry.report.sha256 = hash(JSON.stringify(report))
+    await fixture.writeIndex()
+    const result = await fixture.read()
+    expect(result.verdict).not.toBe('VERIFIED')
+    expect(result.findings.some((row) => row.path.includes(expected))).toBe(true)
+    if (change === 'failure')
+      expect(JSON.stringify(result.rawFailures)).toContain('original launch failure')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('shard packaging retains original reports and report-relative sidecars without inventing a launch', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'production-shard-package-'))
+  try {
+    const fixture = await writeProductionShardFixture(directory)
+    const frozenFile = path.join(directory, 'frozen.json')
+    await writeFile(frozenFile, JSON.stringify(fixture.frozen))
+    const manifests = []
+    for (const [index, entry] of fixture.index.shards.entries()) {
+      const filename = path.join(directory, `shard-${index}`, 'timing-manifest.json')
+      await writeFile(
+        filename,
+        JSON.stringify({
+          schemaVersion: 1,
+          kind: 'production',
+          report: 'production-browser.json',
+          frozen: '../frozen.json',
+          artifacts: entry.artifacts,
+        }),
+      )
+      manifests.push(filename)
+    }
+    const packaged = await assembleTimingShards({
+      root: directory,
+      planFile: 'capture-plan.json',
+      frozenFile,
+      launchManifests: manifests.toReversed(),
+      output: path.join(directory, 'assembly'),
+    })
+    const index = JSON.parse(await readFile(packaged.indexFile, 'utf8'))
+    expect(index.shards).toHaveLength(23)
+    expect(index.shards[0].report.sha256).toBe(fixture.index.shards[0].report.sha256)
+    expect(index.shards[0].report.path).toBe('../shard-0/production-browser.json')
+    expect(index.shards[0].artifacts).toEqual(fixture.index.shards[0].artifacts)
+    expect(index).not.toHaveProperty('browser')
+    await expect(
+      assembleTimingShards({
+        root: directory,
+        planFile: 'capture-plan.json',
+        frozenFile,
+        launchManifests: manifests.slice(1),
+        output: path.join(directory, 'incomplete'),
+      }),
+    ).rejects.toThrow('every planned shard exactly once')
+    await expect(
+      assembleTimingShards({
+        root: directory,
+        planFile: 'capture-plan.json',
+        frozenFile,
+        launchManifests: manifests.concat([manifests[0]]),
+        output: path.join(directory, 'duplicate'),
+      }),
+    ).rejects.toThrow('distinct actual launch identity')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('launch artifact finalization retains actual source/assets and rejects changed source bytes', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'production-launch-artifacts-'))
+  try {
+    const fixture = await writeProductionShardFixture(directory, [0])
+    const launch = path.join(directory, 'shard-0')
+    const source = path.join(launch, 'source')
+    await writeFile(path.join(source, 'bun.lock'), 'lock')
+    await writeFile(path.join(source, 'scripts/markdown/promotion-budget.json'), 'budget')
+    await mkdir(path.join(launch, '.vite'))
+    await writeFile(
+      path.join(launch, '.vite/manifest.json'),
+      await readFile(path.join(launch, 'manifest.json')),
+    )
+    const frozen = path.join(directory, 'frozen.json')
+    await writeFile(frozen, JSON.stringify(fixture.frozen))
+    const original = await readFile(path.join(launch, 'production-browser.json'))
+    const options = {
+      root: directory,
+      report: path.join(launch, 'production-browser.json'),
+      build: launch,
+      source,
+      snapshot: 'retained-source',
+      frozen,
+      host: path.join(launch, 'host.json'),
+      quietHost: path.join(launch, 'quiet-host.json'),
+      output: 'launch-sidecars',
+    }
+    const finalized = await finalizeProductionLaunch(options)
+    const manifest = JSON.parse(await readFile(finalized.manifestFile, 'utf8'))
+    expect(manifest.report).toBe('../shard-0/production-browser.json')
+    expect(manifest.artifacts.build).toBe('../shard-0/markdown-probe-build.json')
+    expect(finalized.fontFingerprint).toBe(fixture.frozen.fontFingerprint)
+    expect(await readFile(path.join(launch, 'production-browser.json'))).toEqual(original)
+    expect(
+      await readFile(
+        path.join(directory, 'retained-source/scripts/markdown/production-browser.ts'),
+        'utf8',
+      ),
+    ).toBe('fixture producer')
+    const browser = JSON.parse(
+      await readFile(path.join(directory, 'launch-sidecars/browser.json'), 'utf8'),
+    )
+    expect(browser.args).toEqual(JSON.parse(original.toString()).browser.actualArgs)
+    await writeFile(path.join(source, 'scripts/markdown/production-browser.ts'), 'changed source')
+    await expect(
+      finalizeProductionLaunch({ ...options, output: 'changed-sidecars' }),
+    ).rejects.toThrow('Source changed after the actual capture')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+async function writeNativeShardFixture(directory: string, indices?: readonly number[]) {
+  const input = nativeInput()
+  const original = JSON.parse(input.report.contents)
+  const sourceCapture = JSON.parse(input.artifacts.sourceCapture?.contents ?? '{}')
+  const qualification = {
+    ...input.frozen.provenance,
+    sources: sourceCapture.provenance.sources,
+    runtime: { bun: '1.3.fixture', node: '24.fixture', platform: 'darwin', architecture: 'arm64' },
+    curatedSources: [],
+    reference: { assets: [] },
+    baselineProfile: { id: 'fixture' },
+  }
+  const metadata = { ...original.metadata, qualification, runtime: 'node v24.fixture' }
+  const plan = {
+    schemaVersion: 1,
+    kind: 'native-capture-plan',
+    purpose: 'qualification',
+    metadata: Object.fromEntries(
+      [
+        'seed',
+        'candidateCommit',
+        'candidateSourceSha256',
+        'sourceFiles',
+        'lockfileSha256',
+        'budgetSha256',
+        'grammarSha256',
+        'chatGrammarSha256',
+        'resolverSha256',
+        'workloadManifestSha256',
+        'qualification',
+      ].map((key) => [key, metadata[key]]),
+    ),
+    shards: [-1, -2, -3]
+      .concat(Array.from({ length: 20 }, (_, pair) => pair))
+      .map((pair) => ({ workload: nativeWorkload.id, pair })),
+  }
+  const planFile = artifact('native-plan.json', plan)
+  await writeFile(path.join(directory, planFile.path), planFile.contents)
+  const shards = await Promise.all(
+    Array.from(plan.shards.entries())
+      .filter(([index]) => !indices || indices.includes(index))
+      .map(async ([index, selection]) => {
+        const folder = path.join(directory, `native-${index}`)
+        await mkdir(folder)
+        const preparation = pairedTrialOrders(3, metadata.seed).map((order, preparation) => ({
+          role: 'launch-preparation',
+          preparation,
+          workload: nativeWorkload.id,
+          pair: {
+            trial: preparation,
+            order,
+            remark: syntheticNativeTrial(nativeWorkload, preparation, 'remark'),
+            candidate: syntheticNativeTrial(nativeWorkload, preparation, 'tree-sitter'),
+            mismatchedRevisions: [],
+          },
+        }))
+        const contents = preparation.map((row) => JSON.stringify(row)).join('\n') + '\n'
+        await writeFile(path.join(folder, 'raw-native-preparation.jsonl'), contents)
+        const report = {
+          ...original,
+          shard: {
+            ...selection,
+            index,
+            planSha256: planFile.sha256,
+            launchId: `native-launch-${index}`,
+          },
+          metadata: {
+            ...metadata,
+            startedAt: instant(index * 20 + 1),
+            finishedAt: instant(index * 20 + 9),
+            initialization: {
+              startedAt: instant(index * 20 + 1),
+              finishedAt: instant(index * 20 + 2),
+              durationMs: 1000,
+            },
+            launchPreparation: {
+              policy: 'paired-full-workload-three-replays-v1',
+              realm: 'fresh Bun process per launch; shared module/parser/JIT caches within launch',
+              sessions: 'fresh session/HAST processor/projection WeakMap per arm',
+              gc: 'no forced GC',
+              startedAt: instant(index * 20 + 2),
+              finishedAt: instant(index * 20 + 8),
+              durationMs: 6000,
+              pairs: 3,
+              arms: 6,
+              trialIds: [0, 1, 2],
+              orderSeed: metadata.seed,
+              mismatchedPairs: 0,
+              artifact: {
+                path: 'raw-native-preparation.jsonl',
+                sha256: hash(contents),
+                byteLength: Buffer.byteLength(contents),
+                recordCount: 3,
+              },
+            },
+          },
+          workloads: original.workloads.map((row: { pairs: { trial: number }[] }) => ({
+            ...row,
+            pairs: row.pairs.filter((pair) => pair.trial === selection.pair),
+          })),
+        }
+        const files = await writeFixture(folder, {
+          ...input,
+          report: artifact(input.report.path, report),
+        })
+        const filename = path.join(folder, input.report.path)
+        const compact = JSON.parse(await readFile(filename, 'utf8'))
+        compact.workloads[0].comparisons =
+          selection.pair < 0
+            ? []
+            : (['updateP95', 'settlementP95', 'mountP95', 'streamCpu'] as const).map((metric) => ({
+                ...pairedConfidence({
+                  workload: nativeWorkload.id,
+                  metric,
+                  seed: metadata.seed,
+                  resamples: 4096,
+                  baseline: [metric === 'streamCpu' ? 2 : 1],
+                  candidate: [metric === 'streamCpu' ? 2 : 1],
+                }),
+                domain: 'native',
+                build: 'source',
+              }))
+        await writeFile(filename, JSON.stringify(compact))
+        for (const key of ['quietHost', 'sourceCapture'] as const) {
+          const file = files[key]
+          if (!file) expect.fail(`Missing ${key}`)
+          const sidecarPath = path.join(folder, file)
+          const sidecar = JSON.parse(await readFile(sidecarPath, 'utf8'))
+          sidecar.reportSha256 = hash(JSON.stringify(compact))
+          if (key === 'quietHost') {
+            sidecar.nativeInvocation.runtime = metadata.runtime
+            sidecar.nativeInvocation.reportPath = `native-${index}/${input.report.path}`
+            sidecar.observations = [0, 1, 5, 9, 10].map((seconds) => ({
+              ...sidecar.observations[0],
+              observedAt: instant(index * 20 + seconds),
+            }))
+            sidecar.nativeInvocation.argv = sidecar.nativeInvocation.argv.concat([
+              '--capture-plan',
+              path.join(directory, planFile.path),
+              '--selection-index',
+              String(index),
+              '--launch-id',
+              report.shard.launchId,
+            ])
+          }
+          await writeFile(sidecarPath, JSON.stringify(sidecar))
+        }
+        return {
+          report: {
+            path: `native-${index}/${input.report.path}`,
+            sha256: hash(JSON.stringify(compact)),
+          },
+          artifacts: files,
+        }
+      }),
+  )
+  const index = {
+    schemaVersion: 1,
+    kind: 'native-shards',
+    plan: { path: planFile.path, sha256: planFile.sha256 },
+    shards,
+  }
+  const writeIndex = () =>
+    writeFile(path.join(directory, 'native-shards.json'), JSON.stringify(index))
+  await writeIndex()
+  const read = () =>
+    reconcileFiles({
+      root: directory,
+      kind: 'native',
+      report: 'native-shards.json',
+      frozen: input.frozen,
+      artifacts: {
+        host: null,
+        quietHost: null,
+        build: null,
+        buildManifest: null,
+        browser: null,
+        fonts: null,
+        sourceCapture: null,
+        trials: 'native-shards.json',
+      },
+    })
+  return { index, read, writeIndex }
+}
+
+test('native shard reader reconciles 23 original launches and excludes preparation from counted coverage', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'native-shard-reader-'))
+  try {
+    const fixture = await writeNativeShardFixture(directory)
+    const result = await fixture.read()
+    expect(result.findings).toEqual([])
+    expect(result.verdict).toBe('VERIFIED')
+    expect(result.samples).toHaveLength(46)
+    expect(result.metrics.observedWarmupTrials).toBe(3)
+    expect(result.metrics.quietHostEstablished).toBe(true)
+    expect(result.comparisons).toHaveLength(4)
+    expect(result.comparisons.every((row) => row.independentTrials === 20)).toBe(true)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test.each([
+  { change: 'missingPlanArgument', expected: 'native.invocation.capturePlan' },
+  { change: 'duplicatePlanArgument', expected: 'native.invocation.capturePlan' },
+  { change: 'absoluteReportPath', expected: 'native.invocation.reportPath' },
+  { change: 'otherReportPath', expected: 'native.invocation.reportPath' },
+  { change: 'duplicateLaunch', expected: 'shards.1.launchId' },
+  { change: 'missingWarmup', expected: 'native.shardCoverage' },
+  { change: 'runtime', expected: 'shards.1.runtime' },
+  { change: 'source', expected: 'shards.1.metadata' },
+  { change: 'copiedQuiet', expected: 'native.host.reportSha256' },
+  { change: 'preparationOutput', expected: 'native.preparation.correctness' },
+  { change: 'preparationCoordinate', expected: 'sourceCoordinates' },
+  { change: 'preparationIdentity', expected: '.tree-sitter.identity' },
+  { change: 'preparationSummary', expected: 'native.preparation.mismatchedPairs' },
+  { change: 'preparationCount', expected: 'native.preparation.recordCount' },
+  { change: 'preparationInterval', expected: 'native.preparation.interval' },
+])('native shard reader retains rejection for $change', async ({ change, expected }) => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'native-shard-rejection-'))
+  try {
+    const fixture = await writeNativeShardFixture(directory, [0, 1])
+    const entry = fixture.index.shards[1]
+    const filename = path.join(directory, entry.report.path)
+    const report = JSON.parse(await readFile(filename, 'utf8'))
+    const quietFile = path.join(path.dirname(filename), entry.artifacts.quietHost ?? '')
+    const quiet = JSON.parse(await readFile(quietFile, 'utf8'))
+    if (change === 'missingPlanArgument')
+      quiet.nativeInvocation.argv = quiet.nativeInvocation.argv.filter(
+        (_: string, index: number, argv: string[]) =>
+          argv[index] !== '--capture-plan' && argv[index - 1] !== '--capture-plan',
+      )
+    if (change === 'duplicatePlanArgument')
+      quiet.nativeInvocation.argv = quiet.nativeInvocation.argv.concat(['--capture-plan', 'other'])
+    if (change === 'absoluteReportPath') quiet.nativeInvocation.reportPath = filename
+    if (change === 'otherReportPath')
+      quiet.nativeInvocation.reportPath = 'native-other/paired-native.json'
+    if (change === 'duplicateLaunch') report.shard.launchId = 'native-launch-0'
+    if (change === 'runtime') report.metadata.runtime = 'bun changed-runtime'
+    if (change === 'source') report.metadata.sourceFiles[0].sha256 = hash('changed source')
+    if (change === 'preparationSummary') report.metadata.launchPreparation.mismatchedPairs = 1
+    if (change === 'preparationInterval')
+      report.metadata.launchPreparation.startedAt = report.metadata.startedAt
+    const prepFile = path.join(path.dirname(filename), 'raw-native-preparation.jsonl')
+    const preparation = (await readFile(prepFile, 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+    if (change === 'preparationOutput')
+      preparation[0].pair.candidate.revisions[0].outputDigest = hash('changed output')
+    if (change === 'preparationCoordinate')
+      preparation[0].pair.candidate.revisions[0].sourceCoordinateFailures = ['retained raw failure']
+    if (change === 'preparationIdentity') preparation[0].pair.candidate.engine = 'remark'
+    if (change === 'preparationCount') preparation.pop()
+    const contents = preparation.map((row) => JSON.stringify(row)).join('\n') + '\n'
+    await writeFile(prepFile, contents)
+    report.metadata.launchPreparation.artifact = {
+      path: 'raw-native-preparation.jsonl',
+      sha256: hash(contents),
+      byteLength: Buffer.byteLength(contents),
+      recordCount: preparation.length,
+    }
+    const bytes = JSON.stringify(report)
+    await writeFile(filename, bytes)
+    entry.report.sha256 = hash(bytes)
+    quiet.reportSha256 = hash(bytes)
+    await writeFile(quietFile, JSON.stringify(quiet))
+    if (change === 'copiedQuiet')
+      await writeFile(quietFile, await readFile(path.join(directory, 'native-0/quiet-host.json')))
+    if (change === 'missingWarmup') fixture.index.shards.splice(0, 1)
+    await fixture.writeIndex()
+    const result = await fixture.read()
+    expect(result.verdict).not.toBe('VERIFIED')
+    expect(result.findings.some((finding) => finding.path.includes(expected))).toBe(true)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('native launch finalizer retains original reports and verifies actual native assets', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'native-launch-finalizer-'))
+  const outside = await mkdtemp(path.join(tmpdir(), 'native-launch-outside-'))
+  try {
+    await writeNativeShardFixture(directory, [0])
+    const launch = path.join(directory, 'native-0')
+    const source = path.join(launch, 'snapshot')
+    await writeFile(path.join(source, 'bun.lock'), 'lock')
+    await mkdir(path.join(source, 'scripts/markdown'), { recursive: true })
+    await writeFile(path.join(source, 'scripts/markdown/promotion-budget.json'), 'budget')
+    await writeFile(
+      path.join(launch, 'host.json'),
+      JSON.stringify({ host: 'fixture-host', observedAt: instant(0) }),
+    )
+    const frozen = path.join(directory, 'frozen.json')
+    await writeFile(frozen, JSON.stringify(nativeInput().frozen))
+    const filename = path.join(launch, 'paired-native.json')
+    const original = await readFile(filename)
+    const options = {
+      root: directory,
+      report: filename,
+      source,
+      snapshot: 'retained-native-source',
+      frozen,
+      host: path.join(launch, 'host.json'),
+      quietHost: path.join(launch, 'quiet-host.json'),
+      grammar: path.join(launch, 'grammar.wasm'),
+      chatGrammar: path.join(launch, 'chat-grammar.wasm'),
+      resolver: path.join(launch, 'resolver.wasm'),
+      output: 'native-sidecars',
+    }
+    await symlink(outside, path.join(directory, 'escaped-source'))
+    await expect(finalizeNativeLaunch({ ...options, snapshot: 'escaped-source' })).rejects.toThrow(
+      'inside their evidence root',
+    )
+    expect(await readdir(outside)).toEqual([])
+    await mkdir(path.join(directory, 'nested-source'))
+    await symlink(outside, path.join(directory, 'nested-source/scripts'))
+    await expect(finalizeNativeLaunch({ ...options, snapshot: 'nested-source' })).rejects.toThrow(
+      'inside their evidence root',
+    )
+    expect(await readdir(outside)).toEqual([])
+    const finalized = await finalizeNativeLaunch(options)
+    const manifest = JSON.parse(await readFile(finalized.manifestFile, 'utf8'))
+    expect(manifest.kind).toBe('native')
+    expect(manifest.report).toBe('../native-0/paired-native.json')
+    expect(manifest.artifacts.trials).toBe('../native-0/raw-native-pairs.jsonl')
+    expect(manifest.artifacts.browser).toBeNull()
+    expect(await readFile(filename)).toEqual(original)
+    const captured = JSON.parse(
+      await readFile(path.join(directory, 'native-sidecars/source-capture.json'), 'utf8'),
+    )
+    expect(captured.reportSha256).toBe(hash(original.toString()))
+    expect(
+      await readFile(
+        path.join(directory, 'retained-native-source/native-assets/chatGrammar.wasm'),
+        'utf8',
+      ),
+    ).toBe('chat grammar')
+    await writeFile(options.grammar, 'changed grammar')
+    await expect(
+      finalizeNativeLaunch({ ...options, output: 'changed-native-sidecars' }),
+    ).rejects.toThrow('native asset differs')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+    await rm(outside, { recursive: true, force: true })
+  }
 })

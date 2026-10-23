@@ -194,11 +194,11 @@ Never initialize a new ledger to reuse exposed messages.
    bun scripts/markdown/qualify.ts qualify --out "$E/qualification"
    bun scripts/markdown/qualify.ts visual --browser webkit --out "$E/webkit"
    bun scripts/markdown/native-resources.ts --windows 4 --out "$E/native-resources"
-   bun scripts/markdown/paired-native.ts --mode qualification --out "$E/native"
-   bun scripts/markdown/production-browser.ts --directory "$BUILD" --port "$PORT" \
-       --out "$E/production" --trials 20 --warmups 3 --negative-controls \
-       --browser chromium --headed --capture promotion --host-evidence "$HOST_EVIDENCE"
    ```
+
+   Capture native and production timing through the [bounded capture sequence](bounded-captures.md).
+   It retains all 75 native and 86 browser cells, 20 measured pairs, three counted warmups, actual
+   per-launch identity, and the exact 160-state promotion raster selection.
 
    Preserve full source closure, native invocation, WASM/lockfile/budget bytes, build files, browser
    arguments, and fonts. Host observations must cover before/during/after with gaps of at most five

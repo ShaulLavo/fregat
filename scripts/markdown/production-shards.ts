@@ -152,6 +152,8 @@ export async function assembleTimingShards(options: {
         frozenSha256: frozen.sha256,
       }),
     )
+  if (new Set(shards.map(({ launchId }) => launchId)).size !== shards.length)
+    throw createScriptError('Assembly requires a distinct actual launch identity for every shard.')
   shards.sort((first, second) => first.index - second.index)
   if (shards.length !== plan.shards.length || shards.some((entry, index) => entry.index !== index))
     throw createScriptError('Assembly requires every planned shard exactly once.')
@@ -221,6 +223,7 @@ async function indexLaunch(options: {
   )
   return {
     index: shard.index,
+    launchId: shard.launchId,
     report: {
       path: path.relative(options.output, report.filename),
       sha256: report.reference.sha256,

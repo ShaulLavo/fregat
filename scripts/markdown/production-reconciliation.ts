@@ -14,7 +14,18 @@ import {
 import frozenBudget from './promotion-budget.json'
 import type { PromotionComparison, PromotionEvidence } from './promotion'
 import { stable } from './serialization'
-import { timingLaunchManifest } from './production-shards'
+import {
+  nativeCapturePlan,
+  nativePlanMetadata,
+  nativeShardIndex,
+  nativeShardSelections,
+  productionShard,
+  productionCapturePlan,
+  productionShardIndex,
+  productionShardSelections,
+  timingSidecarFiles,
+  timingLaunchManifest,
+} from './production-shards'
 import { foldJsonl, hashFile, type ArtifactRef } from './timing-artifacts'
 import {
   productionOracleSchema,
@@ -53,6 +64,8 @@ type TimingReconciliationInput = {
   readonly report: TimingArtifact
   readonly capturedFiles: readonly ArtifactRef[]
   readonly root: string
+  readonly trialRoot?: string
+  readonly shard?: boolean
   readonly frozen: TimingFreeze
   readonly artifacts: {
     readonly host: TimingArtifact | null
@@ -89,8 +102,10 @@ type TimingReconciliationResult = {
   readonly rawExclusions: readonly unknown[]
   readonly resourceTrials: readonly ResourceTimingObservation[]
   readonly coverage: readonly CoverageTimingObservation[]
+  readonly productionSummary?: Readonly<Record<string, unknown>>
 }
 export type ResourceTimingObservation = {
+  readonly launchReport?: string
   readonly workload: string
   readonly pair: number
   readonly engine: string
@@ -285,8 +300,9 @@ const measurementControls = v.object({
   }),
   longTask: v.object({ supported: v.boolean(), observed: v.array(nonnegative) }),
 })
-const productionReport = v.object({
+export const productionReport = v.object({
   schemaVersion: v.literal(2),
+  shard: v.optional(productionShard),
   build: v.literal('production'),
   timingStatus: label,
   controls: measurementControls,
@@ -349,14 +365,38 @@ const nativePair = v.object({
   mismatchedRevisions: v.array(count),
 })
 const nativePairRecord = v.object({ workload: label, pair: nativePair })
-const nativeReport = v.object({
+export const nativeReport = v.object({
   schemaVersion: v.literal(2),
+  shard: v.optional(productionShard),
   pairsArtifact: rawTimingRef,
   scope: v.literal('paired-native-source'),
   mode: v.literal('qualification'),
   metadata: v.object({
     startedAt: label,
     finishedAt: label,
+    initialization: v.optional(
+      v.object({ startedAt: label, finishedAt: label, durationMs: nonnegative }),
+    ),
+    launchPreparation: v.optional(
+      v.object({
+        policy: v.literal('paired-full-workload-three-replays-v1'),
+        realm: v.literal(
+          'fresh Bun process per launch; shared module/parser/JIT caches within launch',
+        ),
+        sessions: v.literal('fresh session/HAST processor/projection WeakMap per arm'),
+        gc: v.literal('no forced GC'),
+        startedAt: label,
+        finishedAt: label,
+        durationMs: nonnegative,
+        pairs: v.literal(3),
+        arms: v.literal(6),
+        trialIds: v.tuple([v.literal(0), v.literal(1), v.literal(2)]),
+        orderSeed: count,
+        mismatchedPairs: count,
+        artifact: rawTimingRef,
+      }),
+    ),
+    qualification: v.optional(v.unknown()),
     seed: count,
     trials: count,
     warmups: count,
@@ -425,7 +465,7 @@ const browserArtifact = v.object({
   version: label,
   args: v.pipe(v.array(v.string()), v.minLength(1)),
 })
-const fontsArtifact = v.object({
+export const fontsArtifact = v.object({
   host: label,
   fingerprint: digest,
   files: v.pipe(v.array(v.object({ path: label, sha256: digest })), v.minLength(1)),
@@ -438,7 +478,7 @@ const sourceIdentity = v.object({
   sourceClosureSha256: digest,
   lockfileSha256: digest,
 })
-const buildArtifact = v.object({
+export const buildArtifact = v.object({
   schemaVersion: v.literal(1),
   sourceBefore: sourceIdentity,
   sourceAfter: sourceIdentity,
@@ -455,7 +495,7 @@ export async function reconcileTimingEvidence(options: {
   readonly kind: 'production' | 'native'
   readonly report: string
   readonly frozen: TimingFreeze
-  readonly artifacts: v.InferOutput<typeof reconciliationManifest>['artifacts']
+  readonly artifacts: v.InferOutput<typeof timingSidecarFiles>
 }): Promise<TimingReconciliationResult> {
   const root = await realpath(options.root)
   const artifacts = await readTimingSidecars(options.artifacts, root, root)
@@ -474,6 +514,10 @@ async function reconcileFiles(
 ): Promise<TimingReconciliationResult> {
   const state = inputState(input)
   const raw = readArtifact(input.report, 'report', state)
+  if (input.kind === 'production' && !input.shard && field(raw, 'kind') === 'production-shards')
+    return reconcileProductionShards(raw, state)
+  if (input.kind === 'native' && !input.shard && field(raw, 'kind') === 'native-shards')
+    return reconcileNativeShards(raw, state)
   if (
     field(raw, 'rawTrials') !== undefined ||
     field(raw, 'warmupResults') !== undefined ||
@@ -523,6 +567,404 @@ async function reconcileFiles(
     resourceTrials: state.resourceTrials,
     coverage: state.coverage,
   }
+}
+
+function emptyTimingSidecars(): TimingReconciliationInput['artifacts'] {
+  return {
+    host: null,
+    quietHost: null,
+    build: null,
+    buildManifest: null,
+    browser: null,
+    fonts: null,
+    sourceCapture: null,
+    trials: '',
+  }
+}
+
+function arrayField(value: unknown, key: string): unknown[] {
+  const entries = field(value, key)
+  return Array.isArray(entries) ? entries : []
+}
+
+function shardCohort(report: v.InferOutput<typeof productionReport>) {
+  const { id, platform, architecture, hardware, osRelease, memoryBytes } = report.host
+  const host = { id, platform, architecture, hardware, osRelease, memoryBytes }
+  return {
+    host,
+    browser: {
+      ...report.browser,
+      actualArgs: report.browser.actualArgs?.map((arg) =>
+        arg.startsWith('--user-data-dir=') ? '--user-data-dir=<launch>' : arg,
+      ),
+    },
+    runtime: field(report.provenance, 'runtime'),
+  }
+}
+
+type ShardAssembly = {
+  readonly planFile: TimingArtifact
+  readonly plan: v.InferOutput<typeof productionCapturePlan> | null
+  readonly parts: TimingReconciliationResult[]
+  readonly declared: string[]
+  readonly launches: Set<string>
+  readonly reports: Set<string>
+  readonly profiles: Set<string>
+  readonly intervals: { start: number; end: number }[]
+  readonly reportsSummary: Readonly<Record<string, unknown>>[]
+  cohort?: ReturnType<typeof shardCohort>
+}
+
+async function reconcileProductionShards(
+  raw: unknown,
+  state: State,
+): Promise<TimingReconciliationResult> {
+  const index = parse(productionShardIndex, raw, 'shards', state)
+  if (!index) return failedShardIndex(state)
+  const planFile = await readTimingFile(
+    path.resolve(path.dirname(state.input.report.path), index.plan.path),
+    state.input.root,
+  )
+  same(state, 'plan.sha256', planFile.sha256, index.plan.sha256)
+  const plan = parse(productionCapturePlan, observedJson(planFile.contents), 'plan', state)
+  if (plan) checkProductionCapturePlan(plan, state)
+  const assembly: ShardAssembly = {
+    planFile,
+    plan,
+    parts: [],
+    declared: [],
+    launches: new Set(),
+    reports: new Set(),
+    profiles: new Set(),
+    intervals: [],
+    reportsSummary: [],
+  }
+  for (const [position, entry] of index.shards.entries())
+    await reconcileIndexedShard(entry, position, assembly, state)
+  const expected = productionShardSelections(state.input.frozen.productionWorkloads).map(
+    (entry) => `${entry.workload}/${entry.pair}`,
+  )
+  same(state, 'shardCoverage', assembly.declared, expected)
+  if (new Set(assembly.declared).size !== assembly.declared.length)
+    finding(
+      state,
+      'shardCoverage',
+      'mismatch',
+      'Duplicate shards cannot count as independent pairs.',
+    )
+  for (const [position, interval] of assembly.intervals.entries()) {
+    if (position > 0 && interval.start < assembly.intervals[position - 1].end)
+      finding(
+        state,
+        `shards.${position}.host.interval`,
+        'mismatch',
+        'Planned capture intervals must advance without overlap.',
+      )
+  }
+  const workloads = state.input.frozen.productionWorkloads
+  checkProductionKeys(
+    state.samples.map((row) => `${row.workload}/${row.pair}/${row.engine}`),
+    workloads,
+    state,
+  )
+  for (const workload of workloads) productionWorkloadMetrics(workload.id, state)
+  compareSamples(
+    workloads.map((entry) => entry.id),
+    941,
+    state,
+  )
+  const { parts } = assembly
+  state.metrics.quietHostEstablished =
+    parts.length > 0 && parts.every((part) => part.metrics.quietHostEstablished === true)
+      ? true
+      : null
+  state.metrics.productionBuild =
+    parts.length > 0 && parts.every((part) => part.metrics.productionBuild === true) ? true : null
+  state.metrics.shardCount = parts.length
+  const verdict = reconciliationVerdict(state)
+  return {
+    schemaVersion: 2,
+    kind: 'production',
+    verdict,
+    timingStatus: timingStatus('production', verdict),
+    findings: state.findings,
+    metrics: state.metrics,
+    comparisons: state.comparisons,
+    samples: state.samples,
+    exclusions: state.exclusions,
+    resourceTrials: state.resourceTrials,
+    coverage: state.coverage,
+    artifacts: [state.input.report, planFile]
+      .map(({ path, sha256 }) => ({ path, sha256 }))
+      .concat(parts.flatMap((part) => part.artifacts)),
+    productionSummary: {
+      provenance: plan?.provenance,
+      frozenBudgetSha256: plan?.budgetSha256,
+      familyCoverage: observedFamilyCoverage(workloads, state.coverage),
+      resourcePlateaus: assembly.reportsSummary.flatMap((report) =>
+        arrayField(report, 'resourcePlateaus'),
+      ),
+      failures: assembly.reportsSummary.flatMap((report) => arrayField(report, 'failures')),
+      missing: assembly.reportsSummary.flatMap((report) => arrayField(report, 'missing')),
+    },
+    ...originalShardOutcomes(parts),
+  }
+}
+
+function originalShardOutcomes(parts: readonly TimingReconciliationResult[]) {
+  return {
+    rawFailures: parts.map((part) => ({ report: part.artifacts[0], failures: part.rawFailures })),
+    rawExclusions: parts.map((part) => ({
+      report: part.artifacts[0],
+      exclusions: part.rawExclusions,
+    })),
+  }
+}
+
+async function reconcileIndexedShard(
+  entry: v.InferOutput<typeof productionShardIndex>['shards'][number],
+  position: number,
+  assembly: ShardAssembly,
+  state: State,
+) {
+  const directory = path.dirname(state.input.report.path)
+  const reportFile = await readTimingFile(
+    path.resolve(directory, entry.report.path),
+    state.input.root,
+  )
+  same(state, `shards.${position}.report.sha256`, reportFile.sha256, entry.report.sha256)
+  if (assembly.reports.has(reportFile.path) || assembly.reports.has(reportFile.sha256))
+    finding(
+      state,
+      `shards.${position}.report`,
+      'mismatch',
+      'A launch report was selected more than once.',
+    )
+  assembly.reports.add(reportFile.path)
+  assembly.reports.add(reportFile.sha256)
+  const report = parse(
+    productionReport,
+    observedJson(reportFile.contents),
+    `shards.${position}.report`,
+    state,
+  )
+  if (report) checkShardLaunch(report, position, assembly, state)
+  const rawReport = observedJson(reportFile.contents)
+  assembly.reportsSummary.push({
+    resourcePlateaus: arrayField(rawReport, 'resourcePlateaus').map((row) => ({
+      ...(typeof row === 'object' && row !== null ? row : {}),
+      launchReport: reportFile.path,
+    })),
+    failures: arrayField(rawReport, 'failures'),
+    missing: arrayField(rawReport, 'missing'),
+  })
+  const sidecars = await readTimingSidecars(
+    entry.artifacts,
+    path.dirname(reportFile.path),
+    state.input.root,
+  )
+  if (assembly.plan) {
+    same(
+      state,
+      `shards.${position}.build.sha256`,
+      sidecars.build?.sha256,
+      assembly.plan.build.metadataSha256,
+    )
+    same(
+      state,
+      `shards.${position}.buildManifest.sha256`,
+      sidecars.buildManifest?.sha256,
+      assembly.plan.build.manifestSha256,
+    )
+  }
+  const part = await reconcileFiles({
+    ...state.input,
+    report: reportFile,
+    artifacts: sidecars,
+    capturedFiles: await readCapturedSources(sidecars.sourceCapture, state.input.root),
+    trialRoot: path.dirname(reportFile.path),
+    shard: true,
+  })
+  assembly.parts.push(part)
+  mergeProductionShard(part, position, state)
+}
+
+function checkShardLaunch(
+  report: v.InferOutput<typeof productionReport>,
+  position: number,
+  assembly: ShardAssembly,
+  state: State,
+) {
+  const { shard } = report
+  if (!shard) {
+    finding(
+      state,
+      `shards.${position}.selection`,
+      'missing',
+      'Every indexed launch requires its original planned shard identity.',
+    )
+    return
+  }
+  same(state, `shards.${position}.planSha256`, shard.planSha256, assembly.planFile.sha256)
+  same(state, `shards.${position}.provenance`, report.provenance, assembly.plan?.provenance)
+  same(
+    state,
+    `shards.${position}.selection`,
+    { workload: shard.workload, pair: shard.pair },
+    assembly.plan?.shards[shard.index],
+  )
+  same(state, `shards.${position}.index`, shard.index, position)
+  assembly.declared.push(`${shard.workload}/${shard.pair}`)
+  if (assembly.launches.has(shard.launchId))
+    finding(state, `shards.${position}.launchId`, 'mismatch', 'Launch identities must be unique.')
+  assembly.launches.add(shard.launchId)
+  const actualProfiles =
+    report.browser.actualArgs?.filter((arg) => arg.startsWith('--user-data-dir=')) ?? []
+  if (actualProfiles.length !== 1 || assembly.profiles.has(actualProfiles[0]))
+    finding(
+      state,
+      `shards.${position}.browser.profile`,
+      'mismatch',
+      'Each actual launch requires its own browser profile.',
+    )
+  if (actualProfiles[0]) assembly.profiles.add(actualProfiles[0])
+  const current = shardCohort(report)
+  assembly.cohort ??= current
+  same(state, `shards.${position}.cohort`, current, assembly.cohort)
+  const interval = {
+    start: Date.parse(report.host.before.observedAt),
+    end: Date.parse(report.host.after.observedAt),
+  }
+  if (!(interval.start < interval.end) || interval.end - interval.start > 110 * 60 * 1000)
+    finding(
+      state,
+      `shards.${position}.deadline`,
+      'mismatch',
+      'A shard must finish inside its bounded capture interval.',
+    )
+  assembly.intervals.push(interval)
+}
+
+function failedShardIndex(state: State): TimingReconciliationResult {
+  return {
+    schemaVersion: 2,
+    kind: 'production',
+    verdict: 'NOT VERIFIED',
+    timingStatus: 'PROMOTION_CAPTURE_UNRECONCILED',
+    findings: state.findings,
+    metrics: state.metrics,
+    comparisons: [],
+    samples: [],
+    exclusions: [],
+    artifacts: [{ path: state.input.report.path, sha256: state.input.report.sha256 }],
+    rawFailures: null,
+    rawExclusions: [],
+    resourceTrials: [],
+    coverage: [],
+  }
+}
+
+function checkProductionCapturePlan(
+  plan: v.InferOutput<typeof productionCapturePlan>,
+  state: State,
+) {
+  same(state, 'plan.purpose', plan.purpose, 'promotion')
+  const provenance = parse(sourceIdentity, plan.provenance, 'plan.provenance', state)
+  same(state, 'plan.provenance', provenance, state.input.frozen.provenance)
+  const sources = parse(
+    sourceCaptureArtifact.entries.provenance.entries.sources,
+    field(plan.provenance, 'sources'),
+    'plan.provenance.sources',
+    state,
+  )
+  same(
+    state,
+    'plan.sourceClosureSha256',
+    sha(JSON.stringify(sources)),
+    state.input.frozen.provenance.sourceClosureSha256,
+  )
+  same(state, 'plan.budgetSha256', plan.budgetSha256, state.input.frozen.identity.budgetSha256)
+  same(state, 'plan.workloadManifest', plan.workloadManifest, {
+    schemaVersion: 1,
+    domain: 'browser',
+    build: 'production',
+    workloads: state.input.frozen.productionWorkloads.map(manifestEntry),
+  })
+  same(
+    state,
+    'plan.shards',
+    plan.shards,
+    productionShardSelections(state.input.frozen.productionWorkloads),
+  )
+}
+
+function mergeProductionShard(part: TimingReconciliationResult, index: number, state: State) {
+  state.findings.push(
+    ...part.findings.map((entry) => ({ ...entry, path: `shards.${index}.${entry.path}` })),
+  )
+  state.samples.push(...part.samples)
+  state.exclusions.push(...part.exclusions)
+  state.resourceTrials.push(
+    ...part.resourceTrials.map((row) => ({
+      ...row,
+      launchReport: part.artifacts[0]?.path,
+    })),
+  )
+  state.coverage.push(...part.coverage)
+  for (const [key, value] of Object.entries(part.metrics)) {
+    const previous = state.metrics[key]
+    state.metrics[key] =
+      typeof previous === 'number' && typeof value === 'number' ? Math.max(previous, value) : value
+  }
+}
+
+function reconcileShardComparisons(
+  report: v.InferOutput<typeof productionReport>,
+  pair: number,
+  state: State,
+) {
+  if (pair < 0) {
+    same(
+      state,
+      'report.comparisons',
+      report.comparisons,
+      ['updateP95', 'settlementP95', 'mountP95', 'streamCpu'].map((metric) => ({
+        workload: report.shard?.workload,
+        metric,
+        selectedPairs: 0,
+        excludedPairs: [],
+        status: 'inconclusive',
+        reason: 'No complete observed metric pairs.',
+        independentTrials: 0,
+      })),
+    )
+    return
+  }
+  for (const metric of ['updateP95', 'settlementP95', 'mountP95', 'streamCpu'] as const) {
+    const workload = report.shard?.workload ?? ''
+    const vector = metricPair(state.samples, pair, metric)
+    const rows = report.comparisons.filter(
+      (row) => field(row, 'workload') === workload && field(row, 'metric') === metric,
+    )
+    same(state, `${workload}.${metric}.reportedCount`, rows.length, 1)
+    const reported = rows[0]
+    same(state, `${workload}.${metric}.selectedPairs`, field(reported, 'selectedPairs'), 1)
+    if (!vector) continue
+    const comparison = {
+      ...pairedConfidence({
+        workload,
+        metric,
+        seed: 941,
+        resamples: 4096,
+        baseline: [vector.baseline],
+        candidate: [vector.candidate],
+      }),
+      domain: 'browser' as const,
+      build: 'production' as const,
+    }
+    state.comparisons.push(comparison)
+  }
+  reconcileReportedComparisons(report, state)
 }
 
 function present<T>(value: T | null): value is T {
@@ -681,6 +1123,7 @@ async function reconcileProduction(raw: unknown, state: State) {
   preserveFailures(raw, state)
   const report = parse(productionReport, raw, 'report', state)
   if (!report) return
+  same(state, 'report.shardMode', Boolean(report.shard), Boolean(state.input.shard))
   checkMeasurementControls(report.controls, state)
   checkFreeze(state)
   same(state, 'report.capture.kind', report.capture.kind, 'promotion')
@@ -755,6 +1198,7 @@ async function reconcileProduction(raw: unknown, state: State) {
     state.metrics.quietHostEstablished = null
   const build = reconcileBuild(report, state)
   reconcileBrowser(report, state)
+  if (state.input.shard) checkSourceCapture({ sourceFiles: [] }, state, false)
   const fonts = artifact(fontsArtifact, 'fonts', state)
   checkFonts([], fonts, report.host.id, build, state)
   await reconcileProductionRows(report, fonts, state)
@@ -835,7 +1279,7 @@ function checkQuietHost(
   }
   if (state.findings.length === before) state.metrics.quietHostEstablished = true
 }
-const wasmBuildRoles = [
+export const wasmBuildRoles = [
   { field: 'grammarSha256', file: /^tree-sitter-markdown(?:-(?!chat(?:-|\.))[\w-]+)?\.wasm$/u },
   { field: 'chatGrammarSha256', file: /^tree-sitter-markdown-chat(?:-[\w-]+)?\.wasm$/u },
   { field: 'resolverSha256', file: /^tree-sitter-md(?:-[\w-]+)?\.wasm$/u },
@@ -962,7 +1406,12 @@ async function reconcileProductionRows(
   fonts: v.InferOutput<typeof fontsArtifact> | null,
   state: State,
 ) {
-  const workloads = state.input.frozen.productionWorkloads
+  const frozenWorkloads = state.input.frozen.productionWorkloads
+  const selection = state.input.shard ? report.shard : undefined
+  const workloads = selection
+    ? frozenWorkloads.filter((entry) => entry.id === selection.workload)
+    : frozenWorkloads
+  const pairs = selection ? [selection.pair] : Array.from({ length: 23 }, (_, index) => index - 3)
   if (workloads.length === 0)
     finding(
       state,
@@ -974,7 +1423,7 @@ async function reconcileProductionRows(
     schemaVersion: 1,
     domain: 'browser',
     build: 'production',
-    workloads: workloads.map(manifestEntry),
+    workloads: frozenWorkloads.map(manifestEntry),
   })
   same(
     state,
@@ -989,9 +1438,9 @@ async function reconcileProductionRows(
   let expectedInputs: readonly ProductionInput[] = []
   let measured = 0
   await foldTimingRecords(report.trialsArtifact, productionTrial, state, async (row, index) => {
-    const expectedWorkload = workloads[Math.floor(index / 46)]
-    const pairIndex = Math.floor((index % 46) / 2)
-    const pair = pairIndex - 3
+    const span = pairs.length * 2
+    const expectedWorkload = workloads[Math.floor(index / span)]
+    const pair = pairs[Math.floor((index % span) / 2)]
     const order = Math.abs(pair) % 2 === 0 ? 'AB' : 'BA'
     const engines = order === 'AB' ? ['remark', 'tree-sitter'] : ['tree-sitter', 'remark']
     same(
@@ -1039,15 +1488,19 @@ async function reconcileProductionRows(
     }
     pending = row
   })
-  checkProductionKeys(keys, workloads, state)
+  checkProductionKeys(keys, workloads, state, pairs)
   same(state, 'report.sampleSummaries.length', report.sampleSummaries.length, measured)
   same(
     state,
     'report.familyCoverage',
     report.familyCoverage,
-    observedFamilyCoverage(workloads, state.coverage),
+    observedFamilyCoverage(frozenWorkloads, state.coverage),
   )
   for (const workload of workloads) productionWorkloadMetrics(workload.id, state)
+  if (selection) {
+    reconcileShardComparisons(report, selection.pair, state)
+    return
+  }
   compareSamples(
     workloads.map((entry) => entry.id),
     941,
@@ -1063,12 +1516,17 @@ async function reconcileOraclePair(
 ) {
   try {
     const artifacts = await reconcileProductionOracles({
-      root: state.input.root,
+      root: state.input.trialRoot ?? state.input.root,
       first,
       second,
       inputs,
     })
-    state.observedArtifacts.push(...artifacts)
+    state.observedArtifacts.push(
+      ...artifacts.map((entry) => ({
+        ...entry,
+        path: path.resolve(state.input.trialRoot ?? state.input.root, entry.path),
+      })),
+    )
   } catch (error) {
     finding(
       state,
@@ -1145,12 +1603,13 @@ async function foldTimingRecords<T extends v.BaseSchema<unknown, unknown, v.Base
   try {
     same(state, 'trials.manifestPath', filename, reference.path)
     if (filename !== reference.path) return
-    const actual = await hashFile({ root: state.input.root, file: filename })
-    state.observedArtifacts.push(actual)
+    const root = state.input.trialRoot ?? state.input.root
+    const actual = await hashFile({ root, file: filename })
+    state.observedArtifacts.push({ ...actual, path: path.resolve(root, actual.path) })
     same(state, 'trials.path', actual.path, reference.path)
     if (actual.path !== reference.path) return
     await foldJsonl({
-      root: state.input.root,
+      root,
       file: filename,
       expected: reference,
       parse: (value, index) => {
@@ -1227,9 +1686,10 @@ function checkProductionKeys(
   keys: readonly string[],
   workloads: readonly ProductionWorkload[],
   state: State,
+  pairs: readonly number[] = Array.from({ length: 23 }, (_, index) => index - 3),
 ) {
   const expected = workloads.flatMap((workload) =>
-    Array.from({ length: 23 }, (_, index) => index - 3).flatMap((pair) =>
+    pairs.flatMap((pair) =>
       ['remark', 'tree-sitter'].map((engine) => `${workload.id}/${pair}/${engine}`),
     ),
   )
@@ -1687,13 +2147,406 @@ function metricPair(
   return left === null || right === null ? null : { baseline: left, candidate: right }
 }
 
+async function reconcileNativeShards(
+  raw: unknown,
+  state: State,
+): Promise<TimingReconciliationResult> {
+  const index = parse(nativeShardIndex, raw, 'shards', state)
+  if (!index) return { ...failedShardIndex(state), kind: 'native', timingStatus: 'EXPLORATORY' }
+  const directory = path.dirname(state.input.report.path)
+  const planFile = await readTimingFile(path.resolve(directory, index.plan.path), state.input.root)
+  same(state, 'plan.sha256', planFile.sha256, index.plan.sha256)
+  const plan = parse(nativeCapturePlan, observedJson(planFile.contents), 'plan', state)
+  if (plan) checkNativeCapturePlan(plan, state)
+  const assembly: NativeShardAssembly = {
+    plan,
+    planSha256: planFile.sha256,
+    parts: [],
+    declared: [],
+    launches: new Set(),
+    reports: new Set(),
+    previousEnd: 0,
+  }
+  for (const [position, entry] of index.shards.entries())
+    await reconcileNativeLaunch(entry, position, directory, assembly, state)
+  const { parts, declared } = assembly
+  const workloads = state.input.frozen.nativeWorkloads
+  same(
+    state,
+    'native.shardCoverage',
+    declared,
+    nativeShardSelections(workloads).map((row) => `${row.workload}/${row.pair}`),
+  )
+  same(
+    state,
+    'native.rawCoverage',
+    state.samples.map((row) => `${row.workload}/${row.pair}/${row.engine}`).toSorted(),
+    nativeShardSelections(workloads)
+      .flatMap((row) =>
+        ['remark', 'tree-sitter'].map((engine) => `${row.workload}/${row.pair}/${engine}`),
+      )
+      .sort(),
+  )
+  const seed = plan?.metadata.seed ?? 176
+  compareSamples(
+    workloads.map((row) => row.id),
+    seed,
+    state,
+  )
+  state.metrics.quietHostEstablished =
+    parts.length > 0 && parts.every((part) => part.metrics.quietHostEstablished === true)
+      ? true
+      : null
+  state.metrics.shardCount = parts.length
+  state.metrics.configuredWarmups = 3
+  state.metrics.observedWarmupTrials = state.samples.filter(
+    (row) => row.warmup && row.engine === 'remark',
+  ).length
+  const verdict = reconciliationVerdict(state)
+  return {
+    schemaVersion: 2,
+    kind: 'native',
+    verdict,
+    timingStatus: timingStatus('native', verdict),
+    findings: state.findings,
+    metrics: state.metrics,
+    comparisons: state.comparisons,
+    samples: state.samples,
+    exclusions: state.exclusions,
+    resourceTrials: [],
+    coverage: [],
+    artifacts: [state.input.report, planFile]
+      .map(({ path, sha256 }) => ({ path, sha256 }))
+      .concat(parts.flatMap((part) => part.artifacts)),
+    ...originalShardOutcomes(parts),
+  }
+}
+
+type NativeShardAssembly = {
+  readonly plan: v.InferOutput<typeof nativeCapturePlan> | null
+  readonly planSha256: string
+  readonly parts: TimingReconciliationResult[]
+  readonly declared: string[]
+  readonly launches: Set<string>
+  readonly reports: Set<string>
+  cohort?: unknown
+  previousEnd: number
+}
+async function reconcileNativeLaunch(
+  entry: v.InferOutput<typeof nativeShardIndex>['shards'][number],
+  position: number,
+  directory: string,
+  assembly: NativeShardAssembly,
+  state: State,
+) {
+  const file = await readTimingFile(path.resolve(directory, entry.report.path), state.input.root)
+  same(state, `shards.${position}.sha256`, file.sha256, entry.report.sha256)
+  if (assembly.reports.has(file.path) || assembly.reports.has(file.sha256))
+    finding(
+      state,
+      `shards.${position}.report`,
+      'mismatch',
+      'Each original native report may appear once.',
+    )
+  assembly.reports.add(file.path)
+  assembly.reports.add(file.sha256)
+  const report = parse(
+    nativeReport,
+    observedJson(file.contents),
+    `shards.${position}.report`,
+    state,
+  )
+  const sidecars = await readTimingSidecars(
+    entry.artifacts,
+    path.dirname(file.path),
+    state.input.root,
+  )
+  if (report) checkNativeLaunch(report, sidecars.quietHost, position, assembly, state)
+  const part = await reconcileFiles({
+    ...state.input,
+    report: file,
+    artifacts: sidecars,
+    capturedFiles: await readCapturedSources(sidecars.sourceCapture, state.input.root),
+    trialRoot: path.dirname(file.path),
+    shard: true,
+  })
+  assembly.parts.push(part)
+  mergeProductionShard(part, position, state)
+}
+function checkNativeLaunch(
+  report: v.InferOutput<typeof nativeReport>,
+  quiet: TimingArtifact | null,
+  position: number,
+  assembly: NativeShardAssembly,
+  state: State,
+) {
+  checkNativeShardIdentity(
+    report,
+    position,
+    assembly.plan,
+    assembly.planSha256,
+    assembly.launches,
+    state,
+  )
+  if (report.shard) assembly.declared.push(`${report.shard.workload}/${report.shard.pair}`)
+  const host = quiet
+    ? parse(quietHostArtifact, observedJson(quiet.contents), `shards.${position}.quietHost`, state)
+    : null
+  const current = {
+    ...nativeCohort(report),
+    osRelease: host?.osRelease,
+    memoryBytes: host?.memoryBytes,
+    executablePath: host?.nativeInvocation?.executablePath,
+  }
+  assembly.cohort ??= current
+  same(state, `shards.${position}.cohort`, current, assembly.cohort)
+  const runtime = assembly.plan?.metadata.qualification.runtime
+  same(
+    state,
+    `shards.${position}.runtime`,
+    [report.metadata.platform, report.metadata.architecture, report.metadata.runtime],
+    [runtime?.platform, runtime?.architecture, runtime ? `node v${runtime.node}` : undefined],
+  )
+  const span = launchInterval(report.metadata, `shards.${position}`, state)
+  if (span.start < assembly.previousEnd)
+    finding(
+      state,
+      `shards.${position}.interval`,
+      'mismatch',
+      'Native launch intervals must advance without overlap.',
+    )
+  assembly.previousEnd = span.end
+}
+function nativeCohort(report: v.InferOutput<typeof nativeReport>) {
+  const { host, hardware, platform, architecture, runtime, launchPreparation } = report.metadata
+  return {
+    host,
+    hardware,
+    platform,
+    architecture,
+    runtime,
+    policy: launchPreparation?.policy,
+    realm: launchPreparation?.realm,
+    sessions: launchPreparation?.sessions,
+    gc: launchPreparation?.gc,
+  }
+}
+function launchInterval(
+  span: { startedAt: string; finishedAt: string },
+  prefix: string,
+  state: State,
+) {
+  const start = Date.parse(span.startedAt)
+  const end = Date.parse(span.finishedAt)
+  if (!(start < end) || end - start > 110 * 60 * 1000)
+    finding(
+      state,
+      `${prefix}.deadline`,
+      'mismatch',
+      'Each original launch must finish inside the110-minute capture bound.',
+    )
+  return { start, end }
+}
+function checkNativeCapturePlan(plan: v.InferOutput<typeof nativeCapturePlan>, state: State) {
+  checkFreeze(state)
+  same(state, 'plan.purpose', plan.purpose, 'qualification')
+  same(state, 'plan.shards', plan.shards, nativeShardSelections(state.input.frozen.nativeWorkloads))
+  const identity = state.input.frozen.identity
+  for (const key of [
+    'candidateCommit',
+    'lockfileSha256',
+    'budgetSha256',
+    'grammarSha256',
+    'chatGrammarSha256',
+    'resolverSha256',
+    'workloadManifestSha256',
+  ] as const)
+    same(state, `plan.metadata.${key}`, plan.metadata[key], identity[key])
+  same(
+    state,
+    'plan.metadata.candidateSourceSha256',
+    plan.metadata.candidateSourceSha256,
+    sha(JSON.stringify(plan.metadata.sourceFiles)),
+  )
+  const qualification = parse(
+    sourceCaptureArtifact.entries.provenance,
+    plan.metadata.qualification,
+    'plan.metadata.qualification',
+    state,
+  )
+  if (!qualification) return
+  for (const [key, value] of Object.entries(state.input.frozen.provenance))
+    same(state, `plan.metadata.qualification.${key}`, field(qualification, key), value)
+  same(
+    state,
+    'plan.metadata.qualification.sources',
+    sha(JSON.stringify(qualification.sources)),
+    qualification.sourceClosureSha256,
+  )
+  for (const file of plan.metadata.sourceFiles)
+    same(
+      state,
+      `plan.metadata.sourceFiles.${file.path}`,
+      qualification.sources.find((row) => row.file === file.path)?.sha256,
+      file.sha256,
+    )
+}
+function checkNativeShardIdentity(
+  report: v.InferOutput<typeof nativeReport>,
+  position: number,
+  plan: v.InferOutput<typeof nativeCapturePlan> | null,
+  planSha256: string,
+  launches: Set<string>,
+  state: State,
+) {
+  const shard = report.shard
+  if (!shard) {
+    finding(
+      state,
+      `shards.${position}.shard`,
+      'missing',
+      'Each original launch requires its planned native selection.',
+    )
+    return
+  }
+  same(state, `shards.${position}.index`, shard.index, position)
+  same(
+    state,
+    `shards.${position}.selection`,
+    { workload: shard.workload, pair: shard.pair },
+    plan?.shards[position],
+  )
+  same(state, `shards.${position}.planSha256`, shard.planSha256, planSha256)
+  const metadata = parse(
+    nativePlanMetadata,
+    Object.fromEntries(
+      Object.keys(nativePlanMetadata.entries).map((key) => [key, field(report.metadata, key)]),
+    ),
+    `shards.${position}.metadata`,
+    state,
+  )
+  same(state, `shards.${position}.metadata`, metadata, plan?.metadata)
+  if (launches.has(shard.launchId))
+    finding(
+      state,
+      `shards.${position}.launchId`,
+      'mismatch',
+      'Native launches require unique actual launch identities.',
+    )
+  launches.add(shard.launchId)
+}
+function nativeShardComparisons(
+  selection: v.InferOutput<typeof productionShard>,
+  seed: number,
+  state: State,
+) {
+  if (selection.pair < 0) return
+  for (const metric of ['updateP95', 'settlementP95', 'mountP95', 'streamCpu'] as const) {
+    const vector = metricPair(state.samples, selection.pair, metric)
+    state.comparisons.push({
+      ...pairedConfidence({
+        workload: selection.workload,
+        metric,
+        seed,
+        resamples: 4096,
+        baseline: vector ? [vector.baseline] : [],
+        candidate: vector ? [vector.candidate] : [],
+      }),
+      domain: 'native',
+      build: 'source',
+    })
+  }
+}
+async function reconcileNativePreparation(
+  report: v.InferOutput<typeof nativeReport>,
+  state: State,
+) {
+  const { initialization, launchPreparation, seed } = report.metadata
+  if (!initialization || !launchPreparation) {
+    finding(
+      state,
+      'native.preparation',
+      'missing',
+      'Each native shard requires actual initialization and full-workload preparation records.',
+    )
+    return
+  }
+  const start = Date.parse(report.metadata.startedAt)
+  const end = Date.parse(report.metadata.finishedAt)
+  const initStart = Date.parse(initialization.startedAt)
+  const initEnd = Date.parse(initialization.finishedAt)
+  const prepStart = Date.parse(launchPreparation.startedAt)
+  const prepEnd = Date.parse(launchPreparation.finishedAt)
+  if (
+    !(
+      start <= initStart &&
+      initStart <= initEnd &&
+      initEnd <= prepStart &&
+      prepStart < prepEnd &&
+      prepEnd <= end
+    )
+  )
+    finding(
+      state,
+      'native.preparation.interval',
+      'mismatch',
+      'Initialization and preparation must occur inside this original launch before its counted pair.',
+    )
+  same(state, 'native.preparation.orderSeed', launchPreparation.orderSeed, seed)
+  const workload = state.input.frozen.nativeWorkloads.find(
+    (row) => row.id === report.shard?.workload,
+  )
+  if (!workload) return
+  const reference = launchPreparation.artifact
+  const directory = path.dirname(state.input.report.path)
+  const actual = await hashFile({
+    root: state.input.root,
+    file: path.resolve(directory, reference.path),
+  })
+  state.observedArtifacts.push({ ...actual, path: path.resolve(state.input.root, actual.path) })
+  let mismatchedPairs = 0
+  await foldJsonl({
+    root: state.input.root,
+    file: actual.path,
+    expected: { ...reference, path: actual.path },
+    parse: (value) =>
+      v.parse(
+        v.object({
+          role: v.literal('launch-preparation'),
+          preparation: count,
+          workload: label,
+          pair: nativePair,
+        }),
+        value,
+      ),
+    consume: (row, index) => {
+      same(
+        state,
+        `native.preparation.${index}.identity`,
+        [row.workload, row.preparation, row.pair.trial],
+        [workload.id, index, index],
+      )
+      mismatchedPairs += Number(nativePairHasMismatches(row.pair))
+      reconcileNativePair(row.pair, workload, seed, state, true)
+    },
+  })
+  same(state, 'native.preparation.recordCount', reference.recordCount, 3)
+  same(
+    state,
+    'native.preparation.mismatchedPairs',
+    launchPreparation.mismatchedPairs,
+    mismatchedPairs,
+  )
+  same(state, 'native.preparation.correctness', mismatchedPairs, 0)
+}
+
 async function reconcileNative(raw: unknown, state: State) {
   preserveFailures(raw, state)
   const report = parse(nativeReport, raw, 'report', state)
   if (!report) return
   checkFreeze(state)
   const metadata = report.metadata
-  checkNativeSourceCapture(metadata, state)
+  checkSourceCapture(metadata, state)
   const expected = state.input.frozen.identity
   for (const name of [
     'candidateCommit',
@@ -1728,7 +2581,32 @@ async function reconcileNative(raw: unknown, state: State) {
     )
       state.metrics.quietHostEstablished = null
   }
-  const workloads = state.input.frozen.nativeWorkloads
+  const frozenWorkloads = state.input.frozen.nativeWorkloads
+  const selection = state.input.shard ? report.shard : undefined
+  if (state.input.shard && !selection)
+    finding(
+      state,
+      'native.shard',
+      'missing',
+      'An indexed native launch requires its original shard identity.',
+    )
+  const workloads = selection
+    ? frozenWorkloads.filter((row) => row.id === selection.workload)
+    : frozenWorkloads
+  if (selection) {
+    try {
+      await reconcileNativePreparation(report, state)
+    } catch (error) {
+      finding(
+        state,
+        'native.preparation',
+        'mismatch',
+        error instanceof Error
+          ? error.message
+          : 'Preparation artifact could not be read completely.',
+      )
+    }
+  }
   same(
     state,
     'native.workloadIds',
@@ -1741,7 +2619,7 @@ async function reconcileNative(raw: unknown, state: State) {
     metadata.workloadManifestSha256,
     sha(
       JSON.stringify(
-        workloads.map(({ source, revisions, ...entry }) => ({
+        frozenWorkloads.map(({ source, revisions, ...entry }) => ({
           ...entry,
           sourceSha256: sha(source),
           revisionSourceSha256: revisions?.map(sha) ?? [],
@@ -1760,7 +2638,9 @@ async function reconcileNative(raw: unknown, state: State) {
       [sha(workload.source), workload.sourceBytes, workload.scheduleUnits, workload.family],
     )
   }
-  const trialIds = [-1, -2, -3].concat(Array.from({ length: 20 }, (_, trial) => trial))
+  const trialIds = selection
+    ? [selection.pair]
+    : [-1, -2, -3].concat(Array.from({ length: 20 }, (_, trial) => trial))
   const keys: string[] = []
   let observedWarmups = 0
   await foldTimingRecords(report.pairsArtifact, nativePairRecord, state, (record, index) => {
@@ -1793,11 +2673,13 @@ async function reconcileNative(raw: unknown, state: State) {
     same(state, `${row.id}.observedPairs`, row.observedPairs, observed?.observed ?? 0)
     same(state, `${row.id}.mismatchedPairs`, row.mismatchedPairs, observed?.mismatched ?? 0)
   }
-  compareSamples(
-    workloads.map((row) => row.id),
-    metadata.seed,
-    state,
-  )
+  if (selection) nativeShardComparisons(selection, metadata.seed, state)
+  else
+    compareSamples(
+      workloads.map((row) => row.id),
+      metadata.seed,
+      state,
+    )
   reconcileReportedComparisons(
     { comparisons: report.workloads.flatMap((row) => row.comparisons) },
     state,
@@ -1830,6 +2712,7 @@ function reconcileNativePair(
   workload: NativePairWorkload,
   seed: number,
   state: State,
+  preparation = false,
 ) {
   same(
     state,
@@ -1837,7 +2720,7 @@ function reconcileNativePair(
     pair.order,
     pair.trial < 0
       ? pairedTrialOrders(3, seed)[-pair.trial - 1]
-      : pairedTrialOrders(20, seed)[pair.trial],
+      : pairedTrialOrders(preparation ? 3 : 20, seed)[pair.trial],
   )
   const expectedRevisions = nativeExpectedRevisions(workload)
   same(
@@ -1859,10 +2742,15 @@ function reconcileNativePair(
     pair.remark.revisions.map((tick) => tick.outputDigest),
     pair.candidate.revisions.map((tick) => tick.outputDigest),
   )
+  if (preparation) {
+    checkNativeTrial(workload.id, pair.trial, pair.remark, 'remark', state)
+    checkNativeTrial(workload.id, pair.trial, pair.candidate, 'tree-sitter', state)
+    return
+  }
   nativeSample(workload.id, pair.trial, pair.remark, 'remark', state)
   nativeSample(workload.id, pair.trial, pair.candidate, 'tree-sitter', state)
 }
-function nativeSample(
+function checkNativeTrial(
   workload: string,
   pair: number,
   trial: v.InferOutput<typeof nativeTrial>,
@@ -1882,6 +2770,15 @@ function nativeSample(
       'failure',
       'Native revision contains raw source-coordinate failures.',
     )
+}
+function nativeSample(
+  workload: string,
+  pair: number,
+  trial: v.InferOutput<typeof nativeTrial>,
+  expectedEngine: 'remark' | 'tree-sitter',
+  state: State,
+) {
+  checkNativeTrial(workload, pair, trial, expectedEngine, state)
   state.samples.push({
     workload,
     pair,
@@ -1989,6 +2886,14 @@ function reconcileReportedExclusions(
   same(state, `${observed.workload}.${observed.metric}.excludedPairs`, actual, expected)
 }
 
+function invocationOption(argv: readonly string[], name: string) {
+  return argv.flatMap((value, index) => {
+    if (value === name) return [argv[index + 1]]
+    if (value.startsWith(`${name}=`)) return [value.slice(name.length + 1)]
+    return []
+  })
+}
+
 function checkNativeInvocation(
   invocation: v.InferOutput<typeof nativeInvocation> | undefined,
   runtime: string,
@@ -2004,8 +2909,36 @@ function checkNativeInvocation(
     return
   }
   same(state, 'native.invocation.runtime', invocation.runtime, runtime)
-  same(state, 'native.invocation.reportPath', invocation.reportPath, state.input.report.path)
+  same(
+    state,
+    'native.invocation.reportPath',
+    invocation.reportPath,
+    path.relative(state.input.root, state.input.report.path).split(path.sep).join('/'),
+  )
   same(state, 'native.invocation.executable', invocation.argv[0], invocation.executablePath)
+  if (state.input.shard) {
+    const plans = invocationOption(invocation.argv, '--capture-plan')
+    if (plans.length !== 1 || !plans[0] || plans[0].startsWith('--'))
+      finding(
+        state,
+        'native.invocation.capturePlan',
+        'mismatch',
+        'An original native shard invocation must name exactly one capture plan.',
+      )
+    const raw = observedJson(state.input.report.contents)
+    const selected = parse(productionShard, field(raw, 'shard'), 'native.invocation.shard', state)
+    if (selected) {
+      same(
+        state,
+        'native.invocation.selectionIndex',
+        invocationOption(invocation.argv, '--selection-index'),
+        [String(selected.index)],
+      )
+      same(state, 'native.invocation.launchId', invocationOption(invocation.argv, '--launch-id'), [
+        selected.launchId,
+      ])
+    }
+  }
   const profiling = /--(?:cpu-prof|heap-prof|prof|inspect|debug|coverage|preload|require|import)/u
   if (
     invocation.argv.some((arg) => profiling.test(arg)) ||
@@ -2027,7 +2960,7 @@ function checkNativeInvocation(
     )
 }
 
-const sourceCaptureArtifact = v.object({
+export const sourceCaptureArtifact = v.object({
   reportSha256: digest,
   sourceRoot: label,
   provenance: v.object({
@@ -2063,9 +2996,10 @@ function sourceCapturePaths(
       ].map((entry) => ({ path: path.resolve(directory, entry.file), sha256: entry.sha256 })),
     )
 }
-function checkNativeSourceCapture(
-  metadata: v.InferOutput<typeof nativeReport>['metadata'],
+function checkSourceCapture(
+  metadata: Pick<v.InferOutput<typeof nativeReport>['metadata'], 'sourceFiles'>,
   state: State,
+  native = true,
 ) {
   const capture = artifact(sourceCaptureArtifact, 'sourceCapture', state)
   if (!capture) return
@@ -2110,7 +3044,7 @@ function checkNativeSourceCapture(
       'Full source manifest must have unique relative source identities.',
     )
   same(state, 'sourceCapture.sources.order', names, names.toSorted())
-  if (metadata.sourceFiles.length === 0)
+  if (native && metadata.sourceFiles.length === 0)
     finding(
       state,
       'sourceCapture.native.sourceFiles',
@@ -2178,7 +3112,15 @@ async function readCapturedSources(
   return captured
 }
 
-const reconciliationManifest = v.object(timingLaunchManifest.entries)
+const reconciliationManifest = v.variant('schemaVersion', [
+  timingLaunchManifest,
+  v.strictObject({
+    schemaVersion: v.literal(2),
+    kind: v.picklist(['production', 'native']),
+    report: label,
+    frozen: label,
+  }),
+])
 const frozenTimingIdentity = v.object({
   identity: v.object({
     candidateCommit: v.pipe(label, v.regex(/^[a-f0-9]{40}$/u)),
@@ -2208,7 +3150,10 @@ export async function reconcileTimingManifest(options: {
   const directory = path.dirname(manifestArtifact.path)
   const frozenArtifact = await readTimingFile(path.resolve(directory, manifest.frozen), root)
   const frozen = v.parse(frozenTimingIdentity, JSON.parse(frozenArtifact.contents))
-  const artifacts = await readTimingSidecars(manifest.artifacts, directory, root)
+  const artifacts =
+    manifest.schemaVersion === 1
+      ? await readTimingSidecars(manifest.artifacts, directory, root)
+      : emptyTimingSidecars()
   const input: TimingReconciliationInput = {
     root,
     capturedFiles: await readCapturedSources(artifacts.sourceCapture, root),
@@ -2221,6 +3166,11 @@ export async function reconcileTimingManifest(options: {
     },
     artifacts,
   }
+  if (
+    manifest.schemaVersion === 2 &&
+    field(observedJson(input.report.contents), 'kind') !== `${manifest.kind}-shards`
+  )
+    throw createScriptError('A shard reconciliation manifest requires its original shard index.')
   const computed = await reconcileFiles(input)
   const result = {
     ...computed,
@@ -2249,7 +3199,7 @@ async function readOptionalTimingFile(filename: string | null, directory: string
   }
 }
 async function readTimingSidecars(
-  files: v.InferOutput<typeof reconciliationManifest>['artifacts'],
+  files: v.InferOutput<typeof timingSidecarFiles>,
   directory: string,
   root: string,
 ): Promise<TimingReconciliationInput['artifacts']> {
@@ -2361,13 +3311,14 @@ async function verifyCapturedFile(
 }
 if (import.meta.main) {
   const { values } = parseArgs({
-    options: { manifest: { type: 'string' }, out: { type: 'string' } },
+    options: { manifest: { type: 'string' }, out: { type: 'string' }, root: { type: 'string' } },
   })
   if (!values.manifest || !values.out)
     throw new Error('Use --manifest FILE --out timing-reconciliation.json')
   const result = await reconcileTimingManifest({
     manifestPath: values.manifest,
     outputPath: values.out,
+    evidenceRoot: values.root,
   })
   process.stdout.write(
     JSON.stringify({
