@@ -6,6 +6,7 @@ import { afterEach, expect, test } from 'vitest'
 import { createMarkdownSession } from '../../packages/markdown/src/utils/session'
 import {
   captureNativeResourceAssets,
+  planResourceWindows,
   resourceSession,
   summarizeResourceWindows,
   summarizeNativeResources,
@@ -76,6 +77,28 @@ function row(window: number, bytes: number, wasm: number): ResourceWindow {
     clearedProjectionEntries: 60,
   }
 }
+
+test('every native window record exists before measurement, in the alternating engine schedule', () => {
+  const rows = planResourceWindows(4)
+  const scale = [
+    'remark/0',
+    'tree-sitter/0',
+    'tree-sitter/1',
+    'remark/1',
+    'remark/2',
+    'tree-sitter/2',
+    'tree-sitter/3',
+    'remark/3',
+  ]
+  expect(rows.map(({ engine, cycles, window }) => `${engine}/${window}@${cycles}`)).toEqual(
+    [20, 100, 500].flatMap((cycles) => scale.map((entry) => `${entry}@${cycles}`)),
+  )
+  expect(new Set(rows.flatMap((entry) => [entry.before, entry.after])).size).toBe(48)
+  expect(new Set(rows.flatMap((entry) => [entry.outputFailures, entry.cleanupFailures])).size).toBe(
+    48,
+  )
+  expect(rows.every((entry) => !entry.before.gcPerformed && !entry.after.gcPerformed)).toBe(true)
+})
 
 test('resource summaries retain actual growth and distinguish allocator reuse from qualification', () => {
   const growing = summarizeResourceWindows([row(0, 100, 64), row(1, 120, 128), row(2, 180, 192)])[0]
