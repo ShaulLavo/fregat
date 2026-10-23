@@ -14,6 +14,7 @@ import {
 import frozenBudget from './promotion-budget.json'
 import type { PromotionComparison, PromotionEvidence } from './promotion'
 import { stable } from './serialization'
+import { timingLaunchManifest } from './production-shards'
 import { foldJsonl, hashFile, type ArtifactRef } from './timing-artifacts'
 import {
   productionOracleSchema,
@@ -2177,22 +2178,7 @@ async function readCapturedSources(
   return captured
 }
 
-const reconciliationManifest = v.object({
-  schemaVersion: v.literal(1),
-  kind: v.picklist(['production', 'native']),
-  report: label,
-  frozen: label,
-  artifacts: v.object({
-    host: v.nullable(label),
-    quietHost: v.nullable(label),
-    build: v.nullable(label),
-    buildManifest: v.nullable(label),
-    browser: v.nullable(label),
-    fonts: v.nullable(label),
-    trials: label,
-    sourceCapture: v.nullable(label),
-  }),
-})
+const reconciliationManifest = v.object(timingLaunchManifest.entries)
 const frozenTimingIdentity = v.object({
   identity: v.object({
     candidateCommit: v.pipe(label, v.regex(/^[a-f0-9]{40}$/u)),
