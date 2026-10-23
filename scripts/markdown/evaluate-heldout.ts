@@ -6,7 +6,6 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
-import { gunzipSync } from 'node:zlib'
 import {
   array,
   boolean,
@@ -48,6 +47,7 @@ import {
   evaluationBatchSchema as batchSchema,
   evaluationManifestSchema as manifestSchema,
   requireEvaluationCustody,
+  readDisjointEvaluationBatch,
 } from './evaluation-custody'
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
@@ -905,7 +905,7 @@ async function trustedLedger(
   report: HeldoutReport,
   bytes: Uint8Array,
 ) {
-  await requireEvaluationCustody({
+  const registration = await requireEvaluationCustody({
     ...input,
     batch: report.batch,
     manifestSha256: report.manifestSha256,
@@ -944,6 +944,7 @@ async function trustedLedger(
     throw createScriptError('The current evaluation manifest differs from its frozen receipt.', {
       internal: { boundary: 'trusted-evaluation-manifest' },
     })
+  await readDisjointEvaluationBatch(input.root, registration)
   return ledger
 }
 
@@ -1275,7 +1276,7 @@ async function main() {
     throw createScriptError('Choose a complete batch from the frozen manifest.', {
       internal: { boundary: 'evaluation-batch' },
     })
-  await requireEvaluationCustody({
+  const registration = await requireEvaluationCustody({
     root: ROOT,
     batch,
     manifestSha256: hash('sha256', manifestBytes),
@@ -1300,17 +1301,11 @@ async function main() {
   let browserInputSha256 = ''
   let fatal: string | null = null
   try {
-    const compressed = await readFile(path.join(path.dirname(manifestFile), batch.file))
-    if (hash('sha256', compressed) !== batch.assetSha256)
-      throw createScriptError('The sealed batch asset differs from its frozen digest.', {
-        internal: { boundary: 'evaluation-asset' },
-      })
-    const bytes = gunzipSync(compressed)
-    if (hash('sha256', bytes) !== batch.uncompressedSha256)
-      throw createScriptError('The opened batch differs from its frozen payload digest.', {
-        internal: { boundary: 'evaluation-payload' },
-      })
-    const messages = validateEvaluationMessages(JSON.parse(bytes.toString('utf8')), manifest, batch)
+    const messages = validateEvaluationMessages(
+      await readDisjointEvaluationBatch(ROOT, registration),
+      manifest,
+      batch,
+    )
     const inputBytes = encoded(browserInput(messages, frozen, batch))
     browserInputSha256 = hash('sha256', inputBytes)
     await writeFile(path.join(output, 'browser-input.json'), inputBytes, { flag: 'wx' })

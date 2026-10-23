@@ -1,3 +1,4 @@
+import { DEVELOPMENT_POLICY_SHA256 } from './development-exclusions'
 import { hash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -61,6 +62,7 @@ function fixture() {
     exclusions,
     exclusionsSha256: digest(encoded(exclusions)),
     freeze: {
+      developmentPolicySha256: DEVELOPMENT_POLICY_SHA256,
       curator: 'synthetic-control',
       custodyStartedAt: time,
       ledgerDirectory: path.resolve(tmpdir(), 'synthetic-exposures'),
@@ -155,6 +157,11 @@ test('actual sibling inventory gates access and pins ledger, selector and licens
   const directory = path.join(root, 'packages/markdown/test/evaluation')
   await mkdir(directory, { recursive: true })
   await mkdir(path.join(root, 'scripts/markdown'), { recursive: true })
+  for (const name of ['development-exclusions.ts', 'development-exclusion-policy.json'])
+    await writeFile(
+      path.join(root, 'scripts/markdown', name),
+      await readFile(new URL(name, import.meta.url)),
+    )
   const { manifest, inventory, registration, batch } = fixture()
   const manifestBytes = encoded(manifest)
   await writeFile(path.join(directory, 'manifest.json'), manifestBytes)
@@ -220,4 +227,106 @@ test('committed quarantine preserves every original batch identity and all 300 l
   expect(legacy.map((record) => record.batch)).toEqual(manifest.batches.slice(0, 3))
   expect(new Set(legacy.flatMap((record) => record.batch.sourceSha256)).size).toBe(300)
   expect(legacy.every((record) => record.eligible === false)).toBe(true)
+})
+
+test('partial exact hashes require reviewed coverage and retain unresolved-source refusal', () => {
+  const { registration, inventory, manifest } = fixture()
+  const exclusions = {
+    ...registration.exclusions,
+    complete: false,
+    conservativeCoverage: { reviewEvidenceSha256: digest('review'), unresolvedSources: [] },
+  }
+  const record = { ...registration, exclusions, exclusionsSha256: digest(encoded(exclusions)) }
+  expect(
+    validateCustodyInventory({ ...inventory, records: [record] }, manifest).records[0],
+  ).toMatchObject({ exclusions: { complete: false } })
+  const unresolved = {
+    ...exclusions,
+    conservativeCoverage: {
+      ...exclusions.conservativeCoverage,
+      unresolvedSources: ['earlier-warmup-controls'],
+    },
+  }
+  expect(() =>
+    validateCustodyInventory(
+      {
+        ...inventory,
+        records: [
+          { ...record, exclusions: unresolved, exclusionsSha256: digest(encoded(unresolved)) },
+        ],
+      },
+      manifest,
+    ),
+  ).toThrow()
+  expect(() =>
+    validateCustodyInventory(
+      {
+        ...inventory,
+        records: [{ ...record, exclusions: { ...exclusions, conservativeCoverage: undefined } }],
+      },
+      manifest,
+    ),
+  ).toThrow()
+  expect(() =>
+    validateCustodyInventory(
+      {
+        ...inventory,
+        records: [
+          {
+            ...registration,
+            freeze: { ...registration.freeze, developmentPolicySha256: digest('changed policy') },
+          },
+        ],
+      },
+      manifest,
+    ),
+  ).toThrow()
+})
+
+test('downstream batch decoding verifies complete ordered sources and rejects policy overlap', async () => {
+  const { readDisjointEvaluationBatch } = await import('./evaluation-custody')
+  const root = await mkdtemp(path.join(tmpdir(), 'markdown-disjoint-control-'))
+  temporary.add(root)
+  const directory = path.join(root, 'packages/markdown/test/evaluation')
+  await mkdir(directory, { recursive: true })
+  const { registration } = fixture()
+  const sources = Array.from({ length: 100 }, (_, index) => `Independent **source ${index}**.`)
+  const record = { ...registration, batch: { ...registration.batch } }
+  const writeBatch = async (values: readonly string[]) => {
+    const payload = encoded(values.map((source) => ({ source })))
+    const bytes = gzipSync(payload)
+    record.batch = {
+      ...record.batch,
+      sourceSha256: values.map(digest),
+      assetSha256: hash('sha256', bytes),
+      uncompressedSha256: digest(payload),
+    }
+    await writeFile(path.join(directory, record.batch.file), bytes)
+  }
+  await writeBatch(sources)
+  await expect(readDisjointEvaluationBatch(root, record)).resolves.toHaveLength(100)
+  await expect(
+    readDisjointEvaluationBatch(root, {
+      ...record,
+      batch: { ...record.batch, sourceSha256: record.batch.sourceSha256.toReversed() },
+    }),
+  ).rejects.toThrow()
+  await expect(
+    readDisjointEvaluationBatch(root, {
+      ...record,
+      batch: { ...record.batch, assetSha256: digest('changed') },
+    }),
+  ).rejects.toThrow()
+  await expect(
+    readDisjointEvaluationBatch(root, {
+      ...record,
+      batch: { ...record.batch, uncompressedSha256: digest('changed') },
+    }),
+  ).rejects.toThrow()
+  await writeBatch(sources.slice(1))
+  await expect(readDisjointEvaluationBatch(root, record)).rejects.toThrow()
+  await writeBatch(['See [the log](unknown-runtime).'].concat(sources.slice(1)))
+  await expect(readDisjointEvaluationBatch(root, record)).rejects.toThrow()
+  await writeBatch(['development'].concat(sources.slice(1)))
+  await expect(readDisjointEvaluationBatch(root, record)).rejects.toThrow()
 })
