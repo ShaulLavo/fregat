@@ -76,7 +76,6 @@ export function selectEvaluationMessages(raw: string, excluded: ReadonlySet<stri
       })
     ids.add(message.message_id)
     if (seen.has(sha256)) continue
-    seen.add(sha256)
     candidates.push({
       priority: hash('sha256', `fregat-chat-evaluation-v1:${message.message_id}`, 'hex'),
       row: {
@@ -90,7 +89,13 @@ export function selectEvaluationMessages(raw: string, excluded: ReadonlySet<stri
     })
   }
   candidates.sort((left, right) => left.priority.localeCompare(right.priority))
-  return candidates.map((candidate) => candidate.row)
+  const selected = []
+  for (const { row } of candidates) {
+    if (seen.has(row.sha256)) continue
+    seen.add(row.sha256)
+    selected.push(row)
+  }
+  return selected
 }
 
 export async function curateEvaluationSnapshot(input: {
@@ -251,7 +256,7 @@ async function requireUnusedOutput(output: string) {
     })
 }
 
-async function builtInExclusions() {
+export async function builtInExclusions() {
   const excluded = new Set(commonmark.concat(gfm).map((example) => hash('sha256', example.source)))
   for (const source of chat) excluded.add(hash('sha256', source))
   for (const fixture of MARKDOWN_CASES) excluded.add(fixture.sha256)
