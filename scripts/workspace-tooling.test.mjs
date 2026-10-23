@@ -73,7 +73,7 @@ async function prepare({ root, put }) {
   await put('.', {
     name: 'fixture',
     private: true,
-    packageManager: 'bun@1.4.2',
+    packageManager: 'bun@1.4.4',
     workspaces: {
       packages: [
         'apps/*',
@@ -141,13 +141,13 @@ test('rejects and synchronizes tool versions, Bun pins and standalone catalog dr
     const failed = run(fixture.root)
     expect(failed.status).not.toBe(0)
     expect(failed.stderr).toContain('typescript must be 7.0.2')
-    expect(failed.stderr).toContain('packageManager must be bun@1.4.2')
+    expect(failed.stderr).toContain('packageManager must be bun@1.4.4')
     expect(failed.stderr).toContain('catalog vitest must be 5.0.2')
     expect(run(fixture.root, '--write').status).toBe(0)
     expect(run(fixture.root).status).toBe(0)
     const manifest = await fixture.read('editor')
     expect(manifest.devDependencies.typescript).toBe('7.0.2')
-    expect(manifest.packageManager).toBe('bun@1.4.2')
+    expect(manifest.packageManager).toBe('bun@1.4.4')
     expect(manifest.workspaces.catalog.vitest).toBe('5.0.2')
   })
 })

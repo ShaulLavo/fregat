@@ -412,7 +412,7 @@ process.exit(status)
           raw.includes(`error: GET ${url} - 503`),
         raw,
       ).toBe(true)
-    if (mode === 'persistent') expect(raw).toMatch(/^\[[0-9]+\.[0-9][0-9]ms\] done$/m)
+    if (mode === 'persistent') expect(raw).toMatch(/^\[[0-9]+\.[0-9][0-9](ms|s)\] done$/m)
     expect(scriptsAtRecovery).toBe('')
     expect(readFileSync(scriptLog, 'utf8')).toBe('good\nroot\n')
     const preparationCounts = { healthy: 1, persistent: 3, cold: 2, workspace: 2, warm: 1 }
@@ -553,14 +553,15 @@ const cachedFailure = [
   '[657.00ms] done',
 ].join('\n')
 
-test.skipIf(!supported)(
-  'continues preparation after the observed cached partial-install failure',
-  () => {
-    const result = runInstall({ output: cachedFailure, firstOutput: download, failures: 2 })
+test.skipIf(!supported).each(['657.00ms', '1.59s'])(
+  'continues preparation after a cached partial-install failure lasting %s',
+  (duration) => {
+    const output = cachedFailure.replace('657.00ms', duration)
+    const result = runInstall({ output, firstOutput: download, failures: 2 })
     expect(result.status, result.output).toBe(0)
     expect(result.calls).toHaveLength(4)
     expect(result.sleeps).toEqual(['2', '4'])
-    expect(result.output).toContain('[657.00ms] done')
+    expect(result.output).toContain(`[${duration}] done`)
   },
 )
 
