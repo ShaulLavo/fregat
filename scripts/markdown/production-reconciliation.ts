@@ -19,6 +19,7 @@ import {
   productionOracleSchema,
   productionOracleIdentitySchema,
   reconcileProductionOracles,
+  type ProductionInput,
 } from './production-oracle'
 import { createScriptError } from '../structured-errors'
 import { BENCHMARK_FAMILIES, fixedChunks } from './workloads'
@@ -255,10 +256,6 @@ export const productionTrial = v.object({
   network: v.nullable(v.array(network)),
 })
 type ProductionRow = v.InferOutput<typeof productionTrial>
-type ProductionInput = Pick<
-  ProductionRow['receipt']['processed'][number],
-  'inputSha256' | 'inputUtf16Units'
->
 const hostObservation = v.object({
   observedAt: label,
   loadAverage: v.pipe(v.array(nonnegative), v.length(3)),
@@ -988,7 +985,6 @@ async function reconcileProductionRows(
   const oraclePaths = new Set<string>()
   let pending: ProductionRow | null = null
   let currentWorkload: ProductionWorkload | undefined
-  let inputs: readonly string[] = []
   let expectedInputs: readonly ProductionInput[] = []
   let measured = 0
   await foldTimingRecords(report.trialsArtifact, productionTrial, state, async (row, index) => {
@@ -1017,8 +1013,7 @@ async function reconcileProductionRows(
     if (!workload) return
     if (currentWorkload !== workload) {
       currentWorkload = workload
-      inputs = productionUpdates(workload).concat([workload.source])
-      expectedInputs = inputs.map(productionInput)
+      expectedInputs = productionUpdates(workload).concat([workload.source]).map(productionInput)
     }
     reconcileProductionRow(row, workload, expectedInputs, fonts, state)
     if (row.pair >= 0) {
@@ -1037,7 +1032,7 @@ async function reconcileProductionRows(
         [pending.workload, pending.pair, pending.order],
         [row.workload, row.pair, row.order],
       )
-      await reconcileOraclePair(pending, row, inputs, state)
+      await reconcileOraclePair(pending, row, expectedInputs, state)
       pending = null
       return
     }
@@ -1062,7 +1057,7 @@ async function reconcileProductionRows(
 async function reconcileOraclePair(
   first: ProductionRow,
   second: ProductionRow,
-  inputs: readonly string[],
+  inputs: readonly ProductionInput[],
   state: State,
 ) {
   try {

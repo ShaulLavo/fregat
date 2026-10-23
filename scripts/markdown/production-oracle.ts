@@ -12,6 +12,8 @@ import type {
 import { foldJsonl, writeJsonl, type RawTimingRef } from './timing-artifacts'
 import { createScriptError } from '../structured-errors'
 
+export type ProductionInput = Pick<ProductionMarkdownFrame, 'inputSha256' | 'inputUtf16Units'>
+
 export type ProductionOracleRecord = Parameters<ProductionOracleSink>[0]
 
 export type ProductionOracleIdentity = {
@@ -261,7 +263,7 @@ export async function reconcileProductionOracles(options: {
   readonly root: string
   readonly first: OracleArm
   readonly second: OracleArm
-  readonly inputs: readonly string[]
+  readonly inputs: readonly ProductionInput[]
 }): Promise<readonly RawTimingRef[]> {
   const artifacts: RawTimingRef[] = []
   const first = recordsFromFile(options.root, options.first, artifacts)
@@ -377,7 +379,7 @@ async function writeWitness(root: string, file: string, witness: CapturedWitness
 function checkRecord(
   record: ProductionOracleRecord,
   arm: OracleArm,
-  inputs: readonly string[],
+  inputs: readonly ProductionInput[],
   index: number,
 ) {
   const expectedKind = recordKind(index, inputs.length)
@@ -389,8 +391,8 @@ function checkRecord(
   const input = inputs[Math.min(index, inputs.length - 1)]
   if (
     input === undefined ||
-    record.frame.inputSha256 !== hash(input) ||
-    record.frame.inputUtf16Units !== input.length
+    record.frame.inputSha256 !== input.inputSha256 ||
+    record.frame.inputUtf16Units !== input.inputUtf16Units
   )
     throw invalid('input differs from frozen schedule', index)
   const actual = record.frame.paintedOutput

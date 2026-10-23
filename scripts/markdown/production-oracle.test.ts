@@ -41,6 +41,12 @@ function frame(text: string, revision: number): ProductionMarkdownFrame {
     paintedOutput: output,
   }
 }
+function inputIdentities(sources: readonly string[]) {
+  return sources.map((source) => ({
+    inputSha256: hash(source),
+    inputUtf16Units: source.length,
+  }))
+}
 function hash(value: string) {
   return createHash('sha256').update(value).digest('hex')
 }
@@ -77,7 +83,7 @@ test('oracle spill preserves full ordered records and returns only compact frame
       root,
       first: captured,
       second: captured,
-      inputs: ['A', 'AB'],
+      inputs: inputIdentities(['A', 'AB']),
     })
   })
 })
@@ -118,7 +124,12 @@ for (const mutation of [
       }
       const changed = { ...captured, correctness: { ...captured.correctness, artifact } }
       await expect(
-        reconcileProductionOracles({ root, first: changed, second: changed, inputs: ['A', 'AB'] }),
+        reconcileProductionOracles({
+          root,
+          first: changed,
+          second: changed,
+          inputs: inputIdentities(['A', 'AB']),
+        }),
       ).rejects.toThrow()
     })
   })
@@ -178,7 +189,12 @@ test('oracle reader reaches EOF and rejects a late original-file hash mismatch',
       contents.replace('"kind":"fresh"', '"kind": "fresh"'),
     )
     await expect(
-      reconcileProductionOracles({ root, first: captured, second: captured, inputs: ['A', 'AB'] }),
+      reconcileProductionOracles({
+        root,
+        first: captured,
+        second: captured,
+        inputs: inputIdentities(['A', 'AB']),
+      }),
     ).rejects.toThrow('SHA256')
   })
 })
@@ -192,7 +208,7 @@ test('independent lockstep comparison rejects individually valid but different p
       records: changedRecords(),
     })
     await expect(
-      reconcileProductionOracles({ root, first, second, inputs: ['A', 'AB'] }),
+      reconcileProductionOracles({ root, first, second, inputs: inputIdentities(['A', 'AB']) }),
     ).rejects.toThrow('paired projection differs')
   })
 })
@@ -269,7 +285,12 @@ test('fresh mismatch retains a bounded witness before compacting the fresh ident
       captured.correctness.final.paintedOutput.digest,
     )
     await expect(
-      reconcileProductionOracles({ root, first: captured, second: captured, inputs: ['A', 'AB'] }),
+      reconcileProductionOracles({
+        root,
+        first: captured,
+        second: captured,
+        inputs: inputIdentities(['A', 'AB']),
+      }),
     ).rejects.toThrow('fresh completion differs')
   })
 })
@@ -297,7 +318,7 @@ test('paired mismatch retains its first bounded pair and releases both backpress
     expect(witness.firstDifference.path).toBe('$.text')
     expect(Buffer.byteLength(text)).toBeLessThanOrEqual(witness.limits.maxJsonBytes)
     await expect(
-      reconcileProductionOracles({ root, first, second, inputs: ['A', 'AB'] }),
+      reconcileProductionOracles({ root, first, second, inputs: inputIdentities(['A', 'AB']) }),
     ).rejects.toThrow('paired projection differs')
   })
 })
@@ -390,7 +411,7 @@ test('repeated live and completed input selects the exact scheduled expectation'
       root,
       first: captured,
       second: captured,
-      inputs: ['A', 'A'],
+      inputs: inputIdentities(['A', 'A']),
     })
     const actual = { ...frame('B', 19), inputSha256: hash('A'), observedRevision: 20, live: false }
     await retainTimingOracleMismatch({
@@ -519,5 +540,26 @@ test('equal-output superseded revision remains a strict analyzer failure', async
         ['A', 'A'],
       ),
     ).toEqual(['remark: paint receipt 1 does not match its expected projection.'])
+  })
+})
+
+test('uses derived frozen input identities and rereads current bytes on every invocation', async () => {
+  await fixture(async (root) => {
+    const captured = await writeProductionOracle({ root, file: 'oracle.jsonl', records: records() })
+    const inputs = inputIdentities(['A', 'AB'])
+    const options = { root, first: captured, second: captured, inputs }
+    await reconcileProductionOracles(options)
+    inputs[0].inputSha256 = hash('wrong source')
+    await expect(reconcileProductionOracles(options)).rejects.toThrow('input differs')
+    inputs[0].inputSha256 = hash('A')
+    inputs[1].inputUtf16Units++
+    await expect(reconcileProductionOracles(options)).rejects.toThrow('input differs')
+    inputs[1].inputUtf16Units--
+    const file = path.join(root, 'oracle.jsonl')
+    const bytes = await readFile(file, 'utf8')
+    await writeFile(file, bytes.replace('"kind":"fresh"', '"kind": "fresh"'))
+    await expect(reconcileProductionOracles(options)).rejects.toThrow('SHA256')
+    await writeFile(file, bytes)
+    await reconcileProductionOracles(options)
   })
 })

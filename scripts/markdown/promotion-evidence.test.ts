@@ -2184,7 +2184,12 @@ test('streams unique oracle files for synthetic measured and warmup arms', async
     }
   }
   expect(new Set(rows.map((row) => row.correctness.artifact.path)).size).toBe(4)
-  const inputs = productionUpdates(workload).concat([workload.source])
+  const inputs = productionUpdates(workload)
+    .concat([workload.source])
+    .map((source) => ({
+      inputSha256: sha(source),
+      inputUtf16Units: source.length,
+    }))
   for (const row of rows) {
     const artifact = await hashFile({
       root: control.directory,
