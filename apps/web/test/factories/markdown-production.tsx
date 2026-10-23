@@ -17,7 +17,7 @@ import type {
   ProductionOracleSink,
   ProductionMarkdownReceipt,
   ProductionOutputReceipt,
-  ProductionResourceTiming,
+  ProductionResourceObservationWire,
   ProductionResourceWindow,
   ProductionTimelineObservation,
   ProductionTimingFrame,
@@ -709,7 +709,7 @@ function paintedFrame() {
   return new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)))
 }
 
-function resourceTimings(since: number): ProductionResourceTiming[] {
+function resourceTimings(since: number): ProductionResourceObservationWire[] {
   return performance.getEntriesByType('resource').flatMap((entry) => {
     if (!(entry instanceof PerformanceResourceTiming) || entry.startTime < since) return []
     return [

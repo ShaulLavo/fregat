@@ -2864,3 +2864,216 @@ test('native launch finalizer retains original reports and verifies actual nativ
     await rm(outside, { recursive: true, force: true })
   }
 })
+
+function independentResourceRows(duration: number) {
+  return [
+    {
+      name: 'https://fixture.invalid/worker.js',
+      kind: 'javascript' as const,
+      initiatorType: 'other',
+      startTime: 1,
+      duration,
+      transferSize: 10,
+      decodedBodySize: 20,
+    },
+  ]
+}
+function withNegativeResources(
+  row: InlineProductionTrial,
+  where: 'measured' | 'oracle' | 'both',
+): InlineProductionTrial {
+  return {
+    ...row,
+    receipt: {
+      ...row.receipt,
+      resources: independentResourceRows(
+        where === 'oracle' ? 2.5999999046325684 : -21.200000047683716,
+      ),
+    },
+    correctness: {
+      ...row.correctness,
+      resources: independentResourceRows(
+        where === 'measured' ? 2.6999998092651367 : -9.599999904632568,
+      ),
+    },
+  }
+}
+test.each(['measured', 'oracle', 'both'] as const)(
+  'independent checks accept complete synthetic evidence with unusable %s durations',
+  async (where) => {
+    const result = await reconcileTimingEvidence(
+      productionInput((report) => {
+        report.rawTrials = report.rawTrials.map((row) => withNegativeResources(row, where))
+        report.warmupResults = report.warmupResults.map((row) => withNegativeResources(row, where))
+      }),
+    )
+    expect(result.findings).toEqual([])
+    expect(result.exclusions).toEqual([])
+    expect(result.verdict).toBe('VERIFIED')
+    expect(result.samples).toHaveLength(46)
+    expect(result.comparisons).toHaveLength(4)
+    expect(result.comparisons.every((row) => row.independentTrials === 20)).toBe(true)
+  },
+)
+
+test('unusable durations cannot fill missing real CPU or shrink the required denominator', async () => {
+  const result = await reconcileTimingEvidence(
+    productionInput((report) => {
+      report.rawTrials = report.rawTrials.map((row) => withNegativeResources(row, 'both'))
+      const row = report.rawTrials[0]
+      report.rawTrials[0] = { ...row, streamMainThreadCpuMs: null }
+      report.comparisons = fixtureProductionComparisons(row.workload).map((entry) =>
+        entry.metric === 'streamCpu'
+          ? {
+              ...pairedConfidence({
+                workload: row.workload,
+                metric: 'streamCpu',
+                seed: 941,
+                resamples: 4096,
+                baseline: Array<number>(19).fill(5),
+                candidate: Array<number>(19).fill(5),
+              }),
+              domain: 'browser',
+              build: 'production',
+              excludedPairs: [
+                { pair: row.pair, engine: row.engine, reason: 'Missing main-thread CPU' },
+              ],
+            }
+          : entry,
+      )
+    }),
+  )
+  expect(result.verdict).toBe('INCONCLUSIVE')
+  expect(result.findings.length).toBeGreaterThan(0)
+  expect(result.findings.every((entry) => entry.kind === 'missing')).toBe(true)
+  expect(
+    result.samples.find((row) => row.pair === 0 && row.engine === 'remark')?.streamCpu,
+  ).toBeNull()
+  expect(result.comparisons.find((row) => row.metric === 'streamCpu')?.independentTrials).toBe(19)
+  expect(
+    result.findings.some((entry) => entry.reason.includes('20 complete independent paired')),
+  ).toBe(true)
+})
+
+const missingIndependentEvidence = [
+  {
+    name: 'frame clock',
+    change: (row: InlineProductionTrial) => {
+      Reflect.deleteProperty(row.receipt.frames[0], 'painted')
+    },
+  },
+  {
+    name: 'held release',
+    change: (row: InlineProductionTrial) => {
+      Reflect.set(row.receipt, 'heldSyntax', null)
+    },
+  },
+  {
+    name: 'per-update CPU',
+    change: (row: InlineProductionTrial) => {
+      Reflect.set(row, 'updateCpu', [])
+    },
+  },
+  {
+    name: 'worker coverage',
+    change: (row: InlineProductionTrial) => {
+      Reflect.set(row, 'workerCpu', null)
+    },
+  },
+  {
+    name: 'worker identity',
+    change: (row: InlineProductionTrial) => {
+      Reflect.set(row, 'workers', null)
+    },
+  },
+  {
+    name: 'long tasks',
+    change: (row: InlineProductionTrial) => {
+      Reflect.set(row.receipt, 'longTasks', null)
+    },
+  },
+  {
+    name: 'network',
+    change: (row: InlineProductionTrial) => {
+      Reflect.set(row, 'network', null)
+    },
+  },
+  {
+    name: 'input identity',
+    change: (row: InlineProductionTrial) => {
+      Reflect.deleteProperty(row.receipt.final, 'inputSha256')
+    },
+  },
+  {
+    name: 'measured resources',
+    change: (row: InlineProductionTrial) => {
+      Reflect.deleteProperty(row.receipt, 'resources')
+    },
+  },
+]
+test.each(missingIndependentEvidence)(
+  'unusable durations cannot fill missing $name',
+  async ({ change }) => {
+    const result = await reconcileTimingEvidence(
+      productionInput((report) => {
+        const row = withNegativeResources(report.rawTrials[0], 'both')
+        change(row)
+        report.rawTrials[0] = row
+      }),
+    )
+    expect(result.verdict).not.toBe('VERIFIED')
+    expect(result.timingStatus).toBe('PROMOTION_CAPTURE_UNRECONCILED')
+    expect(result.findings.length).toBeGreaterThan(0)
+  },
+)
+
+type MeasuredResourceTampering = 'sign' | 'identity' | 'order' | 'duplicate'
+function tamperedMeasuredResources(row: ProductionTrial, change: MeasuredResourceTampering) {
+  const resources = row.receipt.resources.map((resource) => ({ ...resource }))
+  if (change === 'sign') resources[0].duration = -resources[0].duration
+  if (change === 'identity') resources[0].name = 'changed'
+  if (change === 'order') resources.reverse()
+  if (change === 'duplicate') resources.push({ ...resources[0] })
+  return { ...row, receipt: { ...row.receipt, resources } }
+}
+async function measuredResourceTamperResult(change: MeasuredResourceTampering) {
+  const directory = await mkdtemp(path.join(tmpdir(), 'markdown-resource-tamper-'))
+  const input = productionInput((report) => {
+    const row = report.rawTrials[0]
+    report.rawTrials[0] = {
+      ...row,
+      receipt: {
+        ...row.receipt,
+        resources: independentResourceRows(-21.200000047683716).concat(
+          independentResourceRows(2.5999999046325684),
+        ),
+      },
+    }
+  })
+  try {
+    const files = await writeFixture(directory, input)
+    const options = {
+      root: directory,
+      kind: input.kind,
+      report: input.report.path,
+      frozen: input.frozen,
+      artifacts: files,
+    }
+    expect((await reconcileFiles(options)).verdict).toBe('VERIFIED')
+    const rawPath = path.join(directory, files.trials)
+    const lines = (await readFile(rawPath, 'utf8')).trimEnd().split('\n')
+    changedProductionLine(lines, 6, (row) => tamperedMeasuredResources(row, change))
+    await writeFile(rawPath, lines.join('\n') + '\n')
+    return await reconcileFiles(options)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+}
+test.each(['sign', 'identity', 'order', 'duplicate'] as const)(
+  'fixed whole-trials reference rejects measured resource %s tampering',
+  async (change) => {
+    const result = await measuredResourceTamperResult(change)
+    expect(result.verdict).not.toBe('VERIFIED')
+    expect(result.findings.some((entry) => entry.reason.includes('digest differs'))).toBe(true)
+  },
+)

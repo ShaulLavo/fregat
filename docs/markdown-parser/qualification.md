@@ -40,6 +40,32 @@ receipts. The candidate adapter and evidence readers exist. Final identity-bound
 evaluation, reviewed visuals, and passing timing/resource budgets remain required. Baseline commands exit successfully when their test runners and output controls pass,
 while preserving independently recorded baseline defects in `baseline-checks.json`.
 
+## Native resource observations and independent checks
+
+Both `correctness.resources` and measured `receipt.resources` are required arrays. Each row
+contains exactly `name`, `kind`, `initiatorType`, `startTime`, `duration`, `transferSize`, and
+`decodedBodySize`. Empty arrays remain valid. All numeric fields must be finite. `startTime`
+and both byte fields remain nonnegative.
+
+Native `duration` accepts finite signed numbers. The collector, callback, and writer retain every
+original number, row, duplicate, and row order. The writer validates the original wire record
+before serializing it. Reconciliation binds the original JSONL bytes, length, count, and EOF,
+and compares each final resource array with its own oracle summary. Separate measured and
+oracle runs may have different resource arrays.
+
+`resourceTimingView` derives duration usability locally. A negative native duration is unusable
+and has no `durationMs`. A nonnegative duration is usable with the identical value. Serialized
+classification fields are rejected. Duration-dependent calculations require the usable view.
+
+Independent eligibility allows otherwise complete evidence to pass its checks while retaining
+unusable native durations. A negative observation alone adds no blocking finding or metric
+exclusion. Every required clock, CPU, network, identity, and memory receipt remains required,
+and paired comparisons retain their required denominators. All latency and memory budgets,
+including native total-heap windows, remain unchanged.
+
+Synthetic tests establish this contract only. They provide no native qualification and do not
+repair or authorize historical evidence.
+
 ## Finish Q5 from a frozen candidate
 
 Run development checks while disjoint writers work. Final captures require the coordinator's clean,

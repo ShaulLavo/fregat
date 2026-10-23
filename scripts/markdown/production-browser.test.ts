@@ -14,7 +14,7 @@ import {
 } from './production-browser'
 import { productionBrowserWorkloads } from './production-workloads'
 import type { ProductionMarkdownFrame } from '../../apps/web/test/factories/markdown-production-types'
-import type { ProductionOracleRecord } from './production-oracle'
+import type { ProductionOracleWireRecord } from './production-oracle'
 import { qualificationProvenance } from './provenance'
 
 function frame(text: string): ProductionMarkdownFrame {
@@ -42,7 +42,7 @@ function frame(text: string): ProductionMarkdownFrame {
   }
 }
 const observed = frame('A')
-const records: readonly ProductionOracleRecord[] = [
+const records: readonly ProductionOracleWireRecord[] = [
   { kind: 'frame', frame: observed },
   { kind: 'final', frame: observed, fullyReady: 3, longTasks: [], resources: [] },
   { kind: 'fresh', frame: observed },

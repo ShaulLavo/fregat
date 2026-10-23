@@ -6,7 +6,6 @@ import * as v from 'valibot'
 import type {
   ProductionMarkdownFrame,
   ProductionMismatchSample,
-  ProductionMarkdownReceipt,
   ProductionOracleSink,
 } from '../../apps/web/test/factories/markdown-production-types'
 import { foldJsonl, writeJsonl, type RawTimingRef } from './timing-artifacts'
@@ -14,21 +13,10 @@ import { createScriptError } from '../structured-errors'
 
 export type ProductionInput = Pick<ProductionMarkdownFrame, 'inputSha256' | 'inputUtf16Units'>
 
-export type ProductionOracleRecord = Parameters<ProductionOracleSink>[0]
-
-export type ProductionOracleIdentity = {
-  readonly inputSha256: string
-  readonly paintedOutput: ProductionMarkdownFrame['paintedOutput']
-  readonly observationSha256: string
-}
-export type ProductionOracle = {
-  readonly artifact: RawTimingRef
-  readonly frames: readonly ProductionOracleIdentity[]
-  readonly final: ProductionOracleIdentity
-  readonly fullyReady: number
-  readonly longTasks: ProductionMarkdownReceipt['longTasks']
-  readonly resources: ProductionMarkdownReceipt['resources']
-}
+export type ProductionOracleWireRecord = Parameters<ProductionOracleSink>[0]
+export type ProductionOracleRecord = v.InferOutput<typeof oracleRecord>
+export type ProductionOracleIdentity = v.InferOutput<typeof productionOracleIdentitySchema>
+export type ProductionOracle = v.InferOutput<typeof productionOracleSchema>
 export function oracleIdentity(frame: ProductionMarkdownFrame): ProductionOracleIdentity {
   return {
     inputSha256: frame.inputSha256,
@@ -39,7 +27,7 @@ export function oracleIdentity(frame: ProductionMarkdownFrame): ProductionOracle
 export async function writeProductionOracle(options: {
   readonly root: string
   readonly file: string
-  readonly records: AsyncIterable<ProductionOracleRecord>
+  readonly records: AsyncIterable<ProductionOracleWireRecord>
   readonly engine?: string
 }): Promise<{ correctness: ProductionOracle; freshCompleted: ProductionOracleIdentity }> {
   const frames: ProductionOracleIdentity[] = []
@@ -133,11 +121,11 @@ function collectOracleRecord(
 }
 
 // The producer cannot advance until the consumer has released its one record.
-export async function* oracleCallbackRecords(
-  produce: (emit: (record: ProductionOracleRecord) => Promise<void>) => Promise<void>,
-): AsyncGenerator<ProductionOracleRecord> {
+export async function* oracleCallbackRecords<
+  T extends ProductionOracleWireRecord = ProductionOracleWireRecord,
+>(produce: (emit: (record: T) => Promise<void>) => Promise<void>): AsyncGenerator<T> {
   type Entry = {
-    readonly record: ProductionOracleRecord
+    readonly record: T
     readonly consumed: ReturnType<typeof Promise.withResolvers<void>>
   }
   let next = Promise.withResolvers<Entry | null>()
@@ -199,15 +187,31 @@ const observedFrame = v.looseObject({
   // Validate one element at a time without Valibot cloning the full projection array.
   elements: v.custom<ProductionMarkdownFrame['elements']>(isObservedElements),
 })
-const resource = v.object({
+const nativeResourceMs = v.pipe(v.number(), v.finite(), v.brand('NativeResourceMs'))
+const usableResourceMs = v.pipe(nonnegative, v.brand('UsableResourceMs'))
+export const productionResourceObservationSchema = v.strictObject({
   name: v.string(),
   kind: v.picklist(['host', 'grammar', 'resolver', 'javascript', 'other']),
   initiatorType: v.string(),
   startTime: nonnegative,
-  duration: nonnegative,
+  duration: nativeResourceMs,
   transferSize: nonnegative,
   decodedBodySize: nonnegative,
 })
+export type ProductionResourceObservation = v.InferOutput<
+  typeof productionResourceObservationSchema
+>
+export type ResourceTimingView = {
+  readonly raw: ProductionResourceObservation
+  readonly timing:
+    | { readonly kind: 'usable'; readonly durationMs: v.InferOutput<typeof usableResourceMs> }
+    | { readonly kind: 'unusable'; readonly reason: 'negative-native-duration' }
+}
+export function resourceTimingView(raw: ProductionResourceObservation): ResourceTimingView {
+  if (raw.duration < 0)
+    return { raw, timing: { kind: 'unusable', reason: 'negative-native-duration' } }
+  return { raw, timing: { kind: 'usable', durationMs: v.parse(usableResourceMs, raw.duration) } }
+}
 export const productionOracleIdentitySchema = v.strictObject({
   inputSha256: digest,
   paintedOutput: output,
@@ -224,7 +228,7 @@ export const productionOracleSchema = v.object({
   final: productionOracleIdentitySchema,
   fullyReady: nonnegative,
   longTasks: v.nullable(v.array(nonnegative)),
-  resources: v.array(resource),
+  resources: v.array(productionResourceObservationSchema),
 })
 const oracleRecord = v.variant('kind', [
   v.object({ kind: v.literal('frame'), frame: observedFrame }),
@@ -233,12 +237,16 @@ const oracleRecord = v.variant('kind', [
     frame: observedFrame,
     fullyReady: nonnegative,
     longTasks: v.nullable(v.array(nonnegative)),
-    resources: v.array(resource),
+    resources: v.array(productionResourceObservationSchema),
   }),
   v.object({ kind: v.literal('fresh'), frame: observedFrame }),
 ])
+// The schema only brands numbers; validation keeps original frames and projection arrays.
+function isProductionOracleRecord(value: unknown): value is ProductionOracleRecord {
+  return v.is(oracleRecord, value)
+}
 export function parseProductionOracleRecord(value: unknown): ProductionOracleRecord {
-  if (!v.is(oracleRecord, value)) throw invalid('record shape is invalid')
+  if (!isProductionOracleRecord(value)) throw invalid('record shape is invalid')
   return value
 }
 
@@ -247,7 +255,7 @@ type OracleArm = {
   readonly freshCompleted: ProductionOracleIdentity
 }
 function recordsFromFile(root: string, arm: OracleArm, artifacts: RawTimingRef[]) {
-  return oracleCallbackRecords(async (emit) => {
+  return oracleCallbackRecords<ProductionOracleRecord>(async (emit) => {
     artifacts.push(
       await foldJsonl({
         root,

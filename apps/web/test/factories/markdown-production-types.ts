@@ -59,7 +59,7 @@ export type ProductionTimingReceipt = {
   readonly fullyReadyOutput: ProductionOutputReceipt
   readonly heldSyntax: ProductionHeldSyntaxReceipt | null
   readonly longTasks: readonly number[] | null
-  readonly resources: readonly ProductionResourceTiming[]
+  readonly resources: readonly ProductionResourceObservationWire[]
 }
 
 export type ProductionMarkdownReceipt = {
@@ -67,12 +67,12 @@ export type ProductionMarkdownReceipt = {
   readonly final: ProductionMarkdownFrame
   readonly fullyReady: number
   readonly longTasks: readonly number[] | null
-  readonly resources: readonly ProductionResourceTiming[]
+  readonly resources: readonly ProductionResourceObservationWire[]
 }
 
 export type ProductionResourceKind = 'host' | 'grammar' | 'resolver' | 'javascript' | 'other'
 
-export type ProductionResourceTiming = {
+export type ProductionResourceObservationWire = {
   readonly name: string
   readonly kind: ProductionResourceKind
   readonly initiatorType: string

@@ -5,7 +5,7 @@ import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { ProductionTrial } from './production-analysis'
 import type { productionBrowserControls } from './production-controls'
-import { writeProductionOracle, type ProductionOracleRecord } from './production-oracle'
+import { writeProductionOracle, type ProductionOracleWireRecord } from './production-oracle'
 import type { ProductionMarkdownFrame } from '../../apps/web/test/factories/markdown-production-types'
 import {
   nativePairWorkloads,
@@ -173,7 +173,17 @@ export function syntheticProductionTemplate(
         .map((tick) => tick.revision),
       heldSyntax: { held, released, holdMs: 0 },
       longTasks: [],
-      resources: [],
+      resources: [
+        {
+          name: 'https://fixture.invalid/worker.js',
+          kind: 'javascript',
+          initiatorType: 'other',
+          startTime: 1,
+          duration: -21.200000047683716,
+          transferSize: 10,
+          decodedBodySize: 20,
+        },
+      ],
     },
     cpu: null,
     updateCpu: frames
@@ -219,7 +229,7 @@ function oracleFrame(
 }
 async function* syntheticOracleRecords(
   row: ProductionTemplate,
-): AsyncGenerator<ProductionOracleRecord> {
+): AsyncGenerator<ProductionOracleWireRecord> {
   for (const frame of row.receipt.processed) yield { kind: 'frame', frame: oracleFrame(frame) }
   const final = oracleFrame(row.receipt.final)
   yield {
@@ -227,7 +237,10 @@ async function* syntheticOracleRecords(
     frame: final,
     fullyReady: row.receipt.fullyReady,
     longTasks: row.receipt.longTasks,
-    resources: row.receipt.resources,
+    resources: row.receipt.resources.map((resource) => ({
+      ...resource,
+      duration: -9.599999904632568,
+    })),
   }
   yield { kind: 'fresh', frame: final }
 }

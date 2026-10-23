@@ -29,6 +29,7 @@ import {
 import { foldJsonl, hashFile, type ArtifactRef } from './timing-artifacts'
 import {
   productionOracleSchema,
+  productionResourceObservationSchema,
   productionOracleIdentitySchema,
   reconcileProductionOracles,
   type ProductionInput,
@@ -262,6 +263,8 @@ export const productionTrial = v.object({
     skippedPaintRevisions: v.array(count),
     heldSyntax: v.nullable(v.object({ held: frame, released: frame, holdMs: nonnegative })),
     longTasks: v.nullable(v.array(nonnegative)),
+    // Negative native durations stay unusable. Independent metrics require their own evidence.
+    resources: v.array(productionResourceObservationSchema),
   }),
   correctness: productionOracleSchema,
   freshCompleted: productionOracleIdentitySchema,

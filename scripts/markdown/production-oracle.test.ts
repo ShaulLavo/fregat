@@ -2,18 +2,25 @@ import { mkdtemp, readFile, rm, writeFile, access } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
-import { expect, test } from 'vitest'
+import { expect, expectTypeOf, test } from 'vitest'
+import * as v from 'valibot'
 import {
   oracleCallbackRecords,
+  productionResourceObservationSchema,
+  productionOracleSchema,
+  resourceTimingView,
+  type ResourceTimingView,
+  type ProductionOracleRecord,
   retainPairedOracleMismatch,
   retainTimingOracleMismatch,
   parseProductionOracleRecord,
   oracleIdentity,
   reconcileProductionOracles,
   writeProductionOracle,
-  type ProductionOracleRecord,
+  type ProductionOracleWireRecord,
 } from './production-oracle'
 import { hashFile } from './timing-artifacts'
+import { productionTrial } from './production-reconciliation'
 import { validateRevisionReceipts, type ProductionTrial } from './production-analysis'
 import type { ProductionMarkdownFrame } from '../../apps/web/test/factories/markdown-production-types'
 
@@ -50,7 +57,7 @@ function inputIdentities(sources: readonly string[]) {
 function hash(value: string) {
   return createHash('sha256').update(value).digest('hex')
 }
-async function* records(): AsyncGenerator<ProductionOracleRecord> {
+async function* records(): AsyncGenerator<ProductionOracleWireRecord> {
   yield { kind: 'frame', frame: frame('A', 1) }
   yield { kind: 'frame', frame: frame('AB', 2) }
   yield { kind: 'final', frame: frame('AB', 2), fullyReady: 4, longTasks: [1], resources: [] }
@@ -213,7 +220,7 @@ test('independent lockstep comparison rejects individually valid but different p
   })
 })
 
-async function* invalidRecords(invalidOrder: string): AsyncGenerator<ProductionOracleRecord> {
+async function* invalidRecords(invalidOrder: string): AsyncGenerator<ProductionOracleWireRecord> {
   for await (const record of records()) {
     if (invalidOrder === 'early-fresh' && record.kind === 'frame')
       yield { kind: 'fresh', frame: record.frame }
@@ -223,7 +230,7 @@ async function* invalidRecords(invalidOrder: string): AsyncGenerator<ProductionO
   }
 }
 async function pumpRecords(
-  emit: (record: ProductionOracleRecord) => Promise<void>,
+  emit: (record: ProductionOracleWireRecord) => Promise<void>,
   state: { emitted: number; released: number; stopped: boolean },
 ) {
   try {
@@ -236,7 +243,7 @@ async function pumpRecords(
     state.stopped = true
   }
 }
-async function* changedRecords(): AsyncGenerator<ProductionOracleRecord> {
+async function* changedRecords(): AsyncGenerator<ProductionOracleWireRecord> {
   for await (const record of records()) {
     const observed = frame('other', record.frame.revision)
     yield {
@@ -323,7 +330,7 @@ test('paired mismatch retains its first bounded pair and releases both backpress
   })
 })
 
-async function* freshMismatchRecords(): AsyncGenerator<ProductionOracleRecord> {
+async function* freshMismatchRecords(): AsyncGenerator<ProductionOracleWireRecord> {
   for await (const record of records()) {
     if (record.kind !== 'fresh') {
       yield record
@@ -393,7 +400,7 @@ test('paired witness drains to verified EOF and does not seal evidence from a ch
   })
 })
 
-async function* repeatedRecords(): AsyncGenerator<ProductionOracleRecord> {
+async function* repeatedRecords(): AsyncGenerator<ProductionOracleWireRecord> {
   yield { kind: 'frame', frame: frame('A', 1) }
   yield { kind: 'frame', frame: frame('A', 2) }
   yield { kind: 'final', frame: frame('A', 2), fullyReady: 4, longTasks: [], resources: [] }
@@ -433,7 +440,7 @@ test('repeated live and completed input selects the exact scheduled expectation'
 
 async function* failedFreshRecords(
   failure: 'false' | 'undefined' | 'validation',
-): AsyncGenerator<ProductionOracleRecord> {
+): AsyncGenerator<ProductionOracleWireRecord> {
   yield* freshMismatchRecords()
   if (failure === 'false') throw false
   if (failure === 'undefined') throw undefined
@@ -563,3 +570,320 @@ test('uses derived frozen input identities and rereads current bytes on every in
     await reconcileProductionOracles(options)
   })
 })
+
+function resourceObservation(duration: number) {
+  return {
+    name: 'https://fixture.invalid/worker.js',
+    kind: 'javascript' as const,
+    initiatorType: 'other',
+    startTime: 1,
+    duration,
+    transferSize: 10,
+    decodedBodySize: 20,
+  }
+}
+
+test.each([2.5999999046325684, 2.6999998092651367, 0, -21.200000047683716, -9.599999904632568])(
+  'resource callback retains the native duration %s',
+  (duration) => {
+    const resource = resourceObservation(duration)
+    const original = {
+      kind: 'final',
+      frame: frame('AB', 2),
+      fullyReady: 4,
+      longTasks: [],
+      resources: [resource],
+    } as const
+    const parsed = parseProductionOracleRecord(original)
+    expect(parsed).toBe(original)
+    expect(parsed.kind).toBe('final')
+    if (parsed.kind !== 'final') return
+    expect(parsed.resources[0].duration).toBe(duration)
+  },
+)
+
+test.each([2.5999999046325684, 2.6999998092651367, 0, -21.200000047683716, -9.599999904632568])(
+  'resource duration %s has only its locally derived timing view',
+  (duration) => {
+    const raw = v.parse(productionResourceObservationSchema, resourceObservation(duration))
+    const view = resourceTimingView(raw)
+    expect(view.raw).toBe(raw)
+    expect(view.raw.duration).toBe(duration)
+    if (duration < 0) {
+      expect(view.timing).toEqual({ kind: 'unusable', reason: 'negative-native-duration' })
+      expect('durationMs' in view.timing).toBe(false)
+      return
+    }
+    expect(view.timing).toEqual({ kind: 'usable', durationMs: duration })
+  },
+)
+
+function resourceTypeBoundary(record: ProductionOracleRecord, view: ResourceTimingView) {
+  // @ts-expect-error A timing view must be narrowed before accessing a usable duration.
+  const unnarrowedDuration = view.timing.durationMs
+  if (record.kind !== 'final') return
+  type Usable = Extract<ResourceTimingView['timing'], { kind: 'usable' }>['durationMs']
+  // @ts-expect-error Signed native observations cannot satisfy a usable-duration argument.
+  const usable: Usable = record.resources[0].duration
+  return { usable, unnarrowedDuration }
+}
+test('wire producers need no brands while parsed consumers must narrow usable duration', () => {
+  expectTypeOf<typeof resourceTypeBoundary>().toBeFunction()
+  const raw = v.parse(productionResourceObservationSchema, resourceObservation(0))
+  const view = resourceTimingView(raw)
+  if (view.timing.kind !== 'usable') return
+  expect(view.timing.durationMs).toBe(raw.duration)
+})
+
+const invalidResourceRows = Object.keys(resourceObservation(1))
+  .map<{ name: string; value: unknown }>((field) => ({
+    name: `missing ${field}`,
+    value: Object.fromEntries(
+      Object.entries(resourceObservation(1)).filter(([key]) => key !== field),
+    ),
+  }))
+  .concat(
+    [
+      'name',
+      'kind',
+      'initiatorType',
+      'startTime',
+      'duration',
+      'transferSize',
+      'decodedBodySize',
+    ].map((field) => ({
+      name: `null ${field}`,
+      value: { ...resourceObservation(1), [field]: null },
+    })),
+    [NaN, Infinity, -Infinity, '1', true].map((duration) => ({
+      name: `invalid duration ${String(duration)}`,
+      value: { ...resourceObservation(1), duration },
+    })),
+    ['startTime', 'transferSize', 'decodedBodySize'].flatMap((field) =>
+      [-1, NaN, Infinity, -Infinity, '1'].map((value) => ({
+        name: `invalid ${field} ${String(value)}`,
+        value: { ...resourceObservation(1), [field]: value },
+      })),
+    ),
+    [
+      { name: 'wrong kind', value: { ...resourceObservation(1), kind: 'worker' } },
+      { name: 'wrong name', value: { ...resourceObservation(1), name: 1 } },
+      { name: 'wrong initiator', value: { ...resourceObservation(1), initiatorType: false } },
+    ],
+    [{ usable: true }, { timing: { kind: 'usable', durationMs: 1 } }, { durationMs: 1 }].map(
+      (flag) => ({
+        name: `forged ${Object.keys(flag)[0]}`,
+        value: { ...resourceObservation(-1), ...flag },
+      }),
+    ),
+    [{ name: 'forged unusable positive', value: { ...resourceObservation(1), usable: false } }],
+  )
+test.each(invalidResourceRows)('resource boundaries reject $name', ({ value }) => {
+  assertResourceBoundariesReject([value])
+})
+test.each([undefined, null, {}, 1, 'resources'])(
+  'resource boundaries reject missing or nonarray %s',
+  (resources) => {
+    assertResourceBoundariesReject(resources)
+  },
+)
+function assertResourceBoundariesReject(resources: unknown) {
+  expect(() =>
+    parseProductionOracleRecord({
+      kind: 'final',
+      frame: frame('AB', 2),
+      fullyReady: 4,
+      longTasks: [],
+      resources,
+    }),
+  ).toThrow()
+  expect(v.safeParse(productionOracleSchema.entries.resources, resources).success).toBe(false)
+  expect(v.safeParse(productionTrial.entries.receipt.entries.resources, resources).success).toBe(
+    false,
+  )
+}
+test('both receipt arrays share the strict row contract and retain measured rows', () => {
+  expect(productionTrial.entries.receipt.entries.resources.item).toBe(
+    productionResourceObservationSchema,
+  )
+  expect(productionOracleSchema.entries.resources.item).toBe(productionResourceObservationSchema)
+  expect(
+    v.parse(productionTrial.entries.receipt.entries.resources, [
+      resourceObservation(-21.200000047683716),
+    ])[0].duration,
+  ).toBe(-21.200000047683716)
+  expect(v.parse(productionTrial.entries.receipt.entries.resources, [])).toEqual([])
+})
+test.each(['scheduled', 'received', 'committed', 'painted', 'parserWallMs'])(
+  'signed resources do not loosen frame %s',
+  (field) => {
+    expect(() =>
+      parseProductionOracleRecord({ kind: 'frame', frame: { ...frame('A', 1), [field]: -1 } }),
+    ).toThrow()
+  },
+)
+test('signed resources do not loosen completion or long-task clocks', () => {
+  const original = {
+    kind: 'final',
+    frame: frame('AB', 2),
+    fullyReady: 4,
+    longTasks: [1],
+    resources: [],
+  }
+  expect(() => parseProductionOracleRecord({ ...original, fullyReady: -1 })).toThrow()
+  expect(() => parseProductionOracleRecord({ ...original, longTasks: [-1] })).toThrow()
+})
+
+const orderedResourceRows = [
+  2.5999999046325684, -21.200000047683716, 2.6999998092651367, -9.599999904632568,
+  -21.200000047683716, 0,
+].map(resourceObservation)
+async function* resourceRecords(
+  resources = orderedResourceRows,
+): AsyncGenerator<ProductionOracleWireRecord> {
+  for await (const record of records())
+    yield record.kind === 'final' ? { ...record, resources } : record
+}
+test('callback writer JSONL and EOF replay retain every signed value, ordered duplicate and original record', async () => {
+  await fixture(async (root) => {
+    const originals: ProductionOracleWireRecord[] = []
+    const stream = oracleCallbackRecords((emit) => emitResourceRecords(emit, originals))
+    const captured = await writeProductionOracle({ root, file: 'signed.jsonl', records: stream })
+    const bytes = await readFile(path.join(root, 'signed.jsonl'), 'utf8')
+    expect(bytes).toBe(originals.map((record) => JSON.stringify(record)).join('\n') + '\n')
+    expect(captured.correctness.resources).toEqual(orderedResourceRows)
+    expect(captured.correctness.resources).toBe(orderedResourceRows)
+    expect(captured.correctness.resources.every((row) => Object.keys(row).length === 7)).toBe(true)
+    expect(captured.correctness.artifact).toMatchObject({
+      sha256: hash(bytes),
+      byteLength: Buffer.byteLength(bytes),
+      recordCount: originals.length,
+    })
+    const second = await writeProductionOracle({
+      root,
+      file: 'independent.jsonl',
+      records: resourceRecords([resourceObservation(0)]),
+    })
+    await reconcileProductionOracles({
+      root,
+      first: captured,
+      second,
+      inputs: inputIdentities(['A', 'AB']),
+    })
+    expect(await readFile(path.join(root, 'signed.jsonl'), 'utf8')).toBe(bytes)
+  })
+})
+
+const resourceTampering = [
+  {
+    name: 'sign',
+    change: (rows: ReturnType<typeof resourceObservation>[]) =>
+      rows.map((row, i) => (i === 1 ? { ...row, duration: -row.duration } : row)),
+  },
+  {
+    name: 'name',
+    change: (rows: ReturnType<typeof resourceObservation>[]) =>
+      rows.map((row) => ({ ...row, name: 'other' })),
+  },
+  {
+    name: 'kind',
+    change: (rows: ReturnType<typeof resourceObservation>[]) =>
+      rows.map((row) => ({ ...row, kind: 'other' as const })),
+  },
+  {
+    name: 'initiator',
+    change: (rows: ReturnType<typeof resourceObservation>[]) =>
+      rows.map((row) => ({ ...row, initiatorType: 'script' })),
+  },
+  {
+    name: 'start',
+    change: (rows: ReturnType<typeof resourceObservation>[]) =>
+      rows.map((row) => ({ ...row, startTime: 2 })),
+  },
+  {
+    name: 'duration',
+    change: (rows: ReturnType<typeof resourceObservation>[]) =>
+      rows.map((row) => ({ ...row, duration: -2 })),
+  },
+  {
+    name: 'transfer',
+    change: (rows: ReturnType<typeof resourceObservation>[]) =>
+      rows.map((row) => ({ ...row, transferSize: 99 })),
+  },
+  {
+    name: 'decoded',
+    change: (rows: ReturnType<typeof resourceObservation>[]) =>
+      rows.map((row) => ({ ...row, decodedBodySize: 99 })),
+  },
+  { name: 'order', change: (rows: ReturnType<typeof resourceObservation>[]) => rows.toReversed() },
+  { name: 'remove', change: (rows: ReturnType<typeof resourceObservation>[]) => rows.slice(1) },
+  {
+    name: 'insert',
+    change: (rows: ReturnType<typeof resourceObservation>[]) =>
+      rows.concat([resourceObservation(1)]),
+  },
+  {
+    name: 'duplicate',
+    change: (rows: ReturnType<typeof resourceObservation>[]) => rows.concat([rows[0]]),
+  },
+]
+test.each(resourceTampering)(
+  'rehashed oracle rejects resource $name changed against its own summary',
+  async ({ change }) => {
+    await fixture(async (root) => {
+      const captured = await writeProductionOracle({
+        root,
+        file: 'signed.jsonl',
+        records: resourceRecords(),
+      })
+      const rows = (await readFile(path.join(root, 'signed.jsonl'), 'utf8'))
+        .trimEnd()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+      rows[2].resources = change(rows[2].resources)
+      await writeFile(
+        path.join(root, 'signed.jsonl'),
+        rows.map((row) => JSON.stringify(row)).join('\n') + '\n',
+      )
+      const artifact = {
+        ...(await hashFile({ root, file: 'signed.jsonl' })),
+        recordCount: rows.length,
+      }
+      const changed = { ...captured, correctness: { ...captured.correctness, artifact } }
+      await expect(
+        reconcileProductionOracles({
+          root,
+          first: changed,
+          second: changed,
+          inputs: inputIdentities(['A', 'AB']),
+        }),
+      ).rejects.toThrow('final differs from last frame or metadata')
+    })
+  },
+)
+
+async function emitResourceRecords(
+  emit: (record: ProductionOracleWireRecord) => Promise<void>,
+  originals: ProductionOracleWireRecord[],
+) {
+  for await (const record of resourceRecords()) {
+    originals.push(record)
+    await emit(record)
+  }
+}
+
+test.each([NaN, Infinity, -Infinity])(
+  'writer rejects nonfinite native duration %s before JSON serialization',
+  async (duration) => {
+    await fixture(async (root) => {
+      await expect(
+        writeProductionOracle({
+          root,
+          file: 'nonfinite.jsonl',
+          records: resourceRecords([resourceObservation(duration)]),
+        }),
+      ).rejects.toThrow('record shape is invalid')
+      await expect(access(path.join(root, 'nonfinite.jsonl'))).rejects.toThrow()
+    })
+  },
+)
