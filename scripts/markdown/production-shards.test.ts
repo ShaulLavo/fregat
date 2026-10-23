@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import * as v from 'valibot'
 import { nativePairWorkloads } from './paired-native'
 import { productionBrowserWorkloads } from './production-workloads'
@@ -18,8 +18,29 @@ import {
   timingLaunchManifest,
 } from './production-shards'
 
+const io = vi.hoisted(() => ({
+  beforeRead: undefined as undefined | ((file: unknown) => Promise<void>),
+  beforeStat: undefined as undefined | ((file: unknown) => Promise<void>),
+}))
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...actual,
+    readFile: async (...args: Parameters<typeof actual.readFile>) => {
+      await io.beforeRead?.(args[0])
+      return actual.readFile(...args)
+    },
+    stat: async (...args: Parameters<typeof actual.stat>) => {
+      await io.beforeStat?.(args[0])
+      return actual.stat(...args)
+    },
+  }
+})
+
 const directories: string[] = []
 afterEach(async () => {
+  io.beforeRead = undefined
+  io.beforeStat = undefined
   await Promise.all(
     directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
   )
@@ -250,5 +271,61 @@ test.each(['native', 'production'] as const)(
     await expect(assembleTimingShards(options)).rejects.toThrow(
       'Assembly requires a distinct actual launch identity for every shard.',
     )
+  },
+)
+
+async function replacement(root: string, target: 'plan' | 'manifest' | 'report') {
+  const paths = {
+    plan: 'plan.json',
+    manifest: 'launches/0/timing-manifest.json',
+    report: 'launches/0/report.json',
+  }
+  const filename = path.join(root, paths[target])
+  const contents = JSON.parse(await readFile(filename, 'utf8'))
+  if (target === 'plan') contents.purpose = 'qualification'
+  if (target === 'manifest') contents.artifacts.host = 'replacement-host.json'
+  if (target === 'report') contents.shard.launchId = 'replacement-launch'
+  const temporary = path.join(root, 'replacement.json')
+  await writeFile(temporary, JSON.stringify(contents))
+  return { filename, temporary }
+}
+
+test.each(['plan', 'manifest', 'report'] as const)(
+  'assembly binds the hashed %s bytes to parsed data without reopening the file',
+  async (target) => {
+    const options = await fixture('native')
+    const swapped = await replacement(options.root, target)
+    io.beforeRead = async (file) => {
+      if (String(file) !== swapped.filename) return
+      io.beforeRead = undefined
+      await rename(swapped.temporary, swapped.filename)
+    }
+    const assembled = await assembleTimingShards(options)
+    io.beforeRead = undefined
+    const index = v.parse(nativeShardIndex, JSON.parse(await readFile(assembled.indexFile, 'utf8')))
+    expect(index.plan.sha256).toBe(
+      sha(await readFile(path.join(options.root, 'plan.json'), 'utf8')),
+    )
+    expect(index.shards[0]?.report.sha256).toBe(
+      sha(await readFile(path.join(options.root, 'launches/0/report.json'), 'utf8')),
+    )
+    expect(index.shards[0]?.artifacts.host).toBe('host.json')
+  },
+)
+
+test.each(['plan', 'manifest', 'report'] as const)(
+  'assembly rejects a conflicting %s file observation during the identity-checked read',
+  async (target) => {
+    const options = await fixture('native')
+    const swapped = await replacement(options.root, target)
+    io.beforeStat = async (file) => {
+      if (String(file) !== swapped.filename) return
+      io.beforeStat = undefined
+      await rename(swapped.temporary, swapped.filename)
+    }
+    await expect(assembleTimingShards(options)).rejects.toThrow('file changed while reading')
+    io.beforeStat = undefined
+    await expect(readFile(path.join(options.output, 'native-shards.json'))).rejects.toThrow()
+    await expect(readFile(path.join(options.output, 'timing-manifest.json'))).rejects.toThrow()
   },
 )

@@ -2,7 +2,7 @@ import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { createScriptError } from '../structured-errors'
-import { hashFile } from './timing-artifacts'
+import { hashFile, readArtifactBytes } from './timing-artifacts'
 import { stable } from './serialization'
 import * as v from 'valibot'
 import type { ProductionWorkload } from './production-workloads'
@@ -110,9 +110,9 @@ export const timingLaunchManifest = v.strictObject({
 })
 
 async function readCapturedJson(root: string, file: string) {
-  const reference = await hashFile({ root, file })
+  const { reference, bytes } = await readArtifactBytes({ root, file })
   const filename = path.resolve(root, reference.path)
-  const contents: unknown = JSON.parse(await readFile(filename, 'utf8'))
+  const contents: unknown = JSON.parse(bytes.toString('utf8'))
   return { reference, filename, contents }
 }
 
