@@ -15,6 +15,7 @@ import {
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { gunzipSync, gzipSync } from 'node:zlib'
 import { afterEach, expect, test } from 'vitest'
 import { PNG } from 'pngjs'
 import { compareRasterEvidence } from './paired-raster'
@@ -45,6 +46,7 @@ import type { NativeWorkloadSummary } from './paired-native'
 import { createScriptError } from '../structured-errors'
 import { EXCLUSION_GROUPS, sourceIdentity } from './evaluation-custody'
 import { encoded } from './serialization'
+import { DEVELOPMENT_POLICY_SHA256 } from './development-exclusions'
 import {
   browserInput,
   evaluationCounts,
@@ -1624,12 +1626,13 @@ async function syntheticTrustedEvaluation(
 }
 
 function syntheticBatch() {
+  const payload = encoded(syntheticMessages())
   return {
     file: 'oasst1-batch-999.json.gz',
     messages: 100 as const,
     sourceSha256: syntheticMessages().map((message) => message.sha256),
-    assetSha256: sha('owned synthetic asset'),
-    uncompressedSha256: sha('owned synthetic payload'),
+    assetSha256: sha(gzipSync(payload)),
+    uncompressedSha256: sha(payload),
     status: 'sealed' as const,
   }
 }
@@ -1649,6 +1652,11 @@ async function syntheticCustody(
   const evaluation = path.join(root, 'packages/markdown/test/evaluation')
   await writeFile(path.join(evaluation, 'LICENSE'), 'synthetic-license')
   await writeFile(path.join(root, 'scripts/markdown/snapshot-evaluation.ts'), 'synthetic-selector')
+  for (const file of ['development-exclusions.ts', 'development-exclusion-policy.json'])
+    await writeFile(
+      path.join(root, 'scripts/markdown', file),
+      await readFile(new URL(file, import.meta.url)),
+    )
   await writeFile(
     path.join(evaluation, 'custody.json'),
     encoded({
@@ -1664,6 +1672,7 @@ async function syntheticCustody(
           exclusions,
           exclusionsSha256: sha(encoded(exclusions)),
           freeze: {
+            developmentPolicySha256: DEVELOPMENT_POLICY_SHA256,
             curator: 'synthetic-control',
             custodyStartedAt: time,
             ledgerDirectory: path.join(root, 'evidence/ledger'),
@@ -1699,6 +1708,13 @@ async function trustedSyntheticFixture() {
   temporary.add(root)
   await writeSyntheticTree(root)
   const batch = syntheticBatch()
+  const payload = encoded(syntheticMessages())
+  const compressed = gzipSync(payload)
+  expect(batch.sourceSha256).toEqual(syntheticMessages().map((message) => sha(message.source)))
+  expect(batch.assetSha256).toBe(sha(compressed))
+  expect(batch.uncompressedSha256).toBe(sha(payload))
+  expect(gunzipSync(compressed).toString('utf8')).toBe(payload)
+  await writeFile(path.join(root, 'packages/markdown/test/evaluation', batch.file), compressed)
   const manifest: Parameters<typeof sourceIdentity>[0] = {
     schemaVersion: 1,
     dataset: 'owned-synthetic-controls',
