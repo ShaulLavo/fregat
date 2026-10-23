@@ -23,6 +23,10 @@ from host_telemetry_os import (
 )
 
 
+class CaptureInterrupted(Exception):
+    """Keep capture signals separate from retriable OS observation failures."""
+
+
 def utc_now() -> str:
     return (
         datetime.now(timezone.utc)
@@ -213,7 +217,7 @@ class Collector:
         self.sample("after")
 
     def interrupt(self, signum, _frame) -> None:
-        raise InterruptedError(f"Capture received signal {signum}")
+        raise CaptureInterrupted(f"Capture received signal {signum}")
 
     def close(self) -> None:
         self.journal.close()
@@ -335,7 +339,7 @@ def run_capture(args) -> int:
         for signum in (signal.SIGINT, signal.SIGTERM):
             previous_handlers[signum] = signal.signal(signum, collector.interrupt)
         return execute_capture(args, collector, report)
-    except InterruptedError as error:
+    except CaptureInterrupted as error:
         collector.record(
             "interrupted", errorType=type(error).__name__, message=str(error)
         )
@@ -365,7 +369,7 @@ def execute_capture(args, collector: Collector, report: Path) -> int:
             from host_telemetry_native import prepare_native
 
             native = prepare_native(args.command, report, args.evidence_root, collector)
-    except InterruptedError:
+    except CaptureInterrupted:
         raise
     except (
         OSError,
@@ -490,7 +494,7 @@ def wait_child(child, timeout: float) -> tuple[int, str]:
     try:
         status = child.wait(timeout=timeout)
         return status, "exited"
-    except InterruptedError:
+    except CaptureInterrupted:
         terminate_group(child.pid)
         kill_group(child.pid)
         child.wait(timeout=2)
