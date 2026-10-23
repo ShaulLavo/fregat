@@ -2,6 +2,7 @@ import { createMarkdownSession } from '@workspace/markdown/utils/session'
 import { vi } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
+import { recordMarkdownInputReceipt } from '../../../../test/markdown-input-receipt'
 import { createProductionMarkdownProbe } from '../../../../test/factories/markdown-production'
 
 test('production oracle warmup does not wait for undecoded link chrome', async ({
@@ -31,6 +32,7 @@ test('production oracle warmup does not wait for undecoded link chrome', async (
 })
 
 test('production oracle warmup still waits for message image decoding', async ({
+  annotate,
   onTestFinished,
 }) => {
   const host = document.createElement('main')
@@ -48,6 +50,7 @@ test('production oracle warmup still waits for message image decoding', async ({
   })
   let complete = false
   const source = `![Answer](${location.origin}/icons/fregat-favicon.svg)`
+  await recordMarkdownInputReceipt({ annotate, site: 'production-warmup/image', source })
   pending = probe.run(source, []).then(() => {
     complete = true
   })
