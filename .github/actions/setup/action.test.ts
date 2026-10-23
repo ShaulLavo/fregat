@@ -247,7 +247,9 @@ async function runBash(script: string, root: string, env: Record<string, string 
 const realSupported = supported && Bun.which('tar') !== null
 if (!realSupported) console.info('Skipping real Bun lifecycle controls. Bash and tar are required.')
 
-async function lifecycleFixture(mode: 'cold' | 'healthy' | 'warm' | 'workspace' | 'persistent') {
+async function lifecycleFixture(
+  mode: 'cold' | 'healthy' | 'warm' | 'workspace' | 'persistent' | 'slow-filesystem',
+) {
   const warm = mode === 'warm'
   const workspace = mode === 'workspace' || mode === 'persistent'
   const healthy = mode === 'healthy'
@@ -355,6 +357,7 @@ if (args.includes('--ignore-scripts')) {
   appendFileSync(${JSON.stringify(path.join(root, 'prep-state'))}, [process.cwd() === ${JSON.stringify(install)}, existsSync(${JSON.stringify(path.join(install, 'node_modules'))}), configEqual].join(' ') + '\\n')
 }
 appendFileSync(${JSON.stringify(path.join(root, 'raw-output'))}, output)
+if (status !== 0 && args.includes('--ignore-scripts') && ${JSON.stringify(mode === 'slow-filesystem')}) process.stdout.write('warn: Slow filesystem detected. If ' + process.env.BUN_INSTALL_CACHE_DIR + ' is a network drive, consider setting $BUN_INSTALL_CACHE_DIR to a local folder.\\n')
 process.stdout.write(output.replaceAll(${JSON.stringify(url)}, 'https://github.com/fixture/packages/releases/download/v1/bad.tgz'))
 if (status !== 0 && args.includes('--ignore-scripts')) await fetch(${JSON.stringify(`http://127.0.0.1:${server.port}/recover`)})
 process.exit(status)
@@ -415,7 +418,14 @@ process.exit(status)
     if (mode === 'persistent') expect(raw).toMatch(/^\[[0-9]+\.[0-9][0-9]ms\] done$/m)
     expect(scriptsAtRecovery).toBe('')
     expect(readFileSync(scriptLog, 'utf8')).toBe('good\nroot\n')
-    const preparationCounts = { healthy: 1, persistent: 3, cold: 2, workspace: 2, warm: 1 }
+    const preparationCounts = {
+      healthy: 1,
+      persistent: 3,
+      cold: 2,
+      workspace: 2,
+      warm: 1,
+      'slow-filesystem': 2,
+    }
     const preparationCount = preparationCounts[mode]
     expect(recoveryCalls).toBe(preparationCount - 1)
     expect(readFileSync(path.join(root, 'prep-state'), 'utf8')).toBe(
@@ -440,6 +450,13 @@ test.skipIf(!realSupported)(
   'real Bun cold recovery defers trusted and root lifecycle scripts until the final install',
   async () => {
     await lifecycleFixture('cold')
+  },
+)
+
+test.skipIf(!realSupported)(
+  'real Bun cold recovery accepts the exact slow-filesystem advisory and defers lifecycle scripts',
+  async () => {
+    await lifecycleFixture('slow-filesystem')
   },
 )
 
