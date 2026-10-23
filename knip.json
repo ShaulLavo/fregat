@@ -82,6 +82,7 @@
         "agent/desktop-display.ts",
         "large-file/bench.ts",
         "markdown/production-browser.ts",
+        "markdown/production-shards.ts",
         "markdown/production-resource-retention.ts",
         "markdown/production-server.ts",
         "markdown/production-workloads.ts",
