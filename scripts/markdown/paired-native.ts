@@ -6,12 +6,20 @@ import { cpus, hostname } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
+import * as v from 'valibot'
 import type { MarkdownBlock } from '../../packages/markdown/src/utils/blocks'
 import { blockToHast, createHastProcessor } from '../../packages/markdown/src/utils/hast'
 import type { MarkdownSession } from '../../packages/markdown/src/utils/session'
 import { readyRemarkExtensions } from '../../packages/markdown/test/qualification'
 import { createScriptError } from '../structured-errors'
 import { percentile } from './bench-types'
+import { qualificationProvenance } from './provenance'
+import {
+  nativeCapturePlan as nativeCapturePlanSchema,
+  nativeShardSelections,
+  productionShard,
+  type ProductionShard,
+} from './production-shards'
 import { writeJsonl, type RawTimingRef } from './timing-artifacts'
 import frozenBudget from './promotion-budget.json'
 import { metricBudget } from './promotion'
@@ -83,8 +91,15 @@ export type PairedNativeOptions = {
   readonly mode: 'quick' | 'qualification'
   readonly seed?: number
   readonly fixtureIds?: readonly string[]
+  readonly capture?: {
+    readonly plan: string
+    readonly index: number
+    readonly launchId: string
+  }
 }
-export type NativePairRecord = {
+export type NativeShard = ProductionShard
+
+type NativePairRecord = {
   readonly workload: NativePairWorkload['id']
   readonly pair: NativePair
 }
@@ -470,24 +485,143 @@ function measureRevision(
   }
 }
 
+type NativeSourceMetadata = Awaited<ReturnType<typeof provenance>>
+type NativeCapturePlan = v.InferOutput<typeof nativeCapturePlanSchema>
+
+function nativeWorkloadManifestSha256(workloads: readonly NativePairWorkload[]) {
+  return hash(
+    'sha256',
+    JSON.stringify(
+      workloads.map(({ source, revisions, ...entry }) => ({
+        ...entry,
+        sourceSha256: hash('sha256', source, 'hex'),
+        revisionSourceSha256: revisions?.map((source) => hash('sha256', source, 'hex')) ?? [],
+      })),
+    ),
+    'hex',
+  )
+}
+
+export async function createNativeCapturePlan(
+  seed: number,
+  purpose: NativeCapturePlan['purpose'],
+  sourceMetadata?: NativeSourceMetadata,
+): Promise<NativeCapturePlan> {
+  requireInteger(seed, 'seed', 0)
+  const checkout = fileURLToPath(new URL('../../', import.meta.url))
+  const qualification = await qualificationProvenance(checkout)
+  const { revision: _revision, ...identity } = sourceMetadata ?? (await provenance())
+  const plan = {
+    schemaVersion: 1,
+    kind: 'native-capture-plan',
+    purpose,
+    metadata: {
+      ...identity,
+      seed,
+      workloadManifestSha256: nativeWorkloadManifestSha256(nativePairWorkloads('qualification')),
+      qualification,
+    },
+    shards: nativeShardSelections(nativePairWorkloads('qualification')),
+  } satisfies NativeCapturePlan
+  v.parse(nativeCapturePlanSchema, plan)
+  return plan
+}
+
+export function validateNativeCapturePlan(value: unknown, expected: NativeCapturePlan) {
+  const observed = v.parse(nativeCapturePlanSchema, value)
+  if (JSON.stringify(orderedValue(observed)) !== JSON.stringify(orderedValue(expected)))
+    throw createScriptError(
+      'Native capture plan differs from current source identity or ordered population.',
+      {
+        internal: { expectedSelections: expected.shards.length },
+      },
+    )
+  return expected
+}
+
+export function nativeShardSelection(
+  plan: NativeCapturePlan,
+  index: number,
+  planSha256: string,
+  launchId: string,
+): NativeShard {
+  requireInteger(index, 'selection index', 0)
+  const selection = plan.shards[index]
+  if (!selection)
+    throw createScriptError('Native shard requires an existing selection.', { internal: { index } })
+  return v.parse(productionShard, { ...selection, index, planSha256, launchId })
+}
+
+async function selectedNativeShard(options: PairedNativeOptions, metadata: NativeSourceMetadata) {
+  if (!options.capture || options.mode !== 'qualification' || options.fixtureIds !== undefined)
+    throw createScriptError('Native shards require qualification mode and plan selection.', {
+      internal: { mode: options.mode },
+    })
+  const bytes = await readFile(options.capture.plan)
+  const value: unknown = JSON.parse(bytes.toString('utf8'))
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('purpose' in value) ||
+    (value.purpose !== 'qualification' && value.purpose !== 'development')
+  )
+    throw createScriptError('Native capture plan requires an explicit purpose.', {
+      internal: { argument: 'capture-plan' },
+    })
+  const expected = await createNativeCapturePlan(options.seed ?? 176, value.purpose, metadata)
+  const plan = validateNativeCapturePlan(value, expected)
+  return {
+    shard: nativeShardSelection(
+      plan,
+      options.capture.index,
+      hash('sha256', bytes, 'hex'),
+      options.capture.launchId,
+    ),
+    qualification: plan.metadata.qualification,
+  }
+}
+
+function claimNativeShardProcess() {
+  if (nativeCaptureLaunched)
+    throw createScriptError('Native shard capture requires a fresh process per launch.', {
+      internal: { launched: nativeCaptureLaunched },
+    })
+}
+
+let nativeCaptureLaunched = false
+
 export async function runPairedNative(options: PairedNativeOptions) {
-  const { createMarkdownSession } = await import('../../packages/markdown/src/utils/session')
-  const { createTreeSitterMarkdownSession, initializeTreeSitterMarkdown } =
-    await import('../../packages/markdown/src/utils/tree-sitter-session')
   const startedAt = new Date().toISOString()
-  const extensions = await readyRemarkExtensions()
-  await initializeTreeSitterMarkdown()
   const seed = options.seed ?? 176
   const profile = BENCHMARK_PROFILES[options.mode === 'quick' ? 'quick' : 'promotion']
   const orders = pairedTrialOrders(profile.trials, seed)
   const allWorkloads = nativePairWorkloads(options.mode)
-  const workloads = selectWorkloads(allWorkloads, options.fixtureIds)
+  const sourceMetadata = await provenance()
+  const selected = options.capture ? await selectedNativeShard(options, sourceMetadata) : undefined
+  const shard = selected?.shard
+  const workloads = selectWorkloads(allWorkloads, shard ? [shard.workload] : options.fixtureIds)
+  await mkdir(options.output, { recursive: true })
+  await requireMissingNativeOutput(path.join(options.output, 'paired-native.json'))
+  await requireMissingNativeOutput(path.join(options.output, 'raw-native-pairs.jsonl'))
+  if (shard) claimNativeShardProcess()
+  nativeCaptureLaunched = true
+  const initializationStartedAt = new Date().toISOString()
+  const initializationStart = performance.now()
+  const { createMarkdownSession } = await import('../../packages/markdown/src/utils/session')
+  const { createTreeSitterMarkdownSession, initializeTreeSitterMarkdown } =
+    await import('../../packages/markdown/src/utils/tree-sitter-session')
+  const extensions = await readyRemarkExtensions()
+  await initializeTreeSitterMarkdown()
+  const initialization = {
+    startedAt: initializationStartedAt,
+    finishedAt: new Date().toISOString(),
+    durationMs: performance.now() - initializationStart,
+  }
   const factories = {
     remark: () => createMarkdownSession(),
     'tree-sitter': () => createTreeSitterMarkdownSession(),
   }
-  await mkdir(options.output, { recursive: true })
-  const observed = await writeNativePairs({
+  const writeOptions: NativeWriteOptions = {
     output: options.output,
     workloads,
     orders,
@@ -495,7 +629,10 @@ export async function runPairedNative(options: PairedNativeOptions) {
     seed,
     mode: options.mode,
     capture: (trial) => runNativeTrial({ ...trial, factory: factories[trial.engine], extensions }),
-  })
+    pair: shard?.pair,
+  }
+  const launchPreparation = shard ? await writeNativeLaunchPreparation(writeOptions) : undefined
+  const observed = await writeNativePairs(writeOptions)
   const results = observed.workloads
   const missing = [
     'Production browser build, quiet-host timing qualification and paint completion receipts',
@@ -507,22 +644,32 @@ export async function runPairedNative(options: PairedNativeOptions) {
     '1/8-unit schedules above 8 KiB and fine-grained pathological streaming schedules',
   ]
   if (workloads.length !== allWorkloads.length) missing.push('Unselected native workload cells')
+  if (shard)
+    missing.push(
+      'Unselected original native pairs; aggregate comparisons require explicit shard assembly',
+    )
   const report = {
     schemaVersion: 2 as const,
     verdict: 'NOT VERIFIED',
     scope: 'paired-native-source',
-    status: nativeStatus(results),
+    status:
+      launchPreparation && launchPreparation.mismatchedPairs > 0 ? 'FAILED' : nativeStatus(results),
+    ...(shard ? { shard } : {}),
     mode: options.mode,
     metadata: {
       startedAt,
+      ...(selected
+        ? { initialization, launchPreparation, qualification: selected.qualification }
+        : {}),
       finishedAt: new Date().toISOString(),
       seed,
       trials: profile.trials,
       warmups: profile.warmups,
       bootstrapUnit: 'independent paired trial',
       statistic: 'p95 of trial p95 updates/settlements; p95 of trial mount/total CPU',
-      cacheState:
-        'warm runtime; fresh session, HAST processor and block projection cache per engine per trial',
+      cacheState: shard
+        ? 'fresh process; three separate full-workload paired preparation replays; fresh session, HAST processor and block projection cache per counted arm'
+        : 'warm runtime; fresh session, HAST processor and block projection cache per engine per trial',
       boundary:
         'Session creation plus parse/heal and safe HAST; excludes source generation, rendered digest, source-coordinate validation, JSX, React, workers and paint',
       outputContract:
@@ -537,18 +684,8 @@ export async function runPairedNative(options: PairedNativeOptions) {
       platform: process.platform,
       architecture: process.arch,
       runtime: `${process.release.name} ${process.version}`,
-      workloadManifestSha256: hash(
-        'sha256',
-        JSON.stringify(
-          allWorkloads.map(({ source, revisions, ...entry }) => ({
-            ...entry,
-            sourceSha256: hash('sha256', source, 'hex'),
-            revisionSourceSha256: revisions?.map((source) => hash('sha256', source, 'hex')) ?? [],
-          })),
-        ),
-        'hex',
-      ),
-      ...(await provenance()),
+      workloadManifestSha256: nativeWorkloadManifestSha256(allWorkloads),
+      ...sourceMetadata,
     },
     workloads: results,
     pairsArtifact: observed.pairsArtifact,
@@ -597,6 +734,7 @@ type NativeWriteOptions = {
   readonly seed: number
   readonly mode: PairedNativeOptions['mode']
   readonly capture: NativeTrialCapture
+  readonly pair?: number
 }
 type NativeWriteState = {
   readonly workloads: NativeWorkloadSummary[]
@@ -604,22 +742,91 @@ type NativeWriteState = {
 }
 
 export async function writeNativePairs(options: NativeWriteOptions) {
-  await requireMissingNativeOutput(path.join(options.output, 'raw-native-pairs.jsonl'))
+  return writeNativeRecords(options, 'counted')
+}
+
+async function writeNativeRecords(
+  options: NativeWriteOptions,
+  role: 'counted' | 'launch-preparation',
+) {
+  validateNativePairSelection(options)
+  const file = role === 'counted' ? 'raw-native-pairs.jsonl' : 'raw-native-preparation.jsonl'
+  await requireMissingNativeOutput(path.join(options.output, file))
   await requireMissingNativeOutput(path.join(options.output, 'paired-native.json'))
   const state: NativeWriteState = { workloads: [], failure: null }
   let pairsArtifact: RawTimingRef
   try {
     pairsArtifact = await writeJsonl({
       root: options.output,
-      file: 'raw-native-pairs.jsonl',
-      records: nativePairRecords(options, state),
+      file,
+      records: taggedNativeRecords(options, state, role),
     })
   } catch (error) {
-    if (state.failure) await preserveNativeFailure(options.output, state.failure)
+    if (state.failure) await preserveNativeFailure(options.output, state.failure, role)
     throw error
   }
-  if (state.failure) await preserveNativeFailure(options.output, state.failure, pairsArtifact)
+  if (state.failure) await preserveNativeFailure(options.output, state.failure, role, pairsArtifact)
   return { pairsArtifact, workloads: state.workloads }
+}
+
+function validateNativePairSelection(options: NativeWriteOptions) {
+  if (options.pair === undefined) return
+  if (
+    options.workloads.length === 1 &&
+    Number.isSafeInteger(options.pair) &&
+    options.pair >= -options.warmups &&
+    options.pair < options.orders.length
+  )
+    return
+  throw createScriptError('Native pair selection requires one workload and an original trial id.', {
+    internal: { pair: options.pair, workloads: options.workloads.length },
+  })
+}
+
+async function* taggedNativeRecords(
+  options: NativeWriteOptions,
+  state: NativeWriteState,
+  role: 'counted' | 'launch-preparation',
+) {
+  for await (const record of nativePairRecords(options, state)) {
+    if (role === 'counted') yield record
+    else yield { role, preparation: record.pair.trial, ...record }
+  }
+}
+
+export async function writeNativeLaunchPreparation(options: NativeWriteOptions) {
+  if (options.workloads.length !== 1)
+    throw createScriptError('Native launch preparation requires one workload.', {
+      internal: { workloads: options.workloads.length },
+    })
+  await requireMissingNativeOutput(path.join(options.output, 'raw-native-pairs.jsonl'))
+  await requireMissingNativeOutput(path.join(options.output, 'native-preparation-failure.json'))
+  const startedAt = new Date().toISOString()
+  const start = performance.now()
+  const observed = await writeNativeRecords(
+    {
+      ...options,
+      orders: pairedTrialOrders(3, options.seed),
+      warmups: 0,
+      pair: undefined,
+    },
+    'launch-preparation',
+  )
+  return {
+    policy: 'paired-full-workload-three-replays-v1' as const,
+    realm: 'fresh Bun process per launch; shared module/parser/JIT caches within launch',
+    sessions: 'fresh session/HAST processor/projection WeakMap per arm',
+    gc: 'no forced GC',
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    durationMs: performance.now() - start,
+    pairs: 3,
+    arms: 6,
+    trialIds: [0, 1, 2],
+    orderSeed: options.seed,
+    artifact: observed.pairsArtifact,
+    mismatchedPairs: observed.workloads.reduce((count, entry) => count + entry.mismatchedPairs, 0),
+  }
 }
 
 async function requireMissingNativeOutput(file: string) {
@@ -635,15 +842,20 @@ async function requireMissingNativeOutput(file: string) {
 async function preserveNativeFailure(
   output: string,
   failure: NativeCaptureFailure,
+  role: 'counted' | 'launch-preparation',
   pairsArtifact?: RawTimingRef,
 ): Promise<never> {
   const { error, ...context } = failure
   try {
     await writeFile(
-      path.join(output, 'native-pair-failure.json'),
+      path.join(
+        output,
+        role === 'counted' ? 'native-pair-failure.json' : 'native-preparation-failure.json',
+      ),
       `${JSON.stringify(
         {
           ...context,
+          role,
           pairsArtifact,
           error:
             error instanceof Error
@@ -681,6 +893,7 @@ async function* nativeWorkloadRecords(
   let mismatchedPairs = 0
   for (let warmup = 0; warmup < options.warmups; warmup++) {
     const trial = -warmup - 1
+    if (options.pair !== undefined && options.pair !== trial) continue
     const order = warmupOrders[warmup]
     const arms = captureNativeArms(entry, order, trial, options.capture, state)
     if (!arms) return
@@ -690,6 +903,7 @@ async function* nativeWorkloadRecords(
   }
   const metrics: NativeMetricPair[] = []
   for (const [trial, order] of options.orders.entries()) {
+    if (options.pair !== undefined && options.pair !== trial) continue
     const arms = captureNativeArms(entry, order, trial, options.capture, state)
     if (!arms) return
     const pair = nativePair(arms, order, trial)
@@ -726,16 +940,19 @@ function nativeWorkloadSummary(
     scheduleUnits: entry.scheduleUnits,
     observedPairs: metrics.length,
     mismatchedPairs,
-    comparisons: (['updateP95', 'settlementP95', 'mountP95', 'streamCpu'] as const).map((metric) =>
-      pairedConfidence({
-        workload: entry.id,
-        metric,
-        baseline: metrics.map((pair) => pair.baseline[metric]),
-        candidate: metrics.map((pair) => pair.candidate[metric]),
-        seed: options.seed,
-        resamples: options.mode === 'qualification' ? 4096 : 256,
-      }),
-    ),
+    comparisons:
+      metrics.length === 0
+        ? []
+        : (['updateP95', 'settlementP95', 'mountP95', 'streamCpu'] as const).map((metric) =>
+            pairedConfidence({
+              workload: entry.id,
+              metric,
+              baseline: metrics.map((pair) => pair.baseline[metric]),
+              candidate: metrics.map((pair) => pair.candidate[metric]),
+              seed: options.seed,
+              resamples: options.mode === 'qualification' ? 4096 : 256,
+            }),
+          ),
   }
 }
 
@@ -810,6 +1027,8 @@ function trialMetric(trial: NativeTrial, metric: PairedMetric) {
 
 function nativeStatus(results: readonly NativeWorkloadSummary[]) {
   if (results.some((result) => result.mismatchedPairs > 0)) return 'FAILED'
+  if (results.length === 0 || results.some((result) => result.observedPairs === 0))
+    return 'INCONCLUSIVE'
   if (
     results.some((result) =>
       result.comparisons.some((comparison) => comparison.status === 'failed'),
@@ -907,6 +1126,23 @@ function requireInteger(value: number, field: string, minimum: number) {
   })
 }
 
+function nativeCaptureArguments(values: {
+  readonly 'capture-plan'?: string
+  readonly 'selection-index'?: string
+  readonly 'launch-id'?: string
+  readonly purpose?: string
+}) {
+  const plan = values['capture-plan']
+  const index = values['selection-index']
+  const launchId = values['launch-id']
+  if (!plan && index === undefined && !launchId && values.purpose === undefined) return undefined
+  if (!plan || index === undefined || !launchId || values.purpose !== undefined)
+    throw createScriptError('Use capture-plan, selection-index and launch-id together.', {
+      internal: { argument: 'capture-plan' },
+    })
+  return { plan, index: Number(index), launchId }
+}
+
 if (import.meta.main) {
   const { values } = parseArgs({
     options: {
@@ -914,8 +1150,41 @@ if (import.meta.main) {
       seed: { type: 'string', default: '176' },
       fixture: { type: 'string', multiple: true },
       out: { type: 'string' },
+      'write-capture-plan': { type: 'string' },
+      purpose: { type: 'string' },
+      'capture-plan': { type: 'string' },
+      'selection-index': { type: 'string' },
+      'launch-id': { type: 'string' },
     },
   })
+  if (values['write-capture-plan']) {
+    if (
+      values.mode !== 'qualification' ||
+      (values.purpose !== 'development' && values.purpose !== 'qualification') ||
+      values.out ||
+      values.fixture ||
+      values['capture-plan'] ||
+      values['selection-index'] ||
+      values['launch-id']
+    )
+      throw createScriptError(
+        'Use qualification mode and explicit purpose to write a native capture plan.',
+        {
+          internal: { argument: 'write-capture-plan' },
+        },
+      )
+    const file = path.resolve(values['write-capture-plan'])
+    const purpose = values.purpose
+    await writeJsonl({
+      root: path.dirname(file),
+      file: path.basename(file),
+      records: (async function* () {
+        yield await createNativeCapturePlan(Number(values.seed), purpose)
+      })(),
+    })
+    process.exit(0)
+  }
+  const capture = nativeCaptureArguments(values)
   if (!values.out || (values.mode !== 'quick' && values.mode !== 'qualification'))
     throw createScriptError('Use --out DIRECTORY and --mode quick|qualification', {
       internal: { argument: 'out or mode' },
@@ -925,13 +1194,14 @@ if (import.meta.main) {
     mode: values.mode,
     seed: Number(values.seed),
     fixtureIds: values.fixture,
+    capture,
   })
   process.stdout.write(
     `${JSON.stringify({ verdict: report.verdict, status: report.status, evidence: values.out, workloads: report.workloads.length })}\n`,
   )
   process.exitCode =
     report.status === 'FAILED' ||
-    (values.mode === 'qualification' && report.status === 'INCONCLUSIVE')
+    (!capture && values.mode === 'qualification' && report.status === 'INCONCLUSIVE')
       ? 1
       : 0
 }
