@@ -9,6 +9,8 @@ from host_telemetry import run_capture
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--kind", choices=("browser", "native"), default="browser")
+    parser.add_argument("--evidence-root", type=Path)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--adapter-config", type=Path, required=True)
@@ -22,6 +24,12 @@ def main() -> int:
         parser.error("--interval-seconds must be positive and at most 2")
     if not args.command or args.command.pop(0) != "--" or not args.command:
         parser.error("Supply the capture command after --")
+    if args.kind == "native" and args.evidence_root is None:
+        parser.error("Native mode requires --evidence-root")
+    if args.kind == "native" and "{hostEvidence}" in args.command:
+        parser.error(
+            "Native mode takes the producer command without hostEvidence substitution"
+        )
     return run_capture(args)
 
 

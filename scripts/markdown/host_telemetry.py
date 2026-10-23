@@ -230,24 +230,53 @@ def validate_coverage(observations: list[dict], start: float, end: float) -> Non
 
 
 def finalize(
-    collector: Collector, report: Path, host_file: Path, launched: float, exited: float
+    collector: Collector,
+    report: Path,
+    host_file: Path,
+    launched: float,
+    exited: float,
+    native=None,
 ) -> dict:
     if collector.failures:
         raise ValueError("Observation failures prevent telemetry finalization")
     raw = report.read_bytes()
     value = json.loads(raw)
+    if native is None:
+        start, end = browser_interval(value, collector.identity, host_file)
+    else:
+        from host_telemetry_native import measured_interval
+
+        start, end = measured_interval(value, native, collector.identity)
+    if not launched <= start < end <= exited:
+        raise ValueError("Reported run timestamps fall outside the owned launch")
+    validate_coverage(collector.observations, start, end)
+    artifact = dict(
+        **collector.identity,
+        reportSha256=hashlib.sha256(raw).hexdigest(),
+        observations=collector.observations,
+    )
+    if native is not None:
+        artifact["nativeInvocation"] = native.invocation()
+    write_json(collector.out / "quiet-host.json", artifact)
+    return {
+        "reportSha256": artifact["reportSha256"],
+        "observations": len(collector.observations),
+    }
+
+
+def browser_interval(
+    value: dict, identity: dict, host_file: Path
+) -> tuple[float, float]:
     host = value["host"]
-    if host["id"] != collector.identity["host"]:
+    if host["id"] != identity["host"]:
         raise ValueError("Report host identity differs from the observed host")
     for key in ("platform", "architecture", "hardware", "osRelease", "memoryBytes"):
-        if host[key] != collector.identity[key]:
+        if host[key] != identity[key]:
             raise ValueError(f"Report host {key} differs from the observed host")
     start, end = (
         timestamp(host["before"]["observedAt"]),
         timestamp(host["after"]["observedAt"]),
     )
-    if not launched <= start < end <= exited:
-        raise ValueError("Reported run timestamps fall outside the owned launch")
     evidence = value["capture"]["hostEvidence"]
     if evidence != {
         "sha256": hashlib.sha256(host_file.read_bytes()).hexdigest(),
@@ -256,17 +285,7 @@ def finalize(
         raise ValueError(
             "Report prelaunch host evidence differs from the collector artifact"
         )
-    validate_coverage(collector.observations, start, end)
-    artifact = dict(
-        **collector.identity,
-        reportSha256=hashlib.sha256(raw).hexdigest(),
-        observations=collector.observations,
-    )
-    write_json(collector.out / "quiet-host.json", artifact)
-    return {
-        "reportSha256": artifact["reportSha256"],
-        "observations": len(collector.observations),
-    }
+    return start, end
 
 
 def terminate_group(group: int) -> None:
@@ -287,7 +306,7 @@ def run_capture(args) -> int:
     out, report = args.out.resolve(), args.report.resolve()
     if report.exists():
         raise ValueError("Report destination must be absent before launch")
-    if "{hostEvidence}" not in args.command:
+    if args.kind == "browser" and "{hostEvidence}" not in args.command:
         raise ValueError("Command must include the literal {hostEvidence} argument")
     command = adapter_config(args.adapter_config)
     out.mkdir(parents=True, exist_ok=False)
@@ -340,6 +359,37 @@ def run_capture(args) -> int:
 
 
 def execute_capture(args, collector: Collector, report: Path) -> int:
+    native = None
+    try:
+        if args.kind == "native":
+            from host_telemetry_native import prepare_native
+
+            native = prepare_native(args.command, report, args.evidence_root, collector)
+    except InterruptedError:
+        raise
+    except (
+        OSError,
+        ValueError,
+        TypeError,
+        KeyError,
+        RuntimeError,
+        subprocess.SubprocessError,
+    ) as error:
+        collector.record(
+            "native-preparation-error",
+            errorType=type(error).__name__,
+            message=str(error),
+        )
+        write_json(
+            collector.out / "receipt.json",
+            {
+                "status": "incomplete",
+                "launched": False,
+                "errorType": type(error).__name__,
+                "message": str(error),
+            },
+        )
+        return 1
     collector.sample("before")
     time.sleep(0.2)
     collector.sample("before")
@@ -354,9 +404,11 @@ def execute_capture(args, collector: Collector, report: Path) -> int:
     command = [
         str(host_file) if arg == "{hostEvidence}" else arg for arg in args.command
     ]
+    if native is not None:
+        command = native.command
     try:
         status, reason, launched, exited, cleanup = launch_capture(
-            args, collector, command
+            args, collector, command, native.environment if native is not None else None
         )
     except (
         OSError,
@@ -391,7 +443,8 @@ def execute_capture(args, collector: Collector, report: Path) -> int:
         if not cleanup or reason != "exited":
             raise ValueError("Interrupted or unclean launch prevents finalization")
         receipt.update(
-            finalize(collector, report, host_file, launched, exited), status="bound"
+            finalize(collector, report, host_file, launched, exited, native),
+            status="bound",
         )
     except (
         OSError,
@@ -409,9 +462,9 @@ def execute_capture(args, collector: Collector, report: Path) -> int:
     return 128 - status if status < 0 else (status or int(receipt["status"] != "bound"))
 
 
-def launch_capture(args, collector, command) -> tuple:
+def launch_capture(args, collector, command, environment=None) -> tuple:
     launched = time.time()
-    child = subprocess.Popen(command, start_new_session=True)
+    child = subprocess.Popen(command, start_new_session=True, env=environment)
     try:
         collector.group = child.pid
         collector.record(

@@ -36,3 +36,5 @@ Run the narrow controls with:
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
   -s scripts/markdown -p test_host_telemetry.py -v
 ```
+
+For explicit native pair-shard launches, use [native host telemetry](native-host-telemetry.md).
