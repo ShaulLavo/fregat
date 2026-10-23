@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { test } from 'node:test'
+import { test } from 'vitest'
 import { decodeInputs, recoverInputs, selectedString } from './retained-input-hashes.mjs'
 
 const sha256 = (value) => createHash('sha256').update(value).digest('hex')
