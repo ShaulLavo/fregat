@@ -68,6 +68,31 @@ Every row needs matching evidence for the final candidate. The registry is `PROM
 | `native-paired`                 | All 75 cells, 20 independent pairs, three warmups, raw samples, invocation, and source/host records.               |
 | `production-timing`             | All 86 cells, 20 independent pairs, three warmups, headed Mac Chromium, and raw oracle/CPU/paint/transfer records. |
 
+### Prepare without opening sources
+
+Run the metadata-only command before dispatching selection:
+
+```sh
+bun scripts/markdown/prepare-evaluation.ts --asset <pinned-archive> --license <license> \
+    --out <new-receipt.json>
+```
+
+It hashes the compressed archive, checks the committed license and custody inventory, and counts
+built-in development exclusions. It reads no evaluation payload and creates no selection or ledger.
+Missing freeze or exclusions inputs produce `awaiting-inputs`; eligible capacity remains `null`.
+Output files use exclusive creation. Add `--exclude-manifest <exclusions.json>` and
+`--freeze-manifest <freeze.json>` to validate the metadata before the actual selection command.
+`metadata-validated` means the supplied metadata passes the existing custody checks. It does not
+establish historical exclusion completeness, unchanged candidate code, or 100 eligible messages.
+Only the authorized selector measures capacity, after the coordinator supplies both final inputs.
+
+Use a curator for selection and registration, then a separate evaluator with the frozen checkout
+and build for native and browser capture. Keep selected payloads and `browser-input.json` away from
+candidate developers until that evaluation ends. The ledger serializes exposure transitions; it
+cannot establish that two operator names represent independent people or agent contexts. Record
+that separation in the dispatch and retain every failed opening. Any informed fix retires the whole
+batch. Do not treat preparation controls as qualification evidence.
+
 ### Register a prospective batch
 
 Batches 001 through 003 have unknown historical exposure. `custody.json` permanently classifies
@@ -102,8 +127,9 @@ bun scripts/markdown/snapshot-evaluation.ts --asset <pinned-archive> --license <
 ```
 
 The command verifies the pinned archive and committed license before decoding. It keeps the fixed
-ordering and filters and requires 100 eligible unique sources per batch. Existing output paths,
-used batch names, duplicate message IDs, and insufficient capacity fail. It writes new assets,
+ordering and filters and requires 100 eligible unique sources per batch. Duplicate sources keep
+the attributable message with the lowest seeded priority, independently of archive row order.
+Existing output paths, used batch names, duplicate message IDs, and insufficient capacity fail. It writes new assets,
 appendable `manifest.json` and `custody.json`, the byte-exact `previous-manifest.json`, license,
 and `selection.json` with eligibility, invocation, actual times, selector identity, and canonical
 exclusions digest. It presents counts without message previews and imports no candidate parser.

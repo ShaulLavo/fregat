@@ -31,7 +31,7 @@ test('sealed selection excludes development hashes, duplicate sources and synthe
     new Set([hash('sha256', source, 'hex')]),
   )
   expect(selected).toHaveLength(1)
-  expect(selected[0]?.id).toBe('human')
+  expect(selected[0]?.id).toBe('repeated')
   expect(selected[0]?.sha256).toBe(hash('sha256', source + 'kept', 'hex'))
   expect(selected[0]?.provenance.license).toBe('Apache-2.0')
 })
@@ -227,4 +227,13 @@ test('malformed archive rows fail without echoing source bodies', () => {
     expect(String(error)).not.toContain(body)
     expect(String(error)).toContain('A dataset row requires valid message metadata and text.')
   }
+})
+
+test('seeded selection keeps the same attribution when duplicate-source rows are reordered', () => {
+  const rows = [message('duplicate-a'), message('duplicate-b')]
+  const encoded = (input: readonly Record<string, unknown>[]) =>
+    input.map((row) => JSON.stringify(row)).join('\n')
+  const selected = selectEvaluationMessages(encoded(rows), new Set())
+  expect(selected).toHaveLength(1)
+  expect(selectEvaluationMessages(encoded(rows.toReversed()), new Set())).toEqual(selected)
 })
