@@ -67,6 +67,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
   const identifiers = new Map()
   const changed = new Map()
   const aliases = []
+  const numericIncrementors = new Set()
   for (const sf of files.values()) index(sf)
   for (let pass = 0; pass < aliases.length; pass += 1) propagateWrites()
 
@@ -76,7 +77,20 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     indexWrites(node)
     ts.forEachChild(node, index)
   }
+  function unwrap(node) {
+    while (
+      node &&
+      (ts.isParenthesizedExpression(node) ||
+        ts.isAsExpression(node) ||
+        ts.isSatisfiesExpression(node) ||
+        ts.isNonNullExpression(node) ||
+        ts.isTypeAssertionExpression(node))
+    )
+      node = node.expression
+    return node
+  }
   function rootSymbol(node) {
+    node = unwrap(node)
     if (!node) return undefined
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
       return rootSymbol(node.expression)
@@ -118,7 +132,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.expression.getText() === 'Object' &&
+      unwrap(node.expression.expression).getText() === 'Object' &&
       ['assign', 'defineProperty', 'defineProperties'].includes(node.expression.name.text)
     )
       markWrite(node.arguments[0], node)
@@ -136,14 +150,18 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     return name.elements.flatMap((entry) => (entry.name ? bindingSymbols(entry.name) : []))
   }
   function referenceRoots(node) {
-    if (ts.isIdentifier(node)) return declaration(node) ? [symbol(node)] : []
+    node = unwrap(node)
+    if (ts.isIdentifier(node)) {
+      if (
+        !declaration(node) &&
+        Object.hasOwn(globals, node.text) &&
+        typeof globals[node.text] !== 'object' &&
+        typeof globals[node.text] !== 'function'
+      )
+        return []
+      return [symbol(node)]
+    }
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
-      return referenceRoots(node.expression)
-    if (
-      ts.isParenthesizedExpression(node) ||
-      ts.isAsExpression(node) ||
-      ts.isSatisfiesExpression(node)
-    )
       return referenceRoots(node.expression)
     if (ts.isArrayLiteralExpression(node)) return node.elements.flatMap(referenceRoots)
     if (ts.isObjectLiteralExpression(node)) return node.properties.flatMap(referenceRoots)
@@ -170,6 +188,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
   }
   function contextCounterWrite(key, write) {
     const loop = write.parent
+    if (!numericIncrementors.has(write)) return false
     if (!ts.isForStatement(loop) || loop.incrementor !== write) return false
     const name = loop.initializer?.declarations?.[0]?.name
     return name && ts.isIdentifier(name) && symbol(name) === key
@@ -181,9 +200,11 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     return fail(node, `mutable binding ${node.text}`)
   }
   function symbol(node) {
-    if (node.parent && ts.isShorthandPropertyAssignment(node.parent))
-      return checker.getShorthandAssignmentValueSymbol(node.parent)
-    return checker.getSymbolAtLocation(node)
+    const key =
+      node.parent && ts.isShorthandPropertyAssignment(node.parent)
+        ? checker.getShorthandAssignmentValueSymbol(node.parent)
+        : checker.getSymbolAtLocation(node)
+    return key ?? (Object.hasOwn(globals, node.text) ? `global:${node.text}` : undefined)
   }
   function nameOf(node) {
     if (ts.isPropertyAccessExpression(node)) return node.name.text
@@ -216,6 +237,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     if (ts.isFunctionDeclaration(declared)) return { functionNode: declared, env }
     if (ts.isBindingElement(declared)) return readBinding(declared, env, active)
     if (!ts.isVariableDeclaration(declared)) return fail(node, `unbound parameter ${node.text}`)
+    if (ts.isForStatement(declared.parent?.parent)) return fail(node, 'unbound loop counter')
     if (!declared.initializer) return fail(node, 'unbound initializer')
     if (active.has(declared)) return fail(node, 'recursive binding')
     return evaluate(declared.initializer, env, new Set(active).add(declared))
@@ -234,9 +256,8 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     return result.get(symbol(node.name))
   }
   function property(value, key, node) {
-    if (typeof key === 'symbol') return fail(node, 'unknown property key')
-    if (forbiddenKeys.has(key)) return fail(node, 'forbidden property')
-    if (typeof value === 'symbol') return fail(node, 'unreviewed receiver')
+    key = propertyKey(key, node)
+    knownShape(value, node)
     if (value === undefined || value === null) return fail(node, 'missing receiver')
     return value[key]
   }
@@ -259,7 +280,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     if (ts.isArrayLiteralExpression(node))
       return node.elements.flatMap((child) =>
         ts.isSpreadElement(child)
-          ? evaluate(child.expression, env, active)
+          ? Array.from(sequenceValue(evaluate(child.expression, env, active), child))
           : [evaluate(child, env, active)],
       )
     if (ts.isObjectLiteralExpression(node)) return object(node, env, active)
@@ -301,9 +322,8 @@ export function closedInputReader(ts, sources, imported = new Map()) {
   }
   function applyProperty(value, child, env, active) {
     if (ts.isSpreadAssignment(child))
-      return Object.assign(value, evaluate(child.expression, env, active))
-    const key = child.name?.text ?? child.name?.getText()
-    if (forbiddenKeys.has(key)) return fail(child, 'forbidden key')
+      return Object.assign(value, knownShape(evaluate(child.expression, env, active), child))
+    const key = memberKey(child.name, env, active)
     if (ts.isShorthandPropertyAssignment(child)) {
       value[key] = evaluate(child.name, env, active)
       return
@@ -321,10 +341,17 @@ export function closedInputReader(ts, sources, imported = new Map()) {
         .join('')
     )
   }
+  function primitiveValue(value, node) {
+    if (
+      typeof value === 'symbol' ||
+      typeof value === 'function' ||
+      (typeof value === 'object' && value !== null)
+    )
+      return fail(node, 'unsupported primitive conversion')
+    return value
+  }
   function primitiveText(value, node) {
-    if (typeof value === 'symbol' || (typeof value === 'object' && value !== null))
-      return fail(node, 'unknown string conversion')
-    return String(value)
+    return String(primitiveValue(value, node))
   }
   function binary(node, env, active) {
     const left = evaluate(node.left, env, active)
@@ -333,9 +360,8 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     if (op === '&&') return left && evaluate(node.right, env, active)
     if (op === '||') return left || evaluate(node.right, env, active)
     if (op === '??') return left ?? evaluate(node.right, env, active)
-    const right = evaluate(node.right, env, active)
-    if (typeof left === 'symbol' || typeof right === 'symbol')
-      return fail(node, 'unknown binary operand')
+    primitiveValue(left, node)
+    const right = primitiveValue(evaluate(node.right, env, active), node)
     const operators = {
       '+': () => left + right,
       '-': () => left - right,
@@ -363,6 +389,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
   function unary(node, env, active) {
     const value = evaluate(node.operand, env, active)
     condition(value, node)
+    if (node.operator !== ts.SyntaxKind.ExclamationToken) primitiveValue(value, node)
     if (node.operator === ts.SyntaxKind.MinusToken) return -value
     if (node.operator === ts.SyntaxKind.PlusToken) return +value
     if (node.operator === ts.SyntaxKind.ExclamationToken) return !value
@@ -376,6 +403,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     if (fn === String) return primitiveText(args[0], node)
     if ([Number, Boolean].includes(fn)) {
       condition(args[0], node)
+      if (fn === Number) primitiveValue(args[0], node)
       return fn(...args)
     }
     if (fn?.reviewed) return fn.reviewed(...args)
@@ -383,7 +411,7 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     return fail(node, 'unreviewed call')
   }
   function method(node, env, active) {
-    const receiver = evaluate(node.expression.expression, env, active)
+    const receiver = knownShape(evaluate(node.expression.expression, env, active), node)
     const name = node.expression.name.text
     const args = node.arguments.map((arg) => evaluate(arg, env, active))
     if (
@@ -395,34 +423,55 @@ export function closedInputReader(ts, sources, imported = new Map()) {
       return Object[name](...knownValue(args, node))
     if (receiver === Array && name === 'from')
       return Array.from(
-        args[0],
-        args[1] ? (value, index) => invoke(args[1], [value, index], active) : undefined,
+        arrayFromSource(args[0], node),
+        args[1] === undefined ? undefined : mappingCallback(args[1], node, active),
       )
     if (
       Array.isArray(receiver) &&
       ['map', 'flatMap', 'filter', 'find', 'some', 'every'].includes(name)
     )
-      return receiver[name]((value, index) => {
-        const result = invoke(args[0], [value, index], active)
-        return ['map', 'flatMap'].includes(name) ? result : condition(result, node)
-      })
-    if (Array.isArray(receiver) && name === 'concat') return receiver.concat(...args)
+      return arrayCallback(receiver, name, args[0], node, active)
+    if (Array.isArray(receiver) && name === 'concat')
+      return receiver.concat(...args.map((value) => knownShape(value, node)))
     if (Array.isArray(receiver) && name === 'entries') return Array.from(receiver.entries())
     if (name === 'join' && Array.isArray(receiver))
       receiver.forEach((value) => primitiveText(value, node))
     if (['replace', 'replaceAll'].includes(name) && args[1]?.functionNode)
       return fail(node, 'unsupported replacement callback')
+    if (Array.isArray(receiver) && ['includes', 'indexOf', 'lastIndexOf'].includes(name))
+      knownValue(receiver, node)
     if ((typeof receiver === 'string' || Array.isArray(receiver)) && methods.has(name))
       return receiver[name](...knownValue(args, node))
     return fail(node, `unreviewed method ${name}`)
   }
+  function mappingCallback(fn, node, active) {
+    if (!fn?.functionNode) return fail(node, 'unsupported mapping callback')
+    return (value, index) => invoke(fn, [value, index], active)
+  }
+  function arrayCallback(receiver, name, fn, node, active) {
+    const callback = mappingCallback(fn, node, active)
+    return receiver[name]((value, index) => {
+      const result = callback(value, index)
+      if (name === 'flatMap') knownShape(result, node)
+      return ['map', 'flatMap'].includes(name) ? result : condition(result, node)
+    })
+  }
+  function propertyKey(key, node) {
+    if (typeof key !== 'string' && typeof key !== 'number')
+      return fail(node, 'unknown property key')
+    if (forbiddenKeys.has(String(key))) return fail(node, 'forbidden property')
+    return key
+  }
+  function memberKey(key, env, active) {
+    if (ts.isComputedPropertyName(key))
+      return propertyKey(evaluate(key.expression, env, active), key)
+    if (ts.isIdentifier(key) || ts.isStringLiteralLike(key) || ts.isNumericLiteral(key))
+      return propertyKey(key.text, key)
+    return fail(key, 'unsupported member key')
+  }
   function bindingKey(entry, index, env, active) {
     if (ts.isArrayBindingPattern(entry.parent)) return index
-    const key = entry.propertyName ?? entry.name
-    if (ts.isComputedPropertyName(key)) return evaluate(key.expression, env, active)
-    if (ts.isIdentifier(key) || ts.isStringLiteralLike(key) || ts.isNumericLiteral(key))
-      return key.text
-    return fail(entry, 'unsupported binding key')
+    return memberKey(entry.propertyName ?? entry.name, env, active)
   }
   function bindElement(entry, index, value, env, active) {
     if (ts.isOmittedExpression(entry)) return
@@ -527,9 +576,9 @@ export function closedInputReader(ts, sources, imported = new Map()) {
   }
   function finiteRows(node, env) {
     try {
-      return evaluate(node, env)
+      return sequenceValue(evaluate(node, env), node)
     } catch (error) {
-      if (!ts.isArrayLiteralExpression(node)) throw error
+      if (!ts.isArrayLiteralExpression(node) || node.elements.some(ts.isSpreadElement)) throw error
       return node.elements.map((child) => opaqueIdentity(child, env))
     }
   }
@@ -544,9 +593,11 @@ export function closedInputReader(ts, sources, imported = new Map()) {
   function forLoop(node, env) {
     const decl = node.initializer?.declarations?.[0]
     if (!decl || !ts.isIdentifier(decl.name)) return fail(node, 'unsupported loop binding')
-    const start = evaluate(decl.initializer, env)
+    const start = numericValue(evaluate(decl.initializer, env), node)
+    const step = numericValue(loopStep(node, env, symbol(decl.name)), node)
+    numericIncrementors.add(node.incrementor)
     const result = []
-    for (let value = start; result.length < 100000; value += loopStep(node, env)) {
+    for (let value = start; result.length < 100000; value += step) {
       const current = new Map(env)
       bind(decl.name, value, current)
       if (!condition(evaluate(node.condition, current), node)) return result
@@ -554,11 +605,26 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     }
     return fail(node, 'unbounded loop')
   }
-  function loopStep(node, env) {
-    const step = node.incrementor
-    if (ts.isPostfixUnaryExpression(step))
+  function numericValue(value, node) {
+    if (typeof value !== 'number' || !Number.isFinite(value))
+      return fail(node, 'unsupported numeric loop')
+    return value
+  }
+  function loopStep(node, env, key) {
+    const step = unwrap(node.incrementor)
+    if (!step) return fail(node, 'missing loop step')
+    if (
+      ts.isPostfixUnaryExpression(step) &&
+      rootSymbol(step.operand) === key &&
+      ts.isIdentifier(unwrap(step.operand))
+    )
       return step.operator === ts.SyntaxKind.PlusPlusToken ? 1 : -1
-    if (ts.isBinaryExpression(step) && step.operatorToken.kind === ts.SyntaxKind.PlusEqualsToken)
+    if (
+      ts.isBinaryExpression(step) &&
+      step.operatorToken.kind === ts.SyntaxKind.PlusEqualsToken &&
+      ts.isIdentifier(unwrap(step.left)) &&
+      rootSymbol(step.left) === key
+    )
       return evaluate(step.right, env)
     return fail(node, 'unsupported loop step')
   }
@@ -588,7 +654,9 @@ export function closedInputReader(ts, sources, imported = new Map()) {
     return rows.map((args) => bindParameters(node, args, env))
   }
   function callbackRows(node, values, env) {
-    return Array.from(values, (value, index) => bindParameters(node, [value, index], env))
+    return Array.from(sequenceValue(values, node), (value, index) =>
+      bindParameters(node, [value, index], env),
+    )
   }
   function bindParameters(node, args, env, active = new Set()) {
     const result = new Map(env)
@@ -622,6 +690,30 @@ export function closedInputReader(ts, sources, imported = new Map()) {
   }
   function condition(value, node) {
     if (typeof value === 'symbol') return fail(node, 'unknown condition')
+    return value
+  }
+  function knownShape(value, node) {
+    if (typeof value === 'symbol') return fail(node, 'unknown shape')
+    if (value?.functionNode) return fail(node, 'unevaluated function shape')
+    return value
+  }
+  function arrayFromSource(value, node) {
+    knownShape(value, node)
+    if (Array.isArray(value) || typeof value === 'string') return value
+    if (
+      value &&
+      typeof value === 'object' &&
+      Object.hasOwn(value, 'length') &&
+      Number.isSafeInteger(value.length) &&
+      value.length >= 0
+    )
+      return value
+    return fail(node, 'unsupported array-like source')
+  }
+  function sequenceValue(value, node) {
+    knownShape(value, node)
+    if (!Array.isArray(value) && typeof value !== 'string')
+      return fail(node, 'unsupported sequence')
     return value
   }
   function knownValue(value, node) {

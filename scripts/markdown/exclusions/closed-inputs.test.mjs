@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { test } from 'vitest'
 import { closedInputReader, inputSha256 } from './closed-inputs.mjs'
@@ -275,4 +276,254 @@ test('does not propagate container writes to immutable globals', () => {
   `)
   assert.deepEqual(rows[0].failures, [])
   assert.deepEqual(rows[0].values, [undefined])
+})
+
+test.each([
+  [
+    'unknown Array.from source',
+    "import { source } from './external'; owner.update(Array.from(source).join(''))",
+  ],
+  [
+    'unknown object spread',
+    "import { source } from './external'; const {text='fallback'}={...source}; owner.update(text)",
+  ],
+  ['string loop counter', "for(let i='0';i<2;i++) owner.update('row '+i)"],
+  [
+    'wrapped nested alias',
+    "const row={text:'before'}; const holder={row}; (holder).row.text='after'; owner.update(row.text)",
+  ],
+  [
+    'wrapped assign target',
+    "const row={text:'before'}; Object.assign((row),{text:'after'}); owner.update(row.text)",
+  ],
+  ['wrapped counter body write', "for(let i=0;i<2;i++){(i)++;owner.update('row '+i)}"],
+  [
+    'mutable Math alias',
+    'const holder={math:Math}; holder.math.floor=()=>7; owner.update(String(Math.floor(1.2)))',
+  ],
+  [
+    'mutable Object alias',
+    "const holder={object:Object}; holder.object.keys=()=>['after']; owner.update(Object.keys({before:1}).join(''))",
+  ],
+  [
+    'wrapped delete target',
+    "const row={text:'before'}; delete (row).text; owner.update(row.text ?? 'fallback')",
+  ],
+  [
+    'asserted assign target',
+    "const row={text:'before'}; Object.assign((row as object),{text:'after'}); owner.update(row.text)",
+  ],
+  ['asserted counter body write', "for(let i=0;i<2;i++){(i as number)++;owner.update('row '+i)}"],
+  ['string loop increment', "for(let i=0;i<2;i+='1') owner.update('row '+i)"],
+  ['wrong loop increment target', "let j=0; for(let i=0;i<2;j++) owner.update('row '+i)"],
+  [
+    'unknown computed literal key',
+    "import { key } from './external'; const row={[key]:'actual'}; owner.update(row.source ?? 'fallback')",
+  ],
+  [
+    'object computed key coercion',
+    "import { key } from './external'; const row={source:'actual'}; owner.update(row[{key}] ?? 'fallback')",
+  ],
+  [
+    'unknown array-like length',
+    "import { length } from './external'; owner.update(Array.from({length}).join(''))",
+  ],
+  [
+    'unknown iteration source',
+    "import { rows } from './external'; for(const row of rows) owner.update(row ?? 'fallback')",
+  ],
+  [
+    'unknown test rows',
+    "import { rows } from './external'; test.each(rows)('case', (source='fallback')=>owner.update(source))",
+  ],
+  [
+    'unknown callback rows',
+    "import { rows } from './external'; rows.map((source='fallback')=>owner.update(source))",
+  ],
+])('rejects boundary %s before native marker loss', (_name, source) => {
+  const [row] = inputs(source)
+  assert.ok(row.failures.length > 0)
+  assert.deepEqual(row.values, [])
+})
+
+test.each([
+  [
+    "const key='source'; const {[key]:text='fallback'}={[key]:'actual'}; owner.update(text)",
+    ['actual'],
+  ],
+  ["const key=1; const {[key]:text='fallback'}={[key]:'actual'}; owner.update(text)", ['actual']],
+  ["const key='source'; const {[key]:text='fallback'}={}; owner.update(text)", ['fallback']],
+  ["owner.update(Array.from(['actual']).join(''))", ['actual']],
+  [
+    "import { metadata } from './external'; const row={...{source:'actual',metadata}}; owner.update(row.source)",
+    ['actual'],
+  ],
+  [
+    "import { metadata } from './external'; owner.update(Array.from([{source:'actual',metadata}],row=>row.source).join(''))",
+    ['actual'],
+  ],
+  ["for(let i=0;i<3;i+=2) owner.update('row '+i)", ['row 0', 'row 2']],
+  ["for(let i=1;i>=0;i--) owner.update('row '+i)", ['row 1', 'row 0']],
+  ['const holder={math:Math}; owner.update(String(holder.math.floor(1.2)))', ['1']],
+  [
+    "const holder={object:Object}; owner.update(holder.object.keys({actual:1}).join(''))",
+    ['actual'],
+  ],
+  [
+    "function replay(source='fallback'){owner.update(source)}; replay(null); replay('')",
+    [null, ''],
+  ],
+])('keeps exact boundary neighbor %s', (source, expected) => {
+  const [row] = inputs(source)
+  assert.deepEqual(row.failures, [])
+  assert.deepEqual(row.values, expected)
+})
+
+test('keeps native shape consumers behind explicit boundary guards', () => {
+  const source = ts.createSourceFile(
+    'reader.mjs',
+    readFileSync(new URL('./closed-inputs.mjs', import.meta.url), 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.JS,
+  )
+  const functions = new Map()
+  function visit(node) {
+    if (ts.isFunctionDeclaration(node)) functions.set(node.name.text, node.getText(source))
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  const sinks = []
+  function consumers(node, owner) {
+    if (ts.isFunctionDeclaration(node)) owner = node.name.text
+    if (
+      ts.isCallExpression(node) &&
+      /^(Array\.from|Object\.assign|Math\[name\]|Object\[name\]|receiver\[name\]|receiver\.(concat|entries|forEach))$/.test(
+        node.expression.getText(source),
+      )
+    )
+      sinks.push(owner + ':' + node.expression.getText(source))
+    ts.forEachChild(node, (child) => consumers(child, owner))
+  }
+  consumers(source)
+  assert.deepEqual(
+    sinks.sort(),
+    [
+      'closedInputReader:Array.from',
+      'closedInputReader:Array.from',
+      'checkWrites:Array.from',
+      'propagateWrites:Array.from',
+      'propagateWrites:Array.from',
+      'resolve:Array.from',
+      'evaluate:Array.from',
+      'applyProperty:Object.assign',
+      'method:Math[name]',
+      'method:Object[name]',
+      'method:Array.from',
+      'method:receiver.concat',
+      'method:Array.from',
+      'method:receiver.entries',
+      'method:receiver.forEach',
+      'method:receiver[name]',
+      'arrayCallback:receiver[name]',
+      'forOf:Array.from',
+      'testRows:Array.from',
+      'callbackRows:Array.from',
+    ].sort(),
+  )
+  const guarded = {
+    evaluate: ['Array.from(sequenceValue(evaluate(child.expression, env, active), child))'],
+    applyProperty: [
+      'Object.assign(value, knownShape(evaluate(child.expression, env, active), child))',
+      'memberKey(child.name, env, active)',
+    ],
+    method: [
+      'knownShape(evaluate(node.expression.expression, env, active), node)',
+      'Math[name](...knownValue(args, node))',
+      'Object[name](...knownValue(args, node))',
+      'arrayFromSource(args[0], node)',
+      'mappingCallback(args[1], node, active)',
+      'arrayCallback(receiver, name, args[0], node, active)',
+      'primitiveText(value, node)',
+      'receiver[name](...knownValue(args, node))',
+      'receiver.concat(...args.map((value) => knownShape(value, node)))',
+      "['includes', 'indexOf', 'lastIndexOf'].includes(name)) knownValue(receiver, node)",
+    ],
+    arrayCallback: [
+      'mappingCallback(fn, node, active)',
+      "if (name === 'flatMap') knownShape(result, node)",
+      'condition(result, node)',
+    ],
+    finiteRows: [
+      'sequenceValue(evaluate(node, env), node)',
+      'node.elements.some(ts.isSpreadElement)',
+    ],
+    forOf: ['finiteRows(node.expression, env)'],
+    testRows: ['finiteRows(call.arguments[0], env)'],
+    callbackRows: ['Array.from(sequenceValue(values, node)'],
+    property: ['propertyKey(key, node)', 'knownShape(value, node)'],
+    arrayFromSource: [
+      'knownShape(value, node)',
+      "Object.hasOwn(value, 'length')",
+      'Number.isSafeInteger(value.length)',
+    ],
+    binary: [
+      'primitiveValue(left, node)',
+      'primitiveValue(evaluate(node.right, env, active), node)',
+    ],
+    unary: ['primitiveValue(value, node)'],
+    call: ['primitiveValue(args[0], node)'],
+  }
+  for (const [name, checks] of Object.entries(guarded)) {
+    const body = functions.get(name).replace(/\s+/g, '')
+    for (const check of checks)
+      assert.ok(body.includes(check.replace(/\s+/g, '')), name + ': ' + check)
+  }
+})
+
+test.each([
+  "import { source } from './external'; owner.update(['a'].concat(source).length)",
+  "import { source } from './external'; owner.update(['a'].flatMap(()=>source).length)",
+  "import { source } from './external'; owner.update([source].includes('a'))",
+  "import { source } from './external'; owner.update([source].indexOf('a'))",
+  "import { source } from './external'; owner.update([source].lastIndexOf('a'))",
+  "import { source } from './external'; owner.update(Array.from([],source).join(''))",
+  "import { source } from './external'; owner.update([].map(source).join(''))",
+  "import { source } from './external'; for(const row of [...source]) owner.update(row.source)",
+])('rejects unknowns before shape or element-consuming native operations in %s', (source) => {
+  const [row] = inputs(source)
+  assert.ok(row.failures.length > 0)
+  assert.deepEqual(row.values, [])
+})
+
+test.each([
+  'owner.update(Number({valueOf:()=> 7}))',
+  'owner.update(+{valueOf:()=>7})',
+  "owner.update({valueOf:()=> 'after'} + ' tail')",
+])('rejects unsupported object coercion in %s', (source) => {
+  const [row] = inputs(source)
+  assert.ok(row.failures.length > 0)
+  assert.deepEqual(row.values, [])
+})
+
+test.each([
+  'const holder={Math}; holder.Math.floor=()=>7; owner.update(String(Math.floor(1.2)))',
+  "const holder={Object}; holder.Object.keys=()=>['after']; owner.update(Object.keys({before:1}).join(''))",
+])('tracks mutable shorthand global roots in %s', (source) => {
+  const [row] = inputs(source)
+  assert.ok(row.failures.length > 0)
+  assert.deepEqual(row.values, [])
+})
+
+test.each([
+  ["owner.update(Array.from({length:3},(_,i)=>'row '+i).join('|'))", ['row 0|row 1|row 2']],
+  [
+    "import { metadata } from './external'; owner.update(Array.from({length:2,metadata},(_,i)=>'row '+i).join('|'))",
+    ['row 0|row 1'],
+  ],
+  ["owner.update(Array.from({0:'actual',length:1}).join(''))", ['actual']],
+])('preserves proven finite numeric array-like fixture %s', (source, expected) => {
+  const [row] = inputs(source)
+  assert.deepEqual(row.failures, [])
+  assert.deepEqual(row.values, expected)
 })
