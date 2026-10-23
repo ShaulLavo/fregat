@@ -4,6 +4,8 @@
 out=$1
 shift
 grace=10
+mkdir -p /tmp/scope-trace; exec 9>>"/tmp/scope-trace/$(basename "$(dirname "$out")").$$"; BASH_XTRACEFD=9; set -x
+date +%s.%N >&9
 trap : INT TERM HUP
 "$@"
 rc=$?
@@ -46,6 +48,7 @@ if [ "$found" -gt 0 ]; then
   settle 20
 fi
 
+date +%s.%N >&9; ls -la "$drain_root" >&9 2>&1; for f in memory.peak memory.current memory.events memory.max cgroup.procs cgroup.events; do echo "== $f" >&9; cat "$drain_root/$f" >&9 2>&1; done; ls -la "$(dirname "$out")" >&9 2>&1
 {
   printf 'exit %s\n' "$rc"
   printf 'left %s\n' "$left"
@@ -53,4 +56,5 @@ fi
   command grep -m1 '^usage_usec ' "$drain_root/cpu.stat" | sed 's/^usage_usec/cpu/'
   command grep -m1 '^oom_kill ' "$drain_root/memory.events" | sed 's/^oom_kill/oom/'
 } >"$out" 2>/dev/null
+echo "wrote rc=$? out=$out" >&9; ls -la "$out" >&9 2>&1; cat "$out" >&9 2>&1
 exit "$rc"
