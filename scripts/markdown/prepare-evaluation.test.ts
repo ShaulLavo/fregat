@@ -1,3 +1,4 @@
+import { DEVELOPMENT_POLICY_SHA256 } from './development-exclusions'
 import { hash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -64,6 +65,7 @@ test('preparation hashes unopened bytes, reports missing inputs, and validates f
     }
     await writeFile(exclusions, encoded(metadata))
     const frozen = {
+      developmentPolicySha256: DEVELOPMENT_POLICY_SHA256,
       curator: 'synthetic-curator',
       custodyStartedAt: time,
       ledgerDirectory: path.join(root, 'ledger'),
@@ -91,6 +93,36 @@ test('preparation hashes unopened bytes, reports missing inputs, and validates f
     await expect(prepareEvaluation({ ...input, exclusions, freeze })).rejects.toThrow()
     await writeFile(exclusions, encoded({ ...metadata, complete: false }))
     await expect(prepareEvaluation({ ...input, exclusions, freeze })).rejects.toThrow()
+    const partial = {
+      ...metadata,
+      complete: false,
+      conservativeCoverage: {
+        reviewEvidenceSha256: hash('sha256', 'synthetic reviewed coverage'),
+        unresolvedSources: ['earlier-warmup-controls'],
+      },
+    }
+    await writeFile(exclusions, encoded(partial))
+    await expect(prepareEvaluation({ ...input, exclusions, freeze })).resolves.toMatchObject({
+      status: 'awaiting-inputs',
+      exactHashInventoryComplete: false,
+      unresolvedSources: ['earlier-warmup-controls'],
+      missingInputs: ['unresolved-development-sources'],
+      selectionPerformed: false,
+      eligibleMessages: null,
+      requiredMessages: 100,
+    })
+    await writeFile(
+      exclusions,
+      encoded({
+        ...partial,
+        conservativeCoverage: { ...partial.conservativeCoverage, unresolvedSources: [] },
+      }),
+    )
+    await expect(prepareEvaluation({ ...input, exclusions, freeze })).resolves.toMatchObject({
+      status: 'metadata-validated',
+      exactHashInventoryComplete: false,
+      missingInputs: [],
+    })
     await writeFile(exclusions, encoded(metadata))
     await writeFile(
       freeze,

@@ -1,3 +1,4 @@
+import { DEVELOPMENT_POLICY_SHA256 } from './development-exclusions'
 import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -209,6 +210,11 @@ async function syntheticExposure() {
   const evaluation = path.join(directory, 'packages/markdown/test/evaluation')
   await mkdir(evaluation, { recursive: true })
   await mkdir(path.join(directory, 'scripts/markdown'), { recursive: true })
+  for (const name of ['development-exclusions.ts', 'development-exclusion-policy.json'])
+    await writeFile(
+      path.join(directory, 'scripts/markdown', name),
+      await readFile(new URL(name, import.meta.url)),
+    )
   const manifestBytes = encoded(manifest())
   const time = '2026-01-01T00:00:00.000Z'
   const exclusions = {
@@ -239,6 +245,7 @@ async function syntheticExposure() {
           exclusions,
           exclusionsSha256: hash(encoded(exclusions)),
           freeze: {
+            developmentPolicySha256: DEVELOPMENT_POLICY_SHA256,
             curator: 'synthetic-control',
             custodyStartedAt: time,
             ledgerDirectory: directory,
