@@ -1,6 +1,6 @@
 # Collect telemetry for one native pair launch
 
-Use the [host telemetry collector](host-telemetry.md) inside the already admitted execution job. Select native mode explicitly. Both telemetry and capture output directories must initially be absent.
+Use the [host telemetry collector](host-telemetry.md) inside the already admitted execution job. Select native mode explicitly. Both telemetry and capture output directories must initially be absent. The collector currently proves launch lifetime only on Linux. On macOS finalization fails closed until a supported lifetime mechanism is available, so Linux controls cannot authorize Mac timing qualification.
 
 ```sh
 python3 scripts/markdown/host-telemetry.py --kind native \

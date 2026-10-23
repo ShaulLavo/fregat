@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from itertools import pairwise
 from pathlib import Path
 
+from host_telemetry_lifetime import LaunchContainment
 from host_telemetry_os import (
     capture_identities,
     command_text,
@@ -118,6 +119,8 @@ class Collector:
         self.thread = None
         self.journal = (out / "observations.jsonl").open("x", buffering=1)
         self.own_pid = os.getpid()
+        self.cleaning = False
+        self.interrupted = False
 
     def record(self, kind: str, **fields) -> None:
         self.journal.write(
@@ -217,6 +220,9 @@ class Collector:
         self.sample("after")
 
     def interrupt(self, signum, _frame) -> None:
+        self.interrupted = True
+        if self.cleaning:
+            return
         raise CaptureInterrupted(f"Capture received signal {signum}")
 
     def close(self) -> None:
@@ -467,9 +473,12 @@ def execute_capture(args, collector: Collector, report: Path) -> int:
 
 
 def launch_capture(args, collector, command, environment=None) -> tuple:
+    containment = LaunchContainment()
+    collector.record("containment", supported=containment.supported)
     launched = time.time()
-    child = subprocess.Popen(command, start_new_session=True, env=environment)
+    child = None
     try:
+        child = subprocess.Popen(command, start_new_session=True, env=environment)
         collector.group = child.pid
         collector.record(
             "launch",
@@ -480,14 +489,38 @@ def launch_capture(args, collector, command, environment=None) -> tuple:
         )
         collector.start(child.pid, args.interval_seconds)
         status, reason = wait_child(child, args.timeout_seconds)
+    except CaptureInterrupted:
+        status, reason = 143, "interrupted"
     finally:
-        terminate_group(child.pid)
-        kill_group(child.pid)
-        child.wait(timeout=2)
-        exited = time.time()
-        collector.finish()
-        cleanup = cleanup_group(child.pid, collector.capture_owned)
+        collector.cleaning = True
+        try:
+            cleanup, exited = finish_launch(child, containment, collector)
+        finally:
+            collector.cleaning = False
+    if collector.interrupted:
+        status, reason = 143, "interrupted"
     return status, reason, launched, exited, cleanup
+
+
+def finish_launch(child, containment, collector) -> tuple[bool, float]:
+    try:
+        if child is not None:
+            terminate_group(child.pid)
+            kill_group(child.pid)
+            child.wait(timeout=2)
+        exited = time.time()
+    finally:
+        try:
+            collector.finish()
+        finally:
+            lifetime_cleanup = containment.cleanup()
+        collector.record(
+            "containment-cleanup", proven=lifetime_cleanup, adopted=containment.adopted
+        )
+    if child is None:
+        return lifetime_cleanup, exited
+    cleanup = cleanup_group(child.pid, collector.capture_owned) and lifetime_cleanup
+    return cleanup, exited
 
 
 def wait_child(child, timeout: float) -> tuple[int, str]:
@@ -517,7 +550,7 @@ def cleanup_group(group: int, identities: set) -> bool:
     for process in current.processes:
         if not process.live or process.identity not in identities:
             continue
-        kill_identity(process.pid)
+        kill_identity(process.identity)
     rows = command_text(["ps", "-axo", "pgid=,stat="])
     group_stopped = not any(
         int(fields[0]) == group and not fields[1].startswith("Z")
@@ -529,8 +562,30 @@ def cleanup_group(group: int, identities: set) -> bool:
     )
 
 
-def kill_identity(pid: int) -> None:
+def kill_identity(identity: tuple[int, int]) -> None:
+    pid, _started = identity
+    if hasattr(os, "pidfd_open") and hasattr(signal, "pidfd_send_signal"):
+        kill_linux_identity(identity)
+        return
+    current = next((p for p in snapshot().processes if p.identity == identity), None)
+    if current is None or not current.live:
+        return
     try:
         os.kill(pid, signal.SIGKILL)
     except ProcessLookupError:
         return
+
+
+def kill_linux_identity(identity: tuple[int, int]) -> None:
+    try:
+        fd = os.pidfd_open(identity[0])
+    except ProcessLookupError:
+        return
+    try:
+        current = next(
+            (p for p in snapshot().processes if p.identity == identity), None
+        )
+        if current is not None and current.live:
+            signal.pidfd_send_signal(fd, signal.SIGKILL)
+    finally:
+        os.close(fd)

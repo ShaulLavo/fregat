@@ -1,6 +1,6 @@
 # Collect host telemetry for a bounded timing capture
 
-Use Python 3.10 or newer. Run the telemetry wrapper inside your host's admitted job. The wrapper owns one command process group, samples actual host counters, and binds its sidecar after the original report exists. Linux checks validate the collector. Production timing qualification retains its existing Mac requirement.
+Use Python 3.10 or newer. Run the telemetry wrapper inside your host's admitted job. The wrapper owns one command process group, samples actual host counters, and binds its sidecar after the original report exists. Linux checks validate the collector. Production timing qualification retains its existing Mac requirement. Lifetime containment currently supports Linux only. On macOS the wrapper retains observations but returns an incomplete receipt with `cleanup: false` and produces no finalized quiet-host artifact. Mac qualification needs a supported lifetime mechanism before this collector can bind its evidence.
 
 ```sh
 python3 scripts/markdown/host-telemetry.py \
@@ -19,7 +19,7 @@ The adapter config is a JSON object with a nonempty `command` array. Each invoca
 
 The default interval is two seconds. The wrapper requires actual observations before, during, and after the report's measured interval, with advancing timestamps and gaps of at most five seconds. No missing interval is interpolated. A report shorter than the sample interval may have insufficient coverage and fails finalization.
 
-The native observers support Linux x86-64 through `/proc` and macOS through Mach CPU counters and `proc_pid_rusage`. Stable process identity uses PID plus kernel start identity. Current process-group membership and observed ancestry establish capture ownership. Observed descendants remain owned when they change process groups. CPU is a percentage of total logical CPU capacity. Stable owned identities present at both interval boundaries contribute to the owned lower bound. A new owned process contributes lifetime CPU only when its kernel birth clock proves it started inside the interval. Read-order skew and tick rounding reduce that subtraction. Unattributed, vanished, inaccessible, or unobserved process CPU stays competing.
+The native observers support Linux x86-64 through `/proc` and macOS through Mach CPU counters and `proc_pid_rusage`. Stable process identity uses PID plus kernel start identity. Current process-group membership and observed ancestry establish capture ownership. Observed descendants remain owned when they change process groups. Linux starts a kernel child subreaper before launching the command. This dedicated collector must have no preexisting children. Detached and double-forked descendants become its direct children when their ancestors exit. Cleanup signals exact kernel process handles, records PID/start identities, reaps the descendants, and checks that no children remain. This lifetime proof is independent of periodic CPU sampling. Other platforms cannot prove whole-launch cleanup through sampled ancestry alone. CPU is a percentage of total logical CPU capacity. Stable owned identities present at both interval boundaries contribute to the owned lower bound. A new owned process contributes lifetime CPU only when its kernel birth clock proves it started inside the interval. Read-order skew and tick rounding reduce that subtraction. Unattributed, vanished, inaccessible, or unobserved process CPU stays competing.
 
 Outputs are:
 
@@ -34,7 +34,9 @@ Run the narrow controls with:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
-  -s scripts/markdown -p test_host_telemetry.py -v
+  -s scripts/markdown -p 'test_host_telemetry*.py' -v
 ```
+
+The blocking `bun run test:scripts` job discovers `host-telemetry.test.mjs`, which executes the Python OS, native, and lifetime controls once on Linux. It requires Python 3.10 or newer and Bun. Other platforms skip that Linux lifetime integration explicitly.
 
 For explicit native pair-shard launches, use [native host telemetry](native-host-telemetry.md).
