@@ -134,15 +134,52 @@ function collectGarbage(): boolean {
   return true
 }
 
-function memory(readWasm: () => number): MemoryReading {
-  const gcPerformed = collectGarbage()
-  const reading = process.memoryUsage()
-  return {
-    heapUsedBytes: reading.heapUsed,
-    rssBytes: reading.rss,
-    wasmReservedBytes: readWasm(),
-    gcPerformed,
-  }
+type Mutable<T> = { -readonly [K in keyof T]: T[K] }
+type PlannedWindow = Mutable<
+  Omit<ResourceWindow, 'before' | 'after' | 'outputFailures' | 'cleanupFailures'>
+> & {
+  readonly before: Mutable<MemoryReading>
+  readonly after: Mutable<MemoryReading>
+  readonly outputFailures: string[]
+  readonly cleanupFailures: string[]
+}
+
+function unreadMemory(): Mutable<MemoryReading> {
+  return { heapUsedBytes: 0, rssBytes: 0, wasmReservedBytes: 0, gcPerformed: false }
+}
+
+/**
+ * Every window's record exists before the first reading and is filled in place,
+ * so retained probe results never count as post-release heap growth.
+ */
+export function planResourceWindows(windows: number): PlannedWindow[] {
+  const rows: PlannedWindow[] = []
+  for (const cycles of RESOURCE_CYCLES)
+    for (let window = 0; window < windows; window++) {
+      const engines: readonly Engine[] =
+        window % 2 ? ['tree-sitter', 'remark'] : ['remark', 'tree-sitter']
+      for (const engine of engines)
+        rows.push({
+          engine,
+          cycles,
+          window,
+          before: unreadMemory(),
+          after: unreadMemory(),
+          outputFailures: [],
+          cleanupFailures: [],
+          clearedSessions: 0,
+          clearedProjectionEntries: 0,
+        })
+    }
+  return rows
+}
+
+function readMemory(readWasm: () => number, reading: Mutable<MemoryReading>) {
+  reading.gcPerformed = collectGarbage()
+  const usage = process.memoryUsage()
+  reading.heapUsedBytes = usage.heapUsed
+  reading.rssBytes = usage.rss
+  reading.wasmReservedBytes = readWasm()
 }
 
 function validMemoryReading(reading: MemoryReading): boolean {
@@ -272,42 +309,33 @@ export function summarizeNativeResources(rows: readonly ResourceWindow[]) {
   return { nativeStatus, summaries }
 }
 
-async function runWindow(input: {
-  readonly engine: Engine
-  readonly cycles: number
-  readonly window: number
-  readonly sources: readonly ResourceSource[]
-  readonly expected: ReadonlyMap<string, string>
-  readonly extensions: HastExtensions
-  readonly readWasm: () => number
-}): Promise<ResourceWindow> {
-  const before = memory(input.readWasm)
-  const outputFailures: string[] = []
-  const cleanupFailures: string[] = []
-  let clearedSessions = 0
-  let clearedProjectionEntries = 0
-  for (let index = 0; index < input.cycles; index++) {
+async function runWindow(
+  row: PlannedWindow,
+  input: {
+    readonly sources: readonly ResourceSource[]
+    readonly expected: ReadonlyMap<string, string>
+    readonly extensions: HastExtensions
+    readonly readWasm: () => number
+  },
+) {
+  readMemory(input.readWasm, row.before)
+  for (let index = 0; index < row.cycles; index++) {
     const source = input.sources[index % input.sources.length]
     if (!source)
       throw createScriptError('The native probe needs a source.', { internal: { sourceCount: 0 } })
-    const result = cycle({ ...input, source, expectedDigest: input.expected.get(source.id) ?? '' })
-    if (!result.matches || result.error) outputFailures.push(source.id)
-    if (!result.cleanup.cleared || result.retained !== 0) cleanupFailures.push(source.id)
-    if (result.cleanup.cleared) clearedSessions++
-    clearedProjectionEntries += result.cleanup.entries
+    const result = cycle({
+      engine: row.engine,
+      source,
+      expectedDigest: input.expected.get(source.id) ?? '',
+      extensions: input.extensions,
+    })
+    if (!result.matches || result.error) row.outputFailures.push(source.id)
+    if (!result.cleanup.cleared || result.retained !== 0) row.cleanupFailures.push(source.id)
+    if (result.cleanup.cleared) row.clearedSessions++
+    row.clearedProjectionEntries += result.cleanup.entries
   }
   await new Promise<void>((resolve) => setTimeout(resolve, 0))
-  return {
-    engine: input.engine,
-    cycles: input.cycles,
-    window: input.window,
-    before,
-    after: memory(input.readWasm),
-    outputFailures,
-    cleanupFailures,
-    clearedSessions,
-    clearedProjectionEntries,
-  }
+  readMemory(input.readWasm, row.after)
 }
 
 export async function captureNativeResourceAssets(root: string, outputDirectory: string) {
@@ -365,23 +393,6 @@ async function candidateIdentity(root: string, outputDirectory: string) {
   }
 }
 
-async function measureScale(input: {
-  readonly cycles: number
-  readonly windows: number
-  readonly sources: readonly ResourceSource[]
-  readonly expected: ReadonlyMap<string, string>
-  readonly extensions: HastExtensions
-  readonly readWasm: () => number
-}) {
-  const rows: ResourceWindow[] = []
-  for (let window = 0; window < input.windows; window++) {
-    const engines: readonly Engine[] =
-      window % 2 ? ['tree-sitter', 'remark'] : ['remark', 'tree-sitter']
-    for (const engine of engines) rows.push(await runWindow({ ...input, engine, window }))
-  }
-  return rows
-}
-
 async function runNativeResourceProbe(root: string, outputDirectory: string, windows = 4) {
   const provenance = await qualificationProvenance(root)
   const candidate = await candidateIdentity(root, outputDirectory)
@@ -401,18 +412,9 @@ async function runNativeResourceProbe(root: string, outputDirectory: string, win
       context.release()
     }
   }
-  let rows: ResourceWindow[] = []
-  for (const cycles of RESOURCE_CYCLES)
-    rows = rows.concat(
-      await measureScale({
-        cycles,
-        windows,
-        sources,
-        expected,
-        extensions,
-        readWasm: candidate.readWasm,
-      }),
-    )
+  const rows = planResourceWindows(windows)
+  for (const row of rows)
+    await runWindow(row, { sources, expected, extensions, readWasm: candidate.readWasm })
   const native = summarizeNativeResources(rows)
   return {
     schemaVersion: 1,
