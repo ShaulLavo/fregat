@@ -902,7 +902,7 @@ export const SETTINGS_DOCUMENTATION = {
   'files.watchDirectoryLimit': {
     title: 'Folder watch limit',
     details:
-      "Each watched folder uses one inotify watch from a per-user pool that every watcher on the machine shares (524,288 on the owner's machine). Opening /work took 484,687 watches and other apps began failing with ENOSPC. 200,000 fits four roots the size of the Fregat checkout (45,036 folders) and leaves 62% of the pool free.",
+      'Each watched folder uses one inotify watch from a per-user pool that every watcher on the machine shares (524,288 on the machine that set this default). Opening a 484,687-folder tree took 484,687 watches and other apps began failing with ENOSPC. 200,000 fits four roots the size of the Fregat checkout (45,036 folders) and leaves 62% of the pool free.',
     description:
       'How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only.',
     keywords: ['files', 'watch', 'watcher', 'inotify', 'limit', 'large', 'folders', 'live'],

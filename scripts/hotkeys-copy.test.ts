@@ -20,8 +20,8 @@ test('hotkeys credits its upstream library and author', () => {
   expect(readme).toContain('MIT')
 })
 
-test('the parts table describes hotkeys without prescribing a keymap', () => {
+test('the parts list describes hotkeys without prescribing a keymap', () => {
   const parts = readFileSync(path.join(root, 'README.md'), 'utf8')
   expect(parts).not.toContain('Zed-style keymaps')
-  expect(parts).toContain('Keyboard shortcuts for editors and complex apps.')
+  expect(parts).toContain('keyboard shortcuts for editors and complex apps.')
 })
