@@ -93,7 +93,6 @@ external process boundary.
 | Terminal selection survives palette focus and reaches the correct prompt                  | [Terminal context](../apps/tui/src/terminal/tests/agent-context.test.tsx)                                                        |
 | Reconnect reuses the existing shell                                                       | [Terminal reconnect](../apps/tui/src/terminal/tests/reconnect.test.tsx)                                                          |
 
-The working verification artifacts and decision trail are under `/work/tmp/platform-tui-agent/`.
 The full TUI suite passes 282 tests across 86 files. The final composer checks pass 11 tests;
 terminal/provider checks pass 58 tests, and migrated web logic checks pass 168 tests. TUI and
 server builds, TUI lint and formatting, and client-core, server, and web typechecks pass.
