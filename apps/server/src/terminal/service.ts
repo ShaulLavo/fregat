@@ -35,7 +35,12 @@ import {
 } from '../auth'
 import { FsError, isFsError } from '../fs/errors'
 import type { WorkspacePaths } from '../fs/path'
-import { limitText, recordProcessInfo, recordProcessWarning } from '../observability'
+import {
+  limitText,
+  operatorErrorSummary,
+  recordProcessInfo,
+  recordProcessWarning,
+} from '../observability'
 import {
   readForegroundProcessName,
   readShellHasCommand,
@@ -155,7 +160,10 @@ export class TerminalService {
   listHostSessions(): Promise<readonly HostSessionInfo[] | null> {
     if (!this.host) return Promise.resolve(null)
     this.recoverySnapshot ??= this.host.list().catch((error: unknown) => {
-      recordProcessWarning('terminal.host.list_failed', { area: 'terminal', error })
+      recordProcessWarning('terminal.host.list_failed', {
+        area: 'terminal',
+        error: operatorErrorSummary(error),
+      })
       return null
     })
     return this.recoverySnapshot

@@ -214,7 +214,10 @@ export async function createFakeTerminalHost() {
     add,
     write,
     exit,
-    connect(options: { requestTimeoutMs?: number } = {}) {
+    listen() {
+      return new Promise<void>((resolve) => server.listen(paths.socket, resolve))
+    },
+    connect(options: { requestTimeoutMs?: number; launch?: HostLauncher } = {}) {
       const client = new TerminalHostClient({ stateRoot, env, launch: refuseLaunch, ...options })
       clients.push(client)
       return client

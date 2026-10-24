@@ -208,9 +208,18 @@ describe('row menu', () => {
     await expandPaths(model, ['src/', 'src/lib/'])
     await clickRow('src/lib/x.ts', { button: 'right' })
     await vi.waitFor(() => expect(menuOpen()).toBe(true))
-    await wheel(3 * ROW_HEIGHT)
-    await vi.waitFor(() => expect(menuOpen()).toBe(false))
-    expect(scroller().scrollTop).toBe(0)
+    const events: WheelEvent[] = []
+    const recordWheel = (event: WheelEvent) => events.push(event)
+    document.addEventListener('wheel', recordWheel, { capture: true, passive: true })
+    try {
+      await wheel(3 * ROW_HEIGHT)
+      await vi.waitFor(() => expect(menuOpen()).toBe(false))
+      expect(events).toHaveLength(1)
+      expect(events[0]?.defaultPrevented).toBe(true)
+      expect(scroller().scrollTop).toBe(0)
+    } finally {
+      document.removeEventListener('wheel', recordWheel, true)
+    }
   })
 
   it('closes when its row is removed', async () => {
