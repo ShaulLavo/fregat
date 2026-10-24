@@ -6,9 +6,7 @@ Part of [Fregat hotkeys](https://github.com/ShaulLavo/fregat/tree/main/hotkeys).
 
 ## Install
 
-```sh
-npm install @fregat/react-hotkeys react react-dom
-```
+Not on npm yet. Build it from source with the [workspace guide](https://github.com/ShaulLavo/fregat/blob/main/docs/development.md#workspace-libraries). Publishing is planned. It needs React 18 or newer and `react-dom`.
 
 ## Usage
 
@@ -27,18 +25,22 @@ export function SaveButton({ onSave }: { onSave: () => void }) {
 
 ## API highlights
 
-- `useHotkey()` registers a shortcut for the component lifetime.
+- `useHotkey(keys, callback, options)` registers a shortcut for the component lifetime. Options match `register`, and `target` can be a ref.
 - `useHotkeySequence()` registers a chord.
 - `useHotkeyRecorder()` records a shortcut for a settings field.
 - `HotkeysProvider` sets hook defaults.
 
-[Exported API](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/react-hotkeys/src/index.ts) · [Keymap guide](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/keymaps.md)
+[Exported API](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/react-hotkeys/src/index.ts) · [Core API](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/api.md) · [Keymap rules](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/keymaps.md)
 
 ## In the hotkeys family
 
 `@fregat/hotkeys` owns shortcut matching and dispatch. This optional package adds React hooks and re-exports the core API. Use React 18 or newer.
 
 [Main README](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/README.md)
+
+## Status
+
+Version 0.0.x. The API can change between releases.
 
 ## License
 

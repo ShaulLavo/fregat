@@ -58,8 +58,13 @@ for (const directory of packageDirectories) {
   for (const heading of ['Install', 'Usage', 'API highlights', 'License']) {
     assert(readme.includes(`## ${heading}\n`), `${manifest.name}: missing ${heading}`)
   }
+  // A package that is not on npm yet says so instead of printing an install command that fails.
   const installed = readme.match(/^npm install (.+)$/m)?.[1].split(' ') ?? []
-  assert(installed.includes(manifest.name), `${manifest.name}: install command`)
+  const unpublished = /^Not on npm yet\./m.test(readme)
+  assert(
+    installed.includes(manifest.name) || unpublished,
+    `${manifest.name}: install command, or a line starting "Not on npm yet."`,
+  )
   assert.equal(
     [...readme.matchAll(/^```tsx?$/gm)].length,
     1,

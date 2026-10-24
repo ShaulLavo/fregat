@@ -6,9 +6,7 @@ Part of [Fregat hotkeys](https://github.com/ShaulLavo/fregat/tree/main/hotkeys).
 
 ## Install
 
-```sh
-npm install @fregat/hotkeys
-```
+Not on npm yet. Build it from source with the [workspace guide](https://github.com/ShaulLavo/fregat/blob/main/docs/development.md#workspace-libraries). Publishing is planned.
 
 ## Usage
 
@@ -35,13 +33,17 @@ export function disposeShortcuts() {
 - `formatForDisplay()` formats labels for the current platform.
 - `HotkeyRecorder` records a shortcut.
 
-[Exported API](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/src/index.ts) · [Keymap guide](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/keymaps.md)
+[Every export](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/api.md) · [Concepts](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/concepts.md) · [Keymap rules](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/keymaps.md) · [Troubleshooting](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/troubleshooting.md)
 
 ## In the hotkeys family
 
 The core package has framework-neutral key matching and browser and terminal adapters. Add `@fregat/react-hotkeys` to register shortcuts through React hooks.
 
 [Main README](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/README.md)
+
+## Status
+
+Version 0.0.x. The API can change between releases.
 
 ## License
 
