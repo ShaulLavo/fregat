@@ -52,7 +52,7 @@ The installed Tokyo Night and Gruvbox sources provide dark palettes, and Rosé P
 palette. Their opposite versions use upstream Tokyo Night Day, Gruvbox Light and Rosé Pine Main
 palettes with the matching syntax theme. All twelve
 bundled variants pass the existing palette editor’s 4.5:1 text-pair readout. Mapping corrections and
-source versions are recorded in [theme-pack-mapping.txt](theme-pack-mapping.txt).
+source versions are recorded in [theme-pack-mapping.txt](../.internal/theme-pack-mapping.txt).
 
 The twelve paired wallpapers ship with the server under `src/themes/wallpapers/assets/`. Their
 original bytes retain the hashes in `BUNDLED_WALLPAPERS`; the server build validates every hash and

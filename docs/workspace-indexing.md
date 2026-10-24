@@ -14,7 +14,7 @@ children have explicit access states rather than making the whole root fail to o
 A pending workspace switch retains the previous subject and shields it during the switch.
 Directory prefetch admits at most four concurrent speculative listings and skips excess guesses;
 a click may share the same query, so speculative eviction cannot cancel its load. See
-[prefetch ownership](prefetch-every-press.md) for current consumers.
+[prefetch ownership](../.internal/prefetch-every-press.md) for current consumers.
 
 ## Evidence and remaining work
 

@@ -127,7 +127,7 @@ the composer's `/` menu (`rootPath`) may hit too.
    today (see that plan), and without rules approval-required mode is too tedious to use.
 2. **fork** — also gives Claude a conversation rewind it does not have
    (`prepareRollbackSession` throws in `claude.ts`), and is the data-model step toward the
-   compare view `docs/product-vision.md` holds in reserve.
+   compare view `.internal/product-vision.md` holds in reserve.
 3. **mcp-status**, **background-tasks**, **hooks** — read-mostly views over events we already
    receive.
 4. **custom-agents**, **export**.

@@ -64,7 +64,7 @@ Update archive names, URLs, byte counts, SHA-256 and extracted-version checks to
 - Wasm: `scripts/build-wasm.ts` (version check, upstream and bridge invocations), `scripts/build-bridge.ts:62–90`, `scripts/build-canvas-compose.ts:11–45`, `scripts/wasm-provenance.ts`, `scripts/wasm-provenance.test.ts:23`, regenerated `ghostty-vt.provenance.json`, `ghostty-vt.wasm`, `bridge.wasm`, `canvas-compose.wasm`.
 - Native experiments: `scripts/owned-vt-native/identity.ts:38`, `scripts/owned-vt-native/run.ts:37,116–129`, `scripts/positional-native/run.ts:47–52`.
 - tree-sitter-x: `build.zig.zon:5`, `crates/cli/src/templates/build.zig.zon:4,8–10` (also the zig-tree-sitter binding pin), and `crates/xtask/src/upgrade_wasmtime.rs:52–63`, which parses `zig fetch` output that 0.17 moved into the build system.
-- Active docs: `ghostty-webgpu/AGENTS.md:50`, `ghostty-webgpu/docs/api.md:200`, `docs/ghostty-webgpu-brief.md:36,240`, `docs/research/packages-as-products/ghostty-webgpu.md:40`, `plans/286-ghostty-extensions.md:163`. Keep the historical records (`docs/config-resolver-feasibility.*`, `docs/research/packages-as-products/performance-evidence.md:62`, sealed Mac benchmark assets) as they are.
+- Active docs: `ghostty-webgpu/AGENTS.md:50`, `ghostty-webgpu/docs/api.md:200`, `.internal/ghostty-webgpu-brief.md:36,240`, `.internal/research/packages-as-products/ghostty-webgpu.md:40`, `plans/286-ghostty-extensions.md:163`. Keep the historical records (`docs/config-resolver-feasibility.*`, `.internal/research/packages-as-products/performance-evidence.md:62`, sealed Mac benchmark assets) as they are.
 
 0.17 archive identities (from the official download index):
 

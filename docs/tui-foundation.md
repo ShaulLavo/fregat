@@ -79,7 +79,7 @@ Ctrl+C, and terminal mode restoration. No development server was started; the de
 was unavailable.
 
 The original per-command slice audit and installed defaults are preserved in
-[TUI command bindings](tui-bindings.md). Physical Kitty keyboard hardware was unavailable;
+[TUI command bindings](../.internal/tui-bindings.md). Physical Kitty keyboard hardware was unavailable;
 enhanced input was checked through OpenTUI's native event parser and remains capability-gated.
 
 ### Review checks, 2026-09-06

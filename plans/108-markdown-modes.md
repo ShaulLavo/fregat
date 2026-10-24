@@ -8,7 +8,7 @@ The historical three-way mode model below is superseded by these independent cho
 
 Owner direction, 2026-09-28: support both visual rich-text authoring and
 source-revealing authoring, selected by the host, alongside source and split
-views. [Markdown experiences](../docs/markdown-experiences.md) defines the product
+views. [Markdown experiences](../.internal/markdown-experiences.md) defines the product
 target and acceptance checks. The earlier exclusion of always-visual editing
 below is superseded by this direction; that behavior still needs implementation.
 
@@ -93,7 +93,7 @@ Completion: a markdown file can be edited in source with a live rendered pane be
 
 Refreshed 2026-09-28: Plan 111 Phase 1's edit trigger has landed, and the owner selected
 `tree-sitter-md`. Parser release/integration remains in Plan 176; efficient range mapping and
-block layout remain in Plan 111 Phases 4–5. The [editor-behaviour research](../docs/markdown-parser/editor-behaviour.md)
+block layout remain in Plan 111 Phases 4–5. The [editor-behaviour research](../.internal/markdown-parser/editor-behaviour.md)
 records the source-reveal precedent and proposed parsing/readiness contract. Fully rendered
 blocks stay backed by the same source buffer. Permanently hidden syntax with rich-text editing
 would require a separate interaction decision.

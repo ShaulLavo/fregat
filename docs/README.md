@@ -6,10 +6,10 @@ linked checkouts, checks and deployment. [AGENTS.md](../AGENTS.md) is the curren
 ## Work in progress
 
 - [Execution roadmap](../PLAN.md) and [plan index](../plans/README.md)
-- [T3 Code nightly reference](t3code-reference.md) and [deferred orchestration rewrite](../plans/343-t3code-nightly-orchestration.md)
+- [T3 Code nightly reference](../.internal/t3code-reference.md) and [deferred orchestration rewrite](../plans/343-t3code-nightly-orchestration.md)
 - [Wave register](../plans/waves.md)
 - [Native client roadmap](../plans/native-plan-of-plans.md)
-- [Remaining defect-audit questions](defect-audit-follow-ups.md)
+- [Remaining defect-audit questions](../.internal/defect-audit-follow-ups.md)
 
 The plan files own status and authorization. A dated investigation or delivery record describes
 the revision it inspected; it is not a second implementation queue or proof of today's build.
@@ -22,9 +22,9 @@ the revision it inspected; it is not a second implementation queue or proof of t
 | Document content views  | [Document-backed content views](document-backed-content-views.md)                                                                                                                                    |
 | State and UI            | [State ownership](state-ownership.md), [web layering](web-layering.md), [design language](web-design-language.md), [shared patterns](pattern-layer.md)                                               |
 | Sessions and machines   | [Session domain](session-domain.md), [worktree lifecycle](worktree-lifecycle.md), [federated environments](federated-environments.md), [remote releases](remote-server-releases.md)                  |
-| Editor                  | [First paint](editor-first-paint-design.md), [Markdown experiences](markdown-experiences.md), [external edits/LSP](external-edit-lsp-findings.md)                                                    |
+| Editor                  | [First paint](editor-first-paint-design.md), [Markdown experiences](../.internal/markdown-experiences.md), [external edits/LSP](external-edit-lsp-findings.md)                                       |
 | Keyboard                | [Architecture](keymap/architecture.md), [matching and dispatch](vscode-keymap-development.md)                                                                                                        |
-| Terminals               | [Terminal integration](terminal.md), [terminal host](terminal-host.md), [Ghostty package boundary](ghostty-webgpu-brief.md)                                                                          |
+| Terminals               | [Terminal integration](terminal.md), [terminal host](terminal-host.md), [Ghostty package boundary](../.internal/ghostty-webgpu-brief.md)                                                             |
 | Settings and appearance | [Settings reference](settings-reference.md), [theme bundles](theme-bundles.md)                                                                                                                       |
 | Runtime and delivery    | [Boot](boot-and-first-load.md), [HTML bootstrap](html-bootstrap.md), [deployment](../plans/deployment-design.md), [observability](observability-overhead.md), [web push](web-push.md)                |
 
@@ -37,16 +37,16 @@ the revision it inspected; it is not a second implementation queue or proof of t
 
 ## Research and evidence
 
-- [Async runtime research and architecture](async-runtime/README.md): workers, three libraries, alternatives and measurement grounding
+- [Async runtime research and architecture](../.internal/async-runtime/README.md): workers, three libraries, alternatives and measurement grounding
 
-- [UI research index](ui-research/README.md), [document library survey](documents/library-survey.md)
+- [UI research index](../.internal/ui-research/README.md), [document library survey](../.internal/documents/library-survey.md)
 - [Document consumer baseline](document-contributions/baseline-and-inventory.md)
-- [Markdown measurements](markdown-parser/measurements.md), [large-file measurements](large-file-ceiling/README.md)
-- [Search rendering findings](search-view-rendering-findings.md), [prefetch ownership](prefetch-every-press.md)
-- [Dependency licences](dependency-licences.md), [provider prompt audit](prompt-audit.md)
-- [Verification records](verification/) and [T3 alignment evidence](../plans/126-t3code-alignment/)
+- [Markdown measurements](../.internal/markdown-parser/measurements.md), [large-file measurements](../.internal/large-file-ceiling/README.md)
+- [Search rendering findings](../.internal/search-view-rendering-findings.md), [prefetch ownership](../.internal/prefetch-every-press.md)
+- [Dependency licences](../.internal/dependency-licences.md), [provider prompt audit](../.internal/prompt-audit.md)
+- [Verification records](../.internal/verification/) and [T3 alignment evidence](../plans/126-t3code-alignment/)
 
-The [completion-wave record](completion-wave.md) and [wave 2/foundations closeout](next-wave.md)
+The [completion-wave record](../.internal/completion-wave.md) and [wave 2/foundations closeout](../.internal/next-wave.md)
 retain historical owner decisions and delivery evidence. Current batch membership lives in the
 [wave register](../plans/waves.md). Retired
 plans and root scratch documents remain in git history; current references link to their exact

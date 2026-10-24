@@ -159,7 +159,7 @@ its unrelated temporary-file read warnings are tracked in Fregat issue 568.
 
 ### Delivery evidence
 
-The [delivery record](../docs/keymap/command-foundation-delivery.md) pins final source
+The [delivery record](../.internal/keymap/command-foundation-delivery.md) pins final source
 `6da512054154358ed6e9e0681884bf38ddd91f85`, merged main
 `8d4694a20e79fada7acc2b0e97e0fe80762480c5`, exact family qualification and registered
 large-file pair 03. All 280 inputs, including five newlines, meet the processing criteria.

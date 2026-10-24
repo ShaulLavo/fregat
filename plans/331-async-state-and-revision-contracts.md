@@ -10,7 +10,7 @@ Specify and verify how typed commands refer to exact state, how receivers acknow
 
 ## Evidence and current authority
 
-[Coaction research](../docs/async-runtime/coaction.md) pins the epoch/sequence/full-sync protocol, stale-connection guards and action settlement after mirror catch-up. Its JSON-only shared contract excludes our buffers/canvases/ports. Patch sequence order does not serialize awaited methods, and destroying a client does not stop an action already executing.
+[Coaction research](../.internal/async-runtime/coaction.md) pins the epoch/sequence/full-sync protocol, stale-connection guards and action settlement after mirror catch-up. Its JSON-only shared contract excludes our buffers/canvases/ports. Patch sequence order does not serialize awaited methods, and destroying a client does not stop an action already executing.
 
 Editor documents keep the main-thread buffer as sole text authority. Document publication, journal, contribution source delivery and freshness belong to 099; retained analysis/leases belong to 198 and content subjects to 200. Units 2–7 of 099 remain explicitly gated. Do not create a second journal, source synchronization runtime, document analysis handle or worker-owned text authority in this package.
 

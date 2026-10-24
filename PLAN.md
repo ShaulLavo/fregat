@@ -49,7 +49,7 @@ snapshot; this file remains the scheduler and each plan remains its scope author
    supersedes the unfinished absolute-threshold calibration. The owner approved units 2–7 on
    2026-10-04; their runtime implementation merged in PR #787 with accepted scoped performance
    and host proof. The owner's web release is installed and read-only live-verified on October 6. The
-   [wave record](docs/next-wave.md#foundations-wave-2026-09-30) records delivery, the served
+   [wave record](.internal/next-wave.md#foundations-wave-2026-09-30) records delivery, the served
    release and remaining follow-ups. Closure authorizes no additional work.
 2. **126's finite closeout is complete.** Its bounded Wave 2 scope
    closed on 2026-10-02. The [finite pass](plans/126-t3code-alignment/finite-closeout-2026-10-03.md)
@@ -63,7 +63,7 @@ snapshot; this file remains the scheduler and each plan remains its scope author
    order, not a chain of prerequisites; [the closeout table](#wave-2-closeout-and-dependency-order)
    names the dependencies that matter.
 3. **The keymap cutover (204 + 205 → 206) is delivered in PR #603**, with the installed release
-   and live verification recorded in the [delivery record](docs/keymap/command-foundation-delivery.md).
+   and live verification recorded in the [delivery record](.internal/keymap/command-foundation-delivery.md).
    The document runtime's 099 units 2–7 are delivered in PR #787, installed and live-verified;
    [099's delivery checkpoint](plans/099-document-contributions.md#delivery-checkpoint-2026-10-06)
    preserves the exact release and evidence limits. Localization and workspace implementation
@@ -271,7 +271,7 @@ Approved, deferred nightly rewrite and reconciles the affected named follow-ons.
 156 P0–P2
 delivered 2026-10-02 (#269/#280/#286); the whole plan remains open for Approved P3+ work.
 Independent work can move earlier. See the
-[remaining phase checklist](docs/next-wave.md#wave-2-closeout-reconciled-2026-10-02).
+[remaining phase checklist](.internal/next-wave.md#wave-2-closeout-reconciled-2026-10-02).
 
 | Work                                                               | Dependency that matters                                                                                                                                                                                                                                               |
 | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -337,7 +337,7 @@ shared React/TypeScript logic. The wave-2 queue above is unchanged.
   contracts are prerequisites, not unrelated whole plans.
 - Plans 203/206 own keymap infrastructure. Plan 202's controls integrate with that dispatcher;
   they do not introduce a second one. Editor source is canonical in `editor/packages/` after 207.
-- The [coordination and research index](docs/tui-research/ui-plan-links.md) links the retained
+- The [coordination and research index](.internal/tui-research/ui-plan-links.md) links the retained
   catalog, source evidence, companion plans and implementation handoffs. These are plans, not
   delivered package changes; the existing fork overrides remain until the verified cutover.
 
@@ -349,7 +349,7 @@ shared React/TypeScript logic. The wave-2 queue above is unchanged.
 [205: ghostty-webgpu](plans/205-ghostty-on-fregat-hotkeys.md) and
 [206: Platform owns one keymap](plans/206-platform-one-keymap.md) merged together in
 [PR #603](https://github.com/ShaulLavo/fregat/pull/603). The
-[delivery record](docs/keymap/command-foundation-delivery.md) holds exact source, CI,
+[delivery record](.internal/keymap/command-foundation-delivery.md) holds exact source, CI,
 standalone package and processing/presentation evidence. Installed release and live verification passed.
 206's TUI delivery is command infrastructure; Plan 202 retains its own redesign.
 

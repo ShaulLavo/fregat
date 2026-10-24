@@ -51,7 +51,7 @@ Product shape:
 
 Reference doc:
 
-- `docs/t3code-reference.md`
+- `.internal/t3code-reference.md`
 
 Current Platform anchors:
 
@@ -372,7 +372,7 @@ Not in V1:
 
 Source paths and external refs:
 
-- `docs/t3code-reference.md`
+- `.internal/t3code-reference.md`
 - `references/t3code/packages/contracts/src/orchestration.ts`
 - `references/t3code/packages/contracts/src/providerInstance.ts`
 - `references/t3code/packages/contracts/src/providerRuntime.ts`

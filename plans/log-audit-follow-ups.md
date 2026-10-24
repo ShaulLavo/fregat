@@ -1,7 +1,7 @@
 # August log-audit follow-ups
 
 Status: Approved for current reproduction and reconciliation, scheduled with the roadmap's
-observability work. Reviewed 2026-10-03. The [original August audit](../docs/log-audit-prompts.md)
+observability work. Reviewed 2026-10-03. The [original August audit](../.internal/log-audit-prompts.md)
 preserves all 14 reports and their evidence. Its old paths, counts and proposed fixes describe
 that checkout. This review does not establish that any of those defects still exists.
 

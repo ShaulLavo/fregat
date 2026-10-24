@@ -21,7 +21,7 @@ cannot produce a ready verdict. Passing parser construct counts alone cannot qua
 ## Current code and reusable checks
 
 Implementation update, 2026-10-14: the initial baseline harness is implemented. The
-[qualification guide](../docs/markdown-parser/qualification.md) describes the five runnable
+[qualification guide](../.internal/markdown-parser/qualification.md) describes the five runnable
 commands, fixtures, browser checks, raster controls and benchmark evidence. It has 102 owned
 completed cases, 56 package streaming cases, 32 browser streaming stories and 128 visual states.
 The actual parser candidate and independent held-out evaluation remain unqualified. Q0–Q5 below

@@ -54,7 +54,7 @@ runtime smoke check. This qualified the resolution arrangement before final fami
 ## Command foundation standalone qualification (2026-10-04)
 
 [PR #603](https://github.com/ShaulLavo/fregat/pull/603) completed the exact migrated-family
-installation gate. The [delivery record](../docs/keymap/command-foundation-delivery.md)
+installation gate. The [delivery record](../.internal/keymap/command-foundation-delivery.md)
 pins all three family trees, final source, cold caches and real packed consumers.
 Root's local catalog selects workspace core version 0.0.3. Editor and Ghostty's independent
 family catalogs select the immutable hosted core version 0.0.2, built from reviewed source

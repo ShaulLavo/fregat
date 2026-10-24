@@ -11,6 +11,6 @@
 - [ ] Wave 6: preview/devices, pairing/remote, desktop/mobile/distribution, each with runnable host matrix.
 - [ ] Final matrix and independent evidence review; deploy verified source changes and reconcile ledger.
 
-Each delivery follows reproduce → change → focused proof → source review → deploy → browser/host proof. Live verification unavailable on this machine remains explicitly unverified. Decision trail: `.audit/plan126.tsv`. Root coordinates application source and verification. Delegated units own explicit file sets; shared contracts and reducers have one writer at a time. No shared-file edit races.
+Each delivery follows reproduce → change → focused proof → source review → deploy → browser/host proof. Live verification unavailable on this machine remains explicitly unverified. Decision trail: `.internal/audit/plan126.tsv`. Root coordinates application source and verification. Delegated units own explicit file sets; shared contracts and reducers have one writer at a time. No shared-file edit races.
 
 User wrap-up boundary on 2026-09-20: finish the active final batch only (terminal restart, recoverable draft identities, Plan/context defaults, bounded response delivery), deploy and verify, then stop. The remaining 48-group alignment program stays in progress; this boundary supersedes continuing to new waves in this run.

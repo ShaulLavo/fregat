@@ -7,7 +7,7 @@ against our runtime; an inventory of today's Editor, Platform, ghostty-webgpu an
 Plans [203](../../plans/203-fregat-hotkeys.md), [204](../../plans/204-editor-on-fregat-hotkeys.md),
 [205](../../plans/205-ghostty-on-fregat-hotkeys.md) and [206](../../plans/206-platform-one-keymap.md)
 carry the work. This page also owns preset, host-input and display policy; older delivery
-receipts remain in Git history and the [historical baseline](baseline.md).
+receipts remain in Git history and the [historical baseline](../../.internal/keymap/baseline.md).
 
 ## The model
 

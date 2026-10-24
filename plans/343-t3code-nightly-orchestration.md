@@ -31,7 +31,7 @@ does not establish runtime equivalence. The old ledger and percentages provide h
 ## Read this before execution
 
 1. Read repository `AGENTS.md`, [development setup](../docs/development.md), and
-   [the reference guide](../docs/t3code-reference.md). Load the applicable local and package skills.
+   [the reference guide](../.internal/t3code-reference.md). Load the applicable local and package skills.
 2. Reconcile drift before assigning units:
 
    ```sh

@@ -1,6 +1,6 @@
 # Editor decorations: learn from CodeMirror and Lexical, then beat what we have
 
-Owner direction, 2026-09-28: [Markdown experiences](../docs/markdown-experiences.md)
+Owner direction, 2026-09-28: [Markdown experiences](../.internal/markdown-experiences.md)
 defines the shared target for visual authoring, source-revealing authoring, rich
 composition, static pages, split editing and streaming chat. Block layout and
 editing semantics must support both authoring policies. Composer parity alone
@@ -71,7 +71,7 @@ Completion: a gap table, a decision record, a proposed API, and the follow-up pl
 
 ## Research findings (2026-09-25)
 
-Read from Platform origin/main `9f3438258` (the lane branches carry older copies of this plan) and Editor main `c23cd30`. There is no Plan 171 on main or on any branch. Teardown, pinned reference commits and the benchmark tables are in [docs/editor-decorations/survey.md](../docs/editor-decorations/survey.md). Editor paths below are relative to `Editor/packages/`.
+Read from Platform origin/main `9f3438258` (the lane branches carry older copies of this plan) and Editor main `c23cd30`. There is no Plan 171 on main or on any branch. Teardown, pinned reference commits and the benchmark tables are in [.internal/editor-decorations/survey.md](../.internal/editor-decorations/survey.md). Editor paths below are relative to `Editor/packages/`.
 
 **Question 7: yes.** A mention is expressible as a decoration over a plain buffer, and Lexical becomes deletable. The Editor already renders a replaced range as a DOM widget and moves the caret over it as one unit. It lacks four things a chip needs, all small, and the composer has two larger prerequisites: proportional-font wrap and a content-height signal. Zed's agent message editor already works this way: a mention is an inline crease over the buffer's own link text (`crates/agent_ui/src/mention_set.rs:1084-1176`).
 

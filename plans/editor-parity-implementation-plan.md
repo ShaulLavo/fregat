@@ -2,7 +2,7 @@
 > **STATUS: 🟢 CURRENT (reconciled 2026-08-24).** Retained product groups, with current approvals linked below.
 > E0 is complete and E1 is partially landed. Root [`PLAN.md`](../PLAN.md) is the only execution
 > scheduler; linked files under `plans/` are the executable handoffs. Companion analysis:
-> [editor-parity-gap-matrix.md](../docs/editor-parity-gap-matrix.md). The beyond-parity vision layer lives in
+> [editor-parity-gap-matrix.md](../.internal/editor-parity-gap-matrix.md). The beyond-parity vision layer lives in
 > [editor-1000-parity-plan.md](editor-1000-parity-plan.md) (this plan is its dimension D1).
 
 Current decision reconciliation, 2026-10-03: preserve E0–E9 as product groups. Newer approved

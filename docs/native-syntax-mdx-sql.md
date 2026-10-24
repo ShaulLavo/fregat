@@ -1,5 +1,7 @@
 # MDX and SQL admission follow-up
 
+> Internal investigation record, not user documentation. `scripts/syntax/candidates.json` cites this file by path, so it stays here.
+
 Investigated 2026-09-20. Neither language is externally blocked. The investigation below preceded admission.
 Generic SQL and repaired MDX have since shipped as partial coverage. See the
 [SQL increment](native-syntax-implementation.md#generic-sql-increment) and

@@ -321,7 +321,7 @@ which is Plan 142.
 
 ## Phases
 
-Proposed under Research findings; approved as wave 2 lanes (`docs/next-wave.md`): lane B runs
+Proposed under Research findings; approved as wave 2 lanes (`.internal/next-wave.md`): lane B runs
 Phase 1, lane A Phases 2–3.
 
 ### Phase 1: harness-started turns (landed 2026-09-26, wave 2 lane B)

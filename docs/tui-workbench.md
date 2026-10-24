@@ -31,9 +31,9 @@ originating pane. History persistence observes every navigation change, includin
 
 ## Feasibility
 
-- [Terminal feasibility](tui-research/terminal-feasibility.md) covers byte rendering, input,
+- [Terminal feasibility](../.internal/tui-research/terminal-feasibility.md) covers byte rendering, input,
   multiple viewers, real Neovim, raw attach, host resize, and terminal restoration.
-- [Viewer feasibility](tui-research/viewer-feasibility.md) records the published tree-sitter
+- [Viewer feasibility](../.internal/tui-research/viewer-feasibility.md) records the published tree-sitter
   worker failure and the bundled Shiki path that passes Bun and standalone compilation.
 
 The server tracks negotiated in-band resize mode 2048. It reports dimensions through that

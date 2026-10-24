@@ -2,7 +2,7 @@
 
 [Keymap architecture](keymap/architecture.md) defines dispatcher ownership, context resolution,
 presets, authored overrides and terminal input. Plans204–206 deliver these together. Older
-matcher delivery records remain in Git history; the [historical baseline](keymap/baseline.md)
+matcher delivery records remain in Git history; the [historical baseline](../.internal/keymap/baseline.md)
 records their original measurements.
 
 ## Adding commands and bindings

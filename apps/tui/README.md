@@ -265,5 +265,5 @@ See the [foundation record](../../docs/tui-foundation.md),
 [workbench record](../../docs/tui-workbench.md), and [Agent view record](../../docs/tui-agent.md)
 for implementation and verification details. Worktree creation parity and distribution remain
 separate slices in [the TUI strategy](../../plans/tui-plan.md).
-The [binding audit](../../docs/tui-bindings.md) records the original foundation dispositions;
+The [binding audit](../../.internal/tui-bindings.md) records the original foundation dispositions;
 the command catalog and in-app shortcut help contain the current defaults.

@@ -5,7 +5,7 @@
 - Status: DONE except as noted, 2026-09-25 (completion wave, lane L8): phases 1, 2, 3 and 6
   landed; review mode and second-model review moved to Plan 169; comment re-anchoring is left
   (Phase 3 note). Delete this plan once the owner checks pass.
-- Priority: P1. `docs/product-vision.md` makes the diff the reviewable artifact under every
+- Priority: P1. `.internal/product-vision.md` makes the diff the reviewable artifact under every
   harness, and today it ends in a view the user cannot act on.
 - Effort: L overall. Risk: MED — per-hunk undo writes to a worktree an agent may still be
   writing to.
@@ -64,7 +64,7 @@ plan takes the same line comments before it is approved.
 | Scrim UI  | Per-hunk accept on a streaming diff, keyed by hunk id         | `references/scrim-ui/src/showcase/edit-diff-view/` (`edit-diff-view.tsx`, `page-config.tsx` "mistakes")             |
 | Extend UI | Review panel: item focuses its source, per-item undo, tabs    | `references/extend-ui/apps/v4/components/extend/bounding-box-citations.tsx` (`HumanReviewPanel`)                    |
 
-Added 2026-09-25 from the UI library survey (`docs/ui-research/tinkerers-ui.md` item 4,
+Added 2026-09-25 from the UI library survey (`.internal/ui-research/tinkerers-ui.md` item 4,
 `scrimui.md` "edit-diff-view", `extend-ui.md` item 7). What they teach about per-hunk action:
 
 - **Key every decision by hunk id, never by index.** A diff that is still arriving re-splits
@@ -240,4 +240,4 @@ hunk.patch)` (16 hex), scoped by session, turns and whitespace mode. A hunk is a
   and a second writer would conflict.
 - Chat-only revert that leaves files changed (Codex `thread/revert`).
 - LLM-judged risk scores on changes.
-- Side-by-side compare of several agents' results: held in reserve by `docs/product-vision.md`.
+- Side-by-side compare of several agents' results: held in reserve by `.internal/product-vision.md`.

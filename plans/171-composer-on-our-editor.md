@@ -16,7 +16,7 @@
 
 ## Outcome
 
-Product direction: [Markdown experiences](../docs/markdown-experiences.md), adopted
+Product direction: [Markdown experiences](../.internal/markdown-experiences.md), adopted
 2026-09-28. Support visual rich-text authoring, source-revealing authoring, a rich
 prompt composer, streaming chat, static pages and StackEdit-style split editing,
 all ultimately using our Markdown parser.
@@ -51,7 +51,7 @@ list indentation, keyboard shortcuts and the file-editor context menu. Editing s
 are independent settings with per-document overrides. The preview now subscribes
 to immutable text snapshots so the React Compiler observes edits.
 
-Browser evidence is recorded in [Markdown experiences](../docs/markdown-experiences.md).
+Browser evidence is recorded in [Markdown experiences](../.internal/markdown-experiences.md).
 The save scenario waits for rendered edits before its next save. Existing workspace
 mutation exclusion can decline a second Save while the preceding save still owns
 its reservation; file-on-disk completion alone does not mean that reservation is released.
@@ -125,7 +125,7 @@ Deliverable: the gap table, the order, and the Editor and Platform plans it spli
 Read from Platform origin/main `a3768d4e` and Editor origin/main `e2fd299` (the Editor checkout's
 source matches it; the five commits it lacks are plans only). No PR branch carries this plan. Plan 111's
 findings landed during this research (`cc23c6b3`); this section builds on its gap table and
-[survey](../docs/editor-decorations/survey.md) and corrects it where a probe disagreed. Editor paths
+[survey](../.internal/editor-decorations/survey.md) and corrects it where a probe disagreed. Editor paths
 are relative to `Editor/packages/editor/src/`.
 
 **Probe.** The Editor's built `dist` (built after its last source change) was bundled with

@@ -1,6 +1,6 @@
 # Provisional editor display state
 
-Status: implemented and verified across Editor and Platform. See [implementation and verification results](editor-first-paint-verification.md). This replaces the separate preview-owner proposal and refines [workspace reload delivery](instant-reload-implementation.md).
+Status: implemented and verified across Editor and Platform. See [implementation and verification results](../.internal/editor-first-paint-verification.md). This replaces the separate preview-owner proposal and refines [workspace reload delivery](instant-reload-implementation.md).
 
 A saved snapshot supplies provisional display state inside the editor's native view. The first authoritative paint replaces that state in one commit. There is one viewport, one painter, and one presented set of rows. Platform persists opaque paint and supplies authoritative file data.
 

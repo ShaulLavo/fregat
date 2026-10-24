@@ -1,5 +1,7 @@
 # Native Editor Internals — Research Synthesis
 
+> Internal research record, not user documentation. The `mac-app` agent skill cites this file by path, so it stays here.
+
 Deep-read of the reference codebases in `~/Desktop/D/references/` (2026-08-28): CodeEditTextView + CodeEditSourceEditor (custom CoreText, macOS), STTextView (TextKit 2, macOS/iOS), Runestone (custom CoreText, iOS), plus a breadth pass over CotEditor, Chime, CodeEdit-the-app, and CodeEditorView. Input to plan 2 (`native-editor-core-design.md`). Fits the settled ghostty model: custom owner-drawn surface, native everything else.
 
 ## Verdict: custom CoreText, not TextKit 2
