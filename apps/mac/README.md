@@ -2,7 +2,7 @@
 
 Scaffold and benchmarks for a planned native macOS client. `MacApp` opens a stub window. The shipped Fregat desktop app uses the WebKit host in [`apps/desktop`](../desktop/). The [native editor core design](../../docs/native-editor-core-design.md) records the architecture.
 
-## Toolchain
+## Requirements
 
 Requires full Xcode 26+ (Command Line Tools alone cannot build this — no AppKit-capable `xcodebuild`, stale Swift). After installing from the App Store:
 

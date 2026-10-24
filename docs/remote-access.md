@@ -1,5 +1,7 @@
 # Reach Fregat from a phone or another computer
 
+> **Work in progress.** The Fregat proxy and remote access setup is still being built and may change. The steps below describe what works today.
+
 The Fregat server listens on `127.0.0.1` only. It refuses to start on any other host (`FS_HOST=0.0.0.0` stops with "FS RPC server must bind to a loopback host"), so a second device can never connect to its port directly. You put something in front of it: an SSH tunnel, or an HTTPS reverse proxy.
 
 Two checks decide whether a device gets in:

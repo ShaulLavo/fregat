@@ -19,20 +19,18 @@ Start with the [README](../README.md) if you want to know what Fregat is. This i
 
 These pages describe how subsystems work today. They are written for contributors and are dry on purpose. Some still carry the history of the work that produced them.
 
-| Area                  | Pages                                                                                                                                                                                                                                                                       |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Files and documents   | [Filesystem boundaries](filesystem-boundaries.md), [document and tab identity](document-and-tab-domain.md), [document-backed content views](document-backed-content-views.md), [async operations](async-operation-ownership.md), [workspace indexes](workspace-indexing.md) |
-| Navigation and layout | [Workspace navigation](workspace-navigation.md), [workspace rails](workspace-rails.md), [page subscriptions](page-subscriptions.md)                                                                                                                                         |
-| State and UI          | [State ownership](state-ownership.md), [web layering](web-layering.md), [web code layout](web-code-layout.md), [design language](web-design-language.md), [shared patterns](pattern-layer.md), [physical feel](physical-feel.md)                                            |
-| Sessions and machines | [Session domain](session-domain.md), [worktree lifecycle](worktree-lifecycle.md), [federated environments](federated-environments.md), [remote server releases](remote-server-releases.md), [web push](web-push.md)                                                         |
-| Editor and loading    | [First paint](editor-first-paint-design.md), [warm reload design](instant-reload-design.md) and [implementation](instant-reload-implementation.md), [boot and first load](boot-and-first-load.md), [HTML bootstrap](html-bootstrap.md)                                      |
-| Keyboard              | [Keymap architecture](keymap/architecture.md), [adding commands and bindings](vscode-keymap-development.md)                                                                                                                                                                 |
-| Terminals             | [Terminal processes and transport](terminal.md), [terminal host](terminal-host.md)                                                                                                                                                                                          |
-| Chat                  | [Dictation](chat-dictation.md)                                                                                                                                                                                                                                              |
-| Observability         | [Admission and retention](observability-overhead.md)                                                                                                                                                                                                                        |
-| Appearance            | [Theme bundles](theme-bundles.md)                                                                                                                                                                                                                                           |
-| Terminal client       | [Foundation](tui-foundation.md), [workbench](tui-workbench.md), [agent view](tui-agent.md), [worktrees](tui-worktrees.md), and the [TUI guide](../apps/tui/README.md)                                                                                                       |
-| Native macOS client   | [Editor core design](native-editor-core-design.md), [benchmark harness](native-bench-harness.md), and the [`apps/mac` README](../apps/mac/README.md)                                                                                                                        |
+- **Files and documents:** [Filesystem boundaries](filesystem-boundaries.md), [document and tab identity](document-and-tab-domain.md), [document-backed content views](document-backed-content-views.md), [async operations](async-operation-ownership.md), [workspace indexes](workspace-indexing.md)
+- **Navigation and layout:** [Workspace navigation](workspace-navigation.md), [workspace rails](workspace-rails.md), [page subscriptions](page-subscriptions.md)
+- **State and UI:** [State ownership](state-ownership.md), [web layering](web-layering.md), [web code layout](web-code-layout.md), [design language](web-design-language.md), [shared patterns](pattern-layer.md), [physical feel](physical-feel.md)
+- **Sessions and machines:** [Session domain](session-domain.md), [worktree lifecycle](worktree-lifecycle.md), [federated environments](federated-environments.md), [remote server releases](remote-server-releases.md), [web push](web-push.md)
+- **Editor and loading:** [First paint](editor-first-paint-design.md), [warm reload design](instant-reload-design.md) and [implementation](instant-reload-implementation.md), [boot and first load](boot-and-first-load.md), [HTML bootstrap](html-bootstrap.md)
+- **Keyboard:** [Keymap architecture](keymap/architecture.md), [adding commands and bindings](vscode-keymap-development.md)
+- **Terminals:** [Terminal processes and transport](terminal.md), [terminal host](terminal-host.md)
+- **Chat:** [Dictation](chat-dictation.md)
+- **Observability:** [Admission and retention](observability-overhead.md)
+- **Appearance:** [Theme bundles](theme-bundles.md)
+- **Terminal client:** [Foundation](tui-foundation.md), [workbench](tui-workbench.md), [agent view](tui-agent.md), [worktrees](tui-worktrees.md), and the [TUI guide](../apps/tui/README.md)
+- **Native macOS client:** [Editor core design](native-editor-core-design.md), [benchmark harness](native-bench-harness.md), and the [`apps/mac` README](../apps/mac/README.md)
 
 ## Reference
 
@@ -40,7 +38,7 @@ These pages describe how subsystems work today. They are written for contributor
 - [Native syntax coverage](native-syntax-coverage.md): generated by `bun run syntax:coverage`.
 - Package pages: [`packages/pty`](../packages/pty/README.md), [`packages/contracts`](../packages/contracts/README.md), and one README per app and package under `apps/` and `packages/`.
 
-## The other products
+## Mirrored libraries
 
 Singapore (`editor/`), ghostty-webgpu and hotkeys keep their own docs next to their code: [`editor/`](../editor/README.md), [`ghostty-webgpu/`](../ghostty-webgpu/README.md) and [`hotkeys/`](../hotkeys/README.md).
 

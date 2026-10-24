@@ -2,13 +2,9 @@
 
 Runs a program in a pseudo-terminal from Bun. You get its output as bytes, and you can type into it, resize it and kill it.
 
-It wraps Bun's native terminal support and waits for every last byte before reporting exit. Linux and macOS, Bun 1.3.14 or newer. The repository itself builds with the Bun version in its root `packageManager` field (1.4.4).
+It wraps Bun's native terminal support and waits for every last byte before reporting exit. Linux and macOS, Bun 1.3.14 or newer, because earlier Bun versions segfault on failed spawns. The repository itself builds with the Bun version in its root `packageManager` field (1.4.4).
 
-## In Fregat
-
-Private to this repo. Every shell in the app's terminal panel is a `spawnPty` call in the terminal host (`apps/server/src/terminal-host/session.ts`). The host keeps a replay buffer of the bytes and forwards them to the server, which streams them to the browser. [Terminal service](../../docs/terminal.md) and [terminal host](../../docs/terminal-host.md) cover that side.
-
-## The API
+## Usage
 
 One function. `onData` is set at spawn, so no startup output is missed.
 
@@ -34,6 +30,10 @@ process.stdout.write(decoder.decode())
 ```
 
 `pty.kill()` sends `SIGHUP` and escalates to `SIGKILL` after 250 ms. `await using` (or `pty[Symbol.asyncDispose]()`) kills and waits for cleanup. `pty.pid` is the direct child.
+
+## In Fregat
+
+Private to this repo. Every shell in the app's terminal panel is a `spawnPty` call in the terminal host (`apps/server/src/terminal-host/session.ts`). The host keeps a replay buffer of the bytes and forwards them to the server, which streams them to the browser. [Terminal service](../../docs/terminal.md) and [terminal host](../../docs/terminal-host.md) cover that side.
 
 ## Check it
 

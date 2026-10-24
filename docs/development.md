@@ -20,17 +20,15 @@ Every user-facing knob is a registry entry in `packages/contracts/src/settings/k
 
 [Filesystem boundaries](filesystem-boundaries.md) covers ordinary editor access, the optional server root restriction, and the separate permissions agents run under.
 
-## Prerequisites
+## Requirements
 
-Install Node.js 26.0.0 or newer and Bun 1.4.4. Bun 1.4.4 is the version the root `package.json` pins in `packageManager`, and CI installs Bun from that field, so use it to get the lockfile and test results CI gets. To use the browser app, use Chromium 144, Firefox 145 or Safari 26.2 or newer.
+Install Node.js 26.0.0 or newer, because the editor parsers need resizable WebAssembly memory, and Bun 1.4.4. Bun 1.4.4 is the version the root `package.json` pins in `packageManager`, and CI installs Bun from that field, so use it to get the lockfile and test results CI gets. To use the browser app, use Chromium 144, Firefox 145 or Safari 26.2 or newer.
 
 The version floors in this repository come from three places:
 
-| Where                                                                                                                | Floor                   | Why                                                                                              |
-| -------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
-| A checkout (`engines`, `packageManager`)                                                                             | Node 26.0.0, Bun 1.4.4  | Tree-sitter and native Markdown parsing need `WebAssembly.Memory.prototype.toResizableBuffer()`. |
-| `@singapore-editor/tree-sitter`, `@singapore-editor/tree-sitter-languages`, `@singapore-editor/markdown` (`engines`) | Node 26.0.0, Bun 1.2.22 | The same API. Browsers need Chromium 144, Firefox 145 or Safari 26.2.                            |
-| [`@workspace/pty`](../packages/pty/README.md) (`engines`)                                                            | Bun 1.3.14              | Earlier Bun versions segfault on failed spawns.                                                  |
+- **A checkout** (`engines`, `packageManager`): Node 26.0.0 and Bun 1.4.4. Tree-sitter and native Markdown parsing need `WebAssembly.Memory.prototype.toResizableBuffer()`.
+- **`@singapore-editor/tree-sitter`, `@singapore-editor/tree-sitter-languages` and `@singapore-editor/markdown`** (`engines`): Node 26.0.0 and Bun 1.2.22, for the same API. Browsers need Chromium 144, Firefox 145 or Safari 26.2.
+- **[`@workspace/pty`](../packages/pty/README.md)** (`engines`): Bun 1.3.14, because earlier Bun versions segfault on failed spawns.
 
 The package floors are minimums for that package alone. A checkout needs the pinned Bun.
 
@@ -50,8 +48,8 @@ Relative selection follows a moved checkout. The installer preserves existing cu
 
 ## Workspace libraries and native hosts
 
-The Linux desktop host requires Zig 0.17.x, `pkg-config`, and WebKitGTK 4.1 development headers.
-The macOS host requires Swift 6 and the macOS SDK from the Xcode command-line tools.
+The Linux desktop host is written in Zig and links WebKitGTK, so it requires Zig 0.17.x, `pkg-config`, and WebKitGTK 4.1 development headers.
+The macOS host is written in Swift with AppKit and WebKit, so it requires Swift 6 and the macOS SDK from the Xcode command-line tools.
 `bun run --cwd apps/desktop build:native` builds the host for the current platform. Linux uses
 `zig translate-c` to generate library declarations, then compiles the Zig host with safety checks.
 The macOS build compiles the Swift host with AppKit and WebKit, targeting macOS 11 and later.
