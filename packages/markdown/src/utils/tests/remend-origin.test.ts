@@ -212,6 +212,13 @@ const focused = [
 ]
 
 describe('pinned default remend writer', () => {
+  it('pins the dependency to the adapted writer version', () => {
+    const manifest: unknown = JSON.parse(
+      readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'),
+    )
+    expect(manifest).toMatchObject({ dependencies: { remend: '1.3.1' } })
+  })
+
   it('uses the exact unchanged installed reference', () => {
     expect(
       createHash('sha256')
