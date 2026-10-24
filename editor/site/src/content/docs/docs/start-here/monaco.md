@@ -41,7 +41,7 @@ A language id alone supplies no diagnostics or completions. Install the syntax p
 
 Singapore uses UTF-16 offsets for edit ranges. Monaco positions are one-based line and column pairs. Convert at your application's boundary and test emoji and CRLF files.
 
-Singapore's syntax paint cannot use bold or italic. Rows have fixed height. Inlay hints, CodeLens and a Monaco-level screen-reader audit are gaps. Mobile and touch are outside the current target. Check the commands your application uses against the [generated core reference](/docs/reference/api/core/overview/).
+Singapore's syntax paint cannot use bold or italic. Rows have fixed height. Inlay hints, CodeLens and a Monaco-level screen-reader audit are gaps. Mobile is not a supported target. Touch selection exists in the source as an experiment and is not in the npm packages. Check the commands your application uses against the [generated core reference](/docs/reference/api/core/overview/).
 
 No editor-level comparison currently establishes an overall speed or memory advantage over Monaco. Run your application's real files through both editors before making that claim.
 

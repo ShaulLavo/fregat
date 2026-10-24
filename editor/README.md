@@ -87,6 +87,32 @@ bun run --cwd editor/examples/app dev
 
 Vite prints the address of the demo app.
 
+## Which package do I need?
+
+Pick by what you want to do. The npm column was checked with `npm view` on 2026-10-24 (`@singapore-editor/<name>`). A package marked "no" exists in the source only: build it from source, because `npm install` fails.
+
+| I want                                                 | Install                                                    | On npm                    |
+| ------------------------------------------------------ | ---------------------------------------------------------- | ------------------------- |
+| An editor                                              | `core`                                                     | yes (0.1.2)               |
+| Syntax colors, folds and brackets in an editor         | `core`, `tree-sitter`, `tree-sitter-languages`             | yes (0.1.2, 0.1.1, 0.1.1) |
+| Syntax colors outside an editor, such as code snippets | `highlighting` (tokenizes with Shiki and Tree-sitter)      | no                        |
+| Line numbers and fold controls                         | `core`, `gutters`                                          | yes                       |
+| Find and replace                                       | `core`, `find`                                             | yes                       |
+| Language server diagnostics, completion and hover      | `core`, `lsp-plugin`; `lsp` comes with it                  | yes                       |
+| TypeScript or JavaScript intelligence with no server   | `core`, `typescript-lsp`                                   | yes                       |
+| Several people editing one document                    | `collab` and `collaboration`, plus `core`                  | no, neither               |
+| A diff view                                            | `core`, `diff`                                             | yes (0.2.0)               |
+| Markdown preview                                       | `core`, `markdown`, `tree-sitter`, `tree-sitter-languages` | yes                       |
+| A read-only viewer for a very large file               | `paged`                                                    | no                        |
+| React or Solid components                              | `core`, `react` or `solid`                                 | yes                       |
+| Only the persistent text buffer                        | `textbuffer`                                               | yes (0.1.0)               |
+
+Three names invite a wrong guess:
+
+- **`highlighting` is not the way to add syntax colors to an editor.** For that, use `tree-sitter` with `tree-sitter-languages`, as in the [Languages guide](https://singapore.shaulavo.dev/docs/guides/languages/). `highlighting` is unpublished, and it depends on `tree-sitter`, `tree-sitter-languages` and `diff`.
+- **`collab` and `collaboration` are two layers.** `collab` is the engine: it orders edits and gives each character an identity, with no editor or network. `collaboration` depends on `collab` and adds the editor plugin, session protocol, transports and remote cursors. Neither is on npm.
+- **`core/shiki` is not a package.** It is the `@singapore-editor/core/shiki` entry point, which ships in `core`. See [Shiki entry point](packages/editor/README.md#shiki-entry-point).
+
 ## Packages
 
 Each package has a short README with install, usage and API notes. The [generated API reference](https://singapore.shaulavo.dev/docs/reference/packages/) covers every export.
@@ -168,9 +194,20 @@ Pre-1.0. The public API is still changing, and source packages are at 0.2.9 (`co
 
 - **npm lags the source.** On 2026-10-24, 18 packages were on npm at 0.1.x (`diff` at 0.2.0). `collab`, `collaboration`, `file-animation`, `highlighting` and `paged` were not published, and their READMEs say so. Run `npm view @singapore-editor/<name> version` to check. Package READMEs describe the source, so APIs they show can be newer than the npm release. Publishing the current release is deferred.
 - **Browsers.** Input goes through a textarea by default. Pass `inputRoute: 'edit-context'` to use EditContext in engines that have it, which today means Chromium. The Vitest browser projects in `packages/editor` run the full browser suite in Chromium, and the scroll, layout and paint suites in Firefox and WebKit too. Tree-sitter syntax needs Chromium 144, Firefox 145, Safari 26.2 or newer, according to the [tree-sitter README](packages/tree-sitter/README.md). [Browser quirks](docs/display/browser-quirks.md) lists the known engine bugs.
-- **Accessibility and touch.** The docs site says screen-reader support has no published audit, and that mobile and touch are outside the current target.
+- **Accessibility.** The docs site says screen-reader support has no published audit.
+- **Touch and mobile.** Mobile is not a supported target. The source has experimental touch selection: hold or double-tap a word and drag, triple-tap a line, four taps for the document, with an opt-in menu plugin. Neither the gestures nor the menu are in the npm packages. The tests for them use emulated iPhone 13 profiles in Chromium and WebKit and an iOS simulator, not real devices. See [Touch selection](packages/editor/README.md#touch-selection).
 - **Layout.** Text rows have a fixed height today. `::highlight()` cannot set font weight or font style, so syntax colors cannot be bold or italic.
 - **Workers.** Tree-sitter needs your build to serve the worker and its WebAssembly file. See [Bundling and workers](https://singapore.shaulavo.dev/docs/guides/bundling/).
+
+### What differs between npm 0.1.x and the source
+
+The package changelogs start at 0.2.1, so no changelog covers 0.1.x. Comparing the published `@singapore-editor/core@0.1.2` and `@singapore-editor/plugin-ui@0.1.0` tarballs with the source shows these differences:
+
+- `core` 0.1.2 has no `./paint` or `./internal/document-worker` entry point, and its scroll modes are `'virtualized'` and `'static'` only. The source also has `scrollMode: 'content'`, which throws `EDITOR_CONTENT_LAYOUT_LIMIT` when the layout limits are exceeded, and `captureSnapshot({ scope: 'document' })`.
+- Neither tarball contains the touch selection controller, `createTouchSelectionPlugin` or the touch menu.
+- `collab`, `collaboration`, `file-animation`, `highlighting` and `paged` have no published version at all.
+
+Other changes are listed in each package's `CHANGELOG.md` from 0.2.1 on. Everything the package READMEs show was written against the source. An example can fail against 0.1.x, so check an API in the published package before you rely on it.
 
 The [known limits page](docs/limitations.md) lists exact ceilings, such as the 32,000-code-unit row length at which right-to-left rows stop measuring.
 

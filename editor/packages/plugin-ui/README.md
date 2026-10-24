@@ -52,6 +52,8 @@ MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)
 
 ## Touch selection menu
 
+Status: experimental. The menu is in the source only: `@singapore-editor/plugin-ui` 0.1.0 on npm has no touch plugin, and mobile is not a supported target. The gestures it reacts to live in `@singapore-editor/core`. See [Touch selection](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/README.md#touch-selection) for what tests cover.
+
 Add `createTouchSelectionPlugin({ haptics: true })` to the editor's `plugins` option. Import the factory from `@singapore-editor/plugin-ui/touch-selection-plugin`.
 
 The plugin opens a light/dark touch menu after a word, line or document selection gesture settles. Cut, Copy, Paste and Select all use core input commands. Undo and Redo appear when the editable document has the corresponding history. Desktop context menus keep their existing ownership. Removing the plugin removes its menu, styles and listeners; core touch selection continues to work.

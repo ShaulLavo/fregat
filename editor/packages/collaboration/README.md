@@ -42,6 +42,10 @@ console.log(presence.states)
 presence.dispose()
 ```
 
+## No end-to-end quick start yet
+
+There is no step-by-step guide that takes two editors from nothing to a synchronized document, and the example above does not start a session. To see the pieces wired together, read the demo app's collaboration page: [`collaboration.html`](https://github.com/ShaulLavo/fregat/blob/main/editor/examples/app/collaboration.html) and [`collaboration.ts`](https://github.com/ShaulLavo/fregat/blob/main/editor/examples/app/src/collaboration.ts). It is source to read, not a tested tutorial. The [integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collaboration/docs/integration.md#editor-attachment) covers attaching the plugin to an editor.
+
 ## API highlights
 
 - `createCollaborationPlugin()` attaches shared editing and selective Undo to an editor view.

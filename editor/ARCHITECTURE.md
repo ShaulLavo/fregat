@@ -59,6 +59,8 @@ The main thread owns the document, selections, undo, row mounting and paint. Wor
 | Shiki tokenizing                  | `ShikiWorkerOwner`         | `core/shiki`     |
 | TypeScript language service       | `TypeScriptLspWorkerOwner` | `typescript-lsp` |
 
+`core/shiki` is the `@singapore-editor/core/shiki` entry point inside the `core` package, not a separate package. See the [Shiki entry point](packages/editor/README.md#shiki-entry-point).
+
 Each owner starts its worker, tracks requests, and disposes it. The plugin or service that creates an owner disposes it at teardown, and the package-level worker singletons are gone. [Worker topology](docs/architecture/worker-topology.md) lists each owner's cache limits and what happens after a crash. [ADR 003](docs/adr/003-document-on-main-thread.md) explains why the document stays on the main thread.
 
 ## Plugins
