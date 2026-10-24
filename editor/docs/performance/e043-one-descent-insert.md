@@ -95,5 +95,5 @@ the two splits the same way is a smaller version of this change.
   first snap rule. `bun run bench:test`: 73 tests, budgets regenerated for the counters this
   removed (`tryCoalesceInsert`, the insert's `snapEditRange` and `splitsSurrogatePair` calls).
 - Timing and profiles: `bun run bench -- --profile standard --seed <s> [--warmups 6]
-  [--samples 25]` in both trees and `bun run bench:profile -- --modes cpu,counters --repeats 24`,
+[--samples 25]` in both trees and `bun run bench:profile -- --modes cpu,counters --repeats 24`,
   under `timing/` and `cpu/` in the evidence tarball.
