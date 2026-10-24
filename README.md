@@ -43,7 +43,7 @@ All clients talk to one server on your machine. [Architecture](docs/architecture
 
 ## Quick start
 
-Install [Bun](https://bun.sh/), [Node.js 26 or newer](https://nodejs.org/), and [Git](https://git-scm.com/), then run:
+Install [Bun 1.4.4](https://bun.sh/) (the version pinned in `packageManager`, check with `bun --version`), [Node.js 26 or newer](https://nodejs.org/), and [Git](https://git-scm.com/), then run:
 
 ```sh
 git clone https://github.com/ShaulLavo/fregat.git
@@ -60,18 +60,18 @@ The dev server prints `[dev] Client: http://127.0.0.1:5173`.
 3. To use agents, install [Claude Code](https://code.claude.com/docs/en/setup) or [Codex](https://developers.openai.com/codex/cli/) and sign in.
 
 If something fails, [troubleshooting](docs/troubleshooting.md) lists the usual causes.
-Remote phone browsers need an HTTPS proxy and device pairing. Keep access private and pair only devices you trust.
+The server listens on `127.0.0.1` only. A phone or another computer reaches it through an HTTPS proxy or an SSH tunnel, plus device pairing: see [Reach Fregat from another device](docs/remote-access.md). Keep access private and pair only devices you trust.
 
 ## What you can do
 
-| Task                                    | Where                                                                |
-| --------------------------------------- | -------------------------------------------------------------------- |
-| Run it, run the checks, build a release | [Development](docs/development.md)                                   |
-| Pair a phone or another computer        | [Pairing another device](docs/development.md#pairing-another-device) |
-| Change a setting                        | [Settings reference](docs/settings-reference.md)                     |
-| Find your way around the code           | [Monorepo map](docs/monorepo.md)                                     |
-| Use the terminal client                 | [`apps/tui`](apps/tui/README.md)                                     |
-| Understand a subsystem                  | [Documentation index](docs/README.md)                                |
+| Task                                      | Where                                            |
+| ----------------------------------------- | ------------------------------------------------ |
+| Run it, run the checks, build a release   | [Development](docs/development.md)               |
+| Reach it from a phone or another computer | [Remote access](docs/remote-access.md)           |
+| Change a setting                          | [Settings reference](docs/settings-reference.md) |
+| Find your way around the code             | [Monorepo map](docs/monorepo.md)                 |
+| Use the terminal client                   | [`apps/tui`](apps/tui/README.md)                 |
+| Understand a subsystem                    | [Documentation index](docs/README.md)            |
 
 ## The parts
 
@@ -81,19 +81,19 @@ Remote phone browsers need an HTTPS proxy and device pairing. Keep access privat
 | [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu) | Ghostty's terminal, in the browser.                     |
 | [hotkeys](https://github.com/ShaulLavo/hotkeys)               | Keyboard shortcuts for editors and complex apps.        |
 
-These projects live in this monorepo as `editor/`, `ghostty-webgpu/` and `hotkeys/`. Their standalone repositories are read-only mirrors.
+These three are not separate products from separate teams. They are folders of this repository, `editor/` (Singapore), `ghostty-webgpu/` and `hotkeys/`, and Fregat's own build uses them from here. A workflow publishes each folder to the standalone repository in the table, so those repositories are read-only copies, and issues and changes go to this one.
 
 ## Status
 
 Fregat is pre-1.0 and has no app releases. APIs and on-disk formats change without notice.
 
-| Area              | State                                                                                                                    |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Platforms         | Linux and macOS, as the landing page states. Windows is not listed.                                                      |
-| Install           | From source only. `@fregat/hotkeys` is not on npm. The npm releases of Singapore and ghostty-webgpu lag this repository. |
-| Agents            | Claude Code and Codex, through your own installs and logins.                                                             |
-| Terminal restarts | Terminals survive a server restart on Linux. The macOS behavior is not verified.                                         |
-| Remote access     | Needs an HTTPS proxy and device pairing. Treat access to the server as access to your files.                             |
+| Area              | State                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Platforms         | Linux and macOS, as the landing page states. Windows is not listed.                                                             |
+| Install           | From source only. `@fregat/hotkeys` is not on npm. The npm releases of Singapore and ghostty-webgpu lag this repository.        |
+| Agents            | Claude Code and Codex, through your own installs and logins.                                                                    |
+| Terminal restarts | Terminals survive a server restart on Linux. The macOS behavior is not verified.                                                |
+| Remote access     | Needs an HTTPS proxy or SSH tunnel, plus device pairing. Tested through Tailscale Serve only. [Details](docs/remote-access.md). |
 
 ## Contributing
 

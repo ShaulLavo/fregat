@@ -104,5 +104,5 @@ Both returned all 6,400 measured payload bytes. The native service carries those
 JSON envelopes. On the Mac, native startup median was 20.674 ms and echo median was 0.01850 ms;
 no Mac Node baseline was measured. These are service measurements, not end-to-end UI timings.
 
-The package requires Bun 1.3.14 or later; the repository pins 1.4.0. Windows is completely
+The package requires Bun 1.3.14 or later; the repository pins 1.4.4. Windows is completely
 untested, with compatibility unknown. The current package guard permits Linux and macOS only.

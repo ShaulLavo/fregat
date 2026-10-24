@@ -15,7 +15,7 @@ If you take an open issue, check for an `in progress` label or claim comment fir
 
 ## Set up a checkout
 
-Install [Bun](https://bun.sh/), [Node.js 26 or newer](https://nodejs.org/), and [Git](https://git-scm.com/), then run:
+Install [Bun 1.4.4](https://bun.sh/) (the version pinned in `packageManager`, check with `bun --version`), [Node.js 26 or newer](https://nodejs.org/), and [Git](https://git-scm.com/), then run:
 
 ```sh
 git clone https://github.com/ShaulLavo/fregat.git
@@ -25,7 +25,7 @@ bun run build:workspaces
 bun run dev
 ```
 
-Read [docs/development.md](docs/development.md) for source builds, checks, and platform prerequisites, and the [monorepo map](docs/monorepo.md) for where code lives. If a command fails, see [troubleshooting](docs/troubleshooting.md).
+Read [docs/development.md](docs/development.md) for source builds, checks, version floors and platform prerequisites, and the [monorepo map](docs/monorepo.md) for where code lives. If a command fails, see [troubleshooting](docs/troubleshooting.md).
 Read [AGENTS.md](AGENTS.md) for repository conventions. Singapore changes also follow [editor/AGENTS.md](editor/AGENTS.md); terminal changes follow [ghostty-webgpu/AGENTS.md](ghostty-webgpu/AGENTS.md).
 
 ## Make and verify a change
