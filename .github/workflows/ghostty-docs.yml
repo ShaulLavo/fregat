@@ -48,8 +48,10 @@ jobs:
       - name: Check samples, generate reference and validate links
         run: bun run --cwd ghostty-webgpu/${{ matrix.site }} build --base /fregat/ghostty-webgpu/
       - name: Install Chromium and WebKit
-        working-directory: ghostty-webgpu/${{ matrix.site }}
-        run: bunx playwright install --with-deps chromium webkit
+        uses: ./.github/actions/install-browsers
+        with:
+          playwright: ghostty-webgpu/${{ matrix.site }}/node_modules/.bin/playwright
+          browsers: chromium webkit
       - name: Start docs preview
         working-directory: ghostty-webgpu/${{ matrix.site }}
         run: |
