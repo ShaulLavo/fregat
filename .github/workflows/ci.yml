@@ -302,7 +302,7 @@ jobs:
       # Script tests inspect the whole repository; package source readers are declared in Turbo.
       - name: Script tests
         if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tooling == 'true' }}
-        run: bun run test:scripts --exclude scripts/markdown/promotion-evidence.test.ts
+        run: bun run test:scripts --exclude scripts/markdown/promotion-evidence.test.ts --exclude scripts/agent/browser-launch.test.ts --exclude scripts/browser-gc.test.ts
 
       - name: Package tests
         if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' }}

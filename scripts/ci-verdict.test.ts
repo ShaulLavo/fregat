@@ -567,3 +567,15 @@ test('missing producer execution rejects a successful parent and producer-only r
   if (producer) producer.run_attempt = 2
   expect(value.run()).toEqual({ passed: true, issues: [] })
 })
+
+test.each(['failure', 'cancelled', 'skipped', 'missing'])(
+  'exclusive browser script owner %s blocks the aggregate',
+  (conclusion) => {
+    const value = fixture()
+    expect(value.run()).toEqual({ passed: true, issues: [] })
+    const jobs = value.jobs
+      .filter((job) => conclusion !== 'missing' || job.name !== 'Browser tests')
+      .map((job) => (job.name === 'Browser tests' ? { ...job, conclusion } : job))
+    expect(value.evaluate(jobs).passed).toBe(false)
+  },
+)

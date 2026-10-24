@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { YAML } from 'bun'
+import { readWorkspaceGraph, selectAffected } from './affected.mjs'
 
 const root = new URL('../../', import.meta.url)
 const workflow = YAML.parse(await readFile(new URL('.github/workflows/ci.yml', root), 'utf8'))
@@ -230,10 +231,10 @@ test('script test partition discovers every file once and reuses built outputs',
     (job) => job.steps.find((step) => step.name === 'Script tests').run,
   )
   const discover = (command) => {
-    const run = command.replace(
-      'bun run test:scripts',
-      'bun --bun vitest list --config vitest.scripts.config.mjs',
-    )
+    const run = command
+      .replace('bun run test:scripts', 'bun --bun vitest run --config vitest.scripts.config.mjs')
+      .replace('vitest run', 'vitest list')
+    expect(run).toContain('vitest list')
     const result = spawnSync('bash', ['-euo', 'pipefail', '-c', `${run} --filesOnly --json`], {
       cwd: fileURLToPath(root),
       encoding: 'utf8',
@@ -250,8 +251,35 @@ test('script test partition discovers every file once and reuses built outputs',
   expect(promotion).toEqual([
     fileURLToPath(new URL('scripts/markdown/promotion-evidence.test.ts', root)),
   ])
-  expect(general.concat(promotion).sort()).toEqual(all)
-  expect(new Set(general.concat(promotion)).size).toBe(all.length)
+  const browserJob = workflow.jobs.browser
+  expect(browserJob.if).toBe(
+    "${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.tree == 'true' || needs.changes.outputs.tooling == 'true' }}",
+  )
+  expect(browserJob['runs-on']).toBe('ubuntu-latest')
+  expect(workflow.jobs.verdict.needs).toContain('browser')
+  expect(browserJob).not.toHaveProperty('continue-on-error')
+  const install = browserJob.steps.find((step) => step.name === 'Install Chromium')
+  expect(install.uses).toBe('./.github/actions/install-browsers')
+  expect(install.with.browsers).toBe(
+    "${{ needs.changes.outputs.tooling == 'true' && 'chromium webkit' || 'chromium' }}",
+  )
+  const browser = [
+    ['Agent browser shared memory', 'scripts/agent/browser-launch.test.ts'],
+    ['Browser resource teardown', 'scripts/browser-gc.test.ts'],
+  ].flatMap(([name, file]) => {
+    const step = browserJob.steps.find((entry) => entry.name === name)
+    expect(step.if).toBe(
+      "${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tooling == 'true' }}",
+    )
+    expect(step).not.toHaveProperty('continue-on-error')
+    expect(browserJob.steps.indexOf(install)).toBeLessThan(browserJob.steps.indexOf(step))
+    const files = discover(step.run)
+    expect(files).toEqual([fileURLToPath(new URL(file, root))])
+    return files
+  })
+  const partition = general.concat(promotion, browser).sort()
+  expect(partition).toEqual(all)
+  expect(new Set(partition).size).toBe(all.length)
   expect(original.steps.find((step) => step.name === 'Package tests').run).toBe(
     'bun scripts/ci/packages.mjs tests "$CI_PACKAGES"',
   )
@@ -400,3 +428,32 @@ test('transport is same-run and immutable, with only local build tasks persisted
     '--reuse-workspace-builds) bun scripts/ci/build-reuse.mjs verify-site "$json"',
   )
 })
+
+const graph = readWorkspaceGraph(fileURLToPath(root))
+const browserScriptInputs = [
+  'scripts/agent/browser-launch.test.ts',
+  'scripts/agent/browser-launch.ts',
+  'scripts/agent/browser-prerequisites.ts',
+  'scripts/agent/paths.ts',
+  'scripts/structured-errors.ts',
+  'scripts/browser-gc.test.ts',
+].concat(
+  graph.globalInputs.map((pattern) =>
+    pattern
+      .replaceAll('**', 'fixture')
+      .replaceAll('*', 'fixture')
+      .replace(/\{([^,}]+)[^}]*\}/g, '$1'),
+  ),
+)
+
+test.each(browserScriptInputs)(
+  '%s selects the exclusive browser script owner in changed mode',
+  (file) => {
+    const selected = selectAffected(graph, [file])
+    expect(selected.tooling).toBe(true)
+    expect(selected.exhaustive).toBe(false)
+    expect(selected.packages).toEqual(Array.from(graph.packages.keys()).sort())
+    expect(workflow.jobs.browser.if).toContain("needs.changes.outputs.tooling == 'true'")
+    expect(workflow.jobs.verdict.needs).toContain('browser')
+  },
+)
