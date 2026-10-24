@@ -159,5 +159,5 @@ percent, and it is why the decision does not depend on the audit's outcome.
   tarball under `timing/`.
 - Counters: `bun run bench:profile -- --modes counters --retention <mode>`, under `counters/`.
 - CPU: `bun run bench:profile -- --modes cpu --retention <mode> --repeats 24 --only
-random-insertions,random-replacements`, under `cpu/`. Raw `.cpuprofile` files are not kept;
+  random-insertions,random-replacements`, under `cpu/`. Raw `.cpuprofile` files are not kept;
   the command reproduces them.
