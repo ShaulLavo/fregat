@@ -1,16 +1,16 @@
 # @workspace/pty
 
-runs a program in a pseudo-terminal from bun. you get its output as bytes, and you can type into it, resize it and kill it
+Runs a program in a pseudo-terminal from Bun. You get its output as bytes, and you can type into it, resize it and kill it.
 
-it wraps bun's native terminal support and waits for every last byte before reporting exit. linux and macos, bun 1.3.14 or newer
+It wraps Bun's native terminal support and waits for every last byte before reporting exit. Linux and macOS, Bun 1.3.14 or newer. The repository itself builds with the Bun version in its root `packageManager` field (1.4.4).
 
-## in fregat
+## In Fregat
 
-private to this repo. every shell in the app's terminal panel is a `spawnPty` call in the terminal host (`apps/server/src/terminal-host/session.ts`). the host keeps a replay buffer of the bytes and forwards them to the server, which streams them to the browser. [terminal service](../../docs/terminal.md) and [terminal host](../../docs/terminal-host.md) cover that side
+Private to this repo. Every shell in the app's terminal panel is a `spawnPty` call in the terminal host (`apps/server/src/terminal-host/session.ts`). The host keeps a replay buffer of the bytes and forwards them to the server, which streams them to the browser. [Terminal service](../../docs/terminal.md) and [terminal host](../../docs/terminal-host.md) cover that side.
 
-## the api
+## The API
 
-one function. `onData` is set at spawn, so no startup output is missed
+One function. `onData` is set at spawn, so no startup output is missed.
 
 ```ts
 import { spawnPty } from '@workspace/pty'
@@ -33,18 +33,18 @@ const { exitCode, signal } = await pty.exited
 process.stdout.write(decoder.decode())
 ```
 
-`pty.kill()` sends `SIGHUP` and escalates to `SIGKILL` after 250 ms. `await using` (or `pty[Symbol.asyncDispose]()`) kills and waits for cleanup. `pty.pid` is the direct child
+`pty.kill()` sends `SIGHUP` and escalates to `SIGKILL` after 250 ms. `await using` (or `pty[Symbol.asyncDispose]()`) kills and waits for cleanup. `pty.pid` is the direct child.
 
-## check it
+## Check it
 
 ```sh
 bun run --cwd packages/pty test
 bun packages/pty/test/nvim-smoke.ts
 ```
 
-the tests spawn real programs and need posix `sh` and `stty`. the smoke check needs `nvim`
+The tests spawn real programs and need POSIX `sh` and `stty`. The smoke check needs `nvim`.
 
-## more
+## More
 
-- [contract](docs/contract.md), defaults, ordering, exit, kill and disposal rules, platform support
-- [design](docs/design.md), why a spawn-time callback and one owner for process and terminal
+- [Contract](docs/contract.md): defaults, ordering, exit, kill and disposal rules, platform support.
+- [Design](docs/design.md): why a spawn-time callback and one owner for process and terminal.
