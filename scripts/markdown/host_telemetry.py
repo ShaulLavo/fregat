@@ -1,4 +1,4 @@
-"""Measure one bounded process group and bind its report after exit."""
+"""Measure one contained launch and bind its report after exit."""
 
 from __future__ import annotations
 
@@ -100,8 +100,9 @@ def run_adapter(command: list[str], context: dict) -> str:
             )
         return stdout
     finally:
-        terminate_group(child.pid)
-        kill_group(child.pid)
+        # This thread alone reaps this Popen child, retaining its PID until wait.
+        child.terminate()
+        child.kill()
         child.wait(timeout=2)
 
 
@@ -317,20 +318,6 @@ def browser_interval(
     return start, end
 
 
-def terminate_group(group: int) -> None:
-    try:
-        os.killpg(group, signal.SIGTERM)
-    except ProcessLookupError:
-        return
-
-
-def kill_group(group: int) -> None:
-    try:
-        os.killpg(group, signal.SIGKILL)
-    except ProcessLookupError:
-        return
-
-
 def run_capture(args) -> int:
     out, report = args.out.resolve(), args.report.resolve()
     if report.exists():
@@ -339,7 +326,13 @@ def run_capture(args) -> int:
         raise ValueError("Command must include the literal {hostEvidence} argument")
     command = adapter_config(args.adapter_config)
     out.mkdir(parents=True, exist_ok=False)
+    containment = None
     try:
+        if signal.getsignal(signal.SIGCHLD) != signal.SIG_DFL:
+            raise RuntimeError("Capture requires exclusive child reaping")
+        containment = LaunchContainment()
+        if not containment.supported:
+            raise RuntimeError("Capture requires supported launch containment")
         collector = Collector(out, command)
     except (
         OSError,
@@ -349,11 +342,14 @@ def run_capture(args) -> int:
         RuntimeError,
         subprocess.SubprocessError,
     ) as error:
+        if containment is not None:
+            containment.cleanup()
         write_json(
             out / "receipt.json",
             {
                 "status": "incomplete",
                 "launched": False,
+                "cleanup": False,
                 "errorType": type(error).__name__,
                 "message": str(error),
             },
@@ -363,7 +359,7 @@ def run_capture(args) -> int:
     try:
         for signum in (signal.SIGINT, signal.SIGTERM):
             previous_handlers[signum] = signal.signal(signum, collector.interrupt)
-        return execute_capture(args, collector, report)
+        return execute_capture(args, collector, report, containment)
     except CaptureInterrupted as error:
         collector.record(
             "interrupted", errorType=type(error).__name__, message=str(error)
@@ -373,16 +369,33 @@ def run_capture(args) -> int:
             {
                 "status": "incomplete",
                 "launched": collector.group is not None,
+                "cleanup": False,
                 "errorType": type(error).__name__,
                 "message": str(error),
             },
         )
         return 143
     finally:
-        close_capture(collector, previous_handlers)
+        close_capture(collector, previous_handlers, containment)
 
 
-def close_capture(collector: Collector, previous_handlers: dict) -> None:
+def close_capture(collector: Collector, previous_handlers: dict, containment) -> None:
+    collector.cleaning = True
+    try:
+        drain_capture(collector, containment)
+    finally:
+        close_collector(collector, previous_handlers)
+
+
+def drain_capture(collector: Collector, containment) -> None:
+    try:
+        collector.stop_monitor()
+    finally:
+        if containment.cleanup_result is None:
+            finish_containment(containment, collector)
+
+
+def close_collector(collector: Collector, previous_handlers: dict) -> None:
     try:
         collector.close()
     finally:
@@ -390,7 +403,7 @@ def close_capture(collector: Collector, previous_handlers: dict) -> None:
             signal.signal(signum, handler)
 
 
-def execute_capture(args, collector: Collector, report: Path) -> int:
+def execute_capture(args, collector: Collector, report: Path, containment) -> int:
     native = None
     try:
         if args.kind == "native":
@@ -440,7 +453,11 @@ def execute_capture(args, collector: Collector, report: Path) -> int:
         command = native.command
     try:
         status, reason, launched, exited, cleanup = launch_capture(
-            args, collector, command, native.environment if native is not None else None
+            args,
+            collector,
+            command,
+            containment,
+            native.environment if native is not None else None,
         )
     except (
         OSError,
@@ -459,6 +476,7 @@ def execute_capture(args, collector: Collector, report: Path) -> int:
             {
                 "status": "incomplete",
                 "launched": collector.group is not None,
+                "cleanup": False,
                 "errorType": type(error).__name__,
                 "message": str(error),
             },
@@ -494,12 +512,13 @@ def execute_capture(args, collector: Collector, report: Path) -> int:
     return 128 - status if status < 0 else (status or int(receipt["status"] != "bound"))
 
 
-def launch_capture(args, collector, command, environment=None) -> tuple:
-    containment = LaunchContainment()
+def launch_capture(args, collector, command, containment, environment=None) -> tuple:
     collector.record("containment", supported=containment.supported)
     launched = time.time()
     child = None
     try:
+        if not containment.supported:
+            raise RuntimeError("Capture requires supported launch containment")
         child = subprocess.Popen(command, start_new_session=True, env=environment)
         collector.group = child.pid
         collector.record(
@@ -527,22 +546,29 @@ def launch_capture(args, collector, command, environment=None) -> tuple:
 def finish_launch(child, containment, collector) -> tuple[bool, float]:
     try:
         if child is not None:
-            terminate_group(child.pid)
-            kill_group(child.pid)
+            child.kill()
             child.wait(timeout=2)
         exited = time.time()
     finally:
         try:
             collector.finish()
         finally:
-            lifetime_cleanup = containment.cleanup()
-        collector.record(
-            "containment-cleanup", proven=lifetime_cleanup, adopted=containment.adopted
-        )
+            lifetime_cleanup = finish_containment(containment, collector)
     if child is None:
         return lifetime_cleanup, exited
     cleanup = cleanup_group(child.pid, collector.capture_owned) and lifetime_cleanup
     return cleanup, exited
+
+
+def finish_containment(containment, collector) -> bool:
+    try:
+        return containment.cleanup()
+    finally:
+        collector.record(
+            "containment-cleanup",
+            proven=containment.cleanup_result,
+            adopted=containment.adopted,
+        )
 
 
 def wait_child(child, timeout: float) -> tuple[int, str]:
@@ -550,24 +576,21 @@ def wait_child(child, timeout: float) -> tuple[int, str]:
         status = child.wait(timeout=timeout)
         return status, "exited"
     except CaptureInterrupted:
-        terminate_group(child.pid)
-        kill_group(child.pid)
+        child.terminate()
+        child.kill()
         child.wait(timeout=2)
         return 143, "interrupted"
     except subprocess.TimeoutExpired:
-        terminate_group(child.pid)
+        child.terminate()
         try:
             child.wait(timeout=2)
         except subprocess.TimeoutExpired:
-            kill_group(child.pid)
+            child.kill()
             child.wait(timeout=2)
         return 124, "timeout"
 
 
 def cleanup_group(group: int, identities: set) -> bool:
-    terminate_group(group)
-    # Kill the isolated group even when its root has exited with a surviving descendant.
-    kill_group(group)
     current = snapshot()
     for process in current.processes:
         if not process.live or process.identity not in identities:
@@ -585,17 +608,9 @@ def cleanup_group(group: int, identities: set) -> bool:
 
 
 def kill_identity(identity: tuple[int, int]) -> None:
-    pid, _started = identity
-    if hasattr(os, "pidfd_open") and hasattr(signal, "pidfd_send_signal"):
-        kill_linux_identity(identity)
-        return
-    current = next((p for p in snapshot().processes if p.identity == identity), None)
-    if current is None or not current.live:
-        return
-    try:
-        os.kill(pid, signal.SIGKILL)
-    except ProcessLookupError:
-        return
+    if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
+        raise RuntimeError("Identity cleanup requires kernel process handles")
+    kill_linux_identity(identity)
 
 
 def kill_linux_identity(identity: tuple[int, int]) -> None:

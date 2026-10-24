@@ -356,7 +356,12 @@ sys.stdin.readline()
         self.assertFalse((self.root / "report.json").exists())
         self.assertFalse((self.root / "telemetry" / "quiet-host.json").exists())
         self.assertFalse(self.json("receipt.json")["launched"])
-        self.assertEqual([row["kind"] for row in self.journal()], ["error", "error"])
+        self.assertEqual(
+            [row["kind"] for row in self.journal()],
+            ["error", "error", "containment-cleanup"],
+        )
+        self.assertTrue(self.journal()[-1]["proven"])
+        self.assertEqual(self.journal()[-1]["adopted"], [])
 
     def test_stale_adapter_timestamp_blocks_launch(self):
         result = self.run_capture(policy="stale")

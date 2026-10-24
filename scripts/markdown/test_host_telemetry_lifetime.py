@@ -10,7 +10,7 @@ import sys
 import unittest
 
 import test_host_telemetry as fixtures
-from host_telemetry import Collector
+from host_telemetry import Collector, kill_identity
 from host_telemetry_os import snapshot
 
 
@@ -30,7 +30,7 @@ class LifetimeTests(unittest.TestCase):
             (p for p in snapshot().processes if p.identity == identity), None
         )
         if current is not None and current.live:
-            os.kill(current.pid, signal.SIGKILL)
+            kill_identity(current.identity)
 
     def check_escape(self, intermediate):
         case = self.fixture()
