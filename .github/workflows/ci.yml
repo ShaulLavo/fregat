@@ -193,9 +193,32 @@ jobs:
       - name: Unused code
         run: bun run unused:check
 
+  # Build prerequisites once; suites start when their outputs are published.
+  workspace-builds:
+    name: Workspace builds
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          build-packages: '[]'
+      - name: Produce workspace builds
+        uses: ./.github/actions/workspace-builds
+        with:
+          operation: produce
+          selection: ${{ toJSON(needs.changes.outputs) }}
+
+  # Package tests share this runner with typechecking and generated checks.
   typecheck:
     name: Typecheck, generated, packages
-    needs: changes
+    needs: [changes, workspace-builds]
     if: ${{ needs.changes.outputs.shared == 'true' || needs.changes.outputs.tooling == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -208,8 +231,14 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
         with:
-          # Script tests import runtime code across the repository.
-          build-packages: ${{ needs.changes.outputs.tooling == 'true' && 'all' || needs.changes.outputs.packages }}
+          build-packages: '[]'
+
+      - name: Import workspace builds
+        id: builds
+        uses: ./.github/actions/workspace-builds
+        with:
+          operation: consume
+          targets: ${{ needs.changes.outputs.tooling == 'true' && 'all' || needs.changes.outputs.packages }}
 
       - name: Archive script test builds
         if: ${{ needs.changes.outputs.tooling == 'true' }}
@@ -272,11 +301,11 @@ jobs:
 
       # Script tests inspect the whole repository; package source readers are declared in Turbo.
       - name: Script tests
-        if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tooling == 'true' }}
         run: bun run test:scripts --exclude scripts/markdown/promotion-evidence.test.ts
 
       - name: Package tests
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' }}
         env:
           CI_PACKAGES: ${{ needs.changes.outputs.packages }}
         run: bun scripts/ci/packages.mjs tests "$CI_PACKAGES"
@@ -316,7 +345,7 @@ jobs:
   # are scoped to `--project node --project dom`; their browser projects are the browser job.
   test-web:
     name: Test (web ${{ matrix.shard }})
-    needs: changes
+    needs: [changes, workspace-builds]
     if: ${{ needs.changes.outputs.web == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -333,7 +362,14 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
         with:
-          build-packages: '["web"]'
+          build-packages: '[]'
+
+      - name: Import workspace builds
+        id: builds
+        uses: ./.github/actions/workspace-builds
+        with:
+          operation: consume
+          targets: '["web"]'
 
       - name: Test
         run: bun run --cwd apps/web test --shard=${{ matrix.shard }} --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/web-tests.json"
@@ -350,7 +386,7 @@ jobs:
   # By hash of the path: the recorded split was within 15% (207 s against 182 s of file time).
   test-server:
     name: Test (server ${{ matrix.shard }})
-    needs: changes
+    needs: [changes, workspace-builds]
     if: ${{ needs.changes.outputs.server == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -367,14 +403,21 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
         with:
-          build-packages: '["server"]'
+          build-packages: '[]'
+
+      - name: Import workspace builds
+        id: builds
+        uses: ./.github/actions/workspace-builds
+        with:
+          operation: consume
+          targets: '["server"]'
 
       - name: Test
         run: bun run --cwd apps/server test --shard=${{ matrix.shard }}
 
   test-tui:
     name: Test (tui)
-    needs: changes
+    needs: [changes, workspace-builds]
     if: ${{ needs.changes.outputs.tui == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -387,14 +430,21 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
         with:
-          build-packages: '["tui"]'
+          build-packages: '[]'
+
+      - name: Import workspace builds
+        id: builds
+        uses: ./.github/actions/workspace-builds
+        with:
+          operation: consume
+          targets: '["tui"]'
 
       - name: Test
         run: bun run --cwd apps/tui test
 
   browser:
     name: Browser tests
-    needs: changes
+    needs: [changes, workspace-builds]
     if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.tree == 'true' || needs.changes.outputs.tooling == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -407,7 +457,14 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
         with:
-          build-packages: '["web"]'
+          build-packages: '[]'
+
+      - name: Import workspace builds
+        id: builds
+        uses: ./.github/actions/workspace-builds
+        with:
+          operation: consume
+          targets: '["web"]'
 
       # The workspace's own playwright binary, never `bunx playwright` — bunx
       # resolves a fresh copy from npm and downloads the browser revision *that*
@@ -421,46 +478,46 @@ jobs:
           browsers: ${{ needs.changes.outputs.tooling == 'true' && 'chromium webkit' || 'chromium' }}
 
       - name: Agent browser doctor
-        if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tooling == 'true' }}
         run: bun --bun vitest run scripts/agent/browser-doctor.test.ts --environment node
 
       - name: Agent browser shared memory
-        if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tooling == 'true' }}
         run: bun --bun vitest run scripts/agent/browser-launch.test.ts --environment node
 
       - name: Scroll highlight range controls
-        if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tooling == 'true' }}
         run: bun --bun vitest run --config vitest.scripts.config.mjs scripts/editor-scroll-benchmark-ranges.test.mjs
 
       - name: Browser resource teardown
-        if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tooling == 'true' }}
         timeout-minutes: 2
         run: bun --bun vitest run scripts/browser-gc.test.ts --environment node --no-file-parallelism
 
       - name: Cold dev startup
-        if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tooling == 'true' }}
         run: bun --bun vitest run scripts/agent/vite-cold-start.test.ts --environment node
 
       # Plain Node, not `--bun`: Vitest browser orchestration breaks under Bun.
       # Each run takes about a minute; a stuck one fails its step here, and the tree step
       # still runs, where the job timeout would cancel both.
       - name: Browser test (web)
-        if: ${{ !cancelled() && needs.changes.outputs.web == 'true' }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.web == 'true' }}
         timeout-minutes: 5
         run: bun run --cwd apps/web test:browser
 
       - name: Browser test (syntax settings)
-        if: ${{ !cancelled() && needs.changes.outputs.web == 'true' }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.web == 'true' }}
         timeout-minutes: 5
         run: bun run --cwd apps/web test:syntax-settings-browser
 
       - name: Browser test (tree)
-        if: ${{ !cancelled() && needs.changes.outputs.tree == 'true' }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tree == 'true' }}
         timeout-minutes: 5
         run: bun run --cwd apps/web test:tree-browser
 
       - name: Browser test (retention reload)
-        if: ${{ !cancelled() && needs.changes.outputs.web == 'true' }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.web == 'true' }}
         timeout-minutes: 5
         env:
           TMPDIR: ${{ runner.temp }}
@@ -475,7 +532,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Browser test (retention layout)
-        if: ${{ !cancelled() && needs.changes.outputs.web == 'true' }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.web == 'true' }}
         timeout-minutes: 5
         env:
           TMPDIR: ${{ runner.temp }}
@@ -494,7 +551,7 @@ jobs:
 
   site:
     name: Site build
-    needs: changes
+    needs: [changes, workspace-builds]
     if: ${{ needs.changes.outputs.site == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -509,6 +566,13 @@ jobs:
         with:
           build-packages: '[]'
 
+      - name: Import workspace builds
+        id: builds
+        uses: ./.github/actions/workspace-builds
+        with:
+          operation: consume
+          targets: sites:${{ needs.changes.outputs.sites }}
+
       - name: Install Singapore browser test dependencies
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') || contains(needs.changes.outputs.sites, 'fregat') || needs.changes.outputs.tooling == 'true' }}
         uses: ./.github/actions/install-browsers
@@ -518,7 +582,7 @@ jobs:
       - name: Build production sites
         env:
           CI_SITES: ${{ needs.changes.outputs.sites }}
-        run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites" "$CI_SITES"
+        run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites" "$CI_SITES" --reuse-workspace-builds
       - name: Build classic Ghostty site for Pages
         if: ${{ contains(needs.changes.outputs.sites, 'ghostty-webgpu') }}
         run: bun run --cwd ghostty-webgpu/site-classic build --base /ghostty-webgpu/
@@ -623,12 +687,13 @@ jobs:
 
   libraries:
     name: Libraries
-    needs: changes
+    needs: [changes, workspace-builds]
     if: ${{ needs.changes.outputs.editor == 'true' || needs.changes.outputs.ghostty == 'true' || needs.changes.outputs.hotkeys == 'true' }}
     permissions:
       contents: read
     uses: ./.github/workflows/workspace-libraries.yml
     with:
+      reuse_builds: ${{ needs.changes.outputs.code == 'true' }}
       packages: ${{ needs.changes.outputs.packages }}
       exhaustive: ${{ needs.changes.outputs.exhaustive == 'true' }}
       editor: ${{ needs.changes.outputs.editor == 'true' }}
@@ -645,6 +710,7 @@ jobs:
       [
         baseline,
         changes,
+        workspace-builds,
         docs,
         lint,
         typecheck,

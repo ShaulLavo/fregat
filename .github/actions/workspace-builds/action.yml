@@ -1,0 +1,93 @@
+name: Workspace builds
+description: Produces or imports validated same-run workspace prerequisites.
+inputs:
+  operation:
+    description: produce or consume.
+    required: true
+  selection:
+    description: Changes job outputs for the producer union.
+    default: ''
+  targets:
+    description: Consumer package selection, all, editor, or sites selection.
+    default: '[]'
+outputs:
+  ready:
+    description: Required workspace outputs were verified and imported.
+    value: ${{ steps.import.outputs.ready }}
+runs:
+  using: composite
+  steps:
+    - name: Plan workspace builds
+      id: plan
+      shell: bash
+      env:
+        BUILD_OPERATION: ${{ inputs.operation }}
+        BUILD_SELECTION: ${{ inputs.selection }}
+        BUILD_TARGETS: ${{ inputs.targets }}
+        BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      run: bun scripts/ci/build-reuse.mjs prepare
+
+    - name: Restore build task cache
+      if: ${{ inputs.operation == 'produce' && steps.plan.outputs.required == 'true' }}
+      id: cache
+      uses: actions/cache/restore@v4
+      with:
+        path: .turbo/ci-builds
+        key: ${{ steps.plan.outputs.cache-key }}
+        restore-keys: ${{ steps.plan.outputs.cache-prefix }}
+
+    - name: Build selected workspace union
+      if: ${{ inputs.operation == 'produce' && steps.plan.outputs.required == 'true' }}
+      id: build
+      shell: bash
+      env:
+        STATE: ${{ steps.plan.outputs.state }}
+      run: bun scripts/ci/build-reuse.mjs produce "$STATE"
+
+    - name: Save build task cache
+      if: ${{ inputs.operation == 'produce' && steps.plan.outputs.required == 'true' && steps.cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@v4
+      with:
+        path: .turbo/ci-builds
+        key: ${{ steps.plan.outputs.cache-key }}
+
+    - name: Publish workspace outputs
+      if: ${{ inputs.operation == 'produce' && steps.plan.outputs.required == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.build.outputs.name }}
+        path: ${{ steps.build.outputs.bundle }}
+        include-hidden-files: true
+        if-no-files-found: error
+        retention-days: 1
+        overwrite: false
+
+    - name: Record workspace publication
+      if: ${{ inputs.operation == 'produce' && steps.plan.outputs.required == 'true' }}
+      shell: bash
+      env:
+        STATE: ${{ steps.plan.outputs.state }}
+      run: bun scripts/ci/build-reuse.mjs published "$STATE"
+
+    - name: Download same-run workspace outputs
+      if: ${{ inputs.operation == 'consume' && steps.plan.outputs.required == 'true' }}
+      uses: actions/download-artifact@v4
+      with:
+        pattern: ${{ steps.plan.outputs.pattern }}
+        path: ${{ steps.plan.outputs.directory }}/downloads
+        merge-multiple: false
+
+    - name: Validate and import workspace outputs
+      if: ${{ inputs.operation == 'consume' }}
+      id: import
+      shell: bash
+      env:
+        STATE: ${{ steps.plan.outputs.state }}
+      run: bun scripts/ci/build-reuse.mjs consume "$STATE"
+
+    - name: Remove workspace transfer files
+      if: ${{ always() && steps.plan.outputs.directory != '' }}
+      shell: bash
+      env:
+        DIRECTORY: ${{ steps.plan.outputs.directory }}
+      run: rm -rf -- "$DIRECTORY"
