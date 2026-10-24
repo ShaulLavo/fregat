@@ -1,5 +1,7 @@
 import { afterEach, expect, test } from 'vitest'
 
+import { existsSync } from 'node:fs'
+import { HOST_CONNECT_TIMEOUT_MS } from '../../terminal-host/protocol'
 import { createFakeTerminalHost } from '../../../test/factories/fake-terminal-host'
 
 const hosts: Awaited<ReturnType<typeof createFakeTerminalHost>>[] = []
@@ -116,4 +118,124 @@ test('fails the boot listing of a host that answers hello but not list', async (
     code: 'terminal.HOST_UNREACHABLE',
     internal: { reason: 'request-timeout' },
   })
+})
+
+test('connects after a cold launch when the socket becomes ready', async () => {
+  const host = await fakeHost()
+  await host.stop()
+  let launches = 0
+  const client = host.connect({
+    launch: async () => {
+      launches += 1
+      await host.listen()
+    },
+  })
+
+  await expect(client.host()).resolves.toMatchObject({ pid: process.pid })
+  await expect(client.list()).resolves.toEqual([])
+  expect(host.received.map((control) => control.type)).toEqual(['hello', 'list', 'list'])
+  expect(launches).toBe(1)
+})
+
+test('waits for socket readiness after the launcher consumes the connection window', async () => {
+  const host = await fakeHost()
+  await host.stop()
+  const launching = Promise.withResolvers<void>()
+  const releaseLaunch = Promise.withResolvers<void>()
+  const launched = Promise.withResolvers<void>()
+  let launches = 0
+  const client = host.connect({
+    launch: async () => {
+      launches += 1
+      launching.resolve()
+      await releaseLaunch.promise
+      launched.resolve()
+    },
+  })
+  const opening = client.host().then(
+    (hello) => ({ hello }),
+    (error: unknown) => ({ error }),
+  )
+
+  try {
+    await launching.promise
+    await Bun.sleep(HOST_CONNECT_TIMEOUT_MS + 25)
+    releaseLaunch.resolve()
+    await launched.promise
+    await Bun.sleep(25)
+    expect(host.received).toEqual([])
+    expect(existsSync(host.paths.socket)).toBe(false)
+    await host.listen()
+    expect(await opening).toMatchObject({ hello: { pid: process.pid } })
+    await expect(client.list()).resolves.toEqual([])
+    expect(launches).toBe(1)
+  } finally {
+    releaseLaunch.resolve()
+    client.close()
+    await opening
+  }
+})
+
+test('gives up on an absent socket after one launch and the readiness window', async () => {
+  const host = await fakeHost()
+  await host.stop()
+  let launches = 0
+  const client = host.connect({
+    launch: () => {
+      launches += 1
+    },
+  })
+  const startedAt = performance.now()
+
+  await expect(client.host()).rejects.toMatchObject({
+    code: 'terminal.HOST_UNREACHABLE',
+    internal: {
+      launched: true,
+      socketExists: false,
+      readinessElapsedMs: expect.any(Number),
+    },
+  })
+  expect(performance.now() - startedAt).toBeLessThan(2 * HOST_CONNECT_TIMEOUT_MS)
+  expect(launches).toBe(1)
+  expect(host.received).toEqual([])
+  await expect(client.probe()).rejects.toMatchObject({
+    internal: { reason: 'no-retained-connection' },
+  })
+})
+
+test('keeps a reopened connection when a retired launch completes late', async () => {
+  const host = await fakeHost()
+  await host.stop()
+  const launching = Promise.withResolvers<void>()
+  const releaseLaunch = Promise.withResolvers<void>()
+  let launches = 0
+  const client = host.connect({
+    launch: async () => {
+      launches += 1
+      launching.resolve()
+      await releaseLaunch.promise
+    },
+  })
+  const opening = client.host().catch((error: unknown) => error)
+
+  try {
+    await launching.promise
+    client.close()
+    expect(client.info()).toBeNull()
+    await host.listen()
+    const fresh = await client.host()
+    releaseLaunch.resolve()
+    expect(await opening).toMatchObject({
+      code: 'terminal.HOST_UNREACHABLE',
+      internal: { reason: 'retired-opening' },
+    })
+    expect(client.info()).toEqual(fresh)
+    await expect(client.probe()).resolves.toEqual(fresh)
+    await expect(client.list()).resolves.toEqual([])
+    expect(launches).toBe(1)
+  } finally {
+    releaseLaunch.resolve()
+    client.close()
+    await opening
+  }
 })

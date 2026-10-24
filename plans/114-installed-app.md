@@ -427,6 +427,24 @@ Status: Approved. Keep the two October 24, 2026 failures separate. The installed
   an injected launcher and no PTY sessions. Capture monotonic launch, socket, handshake, and
   deadline timings plus the structured error. Compare a known-good launch first. Do not widen
   the timeout or add retries without evidence.
+  The delivered diagnostic at `6dc512adfb3fa75ff259277c53c90c50da23b5b7` retained another
+  natural failure at `02:19:08.495Z`: `HOST_UNREACHABLE`, `attempts: 1`,
+  `elapsedMs: 5962.45`, `launched: true`, `socketExists: false`. The client awaited launch
+  preparation and then rejected before its first post-launch socket attempt. A gated fake-host
+  regression reproduces that decision after holding launch past the connection window. Start
+  the existing five-second socket/hello readiness clock when launch returns, retaining total
+  operation timing and reporting readiness elapsed time separately. Keep one host launch, the
+  existing request and handshake limits, identity validation, and opening-generation retirement.
+  Controls cover a healthy cold launch, a socket that never appears, and a late retired launch
+  completing after the client reopens. This corrects the proven readiness-window ownership
+  defect. It does not establish where the production pre-readiness interval was spent. The immutable delivery
+  evidence is in `owner-diagnostic-delivery-r129` beside the original report. The isolated
+  regression and launcher trace are in `terminal-startup-cause-r130` under the same report root.
+  Next discriminating observation, only during a separately authorized natural startup: record
+  monotonic durations for the initial socket attempt, both systemd probes, scope submission,
+  child entry, lock acquisition,
+  socket bind, hello, and first list. Those intervals distinguish launch preparation, process
+  scheduling, child initialization, and authentication without another owner-instance repro.
 - **Standalone release request.** The first post-refresh check ends at `01:28:43.687Z` with
   `apiRequestContext.get: Timeout 30000ms exceeded` in `scripts/deploy/live-check.mjs`.
   The workbench and separate terminal fixture pass. Immediate public and loopback probes return
