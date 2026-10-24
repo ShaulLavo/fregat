@@ -604,7 +604,7 @@ test('workflow permissions and token boundaries keep branch code unprivileged', 
   const checkouts = jobs
     .flatMap(([, job]) => job.steps ?? [])
     .filter((step) => step.uses?.startsWith('actions/checkout@'))
-  expect(checkouts).toHaveLength(16)
+  expect(checkouts).toHaveLength(17)
   for (const step of checkouts) expect(step.with?.['persist-credentials']).toBe(false)
 
   const baseline = ci.jobs.baseline
