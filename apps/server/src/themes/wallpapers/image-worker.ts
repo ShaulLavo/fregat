@@ -41,6 +41,9 @@ async function decode(bytes: Uint8Array) {
   const header = { width, height, extension, contentType: `image/${format}` }
   const mode = process.argv[2]
   if (mode === 'header') return header
+  // JPEG codecs can fill missing scan data and report success without the closing marker.
+  if (format === 'jpeg' && (bytes.at(-2) !== 0xff || bytes.at(-1) !== 0xd9))
+    throw wallpaperErrors.INVALID({ internal: { reason: 'truncated', format } })
   if (mode === 'thumbnail' || mode === 'display') return renderRendition(bytes, mode)
   if (mode !== 'decode')
     throw wallpaperErrors.INVALID({ internal: { reason: 'worker-mode', mode } })
