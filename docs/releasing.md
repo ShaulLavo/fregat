@@ -50,7 +50,6 @@ Existing changelog history stays as written.
 ## Publishing status
 
 Automated npm publishing is not active yet. A version in git can be newer than the version available on npm.
-[Plan 336 Track N](../plans/336-packages-as-products.md#track-n-npm-publishing-last-with-track-e) owns publication setup.
 
 The publish job requires the repository variable `NPM_TRUSTED_PUBLISHING` to equal `true` and the version job to report no pending changesets.
 Once configured, that job uses npm trusted publishing with GitHub OIDC.

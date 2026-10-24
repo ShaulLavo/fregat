@@ -1,44 +1,44 @@
-# development
+# Development
 
-how the repo is put together. the [readme](../README.md) covers what fregat is and how to run it
+How to run Fregat from a checkout, check a change, build a release and install one. The [README](../README.md) says what Fregat is, and the [monorepo map](monorepo.md) lists the folders.
 
-## what's where
+## Run from a checkout
 
-- `apps/web`, the editor shell, workspace tree, git views, file picker, client state
-- `apps/server`, elysia rpc for filesystem, git, file watching, auth, provider adapters, and the typescript lsp websockets
-- `apps/desktop`, the Bun launcher, installed Chromium app integration, and native Zig/Swift system-webview hosts
-- `apps/mac`, the native swift client
-- `apps/tui`, the terminal client
-- `packages/contracts`, shared dtos, runtime schemas, the settings registry
-- `packages/ui`, react components, styles, primitives
-- `packages/tree`, the file tree, its hooks and its path store
-- `packages/observability`, structured logging and telemetry config
+```sh
+bun install --frozen-lockfile
+bun run build:workspaces
+bun run dev
+```
 
-the rough rule: anything with side effects lives on the server, product workflows and ui state live in web. web reaches the server through `apps/web/src/lib` helpers or feature-local api modules, never by redeclaring a dto inside a component. the ui package stays app-agnostic and keeps react as a peer dependency
+`bun run dev` prints `[dev] Client: http://127.0.0.1:5173`. Open that URL. On macOS it also opens the native desktop window. Use `bun run dev:web` to run the web app and server without the desktop launcher. If a command fails, see [troubleshooting](troubleshooting.md).
 
-every user-facing knob is a registry entry in `packages/contracts/src/settings/keys.ts`, never a loose localStorage key. `docs/settings-reference.md` is generated, so rerun `bun run settings:reference` after touching the registry
+## Where code goes
 
-[filesystem boundaries](filesystem-boundaries.md) covers ordinary editor access, the optional server root restriction, and the separate permissions agents run under
+Anything with side effects lives in the server. Product workflows and UI state live in the web app. The web app reaches the server through helpers in `apps/web/src/lib` or feature-local API modules, and never redeclares a DTO inside a component. The UI package stays app-agnostic and keeps React as a peer dependency.
 
-## prerequisites
+Every user-facing knob is a registry entry in `packages/contracts/src/settings/keys.ts`, never a loose `localStorage` key. `docs/settings-reference.md` is generated, so run `bun run settings:reference` after you touch the registry.
+
+[Filesystem boundaries](filesystem-boundaries.md) covers ordinary editor access, the optional server root restriction, and the separate permissions agents run under.
+
+## Prerequisites
 
 Use Node.js 26.0.0 or newer and the Bun version pinned by `packageManager` in the root manifest. Tree-sitter and native Markdown parsing require `WebAssembly.Memory.prototype.toResizableBuffer()`. Their runtime floors are Node 26.0.0, Bun 1.2.22, Chromium 144, Firefox 145, and Safari 26.2.
 
 Editor package tests use Node through Vitest's shebang. `bun run test` starts the package script with Bun's script runner and leaves that Node child on `PATH`. Language catalog generation and the runtime identity fixture also launch `node` explicitly. Install Node 26 before running these checks.
 
-## checks
+## Checks
 
 ```bash
 bun run verify
 ```
 
-typecheck, lint, format:check, test. lint is oxlint, formatting is oxfmt. narrow it with `bun --filter web test` or `bun --filter server typecheck`
+`bun run verify` runs the typecheck, lint, the repository gates, the format check, the generated-file checks and the test suite. Lint is oxlint and formatting is oxfmt. Run the narrowest check that covers your change first, for example `bun --filter web test` or `bun --filter server typecheck`.
 
 Use Git 2.31 or newer. Run `bun run hooks:install` in each checkout that should use commit hooks. The command installs an ignored `.fregat-hooks/pre-commit` wrapper and selects it through Git's worktree configuration. Commits run oxfmt, oxlint, repository gates, and typechecking. Dependency installation leaves existing hook selection unchanged.
 
 Relative selection follows a moved checkout. The installer preserves existing custom `core.hooksPath` settings and stops before writes when one applies. A custom hook manager can invoke `bun run hooks:pre-commit` explicitly. The first opt-in enables `extensions.worktreeConfig`. An ordinary common `core.bare=false` value moves into the main worktree's config. Bare repositories, `core.worktree` overrides, and unrelated dormant worktree configuration require separate Git setup. Existing common hooks remain in place.
 
-## workspace libraries
+## Workspace libraries and native hosts
 
 The Linux desktop host requires Zig 0.17.x, `pkg-config`, and WebKitGTK 4.1 development headers.
 The macOS host requires Swift 6 and the macOS SDK from the Xcode command-line tools.
@@ -99,19 +99,21 @@ The updater normalizes checkout paths and records the median duration per file. 
 
 Editor retains `--concurrency=1` and the existing Core and Stress cache settings. In run 37149185179, Core reported 117.81 seconds, Textbuffer 54.30 seconds, and Stress 36.00 seconds. A parallelism experiment must bound Vitest workers and keep browser-sensitive tasks serialized, then compare execution and reliability at the same commit.
 
-## optional Mesh dev server
+## Optional Mesh dev server
 
-on a machine with mesh, `bun run dev:serve` registers the dev pair as a mesh route named `:5173`. mesh holds 5173 and 3001 and proxies them to 15173 and 13001, where `bun run dev:upstream` binds vite and the api on `127.0.0.1`. the first connection starts it and holds requests until both ports answer; an open tab counts as use, and once nothing has been connected for `developer.devServerIdleMinutes` (15 by default) mesh stops it. rerun `dev:serve` after changing that setting
+Mesh is an optional tool of the owner's. Contributors do not need it. On a machine that has Mesh, `bun run dev:serve` registers the dev pair as a Mesh route named `:5173`. Mesh holds ports 5173 and 3001 and proxies them to 15173 and 13001, where `bun run dev:upstream` binds Vite and the API on `127.0.0.1`.
 
-`mesh serve stop :5173` restarts it on the next connection, which is the way to pick up a changed export map or a relinked checkout. `bun run dev` beside the route stops with an error naming it, never a second copy on another port. `bun run dev:unserve` removes the route. `bun run desktop:dev` opens these shared routes through the launcher; it waits for readiness and leaves API, Vite and shared terminals running when its window closes
+The first connection starts the pair and holds requests until both ports answer. An open tab counts as use. After nothing has connected for `developer.devServerIdleMinutes` (15 by default), Mesh stops the pair. Run `dev:serve` again after you change that setting.
 
-## desktop app
+`mesh serve stop :5173` restarts the pair on the next connection. Use it to pick up a changed export map or a relinked checkout. `bun run dev` beside the route stops with an error that names the route, and never starts a second copy on another port. `bun run dev:unserve` removes the route. `bun run desktop:dev` opens the shared routes through the launcher. It waits for readiness, and it leaves the API, Vite and shared terminals running when its window closes.
+
+## Desktop app
 
 The launcher automatically selects Fregat’s native WebKit window on macOS and prefers an installed Chrome app on Linux. An explicit browser executable selects the installed Chromium path. Transparent-window mode selects the native host under automatic selection. Installed browser apps work from their OS shortcuts with no launcher or injected bridge running; native hosts retain their own window transport.
 
-`bun run app:mac` builds a self-contained `Fregat.app` on macOS. Production clients share one machine server per state home. Installation reuses a matching service or registers the OS-activated service; closing or uninstalling the browser app keeps that service, mesh routes and terminals. [Plan 114](../plans/114-installed-app.md) records the approved installation, picker and native-window contracts.
+`bun run app:mac` builds a self-contained `Fregat.app` on macOS. Production clients share one machine server per state home. Installation reuses a matching service or registers the OS-activated service; closing or uninstalling the browser app keeps that service, mesh routes and terminals.
 
-## portable release build
+## Portable release build
 
 `bun run build-release --output=<new-directory>` builds a self-contained release for the current OS and architecture. Omit `--output` for a unique directory under the OS temporary directory. It uses the documented Bun/build prerequisites, compiles workspaces, web and server, installs the pinned runtime dependency closure, includes `bin/bun`, and verifies the artifacts. Its `web/`, `server/`, relative runtime dependency links and bundled Bun move together. Building never reads machine installation settings, contacts Mesh, changes a service or writes application state.
 
@@ -124,7 +126,7 @@ bun run build-release --output=./fregat-release --base=/fregat/
 
 Package publishing is separate: `bun run release` is the Package releases workflow's Changesets publishing step.
 
-## pairing another device
+## Pairing another device
 
 A browser on another device, such as a phone reaching the machine over the tailnet, shows a pairing screen naming the machine until it is paired. Make a code on the machine or on any paired device in Settings › Machines › Pair a device, then scan it or type it on the new device.
 
@@ -138,7 +140,7 @@ Other requests use pairing, including proxy requests without `X-Forwarded-For`. 
 
 HTTP requests and WebSocket upgrades use the same captured socket provenance. An SSH machine relay pairs its own device through the authenticated tunnel and keeps the destination credential in server memory. Reconnecting after a source restart replaces that source server’s previous relay device and closes its old sockets; the device list names the relay’s source machine. SSH aliases for one destination share the credential. A destination’s device-admission rejection renews it once; WebSocket relays check admission before upgrading. Both HTTP and WebSocket relays present that credential, while browser credentials stay on the source machine. Destination `Set-Cookie` headers stay off the source browser. A hop marker alone grants no device access.
 
-## optional local release installation
+## Optional local release installation
 
 `bun run install-release` is an optional Linux integration with Mesh and user systemd. It builds first by default; `--from=<release-directory>` installs a previously built release. Installation additionally needs `mesh`, `systemctl`, `df`, Node and Playwright Chromium. This integration owns `platform-prod.service` on loopback port 3301. Run it on the machine serving the configured target.
 

@@ -1,7 +1,8 @@
 # Terminal processes and transport
 
 Platform's terminal service uses [`@workspace/pty`](../packages/pty/README.md) directly. Each
-terminal shell is a child of the Bun server process. The Node bridge, embedded bridge script,
+terminal shell runs in the separate [terminal host](terminal-host.md) process, which the server
+talks to through `TerminalHostClient`. The Node bridge, embedded bridge script,
 and `@lydell/node-pty` dependency have been removed.
 
 ## Ownership

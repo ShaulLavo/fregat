@@ -2,7 +2,7 @@
 
 Plan 079 establishes a second client for Platform's existing server. The terminal opens settings,
 with a command palette, file picker and previews, address history, editable settings, and terminal
-themes. Agent sessions and the workbench remain separate slices in [the strategy](../plans/tui-plan.md).
+themes. Agent sessions and the workbench are separate slices.
 The [TUI guide](../apps/tui/README.md) covers launch, controls, editing and recovery.
 
 ## Shared ownership
@@ -78,8 +78,7 @@ PTY run verified a live in-process server session, external-editor save and retu
 Ctrl+C, and terminal mode restoration. No development server was started; the default server port
 was unavailable.
 
-The original per-command slice audit and installed defaults are preserved in
-[TUI command bindings](../.internal/tui-bindings.md). Physical Kitty keyboard hardware was unavailable;
+The command catalog and in-app shortcut help hold the installed defaults. Physical Kitty keyboard hardware was unavailable;
 enhanced input was checked through OpenTUI's native event parser and remains capability-gated.
 
 ### Review checks, 2026-09-06

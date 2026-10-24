@@ -81,5 +81,4 @@ records the running Mesh asset `index-M7axwCjS.js`, reached URLs, and cleanup re
 The verifier keeps its configured-machine lease alive by draining `/machines/events` through
 cleanup. Startup waits account for observed slow workspace initialization; completed-selection and
 reload timing checks retain their explicit 250 ms limits. Clipboard checks wait for this run's
-actual copied address. The [Router evaluation](router-evaluation.md) preserves the architectural
-comparison that preceded implementation.
+actual copied address. [ADR 002](adr/002-typed-router-owns-web-navigation.md) records why TanStack Router owns navigation.

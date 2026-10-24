@@ -51,8 +51,7 @@ Graphite and Sage have paired palettes. Catppuccin uses the installed Mocha and 
 The installed Tokyo Night and Gruvbox sources provide dark palettes, and Rosé Pine provides a light
 palette. Their opposite versions use upstream Tokyo Night Day, Gruvbox Light and Rosé Pine Main
 palettes with the matching syntax theme. All twelve
-bundled variants pass the existing palette editor’s 4.5:1 text-pair readout. Mapping corrections and
-source versions are recorded in [theme-pack-mapping.txt](../.internal/theme-pack-mapping.txt).
+bundled variants pass the existing palette editor’s 4.5:1 text-pair readout.
 
 The twelve paired wallpapers ship with the server under `src/themes/wallpapers/assets/`. Their
 original bytes retain the hashes in `BUNDLED_WALLPAPERS`; the server build validates every hash and
@@ -118,6 +117,4 @@ Appearance settings expose each theme part as a regular setting. The studio prov
 preview and Apply over the same values; it owns no exclusive setting. A part edit customizes the
 selected theme and mode, and Reset returns that part to the theme's value.
 
-The [completed appearance repair](https://github.com/ShaulLavo/fregat/blob/8ca59fd7df915cccae0f3b920b8746c7a7651956/plans/194-appearance-back-in-settings.md)
-records the shared controls, owner decisions, deployment and follow-up verification. Its executable
-plan is retired; the [generated settings reference](settings-reference.md) lists current keys.
+The [generated settings reference](settings-reference.md) lists the current keys.

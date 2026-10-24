@@ -108,9 +108,7 @@ revision and returns either a rebased ref or one of these reasons:
 | `not-live`            | A complete disk or attachment read, which has no edits to follow                    |
 | `history-unavailable` | The edit chain no longer reaches the ref                                            |
 
-A live read for a different document throws. Search results will use this contract
-([Plan 182](../plans/182-search-view-rendering.md#source-handoff-from-plan-200)), and composer
-drafts will use it for mentions ([Plan 171](../plans/171-composer-on-our-editor.md#draft-ownership-handoff-from-plan-200)).
+A live read for a different document throws. Search results and composer mentions do not use this contract yet.
 
 ## Entry points
 

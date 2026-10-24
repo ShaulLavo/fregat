@@ -1,7 +1,7 @@
 # Web design language
 
 The web app shares its design tokens and controls through `@workspace/ui`. The settled rules
-live in [`AGENTS.md`](../AGENTS.md#the-design-language); the census rejects conflicting call-site
+live in [`AGENTS.md`](../AGENTS.md); `bun run design:census` rejects conflicting call-site
 choices. This reference records ownership, deliberate exceptions, and verification.
 
 ## Owners

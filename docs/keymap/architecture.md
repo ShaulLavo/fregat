@@ -1,20 +1,16 @@
 # Keymap architecture
 
 Owner decisions of 2026-09-29, after Mod+B in a Markdown editor ran `markdown.bold` and silently
-took the key from Toggle sidebar. Research behind them: `/work/reports/keymap-architecture/`
-(prior art in VS Code, Zed, Helix, CodeMirror, SilverBullet and Obsidian; TanStack Hotkeys
-against our runtime; an inventory of today's Editor, Platform, ghostty-webgpu and TUI keymaps).
-Plans [203](../../plans/203-fregat-hotkeys.md), [204](../../plans/204-editor-on-fregat-hotkeys.md),
-[205](../../plans/205-ghostty-on-fregat-hotkeys.md) and [206](../../plans/206-platform-one-keymap.md)
-carry the work. This page also owns preset, host-input and display policy; older delivery
-receipts remain in Git history and the [historical baseline](../../.internal/keymap/baseline.md).
+took the key from Toggle sidebar. The research compared VS Code, Zed, Helix, CodeMirror, SilverBullet and Obsidian, and TanStack Hotkeys
+against our runtime. This page also owns preset, host-input and display policy; older delivery
+receipts remain in Git history.
 
 ## The model
 
 - **One library, no keymaps inside.** `@fregat/hotkeys` is our fork of TanStack Hotkeys: its API
   shape and pure key functions, with our trie, editor-grade chords and Zed's context resolution.
   It lives in Fregat's `hotkeys/`, mirrored to its own public repo
-  ([207](../../plans/207-one-repo-with-mirrors.md)). Local consumers use the workspace;
+  ([ADR 001](../adr/001-one-repository-with-mirrors.md)). Local consumers use the workspace;
   standalone consumers qualify a pinned dependency artifact while npm remains deferred.
   The core is DOM-free; adapters turn browser and terminal input into its key events.
 - **Every product is standalone on the library** and ships its own defaults. The Editor follows
@@ -104,7 +100,7 @@ Browsers can intercept reserved tab shortcuts before a page sees them; headless 
 does not qualify a desktop or macOS browser. AltGraph input and physical-key fallback need their
 own browser coverage. Native device verification keeps its separate execution grants.
 
-The initial `ours` deviation keeps the approved document-navigation keys: Mod+[ and Mod+] dispatch `workspace.navigateBack` and `workspace.navigateForward` at Workspace depth. The four source rows record this choice; `zed` retains the pinned Editor indent/outdent bindings. Fregat's own commands join `ours` with their application keys; [Plan 206](../../plans/206-platform-one-keymap.md) lists the keys that moved because Zed uses them.
+The initial `ours` deviation keeps the approved document-navigation keys: Mod+[ and Mod+] dispatch `workspace.navigateBack` and `workspace.navigateForward` at Workspace depth. The four source rows record this choice; `zed` retains the pinned Editor indent/outdent bindings. Fregat's own commands join `ours` with their application keys.
 
 An unbound nonprintable chord prefix waits for the next key. Bound prefixes use the continuation timeout; printable text prefixes follow the replay contract. Focus, blur and pointer changes cancel a pending chord.
 

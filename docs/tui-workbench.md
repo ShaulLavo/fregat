@@ -3,7 +3,7 @@
 The workbench connects the existing TUI foundation to the server's filesystem, Git, search,
 logs, workspace-edit, LSP, and terminal routes. Plan 081 completed this slice on 2026-09-07.
 [Agent sessions](tui-agent.md) followed in Plan 082. Worktree parity and distribution remain
-subsequent work in [the strategy](../plans/tui-plan.md).
+subsequent work.
 
 ## Implementation
 
@@ -28,13 +28,6 @@ an asynchronous load acknowledge focus after their commit. An open dialog owns i
 closes; background focus requests stay deferred without exposing a target to terminal input.
 Commands stay registered while their pane is visible, including when the palette captures the
 originating pane. History persistence observes every navigation change, including Back and Forward.
-
-## Feasibility
-
-- [Terminal feasibility](../.internal/tui-research/terminal-feasibility.md) covers byte rendering, input,
-  multiple viewers, real Neovim, raw attach, host resize, and terminal restoration.
-- [Viewer feasibility](../.internal/tui-research/viewer-feasibility.md) records the published tree-sitter
-  worker failure and the bundled Shiki path that passes Bun and standalone compilation.
 
 The server tracks negotiated in-band resize mode 2048. It reports dimensions through that
 protocol when enabled, in addition to the PTY resize. A joining viewer gets replay followed by
