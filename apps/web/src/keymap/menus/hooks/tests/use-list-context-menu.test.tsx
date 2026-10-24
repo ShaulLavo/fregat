@@ -147,7 +147,9 @@ test('unmounting a virtual row closes its menu even while the item remains', asy
 test('wheel input inside the menu stays open, while the modal backdrop dismisses', () => {
   render(<ListMenu />)
   fireEvent.contextMenu(screen.getByRole('option', { name: 'second' }))
-  fireEvent.wheel(screen.getByRole('menu'))
+  const wheel = new WheelEvent('wheel', { bubbles: true, cancelable: true })
+  fireEvent(screen.getByRole('menu'), wheel)
+  expect(wheel.defaultPrevented).toBe(false)
   expect(screen.getByRole('menu')).toBeVisible()
   fireEvent.wheel(document.body)
   expect(screen.queryByRole('menu')).toBeNull()
@@ -162,4 +164,7 @@ test('dismissal consumes a cancelable wheel before returning focus', () => {
   expect(wheel.defaultPrevented).toBe(true)
   expect(screen.queryByRole('menu')).toBeNull()
   expect(screen.getByRole('listbox')).toHaveFocus()
+  const nextWheel = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 72 })
+  fireEvent(screen.getByRole('listbox'), nextWheel)
+  expect(nextWheel.defaultPrevented).toBe(false)
 })

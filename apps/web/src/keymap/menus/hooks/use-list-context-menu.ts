@@ -64,9 +64,9 @@ export function useListContextMenu<T>({
       )
         dismiss()
     }
-    // Base UI's backdrop receives wheel input and prevents the underlying list from scrolling.
     const onWheel = (event: WheelEvent) => {
       if (event.target instanceof Element && event.target.closest('[role="menu"]')) return
+      event.preventDefault()
       dismiss()
     }
     const observer = new MutationObserver(() => {
@@ -74,7 +74,7 @@ export function useListContextMenu<T>({
     })
     observer.observe(list, { childList: true, subtree: true })
     list.ownerDocument.addEventListener('scroll', onScroll, true)
-    list.ownerDocument.addEventListener('wheel', onWheel, { capture: true, passive: true })
+    list.ownerDocument.addEventListener('wheel', onWheel, { capture: true, passive: false })
     return () => {
       observer.disconnect()
       list.ownerDocument.removeEventListener('scroll', onScroll, true)
