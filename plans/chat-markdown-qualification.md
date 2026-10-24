@@ -19,3 +19,12 @@ safe rendering, browser appearance, and selection, clipboard, and scroll behavio
 and streaming measurements of latency, CPU, and memory on the real chat path. These checks would
 find behavior regressions that the merge benchmark does not cover and show where later parser or
 renderer work would help.
+
+## Mixed delimiters if noticed in real chats
+
+The owner accepted this difference for PR #1326 on 2026-10-24. For `~_~a_~`, remark renders
+`<p>~_<del>a_</del></p>` while tree-sitter renders `<p><del><em>~a</em></del></p>`.
+If the owner notices it in real chats, fix delimiter resolution in `tree-sitter-md` and cover
+this input plus neighboring mixed emphasis/strikethrough cases. Two bounded attempts found no
+safe fix; one upstream candidate changed `*~~a*~~` and `*~~*a~~*` incorrectly and was discarded.
+This item does not block merge or deployment.
