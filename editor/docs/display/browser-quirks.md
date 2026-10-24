@@ -423,7 +423,7 @@ examples keep their captured colours in HTML; explicit live examples still use
 native highlights. Screenshot animations must remain enabled: disabling them
 forces a WebKit repaint and hides the bug.
 The unchanged control failed with zero native live syntax pixels; the workaround
-passed all 32 production cases. See [the fix and verification](https://github.com/ShaulLavo/fregat/pull/1117).
+passed all 32 production cases. The fix and its verification are in the `@singapore-editor/core` changelog.
 
 A plain native-API fixture and a one-line editor with manually assigned tokens both
 paint correctly in Chromium 153, Firefox 155 and WebKit 26.6. Hidden registration
@@ -564,8 +564,8 @@ typing. The local evidence set is `custom-touch-evidence/native-guard`, includin
 No upstream browser bug is claimed for normal native long-press selection.
 
 Keep the ownership guard while custom touch selection is active. Remove it only
-with a qualified replacement selection owner. The later native-layout experiment
-and optional handles are recorded in [plan 336](../../../plans/336-singapore-ios-scroll.md).
+with a qualified replacement selection owner. A native-layout experiment
+and optional handles remain open.
 Retest native gestures, all-engine highlight paint, and generic DOM selection
 before changing row selectability.
 

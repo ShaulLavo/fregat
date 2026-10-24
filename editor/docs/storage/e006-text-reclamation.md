@@ -371,8 +371,8 @@ bun run --cwd packages/editor build
 bun run --cwd examples/stress bench:reclamation-live
 node examples/stress/reclamation-repeat.mjs
 node examples/stress/reclamation-copy.mjs
-node examples/stress/reclamation-paste.mjs --output /work/tmp/e006-paste.json
-bun run --cwd examples/stress bench:input --output /work/tmp/e006-input.json --repetitions 3
+node examples/stress/reclamation-paste.mjs --output /tmp/e006-paste.json
+bun run --cwd examples/stress bench:input --output /tmp/e006-input.json --repetitions 3
 bun run --cwd packages/textbuffer test
 bun run --cwd packages/editor test --project node test/storageMaintenance.node.test.ts src/textMeasurements.test.ts
 bun run --cwd packages/tree-sitter test

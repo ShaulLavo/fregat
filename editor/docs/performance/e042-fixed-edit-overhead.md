@@ -33,7 +33,7 @@ Standard profile, three seeds, 9 samples of 2 warmups, the transient edits head 
 change in the checkout, alternating per seed. Milliseconds per lane, median over seeds with the
 range, ratio to the control's median.
 
-| Lane                 | Control | transient edits head              | fixed edit overhead                   | Change |
+| Lane                 | Control | transient edits head   | fixed edit overhead    | Change |
 | -------------------- | ------: | ---------------------- | ---------------------- | -----: |
 | sequential-typing    |    0.61 | 0.66 [0.54–0.66] 1.08x | 0.64 [0.52–0.65] 1.05x |    -3% |
 | typing-with-lookups  |    0.94 | 0.91 [0.74–0.91] 0.97x | 0.89 [0.73–0.90] 0.95x |    -2% |

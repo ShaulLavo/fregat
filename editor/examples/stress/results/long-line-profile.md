@@ -101,7 +101,7 @@ and shared hidden views in the correctness checks.
 
 Follow [the profiling commands](../README.md#cpu-profiling) with a fresh output directory.
 The raw `.cpuprofile` files and matching build for this capture remain in
-`/work/tmp/editor-long-line-profile-final`. The JSON summary includes that path and the run ID.
+the local run directory. The JSON summary includes that path and the run ID.
 No editor performance fix or improvement is claimed by this investigation.
 
 The profiler requests one sample per millisecond. Active percentages exclude idle samples;

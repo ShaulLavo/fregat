@@ -1,7 +1,7 @@
 # Host obligations now owned by the API
 
 The eleven audited workarounds have public contracts and migrated callers.
-Platform Plan 130 removes the host copies; Editor owns the presentation and interaction ordering.
+Editor owns the presentation and interaction ordering; hosts no longer need their own copies.
 
 | Former host obligation                           | Public contract                                                                                         |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |

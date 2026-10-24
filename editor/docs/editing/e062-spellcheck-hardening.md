@@ -1,8 +1,5 @@
 # Spellcheck hardening: bounded tokenization, settled worker failures, cheaper underline masks
 
-Builds on
-[spellcheck](https://github.com/ShaulLavo/fregat/blob/main/plans/e058-spellcheck.md).
-
 Scope: retain cspell and the worker/plugin architecture. Fix bounded tokenization and worker
 failure settlement; measure rendering before deciding on changes. Keep file defaults unchanged.
 
@@ -82,13 +79,13 @@ functions. Browser tokenizer medians were below its 0.1 ms clock resolution; p95
 0.1 ms across the 99-character prose and 5k/10k/20k oversized cases.
 
 Platform doctor passed after the dev restart, with screenshot inspected at
-`/work/tmp/fregat-evidence/20260926T210903Z-look-1440x1000/page.png`.
+the local run directory.
 Subsequent spelling scenarios were interrupted by unrelated merges hot-reloading the app.
 A further run found newly added server dependencies missing; installing the current lockfile.
 
 The complete Platform `editor-spellcheck` scenario passed after dependencies were synchronized.
 Inspected the menu and accepted-after-reload screenshots in
-`/work/tmp/fregat-evidence/20260926T211027Z-scenario-editor-spellcheck/`.
+the local run directory.
 It verified replacement on disk, caret suggestions, accepted-word settings and reload persistence.
 The log contains connection-abort warnings during fixture navigation; no spellcheck error.
 

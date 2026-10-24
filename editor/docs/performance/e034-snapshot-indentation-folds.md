@@ -17,14 +17,14 @@ Snapshot indexing removes repeated whole-document scans from fallback folding.
 The snapshot indentation folds browser comparison measures fallback folding on the same 500,000-line document before
 and after the snapshot index. The baseline core is commit
 `88cd55da61e895542cfe248082221cf992be74e5`, exported with `git archive` and rebuilt under
-`/work/tmp/editor-e034/baseline-88cd55d-core`. The archive excludes the uncommitted snapshot indentation folds work.
+the local run directory. The archive excludes the uncommitted snapshot indentation folds work.
 The unrelated LSP changes do not enter this core build.
 
 Earlier pilot runs used `30ae9ec`. Two concurrent viewport fixes, `b4ddbc3` and `6244aca`, then
 changed when attachment measures and renders the initial visible rows. Comparing those pilots
 with the later candidate would attribute viewport work to snapshot indentation folds. The final comparison repeats
 the baseline and control at `88cd55d`, which includes both fixes. The earlier runs remain under
-`/work/tmp/editor-e034/historical-30ae9` and are excluded from the results below.
+the local run directory and are excluded from the results below.
 
 The runner is [`examples/stress/first-paint.mjs`](../../examples/stress/first-paint.mjs).
 It builds against the selected core package and serves production assets through Playwright
@@ -139,21 +139,21 @@ From the repository root, with workspace dependencies and the gutter package alr
 create the frozen core build:
 
 ```sh
-mkdir -p /work/tmp/editor-e034/baseline-88cd55d-core
+mkdir -p /tmp/editor-e034/baseline-88cd55d-core
 git archive 88cd55da61e895542cfe248082221cf992be74e5 \
 	packages/editor/src packages/editor/package.json packages/editor/tsconfig.json |
-	tar -x --strip-components=2 -C /work/tmp/editor-e034/baseline-88cd55d-core
-ln -s "$PWD/packages/editor/node_modules" /work/tmp/editor-e034/baseline-88cd55d-core/node_modules
-bun scripts/build-package.ts /work/tmp/editor-e034/baseline-88cd55d-core
+	tar -x --strip-components=2 -C /tmp/editor-e034/baseline-88cd55d-core
+ln -s "$PWD/packages/editor/node_modules" /tmp/editor-e034/baseline-88cd55d-core/node_modules
+bun scripts/build-package.ts /tmp/editor-e034/baseline-88cd55d-core
 ```
 
 The matched production command is:
 
 ```sh
 taskset -c 8,10,12,14 bun run --cwd examples/stress bench:first-paint \
-	--core-directory /work/tmp/editor-e034/baseline-88cd55d-core \
+	--core-directory /tmp/editor-e034/baseline-88cd55d-core \
 	--repetitions 5 --fixtures short-lines --plugins none --modes direct,prepared \
-	--fallback-cases --output /work/tmp/editor-e034/baseline.json
+	--fallback-cases --output /tmp/editor-e034/baseline.json
 ```
 
 The unchanged control changes only the output to `control.json`. The candidate omits
@@ -304,7 +304,7 @@ The raw results are in [`e034-index.json`](e034-index.json).
 
 ```sh
 bun packages/editor/bench/indentationFolds.ts \
-	--output /work/tmp/editor-e034/index-benchmark.json
+	--output /tmp/editor-e034/index-benchmark.json
 ```
 
 ## Remaining costs
@@ -350,7 +350,7 @@ The current deep-stack case is reproducible with
 
 ```sh
 bun packages/editor/bench/indentationFoldStack.ts --depth 250000 \
-	--output /work/tmp/editor-e034-fixes/deep-stack-after.json
+	--output /tmp/editor-e034-fixes/deep-stack-after.json
 ```
 
 The existing index benchmark also ran against frozen `33e632a` and the corrected source with
@@ -370,7 +370,7 @@ fallback materializations. The image below is from that corrected build.
 taskset -c 8,10,12,14 bun run --cwd examples/stress bench:first-paint \
 	--repetitions 1 --fixtures short-lines --plugins none --modes direct,prepared \
 	--fallback-cases --fold-gutter --diagnostics \
-	--output /work/tmp/editor-e034-fixes/browser-diagnostic.json
+	--output /tmp/editor-e034-fixes/browser-diagnostic.json
 ```
 
 ![Corrected fallback markers after thirty-six typed characters](e034-review-folds.png)

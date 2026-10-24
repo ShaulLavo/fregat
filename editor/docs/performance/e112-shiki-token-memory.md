@@ -1,6 +1,6 @@
 # Shiki token representation
 
-Plan 112's application trace identified Shiki as the dominant worker at 15 MiB: about 2.38 GB
+The application trace of a 15 MiB file identified Shiki as the dominant worker: about 2.38 GB
 of JS heap, versus about 19 MB in Tree-sitter. Inspection found a fresh pair of accessor closures
 on every retained themed token. Millions of these object literals retained separate getter/property
 storage even though every getter performed the same lookup into a shared scope style.
@@ -14,7 +14,7 @@ introduce a partially parsed document or a bounded viewport tokenizer.
 Run from the Editor root:
 
 ```sh
-node examples/stress/shiki-memory.mjs --output /work/tmp/editor-shiki/result.json
+node examples/stress/shiki-memory.mjs --output /tmp/editor-shiki/result.json
 ```
 
 The Chromium experiment creates the real TypeScript tokenizer and retains it over repeated indented

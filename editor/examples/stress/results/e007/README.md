@@ -9,7 +9,7 @@ the copy inventory, measurement boundaries, checks, and deployment.
   counts from the uninstrumented timings. They precede the added token-reference check.
 - `before-consumers.json` and `verified-consumers.json` mount Shiki, find, and minimap,
   and encode LSP changes from the real buffer. Screenshots remain beside the original
-  files in `/work/tmp/editor-e007/`.
+  files in the local run directory.
 - `control-stress.json` and `candidate-stress.json` retain the stress harness work's 72 samples per build,
   including all raw typing latency values. These are local observations, not a new CI gate.
 

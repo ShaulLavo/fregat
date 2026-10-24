@@ -75,25 +75,25 @@ be the log's last, and `reads.test.ts` holds the regression test. The editor's
 
 The final code against the node summaries head in a worktree, same method, three seeds.
 
-| Lane                          | Control | node summaries head    | balanced tree         | Change |
-| ----------------------------- | ------: | ------------ | ------------ | -----: |
-| sequential-typing             |    0.61 | 0.52 (0.85x) | 0.43 (0.70x) |   -17% |
-| typing-with-lookups           |    0.93 | 0.73 (0.79x) | 0.63 (0.68x) |   -14% |
-| random-insertions             |    1.12 | 3.15 (2.80x) | 2.36 (2.10x) |   -25% |
-| random-replacements           |    1.37 | 6.14 (4.49x) | 4.06 (2.97x) |   -34% |
-| eight-cursor-batches          |    1.18 | 3.53 (3.00x) | 2.75 (2.33x) |   -22% |
-| mixed-edit-churn              |    1.22 | 5.25 (4.31x) | 3.80 (3.12x) |   -28% |
-| large-paste-delete            |   12.54 | 4.63 (0.37x) | 4.69 (0.37x) |    +1% |
-| lines-sequential-after-churn  |    0.49 | 1.44 (2.97x) | 1.28 (2.63x) |   -11% |
-| lines-random-after-churn      |    0.77 | 2.28 (2.98x) | 1.97 (2.57x) |   -14% |
-| ranges-after-churn            |    3.04 | 1.48 (0.49x) | 1.33 (0.44x) |   -10% |
-| offset-to-position            |    1.61 | 1.32 (0.82x) | 1.22 (0.76x) |    -8% |
-| position-to-offset            |    0.40 | 1.27 (3.19x) | 1.12 (2.81x) |   -12% |
-| full-read-after-churn         |    1.29 | 2.19 (1.70x) | 2.00 (1.55x) |    -9% |
-| load-short-lines              |    3.77 | 2.16 (0.57x) | 2.13 (0.57x) |    -1% |
-| persistent-history            |       — | 5.22         | 3.81         |   -27% |
-| branch-edits                  |       — | 0.34         | 0.31         |    -9% |
-| anchor-resolution-after-churn |       — | 0.79         | 0.82         |    +4% |
+| Lane                          | Control | node summaries head | balanced tree | Change |
+| ----------------------------- | ------: | ------------------- | ------------- | -----: |
+| sequential-typing             |    0.61 | 0.52 (0.85x)        | 0.43 (0.70x)  |   -17% |
+| typing-with-lookups           |    0.93 | 0.73 (0.79x)        | 0.63 (0.68x)  |   -14% |
+| random-insertions             |    1.12 | 3.15 (2.80x)        | 2.36 (2.10x)  |   -25% |
+| random-replacements           |    1.37 | 6.14 (4.49x)        | 4.06 (2.97x)  |   -34% |
+| eight-cursor-batches          |    1.18 | 3.53 (3.00x)        | 2.75 (2.33x)  |   -22% |
+| mixed-edit-churn              |    1.22 | 5.25 (4.31x)        | 3.80 (3.12x)  |   -28% |
+| large-paste-delete            |   12.54 | 4.63 (0.37x)        | 4.69 (0.37x)  |    +1% |
+| lines-sequential-after-churn  |    0.49 | 1.44 (2.97x)        | 1.28 (2.63x)  |   -11% |
+| lines-random-after-churn      |    0.77 | 2.28 (2.98x)        | 1.97 (2.57x)  |   -14% |
+| ranges-after-churn            |    3.04 | 1.48 (0.49x)        | 1.33 (0.44x)  |   -10% |
+| offset-to-position            |    1.61 | 1.32 (0.82x)        | 1.22 (0.76x)  |    -8% |
+| position-to-offset            |    0.40 | 1.27 (3.19x)        | 1.12 (2.81x)  |   -12% |
+| full-read-after-churn         |    1.29 | 2.19 (1.70x)        | 2.00 (1.55x)  |    -9% |
+| load-short-lines              |    3.77 | 2.16 (0.57x)        | 2.13 (0.57x)  |    -1% |
+| persistent-history            |       — | 5.22                | 3.81          |   -27% |
+| branch-edits                  |       — | 0.34                | 0.31          |    -9% |
+| anchor-resolution-after-churn |       — | 0.79                | 0.82          |    +4% |
 
 Anchor resolution is within run variation of the treap; it is bounded by the reverse index, which
 this plan did not touch.
@@ -114,13 +114,13 @@ Height, standard replay, 4,662 samples, every invariant passing. Maximum sequenc
 workload, with the treap's figures from the node summaries replay:
 
 | Trace               | Pieces | Treap | balanced tree | Control |
-| ------------------- | -----: | ----: | ---: | ------: |
-| random-insertions   |  2,498 | 26–33 |   14 |      14 |
-| random-replacements |  4,437 | 26–33 |   15 |      14 |
-| mixed-edit-churn    |  2,631 | 26–33 |   14 |      14 |
-| prepend             |  4,097 |     — |   13 |      22 |
-| fixed-middle        |  4,098 |     — |   13 |      22 |
-| alternating-ends    |  4,097 |     — |   13 |      21 |
+| ------------------- | -----: | ----: | ------------: | ------: |
+| random-insertions   |  2,498 | 26–33 |            14 |      14 |
+| random-replacements |  4,437 | 26–33 |            15 |      14 |
+| mixed-edit-churn    |  2,631 | 26–33 |            14 |      14 |
+| prepend             |  4,097 |     — |            13 |      22 |
+| fixed-middle        |  4,098 |     — |            13 |      22 |
+| alternating-ends    |  4,097 |     — |            13 |      21 |
 
 `height / log2(P + 1)` peaks at 1.28 over every trace, inside AVL's 1.44 bound and below the
 control's red-black tree on the adversarial traces.

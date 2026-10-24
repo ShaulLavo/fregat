@@ -1,7 +1,7 @@
 # Spellcheck for painted text: research findings
 
-Research for [spellcheck](https://github.com/ShaulLavo/fregat/blob/main/plans/e058-spellcheck.md), 2026-09-26, at Editor `74e76be` and Platform
-`97bfbf2ba`. Probe scripts, corpora and raw output are in `/work/tmp/research2/spellcheck/`
+Research for spellcheck, 2026-09-26, at Editor `74e76be` and Platform
+`97bfbf2ba`. Probe scripts, corpora and raw output are in the local run directory
 (`bench.mjs <engine>`, `vocab.mjs`, `tok.mjs`, `buildtrie.mjs`). The survey clones are in Platform
 `references/` (`cspell`, `cspell-dicts`, `vscode-spell-checker`, `harper`, `codebook`, `zed`).
 
@@ -28,7 +28,7 @@ Nothing we can use.
 - Electron exposes `webFrame.isWordMisspelled` and `getWordSuggestions`. Platform ships on the mesh
   as a web app, and its desktop shell is Electrobun on CEF, which has no such API.
 - Mobile keyboards autocorrect through the input element's own text. That is a separate channel,
-  covered by Plan 171's prose input options (row 19), and it draws no marks.
+  covered by the host's prose input options (row 19), and it draws no marks.
 
 VS Code and CodeMirror 6 disable native spellcheck too (`nativeEditContext.ts:108`,
 `codemirror-view/src/editorview.ts:525`). CodeMirror users opt back in through

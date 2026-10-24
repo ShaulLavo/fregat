@@ -49,16 +49,16 @@ The control warms up too: an earlier version of this table divided every column 
 control and showed typing at 0.71x with 8 warmups, where it is 1.15x.
 
 | Lane                          | Control, 2 warmups | balanced tree, 2 warmups | one-pass edits, 2 warmups | Control, 8 warmups | balanced tree, 8 warmups | one-pass edits, 8 warmups |
-| ----------------------------- | -----------------: | --------------- | --------------- | -----------------: | --------------- | --------------- |
-| sequential-typing             |               0.61 | 0.42 (0.70x)    | 0.46 (0.76x)    |               0.37 | 0.39 (1.06x)    | 0.42 (1.15x)    |
-| typing-with-lookups           |               0.92 | 0.63 (0.69x)    | 0.67 (0.72x)    |               0.76 | 0.61 (0.80x)    | 0.64 (0.85x)    |
-| random-insertions             |               1.08 | 2.38 (2.19x)    | 2.38 (2.20x)    |               0.97 | 2.00 (2.06x)    | 1.99 (2.05x)    |
-| random-replacements           |               1.37 | 3.97 (2.90x)    | 3.75 (2.74x)    |               1.23 | 3.56 (2.89x)    | 3.26 (2.64x)    |
-| eight-cursor-batches          |               1.18 | 2.85 (2.41x)    | 2.47 (2.09x)    |               1.04 | 2.47 (2.37x)    | 2.30 (2.20x)    |
-| mixed-edit-churn              |               1.23 | 3.82 (3.12x)    | 3.75 (3.06x)    |               1.03 | 3.18 (3.08x)    | 3.07 (2.98x)    |
-| persistent-history            |                  — | 3.81            | 3.73            |                  — | 3.34            | 3.27            |
-| branch-edits                  |                  — | 0.31            | 0.29            |                  — | 0.28            | 0.25            |
-| anchor-resolution-after-churn |                  — | 0.81            | 0.67            |                  — | 0.65            | 0.51            |
+| ----------------------------- | -----------------: | ------------------------ | ------------------------- | -----------------: | ------------------------ | ------------------------- |
+| sequential-typing             |               0.61 | 0.42 (0.70x)             | 0.46 (0.76x)              |               0.37 | 0.39 (1.06x)             | 0.42 (1.15x)              |
+| typing-with-lookups           |               0.92 | 0.63 (0.69x)             | 0.67 (0.72x)              |               0.76 | 0.61 (0.80x)             | 0.64 (0.85x)              |
+| random-insertions             |               1.08 | 2.38 (2.19x)             | 2.38 (2.20x)              |               0.97 | 2.00 (2.06x)             | 1.99 (2.05x)              |
+| random-replacements           |               1.37 | 3.97 (2.90x)             | 3.75 (2.74x)              |               1.23 | 3.56 (2.89x)             | 3.26 (2.64x)              |
+| eight-cursor-batches          |               1.18 | 2.85 (2.41x)             | 2.47 (2.09x)              |               1.04 | 2.47 (2.37x)             | 2.30 (2.20x)              |
+| mixed-edit-churn              |               1.23 | 3.82 (3.12x)             | 3.75 (3.06x)              |               1.03 | 3.18 (3.08x)             | 3.07 (2.98x)              |
+| persistent-history            |                  — | 3.81                     | 3.73                      |                  — | 3.34                     | 3.27                      |
+| branch-edits                  |                  — | 0.31                     | 0.29                      |                  — | 0.28                     | 0.25                      |
+| anchor-resolution-after-churn |                  — | 0.81                     | 0.67                      |                  — | 0.65                     | 0.51                      |
 
 Structural counters, standard profile, against the balanced tree budgets:
 

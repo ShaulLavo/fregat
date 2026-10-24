@@ -1,6 +1,6 @@
 # Browser highlighted open after viewport-first syntax
 
-A quiet-scheduled, headless Chromium experiment after [PR #1021](https://github.com/ShaulLavo/fregat/pull/1021). The main comparison uses Singapore's default viewport-first syntax mode. The 10 MiB whole-document run is a separate instrumented reference. These are frame-opportunity measurements on one repeated TypeScript fixture. Physical presentation and a public editor-speed ranking remain unmeasured.
+A quiet-scheduled, headless Chromium experiment after the viewport-first syntax change. The main comparison uses Singapore's default viewport-first syntax mode. The 10 MiB whole-document run is a separate instrumented reference. These are frame-opportunity measurements on one repeated TypeScript fixture. Physical presentation and a public editor-speed ranking remain unmeasured.
 
 ## Default highlighted open
 
@@ -29,7 +29,7 @@ This build makes Singapore wait for the full parse, injection discovery, highlig
 ## Method and environment
 
 - Date, UTC: 2026-10-08. Default run began at 19:18:20; whole-document run time is recorded in its raw JSON.
-- Product commit: `b035dc69d20bfa9b3cddd523d958b38d7b741d9e`, the merge of PR #1021. No product source changed during these runs.
+- Product commit: `b035dc69d20bfa9b3cddd523d958b38d7b741d9e`, the viewport-first syntax change. No product source changed during these runs.
 - Machine: Intel Core i7-14700K, 28 logical CPUs, 31.1 GiB usable RAM, Linux x64, kernel `7.2.8-arch1-2`.
 - Browser: Playwright 1.63.0, headless Chromium `153.0.8010.12`. Node 26.7.0, Bun 1.4.2, Vite 8.3.1. No CPU affinity.
 - Packages: Singapore core, textbuffer, Tree-sitter and languages 0.2.6; Monaco 0.57.0; CodeMirror 6.0.2, state 6.7.6, view 6.43.14, JavaScript language 6.2.5.

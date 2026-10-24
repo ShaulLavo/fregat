@@ -24,11 +24,11 @@ Dependencies must remain resolvable from the preserved directory. From the repos
 
 ```sh
 bun run stress:build
-node examples/stress/first-paint.mjs --core-directory /work/tmp/editor-e003-baseline --output /work/tmp/editor-e003/before.json
-node examples/stress/first-paint.mjs --core-directory /work/tmp/editor-e003-baseline --output /work/tmp/editor-e003/control.json
-node examples/stress/first-paint.mjs --output /work/tmp/editor-e003/after.json
-node examples/stress/first-paint.mjs --core-directory /work/tmp/editor-e003-baseline --repetitions 1 --diagnostics --output /work/tmp/editor-e003/diagnostic-before.json
-node examples/stress/first-paint.mjs --repetitions 1 --diagnostics --output /work/tmp/editor-e003/diagnostic-after.json
+node examples/stress/first-paint.mjs --core-directory /tmp/editor-e003-baseline --output /tmp/editor-e003/before.json
+node examples/stress/first-paint.mjs --core-directory /tmp/editor-e003-baseline --output /tmp/editor-e003/control.json
+node examples/stress/first-paint.mjs --output /tmp/editor-e003/after.json
+node examples/stress/first-paint.mjs --core-directory /tmp/editor-e003-baseline --repetitions 1 --diagnostics --output /tmp/editor-e003/diagnostic-before.json
+node examples/stress/first-paint.mjs --repetitions 1 --diagnostics --output /tmp/editor-e003/diagnostic-after.json
 bun run --cwd examples/stress first-paint:proof
 ```
 

@@ -2,9 +2,8 @@
 
 The shared contract runs 25 useful-answer cases against one project and one unsaved edit.
 It preserves the original worker method assertions and checks required diagnostics, semantic
-color, completion detail and extraction independently of optional wire methods. The wider
-[execution plan](../../../plans/typescript-language-service-parity.md) owns editor actions,
-additional feature families, project/lifetime coverage and eventual Rust qualification.
+color, completion detail and extraction independently of optional wire methods. Editor actions,
+additional feature families, project/lifetime coverage and Rust qualification are not covered.
 
 ## Results
 

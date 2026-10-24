@@ -116,7 +116,7 @@ compare every retained token offset and both fold boundaries with the expected f
 Run the source proof from the repository root:
 
 ```sh
-bun packages/editor/bench/editBatches.mjs --output /work/tmp/e032-source.json --require-incremental
+bun packages/editor/bench/editBatches.mjs --output /tmp/e032-source.json --require-incremental
 ```
 
 It records full-read calls and bytes, range-read count and maximum span, reads spanning the
@@ -138,8 +138,8 @@ screenshots. It also requires zero synchronous and zero deferred full-document r
 diagnostic sample. Full-document correctness reads happen after timing and diagnostics.
 
 ```sh
-TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
-  --output /work/tmp/e032-browser.json --require-incremental
+TMPDIR=/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+  --output /tmp/e032-browser.json --require-incremental
 ```
 
 Both runners accept `--core-directory` to compare a frozen package. Before capturing, the browser
@@ -165,18 +165,18 @@ An unknown group fails before building or capturing results.
 The original baseline can be recreated without switching the checkout:
 
 ```sh
-mkdir -p /work/tmp/e032-baseline
-git archive 6492651 packages/editor/src packages/editor/package.json | tar -x -C /work/tmp/e032-baseline
-ln -sfn "$(pwd)/packages/editor/node_modules" /work/tmp/e032-baseline/node_modules
-bun packages/editor/bench/editBatches.mjs --core-directory /work/tmp/e032-baseline/packages/editor \
-  --output /work/tmp/e032-before-source.json
-TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
-  --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-before-browser.json
+mkdir -p /tmp/e032-baseline
+git archive 6492651 packages/editor/src packages/editor/package.json | tar -x -C /tmp/e032-baseline
+ln -sfn "$(pwd)/packages/editor/node_modules" /tmp/e032-baseline/node_modules
+bun packages/editor/bench/editBatches.mjs --core-directory /tmp/e032-baseline/packages/editor \
+  --output /tmp/e032-before-source.json
+TMPDIR=/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+  --core-directory /tmp/e032-baseline/packages/editor --output /tmp/e032-before-browser.json
 ```
 
 ## Results
 
-The frozen reviewed candidate at `/work/tmp/e032-reviewed/packages/editor` passes every
+The frozen reviewed candidate at the local run directory passes every
 source-work bound and every strengthened browser preservation check. Source capture contains
 two runs of 30 measured samples after five warmups per group, or 600 measured samples per
 revision. Its baseline captures are retained because the source harness is unchanged; candidate
@@ -304,9 +304,9 @@ decorated cases fail the gate. The runner also asserts post-screenshot token off
 observations, benchmark fingerprint, and exact source/build hashes for both revisions.
 
 ```sh
-TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
-  --core-directory /work/tmp/e032-reviewed/packages/editor --verify-guards \
-  --output /work/tmp/e032-reviewed-guard-proof.json
+TMPDIR=/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+  --core-directory /tmp/e032-reviewed/packages/editor --verify-guards \
+  --output /tmp/e032-reviewed-guard-proof.json
 ```
 
 ## Build correspondence control
@@ -322,9 +322,9 @@ the clean reference build, and the repaired build.
 
 ```sh
 node packages/editor/bench/editBatchesBuildProof.mjs \
-	--baseline-core-directory /work/tmp/e032-baseline/packages/editor \
-	--candidate-core-directory /work/tmp/e032-reviewed/packages/editor \
-	--output /work/tmp/e032-build-proof.json
+	--baseline-core-directory /tmp/e032-baseline/packages/editor \
+	--candidate-core-directory /tmp/e032-reviewed/packages/editor \
+	--output /tmp/e032-build-proof.json
 ```
 
 ## Small single-edit control
@@ -351,13 +351,13 @@ a separate comparison from the ten-group matrix.
 
 ```sh
 e032_control() {
-	TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+	TMPDIR=/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
 		--group ordinary:single-edit:decorated --repetitions 100 --warmups 10 "$@"
 }
-e032_control --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-control-a1.json
-e032_control --core-directory /work/tmp/e032-reviewed/packages/editor --output /work/tmp/e032-control-b1.json --require-incremental
-e032_control --core-directory /work/tmp/e032-reviewed/packages/editor --output /work/tmp/e032-control-b2.json --require-incremental
-e032_control --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-control-a2.json
+e032_control --core-directory /tmp/e032-baseline/packages/editor --output /tmp/e032-control-a1.json
+e032_control --core-directory /tmp/e032-reviewed/packages/editor --output /tmp/e032-control-b1.json --require-incremental
+e032_control --core-directory /tmp/e032-reviewed/packages/editor --output /tmp/e032-control-b2.json --require-incremental
+e032_control --core-directory /tmp/e032-baseline/packages/editor --output /tmp/e032-control-a2.json
 ```
 
 ## Earlier large single-edit control
@@ -387,20 +387,20 @@ The slower observations remain in the artifact, including the 4.2 ms baseline ma
 
 ```sh
 e032_large_control() {
-  TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+  TMPDIR=/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
     --group short-lines:single-edit:decorated --repetitions 100 --warmups 10 "$@"
 }
-e032_large_control --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-large-a1.json
-e032_large_control --core-directory /work/tmp/e032-reviewed/packages/editor --output /work/tmp/e032-large-b1.json --require-incremental
-e032_large_control --core-directory /work/tmp/e032-reviewed/packages/editor --output /work/tmp/e032-large-b2.json --require-incremental
-e032_large_control --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-large-a2.json
+e032_large_control --core-directory /tmp/e032-baseline/packages/editor --output /tmp/e032-large-a1.json
+e032_large_control --core-directory /tmp/e032-reviewed/packages/editor --output /tmp/e032-large-b1.json --require-incremental
+e032_large_control --core-directory /tmp/e032-reviewed/packages/editor --output /tmp/e032-large-b2.json --require-incremental
+e032_large_control --core-directory /tmp/e032-baseline/packages/editor --output /tmp/e032-large-a2.json
 ```
 
 ## Earlier single-edit control
 
 Before the review fixes, the small decorated browser group's higher p95 in the initial
 ten-sample runs prompted a separate matched control. This historical capture uses browser
-protocol 1 and the earlier `/work/tmp/e032-final` candidate; it does not validate the final
+protocol 1 and the earlier the local run directory candidate; it does not validate the final
 reviewed source or protocol 2 highlighted-source paint checks. The sequence is baseline, candidate, candidate, baseline, with
 100 measured samples and ten warmups in each run. It uses only
 `ordinary:single-edit:decorated`. The larger sample count and longer warmup change the tail

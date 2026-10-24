@@ -29,10 +29,10 @@ Each package keeps its own guides in `packages/<name>/docs/`. The package README
 
 ## Records
 
-The files below are the written record of finished work: reports, measurements and research, mostly named for a plan ID such as `balanced tree`. They are not guides. They stay at these paths because tests, scripts and the Fregat plans link to them by path, so renaming one breaks a check. Read them when you need the evidence behind a design.
+The files below are reports, measurements and research behind the design. They are not guides. Their file names start with a short code such as `e040`. They stay at these paths because tests, scripts and other documents link to them by path, so renaming one breaks a check. Read them when you need the evidence behind a design.
 
 - [`performance/`](performance/README.md): benchmark reports and the raw data behind them. Tests read some of the data.
-- [`storage/`](storage/e006-text-reclamation.md) `e006-*`: text reclamation and tombstone compaction (text reclamation).
+- [`storage/`](storage/e006-text-reclamation.md) `e006-*`: text reclamation and tombstone compaction.
 - [`editing/`](editing/undo-graph-viewer.md) `e018`, `e062`, `undo-graph-viewer`, `spellcheck-research`: persisted undo, spellcheck hardening and research, the undo graph viewer.
 - [`display/`](display/e036-monaco-geometry-comparison.md) `e036`, `e047`, `e048`, `e051`: geometry comparison with Monaco, point queries, minimap line mapping, fast-path equivalence tests.
 - [`architecture/`](architecture/e049-no-silent-misses.md) `e049`, `e050`, `e054`, `e056`, `modal-input-findings`, `typescript-parity-baseline`: error contracts, host obligations, TypeScript worker parity, platform-agnostic core research, modal input.

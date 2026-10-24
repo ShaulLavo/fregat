@@ -155,8 +155,8 @@ not the currently running development page.
 From the Editor repository, reproduce one run and its summary:
 
 ```sh
-bun packages/tree-sitter/bench/transport-run.mjs --repetitions 12 --lines 10000,50000 --edits 20 --warmups 5 --fanout --output /work/tmp/sab-bench/reproduced.json
-bun packages/tree-sitter/bench/transport-summary.mjs /work/tmp/sab-bench/reproduced.json --json-output=/work/tmp/sab-bench/reproduced-summary.json
+bun packages/tree-sitter/bench/transport-run.mjs --repetitions 12 --lines 10000,50000 --edits 20 --warmups 5 --fanout --output /tmp/sab-bench/reproduced.json
+bun packages/tree-sitter/bench/transport-summary.mjs /tmp/sab-bench/reproduced.json --json-output=/tmp/sab-bench/reproduced-summary.json
 ```
 
 Raw results include machine metadata and SHA-256 hashes of benchmark sources, compiled bundles, and

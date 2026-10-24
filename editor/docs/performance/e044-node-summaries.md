@@ -34,15 +34,15 @@ Standard profile, 9 samples of 2 warmups, three seeds, the one-descent insert he
 change in the checkout, alternating per seed. Milliseconds per lane, median over seeds with the
 range, ratio to the control's median.
 
-| Lane                 | Control | one-descent insert head              | node summaries                   | Change |
-| -------------------- | ------: | ---------------------- | ---------------------- | -----: |
-| sequential-typing    |    0.60 | 0.70 [0.57–0.70] 1.16x | 0.51 [0.51–0.51] 0.85x |   -27% |
-| typing-with-lookups  |    0.93 | 0.95 [0.78–0.96] 1.02x | 0.73 [0.73–0.74] 0.78x |   -23% |
-| random-insertions    |    1.09 | 3.51 [3.49–3.55] 3.21x | 3.13 [3.04–3.18] 2.87x |   -11% |
-| random-replacements  |    1.37 | 7.25 [7.23–7.35] 5.28x | 6.11 [5.92–6.33] 4.45x |   -16% |
-| eight-cursor-batches |    1.16 | 4.08 [3.85–4.13] 3.53x | 3.55 [3.41–3.63] 3.07x |   -13% |
-| mixed-edit-churn     |    1.21 | 6.15 [6.14–6.25] 5.07x | 5.16 [5.10–5.60] 4.26x |   -16% |
-| persistent-history   |       — | 6.21 [6.12–6.29]       | 5.23 [5.07–5.76]       |   -16% |
+| Lane                 | Control | one-descent insert head | node summaries         | Change |
+| -------------------- | ------: | ----------------------- | ---------------------- | -----: |
+| sequential-typing    |    0.60 | 0.70 [0.57–0.70] 1.16x  | 0.51 [0.51–0.51] 0.85x |   -27% |
+| typing-with-lookups  |    0.93 | 0.95 [0.78–0.96] 1.02x  | 0.73 [0.73–0.74] 0.78x |   -23% |
+| random-insertions    |    1.09 | 3.51 [3.49–3.55] 3.21x  | 3.13 [3.04–3.18] 2.87x |   -11% |
+| random-replacements  |    1.37 | 7.25 [7.23–7.35] 5.28x  | 6.11 [5.92–6.33] 4.45x |   -16% |
+| eight-cursor-batches |    1.16 | 4.08 [3.85–4.13] 3.53x  | 3.55 [3.41–3.63] 3.07x |   -13% |
+| mixed-edit-churn     |    1.21 | 6.15 [6.14–6.25] 5.07x  | 5.16 [5.10–5.60] 4.26x |   -16% |
+| persistent-history   |       — | 6.21 [6.12–6.29]        | 5.23 [5.07–5.76]       |   -16% |
 
 The typing lane's gain is larger than the hashing and summaries explain. Its counters show the
 reason: with the left half of a split keeping its parent's priority, the three-piece typing tree

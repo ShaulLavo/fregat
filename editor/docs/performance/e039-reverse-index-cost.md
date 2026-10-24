@@ -18,12 +18,12 @@ index untouched from `applyReverseIndexChanges` and from the relabel. Millisecon
 warmups, 7 samples, median over three seeds:
 
 | Lane                 | one-pass edits head | No index | Share of the lane |
-| -------------------- | --------: | -------: | ----------------: |
-| sequential-typing    |      0.43 |     0.36 |               16% |
-| random-insertions    |      1.99 |     1.31 |               34% |
-| random-replacements  |      3.19 |     2.17 |               32% |
-| eight-cursor-batches |      2.30 |     1.67 |               28% |
-| mixed-edit-churn     |      3.15 |     2.15 |               32% |
+| -------------------- | ------------------: | -------: | ----------------: |
+| sequential-typing    |                0.43 |     0.36 |               16% |
+| random-insertions    |                1.99 |     1.31 |               34% |
+| random-replacements  |                3.19 |     2.17 |               32% |
+| eight-cursor-batches |                2.30 |     1.67 |               28% |
+| mixed-edit-churn     |                3.15 |     2.15 |               32% |
 
 Every random lane is above the plan's stop line of a fifth, so the work went ahead.
 
@@ -80,18 +80,18 @@ comparison stand. The textbuffer [README](../../packages/textbuffer/README.md#cu
 holds the per-regime ratios for this commit.
 
 | Lane                          | Control | one-pass edits, 2 warmups | reverse-index cost, 2 warmups | one-pass edits, 8 warmups | reverse-index cost, 8 warmups |
-| ----------------------------- | ------: | --------------- | --------------- | --------------- | --------------- |
-| sequential-typing             |    0.61 | 0.46 (0.76x)    | 0.40 (0.66x)    | 0.43 (0.70x)    | 0.37 (0.60x)    |
-| typing-with-lookups           |    0.98 | 0.67 (0.73x)    | 0.62 (0.63x)    | 0.66 (0.68x)    | 0.59 (0.61x)    |
-| random-insertions             |    1.09 | 2.38 (2.23x)    | 1.59 (1.46x)    | 2.00 (1.84x)    | 1.39 (1.28x)    |
-| random-replacements           |    1.38 | 3.75 (2.77x)    | 3.22 (2.34x)    | 3.17 (2.29x)    | 2.29 (1.66x)    |
-| eight-cursor-batches          |    1.15 | 2.47 (2.17x)    | 1.95 (1.71x)    | 2.28 (1.99x)    | 1.77 (1.54x)    |
-| mixed-edit-churn              |    1.21 | 3.75 (3.29x)    | 2.72 (2.25x)    | 3.12 (2.58x)    | 2.31 (1.91x)    |
-| large-paste-delete            |   12.53 | —               | 4.60 (0.37x)    | 4.49            | 4.47            |
-| persistent-history            |       — | 3.73            | 2.90            | 3.28            | 2.42            |
-| branch-edits                  |       — | 0.29            | 0.29            | 0.25            | 0.21            |
-| anchor-resolution-after-churn |       — | 0.67            | 0.50            | 0.52            | 0.31            |
-| anchor-density                |       — | —               | 10.56           | 18.33           | 10.22           |
+| ----------------------------- | ------: | ------------------------- | ----------------------------- | ------------------------- | ----------------------------- |
+| sequential-typing             |    0.61 | 0.46 (0.76x)              | 0.40 (0.66x)                  | 0.43 (0.70x)              | 0.37 (0.60x)                  |
+| typing-with-lookups           |    0.98 | 0.67 (0.73x)              | 0.62 (0.63x)                  | 0.66 (0.68x)              | 0.59 (0.61x)                  |
+| random-insertions             |    1.09 | 2.38 (2.23x)              | 1.59 (1.46x)                  | 2.00 (1.84x)              | 1.39 (1.28x)                  |
+| random-replacements           |    1.38 | 3.75 (2.77x)              | 3.22 (2.34x)                  | 3.17 (2.29x)              | 2.29 (1.66x)                  |
+| eight-cursor-batches          |    1.15 | 2.47 (2.17x)              | 1.95 (1.71x)                  | 2.28 (1.99x)              | 1.77 (1.54x)                  |
+| mixed-edit-churn              |    1.21 | 3.75 (3.29x)              | 2.72 (2.25x)                  | 3.12 (2.58x)              | 2.31 (1.91x)                  |
+| large-paste-delete            |   12.53 | —                         | 4.60 (0.37x)                  | 4.49                      | 4.47                          |
+| persistent-history            |       — | 3.73                      | 2.90                          | 3.28                      | 2.42                          |
+| branch-edits                  |       — | 0.29                      | 0.29                          | 0.25                      | 0.21                          |
+| anchor-resolution-after-churn |       — | 0.67                      | 0.50                          | 0.52                      | 0.31                          |
+| anchor-density                |       — | —                         | 10.56                         | 18.33                     | 10.22                         |
 
 The one-pass edits ratios in the 2-warmup columns are its report's, against that run's control. The
 driver's own 2-warmup run is colder than the bench's, because it does not validate between

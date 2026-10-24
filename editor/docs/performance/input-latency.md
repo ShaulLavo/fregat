@@ -226,5 +226,4 @@ records the measured source hash and retains all raw distributions.
 Declared `--loaded` comparisons keep every key blocking. Standalone Tree-sitter uses a 5 ms
 minimum blocking margin under contention and runs in the full loaded matrix or focused
 verification. Quiet Tree-sitter retains its frozen fine margins, as do all other loaded
-configurations. Every metric records frozen/applied margins and the reason. Root Plan 282 owns
-the affected-key inventory and requires real 20 ms stage sensitivity under this policy.
+configurations. Every metric records frozen/applied margins and the reason. The policy requires real 20 ms stage sensitivity on the affected keys.

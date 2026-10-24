@@ -16,7 +16,7 @@ Options:
 - `--label=before` selects artifact names.
 - `--minimap-root=/path/to/package` measures a preserved minimap source tree against the same Editor.
 - `--origin=http://127.0.0.1:3300` sets the browser origin.
-- `--output-dir=/work/tmp/another-run` changes the artifact directory.
+- `--output-dir=/tmp/another-run` changes the artifact directory.
 - `--steps=120` changes each timing sample's scroll count.
 - `--trials=3` repeats each timing configuration.
 - `--all-motions` also measures 2px steps, reverse scrolling, and jumps beyond the cached bitmap.

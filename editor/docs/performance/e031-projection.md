@@ -122,17 +122,17 @@ rejects source text reads and unbounded sequence work during a local plain edit.
 The eager control is reproducible from a frozen source copy. From the repository root:
 
 ```sh
-mkdir -p /work/tmp/e031-control
-git archive ff1dfeda9e52b308f57915da7372f7ac6e5f04f9 packages/editor/src packages/editor/package.json | tar -x -C /work/tmp/e031-control
-ln -s /work/projects/Editor/packages/editor/node_modules /work/tmp/e031-control/node_modules
-bun packages/editor/bench/captureEagerProjection.mjs --core-directory /work/tmp/e031-control/packages/editor --output /work/tmp/e031-eager.json
+mkdir -p /tmp/e031-control
+git archive ff1dfeda9e52b308f57915da7372f7ac6e5f04f9 packages/editor/src packages/editor/package.json | tar -x -C /tmp/e031-control
+ln -s $PWD/packages/editor/node_modules /tmp/e031-control/node_modules
+bun packages/editor/bench/captureEagerProjection.mjs --core-directory /tmp/e031-control/packages/editor --output /tmp/e031-eager.json
 ```
 
 The browser runners accept `--core-directory` for frozen packages with matching `src` and `dist`.
 The recorded runs used these commands from `examples/stress`:
 
 ```sh
-node first-paint.mjs --core-directory /work/tmp/e031-accepted/packages/editor --repetitions 1 --output /work/tmp/e031-first-paint.json
-node run.mjs --core-directory /work/tmp/e031-accepted/packages/editor --repetitions 1 --warmups 1 --output /work/tmp/e031-stress.json.gz
-bun run bench:input:paired --baseline /work/tmp/plan-282/baseline --candidate /work/tmp/plan-282/candidate
+node first-paint.mjs --core-directory /tmp/e031-accepted/packages/editor --repetitions 1 --output /tmp/e031-first-paint.json
+node run.mjs --core-directory /tmp/e031-accepted/packages/editor --repetitions 1 --warmups 1 --output /tmp/e031-stress.json.gz
+bun run bench:input:paired --baseline /tmp/plan-282/baseline --candidate /tmp/plan-282/candidate
 ```

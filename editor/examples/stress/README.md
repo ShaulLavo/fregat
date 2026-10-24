@@ -4,7 +4,7 @@ Run from the repository root with Node 26 and Bun installed:
 
 ```sh
 bun install --frozen-lockfile
-bun run bench:stress --output /work/tmp/editor-stress/control-1.json --verify-cancellation
+bun run bench:stress --output /tmp/editor-stress/control-1.json --verify-cancellation
 bun run --cwd examples/stress test
 ```
 
@@ -33,14 +33,14 @@ Install Chromium separately if it is missing, with Playwright's browser cache on
 
 The older generators exercise different algorithms, sizes, and edit distributions. None is an
 equivalent caller of the new corpus, so none was deleted or silently changed. Future users can
-generate the common corpus with `bun run --cwd examples/stress fixtures /work/tmp/editor-fixtures`.
+generate the common corpus with `bun run --cwd examples/stress fixtures /tmp/editor-fixtures`.
 Without a directory argument, that command prints only the manifest. Generated documents do not
 belong in Git. `results/manifest.json` pins the seed, generator version, UTF-8 bytes, UTF-16 length,
 normalized line count, longest line, search count, and SHA-256 for every fixture.
 
 ## Full-text boundary workload (full-text boundary)
 
-`node boundary.mjs --output /work/tmp/editor-e033/boundary/run.json` opens two views over a
+`node boundary.mjs --output /tmp/editor-e033/boundary/run.json` opens two views over a
 document fragmented by 32 replacements at 65,536, 4,194,304 and 50,331,648 units. The content above
 the filler is fixed, so the viewport, captures, caret and conflict stay the same as the size grows.
 `plain` has no plugins. `contributions` adds Markdown (fixed captures), scope-lines, decode and the
@@ -60,7 +60,7 @@ external strings; it is not a measurement of live WASM trees alone.
 
 ## Row geometry workload (Monaco geometry comparison)
 
-`node geometry.mjs --output /work/tmp/editor-e036/run.json` opens one 900x600 view over 3,000-line
+`node geometry.mjs --output /tmp/editor-e036/run.json` opens one 900x600 view over 3,000-line
 fixtures: Go indented with tabs and the same text with four spaces, both again padded to 180 columns,
 Markdown with inline replacements, and Unicode. Each fixture runs one counting pass (geometry
 diagnostics and rect-read counters on) and `--repetitions` timing passes (both off), each in a fresh
@@ -69,7 +69,7 @@ The summary reports mounted rows per geometry path, builds and sweeps per operat
 CDP layout, script and task time, and dispatch-to-applied latency. `--font-check "a,b"` instead
 hit-tests every third column of the space-indented fixture in each font and times a monospace probe.
 
-`node blink.mjs --output /work/tmp/editor-e036/blink.json` measures whole-browser CPU from `/proc`
+`node blink.mjs --output /tmp/editor-e036/blink.json` measures whole-browser CPU from `/proc`
 while a focused view sits idle: CSS blink, a JS interval, and no blink, interleaved per round.
 Headless compositing is software; pass `--headed` for a GPU reading.
 
@@ -114,12 +114,12 @@ comparisons. No additional timing hooks were added to core subsystems.
 ## Controls and comparison
 
 ```sh
-bun run bench:stress --output /work/tmp/editor-stress/control-1.json --verify-cancellation
-bun run bench:stress --output /work/tmp/editor-stress/control-2.json
-bun run bench:stress --output /work/tmp/editor-stress/control-3.json
-bun run --cwd examples/stress compare calibrate /work/tmp/editor-stress/limits.json /work/tmp/editor-stress/control-1.json /work/tmp/editor-stress/control-2.json /work/tmp/editor-stress/control-3.json
-bun run bench:stress --output /work/tmp/editor-stress/rerun.json
-bun run --cwd examples/stress compare check /work/tmp/editor-stress/control-1.json /work/tmp/editor-stress/rerun.json /work/tmp/editor-stress/limits.json
+bun run bench:stress --output /tmp/editor-stress/control-1.json --verify-cancellation
+bun run bench:stress --output /tmp/editor-stress/control-2.json
+bun run bench:stress --output /tmp/editor-stress/control-3.json
+bun run --cwd examples/stress compare calibrate /tmp/editor-stress/limits.json /tmp/editor-stress/control-1.json /tmp/editor-stress/control-2.json /tmp/editor-stress/control-3.json
+bun run bench:stress --output /tmp/editor-stress/rerun.json
+bun run --cwd examples/stress compare check /tmp/editor-stress/control-1.json /tmp/editor-stress/rerun.json /tmp/editor-stress/limits.json
 ```
 
 The local envelope is derived separately for each fixture/scenario/state/metric. The p50 limit
@@ -157,7 +157,7 @@ Build the public packages, then run the first-paint open matrix:
 
 ```sh
 bun run stress:build
-bun run --cwd examples/stress bench:first-paint --output /work/tmp/editor-e003/before.json
+bun run --cwd examples/stress bench:first-paint --output /tmp/editor-e003/before.json
 ```
 
 The runner opens the stress harness ordinary and 500,000-line fixtures, with and without the real
@@ -173,7 +173,7 @@ pixels in the first text screenshot. The matrix uses a fixed four-space tab poli
 Asset request/response times use a runner wall-clock origin; browser durations use performance.now.
 The artifact retains both clocks without treating them as interchangeable.
 
-Use `--core-directory /work/tmp/editor-e003-baseline` for a preserved core package containing
+Use `--core-directory /tmp/editor-first-paint-baseline` for a preserved core package containing
 matching `src`, `dist`, and `package.json`. Dependencies must remain resolvable from that directory.
 Record baseline, unchanged control, and candidate with the same options. `--diagnostics` adds
 the existing opt-in sink plus language asset, worker registration, parse, and range-query phases;
@@ -204,11 +204,11 @@ Use an isolated checkout for a long comparison if other work may change the repo
 Copy their built outputs and point workspace dependency links at the isolated checkout too.
 
 ```sh
-node examples/stress/fallback-validation-design.mjs /work/tmp/e034-design.json /work/tmp/e034-captures
-node examples/stress/fallback-experiment.mjs --design /work/tmp/e034-design.json \
-  --baseline-core /work/tmp/e034-baseline --candidate-core /work/tmp/e034-candidate \
+node examples/stress/fallback-validation-design.mjs /tmp/e034-design.json /tmp/e034-captures
+node examples/stress/fallback-experiment.mjs --design /tmp/e034-design.json \
+  --baseline-core /tmp/e034-baseline --candidate-core /tmp/e034-candidate \
   --cpu-affinity 8,10,12,14
-node examples/stress/fallback-validation.mjs /work/tmp/e034-design.json /work/tmp/e034-report.json
+node examples/stress/fallback-validation.mjs /tmp/e034-design.json /tmp/e034-report.json
 ```
 
 For a larger declaration, append its block count after the capture directory, for example `24`.
@@ -231,7 +231,7 @@ Build the public packages, then run the focused hidden-rendering measurement:
 
 ```sh
 bun run stress:build
-bun run --cwd examples/stress bench:hidden --expect-suspended --output /work/tmp/editor-e004/result.json
+bun run --cwd examples/stress bench:hidden --expect-suspended --output /tmp/editor-e004/result.json
 ```
 
 The runner reuses stress harness fixtures, document churn, and the browser entry. It records initial and
@@ -247,8 +247,8 @@ candidate artifacts. Their reveal measurements are separate from the stress harn
 Use a fresh profile directory for each run:
 
 ```sh
-bun run bench:stress --fixtures ordinary,long-line --repetitions 1 --profile-directory /work/tmp/editor-line-profile --output /work/tmp/editor-line-profile/result.json
-bun run --cwd examples/stress profile:summary /work/tmp/editor-line-profile > /work/tmp/editor-line-profile/summary.jsonl
+bun run bench:stress --fixtures ordinary,long-line --repetitions 1 --profile-directory /tmp/editor-line-profile --output /tmp/editor-line-profile/result.json
+bun run --cwd examples/stress profile:summary /tmp/editor-line-profile > /tmp/editor-line-profile/summary.jsonl
 ```
 
 The runner records Chromium CPU profiles at a requested 1 ms sampling interval around typing and
@@ -278,7 +278,7 @@ Build the packages with `bun run stress:build` from the repository root. Capture
 around native typing and paste bursts with a new output directory:
 
 ```sh
-bun run --cwd examples/stress profile:input --mode trace --repetitions 1 --output /work/tmp/editor-layout-trace
+bun run --cwd examples/stress profile:input --mode trace --repetitions 1 --output /tmp/editor-layout-trace
 ```
 
 The default groups cover typing in ordinary and long-line documents, and paste in long-line and
@@ -290,7 +290,7 @@ Layouts without a JavaScript stack remain in the totals.
 For latency measurements without profiling instrumentation, use `--mode timing`:
 
 ```sh
-bun run --cwd examples/stress profile:input --mode timing --output /work/tmp/editor-layout-timing
+bun run --cwd examples/stress profile:input --mode timing --output /tmp/editor-layout-timing
 ```
 
 Add `--core-directory /path/to/frozen/packages/editor` to compare a frozen core through the same
@@ -301,19 +301,18 @@ Use the complete input suite below for budget comparisons.
 
 ## Input latency budgets
 
-The paired command uses frozen historical group budgets. The coordinator approves shipping
-Plan 282 with its actual 855.026-second default and 215/216 blocking keys passing. The one
-Platform short-lines/multiple applied-undo rejection (+1.000 ms versus 0.800 ms budget) is
-unclassified: a real #224 large-file undo cost or noise. The runner keeps its failing verdict.
+The paired command uses frozen historical group budgets. The latest full run took its default
+855.026 seconds and passed 215 of 216 blocking keys. The one rejection, Platform
+short-lines/multiple applied-undo (+1.000 ms against a 0.800 ms budget), is unclassified: it is
+either a real large-file undo cost or noise. The runner keeps its failing verdict.
 The retained ten-run A/A has zero selected ordinary/multiple rejects; it does not cover this key.
 Corrected-identity controls reject all 72 input and 36 frame keys; the native positive passes.
-Follow-up is a restricted alternating A/A and A/B undo cohort after its scoped cleanup counts
-reset replacement generations. The first attempted cohort produces no valid comparisons.
-Full historical agreement is not claimed. Expanded final-identity loaded/historical proofs
-and full-matrix timing are explicit follow-ups. Minimap acceptance remains temporarily excluded
-pending its separately owned undo source-correctness fix. See the
-[acceptance record](../../../docs/document-contributions/paired-input-latency.md#minimap-proof-retention-correction).
-Plan 099 units 2–7 retain their implementation authorization gate.
+A restricted alternating A/A and A/B undo cohort, run after scoped cleanup counts reset
+replacement generations, would classify the rejection. The first attempted cohort produced no
+valid comparisons.
+Not covered: full historical agreement, expanded final-identity loaded and historical proofs, and
+full-matrix timing. Minimap acceptance is excluded until its undo source-correctness fix lands.
+See the [acceptance record](../../../docs/document-contributions/paired-input-latency.md#minimap-proof-retention-correction).
 
 Compare complete frozen package sets from the Fregat or Editor root. Replace the example paths
 with your frozen baseline and candidate directories. Follow the execution host's resource policy
@@ -380,7 +379,6 @@ repeat measurement was amplified to 128.6 ms by callback batching. Fresh split-i
 reject 72/72 input keys and 36/36 frame keys at 20 ms, and the named floor at 25 ms, with 30 ms
 skipped. They take 436.559 seconds once. The fresh repeat-frame medians are 68.4 ms at 20 ms
 and 113.2 ms at 25 ms; phase/batching variability remains recorded, with every budget unchanged.
-All raw outcomes are preserved under `/work/tmp/plan-282/run-20261001T153544Z-sol/`.
 A failure at 30 ms blocks sensitivity. Both controls and all floor
 attempts are keyed by the measurement hash; reuse recomputes their verdicts. Schema-4 caches
 record the validation hash their controls used. Measurement covers all sources except
@@ -453,8 +451,7 @@ still reject every required key.
 
 The two-pair stopping guard uses the applied blocking margins and preserves its strict span check.
 A load declaration changes the workload receipt and cannot be mixed between paired sides.
-See root [Plan 282](../../../plans/282-fast-paired-input-latency-check.md) for the exact margin audit
-and acceptance evidence. Pre-input and post-input readiness require the current source and its
+Pre-input and post-input readiness require the current source and its
 accepted render; a reset can publish its source after the prior render has been accepted.
 
 The harness mirrors Platform document ownership: every buffer has one public document-analysis
@@ -472,4 +469,4 @@ freshness uses monotonic `sourceUpdates`, independent of compacted log length. N
 proof keeps repeated short-lines heaps near 122.7 MiB, where the old capture climbed from 122.0
 to 250.5 MiB. This is a measurement-capture correction; frozen products, sampling and budgets
 stay unchanged. Its new measurement identity requires fresh controls before the single default
-rerun; the approved earlier A/A stays stamped with its original identity.
+rerun; the earlier A/A stays stamped with its original identity.

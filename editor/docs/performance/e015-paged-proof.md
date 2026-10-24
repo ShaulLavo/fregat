@@ -25,8 +25,8 @@ construction copies; it does not solve steady-state residency.
 
 ```sh
 bun run stress:build
-node examples/stress/paged.mjs --sizes 52428800,209715200 --modes resident,streamed --output /work/tmp/editor-paged/resident.json
-node examples/stress/paged.mjs --sizes 314572800,629145600 --modes paged --output /work/tmp/editor-paged/paged.json
+node examples/stress/paged.mjs --sizes 52428800,209715200 --modes resident,streamed --output /tmp/editor-paged/resident.json
+node examples/stress/paged.mjs --sizes 314572800,629145600 --modes paged --output /tmp/editor-paged/paged.json
 ```
 
 The range source generates deterministic repeated UTF-8 containing a surrogate pair, a combining
@@ -66,7 +66,7 @@ cap is verified with a smaller limit in unit tests; those document sizes do not 
 Index plus full sweep fetched about twice the file size. Paging bounds residency, not total I/O.
 
 Raw evidence is in `docs/performance/e015-results/`; browser screenshots and complete captures are
-in `/work/tmp/editor-112-performance/`. Paged disposal drops backing storage from 8.16 MiB to about
+in the local run directory. Paged disposal drops backing storage from 8.16 MiB to about
 0.11 MiB. The streamed 200 MiB sample still retained its buffer at the immediate disposal GC;
 that is recorded, not reported as successful collection. Closing its isolated browser context
 releases it. No general buffer-reclamation claim follows from this construction experiment.

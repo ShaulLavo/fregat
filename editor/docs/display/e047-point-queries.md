@@ -1,7 +1,6 @@
 # Point and row queries
 
-Implemented 2026-09-21 in Editor `6656eb7`; Platform Plan 130 Phases 1 and 4 consume it
-(`ee6f97e0`). A plugin or host asks the editor what sits under a pointer and gets the answer the
+A plugin or host asks the editor what sits under a pointer and gets the answer the
 view gives under wrap, folds, injected rows and the gutter band.
 
 - `Editor` and contribution contexts expose `rowAtPoint`, `markerAtPoint` and

@@ -50,14 +50,14 @@ checkout, alternating. The default regime is 2 warmups; the warm column is 6 war
 seed. Milliseconds per lane, ratio to the control's median.
 
 | Lane                 | Control | fixed edit overhead head, 2 warmups | one-descent insert, 2 warmups | fixed edit overhead head, 6 warmups | one-descent insert, 6 warmups |
-| -------------------- | ------: | -------------------- | --------------- | -------------------- | --------------- |
-| sequential-typing    |    0.60 | 0.64 1.06x           | 0.70 1.17x +10% | 0.53 1.50x           | 0.50 1.41x -6%  |
-| typing-with-lookups  |    0.93 | 0.89 0.95x           | 0.95 1.02x +7%  | 0.78 1.06x           | 0.76 1.02x -3%  |
-| random-insertions    |    1.08 | 3.91 3.63x           | 3.52 3.27x -10% | 3.26 2.96x           | 2.88 2.61x -12% |
-| random-replacements  |    1.38 | 6.94 5.04x           | 7.23 5.24x +4%  | 6.60 5.23x           | 6.59 5.22x -0%  |
-| eight-cursor-batches |    1.16 | 4.22 3.63x           | 4.05 3.49x -4%  | 3.46 3.27x           | 3.36 3.17x -3%  |
-| mixed-edit-churn     |    1.21 | 6.15 5.06x           | 6.12 5.05x -0%  | 5.61 5.22x           | 5.50 5.11x -2%  |
-| persistent-history   |       — | 6.21                 | 6.21 -0%        | 5.82                 | 5.70 -2%        |
+| -------------------- | ------: | ----------------------------------- | ----------------------------- | ----------------------------------- | ----------------------------- |
+| sequential-typing    |    0.60 | 0.64 1.06x                          | 0.70 1.17x +10%               | 0.53 1.50x                          | 0.50 1.41x -6%                |
+| typing-with-lookups  |    0.93 | 0.89 0.95x                          | 0.95 1.02x +7%                | 0.78 1.06x                          | 0.76 1.02x -3%                |
+| random-insertions    |    1.08 | 3.91 3.63x                          | 3.52 3.27x -10%               | 3.26 2.96x                          | 2.88 2.61x -12%               |
+| random-replacements  |    1.38 | 6.94 5.04x                          | 7.23 5.24x +4%                | 6.60 5.23x                          | 6.59 5.22x -0%                |
+| eight-cursor-batches |    1.16 | 4.22 3.63x                          | 4.05 3.49x -4%                | 3.46 3.27x                          | 3.36 3.17x -3%                |
+| mixed-edit-churn     |    1.21 | 6.15 5.06x                          | 6.12 5.05x -0%                | 5.61 5.22x                          | 5.50 5.11x -2%                |
+| persistent-history   |       — | 6.21                                | 6.21 -0%                      | 5.82                                | 5.70 -2%                      |
 
 The warm control is faster too, which is why its ratios move; compare the Singapore columns.
 The typing lane at 2 warmups is a JIT transient: the bench times the third replay in a fresh
