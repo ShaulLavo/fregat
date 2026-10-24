@@ -6,5 +6,10 @@ export function liveVerdict(report, preexisting) {
       failure.startsWith('terminal check:') ||
       !preexisting.includes(failure),
   )
-  return { status: fresh.length === 0 ? 'passed' : 'failed', fresh }
+  const release = report.release ?? report.served?.release
+  return {
+    ...(release === undefined ? {} : { release }),
+    status: fresh.length === 0 ? 'passed' : 'failed',
+    fresh,
+  }
 }
