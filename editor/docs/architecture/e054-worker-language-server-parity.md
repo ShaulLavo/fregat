@@ -1,6 +1,6 @@
-# E054: the TypeScript worker at language-server parity
+# The TypeScript worker at language-server parity
 
-Completed 2026-09-25. `@singapore-editor/typescript-lsp` answers every method Platform gets from its
+`@singapore-editor/typescript-lsp` answers every method Platform gets from its
 server-side TypeScript backend, loads its standard library without the network, takes project files
 one at a time, and reports its own crash the way a server process does. The Editor demo renames
 across files, applies a quick fix, formats, and shows an outline with no server running.
@@ -103,7 +103,7 @@ notification to its socket.
 - `bun run test` in `packages/lsp-plugin`: server-request handlers through the pool, and a close
   after `$/serverExited` reported as that exit.
 - `bunx playwright test` in `examples/app`: `fixes, formats, renames across files and outlines with
-no language server`, with the CDN routed to fail.
+  no language server`, with the CDN routed to fail.
 
 ## Left for later
 

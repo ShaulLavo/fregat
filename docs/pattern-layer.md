@@ -78,8 +78,7 @@ replacement focus, breadcrumb nesting, references, machine discovery, chat check
 scrolling. The shared package tests selection paint, density changes, active-descendant mounting,
 keyboard behavior and virtualization.
 
-Implementation evidence is indexed at `/work/tmp/fregat-evidence/plan126-pattern-layer/summary.md`.
-It records the exact checks, screenshots, render comparisons, trace comparison and mesh release.
+The implementation evidence records the exact checks, screenshots, render comparisons, trace comparison and mesh release.
 The repository's completed-plan cleanup policy replaces the executable plan with this reference.
 
 Two existing server limitations were observed during verification:

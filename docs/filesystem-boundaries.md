@@ -4,14 +4,14 @@ Platform gives you normal access to files on your computer by default. The file 
 
 The distinction matters when you edit files from several projects or follow a symlink to another directory. A symlink is a filesystem entry that points to another path. With the default server root, both paths can be accessible even when the target is outside your open project.
 
-`FS_WORKSPACE_ROOT` is an optional server startup restriction. When it is set to `/work/projects/demo`, the filesystem API accepts paths beneath that directory and checks their physical destinations. The configured root can itself be a symlink. Its resolved destination defines the physical boundary. This existing startup option does not add a user setting or a folder-trust prompt.
+`FS_WORKSPACE_ROOT` is an optional server startup restriction. When it is set to `/home/user/projects/demo`, the filesystem API accepts paths beneath that directory and checks their physical destinations. The configured root can itself be a symlink. Its resolved destination defines the physical boundary. This existing startup option does not add a user setting or a folder-trust prompt.
 
 For example, consider these entries under a restricted root:
 
 ```text
-/work/projects/demo/notes.txt -> /work/private/notes.txt
-/work/projects/demo/current.txt -> /work/projects/demo/draft.txt
-/work/projects/demo/shared -> /work/private
+/home/user/projects/demo/notes.txt -> /home/user/private/notes.txt
+/home/user/projects/demo/current.txt -> /home/user/projects/demo/draft.txt
+/home/user/projects/demo/shared -> /home/user/private
 ```
 
 The operations have different meanings:

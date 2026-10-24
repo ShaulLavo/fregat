@@ -31,6 +31,10 @@ const edit = participant.local({ offset: 5, deleteCount: 0, text: ' world' })
 // Submit edit to the Host; deliver its ordered HostMessages to participant.receive.
 ```
 
+## No end-to-end quick start yet
+
+There is no runnable example with a host and two participants. The example above makes one local edit and stops there. The [integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collab/docs/integration.md) describes the host's job, and the `collaboration` package adds the editor binding and transports that a working setup needs.
+
 ## API highlights
 
 - `Participant.local()` creates an optimistic local edit.

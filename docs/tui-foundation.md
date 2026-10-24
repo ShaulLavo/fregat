@@ -1,6 +1,6 @@
 # TUI foundation
 
-Plan 079 establishes a second client for Platform's existing server. The terminal opens settings,
+The terminal is a second client for Platform's existing server. The terminal opens settings,
 with a command palette, file picker and previews, address history, editable settings, and terminal
 themes. Agent sessions and the workbench are separate slices.
 The [TUI guide](../apps/tui/README.md) covers launch, controls, editing and recovery.

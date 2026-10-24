@@ -74,8 +74,7 @@ The server process was reused. Browser scenarios passed for Astro in both palett
 containing Astro and Python fences; screenshots were read back. Registration logs show only
 requested dependencies, and no Shiki requests.
 
-[Evidence and check results](/work/tmp/fregat-evidence/native-syntax-coverage-20260920/summary.md)
-include the before/after trace, five-run worker samples, capture-equivalence results and build logs.
+The evidence and check results include the before/after trace, five-run worker samples, capture-equivalence results and build logs.
 The focused suites passed 185 tests. Runtime and web typechecks pass; the language package's full
 test-source typecheck encounters the existing `packages/editor/src/editor/indentationGuess.ts:83`
 possibly-undefined indexed value. Its distributable builds successfully.
@@ -103,8 +102,7 @@ generated-file check, package build, Tree-sitter typecheck and web typecheck pas
 package's test-source typecheck still reports the existing `indentationGuess.ts:83` error.
 
 Release `20260920T101706Z-6e04e664-native-sql` serves this increment; the server process was reused.
-[SQL admission evidence](/work/tmp/fregat-evidence/native-sql-admission-20260920/summary.md)
-records the browser checks and screenshots for standalone SQL and Markdown fences in both palettes.
+The SQL admission evidence records the browser checks and screenshots for standalone SQL and Markdown fences in both palettes.
 
 ## MDX increment
 
@@ -147,5 +145,4 @@ JavaScript injections, builtin-name specialization and folds remain unsupported.
 now records 24 partial mappings and 218 candidates.
 
 Release `20260920T103700Z-43d3ac17-native-mdx` serves the increment and the Markdown preview fix.
-The server process was reused. [MDX admission evidence](/work/tmp/fregat-evidence/native-mdx-admission-20260920/summary.md)
-records both palette checks, inspected screenshots, lazy registrations and the deployment check.
+The server process was reused. The MDX admission evidence records both palette checks, inspected screenshots, lazy registrations and the deployment check.

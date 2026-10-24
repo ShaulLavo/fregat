@@ -1,7 +1,5 @@
 # TUI worktrees and session creation
 
-Plan 083 completed on 2026-09-08.
-
 The terminal client uses the same [worktree lifecycle](worktree-lifecycle.md) as the web app.
 The [TUI README](../apps/tui/README.md#choose-and-manage-worktrees) describes the controls.
 
@@ -75,5 +73,5 @@ MockProviderAdapter, and temporary Git repositories.
 TUI build, TUI/web/client-core typechecks, changed TypeScript lint and formatting, and the
 focused native and migrated web worktree tests pass.
 
-The live native frame is `/work/tmp/platform-tui-083-frame.txt`, captured from the existing
-server at `http://127.0.0.1:3301` with the new shared worktree labels visible.
+A live native frame, written with `bun run dev:tui --headless-frame <path>` against the existing
+server at `http://127.0.0.1:3301`, shows the new shared worktree labels.

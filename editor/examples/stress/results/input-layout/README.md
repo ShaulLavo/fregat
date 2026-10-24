@@ -41,4 +41,4 @@ and the selected core in the saved browser bundles.
 The [runner instructions](../../README.md#native-input-layout-profiles) describe `profile:input`,
 including frozen-core selection and trace versus timing modes. Raw traces and their summaries
 are saved here; matching readable builds and CPU profiles remain in
-`/work/tmp/editor-layout/final-trace-before` and `/work/tmp/editor-layout/final-trace-after`.
+the local run directory and the local run directory.

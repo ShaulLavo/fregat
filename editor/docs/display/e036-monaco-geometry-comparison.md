@@ -1,6 +1,6 @@
-# E036: Monaco's view mechanisms against the calculated geometry path
+# Monaco's view mechanisms against the calculated geometry path
 
-Completed on 2026-09-24. Planned against `5f68ce6` (2026-09-14), measured on `10b0ac4` and later
+Planned against `5f68ce6` (2026-09-14), measured on `10b0ac4` and later
 in Chromium 148 through Playwright. Monaco's mechanisms were the control, not the spec.
 
 Each of the six candidates ended in a measured decision. Three went in: monospace verification
@@ -14,7 +14,7 @@ measured-path cache. Replacing the CSS caret blink with a JavaScript interval wa
 The calculated path does not cover real files. On disk, tab-indented codebases have a tab on 69%
 (Go, crush) to 77% (VS Code `.ts`) of lines. Markdown has 8–10% non-ASCII lines before counting
 inline replacements. Of the mounted rows, 71% (go-tabs), 33% (markdown) and 100% (unicode) take
-measured geometry. The plan's 5% gate therefore did not settle candidates 1 and 4; their cost did.
+measured geometry. The brief's 5% gate therefore did not settle candidates 1 and 4; their cost did.
 
 The geometry module reports each row build's path (`view.rowGeometry`: `calculated`, `tab`,
 `non-simple-text`, `inline-mapping`, `proportional-font`) and each sweep
@@ -44,7 +44,7 @@ per font and style.
 
 Proportional fonts still misplace what is estimated from `characterWidth` outside row geometry:
 soft-wrap column counts and the spacers of windowed long rows.
-[E052](https://github.com/ShaulLavo/fregat/blob/main/plans/e052-proportional-font-extents.md) plans the fix.
+The fix is not implemented.
 
 ## Re-measuring when the face changes
 
@@ -92,12 +92,12 @@ textarea composition commit. Nothing can be deleted while other engines still ne
 From `examples/stress`, after `bun run build` at the repository root:
 
 ```sh
-node geometry.mjs --output /work/tmp/editor-e036/run.json --repetitions 5
-node geometry.mjs --output /work/tmp/editor-e036/fonts.json --font-check "monospace,Liberation Sans"
-node blink.mjs --output /work/tmp/editor-e036/blink.json --headed
-node edit-context-probe.mjs --output /work/tmp/editor-e036/edit-context-events.json
+node geometry.mjs --output /tmp/editor-e036/run.json --repetitions 5
+node geometry.mjs --output /tmp/editor-e036/fonts.json --font-check "monospace,Liberation Sans"
+node blink.mjs --output /tmp/editor-e036/blink.json --headed
+node edit-context-probe.mjs --output /tmp/editor-e036/edit-context-events.json
 node profile-input-layout.mjs --mode trace --repetitions 1 --groups ordinary/single/typing \
-  --output /work/tmp/editor-e036/layout-trace
+  --output /tmp/editor-e036/layout-trace
 ```
 
 Browser tests in `packages/editor`:

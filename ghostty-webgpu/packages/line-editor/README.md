@@ -1,6 +1,6 @@
 # ghostty-webgpu-line-editor
 
-Readline-style editing for local shells hosted by ghostty-webgpu. Working package name and current version `0.0.3`. This package is under development and marked private until publication is authorized.
+Readline-style editing for local shells hosted by ghostty-webgpu. Working package name and current version `0.0.3`.
 
 The package provides a browser-independent model, keymap, history, read lifecycle and a `readline()` terminal extension. The extension owns input while a read is active, renders the prompt through the terminal API, and exposes `print()` for output that arrives during editing.
 
@@ -49,5 +49,3 @@ Completion candidates are replacements for the whitespace-delimited token before
 ## Verification
 
 Build the terminal from the family root with `bun run build`, then run `bun run verify` from this directory. Tests run in Node through Vitest. From the repository root, the package is included in `build:workspaces`, workspace lint/typecheck/test commands and the Ghostty CI job.
-
-The approved delivery work lives in [Plan 286](https://github.com/ShaulLavo/fregat/blob/main/plans/286-ghostty-extensions.md), under the root [roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md).

@@ -1,6 +1,6 @@
-# E051: Fast paths pinned to their slow paths
+# Fast paths pinned to their slow paths
 
-Implemented 2026-09-21 in Editor `7a37f10`. Where the core answers one question two ways, a test
+Where the core answers one question two ways, a test
 proves the answers agree.
 
 - The incremental row-layout patches (`sameLineEditPatch`, `multiLineEditPatch`) ask the projection

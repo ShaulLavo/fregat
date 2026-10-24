@@ -1,20 +1,16 @@
-# E056 research: platform-agnostic core and React Strict DOM
+# Platform-agnostic core and React Strict DOM
 
-Status: supporting design for approved E056, researched on 2026-09-20.
-E056 remains parked by the owner; implementation has not started.
+Research from 2026-09-20. This is a design proposal; implementation has not started.
 
-Execution entry: [E056](https://github.com/ShaulLavo/fregat/blob/main/plans/e056-platform-agnostic-core.md).
 Machine-readable evidence: [source ledger](e056-platform-agnostic-core-sources.json).
 
 **Proposed direction:** make Singapore's editor engine independent of React, DOM and browser worker construction; retain the existing fast DOM renderer; build a Strict DOM host only against capabilities demonstrated on the intended native runtime. Fregat remains the compatibility contract, not collateral damage.
 
-This document preserves the detailed research, contracts and delivery units behind E056. It is not a report of implemented or passing changes. Source references resolve to pinned source URLs; the companion JSON ledger preserves all 57 source descriptions, reviewed ranges, evidence classes and research limitations. Implementation status and scheduling remain with the executable plan and the cross-project roadmap.
+This document preserves the detailed research, contracts and delivery units behind platform-agnostic core. It is not a report of implemented or passing changes. Source references resolve to pinned source URLs; the companion JSON ledger preserves all 57 source descriptions, reviewed ranges, evidence classes and research limitations.
 
-Reconciled on 2026-09-29: Plan 207 owns the move to canonical Fregat `editor/` sources and
-public mirrors. References below to sibling links, `editor-ref` and paired repositories describe
-the inspected baseline. Refresh them before implementation; package relocation and cutover
-follow 207. Plan 208 owns copy catalogs. This iOS/Android proof leaves the Swift/macOS roadmap
-and its benchmark, document, editor and shell gates with their existing owners.
+References below to sibling links, `editor-ref` and paired repositories describe
+the inspected baseline. Refresh them before implementation. This iOS/Android proof leaves the
+Swift/macOS roadmap and its benchmark, document, editor and shell gates out of scope.
 
 ## 1. Baseline and scope
 
@@ -36,7 +32,7 @@ This was connector-backed source research. Archive retrieval did not succeed, so
 
 The deliverable is one platform-neutral editor model and behavior implementation, an explicit DOM host, and an independently certified Strict DOM host. Existing browser behavior, package consumers, document identity and performance constraints are preserved through the extraction.
 
-Assume **existing web support plus an iOS/Android feasibility lane**. This does not authorize a Fregat native-app rewrite, certify native desktop platforms, replace the textbuffer, move document authority into a worker, consolidate all workers, invent another plugin framework, or implement a universal text shaper in JavaScript.
+Assume **existing web support plus an iOS/Android feasibility track**. This does not authorize a Fregat native-app rewrite, certify native desktop platforms, replace the textbuffer, move document authority into a worker, consolidate all workers, invent another plugin framework, or implement a universal text shaper in JavaScript.
 
 A portable engine is useful even if the first native gate requires additional native code. Conversely, a working read-only Strict DOM demo does not certify native editing.
 
@@ -218,7 +214,7 @@ The host owns its mounting strategy and actual measurements. Native wrapping may
 
 ### 4.5 Plugin power and portability
 
-A plugin can have portable logic, a DOM view contribution, a native view contribution and an execution service. This does not require separate competing plugin runtimes. Composition, demand registration, ordering, cancellation and disposal should follow the existing direction of Plan 122. [FG12]
+A plugin can have portable logic, a DOM view contribution, a native view contribution and an execution service. This does not require separate competing plugin runtimes. Composition, demand registration, ordering, cancellation and disposal should follow the existing composable-plugin direction.
 
 Keep full DOM access available to DOM-specific plugins. Keep native service access explicit on native. “Portable” must not mean reducing every plugin to the least common denominator. It also must not mean importing a browser library at module scope and guarding its use afterward with a platform check.
 
@@ -312,11 +308,11 @@ An IME may ask for text beyond a fixed hidden-input window. Windowing must suppo
 
 ## 7. Execution sequence: small migrations, explicit gates
 
-The units below are dependency-ordered changes, not time estimates. “Owner” names a responsibility, not an assigned person. Existing plan sequencing remains authoritative until this proposal is explicitly scheduled. A unit may contain several reviewable commits, but every merge must preserve a working DOM editor and a reproducible Fregat pairing.
+The units below are dependency-ordered changes, not time estimates. A unit may contain several reviewable commits, but every merge must preserve a working DOM editor and a reproducible Fregat pairing.
 
 ### P00 · Capture the paired baseline and complete the census
 
-**Owner:** Singapore architecture + Fregat integration. **Depends on:** nothing.
+**Depends on:** nothing.
 
 Record both actual checkout HEADs, complete dirty diffs, lockfiles, runtime versions and the linked producer build identity. Inventory all Singapore imports in Fregat and first-party packages, including dynamic imports, type-only imports, CSS, test/internal entrypoints and re-exports. Classify each as document, behavior, rendering, execution, application or tooling. Trace dependencies transitively, including declarations and module-level side effects; a grep for `document` alone is insufficient.
 
@@ -326,17 +322,17 @@ Extend the existing architecture-health inventory with portable-entrypoint depen
 
 ### P01 · Decide the minimum contracts and plan ownership
 
-**Owner:** shared architecture review. **Depends on:** P00.
+**Depends on:** P00.
 
 Write decision records for document/view/host ownership, normalized input acknowledgement, geometry availability and coordinate spaces, execution providers, host-specific contribution access and final export locations. Compare the proposed boundary against actual call sites rather than defining interfaces from imagined future hosts.
 
-Use three reference examples: a pure document command, a selection-driven decoration and a DOM-specific view contribution. Add a bounded native input example. Review CodeMirror's state/view separation and Monaco's distinct event surfaces for useful concepts; neither API inventory establishes performance guarantees or solves native text input. Final plugin-authoring choices remain coordinated with Plan 122, including its comparison experiments. [D14], [D15], [FG12]
+Use three reference examples: a pure document command, a selection-driven decoration and a DOM-specific view contribution. Add a bounded native input example. Review CodeMirror's state/view separation and Monaco's distinct event surfaces for useful concepts; neither API inventory establishes performance guarantees or solves native text input. Final plugin-authoring choices remain coordinated with the composable-plugin design, including its comparison experiments. [D14], [D15],
 
 **Exit:** every public contract has a real caller, lifecycle, error behavior and test. Unproven native requirements remain conditional instead of being hidden behind `any`. Record how overlapping changes belong to Plans 099/122. **Rollback:** revise decisions before source relocation; no new production API needs to become permanent yet.
 
-### P02 · Run the native feasibility lane early
+### P02 · Run the native feasibility track early
 
-**Owner:** native host/runtime. **Depends on:** P00; feeds P01, P05, P06 and P12.
+**Depends on:** P00; feeds P01, P05, P06 and P12.
 
 Create a small RSD test application using the exact intended native dependency set. Start with N0–N4: built-package styling, input traces, physical composition, actual selection movement and glyph geometry. It may use existing document factories or a test-only buffer driver; do not duplicate production editing algorithms to make a demo pass.
 
@@ -346,7 +342,7 @@ Record where public RSD APIs suffice, where native integration is required and w
 
 ### P03 · Establish portable source islands and compiler fences
 
-**Owner:** Singapore core. **Depends on:** P00–P01.
+**Depends on:** P00–P01.
 
 Within the current package, isolate document types, offset/range/selection types, semantic token/style data and reusable calculations. Remove accidental imports of browser metric, element, rectangle and event types from the portable closure. Keep host-specific types explicit rather than giving them misleading neutral names.
 
@@ -356,7 +352,7 @@ Add a dedicated portable compiler target using an ECMAScript library set and no 
 
 ### P04 · Extract the existing document and view-state owners
 
-**Owner:** Singapore core + Fregat transaction integration. **Depends on:** P03.
+**Depends on:** P03.
 
 Move the existing buffer/session/history/selection/edit-chain implementation into the portable boundary. Keep the public document contract and object ownership stable. Cover every mutation path: typing, batch edits, undo/redo, history checkout/clear, prepared commits, segmented sequences, compensation, clean-state changes and logical-only publication. Preserve mutation leases and external history barriers. [SG03], [SG04]
 
@@ -366,7 +362,7 @@ Replay identical operation traces through the baseline and candidate: compare re
 
 ### P05 · Separate input observation from editing policy
 
-**Owner:** input/commands. **Depends on:** P04 and P01; native-specific policy is informed by P02.
+**Depends on:** P04 and P01; native-specific policy is informed by P02.
 
 Split `InputSelectionController`: keep DOM listeners, hidden-input reads/writes, clipboard objects, drag/drop and browser selection reconciliation in the browser adapter. Move shared command/editing behavior through the existing transaction owner, including autoclose, snippets, linked edits, indentation and history grouping. Preserve the one path that updates mirrors for typed, pasted, cut, dropped and accepted text. [SG07], [SG08]
 
@@ -376,7 +372,7 @@ Introduce normalized input observations with explicit ownership and acknowledgem
 
 ### P06 · Separate projection and viewport calculations
 
-**Owner:** display/virtualization. **Depends on:** P03–P04; geometry contracts informed by P02.
+**Depends on:** P03–P04; geometry contracts informed by P02.
 
 Extract numeric row-window, row-height, overscan, scroll-anchor and source-mapping calculations from platform observation. Classify fold/inline transforms and caches by document or view lifetime. Keep DOM text nodes, resize observers, wheel handlers, platform scroll caps and actual glyph measurement in the host. [SG09], [SG10]
 
@@ -386,7 +382,7 @@ Test hidden views, variable-height rows, wrapping, folded ranges, inline replace
 
 ### P07 · Make the existing DOM renderer an explicit host
 
-**Owner:** DOM rendering/input/accessibility. **Depends on:** P05–P06.
+**Depends on:** P05–P06.
 
 Collect DOM creation, mounted rows, CSS Highlights, geometry, input placement, scrolling, browser metrics, announcements and paint capture behind the chosen host boundary. Keep the current DOM implementation rather than rebuilding it as React components. The existing `Editor` becomes a browser composition root around shared state and behavior.
 
@@ -396,27 +392,27 @@ Preserve source/peer callback ordering and the measured hidden-textarea write-be
 
 ### P08 · Isolate execution contracts from browser factories
 
-**Owner:** syntax/runtime. **Depends on:** P03–P04; coordinate with Plan 099.
+**Depends on:** P03–P04.
 
 Move `TreeSitterBackend` and portable provider/session contracts out of browser Worker implementation files. Separate the supplied-highlighter tokenizer from Shiki worker construction. Inventory minimap and language-service runtime imports, cancellation, source transport and build assets. Preserve each owner’s current restart, disposal, idle-fence and freshness semantics. [SG16], [SG18], [FG08]
 
-Do not invent a fake Worker API for every runtime or make unsupported analysis appear as a successful empty result. A native execution path gets an explicit implementation and support state. Browser shared-memory optimizations and cancellation must remain optional where designed; this unit does not independently implement Plan 099's transport migration.
+Do not invent a fake Worker API for every runtime or make unsupported analysis appear as a successful empty result. A native execution path gets an explicit implementation and support state. Browser shared-memory optimizations and cancellation must remain optional where designed; this unit does not independently implement the document-contribution design's transport migration.
 
 **Exit:** portable/native entrypoints do not evaluate browser factories; existing web worker behavior and TUI tokenizer usage are preserved. **Rollback:** restore a host-specific factory entrypoint, without reverting shared document state.
 
 ### P09 · Partition contribution types without creating another plugin framework
 
-**Owner:** extension system + feature-package owners. **Depends on:** P05–P08; coordinated with Plan 122.
+**Depends on:** P05–P08.
 
 Separate portable commands/data/providers from DOM-specific view contexts and paint/capture interfaces. Keep trusted DOM extensions powerful. Add explicit target/capability matching only where needed, with predictable unsupported-feature reporting and cleanup. Preserve current provider precedence, cached language ordering, demand-triggered ambient activation and failure containment. [SG11], [SG12]
 
-Migrate representative features before finalizing names: one command, one data decoration, one gutter or overlay, and one syntax-backed feature. Test late registration, duplicate ownership, configuration changes, reentrancy, provider failure and disposal during notification. A general catch-all update remains opt-in rather than the new default. Do not implement a second `createPlugin` universe or require the complete future Plan 122 runtime before moving the existing boundary.
+Migrate representative features before finalizing names: one command, one data decoration, one gutter or overlay, and one syntax-backed feature. Test late registration, duplicate ownership, configuration changes, reentrancy, provider failure and disposal during notification. A general catch-all update remains opt-in rather than the new default. Do not implement a second `createPlugin` universe or require the complete future composable-plugin runtime before moving the existing boundary.
 
 **Exit:** a portable extension compiles without host types; a DOM extension still accesses real DOM through its explicit surface. No extra unrelated payload construction is introduced by the migration. **Rollback:** keep the old authoring route locally until the paired public cutover; never retain two active contribution owners for one feature.
 
 ### P10 · Preserve React, prepared-open and paint handoff behavior
 
-**Owner:** React binding + Fregat presentation. **Depends on:** P07–P09.
+**Depends on:** P07–P09.
 
 Update the current React controller internally to consume the explicit browser composition root. Preserve stable controller identity, controlled option synchronization, full/none store modes, deferred disposal and incarnation/document guards. Keep DOM binding types concrete instead of widening `getEditor()` to a platform union that leaks unsafe assertions into consumers. [SG15]
 
@@ -426,7 +422,7 @@ Preserve prepared stage matching, one-time adoption and release of unclaimed liv
 
 ### P11 · Perform the paired package and consumer cutover
 
-**Owner:** release/build + Fregat integration. **Depends on:** P03–P10, all browser gates.
+**Depends on:** P03–P10, all browser gates.
 
 Create the explicit DOM package and update Singapore's feature-package imports, exports, dependencies, CSS paths, declaration output, architecture inventories and build ordering together. At this point remove browser exports from the pure core root. Do not publish a `core -> dom -> core` compatibility cycle. [SG19]–[SG22]
 
@@ -438,7 +434,7 @@ Test the actual built or packed packages from a clean consumer resolution enviro
 
 ### P12 · Build the production Strict DOM host against the shared core
 
-**Owner:** RSD/native host. **Depends on:** P02's explicit capability decision and shared boundaries from P04–P09; package wiring from P11 before release.
+**Depends on:** P02's explicit capability decision and shared boundaries from P04–P09; package wiring from P11 before release.
 
 First consume the shared semantic projection to render a bounded readonly viewport, then add real input, selection, scrolling and composition against the same document owner. The intermediate readonly milestone does not close this unit. Use the native bridge selected by the proof where necessary. Do not measure one font/style representation and paint another or promote cached native input text to document authority.
 
@@ -448,7 +444,7 @@ Add supported gutters/decorations and required syntax through proven adapters. K
 
 ### P13 · Run integrated correctness, performance and lifetime certification
 
-**Owner:** cross-project validation. **Depends on:** P11 for browser; P12 for native claims.
+**Depends on:** P11 for browser; P12 for native claims.
 
 Run the full Fregat matrix and the benchmark/lifetime protocol below. Include real ordinary files, huge line counts, huge single lines, Unicode, multiple visible views and hidden retained views. Reproduce fresh controls where the harness/hardware requires them, preserving established limits rather than resetting them to fit the candidate. Freeze and hash the entire relocated dependency closure. [SG23]
 
@@ -458,7 +454,7 @@ Native measurements use separately recorded device-specific baselines and budget
 
 ### P14 · Close the migration and publish the support contract
 
-**Owner:** maintainers/release. **Depends on:** P13 for the scope being released.
+**Depends on:** P13 for the scope being released.
 
 Remove superseded forwarding paths, duplicate ownership, temporary source-island bridges and unused exports after all consumers migrate. Keep a deliberate DOM-specific escape hatch rather than an undocumented internal escape route. Update package documentation, architecture diagrams, source inventories and the cross-project roadmap through its normal scheduling process. Keep deferred native features explicitly separate from completed headless/DOM work.
 
@@ -500,7 +496,7 @@ The current frozen-reference mechanism is core-directory-oriented. Once DOM code
 
 Enforce viewport-bounded mounted rows/chunks and geometry buffers, stable reuse where unchanged, and bounded queues/caches. Do not materialize full document text or call snapshot `toJSON()` to feed an incremental render. Cold preparation or explicit export can still materialize text where the existing contract permits it; do not claim an unrealistic global ban. [SG11], [SG13], [SG23]
 
-Instrument demand routing so an operation with no interested plugin consumers creates no new plugin payloads or callbacks attributable to the new path. Also count registration/index-maintenance overhead and affected dependency edges. “No callbacks” alone is not proof that a global selector scan is cheap. Preserve efficient existing paths without claiming the current complete plugin runtime is already selective. [SG11], [SG12], [FG12]
+Instrument demand routing so an operation with no interested plugin consumers creates no new plugin payloads or callbacks attributable to the new path. Also count registration/index-maintenance overhead and affected dependency edges. “No callbacks” alone is not proof that a global selector scan is cheap. Preserve efficient existing paths without claiming the current complete plugin runtime is already selective. [SG11], [SG12],
 
 Keep input-critical local work independent of slow derived analysis. Preserve current debounce/max-wait policy unless a separately measured change is approved. Reject stale derived results, but retain/reconcile unacknowledged input. Record queue depth and oldest-work age rather than reporting only average task time.
 
@@ -546,19 +542,19 @@ bun run verify
 
 Historical input results remain as saved evidence. Fresh collection uses the paired runner and follows the stress-runner instructions, frozen-package protocol and actual argument schema. The new headless/native/package fixtures need explicit scripts added in their owning migration units rather than guessed command names. A skipped browser/physical-device case is not a pass. [SG21], [SG23], [SG24], [FG01], [FG11]
 
-## 9. Existing plans: cooperate rather than fork ownership
+## 9. Existing designs: cooperate rather than fork ownership
 
-### Plan 099: document publication and contribution synchronization
+### Document publication and contribution synchronization
 
-Preserve its ownership of canonical publication and demand-driven source synchronization. Source-island extraction can move the **current** implementation before the proposed contribution runtime is built. If publication code is changed as part of the work, reconcile that change into Plan 099 rather than creating a parallel journal, second buffer bus or native-only revision system. [FG13]
+Preserve its ownership of canonical publication and demand-driven source synchronization. Source-island extraction can move the **current** implementation before the proposed contribution runtime is built. If publication code is changed as part of the work, reconcile that change into the document-contribution design rather than creating a parallel journal, second buffer bus or native-only revision system.
 
-Keep separate execution queues and typed feature results. Do not independently switch text transport, consolidate workers or move document authority. Its public backend cutover must still follow the prerequisite contracts named in the cross-project roadmap. This proposal does not reorder them. [FG13], [FG14]
+Keep separate execution queues and typed feature results. Do not independently switch text transport, consolidate workers or move document authority. Its public backend cutover must still follow the prerequisite contracts named in the cross-project roadmap. This proposal does not reorder them. [FG14]
 
-### Plan 122: composable full-power plugins
+### Composable full-power plugins
 
-Preserve the direction toward one authoring entrypoint, extensible composition, trusted access and selective execution. Partitioning portable and host-specific contributions is compatible with that direction; introducing another plugin runtime for RSD is not. Do not require the whole proposed authoring/runtime redesign merely to extract existing document and host boundaries. [FG12]
+Preserve the direction toward one authoring entrypoint, extensible composition, trusted access and selective execution. Partitioning portable and host-specific contributions is compatible with that direction; introducing another plugin runtime for RSD is not. Do not require the whole proposed authoring/runtime redesign merely to extract existing document and host boundaries.
 
-Both plans should share the same document/view/lifetime definitions and compatibility decisions. Pair overlapping reviews and agree on the owner of each changed contract. Keep the historical proposed-plan status distinct from implemented code throughout.
+Both designs should share the same document/view/lifetime definitions and compatibility decisions. Pair overlapping reviews and agree on the owner of each changed contract. Keep the historical proposed status distinct from implemented code throughout.
 
 ### Roadmap and release discipline
 
@@ -653,8 +649,6 @@ performed when this research was added to the repository.
 [FG09]: https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/packages/client-core/src/git/diff-files.ts
 [FG10]: https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/apps/web/src/keymap/editor-keymap.ts
 [FG11]: https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/.github/actions/setup/action.yml
-[FG12]: https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/plans/122-composable-plugins.md
-[FG13]: https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/plans/099-document-contributions.md
 [FG14]: https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/PLAN.md
 [RSD01]: https://github.com/react/react-strict-dom/blob/abd34bbf22bb468ffdc0baaf606f172c3a583487/packages/react-strict-dom/package.json
 [RSD02]: https://github.com/react/react-strict-dom/blob/abd34bbf22bb468ffdc0baaf606f172c3a583487/packages/react-strict-dom/src/native/modules/useStrictDOMElement.js

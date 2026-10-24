@@ -190,14 +190,6 @@ The migration removes Platform's former `editor-visible-snapshot.tsx` renderer, 
 
 Set performance tolerances from the baseline before implementation. A repeatable material regression in ordinary editing requires redesign. If current constructor cost prevents useful early paint, return with that measurement and a targeted design; do not silently expand this into the rejected staged lifecycle.
 
-## Implementation handoff
-
-Implement this design inside `/work/projects/platform`, including `editor/`. Scope is editor snapshot restoration and Platform integration, not the other milestones in Plan 085. Reconcile current source, the workspace install, the worktree, and the build served by the existing app before editing. Preserve unrelated work and use the running server. Store browser/profile artifacts under `/work/tmp/editor-provisional-paint/`.
-
-Start by recording the immediate-document/delayed-highlights browser case and ordinary startup/typing baseline. Then establish the native presentation boundary and implement in the order above. Keep provisional data out of document/session/line-index state, preserve synchronous construction and incremental rendering, and replace paint in one commit based on render-data readiness. Do not use a separate preview owner, second editor text tree, or document arrival as the completion signal.
-
-Complete the paired package/adapter/Platform migration and delete the superseded renderer in the same delivery. Run only the focused native, adapter, and browser checks that prove the listed behavior. Report changed files, baseline-versus-result timings, frame/minimap evidence, and any unsupported contribution or unfinished acceptance check. A typecheck alone does not complete this work.
-
 ## Workspace reload integration, 2026-09-21
 
 Native snapshot format 3 includes diff gutter/row paint and visible selection rectangles. It captures

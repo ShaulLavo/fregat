@@ -2,19 +2,19 @@
 
 ## Status
 
-- Done 2026-09-25 (completion wave, lane L5): Phases 1–4 implemented. This file was Plan 151 and is
-  kept as the design record Plan 152 builds on.
-- Live update verification pending: on an authorized remote installation, open Connect machine,
-  press Update server on the out-of-date machine, and confirm it goes live and `GET /release`
-  through its proxy names the primary's release.
-- At the 2026-09-25 planning baseline, the pending check targeted `shaul-mac` from the mesh.
-  Agent sandboxes could not reach that Mac at the time.
+Implemented: the release carries its runtime manifest, a `release` installation kind, the update
+route, and the Update server button. Development builds are covered at the end of this page.
 
-## Shared with lane L4 (Plan 148 staged restarts)
+Not yet verified live: on an authorized remote installation, open Connect machine, press Update
+server on the out-of-date machine, and confirm it goes live and `GET /release` through its proxy
+names the primary's release. The same check applies to a development primary and the `dev-…`
+build.
+
+## Shared with staged restarts
 
 - A release is `releases/<name>/` with `server/` inside; `<name>` is
   `<UTC stamp>-<commit>-<slug>`, which matches the release-name pattern `update.ts` accepts.
-- `current` and L4's `pending` are symlinks to a release directory. A bundled server's
+- `current` and the staged-restart `pending` are symlinks to a release directory. A bundled server's
   `import.meta.dirname` resolves to `<release>/server` whichever link started it, so a staged but
   unpromoted primary ships its own staged release.
 - Every release built by `install-release --server` carries `server/runtime/package.json`, `server/runtime/bun.lock`, and
@@ -30,7 +30,7 @@ copies the release over SSH, installs its handful of platform-specific runtime p
 restarts the remote server and reconnects. The same action installs the server on a machine that
 has none, so the only thing a remote needs is `bun` and SSH.
 
-## Planning baseline (2026-09-25)
+## Starting point
 
 - A server release is already self-contained JavaScript. `apps/server` `build`
   (`apps/server/package.json:22`) is `bun build src/index.ts --target bun` with only `sharp` and
@@ -43,7 +43,7 @@ has none, so the only thing a remote needs is `bun` and SSH.
   - `typescript` and `typescript-language-server/lib/cli.mjs` via `import.meta.resolve`
     (`apps/server/src/lsp/typescript/runtime.ts:22-23`).
   - `pyright` and `vscode-langservers-extracted` through `resolvePackageBinary`
-    (`apps/server/src/lsp/installers.ts:84`). Reconciled 2026-09-25: these do not resolve beside the
+    (`apps/server/src/lsp/installers.ts:84`). These do not resolve beside the
     bundle. `resolvePackageBinary` looks in the LSP download root (`~/.platform/lsp/node`), then
     `PATH`, then downloads on demand, so a release does not carry them. `pyright` is not in
     `bun.lock` at all, and `vscode-langservers-extracted` is a dev dependency.
@@ -64,12 +64,12 @@ has none, so the only thing a remote needs is `bun` and SSH.
 - Nothing copies anything to a remote. Routes are connect, disconnect, auth and events
   (`apps/server/src/machines/routes.ts`).
 - At that baseline, the Mac ran a hand-built source rig at `/Users/shaul/projects/platform-verification`
-  that is not a git checkout (Plan 150's findings, 2026-09-25): `node_modules` links to a curated
+  that is not a git checkout : `node_modules` links to a curated
   darwin install, `.verification-editor/` holds copied editor packages, and `.env` points settings,
   secrets and the workspace root at isolated paths. The Mac's global `bun link` registry maps
   `@singapore-editor/*` to a stale Editor copy. Its `bun` is `~/.bun/bin/bun` 1.4.0, the same
   version as `packageManager` here (`package.json:120`).
-- The launch script checks the protocol (Plan 150). A stale managed server is relaunched when the
+- The launch script checks the protocol . A stale managed server is relaunched when the
   checkout's own `ORCHESTRATION_WS_PROTOCOL_VERSION` matches and no other lease holds it; anything
   else fails with `machines.SSH_PROTOCOL`, whose `internal` names the expected, running and
   checkout protocols and the other-lease count. A missing installation is
@@ -81,43 +81,39 @@ has none, so the only thing a remote needs is `bun` and SSH.
 
 ## Decisions
 
-- **D1 — What travels.** Decided 2026-09-25: recommendation (completion wave). Recommended: the running server's own release directory, `server/` only.
+- **What travels.** the running server's own release directory, `server/` only.
   The web build stays on the primary (the remote serves the API; the browser loads the web from the
   primary). A production server finds its release from its own bundle path
   (`import.meta.dirname` is `<release>/server`). A development primary has no release. Its button
-  says so and points to Plan 152.
-- **D2 — Runtime packages (owner).** Decided 2026-09-25: recommendation (completion wave).
-  Recommended: deploy writes `server/runtime/package.json` into
+  says so and points to the development-build update described below.
+- **Runtime packages.** deploy writes `server/runtime/package.json` into
   each release. It lists the runtime packages above at the exact versions in `bun.lock`; `sharp` and the Claude
   SDK bring their natives as optional per-platform packages. The remote runs `bun install --production` against it.
   The alternative is to ship a platform tarball per target from this machine. That needs a
   cross-platform `bun install --os/--cpu` here, and it breaks on packages that build natives
   during install.
-- **D3 — Remote layout.** Decided 2026-09-25: recommendation (completion wave). Recommended:
+- **Remote layout.** Recommended:
   `~/.platform/server/releases/<release>/` holds the release, and `current` is a symlink swapped
   atomically. `runtime/<manifest-and-lock sha256>/node_modules` is shared by every release with the same
   manifest, so a web-only redeploy never reinstalls. Keep the running release and the one before
   it; delete older ones after a successful swap.
-- **D4 — Which launcher (owner).** Decided 2026-09-25: recommendation (completion wave).
-  Recommended: `~/.local/bin/platform-server` becomes the
+- **Which launcher.** `~/.local/bin/platform-server` becomes the
   release launcher (`kind: 'release'`). Development builds get their own channel and
-  `~/.local/bin/platform-server-dev` (Plan 152 D2). A production primary probes `platform-server`.
+  `~/.local/bin/platform-server-dev` . A production primary probes `platform-server`.
   Replacing the Mac's current launcher leaves the old rig on disk untouched;
   `bun run server:install` from it restores it.
-- **D5 — State on the remote.** Decided 2026-09-25: recommendation (completion wave). Recommended: no `.env` for a release. The server uses its defaults
-  under the remote user's `~/.platform`, the same way the mesh unit runs here. Plan 146's
-  separation of dev and prod state applies to the remote as it does locally: the dev server of
-  Plan 152 channel gets its own state directory.
+- **State on the remote.** no `.env` for a release. The server uses its defaults
+  under the remote user's `~/.platform`, the same way the mesh unit runs here. The separation of dev and prod state applies to the remote as it does locally: the development channel gets its own state directory.
 
 ## Phases
 
 ### Phase 1: A release carries its runtime manifest
 
-Done 2026-09-25 (completion wave). As built:
+As built:
 
 - `readCheckout` reads `git status --porcelain -z` untrimmed through `porcelainPaths`
   (`scripts/deploy/release.ts`, test `scripts/deploy/release.test.ts`, in `test:scripts`).
-- The shared module is `apps/server/src/installation/release-files.ts` (Plan 152 D1):
+- The shared module is `apps/server/src/installation/release-files.ts`:
   `RUNTIME_PACKAGES`, `runtimeManifest(lock)`, `writeRuntimeManifest(serverDirectory, lockfile)` and
   `missingReleaseFiles(serverDirectory)`. Deploy imports it. The list is the bundle's two
   `--external`s plus the two `import.meta.resolve` targets; `pyright` and
@@ -133,7 +129,7 @@ Done 2026-09-25 (completion wave). As built:
   self-contained.
 - A release server takes two steps: `apps/server` `build` (which also emits `remote-support.js`),
   then `writeRuntimeManifest(serverDirectory, bun.lock)`; `missingReleaseFiles` must return `[]`
-  afterwards. Plan 152's dev build repeats this sequence, so its D1 "one shared module" is
+  afterwards. The development build repeats this sequence, so its one shared module is
   `release-files.ts` plus the `build` script.
 
 1. Fix `readCheckout`'s porcelain parsing (use the untrimmed stdout, or `-z`).
@@ -149,13 +145,13 @@ Done 2026-09-25 (completion wave). As built:
 
 ### Phase 2: A `release` installation kind
 
-Done 2026-09-25 (completion wave). As built:
+As built:
 
 - `installationSchema` is a `kind` variant. A release's `directory` must end in `current`, so its
   parent is always the server root.
 - `install.ts` writes either launcher. The release launcher `cd`s to the server root and execs
   `<executable> <directory>/server/index.js` with `NODE_ENV=production`. It still writes
-  `~/.local/bin/platform-server`; moving the source launcher to `platform-server-dev` is Plan 152.
+  `~/.local/bin/platform-server`; moving the source launcher to `platform-server-dev` is the development channel below.
 - `remoteLayout(installation)` in `remote-scripts.ts` returns
   `{ workingDirectory, imports, entry, env, protocolSource }`. A release runs its launch and stop scripts in the server root
   (`~/.platform/server`), so `.platform-ssh-launch/` and `logs/` survive every `current` swap. It
@@ -179,8 +175,7 @@ Done 2026-09-25 (completion wave). As built:
 1. `installationSchema` becomes a variant: `source` (unchanged) and
    `release { directory, executable }`, where `directory` is the `current` link.
 2. `launcherSource` writes the release launcher: it execs `<executable> <directory>/server/index.js`
-   and answers `--describe`. The source launcher is unchanged (and moves to `platform-server-dev`
-   under D4).
+   and answers `--describe`. The source launcher is unchanged (and moves to `platform-server-dev`).
 3. `remote-scripts.ts`: the prelude imports `./server/remote-support.js` for a release and the
    checkout paths for source. `launch()` spawns `server/index.js` for a release (no `--env-file`).
    One helper chooses `{ importBase, entry }` by kind, so the two scripts do not fork.
@@ -231,12 +226,11 @@ Done 2026-09-25 (completion wave). As built:
    - Settings › Machines (`features/settings/components/machine-row.tsx`).
 3. A failure keeps Fix with AI beside it, as every machine error now does.
 
-## Security constraints (from Plan 150)
+## Security constraints
 
-Plan 150 closed 2026-09-25 with D1 (check at both ends of the launch), D3 (relaunch a stale server
-only when no other lease holds it) and D4 (never restart an external server) decided as recommended
-(completion wave). Its update phase was never built; these constraints carry over to Phase 3 here
-and to Plan 152.
+The launch checks the protocol at both ends, relaunches a stale server only when no other lease
+holds it, and never restarts an external server. These constraints apply to Phase 3 and to the
+development channel.
 
 - The remote command is fixed text. Only the probed installation paths and this server's own
   release directory reach execution, as validated absolute paths passed through `shellQuote`. No
@@ -267,18 +261,17 @@ and to Plan 152.
 
 ## Out of scope
 
-- Development primaries (Plan 152).
 - Shipping `bun` itself, Windows remotes, and automatic updates. Updating is always an explicit
   action.
 - The web build on the remote.
 
-## Development builds (was Plan 152, done 2026-09-25)
+## Development builds
 
 A primary running from source (`bun dev`) has no release, so Update server builds one:
 `buildWorkingTree()` (`apps/server/src/machines/dev-build.ts`) runs the `apps/server` build, copies
 `dist` to a uniquely named outgoing directory, then writes the runtime manifest and lockfile.
 All machine suppliers share one build coordinator. The artifact stays alive until every consuming
-update finishes, then it is removed. Decisions D1–D4 as recommended (completion wave):
+update finishes, then it is removed.:
 
 - **Channel.** A development build installs beside production: `~/.platform/server/dev` with its own
   `releases/`, `current`, `runtime/` and lease state, and `~/.local/bin/platform-server-dev`. A
@@ -290,6 +283,6 @@ update finishes, then it is removed. Decisions D1–D4 as recommended (completio
   `channel`, `source: 'dev-build'`, `buildMs` and `bundleBytes`; a failed build is
   `machines.SSH_UPDATE_BUILD` with the build log tail in `internal`.
 
-Live development-channel verification pending: from a development primary, Update server on an
-authorized remote goes live and its `/release` names the `dev-…` build while the production
-primary's connection keeps its production release.
+To verify live from a development primary: Update server on an authorized remote goes live, and
+its `/release` names the `dev-…` build while the production primary's connection keeps its
+production release.

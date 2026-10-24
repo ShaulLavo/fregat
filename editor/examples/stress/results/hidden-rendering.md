@@ -6,7 +6,7 @@ The ordinary fixture also registered 65 syntax ranges while hidden. Previously v
 keep detached rows in their reuse pool; the row counts below describe mounted DOM.
 
 The [baseline](hidden-rendering-before.json), [unchanged control](hidden-rendering-control.json),
-and [candidate](hidden-rendering-after.json) each contain nine samples. They reuse E001's seed
+and [candidate](hidden-rendering-after.json) each contain nine samples. They reuse the stress harness work's seed
 60061, fixture hashes, shared document with three views, and 100 insert/delete cycles.
 Each fixture starts in a fresh browser context and then runs two warm repetitions. All samples
 verify the shared edits, both visible siblings, updated text after reveal, syntax after reveal,
@@ -14,7 +14,7 @@ and disposal. Reveal changes only the host's display state.
 
 The baseline build's virtualizer, view, and row-renderer source maps match commit
 `715516cfd631b34c1922b0eba7323e036645e1b8`. Both control runs have the same built-package hash.
-The candidate includes E004's source changes. The artifacts record those hashes and the complete
+The candidate includes the hidden-rendering work's source changes. The artifacts record those hashes and the complete
 environment: Chromium 148.0.7778.96, Node 26.7.0, Intel Core i7-14700K, and Arch Linux.
 
 ## Retention and reveal cost
@@ -58,13 +58,13 @@ tracked buffer and editor objects after disposal and forced GC.
 A preceding final-build attempt stopped at the warm short-line cleanup check after four passing
 samples. That temporary check required immediate collection of every weak reference after one GC;
 the failed attempt did not publish a result, and its error did not record the survivor count.
-An unchanged rerun passed all nine samples. The final runner follows E001: active resources must
+An unchanged rerun passed all nine samples. The final runner follows stress harness: active resources must
 be zero, while weak-reference survivors remain a recorded observation. No timing sample or
 memory value in the saved comparison was replaced with an estimate or retried within a sample.
 
-The [original E001 calibration](README.md) remains provisional. It does not measure hidden rows
+The [original stress harness calibration](README.md) remains provisional. It does not measure hidden rows
 or reveal, and its ordinary churn disables syntax. This focused ordinary scenario enables
-TypeScript on all three views to measure range cleanup, so its timings cannot use E001's old
+TypeScript on all three views to measure range cleanup, so its timings cannot use the stress harness work's old
 thresholds. Worker heaps, renderer process RSS, and user-agent-specific memory remain unsupported.
 
 ## Remaining syntax work
@@ -72,7 +72,7 @@ thresholds. Worker heaps, renderer process RSS, and user-agent-specific memory r
 Empty mounted rows make `Editor.visibleSyntaxRange` and its prefetch range return `null`.
 The syntax controller therefore skips new viewport queries while hidden. Document parsing still
 runs on load and edits. Previously scheduled background warming can continue through 120,000
-character tiles because its scheduler does not check visibility. E004 suspends DOM rendering;
+character tiles because its scheduler does not check visibility. Hidden-rendering suspends DOM rendering;
 worker and background-query suspension require a separate lifecycle policy.
 
 The [runner guide](../README.md#hidden-retained-views) contains the reproduction command.

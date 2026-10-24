@@ -20,9 +20,17 @@ Every user-facing knob is a registry entry in `packages/contracts/src/settings/k
 
 [Filesystem boundaries](filesystem-boundaries.md) covers ordinary editor access, the optional server root restriction, and the separate permissions agents run under.
 
-## Prerequisites
+## Requirements
 
-Use Node.js 26.0.0 or newer and the Bun version pinned by `packageManager` in the root manifest. Tree-sitter and native Markdown parsing require `WebAssembly.Memory.prototype.toResizableBuffer()`. Their runtime floors are Node 26.0.0, Bun 1.2.22, Chromium 144, Firefox 145, and Safari 26.2.
+Install Node.js 26.0.0 or newer, because the editor parsers need resizable WebAssembly memory, and Bun 1.4.4. Bun 1.4.4 is the version the root `package.json` pins in `packageManager`, and CI installs Bun from that field, so use it to get the lockfile and test results CI gets. To use the browser app, use Chromium 144, Firefox 145 or Safari 26.2 or newer.
+
+The version floors in this repository come from three places:
+
+- **A checkout** (`engines`, `packageManager`): Node 26.0.0 and Bun 1.4.4. Tree-sitter and native Markdown parsing need `WebAssembly.Memory.prototype.toResizableBuffer()`.
+- **`@singapore-editor/tree-sitter`, `@singapore-editor/tree-sitter-languages` and `@singapore-editor/markdown`** (`engines`): Node 26.0.0 and Bun 1.2.22, for the same API. Browsers need Chromium 144, Firefox 145 or Safari 26.2.
+- **[`@workspace/pty`](../packages/pty/README.md)** (`engines`): Bun 1.3.14, because earlier Bun versions segfault on failed spawns.
+
+The package floors are minimums for that package alone. A checkout needs the pinned Bun.
 
 Editor package tests use Node through Vitest's shebang. `bun run test` starts the package script with Bun's script runner and leaves that Node child on `PATH`. Language catalog generation and the runtime identity fixture also launch `node` explicitly. Install Node 26 before running these checks.
 
@@ -40,8 +48,8 @@ Relative selection follows a moved checkout. The installer preserves existing cu
 
 ## Workspace libraries and native hosts
 
-The Linux desktop host requires Zig 0.17.x, `pkg-config`, and WebKitGTK 4.1 development headers.
-The macOS host requires Swift 6 and the macOS SDK from the Xcode command-line tools.
+The Linux desktop host is written in Zig and links WebKitGTK, so it requires Zig 0.17.x, `pkg-config`, and WebKitGTK 4.1 development headers.
+The macOS host is written in Swift with AppKit and WebKit, so it requires Swift 6 and the macOS SDK from the Xcode command-line tools.
 `bun run --cwd apps/desktop build:native` builds the host for the current platform. Linux uses
 `zig translate-c` to generate library declarations, then compiles the Zig host with safety checks.
 The macOS build compiles the Swift host with AppKit and WebKit, targeting macOS 11 and later.
@@ -101,14 +109,6 @@ The updater normalizes checkout paths and records the median duration per file. 
 
 Editor retains `--concurrency=1` and the existing Core and Stress cache settings. In run 37149185179, Core reported 117.81 seconds, Textbuffer 54.30 seconds, and Stress 36.00 seconds. A parallelism experiment must bound Vitest workers and keep browser-sensitive tasks serialized, then compare execution and reliability at the same commit.
 
-## Optional Mesh dev server
-
-Mesh is an optional tool of the owner's. Contributors do not need it. On a machine that has Mesh, `bun run dev:serve` registers the dev pair as a Mesh route named `:5173`. Mesh holds ports 5173 and 3001 and proxies them to 15173 and 13001, where `bun run dev:upstream` binds Vite and the API on `127.0.0.1`.
-
-The first connection starts the pair and holds requests until both ports answer. An open tab counts as use. After nothing has connected for `developer.devServerIdleMinutes` (15 by default), Mesh stops the pair. Run `dev:serve` again after you change that setting.
-
-`mesh serve stop :5173` restarts the pair on the next connection. Use it to pick up a changed export map or a relinked checkout. `bun run dev` beside the route stops with an error that names the route, and never starts a second copy on another port. `bun run dev:unserve` removes the route. `bun run desktop:dev` opens the shared routes through the launcher. It waits for readiness, and it leaves the API, Vite and shared terminals running when its window closes.
-
 ## Desktop app
 
 The launcher automatically selects Fregat’s native WebKit window on macOS and prefers an installed Chrome app on Linux. An explicit browser executable selects the installed Chromium path. Transparent-window mode selects the native host under automatic selection. Installed browser apps work from their OS shortcuts with no launcher or injected bridge running; native hosts retain their own window transport.
@@ -130,6 +130,8 @@ Package publishing is separate: `bun run release` is the Package releases workfl
 
 ## Pairing another device
 
+[Reach Fregat from a phone or another computer](remote-access.md) has the steps for getting the server to another device. This section covers pairing itself.
+
 A browser on another device, such as a phone reaching the machine over the tailnet, shows a pairing screen naming the machine until it is paired. Make a code on the machine or on any paired device in Settings › Machines › Pair a device, then scan it or type it on the new device.
 
 With no paired browser at hand, run the pair command on the machine, over SSH for example. In an installed release, run `bun current/server/pair.js` from the release folder: `server.releaseRoot`, by default `~/.local/share/fregat/releases` on Linux and `~/Library/Application Support/Fregat/releases` on macOS; an `install-release` installation uses its `productionRoot`. In a checkout, `bun run pair` runs the same command. It asks the server at the `server.address` setting over loopback (`--address=http://127.0.0.1:<port>` picks another server) and prints the code, plus a link when the server is served at an address other devices reach. A code works once, for 5 minutes.
@@ -142,7 +144,19 @@ Other requests use pairing, including proxy requests without `X-Forwarded-For`. 
 
 HTTP requests and WebSocket upgrades use the same captured socket provenance. An SSH machine relay pairs its own device through the authenticated tunnel and keeps the destination credential in server memory. Reconnecting after a source restart replaces that source server’s previous relay device and closes its old sockets; the device list names the relay’s source machine. SSH aliases for one destination share the credential. A destination’s device-admission rejection renews it once; WebSocket relays check admission before upgrading. Both HTTP and WebSocket relays present that credential, while browser credentials stay on the source machine. Destination `Set-Cookie` headers stay off the source browser. A hop marker alone grants no device access.
 
-## Optional local release installation
+## Owner-only setup
+
+This section describes the maintainer's own machine: Mesh routing, user systemd services and a deploy target in the private production settings. Contributors do not need any of it, and no repository command or test depends on it. `bun run dev`, `bun run verify` and `bun run build-release` work without it.
+
+### Mesh dev server
+
+On a machine that has Mesh, `bun run dev:serve` registers the dev pair as a Mesh route named `:5173`. Mesh holds ports 5173 and 3001 and proxies them to 15173 and 13001, where `bun run dev:upstream` binds Vite and the API on `127.0.0.1`.
+
+The first connection starts the pair and holds requests until both ports answer. An open tab counts as use. After nothing has connected for `developer.devServerIdleMinutes` (15 by default), Mesh stops the pair. Run `dev:serve` again after you change that setting.
+
+`mesh serve stop :5173` restarts the pair on the next connection. Use it to pick up a changed export map or a relinked checkout. `bun run dev` beside the route stops with an error that names the route, and never starts a second copy on another port. `bun run dev:unserve` removes the route. `bun run desktop:dev` opens the shared routes through the launcher. It waits for readiness, and it leaves the API, Vite and shared terminals running when its window closes.
+
+### Local release installation
 
 `bun run install-release` is an optional Linux integration with Mesh and user systemd. It builds first by default; `--from=<release-directory>` installs a previously built release. Installation additionally needs `mesh`, `systemctl`, `df`, Node and Playwright Chromium. This integration owns `platform-prod.service` on loopback port 3301. Run it on the machine serving the configured target.
 

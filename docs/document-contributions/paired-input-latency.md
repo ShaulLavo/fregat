@@ -2,7 +2,7 @@
 
 ## Current qualification, 2026-10-05
 
-Plan 099 units 2–7 are Approved and integrated in [PR #787](https://github.com/ShaulLavo/fregat/pull/787).
+Document contributions units 2–7 are integrated.
 The final comparison uses untouched main `51d2a71ae`, candidate `9e773c8fa`, measurement
 `b615d5ab`, and validation `e76f680d`, with equal external dependencies. Fresh input, frame,
 detection-floor, and native controls pass. The quiet default passes 216 blocking comparisons
@@ -10,7 +10,7 @@ in 566.201 seconds. The complete matrix passes 972 required and 1,080 raw compar
 exact replay and complete cleanup.
 
 The full command takes 2,798.161 seconds, exceeding its 2,700-second tooling target by 98.161.
-The runtime miss remains a benchmark follow-up after the owner's cost concern. It does not
+The runtime miss remains a benchmark follow-up because of its cost. It does not
 invalidate the completed comparisons or require a full rerun. App-only changes use affected
 app checks while unchanged SDK evidence remains valid.
 
@@ -19,7 +19,7 @@ the production sampler, current-source checks, and complete cleanup. In its two 
 pairs, consumer readiness falls from 10,157 and 10,090.6 ms to 1,813.7 and 1,787 ms. Actual latest
 Tree-sitter requests are sent about 8,868 ms after the last input in the baseline and about
 16 ms afterward in the candidate. Matching worker replies and final current output pass in
-both arms. Independent review accepts this bounded cross-domain readiness improvement.
+both arms. This is a bounded cross-domain readiness improvement.
 
 The experiment keeps its separate diagnostic identity `7e2a4be7`; it does not replace production
 input acceptance. Earliest source-tagged token application and visible-paint timing remain
@@ -32,15 +32,13 @@ seconds. Thirteen selected keys across eleven groups complete ten identical-cand
 each in 893.648 seconds. Two selected and two auxiliary native Undo verdicts reject identical
 source, compiled bytes, and dependencies on both arms. The original zero-rejection predicate
 remains false, with source/output, actual CPU-affinity, and cleanup checks passing. These are
-benchmark reliability findings. They remain follow-ups rather than a Plan 099 delivery blocker;
+benchmark reliability findings. They remain follow-ups rather than a delivery blocker;
 the actual changed-code comparisons keep their original budgets and passing verdicts.
 
 App typing passes after complete summary accounting fixes early-event eviction from its bounded
 trace. Scroll timing limits pass, while its 270-range cap rejects the untouched baseline and
 candidate at exactly 354 matching current ranges. No detached, foreign, or duplicated ranges
-occur in the matched capture. [Issue #818](https://github.com/ShaulLavo/fregat/issues/818) preserves
-that invalid reference and original failure. [Issue #820](https://github.com/ShaulLavo/fregat/issues/820)
-preserves the four identical-build control flags. Final app revision `b20cf82db` completes the
+occur in the matched capture. A tracked issue preserves that invalid reference and original failure; another preserves the four identical-build control flags. Final app revision `b20cf82db` completes the
 shared-observer refresh: all three calibrations, derived open, typing, and scroll timing pass.
 Its 120 measured prepared-300 samples begin no transferable work after activation. The known
 range-count failure remains red. Broader loaded matrices and repeated historical negative
@@ -48,7 +46,7 @@ matrices remain follow-ups, with no credit for uncollected results.
 
 ## Archived qualification
 
-Plan 282 implements the paired replacement for Plan 099 units 2–7. The follow-up uses historical budgets with a declared 5 ms loaded Tree-sitter blocking floor and temporarily excludes the known minimap undo source failure from acceptance, as directed by the owner. Corrected-identity controls pass; actual default completes in 855.026 seconds and passes 215/216 blocking keys. The one Platform applied-undo rejection remains unclassified: either a real #224 large-file undo cost or noise. The coordinator approves shipping this result with that open key and follow-ups recorded; the runner's failing verdict stays unchanged. Full timing and expanded loaded proofs remain follow-ups. The owner approved units 2–7 on 2026-10-04; their latency prerequisite remains pending. The runner compares two frozen Editor package sets in one Chromium session. Every complete two-pair block runs each side first once, with reproducible randomized order per key.
+The paired instrument replaces the absolute-threshold matrix for document contributions units 2–7. The follow-up uses historical budgets with a declared 5 ms loaded Tree-sitter blocking floor and temporarily excludes the known minimap undo source failure from acceptance. Corrected-identity controls pass; actual default completes in 855.026 seconds and passes 215/216 blocking keys. The one Platform applied-undo rejection remains unclassified: either a real large-file undo cost from the prerequisite core change or noise. This result shipped with that open key and the follow-ups recorded; the runner's failing verdict stays unchanged. Full timing and expanded loaded proofs remain follow-ups. Units 2–7 started on 2026-10-04; their latency prerequisite remains pending. The runner compares two frozen Editor package sets in one Chromium session. Every complete two-pair block runs each side first once, with reproducible randomized order per key.
 
 ## Run the comparison
 
@@ -70,7 +68,7 @@ Freeze matching `src`, `dist`, manifests, and external dependencies with `editor
 
 ## Verdict
 
-Each configuration has 36 fixture, view, and scenario groups. Each group reports three blocking measures and one advisory screenshot-duration measure. The runner preserves the native-event capture boundaries, text and revision checks, changed pixels, consumer worker proofs, and context cleanup from PR #224.
+Each configuration has 36 fixture, view, and scenario groups. Each group reports three blocking measures and one advisory screenshot-duration measure. The runner preserves the native-event capture boundaries, text and revision checks, changed pixels, consumer worker proofs, and context cleanup from the prerequisite core change.
 
 For each repetition, the statistic is candidate p95 minus baseline p95. The reported difference is the median of these paired differences. A deterministic percentile bootstrap resamples whole repetitions 10,000 times and reports a 95% confidence interval. Input operations within one repetition remain together.
 
@@ -92,7 +90,7 @@ One initial ordinary-code lifecycle warms Playwright's two execution worlds and 
 
 ## Sensitivity and fixtures
 
-The first run of a measurement instrument collects two named native candidate/candidate controls. A 20 ms pause before Editor handling must reject all 72 input-stage keys. A separate 20 ms pause inside each rAF callback must reject 35 frame-stage keys. Native `ordinary/multiple/repeat/inputToFrame` keeps its frozen 15.2 ms budget and records a separate detection-floor proof: test 25 ms, then 30 ms only if needed, and stop at the first rejection. A failure at 30 ms blocks the cache. Both full raw comparisons are stored under `/work/tmp/plan-282/sensitivity/<measurement-hash>.json.gz`. Later runs recompute both verdicts. Every native control interval remains blocking with its original budget.
+The first run of a measurement instrument collects two named native candidate/candidate controls. A 20 ms pause before Editor handling must reject all 72 input-stage keys. A separate 20 ms pause inside each rAF callback must reject 35 frame-stage keys. Native `ordinary/multiple/repeat/inputToFrame` keeps its frozen 15.2 ms budget and records a separate detection-floor proof: test 25 ms, then 30 ms only if needed, and stop at the first rejection. A failure at 30 ms blocks the cache. Both full raw comparisons are stored under `<report-directory>/sensitivity/<measurement-hash>.json.gz`. Later runs recompute both verdicts. Every native control interval remains blocking with its original budget.
 
 The instrument has two identities. The **measurement hash** covers every source except the two explicitly validation-only modules, plus external dependency bytes, Chromium version and runner version. It includes capture/marks/injection, sampling/order/stopping, bootstrap/statistics, budgets, fixtures/operations, consumer policy, readiness fences, worker interception and browser/runner launch. Unknown files belong to measurement. The **validation hash** covers `input-output.mjs` and `src/input-output.ts`: output/source correctness predicates and their post-interval receipt readers. A combined instrument hash records both identities in raw runs.
 
@@ -102,25 +100,25 @@ Default fixtures are ordinary TypeScript, 500,000 short comment lines, and a one
 
 ## Historical reference
 
-PR [#224](https://github.com/ShaulLavo/fregat/pull/224) accepted five configurations at source revision `56c8e77fb216232116c5acc714bd697d26633bb2`. Their accepted calibration artifacts record instrument hash `b0feb67fd9ed6a23ed31cdf3da9dee8c812fce28de42e34e58be3624e79b8c82`. Its accepted candidates passed all 108 blocking groups. Each delayed negative failed 47 blocking groups, including all 36 dispatch groups. `tree-sitter-shiki` failed its independent holdout. Four other configurations were unrun. That record does not establish full-matrix acceptance.
+The prerequisite core change accepted five configurations at source revision `56c8e77fb216232116c5acc714bd697d26633bb2`. Their accepted calibration artifacts record instrument hash `b0feb67fd9ed6a23ed31cdf3da9dee8c812fce28de42e34e58be3624e79b8c82`. Its accepted candidates passed all 108 blocking groups. Each delayed negative failed 47 blocking groups, including all 36 dispatch groups. `tree-sitter-shiki` failed its independent holdout. Four other configurations were unrun. That record does not establish full-matrix acceptance.
 
 The frozen products are `packages-{baseline,candidate}-x3` for native, disabled, Tree-sitter, and minimap. Shiki uses `packages-{baseline,candidate}-prereq-213-215-x3`, with identical historical worker-teardown and Shiki line-limit prerequisites on both sides. Their external receipt is `a71e25fffb81a474bf8eb5434213af2def69582fce1fa4ffeae9d71cdb0ab893`.
 
-The original non-prerequisite package receipts resolve internal links through removed historical worktrees. Validation copies their unchanged product bytes to `/work/tmp/plan-282/` and relocates those links. External payloads come from the surviving prerequisite worktrees, with the same recorded external hash. The archived package sets are untouched.
+The original non-prerequisite package receipts resolve internal links through removed historical worktrees. Validation copies their unchanged product bytes to `<report-directory>` and relocates those links. External payloads come from the surviving prerequisite worktrees, with the same recorded external hash. The archived package sets are untouched.
 
-Historical raw results, receipts, method snapshots, and stopped attempts remain under `/work/tmp/fregat-evidence/foundations-documents/native-input/` and `/work/tmp/foundations-documents-calibration/`. The accepted matrix is `/work/tmp/fregat-evidence/foundations-documents/native-input/runs-exclusive-56c8e77fb/`. The old delayed-check files supply the exact 47 failed keys used for agreement checks.
+Historical raw results, receipts, method snapshots, and stopped attempts remain under `<report-directory>/native-input/`. The accepted matrix is `<report-directory>/native-input/runs-exclusive-56c8e77fb/`. The old delayed-check files supply the exact 47 failed keys used for agreement checks.
 
 ### Historical limits and product prerequisites
 
-The combined Tree-sitter/Shiki holdout missed one blocking key, `ordinary/multiple/undo/inputToApplied`: 2.7 ms against a 2.3 ms limit. The saved [causal report](/work/reports/foundations-wave-2026-09-30/calibration-ts-shiki-holdout-causal.md) attributes diagnostic gaps to rendering and occasional major GC; the specific queued holdout inputs were not reproduced under tracing. The planned phase sweep was never run.
+The combined Tree-sitter/Shiki holdout missed one blocking key, `ordinary/multiple/undo/inputToApplied`: 2.7 ms against a 2.3 ms limit. The saved causal report attributes diagnostic gaps to rendering and occasional major GC; the specific queued holdout inputs were not reproduced under tracing. The planned phase sweep was never run.
 
-Shiki’s historical long-line and busy-worker-disposal failures led to [#213](https://github.com/ShaulLavo/fregat/pull/213) and [#215](https://github.com/ShaulLavo/fregat/pull/215). The accepted Shiki package sets include the same prerequisite patches on both sides. The archived over-tier Tree-sitter undo finding and highlight-query range failure do not establish unpaused analysis performance or resolve those findings. The [wave handoff](/work/reports/foundations-wave-2026-09-30/handoff.md) retains their disposition.
+Shiki’s historical long-line and busy-worker-disposal failures led to two prerequisite patches. The accepted Shiki package sets include the same prerequisite patches on both sides. The archived over-tier Tree-sitter undo finding and highlight-query range failure do not establish unpaused analysis performance or resolve those findings.
 
 Headless Chromium frame timing is an observable, not physical display latency. Worker/WASM memory and language-server performance are outside this instrument. The new supported-tier short-lines fixture activates analysis that the old over-tier fixture paused, so verdict agreement is not byte-identical-workload equivalence.
 
 ## Follow-up validation
 
-Archived warm evidence for instrument `5929738e…` is under `/work/tmp/plan-282/run-20261001T153544Z-sol/floor-controls/`. New split-identity runs use `../split-controls/`. The frozen products and all budgets are unchanged. The owner selected separate controls for the input and frame stages on 2026-10-01. All 108 measures remain blocking.
+Archived warm evidence for instrument `5929738e…` is under `<report-directory>/run-20261001T153544Z/floor-controls/`. New split-identity runs use `../split-controls/`. The frozen products and all budgets are unchanged. Separate controls were selected for the input and frame stages on 2026-10-01. All 108 measures remain blocking.
 
 ### Archived counterbalanced controls and reliability
 
@@ -199,7 +197,7 @@ Loaded disabled also passes unchanged and rejects all 72 input, 36 frame and exa
 
 Loaded Tree-sitter rejects three blocking undo measures after 1,126.549 CLI seconds: ordinary/single applied median +1.3 ms against 0.7 ms, interval `[1.2, 1.5]`; ordinary/single dispatch +1.3 ms against 0.8 ms, interval `[0.000000015, 1.4]`; ordinary/multiple dispatch +1.3 ms against 0.8 ms, interval `[0.3, 1.4]`. Four advisory rejections do not gate. Thirty-nine receipts show eight live workers, all stopped and awaited. The positive artifact is preserved in `../split-controls/tree-sitter-warm-loaded.json.gz`; negatives and remaining configurations are held while diagnosing it. Historical quiet accepts do not establish a verdict on this same-core loaded configuration.
 
-The failed run's measured single/undo order is candidate-first in all three pairs; multiple/undo is baseline-first, candidate-first, baseline-first. A shared RNG also makes a later key's order depend on how many pairs earlier adaptive groups collected. The owner requested a candidate-first page-creation swap, followed by baseline/baseline undo-only replay of the failed order. Both diagnostics have separate identities and explicitly exclude acceptance; they collect or reuse no sensitivity controls.
+The failed run's measured single/undo order is candidate-first in all three pairs; multiple/undo is baseline-first, candidate-first, baseline-first. A shared RNG also makes a later key's order depend on how many pairs earlier adaptive groups collected. A candidate-first page-creation swap, followed by baseline/baseline undo-only replay of the failed order. Both diagnostics have separate identities and explicitly exclude acceptance; they collect or reuse no sensitivity controls.
 
 The full page-creation swap passes all 108 blocking measures in 1,149.188 CLI seconds. The three affected medians become +0.9 ms applied with `[0, 1.0]`, +0.1 ms single-view dispatch with `[-0.1, 0.3]`, and -0.4 ms multiple-view dispatch with `[-3.4, 0.7]`. Its actual single-view undo order changes to baseline-first, baseline-first, candidate-first because preceding adaptive groups consume different RNG counts. The result does not isolate creation order from pair order. Forty receipts retain eight live workers; cleanup stops and awaits every worker, and the direct PID check finds none. Measurement identity is `b1b6170bbbacaffbaa188a2a763b174fbeaa2bcb32b290767c5ffaee4129096e`. Raw comparison is `../swap-diagnostic/swap-comparison.json`.
 
@@ -213,7 +211,7 @@ A direct product audit confirms that the required historical baseline/candidate 
 
 The 1,126.549 seconds includes 240 bursts, comprising 168 measured and 72 warmup samples. Opening readiness consumes 517.270 seconds, final consumer/source settlement 417.573 seconds, priming/source readiness/screenshots 102.904 seconds, and input/paint 36.821 seconds. Fixture attachment is 35.684 seconds, bootstrap 1.632, memory/release 3.464, other configuration overhead 1.688, and outer CLI setup 9.512. Short-lines/multiple alone contributes 463.848 seconds opening and 328.065 seconds final settlement; its undo group totals 280.451 seconds. Measured reset calls themselves total 1.970 seconds. These are repeated readiness fences, with no terminal readiness timeout or CLI retry. The accounting includes warmups and is saved in `../split-controls/tree-sitter-loaded-wall-accounting.json`.
 
-Actual default and full warm matrix wall times remain pending. At this archived checkpoint the default still included Platform plus declared/inferred affected configurations; full executed all ten configurations. The owner requested measured default-composition options after the diagnosis because loaded Tree-sitter alone exceeds 15 minutes. The smaller defaults are subsequently adopted in the shared-analysis checkpoint below.
+Actual default and full warm matrix wall times remain pending. At this archived checkpoint the default still included Platform plus declared/inferred affected configurations; full executed all ten configurations. Measured default-composition options were requested after the diagnosis because loaded Tree-sitter alone exceeds 15 minutes. The smaller defaults are subsequently adopted in the shared-analysis checkpoint below.
 
 The quiet Tree-sitter unchanged comparison passed in 746.498 seconds, including 741.339 seconds inside the configuration. Its measured short-lines/multiple samples spent 425.123 seconds across both sides. Opening readiness consumed 225.517 seconds and final settlement 160.973 seconds; captured input and paint consumed 4.797 seconds. Reset itself took 0.441 seconds. These sums exclude warmups and fixture attachment. Frozen `syncText` already applies the minimal replacement, and source epochs remain fixed during these bursts. Three retained view sessions perform the supported-tier syntax work. Retaining owners removes construction cost, but it cannot remove source-current settlement or change the frozen syntax products.
 
@@ -231,7 +229,7 @@ With `--pending-minimap-source`, only an observed false final source receipt in 
 
 ## Archived cold follow-up validation
 
-The owner directed three corrections after the first draft: freeze historical budgets, exclude minimap acceptance pending its separately owned correctness fix, and finish native/Tree-sitter/Shiki validation and default/full timing. New evidence is under `/work/tmp/plan-282/fixed-budgets/`; the initial draft evidence below is preserved.
+Three corrections followed the first run: freeze historical budgets, exclude minimap acceptance pending its separately owned correctness fix, and finish native/Tree-sitter/Shiki validation and default/full timing. New evidence is under `<report-directory>/fixed-budgets/`; the initial evidence below is preserved.
 
 ### Quiet and same-core loaded agreement
 
@@ -253,7 +251,7 @@ Use `--pending-minimap-source` only while validating the historical products wit
 
 ### Cost evidence and receipt reuse
 
-An isolated unchanged-product short-lines undo probe measured 3.8–4.4 seconds per sample. Input and paint took approximately 125 ms; opening consumers took 1.2–1.7 seconds, priming and its screenshot approximately 1.5 seconds, and final consumer settlement approximately 956–967 ms. Memory and cleanup took approximately 112–116 ms. The initial evidence is `/work/tmp/plan-282/profile-sample.log`.
+An isolated unchanged-product short-lines undo probe measured 3.8–4.4 seconds per sample. Input and paint took approximately 125 ms; opening consumers took 1.2–1.7 seconds, priming and its screenshot approximately 1.5 seconds, and final consumer settlement approximately 956–967 ms. Memory and cleanup took approximately 112–116 ms. The initial evidence is `<report-directory>/profile-sample.log`.
 
 The follow-up reuses the accepted final readiness receipt for the correctness assertions, removing a second full-source replay after polling. Per-sample phase durations are saved in raw results. The first fixed-three-pair default matrix passed with the pending minimap exception, but took 1,659.575 seconds (27 min 39.575 s), including 1,514.827 seconds for Platform. Sensitivity was cached. Multi-view short-lines samples spent about 13 seconds opening consumers and another 4–6 seconds settling them. Native input and paint took about 0.1–0.27 seconds. Repeated cold consumer setup and supported-tier analysis dominate the cost.
 
@@ -269,7 +267,7 @@ The real default command is `--configurations native --pending-minimap-source`, 
 
 ## Initial draft validation
 
-The first draft was not accepted. Results and logs are written under `/work/tmp/plan-282/`.
+The first run was not accepted. Results and logs are written to `<report-directory>`.
 
 ### Frozen minimap undo blocker
 
@@ -342,7 +340,7 @@ Eight owned CPU-load workers were pinned one per CPU 8–15, the same affinity a
 the benchmark. Each alternated approximately 5 ms arithmetic and 5 ms sleep. Their final measured
 CPU use was 48.1–48.5% each. The heavy-job reservation held all three slots. All owned workers
 were stopped after collection. Raw matrices, load receipts, exact-key comparison, and isolated
-minimap captures are in `/work/tmp/plan-282/final-diagnostics/`.
+minimap captures are in `<report-directory>/final-diagnostics/`.
 
 The loaded native negative misses both `ordinary/{single,multiple}/composition-update/inputToFrame`
 keys. The single-view effect is 12.0 ms with interval `[6.3, 29.5]` ms and budget 17.7 ms. The
@@ -373,8 +371,7 @@ contract tests and repository checks do not substitute for this acceptance gate.
 Final acceptance requires unchanged candidates to pass and delayed candidates to reject all
 historical failed keys on native, disabled, Tree-sitter, Shiki, and minimap, both without background
 load and with load on the benchmark's CPUs. Default and full wall times include package verification
-and builds. Plan 099 units 2–7 remain gated. This implementation is delivered as a draft PR and is
-not an accepted replacement gate. No app UI or server code changed; deployment and app `look`
+and builds. Document contributions units 2–7 remain gated. This implementation is not an accepted replacement gate. No app UI or server code changed; deployment and app `look`
 verification were skipped.
 
 ### Declared loaded Tree-sitter policy, 2026-10-02
@@ -402,7 +399,7 @@ was prepared but never launched after its estimated 110–170-minute cost was re
 rule was rejected because its 20 demotions included 17 historical negatives. All 47 historical
 negative keys remain blocking and must reject their real 20 ms stage delay under the new floor.
 
-Plan 282 lists all 61 affected margins and the evidence. Fresh native controls pass under this
+The record lists all 61 affected margins and the evidence. Fresh native controls pass under this
 identity. The real input delay rejects 72/72 synchronous keys at 20 ms; the real frame delay rejects
 36/36 frame keys at 20 ms. The named frame key also rejects at 25 ms, so 30 ms is skipped. Its
 20 ms frame median is 87.8 ms, interval [68.3, 89.8], against the unchanged 15.2 ms budget.
@@ -443,7 +440,7 @@ The three actual CLI stages total 4,884.844 seconds (81.4 minutes). Remaining cu
 agreement and default/full matrix wall times are pending; earlier receipts earn no current-identity
 credit.
 
-The approved next policy extends loaded floor/default omission to `tree-sitter-shiki`,
+The next policy extends loaded floor/default omission to `tree-sitter-shiki`,
 `tree-sitter-minimap`, `all` and `platform` after the current standalone stages. Each inherits
 native budgets and raises 62 blocking margins, including 17 sub-ms margins. All 540 keys across
 the five configurations remain blocking, with 309 raised margins. Platform remains in quiet
@@ -452,7 +449,7 @@ previous mandatory loaded inclusion because it carries Tree-sitter readiness wor
 contention noise. Standalone runs have cost about 18 minutes; individual composition costs are
 unmeasured. Source changes will require fresh sensitivity controls under a new identity.
 
-The frozen prerequisite #224 pair changes executable core products used by every configuration.
+The frozen prerequisite core pair changes executable core products used by every configuration.
 Its actual quiet default therefore selects all ten configurations. The 15-minute target applies
 to this matrix, and a miss requires measured cut variants. Selecting only configurations with
 differing products removes none. The runtime-dependency audit records the public import chain
@@ -462,7 +459,7 @@ audit, not per-module paths. Evidence is `../loaded-floor/runtime-product-depend
 ### Composition floor and pre-input source readiness
 
 The composition policy is implemented for all five worker-backed Tree-sitter configurations.
-Loaded default is now native, disabled, Shiki, minimap and Shiki/minimap for the #224 core pair.
+Loaded default is now native, disabled, Shiki, minimap and Shiki/minimap for the prerequisite core pair.
 Quiet default and full membership remain all ten. The narrow paired/policy suite passes 140 tests.
 
 The first actual inferred-default attempt failed before completing its first Platform group.
@@ -485,7 +482,7 @@ Consolidated measurement identity is
 `3c9a18ed47822568315cc513dd51b54d16cfd12a8091742fb5a7f2f168dcb203`; validation remains
 `9f0b90934c620bae2d7aeeab8565d11c1adb5c74a58a3d6805f09cb1ce7dc156`, combined instrument is
 `f4126d66e9d2da847266c5c1ba761ae21f559f463875be8ea287abf580101fa0`. Source checkpoint
-`26b4c99b195c4424240e3e75dd755911c001e762` is pushed to draft PR #247. All commit hooks pass;
+`26b4c99b195c4424240e3e75dd755911c001e762` is pushed. All commit hooks pass;
 recomputing identity after their fixes confirms unchanged measurement and validation hashes.
 
 Fresh controls pass under `../composition-floor/`. Input 20 ms rejects 72/72 synchronous keys in
@@ -502,9 +499,9 @@ cache verification recomputes all raw comparisons. Evidence is `fresh-controls-s
 `fresh-controls-details.json` and `validation-quiet-native-positive.json` in `../composition-floor/`.
 
 After complete cache, receipt and source-identity verification, the actual quiet inferred default
-started at 2026-10-02T00:51:56.382Z. It used the #224 prerequisite pair, all ten inferred
+started at 2026-10-02T00:51:56.382Z. It used the prerequisite core pair, all ten inferred
 configurations, no configuration override, unpinned affinity and no intentional CPU workers.
-The coordinator stopped it after three completed configurations, already over 15 minutes.
+It was stopped after three completed configurations, already over 15 minutes.
 Platform, native and disabled each pass all 108 blocking keys in 694.244, 77.516 and 84.219
 configuration seconds. Tree-sitter is partial. Last log activity is 1,247.493 seconds after
 launch; this is a stopped-run observation, not a completed CLI wall time. No outer matrix or
@@ -523,7 +520,7 @@ opening seconds and 86.963 of 90.641 post-input seconds. Thus the dominant readi
 inside owner settlement; full-source proof replay is a smaller residual. Evidence is
 `default-complete-phase-accounting.json` and `platform-readiness-owner-vs-wall.json`.
 
-The approved next sequence is to identify what those owner waits block on and report the cause
+The next sequence is to identify what those owner waits block on and report the cause
 before changing measurement code, then measure the actual declared Platform+native CLI as the
 candidate default. Platform includes the shipping Tree-sitter/Shiki/minimap composition; the
 other compositions supply attribution in full. No timing for that candidate scope is projected
@@ -566,13 +563,13 @@ discovery before returning the edit acknowledgement; timing is recorded as
 `treeSitter.injectionDiscovery`. Locations are the prerequisite products' `tree-sitter/dist/assets/
 treeSitter.worker-BpGck7-d.js`, around `editDocument` (line 4218), the updated-layer construction,
 and injection query matches (lines 4807–4813). Evidence is
-`/work/tmp/plan-282/run-20261001T153544Z-sol/composition-floor/platform-fence-details.json`
-and `platform-fence-details-summary.json`. This is separately owned Editor work; Plan 282
+`<report-directory>/run-20261001T153544Z/composition-floor/platform-fence-details.json`
+and `platform-fence-details-summary.json`. This is separately owned Editor work; the paired instrument
 will preserve the frozen product bytes.
 
 ### Shared-analysis and default-scope checkpoint
 
-The coordinator approved one analysis owner per harness buffer, independent view sessions,
+One analysis owner per harness buffer, independent view sessions,
 quiet default Platform+native and loaded default native+disabled on 2026-10-02. The old
 `3c9a18ed…` declared Platform+native run was stopped before a complete matrix: its Platform
 configuration rejects in 583.851 seconds and native is partial. There is no completed CLI wall
@@ -585,7 +582,7 @@ The ownership/default-policy unit suite passes 136 tests and stress TypeScript p
 diagnostic passes on both frozen products: three independent views share one Tree runtime
 session; Shiki retains three sessions. Source/render receipts pass, replacement keeps one Tree
 session, final disposal leaves zero runtime sessions and live workers, and both contexts close.
-Evidence is under `/work/tmp/plan-282/run-20261001T153544Z-sol/shared-analysis/`.
+Evidence is under `<report-directory>/run-20261001T153544Z/shared-analysis/`.
 
 #### Strict shared-analysis accounting and quiet reliability gate
 
@@ -623,14 +620,14 @@ identities and compute attribution were not captured; these receipts do not prov
 views each issue exactly one query. The harness's getter/poll/fence paths do not issue range
 queries: `getState` reads snapshot/selections/status, inspect and render checks read receipts,
 source validation replays captured messages, and idle fences send only fence requests. The
-queued range work comes from Editor runtime requests. Plan 282 does not alter that product.
+queued range work comes from Editor runtime requests. The paired instrument does not alter that product.
 
-### Shared-analysis controls and approved finish line (2026-10-02)
+### Shared-analysis controls and finish line (2026-10-02)
 
 The pre-compaction shared-analysis measurement is `4cd4f6f3f6903d78dc6ea820ede32cdcc2d3a869ba6e8e12f68d86f89cbaaf61`;
 validation is `9f0b90934c620bae2d7aeeab8565d11c1adb5c74a58a3d6805f09cb1ce7dc156`;
 combined instrument is `521f225056fd5f2881e1b3c9949c93a58de872018fba22901bb1898be003cf30`.
-Evidence is `/work/tmp/plan-282/run-20261001T153544Z-sol/shared-analysis/accounted/`.
+Evidence is `<report-directory>/run-20261001T153544Z/shared-analysis/accounted/`.
 The failed stale-count collection under the preceding shared-analysis identity earns no credit.
 
 | Final-identity receipt                 | Verdict                       | Actual seconds |
@@ -653,9 +650,8 @@ summary and `validation-quiet-native-positive.json` retain full receipts. Affini
 and these quiet runs start no CPU-load workers. Stress contracts pass 347 tests across twenty files;
 stress TypeScript, commit formatting/lint, repository gates and typechecks pass.
 
-The coordinator's bounded finish line requires these fresh controls, zero restricted quiet A/A
-rejects and an actual passing Platform+native default within 900 seconds. Then collection stops,
-#247 becomes ready and the coordinator arranges independent review. A rejection or overrun is
+The bounded finish line requires these fresh controls, zero restricted quiet A/A
+rejects and an actual passing Platform+native default within 900 seconds. Then collection stops and the change is ready for review. A rejection or overrun is
 reported with one smallest proposed fix before another proof round. The first actual default exits after 549.473 seconds with Chromium `page.evaluate: Target crashed`
 during cleanup after short-lines/multiple composition commit. No outer matrix artifact or aggregate
 verdict is published. This failed attempt establishes neither a passing default nor a fifteen-minute
@@ -663,10 +659,10 @@ timing result. The following retention proof and authorized rerun supersede that
 
 Outside this PR's finish line: final-identity loaded Tree-sitter, Tree compositions and loaded
 Platform positive/real-negative re-proofs; remaining expanded historical agreement; and actual
-full-matrix timing against 2,700 seconds. These are explicit Plan 282 follow-ups, unconfirmed
+full-matrix timing against 2,700 seconds. These are explicit follow-ups, unconfirmed
 under the final identity. Archived quiet/loaded receipts retain their original identities and
 earn no shared-analysis acceptance credit. The loaded 5 ms floor, all 540 blocking keys and the
-standalone minimap exclusion remain unchanged. Plan 099 units 2–7 still need implementation
+standalone minimap exclusion remain unchanged. Document contributions units 2–7 still need implementation
 authorization. No further loaded or full runs are launched for this finish line.
 
 ### Minimap proof retention correction
@@ -683,7 +679,7 @@ The concrete harness memory problem is captured-data layout: minimap proof logs 
 full source across fixture replacements, until worker termination. The released analysis/buffer
 list contains WeakRefs; disposing prior analysis clears its structural/highlighter entries. The
 minimap protocol has no `disposeDocument`: retained workers receive authoritative `openDocument`
-or `replaceDocument`, and their disposal already clears logs. The approved minimal correction
+or `replaceDocument`, and their disposal already clears logs. The minimal correction
 keeps the latest full document and all subsequent patches, releasing its superseded prefix.
 Render freshness now uses monotonic `sourceUpdates` on capture and predicate; log compaction
 cannot make an older accepted render current. No product, budget, sampling or heap flag changes.
@@ -717,8 +713,8 @@ New measurement is `523635b39d32d14c2a539404a834a5164dab1c63fd5f686e6ab5fd68e59a
 validation is `4e7e4d4a62ab85c561c5d0760ed3d367127ae2d2f7e637765cc39463d4411482`;
 combined instrument is `380423a053c280713dc5cf2bef9a8edd685e1e16b10c6d74acc0d4ee8b7e36ea`.
 Fresh controls and the one authorized actual default rerun write to
-`/work/tmp/plan-282/run-20261001T153544Z-sol/shared-analysis/minimap-compacted/`.
-The coordinator retains the completed restricted A/A as directed, with its original `4cd4f6f3…`
+`<report-directory>/run-20261001T153544Z/shared-analysis/minimap-compacted/`.
+The completed restricted A/A is retained, with its original `4cd4f6f3…`
 production identity and diagnostic stamp; it is not presented as a newly collected A/A. No extra
 A/A, loaded or full matrix runs are authorized. Fresh controls and the native quiet positive
 complete under the corrected identity:
@@ -757,10 +753,10 @@ corrected-identity directory above.
 
 ### Final delivery decision and one open undo key
 
-The coordinator approves shipping Plan 282 on 2026-10-02 with this result recorded honestly:
+The paired instrument shipped on 2026-10-02 with this result recorded:
 **855.026 seconds actual default, 215/216 blocking keys pass, one unclassified rejection**.
 The runner's `passed: false`, exit 1 and exact budget remain unchanged. The open key is either
-a real #224 undo cost on large files or noise; current evidence cannot distinguish them. Full
+a real undo cost from the prerequisite core change on large files or noise; current evidence cannot distinguish them. Full
 agreement with historical verdicts is not established.
 
 Evidence for the open key:
@@ -772,7 +768,7 @@ Evidence for the open key:
   [0.30, 1.50]. Its 1,062.096-second receipt is recorded in the loaded-floor section. Different
   load, view and measurement identity make this supporting evidence, without a causal claim.
 - Retained quiet Platform A/A: 0/10 rejects on each selected ordinary/multiple key. The clean
-  cohort excludes this short-lines key and cannot classify it. #224 changed `editChain` and
+  cohort excludes this short-lines key and cannot classify it. The prerequisite core change changed `editChain` and
   `documentSession`; this does not independently attribute the observed cost to either change.
 
 The authorized restricted alternating A/A and A/B undo cohort stops after **195.706 seconds**
@@ -782,7 +778,7 @@ The reused ordinary-only count accounts for subject buffers/analyses and Editors
 pending-minimap short-lines undo reset can replace its document and add buffer/analysis lifetime
 owners. Ten bursts finish, but no validated A/A or A/B comparison exists: rejects/10 and A/B median
 of medians are **unconfirmed**, not zero. Logs and the incomplete receipt are preserved under
-`undo-cohort/` in the corrected-identity directory. No repair or rerun is performed, as directed.
+`undo-cohort/` in the corrected-identity directory. No repair or rerun is performed.
 
 Follow-up: count reset replacement generations in the scoped diagnostic, retaining strict
 source/render, zero-retained-object, worker and context checks; then run the restricted A/A and
@@ -790,12 +786,11 @@ A/B cohort on this key with unchanged production statistic, budgets and stopping
 same prerequisite candidate, A/B the original frozen prerequisite pair. Report rejects per arm,
 A/B median of medians and actual wall. These measurements do not justify changing a budget or
 sampling rule. Loaded Tree, compositions, loaded Platform and full-matrix wall proofs remain
-explicit follow-ups. Collection stops; #247 is handed ready to the coordinator for independent
-review, without merging.
+explicit follow-ups. Collection stops; the change is ready for independent review, without merging.
 
 ### Current-identity undo repair, 2026-10-04
 
-The owner approved the repair, its proof rounds and Plan 099 units 2–7. The performance
+The repair, its proof rounds and document contributions units 2–7 started on 2026-10-04. The performance
 prerequisite remains pending. The old 855.026-second default retains its failing verdict and
 original identity; the failed 195.706-second diagnostic remains archived.
 
@@ -819,8 +814,8 @@ bootstrap intervals, key-local AB/BA order and strict two-or-four stopping polic
 Five pilot runs per arm bound the first checkpoint. The requested final reliability follow-up
 remains ten runs per arm; the pilot earns no rejects/10 or expanded acceptance credit.
 
-Current proof artifacts are under `/work/tmp/plan282-undo-20261004/`. Failing-before and passing
-contract logs are under `/work/reports/plan099-unblock-20261004/latency-proof/`.
+Current proof artifacts are under `<report-directory>/undo-20261004/`. Failing-before and passing
+contract logs are under `<report-directory>/latency-proof/`.
 
 Measurement `8127db7f5778b19c6e0543defeefefbde388572e176bddf09e1130391be97c25`, validation
 `0620138886cf2eb6f5c4f1e382fdfefd643f1d45668c680468566296fff9de8c`, and combined instrument
@@ -863,7 +858,7 @@ minimap configuration still requires source/render readiness: source is current,
 33 matches the latest requested render, and render 395 is pending while 393 is accepted. The
 full artifact is absent, so neither remaining positives nor the 2,700-second full target is proved.
 The exact error, CLI receipt and four complete raw artifacts remain under
-`/work/tmp/plan282-undo-20261004/full-window-01*`; `full-checkpoint.json` records the incomplete window.
+`<report-directory>/undo-20261004/full-window-01*`; `full-checkpoint.json` records the incomplete window.
 The failed minimap arm publishes no strict object-cleanup receipt. Its owned processes exit after
 the awaited session-close attempts and outer browser/runtime cleanup; the four completed
 configurations retain their strict cleanup receipts.
@@ -880,7 +875,7 @@ The actual manifest classifies `src/inputConsumers.ts` as measurement-owned. Rep
 controls, required matrix timings, selected loaded A/A and affected minimap-backed proofs remain
 to collect after independent review. The source audit finds no change to capture, sampling,
 statistics, workload, interception, package products or budgets. With minimap disabled, the added
-predicate short-circuits and the prior readiness logic is unchanged. Any coordinator-approved reuse
+predicate short-circuits and the prior readiness logic is unchanged. Any approved reuse
 of unaffected reference evidence will retain its explicit old identity. No repaired-identity
 acceptance is claimed here.
 

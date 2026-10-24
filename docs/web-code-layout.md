@@ -61,7 +61,6 @@ feature, folder, or utility directory.
 
 `apps/web/src/lib/` is a real high-fan-in core (`client`, `file-system-types`),
 not a home for feature code. Pure code belongs in the feature's own `utils/`.
-Plan 043 states the membership rule for `lib/` itself.
 
 ## Feature imports
 

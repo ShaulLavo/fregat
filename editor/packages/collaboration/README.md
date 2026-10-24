@@ -8,6 +8,20 @@ Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the brow
 
 Not on npm yet. Build it from source with the [development guide](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/development.md#set-up).
 
+## Usage
+
+This example validates a presence message. A room needs a document engine, authenticated links, and a clock supplied by your app.
+
+```ts
+import { Presence, parsePresence } from '@singapore-editor/collaboration'
+
+const presence = new Presence('peer-1', 'document-1')
+const message = parsePresence({ clock: 1, state: null }, 'peer-2', 'document-1')
+if (message) presence.receive('peer-2', message)
+console.log(presence.states)
+presence.dispose()
+```
+
 ## What you set up
 
 The library uses no hosted services and has no public defaults. What you need depends on where
@@ -28,19 +42,9 @@ peers are:
 Pass the broker URLs, ICE servers and credentials to the transports when joining. The
 [integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collaboration/docs/integration.md#browser-transports) covers each option.
 
-## Usage
+## No end-to-end quick start yet
 
-This example validates a presence message. A room needs a document engine, authenticated links, and a clock supplied by your app.
-
-```ts
-import { Presence, parsePresence } from '@singapore-editor/collaboration'
-
-const presence = new Presence('peer-1', 'document-1')
-const message = parsePresence({ clock: 1, state: null }, 'peer-2', 'document-1')
-if (message) presence.receive('peer-2', message)
-console.log(presence.states)
-presence.dispose()
-```
+There is no step-by-step guide that takes two editors from nothing to a synchronized document, and the example above does not start a session. To see the pieces wired together, read the demo app's collaboration page: [`collaboration.html`](https://github.com/ShaulLavo/fregat/blob/main/editor/examples/app/collaboration.html) and [`collaboration.ts`](https://github.com/ShaulLavo/fregat/blob/main/editor/examples/app/src/collaboration.ts). It is source to read, not a tested tutorial. The [integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collaboration/docs/integration.md#editor-attachment) covers attaching the plugin to an editor.
 
 ## API highlights
 

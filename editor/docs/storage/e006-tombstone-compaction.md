@@ -1,4 +1,4 @@
-# E006: Tombstone compaction
+# Tombstone compaction
 
 Maintenance now shrinks the position metadata of the current snapshot, not only its text. Runs of
 tombstones become a few textless **stand-ins**, and the reverse index leads the dropped tombstones'
@@ -6,7 +6,7 @@ entries to them. Every anchor resolves to exactly the offset and liveness it did
 compacted snapshot and in every snapshot edited from it. Snapshot identity, text, revision and
 visible pieces do not change. After 20,000 paragraph replacements the current tree holds 4 pieces
 instead of 20,002. What still grows with edit count is about 22 bytes per insertion, down from
-about 259. This completes E006; [text reclamation](e006-text-reclamation.md) was the first milestone.
+about 259. Together with [text reclamation](e006-text-reclamation.md), which frees the text, this reclaims both text and position metadata.
 
 ## Where text lands
 
@@ -36,9 +36,9 @@ raw runs beside it). Medians in milliseconds, baseline / candidate / baseline / 
 | ASCII replacements  | 2.341 / 2.080 / 2.588 / 2.115 |  1.69 / 1.51 / 1.80 / 1.54 |
 | Anchor density      | 10.58 / 10.97 / 10.53 / 11.03 |                          — |
 
-Replacement-heavy lanes got 9–18% faster; typing and large pastes did not move. Anchor density
-is 4% slower in both pairs. That lane has two modes about 10% apart that change with warmup
-count ([E046](../performance/e046-one-walk-rows-and-cuts.md)), so this is recorded, not
+Replacement-heavy scenarios got 9–18% faster; typing and large pastes did not move. Anchor density
+is 4% slower in both pairs. That scenario has two modes about 10% apart that change with warmup
+count ([one-walk rows and cuts](../performance/e046-one-walk-rows-and-cuts.md)), so this is recorded, not
 explained. `bench:check` passes its structural budgets.
 
 ## What a tombstone still answers

@@ -20,7 +20,7 @@ The [Monaco](monaco.md) and [CodeMirror](codemirror.md) migration pages map fami
 
 ## Current limits
 
-The public API is still changing. Screen-reader accessibility has no published audit, and mobile and touch are outside the current target. Rows have fixed height. Syntax colours use `::highlight()`, which cannot set font weight or font style.
+The public API is still changing. Screen-reader accessibility has no published audit, and mobile is not a supported target. Touch selection exists in the source as an experiment and is not in the npm packages. Rows have fixed height. Syntax colours use `::highlight()`, which cannot set font weight or font style.
 
 Monaco has VS Code's language ecosystem and a longer record of editor edge cases. CodeMirror has a small core and a large extension ecosystem. Singapore requires worker and WebAssembly asset hosting when you add tree-sitter. Choose based on the features and browser support your application needs.
 

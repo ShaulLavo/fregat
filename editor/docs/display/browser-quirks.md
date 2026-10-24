@@ -20,7 +20,7 @@ Related inline workarounds already documented at their call sites:
 
 Verified 2026-10-10 on Linux with Playwright 1.63.0. WebKit 26.6 paints the wrong
 text. Chromium 153.0.8010.12 and Firefox 155.0 paint the intended text.
-The upstream report is ready for the owner to file; no upstream issue has been opened.
+The upstream report is written; no upstream issue has been opened.
 
 ### Symptom
 
@@ -423,7 +423,7 @@ examples keep their captured colours in HTML; explicit live examples still use
 native highlights. Screenshot animations must remain enabled: disabling them
 forces a WebKit repaint and hides the bug.
 The unchanged control failed with zero native live syntax pixels; the workaround
-passed all 32 production cases. See [the fix and verification](https://github.com/ShaulLavo/fregat/pull/1117).
+passed all 32 production cases. The fix and its verification are in the `@singapore-editor/core` changelog.
 
 A plain native-API fixture and a one-line editor with manually assigned tokens both
 paint correctly in Chromium 153, Firefox 155 and WebKit 26.6. Hidden registration
@@ -514,7 +514,7 @@ WebKit records `error` and rejects with `NetworkError`; the first row is blank
 before the response and uses the downloaded face afterwards. Chromium retains
 visible fallback text during the delay.
 
-The owner's upstream queue contains standalone HTML, the delayed-response server,
+The upstream report material contains standalone HTML, the delayed-response server,
 engine results and before/after screenshots. No upstream issue has been opened.
 Regression coverage lives in `site/tests/review.browser.ts`: two aborted editor
 entry requests, an allowed third request, successful activation with the optional
@@ -526,7 +526,7 @@ retain nonfatal font preparation and the matching fallback stack.
 ## iOS native long-press selection
 
 Observed 2026-10-11 in Mobile Safari on the iPhone 17e simulator, iOS 26.5.
-The owner also reported intermittent native selection on a physical iPhone;
+Intermittent native selection was also reported on a physical iPhone;
 that report did not record the OS version. Desktop Playwright WebKit does not
 reproduce UIKit's native long-press recognition through synthetic TouchEvents.
 
@@ -564,8 +564,8 @@ typing. The local evidence set is `custom-touch-evidence/native-guard`, includin
 No upstream browser bug is claimed for normal native long-press selection.
 
 Keep the ownership guard while custom touch selection is active. Remove it only
-with a qualified replacement selection owner. The later native-layout experiment
-and optional handles are recorded in [plan 336](../../../plans/336-singapore-ios-scroll.md).
+with a qualified replacement selection owner. A native-layout experiment
+and optional handles remain open.
 Retest native gestures, all-engine highlight paint, and generic DOM selection
 before changing row selectability.
 
@@ -709,8 +709,8 @@ The reviewed upstream
 requires trusted click state before `performSwitchVisuallyOnAnimation`, and requires
 a processing user gesture for click-trigger haptic feedback. This source inspection
 explains the limitation; it is not a trace of the installed Safari engine.
-[WebKit bug 309082](https://bugs.webkit.org/show_bug.cgi?id=309082) is the owner's
-cited issue for scripted switch haptics. The report is access-restricted, so its
+[WebKit bug 309082](https://bugs.webkit.org/show_bug.cgi?id=309082) is the cited
+issue for scripted switch haptics. The report is access-restricted, so its
 contents and status could not be verified. No additional issue has been filed.
 
 A portable physical-device control contains a visible native checkbox switch,

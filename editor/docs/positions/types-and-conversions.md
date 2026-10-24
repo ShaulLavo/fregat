@@ -48,7 +48,7 @@ The sequence tree has no way to convert between offsets and row/column positions
 
 Extend the tree's aggregates to track newline counts. O(log n) conversion.
 
-**Normalization (locked):** All input normalized to `\n` at system boundary. Piece table assumes `\n`-only.
+**Normalization:** All input normalized to `\n` at system boundary. Piece table assumes `\n`-only.
 
 **Piece-level:** Each Piece gains `lineBreaks` field (computed at creation by scanning buffer slice).
 
@@ -61,7 +61,7 @@ Walks the tree using `subtreeLineBreaks` to count newlines preceding target. O(l
 ### pointToOffset
 
 Seeks to target row via `subtreeLineBreaks`, adds column. Clamps column to line end if out of range.
-Both ends of the row come from one descent (`findLineRange`, E046): the break that ends the row is
+Both ends of the row come from one descent (`findLineRange`): the break that ends the row is
 in the piece the descent lands in, or it is the first break after it, found by walking on from the
 landing. `lineRange` and `readPieceTableLine` are the same lookup; a row inside one piece is sliced
 straight from that piece's chunk.

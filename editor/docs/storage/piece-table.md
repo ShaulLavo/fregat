@@ -1,6 +1,6 @@
 # Storage Engine: Tree-Backed Piece Table
 
-## Status: Implemented and Proven
+## Overview
 
 The editor's storage engine is a piece table on a persistent AVL tree with immutable snapshots through structural sharing. Each mutation returns a new snapshot; previous snapshots remain valid and unmodified.
 
@@ -10,7 +10,7 @@ What each piece costs the garbage collector, and the layouts measured against it
 **Types:** `packages/textbuffer/src/pieceTableTypes.ts`
 **Operations:** `packages/textbuffer/src/pieceTable.ts`
 
-## Locked Decisions
+## Design Decisions
 
 - Piece table on a balanced persistent tree as the storage engine
 - Persistent (immutable-snapshot) data model for undo
@@ -39,7 +39,7 @@ The editor has one fundamental text-slice record: the **piece**. There is no sec
 
 A piece's `(buffer, start)` pair serves as its insertion identity — no separate `insertionId` field is needed. The anchor model (see [Anchors](../positions/anchors.md)) builds on this identity without introducing new record types.
 
-## Aggregate Maintenance Pattern (Locked)
+## Aggregate Maintenance Pattern
 
 All subtree aggregates (`subtreeVisibleLength`, `subtreePieces`, `subtreeLineBreaks`, `subtreeOriginalLength` and the rest) are computed in a single function pattern. `createNode` delegates to aggregate computation; every site that reassigns children recomputes aggregates on the result. There is no separate update that mutates individual fields — partial aggregate updates are structurally impossible. Adding a new aggregate means adding it to the aggregate function and the `PieceTreeNode` type.
 
@@ -48,7 +48,7 @@ All subtree aggregates (`subtreeVisibleLength`, `subtreePieces`, `subtreeLineBre
 **Line breaks:**
 
 - Each piece records `lineBreaks`, the newline count in its buffer slice
-- Each piece records `firstLineBreak` (E046), the position of its first break in its chunk's line index.
+- Each piece records `firstLineBreak`, the position of its first break in its chunk's line index.
   A chunk only grows at its end, so the position never moves. A cut gives the right part the left
   part's position plus the left part's count, and an appended piece takes the tail's running count
 - AVL nodes cache the `subtreeLineBreaks` aggregate
@@ -61,25 +61,23 @@ All subtree aggregates (`subtreeVisibleLength`, `subtreePieces`, `subtreeLineBre
 - AVL nodes cache `subtreeVisibleLength`, maintained in the shared aggregate function
 - `subtreeVisibleLength` sums visible pieces and gives the user-facing document length
 
-## Historical design
+## Tree balancing
 
-The original tree was a treap. [E040](../performance/e040-balanced-tree.md) records the completed move to an AVL tree. The earlier line-break and anchor-resolution phases introduced the metadata described above.
-
-Future work is scheduled in Fregat's [root roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md).
+The tree is an AVL tree. The [balanced-tree report](../performance/e040-balanced-tree.md) has the measurements against the treap it replaced.
 
 ## Buffer storage
 
 ### Opaque BufferId
 
-**Status: complete.** `PieceBufferId` is an opaque branded number.
+`PieceBufferId` is an opaque branded number.
 
 Anchor resolution treats buffer identity as opaque.
 
 ### Chunked Append Buffer
 
-**Status: complete.** Inserted text is stored in append chunks shared by a lineage's snapshots through an append-only log. An insert fills the newest chunk before opening another; each `PieceBufferId` names one contiguous span of one chunk, so several ids share a chunk string.
+Inserted text is stored in append chunks shared by a lineage's snapshots through an append-only log. An insert fills the newest chunk before opening another; each `PieceBufferId` names one contiguous span of one chunk, so several ids share a chunk string.
 
-Pieces reference buffer identity plus a range in that chunk. Appending is O(1) on a linear history; a branch that appends after a sibling copies its visible prefix of the log once. See the [E038 report](../performance/e038-append-only-buffer-store.md).
+Pieces reference buffer identity plus a range in that chunk. Appending is O(1) on a linear history; a branch that appends after a sibling copies its visible prefix of the log once. See the [append-only buffer store report](../performance/e038-append-only-buffer-store.md).
 
 **Alternatives rejected:**
 

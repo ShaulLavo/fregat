@@ -1,4 +1,4 @@
-# E003 first paint measurements
+# First paint measurements
 
 The 500,000-line plain-text cold open reached captured text in 188.2 ms, compared with 230.2 ms
 before and 219.1 ms in the unchanged control. Attachment fell from 120.5/117.2 ms to 84.3 ms.
@@ -15,7 +15,7 @@ Deferral removes this work from first text paint, not from the document's total 
 ## Reproduce and verify
 
 The runs use Chromium 148.0.7778.96, Node 26.7.0, Linux, and an Intel Core i7-14700K with 28 logical
-CPUs and 33,370,660,864 bytes of RAM. E001's seed 60061 and fixture hashes are retained. Every run
+CPUs and 33,370,660,864 bytes of RAM. The stress harness work's seed 60061 and fixture hashes are retained. Every run
 used built public package exports through Vite production output served by Playwright routing.
 No dev server, filesystem read, application startup, or fixture generation enters open timing.
 
@@ -24,11 +24,11 @@ Dependencies must remain resolvable from the preserved directory. From the repos
 
 ```sh
 bun run stress:build
-node examples/stress/first-paint.mjs --core-directory /work/tmp/editor-e003-baseline --output /work/tmp/editor-e003/before.json
-node examples/stress/first-paint.mjs --core-directory /work/tmp/editor-e003-baseline --output /work/tmp/editor-e003/control.json
-node examples/stress/first-paint.mjs --output /work/tmp/editor-e003/after.json
-node examples/stress/first-paint.mjs --core-directory /work/tmp/editor-e003-baseline --repetitions 1 --diagnostics --output /work/tmp/editor-e003/diagnostic-before.json
-node examples/stress/first-paint.mjs --repetitions 1 --diagnostics --output /work/tmp/editor-e003/diagnostic-after.json
+node examples/stress/first-paint.mjs --core-directory /tmp/editor-e003-baseline --output /tmp/editor-e003/before.json
+node examples/stress/first-paint.mjs --core-directory /tmp/editor-e003-baseline --output /tmp/editor-e003/control.json
+node examples/stress/first-paint.mjs --output /tmp/editor-e003/after.json
+node examples/stress/first-paint.mjs --core-directory /tmp/editor-e003-baseline --repetitions 1 --diagnostics --output /tmp/editor-e003/diagnostic-before.json
+node examples/stress/first-paint.mjs --repetitions 1 --diagnostics --output /tmp/editor-e003/diagnostic-after.json
 bun run --cwd examples/stress first-paint:proof
 ```
 

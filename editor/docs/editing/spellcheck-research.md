@@ -1,7 +1,7 @@
 # Spellcheck for painted text: research findings
 
-Research for [E058](https://github.com/ShaulLavo/fregat/blob/main/plans/e058-spellcheck.md), 2026-09-26, at Editor `74e76be` and Platform
-`97bfbf2ba`. Probe scripts, corpora and raw output are in `/work/tmp/research2/spellcheck/`
+Research for spellcheck, 2026-09-26, at Editor `74e76be` and Platform
+`97bfbf2ba`. Probe scripts, corpora and raw output are in the local run directory
 (`bench.mjs <engine>`, `vocab.mjs`, `tok.mjs`, `buildtrie.mjs`). The survey clones are in Platform
 `references/` (`cspell`, `cspell-dicts`, `vscode-spell-checker`, `harper`, `codebook`, `zed`).
 
@@ -28,7 +28,7 @@ Nothing we can use.
 - Electron exposes `webFrame.isWordMisspelled` and `getWordSuggestions`. Platform ships on the mesh
   as a web app, and its desktop shell is Electrobun on CEF, which has no such API.
 - Mobile keyboards autocorrect through the input element's own text. That is a separate channel,
-  covered by Plan 171's prose input options (row 19), and it draws no marks.
+  covered by the host's prose input options (row 19), and it draws no marks.
 
 VS Code and CodeMirror 6 disable native spellcheck too (`nativeEditContext.ts:108`,
 `codemirror-view/src/editorview.ts:525`). CodeMirror users opt back in through
@@ -41,7 +41,7 @@ All runs used Node 26 (V8) on this machine, one process per engine, with `--expo
 Corpora:
 
 - **Composer:** a 60-word chat message with three typos.
-- **10k-line markdown:** the first 10,000 lines of Platform `plans/*.md` (989 KB). The prose
+- **10k-line markdown:** the first 10,000 lines of the Platform repository's planning notes, concatenated (989 KB). The prose
   tokenizer skips fenced code, inline code, link targets, URLs, paths, camelCase and acronyms, which
   leaves 78,955 words, 6,274 of them distinct.
 - **Suggestion quality:** Norvig's Birkbeck-derived `spell-testset1` and `spell-testset2`. A pair
@@ -140,4 +140,4 @@ extension as a whole is GPL-3.0-or-later; `cspell` and `cspell-trie-lib` are MIT
   ranges, with suggestions and "Add to dictionary" in a tooltip. Obsidian itself relies on
   Electron's native checker.
 - **Neovim** marks tree-sitter nodes with `@spell` and `@nospell` captures, so its built-in checker
-  reads only comments, strings and prose. E058 takes this model.
+  reads only comments, strings and prose. Spellcheck takes this model.

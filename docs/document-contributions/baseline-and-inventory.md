@@ -1,6 +1,6 @@
-# Plan 099 unit 0: baseline and consumer inventory
+# Baseline and consumer inventory
 
-Research record for [Plan 099](../../plans/099-document-contributions.md) unit 0, taken 2026-09-25.
+Research record for document contributions unit 0, taken 2026-09-25.
 Current canonical sources, publication proof and remaining acceptance limits are recorded in
 [the 2026-09-30 foundations closeout](foundations-publication-proof.md).
 This historical record covers the inventory, baseline identity and measurements from the research
@@ -9,11 +9,11 @@ pass. Its [Not done](#not-done) section describes that checkpoint, not the curre
 Closeout, 2026-10-01: unit 0 is partial, **5/10 configurations calibrated** at instrument `56c8e77fb`.
 The harness is delivered; `native`, `disabled`, `tree-sitter`, `shiki` and `minimap` are accepted.
 `tree-sitter-shiki` failed its holdout; four other configurations never ran. The remaining
-absolute-threshold matrix is superseded by **Plan 282's paired A/B instrument**. The owner approved
-units 2–7 on 2026-10-04. Production start still needs accepted performance and exact host proof.
+absolute-threshold matrix is superseded by **the paired A/B instrument**. Units 2–7 were
+started on 2026-10-04. Production start still needs accepted performance and exact host proof.
 See [the historical reference](paired-input-latency.md#historical-reference) for results and evidence.
 
-Probe scripts and raw output live in `/work/tmp/research/099/`: `scan.ts` (inventory scan) and
+Probe scripts and raw output live in `<report-directory>`: `scan.ts` (inventory scan) and
 `inventory.tsv` (its 296 rows), `publication.ts` and `publication.json`, `head-read.ts`, and
 `probe/` (browser probe) with `consumers-baseline.json`.
 
@@ -22,7 +22,7 @@ Probe scripts and raw output live in `/work/tmp/research/099/`: `scan.ts` (inven
 Source identity: canonical Fregat `0f6a1edcff995260dad0e49a69b63a29c4540bc8`, clean production
 source in the preparation worktree. All Editor packages are local root workspaces. Frozen dependency
 installation and all 25 `build:workspaces` tasks pass. This refresh adds inventory/proof tooling and
-records owner approval; it creates no production contribution runtime. Earlier source/payload
+adds no approval record; it creates no production contribution runtime. Earlier source/payload
 measurements below retain their original identity and date.
 
 ### Rerunnable source inventory
@@ -76,11 +76,11 @@ document owner as each family migrates.
 | Caller                                                   | Current source contract                            | Migration                                                               |
 | -------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------- |
 | Core `editor/Editor.ts:3615`                             | Captured publication for synchronous view update   | Preserve view notification; unit 2 removes its provider source fallback |
-| Core `editor/documentAnalysis.ts:297`                    | One captured-frame subscription per analysis owner | Extend this owner for unit 2; preserve Plan 198 leases/results          |
+| Core `editor/documentAnalysis.ts:297`                    | One captured-frame subscription per analysis owner | Extend this owner for unit 2; preserve retained-analysis leases/results |
 | Core `historyViewer.ts:137`                              | Latest undo graph, independent of edit frame       | Preserve synchronous presentation                                       |
 | LSP `document.ts:104`, `bufferSync.ts:36`                | Captured source/protocol snapshot                  | Unit 4 retained synchronization                                         |
 | Platform `workspace-document-service.ts:1440`            | Captured revision/dirty metadata                   | Preserve host transaction policy                                        |
-| Platform `language-server-documents.ts:59`               | Captured source length for analysis admission      | Preserve host admission; unit 4 migrates lane delivery                  |
+| Platform `language-server-documents.ts:59`               | Captured source length for analysis admission      | Preserve host admission; unit 4 migrates language-server delivery       |
 | Platform `use-editor-visible-snapshot.ts:133`            | Captured dirtiness invalidates saved paint         | Preserve saved-paint policy                                             |
 | Platform `markdown-preview-pane.tsx:59`                  | Latest immutable external-store read               | Preserve synchronous source projection                                  |
 | Platform `use-document-feature-tier.ts:11`               | Latest source length and settings                  | Preserve feature-size admission                                         |
@@ -89,29 +89,27 @@ document owner as each family migrates.
 
 ### Unit 2 start conditions
 
-The owner approved units 2–7, benchmark repairs and acceptance proofs in this session on October 4.
-That clears the authorization restriction in the September decisions. It supplies no latency,
-memory or first-frame acceptance by itself.
+Units 2–7, benchmark repairs and acceptance proofs started on October 4. That lifts the September
+restriction on starting them. It supplies no latency, memory or first-frame acceptance by itself.
 
-| Required contract                                               | State at this source identity                                                                                                         | Production-start implication                                                                                              |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Exact paired instrument and frozen baseline/candidate products  | Plan 282 repair/acceptance is in the sibling lane; accepted identity has not been relayed                                             | Wait for the coordinator's accepted receipts and selected workload scope. Historical controls earn no new-identity credit |
-| Canonical captured publication                                  | Landed in #203; 154 focused tests pass in this refresh                                                                                | Reuse `EditorTextBufferChange`, snapshots and edit chain                                                                  |
-| Scoped document/tab identity and captured operation ownership   | Plans 098/097 delivered; `documentKey`, targets and operation-issued sources are authoritative                                        | Bind runtime identity to retained buffer incarnation and environment, preserving captured WorkspaceEdit ordering          |
-| Retained analysis and prepared borrowing                        | Landed; `WorkspaceDocumentService` creates analysis beside the buffer, preparer receives it, `preparedDocument.borrow` creates leases | Extend `EditorDocumentAnalysis`; no second handle or preparation registry                                                 |
-| Retained structural range readiness and final runtime disposal  | #659 and #661 landed before this baseline                                                                                             | Preserve their ready/pending distinction and final-release order                                                          |
-| Complete first-frame observation and dirty two-view Shiki paint | #662 is open/draft; #666 is open and repairs its 7/70 versus 70/70 split failure                                                      | Integrate the owned repair/probe and verify the host attachment contract before public cutover. Reuse their work          |
-| Disposed Tree-sitter source metadata                            | #660 is open, with 40-cycle surviving-runtime proof                                                                                   | Reconcile the source-retirement fix before replacing its owner; carry its regression into the common delivery path        |
-| Inactive analysis reclamation                                   | #664 is open; inspection/reclaim covers zero-lease sessions and preserves active entries                                              | Reuse the existing handle API if landed. Active-range pruning, host budget and parser/WASM bytes remain unproven          |
-| Standalone highlighting and prepared-diff service ownership     | Plan 197 delivered; service owns engine selection, workers and `DiffSyntaxStore`                                                      | Migrate through this service, preserving borrowed service lifetime and its bounded prepared-side store                    |
-| Historical complete blobs and partial-source admission          | Platform checkpoint `withCheckpointSources` and `DiffPane` guard landed; Editor `diffSyntax` still accepts patch lines                | Editor's typed complete/partial boundary and common source registration are unit 2 work                                   |
-| Shared content acquisition for every comparison/preview         | Plan 200 remains approved and unimplemented                                                                                           | Preserve its source semantics; its whole migration is outside this start gate                                             |
+| Required contract                                               | State at this source identity                                                                                                             | Production-start implication                                                                                       |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Exact paired instrument and frozen baseline/candidate products  | Repair and acceptance of the paired instrument are separate work; no accepted identity exists yet                                         | Wait for accepted receipts and the selected workload scope. Historical controls earn no new-identity credit        |
+| Canonical captured publication                                  | Landed; 154 focused tests pass in this refresh                                                                                            | Reuse `EditorTextBufferChange`, snapshots and edit chain                                                           |
+| Scoped document/tab identity and captured operation ownership   | Scoped document/tab identity and operation ownership are delivered; `documentKey`, targets and operation-issued sources are authoritative | Bind runtime identity to retained buffer incarnation and environment, preserving captured WorkspaceEdit ordering   |
+| Retained analysis and prepared borrowing                        | Landed; `WorkspaceDocumentService` creates analysis beside the buffer, preparer receives it, `preparedDocument.borrow` creates leases     | Extend `EditorDocumentAnalysis`; no second handle or preparation registry                                          |
+| Retained structural range readiness and final runtime disposal  | Landed before this baseline                                                                                                               | Preserve their ready/pending distinction and final-release order                                                   |
+| Complete first-frame observation and dirty two-view Shiki paint | Probe and repair are not yet merged; the repair addresses a 7/70 versus 70/70 split failure                                               | Integrate the repair and probe and verify the host attachment contract before public cutover                       |
+| Disposed Tree-sitter source metadata                            | Fix not yet merged, with 40-cycle surviving-runtime proof                                                                                 | Reconcile the source-retirement fix before replacing its owner; carry its regression into the common delivery path |
+| Inactive analysis reclamation                                   | Not yet merged; inspection/reclaim covers zero-lease sessions and preserves active entries                                                | Reuse the existing handle API if landed. Active-range pruning, host budget and parser/WASM bytes remain unproven   |
+| Standalone highlighting and prepared-diff service ownership     | Delivered; the service owns engine selection, workers and `DiffSyntaxStore`                                                               | Migrate through this service, preserving borrowed service lifetime and its bounded prepared-side store             |
+| Historical complete blobs and partial-source admission          | Platform checkpoint `withCheckpointSources` and `DiffPane` guard landed; Editor `diffSyntax` still accepts patch lines                    | Editor's typed complete/partial boundary and common source registration are unit 2 work                            |
+| Shared content acquisition for every comparison/preview         | Not implemented                                                                                                                           | Preserve its source semantics; its whole migration is outside this start gate                                      |
 
-The open docwave PRs have focused evidence, not broad Plan 198 acceptance. Chat/workbench crossing,
+The unmerged changes have focused evidence, not broad retained-analysis acceptance. Chat/workbench crossing,
 reload/font loading, physical hardware, memory pressure, independent host inactive-analysis budget,
-active-range pruning and total parser/WASM memory remain Plan 198 work. Their absence cannot be
+active-range pruning and total parser/WASM memory remain retained-analysis work. Their absence cannot be
 reported as a completed guarantee or silently made a prerequisite for every unrelated unit 2 edit.
-The coordinator owns acceptance and integration of prerequisite work.
 
 ### Unit 2 caller cutover and deletions
 
@@ -138,7 +136,7 @@ in unit 3; LSP `DocumentSyncLane.syncPoint`, browser TypeScript VFS and external
 state in unit 4; Find `elsewhereSyncPoint`, merge conflicts `parsedPoint`, semantic
 `syncPointsByTextVersion` and live diff-overlay rebuilds in unit 5. Protocol versions and derived
 projection indexes remain domain state. Storage-owned internal imports, inspector debug imports,
-and reclamation benchmark `dist` imports stay with their existing owners. E057's SAB text deletion
+and reclamation benchmark `dist` imports stay with their existing owners. The SAB text deletion
 is complete; the current Tree-sitter descriptor contains strings. Atomic cancellation is separate.
 
 ### Executable first-unit outline
@@ -187,14 +185,14 @@ prevent cross-owner sharing. The delivery module has no independent public resou
 6. Delete each replaced cursor, reset policy and public source factory in the same cutover. Add real
    worker proof for exact pinned reads after the head advances, wrong base/reset, UTF-16 chunks,
    sparse edits, worker replacement, stale completions, two views, prepared adoption and partial
-   diff refusal. Reuse the docwave regressions rather than copying their implementations.
+   diff refusal. Reuse the existing regressions rather than copying their implementations.
 7. Build all workspace exports, run affected core/provider/framework/Platform checks, verify real
-   first-frame/source output, and compare the affected frozen products using accepted Plan 282
+   first-frame/source output, and compare the affected frozen products using accepted paired-instrument
    identity. Measure source reads/payloads and bounded retention independently of latency. No
    improvement claim follows from the source inventory or a successful build.
 
 The selected extension follows the existing owner. A separate public document wrapper was already
-rejected in Plan 198, and a worker-message wrapper leaves generic cursor/reset decisions with each
+rejected in the retained-analysis design, and a worker-message wrapper leaves generic cursor/reset decisions with each
 feature. Neither supplies this migration's one-owner contract.
 
 ### Current focused verification
@@ -224,22 +222,22 @@ WorkspaceEdit checks:
 bun --bun vitest run --project node src/features/editor/tests/runtime.test.ts src/features/editor/tests/prepared-document.test.ts src/features/editor/tests/document-retention.test.ts src/features/editor/tests/workspace-text-change.test.ts
 ```
 
-The local raw logs are `/work/reports/plan099-unblock-20261004/runtime-evidence/`.
+The local raw logs are in `<report-directory>`.
 All heavy checks use the local runner. This preparation changes source inventory and documentation,
 so new browser rendering, latency measurements and package release changes are outside its proof.
 
 ## Baseline identity
 
-| Item               | Value                                                                                                                                                                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Platform           | `origin/main` `9f343825858b10a3b70b86250946e562956fbf13`, clean worktree                                                                                                                                                                                |
-| Editor             | `origin/main` `e2fd299`. The shared checkout `/work/projects/Editor` is at `c23cd306`, clean, 5 commits behind; `git diff c23cd30 origin/main -- packages examples` is empty, so every probe that imports the checkout measures `e2fd299` code          |
-| Link resolution    | `packages/editor-*` in Platform are relative symlinks to `../editor/packages/*`, which resolves to `/work/projects/Editor`. `apps/web/node_modules/@singapore-editor/*` → `/work/cache/bun/global/node_modules/@singapore-editor/*` → the same checkout |
-| What Platform runs | Dev: Editor `src/` through `platform-dev-sources` (`apps/web/vite.config.ts:103`). Build: each package's `dist/`. `packages/editor/dist` was built 18:51, before the 20:19 source commit, so a Platform build today would not match source              |
-| Package versions   | `@singapore-editor/core` 0.1.2, `diff` 0.2.0, `find`/`gutters`/`lsp`/`lsp-plugin`/`minimap`/`react`/`scope-lines`/`tree-sitter`/`tree-sitter-languages` 0.1.1, `decode`/`markdown`/`plugin-ui`/`textbuffer` 0.1.0 (`apps/web/package.json:49`)          |
-| Tools              | Bun 1.4.0, Node 26.7.0, Vite 8.0.16, Playwright 1.63.0 (Chromium headless)                                                                                                                                                                              |
-| Hardware           | Intel Core i7-14700K, 31 GB RAM, shared with other agents (runs went through the 3-slot memory wrapper)                                                                                                                                                 |
-| Capability flags   | The browser probe records `crossOriginIsolated` and `SharedArrayBuffer` per run. Platform passes no `useSharedBuffers`; E057 (delete the SAB text arm) is proposed and not landed                                                                       |
+| Item               | Value                                                                                                                                                                                                                                          |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform           | `origin/main` `9f343825858b10a3b70b86250946e562956fbf13`, clean worktree                                                                                                                                                                       |
+| Editor             | `origin/main` `e2fd299`. The shared checkout is at `c23cd306`, clean, 5 commits behind; `git diff c23cd30 origin/main -- packages examples` is empty, so every probe that imports the checkout measures `e2fd299` code                         |
+| Link resolution    | `packages/editor-*` in Platform are relative symlinks to `../editor/packages/*`, which resolves to the shared Editor checkout. `apps/web/node_modules/@singapore-editor/*` resolves to the same checkout through the global Bun cache          |
+| What Platform runs | Dev: Editor `src/` through `platform-dev-sources` (`apps/web/vite.config.ts:103`). Build: each package's `dist/`. `packages/editor/dist` was built 18:51, before the 20:19 source commit, so a Platform build today would not match source     |
+| Package versions   | `@singapore-editor/core` 0.1.2, `diff` 0.2.0, `find`/`gutters`/`lsp`/`lsp-plugin`/`minimap`/`react`/`scope-lines`/`tree-sitter`/`tree-sitter-languages` 0.1.1, `decode`/`markdown`/`plugin-ui`/`textbuffer` 0.1.0 (`apps/web/package.json:49`) |
+| Tools              | Bun 1.4.0, Node 26.7.0, Vite 8.0.16, Playwright 1.63.0 (Chromium headless)                                                                                                                                                                     |
+| Hardware           | Intel Core i7-14700K, 31 GB RAM, shared with other workloads (runs went through the 3-slot memory wrapper)                                                                                                                                     |
+| Capability flags   | The browser probe records `crossOriginIsolated` and `SharedArrayBuffer` per run. Platform passes no `useSharedBuffers`; deleting the SAB text arm is proposed and not landed                                                                   |
 
 Platform's enabled contributions for an ordinary file (`features/editor/utils/plugins.ts:35`):
 Tree-sitter syntax always, plus Shiki when the selected theme is not a built-in
@@ -317,7 +315,7 @@ the syntax workers pass their idle fences, every view has left `loading`, and no
 posted for 500 ms. Phases: open; 20 characters typed 30 ms apart; one undo; ten 400 px scrolls.
 Fixtures are a four-line TypeScript function repeated 700 and 8,000 times. All 16 rows painted
 (`plain` for minimap alone) with no page errors; `crossOriginIsolated` and `SharedArrayBuffer`
-were both false, so every text payload was a string. Raw rows: `/work/tmp/research/099/consumers-baseline.json`.
+were both false, so every text payload was a string. Raw rows: `consumers-baseline.json` in `<report-directory>`.
 
 Cells are messages / string code units sent to that consumer's worker. The last column is the
 main thread's `TextSnapshot` reads during open, as reads / code units, from the `textSnapshot.read`
@@ -362,7 +360,7 @@ non-built-in theme.
 - **Main-thread reads at open differ per consumer.** Shiki materializes the whole text once per
   view (`materializeFullText`, 624,000 units). Minimap reads the whole document line by line:
   32,045 reads and 592,799 units for one view on the medium file without materializing it, the
-  pattern [E031](../../editor/docs/performance/e031-projection.md) warns a full-read counter
+  pattern [projection performance notes](../../editor/docs/performance/e031-projection.md) warns a full-read counter
   hides. Tree-sitter shows 43 reads because it builds chunks from the piece table's buffers
   (`treeSitter/source.ts:172`), below the `TextSnapshot` counter; its cost appears only in the
   message column. Typing costs the view about 900 reads and 16,000 units per 20 keystrokes in
@@ -424,7 +422,7 @@ Each `Editor` subscribes to the buffer (`Editor.ts:3284`) and runs the fan-out f
 | Class                   | Occurrences                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Core mutation           | The ten publishers above; `emitChange` (1717); `DocumentEditChain` (`editChain.ts:57`); `changesSinceDocumentSyncPoint`/`getDocumentSyncPoint` (860–868); `diffPieceTableSnapshots` in checkout (930) and prepared reversal (2599); `historySerialization.ts:124`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Document contribution   | Tree-sitter session (`tree-sitter/src/session.ts:56`, own `runtimeSessionId` per session at :80, piece-table diff fallback :569); Shiki client (`shiki/workerClient.ts`: own `snapshot` baseline, full-text `open` :397, diff fallback :534); syntax controller cursors (above); LSP document (`lsp-plugin/src/document.ts:92`, buffer subscription :98, per-lane `syncPoint` in `documentSync.ts:54`, compose :380); live diff overlay (`diff/src/editorDiffPlugin.ts:422`, full text + whole-document diff per rebuild :480); merge conflicts (`mergeConflictPlugin.ts:159`, own `parsedPoint`); find's `elsewhereSyncPoint` (`find/src/plugin.ts:413`)                                                                                                                                                                                                                                                                                                                 |
+| Document contribution   | Tree-sitter session (`tree-sitter/src/session.ts:56`, own `runtimeSessionId` per session at :80, piece-table diff fallback :569); Shiki client (`shiki/workerClient.ts`: own `snapshot` baseline, full-text `open` :397, diff fallback :534); syntax controller cursors (above); LSP document (`lsp-plugin/src/document.ts:92`, buffer subscription :98, per-`DocumentSyncLane` `syncPoint` in `documentSync.ts:54`, compose :380); live diff overlay (`diff/src/editorDiffPlugin.ts:422`, full text + whole-document diff per rebuild :480); merge conflicts (`mergeConflictPlugin.ts:159`, own `parsedPoint`); find's `elsewhereSyncPoint` (`find/src/plugin.ts:413`)                                                                                                                                                                                                                                                                                                   |
 | View presentation       | Minimap (`minimap/src/plugin.ts:99`: a `MinimapWorkerClient` and worker per view, `workerClient.ts:250`; own `workerDocumentState` baseline :235; clipped `readRange` :1072); history viewer (`historyViewer.ts:137`); view snapshot serialization (`viewSnapshot.ts:125`, allowlisted full read); React `createFullTextSelector` (`react/src/index.tsx:1095`) and Solid `readWholeRevision` (`solid/src/index.ts:204`), both allowlisted; `fixedRowVirtualizer` and `inputSelectionController` `emitChange`/`notifyChangeWithTiming` (view events, not buffer publishers); synchronous range reads in `editor/src/editor/*` (occurrences, folds, ghost text, line map, row window, token projection, text cursor, selection ranges, navigation targets, edit actions), `find/`, `scope-lines/`, `markdown/`, `plugin-ui/`, bracket match, document links; Platform `unicode-hover-plugin.ts:48`, `utils/text-snapshot.ts:26`, `search/utils/result-syntax-plugin.ts:192` |
 | Domain adapter          | Tree-sitter worker client (`treeSitter/workerClient.ts`: `parse`/`edit`/`queryRange`/`disposeDocument`), source descriptors and chunk retention (`source.ts`, `sourceChunkRetention.ts`); Shiki worker protocol (`workerTypes.ts:35`); minimap worker protocol (`types.ts:177`); LSP client (`lsp/src/client.ts:203`–`240`, full read for `didOpen`/full sync :572, `positions.ts:306`); semantic token layer (`semanticTokenLayer.ts:194`, own 128-entry point map); `lsp-plugin` range reads (formatting, code actions, completion, rename, source text); `workspaceTextEdits.ts` (prepared transactions from LSP edits); browser TypeScript LSP (`typescript-lsp/`, used only by `examples/app`); Platform server LSP (`apps/server/src/lsp/proxy-session.ts:955`, `lsp/typescript/session.ts:148`); Platform `semantic-token-controller.ts:760`                                                                                                                       |
 | Headless or prepared    | `editor/preparedDocument.ts:375`, `:420` (prepared highlighter and structural sessions); `diff/src/diffSyntax.ts:173`, `:327`, `:347`; `editor/snippetTokensFeature.ts:83`, `:101` (hover and snippet code); Platform `utils/prepared-document.ts:57` (file-open preparer); Platform `search/state/result-syntax-cache.ts:77` (Tree-sitter session per search excerpt)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -434,7 +432,7 @@ Resolved at first sight unclassified:
 
 - **Platform document symbols** (`lib/document-symbols.ts:181`, callers `command-palette/hooks/use-symbols.ts:58`
   and `workbench/hooks/use-document-symbol-tree.ts:35`): a dirty document is materialized and sent
-  as `didOpen` version 1 over a separate socket, outside the retained language-server lane. It is
+  as `didOpen` version 1 over a separate socket, outside the retained language-server delivery. It is
   an external-LSP source path the plan does not list; it belongs to unit 4.
 - **Platform saved-state diffs** (`compare-saved-view.tsx:48`, `use-diff-language-context.ts:27`,
   `utils/history-compare.ts:26`, which reads the piece table through
@@ -458,10 +456,10 @@ Generic source bookkeeping each consumer owns today, which the runtime replaces:
 | 2    | Syntax controller dispatch cursors and `composeSkippedChanges`; per-view syntax session creation for a shared buffer                                                                         |
 | 2    | Tree-sitter per-session `runtimeSessionId` source mirror, piece descriptors from piece-table internals, `diffPieceTableSnapshots` fallback in `session.ts`; chunk retention keyed by session |
 | 2    | Shiki client `snapshot` baseline, `pieceTableSnapshotsHaveSameText` check and `diffPieceTableSnapshots` fallback                                                                             |
-| 2    | SAB text arm, if E057 has not landed first                                                                                                                                                   |
+| 2    | SAB text arm, if its deletion has not landed first                                                                                                                                           |
 | 2    | Direct `createSession` callers: prepared document, diff syntax, snippet tokens, Platform file-open preparer and search excerpt cache                                                         |
 | 3    | Minimap `workerDocumentState` baseline and per-view worker ownership for one document                                                                                                        |
-| 4    | LSP document buffer subscription and per-lane sync points; Platform document-symbols `didOpen` path                                                                                          |
+| 4    | LSP document buffer subscription and per-`DocumentSyncLane` sync points; Platform document-symbols `didOpen` path                                                                            |
 | 5    | Find, merge conflict and semantic-token private sync points, if they still need generic progress after unit 4; live diff full rebuild                                                        |
 
 ### Anchor drift since the plan's inspected baseline

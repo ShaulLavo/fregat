@@ -116,8 +116,8 @@ source, chat or search text. `workspace.reload.*` performance entries provide pe
 Use the existing server; none of these scripts starts or restarts it:
 
 ```bash
-bun run --cwd apps/web proof:workspace-reload --scenario all --output /work/tmp/platform-instaload/final
-bun run --cwd apps/web proof:workspace-reload --scenario all --width 900 --height 700 --output /work/tmp/platform-instaload/narrow
+bun run --cwd apps/web proof:workspace-reload --scenario all --output <report-directory>/desktop
+bun run --cwd apps/web proof:workspace-reload --scenario all --width 900 --height 700 --output <report-directory>/narrow
 ```
 
 Individual scenarios include `tree`, `settings`, `settings-json`, `git`, `editor`, `search-compact`,
@@ -137,41 +137,31 @@ native canvas pixels against its control and a deliberately blank calibration. I
 bridge records and discards late mock deliveries to already closed sockets; it does not filter app
 errors or modify application data.
 
-Evidence for this run lives in `/work/tmp/platform-instaload/all-slices/`. The decision trail and
-workflow are there too. The final `desktop-verified/matrix.json` and `narrow-verified/matrix.json` each pass all 15 scenarios
-(1440×900 and 900×700); `verification.json` summarizes both. These are held-response/stream runs,
-not production latency benchmarks. Both full commands exited successfully.
+The full run passes all 15 scenarios at 1440×900 and at 900×700. These are held-response and
+held-stream runs, not production latency benchmarks.
 
 Across the 20 generic-pane budget reports, startup parsed 432,764–966,394 unique bytes with no
 aggregate refusals. Cache read/validation cost was 1.7–5.6 ms; synchronous preparation was
 2.5–5.6 ms. First application commit was 88.5–438.1 ms after preparation began. Native diff and
 terminal scripts report their own paint and readiness measurements separately.
 
-Additional checks passed:
+Additional checks:
 
-- Large native diff retained visible paint during HTTP 503 and recovered on reconnect; selection
-  rectangles and real clipboard text matched the control in all four diff variants.
-- Holding machine identity confirmation preserved settings presentation (`identity-held/`).
-- Two same-origin windows and a natively duplicated tab passed six isolation checks
-  (`window-isolation/`). Accepted settings filter edits persist even before live revalidation.
-- Tree scroll changed from 320 to 384 while responses were held, survived a second held reload,
-  and remained 384 after live takeover (`tree-pending-scroll/`). Logs and diagnostics similarly
-  preserve view-only edits over their original observation, with 14 focused regression tests
-  across these four features. Their saved records never populate the live query cache.
-- 448 focused web tests, followed by 66 search/listbox checks for the compact-scroll fix and 16
-  Git checks after the failure-overlay repair; 42 focused server checks.
-- Root type checking, scoped web/server lint, feature boundaries, design/compiler/error censuses,
-  generated-file checks, unused-code checks, duplicate checks, and changed-file formatting.
-- Native Editor and Ghostty checks described above. The broader pre-existing settings-page suite
-  still has its baseline model-row/widget-label failures; the baseline native lane-width assertion
-  also remains outside this change. The entire repository test suite is not claimed green.
+- Large native diff keeps visible paint during an HTTP 503 and recovers on reconnect; selection
+  rectangles and real clipboard text match the control in all four diff variants.
+- Holding machine identity confirmation preserves settings presentation.
+- Two same-origin windows and a natively duplicated tab pass six isolation checks. Accepted
+  settings filter edits persist even before live revalidation.
+- Tree scroll changed from 320 to 384 while responses were held, survives a second held reload,
+  and stays 384 after live takeover. Logs and diagnostics preserve view-only edits over their
+  original observation. Saved records never populate the live query cache.
+- The proof removes its own terminals and fixture sessions through the terminal API and confirms
+  their exits.
+- The broader settings-page suite has known model-row and widget-label failures, and the native
+  diff-plugin width assertion differs from both baseline and changed native output. Neither
+  is caused by this feature, and the whole repository suite is not claimed green.
 
-The proof now verifies cleanup of its own terminals. Earlier fixture sessions were identified by
-exact fixture path and worktree, removed through the terminal API, and their exits confirmed in
-`proof-terminal-cleanup.json`. Temporary integration worktrees were removed after comparing their
-changes with the original repositories. Source changes remain uncommitted and unpublished.
-
-## Review corrections
+## Failure handling
 
 Warm settings and terminal module preloads are best-effort: a rejected chunk no longer prevents
 `createRoot`; the lazy view mounts a visible render boundary. Browser checks blocked both chunks and confirmed
@@ -191,10 +181,9 @@ Terminal replay completion is per connection, and saved native viewport disposal
 cache writer time, and total registered-callback time. It keeps only the latest measurement and
 contains no cached content. One failed callback does not prevent other owners from flushing.
 
-Run the existing proof with `--scenario search-full --measure-writes` to collect 25 synthetic hidden-document
+Run `bun run --cwd apps/web proof:workspace-reload --scenario search-full --measure-writes` to collect 25 synthetic hidden-document
 flush samples and a separate 13-record serialization/storage stress case. The proof restores the
-real visibility state and deletes its temporary stress records. Evidence is in
-`/work/tmp/platform-instaload/all-slices/write-measurement/result.json`.
+real visibility state and deletes its temporary stress records.
 
 On this machine, the settled 750-match search view had three active flush callbacks and two actual
 cache writes totaling 19,220 bytes: median 1.1 ms, p95 3.0 ms, maximum 4.6 ms for all registered
@@ -206,9 +195,3 @@ bound or a claim about total browser unload/BFCache time. Other lifecycle listen
 registered-callback measurement. Visibility change and page departure are separate events and can
 both flush; the measurements describe one event at a time. The 2 MiB admission ceiling remains a **read** ceiling, not a write
 ceiling; writes retain their per-record bounds and existing coalescing.
-
-Review validation: 27 focused web regressions plus the viewport disposal test pass; 38 terminal
-service and 14 Git/cache server tests pass. Root type checking, feature boundaries, unused-code,
-compiler and design gates pass. Settings/Git/search browser reloads pass. Failed settings and
-terminal warm-chunk evidence is in `all-slices/warm-chunk-failure/`; write measurements and
-navigation-write isolation are separate from read-admission budgets.

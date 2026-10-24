@@ -47,21 +47,21 @@ verify that orders rise in document order. The checker scans LF characters direc
 aggregate helpers or the buffer line-index cache. Invisible pieces still require valid bounds and
 raw line-break counts. Invalid ranges produce an issue before scanning.
 
-A piece's `firstLineBreak` is where its breaks begin in its chunk's line index (E046). The checker
+A piece's `firstLineBreak` is where its breaks begin in its chunk's line index (one-walk rows and cuts). The checker
 expects the count of LF characters in the chunk ahead of `p.start`, scanned once per chunk. Row
 lookups and cuts read the index at that position without a search, so a wrong value is a wrong row.
 
 Every left order is strictly below its parent; every right order is strictly above. The tree is
-an AVL tree since E040: a node's stored height is one more than its taller child's, and sibling
+an AVL tree since balanced tree: a node's stored height is one more than its taller child's, and sibling
 heights differ by at most one.
 
 Anchor resolution relies on the document order of each buffer's pieces, so the checker reads it
 off the pieces sorted by order: a buffer's pieces appear in buffer order with no unit missing
 between them, the original buffer's start at 0, and no piece of an older buffer sits between two
-pieces of a newer one. Since [E006](e006-tombstone-compaction.md), units may be missing where
+pieces of a newer one. Since [text reclamation](e006-tombstone-compaction.md), units may be missing where
 compaction dropped a tombstone, but only where the reverse index leads that offset to a stand-in.
 
-Since [E039](../performance/e039-reverse-index-cost.md) the reverse index holds inserted buffers
+Since [reverse-index cost](../performance/e039-reverse-index-cost.md) the reverse index holds inserted buffers
 only. Each of their pieces has exactly one entry, keyed by buffer ID and by starting offset, or by
 0 for the buffer's first piece, and the entry's order must equal the piece's. A buffer whose first
 piece was compacted keys its first remaining piece by start. Every other entry must lead to a
@@ -117,7 +117,7 @@ invariants. [Raw measurements](inspection/2026-09-06.json) record Bun 1.4.0 on t
 These are single local observations, not budgets. Heap deltas estimate live allocation cost;
 they do not measure cumulative allocation or peak RSS, and GC can move unrelated objects between
 samples. `bun run bench:inspection` in `packages/editor` reproduces the fixture and measurements.
-The E001 browser latency harness is not required for this explicit diagnostic operation.
+The stress harness browser latency harness is not required for this explicit diagnostic operation.
 
 The new checker exposed an existing heap-order defect when a split piece received a priority
 smaller than its ancestor. `splitByVisibleOffset` now merges the split remainder back with the

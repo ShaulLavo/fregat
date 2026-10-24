@@ -1,4 +1,4 @@
-# Phase 0 Performance Baseline
+# Performance Baseline
 
 Captured on 2026-05-24 with Bun 1.3.10 on the local macOS workspace.
 
@@ -21,5 +21,5 @@ scenarios, plus the commands that reproduce them.
   path.
 - The minimap update bench covers worker-renderer document update work. It does not include real
   worker transfer, canvas drawing, or browser paint.
-- Syntax timings are dominated by query work at larger sizes; Phase 4 should split parse/query
+- Syntax timings are dominated by query work at larger sizes; The next change should split parse/query
   ownership and budgets before setting hard thresholds.

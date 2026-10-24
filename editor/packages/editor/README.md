@@ -36,9 +36,23 @@ Content mode supports up to 10,000 display rows, 1,048,576 UTF-16 source units a
 
 ## Touch selection
 
+Status: experimental, in the source only. The npm releases (`core` 0.1.2, `plugin-ui` 0.1.0) have no touch code, and mobile is not a supported target.
+
 Hold a word or double-tap it, keep that contact down, and drag by words across rows. Triple-tap selects a whole line and its held contact drags by lines. Four taps select the document. Ordinary swipes scroll. These gestures use the same document selections and boundaries as desktop clicks.
 
 Touch menu chrome is opt-in through `createTouchSelectionPlugin` from `@singapore-editor/plugin-ui/touch-selection-plugin`. The plugin owns its menu, extension items and optional haptics. Core view contributions expose `onDidTouchSelection`, `getTouchSelectionAnchor`, `getSelectedText`, `getInputCommandState` and `runInputCommand` for input-aware plugins. Clipboard commands retain active paste providers and browser clipboard authorization.
+
+What tests cover it:
+
+- Unit tests for the gesture recognizer (`test/touchSelection.test.ts` in this package) and the menu and plugin (`packages/plugin-ui/test/touchSelection*.test.ts`).
+- Playwright specs in `examples/app/test/mobile-*.spec.ts`, which run in Chromium and WebKit with an iPhone 13 profile. The repository's CI workflows do not run them. Run them with `bun run --cwd editor/examples/app test:e2e`.
+- Notes on a Mobile Safari run on the iOS 26.5 simulator in [Browser quirks](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/display/browser-quirks.md#ios-native-long-press-selection).
+
+The automated tests above do not run on a physical phone, and [Browser quirks](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/display/browser-quirks.md#touch-haptic-availability) lists physical-device haptic feedback as unverified.
+
+## Shiki entry point
+
+`@singapore-editor/core/shiki` is a subpath export of this package. It holds the Shiki-based tokenizer that runs in a worker (`createShikiWorkerOwner`, `ShikiWorkerOwner`), `createShikiHighlighterPlugin` for editors that bring their own Shiki grammar and theme loaders, and theme converters such as `editorThemeFromVscodeTheme`. The [Themes guide](https://singapore.shaulavo.dev/docs/guides/themes/) uses the converters. For editor syntax colors, use the [`tree-sitter`](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/tree-sitter/README.md) package instead. The unpublished `highlighting` package builds on this entry point for snippets and diffs. Worker details are in [Worker topology](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/architecture/worker-topology.md#shiki-tokenizer-worker).
 
 ## API highlights
 

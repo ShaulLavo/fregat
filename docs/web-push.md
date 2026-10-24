@@ -1,14 +1,11 @@
 # Web Push from the mesh server
 
-Delivery record for Plan 142 (completion wave, lane L5, 2026-09-25). The plan is done and deleted;
-what remains is the owner checks and the owner question at the end of this file.
-
 When a session needs input or completes, every device registered for push gets a notification,
 with every Platform tab closed. Tapping it opens that session.
 
 ## How it works
 
-- **One derivation, two deliveries (D1).** `packages/contracts/src/session-notices.ts` holds the
+- **One derivation, two deliveries.** `packages/contracts/src/session-notices.ts` holds the
   notice derivation (`sessionNotificationTransition`, `sessionNotice`, the tab's tracker) and
   `sessionRailStatus`, which it needs. The tab's toast, sound and native path
   (`apps/web/src/features/chat-mode/state/`) and the server both import it. It moved out of
@@ -24,7 +21,7 @@ with every Platform tab closed. Tapping it opens that session.
   baseline, so historical hydration, replay and boot recovery never notify (the stream starts after
   the engine's recovery), and an archived session never notifies (the transition's own rule). A
   session seen for the first time is baselined, as in the tab.
-- **Suppression (D2).** The web app reports `{ kind: 'presence', focused }` over the orchestration
+- **Suppression.** The web app reports `{ kind: 'presence', focused }` over the orchestration
   WebSocket after each handshake and on every focus, blur and visibility change
   (`features/chat/transport/window-presence.ts`, `OrchestrationRpcClient`'s `presence` option).
   The server keeps the focused sockets (`orchestration/client-presence.ts`); a closed socket stops
@@ -52,11 +49,11 @@ with every Platform tab closed. Tapping it opens that session.
 
 ## Spike results (2026-09-25)
 
-- `web-push` 3.6.7 runs under Bun 1.4.0 (D4), pinned; only `generateVAPIDKeys` and
+- `web-push` 3.6.7 runs under Bun 1.4.0 pinned; only `generateVAPIDKeys` and
   `generateRequestDetails` are called, and the request goes out through the injected fetcher. The
   library prints Node's `url.parse()` deprecation warning once per process.
-- `sw.js` is served from the Vite base and registered with that base as scope: `/` in the lane
-  Vite, `/platform/sw.js` with scope `/platform/` on the mesh. No `Service-Worker-Allowed` header.
+- `sw.js` is served from the Vite base and registered with that base as scope: `/` in the
+  dev Vite server, `/platform/sw.js` with scope `/platform/` on the mesh. No `Service-Worker-Allowed` header.
   It handles only `push` and `notificationclick` and caches nothing, so it calls `skipWaiting()`.
 - The worker is registered only from the Turn on button. When another service worker
   controls the page, the section explains the scope conflict and sends no `/push` request.
@@ -80,7 +77,7 @@ with every Platform tab closed. Tapping it opens that session.
   map). A script cannot make a trusted notification click, so the second records the worker's
   `openWindow` and `focus` calls and then loads the opened route.
 
-## Device checks
+## Device checks before relying on it
 
 - iOS: on the iPhone, open the installation's HTTPS URL, Share › Add to Home
   Screen, open it from there, Settings › search "push", Turn on for this device, Send test. This
@@ -90,8 +87,8 @@ with every Platform tab closed. Tapping it opens that session.
 - Session notices: turn on Push session notifications, close every Platform tab, let a session
   finish, and tap the notification.
 
-## Owner question
+## Privacy
 
 - The payload is end-to-end encrypted, but the push endpoint's host (Apple, Google or Mozilla,
   whichever the device's browser uses) learns when each notification is sent and roughly how large
-  it is. Is that acceptable? Push stays off until a device turns it on and the switch is on.
+  it is. Push stays off until a device turns it on and the switch is on.

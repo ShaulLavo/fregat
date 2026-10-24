@@ -1,14 +1,10 @@
-# E017 branching undo
+# Branching undo
 
-E017 is complete on 2026-09-16. The text buffer's history is a bounded tree of states instead of
+The text buffer's history is a bounded tree of states instead of
 two stacks. Undoing B and typing C keeps B: A has two children, redo follows the one most recently
-left or created, and any retained state can be checked out. The execution plan has been removed;
-[selections-and-undo.md](selections-and-undo.md) still describes selection ownership, and this
+left or created, and any retained state can be checked out. [selections-and-undo.md](selections-and-undo.md) describes selection ownership, and this
 document holds the contracts the graph adds. [undo-graph-viewer.md](undo-graph-viewer.md) is the
-browser built on it (E019); persistence is [E018](e018-persisted-undo.md).
-
-The inspected baseline was `9abb944f3a2b8d6516953fdec75e8df5e1a94811`; the work landed on top of
-`b6a265a786b08c61318a3e02b666f17cb7ef50fc`.
+browser built on it; persistence is in [persisted undo history](e018-persisted-undo.md).
 
 ## Contracts that remain
 
@@ -73,8 +69,8 @@ reachability test in `history.test.ts` proves a pruned node's snapshot and selec
 
 ## What is left
 
-- E018 persists the graph across restarts. The graph has no codec; node ids are per buffer
+- [Persisted undo history](e018-persisted-undo.md) serializes the graph for restarts. The graph itself has no codec; node ids are per buffer
   generation and `committedAt` is wall clock.
 - The barrier is still a cut, not a node. The graph beneath a workspace group is stashed and
   invisible until the group is undone; the host shows the barrier from `getHistoryGraph().barrier`.
-- Anchor and snapshot ownership across pruning still coordinates with E006 the way the stacks did.
+- Anchor and snapshot ownership across pruning coordinates with [text reclamation](../storage/e006-text-reclamation.md) the way the stacks did.

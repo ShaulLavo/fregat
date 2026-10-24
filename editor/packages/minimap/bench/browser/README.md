@@ -9,14 +9,14 @@ node packages/minimap/bench/browser-runner.mjs --label=after
 The runner builds the current Editor and minimap sources with Vite, launches the installed
 Playwright Chromium, and serves the output through `BrowserContext.route` on the existing
 `http://127.0.0.1:3300` origin. It starts no server and leaves the running preview untouched.
-Builds, JSON results, and PNG frames go to `/work/tmp/minimap-benchmark` by default.
+Builds, JSON results, and PNG frames go to the directory set by `--output-dir`. The default is a fixed `/work/tmp/minimap-benchmark`, so pass `--output-dir` on machines without `/work`.
 
 Options:
 
 - `--label=before` selects artifact names.
 - `--minimap-root=/path/to/package` measures a preserved minimap source tree against the same Editor.
 - `--origin=http://127.0.0.1:3300` sets the browser origin.
-- `--output-dir=/work/tmp/another-run` changes the artifact directory.
+- `--output-dir=/tmp/another-run` changes the artifact directory.
 - `--steps=120` changes each timing sample's scroll count.
 - `--trials=3` repeats each timing configuration.
 - `--all-motions` also measures 2px steps, reverse scrolling, and jumps beyond the cached bitmap.

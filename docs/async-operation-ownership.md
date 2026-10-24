@@ -2,7 +2,7 @@
 
 Workspace operations retain their initiating environment, root generation, and source evidence through preparation, confirmation, persistence, and completion. Selecting another machine does not redirect an operation. Changing a workspace root invalidates work that has not committed, including a return to the same path.
 
-This implements Plan 097 on the [document and tab model](document-and-tab-domain.md).
+This builds on the [document and tab model](document-and-tab-domain.md).
 
 ## Transport ownership
 
@@ -63,4 +63,4 @@ Implementation started from Platform `b94336c2`. Fourteen recorded source hashes
 
 The initial verification passed the combined ownership gates, including TUI replacement and the linked Editor's 62 provenance cases. The review fixes passed 123 focused tests across the edit engine, conflict/event handling, native watchers, transaction controls, workspace integration, and the search hook. Web and server typechecks, production builds, exact-file formatting and lint, and Knip passed.
 
-The mesh release is `20260912T182004Z-b94336c2-plan097-review-fixes` at [Platform](https://omarchy.mesh.shaulavo.dev/platform). The candidate and live browser checks report no page errors, console errors or warnings, failed HTTP responses, or loopback requests. The orchestration WebSocket receives frames, and the served entry asset matches the release hash. Build logs, focused verification logs, review reproductions, and `deployment.json` are retained in `/work/platform-production/releases/20260912T182004Z-b94336c2-plan097-review-fixes/`.
+The mesh release `20260912T182004Z-b94336c2` is served at [Platform](https://omarchy.mesh.shaulavo.dev/platform). The candidate and live browser checks report no page errors, console errors or warnings, failed HTTP responses, or loopback requests. The orchestration WebSocket receives frames, and the served entry asset matches the release hash. The release directory holds the build logs, focused verification logs, review reproductions, and `deployment.json`.

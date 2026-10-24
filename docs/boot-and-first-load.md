@@ -1,8 +1,7 @@
 # Boot and first load
 
 What must be on screen at first frame, how first-load JavaScript is measured, and how a page open across
-a deploy keeps loading its lazy chunks. Written by Plan 109 (retired 2026-09-25; its measurements are
-in git history).
+a deploy keeps loading its lazy chunks.
 
 ## Initial appearance
 
@@ -57,9 +56,9 @@ palette load and closing/reopening the pending picker.
 
 ## Bundle size
 
-Bundle size is not gated; deal with it when it's a real problem (owner, 2026-10-09).
-PR #1202 removed the first-load size check from CI and `verify`. The remaining
-on-demand gate, pins and build-based report were then removed. Commit hooks also
+Bundle size is not gated. Deal with it when it is a real problem. CI and `verify`
+have no first-load size check, and the on-demand gate, pins and build-based report
+are gone. Commit hooks also
 impose no first-load byte limits or per-owner budgets. Vite's production build
 log still reports output sizes. Investigate download size alongside measured startup
 behavior when users encounter a problem.

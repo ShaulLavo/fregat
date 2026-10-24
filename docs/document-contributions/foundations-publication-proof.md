@@ -1,7 +1,7 @@
 # Committed document publication and retained analysis
 
-The 2026-09-30 foundations wave executes Plan 099 publication and the retained-analysis contract
-checks from Plan 198. Source baseline: Platform `2ac20743c4402b1ee0cdb205e69260b60cb89283`.
+The 2026-09-30 foundations work covers committed document publication and the retained-analysis
+contract checks. Source baseline: Platform `2ac20743c4402b1ee0cdb205e69260b60cb89283`.
 Editor source and package exports now live in `editor/packages/` in that same commit. There is no
 external Editor checkout, CI editor-ref, global Bun link or SAB text transport to reconcile.
 
@@ -35,7 +35,7 @@ The stress `consumers.ts` subscription is an example-only LSP copy probe. Minima
 contributions; its source delivery remains unit 3 work. Tree-sitter/Shiki delivery and worker
 queues remain provider-owned until unit 2. Snippet tokens and search excerpts own temporary
 provider sessions; their provider cutover belongs to unit 2. Diff source acquisition/highlighting stays
-with the separately owned highlighting lane. Prepared documents already borrow retained analysis
+with the separately owned highlighting work. Prepared documents already borrow retained analysis
 and use `.borrow()`, not the historical transfer-only `.take()` API; fallback fold-index `.take()`
 is an unrelated handoff.
 
@@ -95,7 +95,7 @@ releases it. Provider ownership remains independent of a document's borrowed ses
 
 ## Evidence and limits
 
-Raw local evidence lives at `/work/tmp/fregat-evidence/foundations-documents/`: current inventory,
+Raw local evidence lives in `<report-directory>`: current inventory,
 three unchanged headless publication controls, an independent holdout, candidate samples, frozen
 64 KiB/4 MiB/32 MiB fixtures and hashes, plus failing original-analysis/workspace logs.
 `prepared-open.png` captures the real prepared editor surface; the screenshot was read back. The headless
@@ -111,11 +111,11 @@ Shiki/Tree-sitter readiness. Canonical workspace builds and affected typechecks 
 Unit 0 remains partial: **5/10 configurations calibrated** at instrument `56c8e77fb` (`native`,
 `disabled`, `tree-sitter`, `shiki`, `minimap`). `tree-sitter-shiki` failed its holdout; its candidate
 and the four remaining configurations never ran. The remaining absolute-threshold matrix is
-superseded by **Plan 282's paired A/B instrument**. See
+superseded by **the paired A/B instrument**. See
 [the paired method and historical reference](paired-input-latency.md#historical-reference) for the accepted results and archive locations.
-The owner authorized units 2–7 on 2026-10-04; exact performance and host start conditions are
+Units 2–7 started on 2026-10-04; exact performance and host start conditions are
 recorded in the inventory refresh. Chat/workbench pixel-level comparison of every visible token,
 retained parser/WASM byte accounting, an independent inactive
-analysis budget and full memory-pressure/first-frame matrix remain Plan 198 acceptance work. No
+analysis budget and full memory-pressure/first-frame matrix remain retained-analysis acceptance work. No
 budget was invented from document text size alone. The foundation evidence supplies no additional
-acceptance for Plan 099's runtime migration or Plan 200's editor-service migration.
+acceptance for the document-contributions runtime migration or the editor-service migration.

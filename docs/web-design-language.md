@@ -99,8 +99,8 @@ Run the browser check against an existing app and an isolated verification works
 
 ```sh
 node apps/web/scripts/verify-web-design.mjs \
-  --fixture /work/tmp/platform-plan100-closeout/fixture.json \
-  --output-dir /work/tmp/platform-plan100-closeout/visual
+  --fixture <fixture.json> \
+  --output-dir <report-directory>/visual
 ```
 
 The fixture JSON identifies `appUrl`, `serverUrl`, `origin`, `primaryEnvironmentId`,
@@ -156,26 +156,16 @@ and the production build passed. The sustained Mesh smoke loaded 21 assets with 
 console errors or warnings, failed HTTP responses, or loopback requests. Rapid-navigation visual
 runs separately record cancelled requests; these are retained in the evidence.
 
-Local artifacts are under `/work/tmp/platform-plan100-closeout/`:
+The verifier writes these artifacts to the output directory:
 
 - `visual/index.html` compares the four variants, with plain images and ruler overlays.
 - `visual/results.json` records all 52 surface cases and the served asset.
-- `loading-final/results.json` records all 52 loading cases and terminal cleanup.
-- `loading/owner-coverage.json` records pane ownership and nested waits sharing those headers.
-- `loading-divider-restore/results.json` verifies exact divider restoration after the narrow check.
-- `cleanup.json` confirms fixture session/project deletion, workspace removal, index restoration,
-  and the original compact/system appearance values.
-- `static/README.md` records the widened scan and individual exception review.
-- `static/verifier-review.json` records the independent review of the new verification code.
-- `static/visual-review.json` records independent inspection of 28 final screenshots.
-- `implementation-review/` preserves the original implementation audits.
+- A loading run records all 52 loading cases and terminal cleanup, pane ownership and nested
+  waits sharing those headers, and exact divider restoration after the narrow check.
+- `cleanup.json` confirms fixture session and project deletion, workspace removal, index
+  restoration, and the original compact/system appearance values.
 
-The release directory retains the source diff, build configuration, build output, deployment
-receipt, and `live-check.json` so the verification can be tied to the served files.
-
-The completed plan file is deleted. Its dependent plans and census exception links now point to
-this reference. Verification restored the original `/work/projects/platform` index root and
-removed the disposable workspace, project and session. No provider turn ran.
+No provider turn runs.
 
 The native window titlebar keeps its semantic `<header>` and runtime grid for desktop drag regions.
 It uses `--bar-height` and `--bar-padding-x`; pane headers compose `ToolPaneHeader`/`PaneBar`.

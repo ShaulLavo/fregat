@@ -1,6 +1,6 @@
-# E020: Cursor jump history
+# Cursor jump history
 
-Completed 2026-09-25. Same-document navigation has a bounded trail that survives edits.
+Same-document navigation has a bounded trail that survives edits.
 `editor.jumpTo(anchor, head?, cause?)` records the current location and the destination.
 `setSelection` also accepts `jumpCause: 'pointer' | 'find' | 'go-to-line' | 'provider'`.
 Committed Find navigation and complete pointer gestures use that boundary. Find query previews

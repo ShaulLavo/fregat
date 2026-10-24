@@ -1,6 +1,6 @@
-# E008: In-buffer search
+# In-buffer search
 
-Implemented against Editor `21c17e8`, 2026-09-21. The production change is in
+The production change is in
 [`search.ts`](../../packages/find/src/search.ts) and
 [`findController.ts`](../../packages/find/src/findController.ts), with one fast path in
 [`textRanges.ts`](../../packages/editor/src/textRanges.ts).
@@ -62,7 +62,7 @@ already uncapped. A re-search that lists nothing skips the navigation scan.
 ## Measurements
 
 `bun run --cwd packages/find bench:search` builds real piece-table snapshots from the
-[E001 fixtures](../../examples/stress/README.md) and reports the median of at least five runs.
+[stress harness fixtures](../../examples/stress/README.md) and reports the median of at least five runs.
 The fragmented document is `short-lines` after 20,000 seeded small edits. Milliseconds, Node
 26.7 (V8), capped listing unless noted, same machine and same built core for both columns:
 
@@ -90,7 +90,7 @@ visitor, and it stays under half a millisecond. Whole-word before was 74 ms with
 the ASCII fast path in `isWordCodePointAt` and the allocation-free `isWholeWordRange` are part
 of the after column only in the Bun runs archived beside this file.
 
-In Chromium, the E001 `find-all` scenario on `short-lines` types `needle` with trusted keys and
+In Chromium, the stress harness `find-all` scenario on `short-lines` types `needle` with trusted keys and
 waits for the exact count: 205 ms before, 46 ms after (warm medians of three, 225 → 56 cold).
 
 ### Matcher
@@ -113,7 +113,7 @@ fixture that represents real use.
 
 **No search slices.** For the same reason: the bounded plans finish inside a frame on 12.8 MB.
 The unbounded case is one native `RegExp.exec` over a `range` window, which slicing cannot
-interrupt. Isolating it is E014 work.
+interrupt. Isolating it is separate work.
 
 ## Verification
 

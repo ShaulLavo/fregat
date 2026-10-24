@@ -1,6 +1,6 @@
-# E048: Minimap document-line mapping
+# Minimap document-line mapping
 
-Implemented 2026-09-21. Raster positioning, slider bounds, clicks and dragging now share a
+Raster positioning, slider bounds, clicks and dragging now share a
 zero-based document-line mapping. Visible bounds exclude injected rows and mounted overscan.
 Unwrapped lines retain fractional scrolling; wrapped lines count once, including when only their
 continuations are visible. Oversized collapsed spans switch to fitted rendering. Sampled rasters
