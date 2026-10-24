@@ -1,5 +1,24 @@
 # @singapore-editor/file-animation
 
+## 0.2.10
+
+### Patch Changes
+
+- [#1261](https://github.com/ShaulLavo/fregat/pull/1261) [`ad5afbc`](https://github.com/ShaulLavo/fregat/commit/ad5afbcfa63daa4a7d160c343a67d285a8fbb2d4) - Improved the `createFileTransitionPlugin` reveals: they start the moment a file opens instead of waiting for highlighting, take colours as highlighting lands, keep playing through scrolls, and run as compositor animations. Autoregressive, parallel and token modes now write token by token behind a caret; diffusion resolves scrambled tokens in clusters. Morphs and reveals keep a repainted row hidden until they finish.
+
+- [#1323](https://github.com/ShaulLavo/fregat/pull/1323) [`5b190a9`](https://github.com/ShaulLavo/fregat/commit/5b190a9a6e6d8bec24eb1cceaedf72f524f36296) - Breaking: `@singapore-editor/decode` is now `@singapore-editor/file-animation`. Rename imports: `createDecodePlugin` is `createFileTransitionPlugin`, `DecodeMode` is `FileTransitionMode`, `DecodePluginOptions` is `FileTransitionPluginOptions`, `createMorphPlugin` is `createFileEditAnimationPlugin` and `MorphPluginOptions` is `FileEditAnimationPluginOptions`. The `editor-decode-*` CSS classes are now `editor-file-transition-*`.
+
+  Added the `magicMove` file transition mode: opening a file slides the text it shares with the previous file from where it stood on screen to its new place, while the rest fades out and in.
+
+- [#1318](https://github.com/ShaulLavo/fregat/pull/1318) [`8ff1b65`](https://github.com/ShaulLavo/fregat/commit/8ff1b654b4b7096dbe9499919df06e045f0a4123) - Breaking: `createFileEditAnimationPlugin` now morphs every text change except keyboard text input, including small commands such as indenting and toggling comments; remove the `minEditChars` option from calling code. Added `typing` to `EditorContributionChange`, true when a change is typed text, Enter, Backspace or Delete at a caret, or IME composition.
+
+  Fixed lines that swap places in a morph: each line now slides whole to its new spot, where shared words and punctuation used to fade out and back in.
+
+  Fixed Markdown preview briefly showing raw source after every edit: replacements from a provider that needs syntax now carry through an edit until the next parse, following lines the edit only moved. `createFileEditAnimationPlugin` now animates documents with inline replacements: rows it can draw morph as before, and rendered rows slide or fade in as whole rows.
+
+- Updated dependencies [[`c8964ca`](https://github.com/ShaulLavo/fregat/commit/c8964ca9f13ea527acb6f049fbf3b4d24bec256b), [`8ff1b65`](https://github.com/ShaulLavo/fregat/commit/8ff1b654b4b7096dbe9499919df06e045f0a4123), [`5b50c80`](https://github.com/ShaulLavo/fregat/commit/5b50c80dc40b6173023ea94a83c3215094304779), [`044eafe`](https://github.com/ShaulLavo/fregat/commit/044eafef8f31f2cb5435a07988785793194a283c), [`57cbbbf`](https://github.com/ShaulLavo/fregat/commit/57cbbbf1b0a37df9e6cdc5a2e97e3732975d1cbe), [`b981120`](https://github.com/ShaulLavo/fregat/commit/b9811202176722702d40fef6e8e1b781a2e5a816), [`bb88ac6`](https://github.com/ShaulLavo/fregat/commit/bb88ac6c1dc8fd3ad7e938d707ca1990f92d6899)]:
+  - @singapore-editor/core@0.2.10
+
 ## 0.2.9
 
 ### Patch Changes
