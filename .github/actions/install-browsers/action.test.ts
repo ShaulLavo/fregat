@@ -121,6 +121,8 @@ const names = args.slice(2)
 if (!dry && args[1] !== '--with-deps') process.exit(2)
 if (names.some(name => !['chromium', 'chromium-headless-shell', 'firefox', 'webkit'].includes(name))) process.exit(3)
 const selected = new Set(names.length ? names : ['chromium', 'firefox', 'webkit'])
+const plan = names.length ? 'requested' : 'full'
+const malformed = process.env.MALFORMED_PLAN === plan ? process.env.MALFORMED_FIELD : undefined
 const payloads = [
   ['chromium', process.env.CHROMIUM_REVISION ?? '1243', selected.has('chromium')],
   ['chromium_headless_shell', process.env.CHROMIUM_REVISION ?? '1243', selected.has('chromium') || selected.has('chromium-headless-shell')],
@@ -133,8 +135,8 @@ for (const [name, revision, requested] of payloads) {
   const directory = path.join(process.env.PLAYWRIGHT_BROWSERS_PATH, name + '-' + revision)
   if (dry) {
     console.log(name + ' (playwright ' + name + ' v' + revision + ')')
-    console.log('  Install location:    ' + directory)
-    console.log('  Download url:        https://fixture.invalid/' + process.env.FIXTURE_PLATFORM + '/' + name + '-' + revision + '.zip')
+    if (malformed !== 'missing-location') console.log('  Install location:    ' + (malformed === 'empty-location' ? '' : directory))
+    if (malformed !== 'missing-url') console.log('  Download url:        ' + (malformed === 'empty-url' ? '' : 'https://fixture.invalid/' + process.env.FIXTURE_PLATFORM + '/' + name + '-' + revision + '.zip'))
     continue
   }
   const marker = path.join(directory, 'INSTALLATION_COMPLETE')
@@ -155,16 +157,24 @@ for (const [name, revision, requested] of payloads) {
     FIXTURE_PLATFORM: 'ubuntu24-x64',
     GITHUB_OUTPUT: output,
   }
-  function resolve(browsers: string, overrides: Record<string, string | undefined> = {}) {
+  function attempt(
+    browsers: string,
+    overrides: Record<string, string | undefined> = {},
+    prelude = '',
+  ) {
     writeFileSync(output, '')
-    const result = runPayloadScript(actionScript('Resolve Playwright payload cache'), {
+    const result = runPayloadScript(prelude + actionScript('Resolve Playwright payload cache'), {
       ...env,
       ...overrides,
       BROWSERS: browsers,
     })
+    return { ...result, cacheOutputs: readFileSync(output, 'utf8') }
+  }
+  function resolve(browsers: string, overrides: Record<string, string | undefined> = {}) {
+    const result = attempt(browsers, overrides)
     expect(result.status, result.output).toBe(0)
     return Object.fromEntries(
-      readFileSync(output, 'utf8')
+      result.cacheOutputs
         .trim()
         .split('\n')
         .map((line) => {
@@ -181,7 +191,7 @@ for (const [name, revision, requested] of payloads) {
     expect(result.status, result.output).toBe(0)
     return result.output.trim().split('\n').filter(Boolean)
   }
-  return { root, cache, env, resolve, install }
+  return { root, cache, env, attempt, resolve, install }
 }
 
 function runPayloadScript(script: string, env: Record<string, string | undefined>) {
@@ -275,6 +285,116 @@ test.skipIf(!supported).each(['', 'unknown-browser'])(
     }
   },
 )
+
+test.skipIf(!supported).each(
+  ['full', 'requested'].flatMap((plan) =>
+    ['missing-url', 'empty-url', 'missing-location', 'empty-location'].map((field) => ({
+      plan,
+      field,
+    })),
+  ),
+)('incomplete $plan plan rejects $field before writing cache outputs', ({ plan, field }) => {
+  const fixture = payloadFixture()
+  try {
+    fixture.resolve('chromium')
+    const result = fixture.attempt('chromium', {
+      MALFORMED_PLAN: plan,
+      MALFORMED_FIELD: field,
+    })
+    expect(result.status, result.output).not.toBe(0)
+    expect(result.cacheOutputs).toBe('')
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true })
+  }
+})
+
+function pipelineControl(tool: string, empty = false) {
+  return `${tool}() {
+  local count=0
+  if test -f "$PIPELINE_COUNTER"; then read -r count < "$PIPELINE_COUNTER"; fi
+  count=$((count + 1))
+  command printf '%s\\n' "$count" > "$PIPELINE_COUNTER"
+  if test "$count" -eq "$FAIL_CALL"; then
+    command ${tool} "$@"${empty ? ' > /dev/null' : ''}
+    return ${empty ? 0 : 79}
+  fi
+  command ${tool} "$@"
+}
+`
+}
+
+const extractionCalls = [
+  { tool: 'printf', calls: 8 },
+  { tool: 'sed', calls: 5 },
+  { tool: 'sort', calls: 5 },
+  { tool: 'sha256sum', calls: 2 },
+  { tool: 'cut', calls: 2 },
+  { tool: 'dirname', calls: 1 },
+  { tool: 'wc', calls: 1 },
+].flatMap(({ tool, calls }) =>
+  Array.from({ length: calls }, (_, index) => ({ tool, call: index + 1 })),
+)
+
+test.skipIf(!supported).each(extractionCalls)(
+  'extraction failure from $tool call $call propagates before cache outputs',
+  ({ tool, call }) => {
+    const fixture = payloadFixture()
+    try {
+      const expected = fixture.attempt('chromium')
+      expect(expected.status, expected.output).toBe(0)
+      const counter = path.join(fixture.root, 'pipeline-counter')
+      const env = { PIPELINE_COUNTER: counter, FAIL_CALL: '0' }
+      const healthy = fixture.attempt('chromium', env, pipelineControl(tool))
+      expect(healthy.status, healthy.output).toBe(0)
+      expect(healthy.cacheOutputs).toBe(expected.cacheOutputs)
+      rmSync(counter)
+      const failed = fixture.attempt(
+        'chromium',
+        { ...env, FAIL_CALL: String(call) },
+        pipelineControl(tool),
+      )
+      expect(failed.status, failed.output).toBe(79)
+      expect(failed.cacheOutputs).toBe('')
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
+  },
+)
+
+test.skipIf(!supported).each([1, 2])(
+  'empty fingerprint from hash call %i rejects cache outputs',
+  (call) => {
+    const fixture = payloadFixture()
+    try {
+      fixture.resolve('chromium')
+      const result = fixture.attempt(
+        'chromium',
+        { PIPELINE_COUNTER: path.join(fixture.root, 'pipeline-counter'), FAIL_CALL: String(call) },
+        pipelineControl('sha256sum', true),
+      )
+      expect(result.status, result.output).not.toBe(0)
+      expect(result.cacheOutputs).toBe('')
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
+  },
+)
+
+test.skipIf(!supported)('empty cache parent rejects cache outputs', () => {
+  const fixture = payloadFixture()
+  try {
+    fixture.resolve('chromium')
+    const result = fixture.attempt(
+      'chromium',
+      {},
+      'dirname() { command dirname "$@" > /dev/null; }\n',
+    )
+    expect(result.status, result.output).not.toBe(0)
+    expect(result.cacheOutputs).toBe('')
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true })
+  }
+})
 
 test.skipIf(!supported)(
   'cache resolution matches the installed workspace Playwright dry run',

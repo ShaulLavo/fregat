@@ -26,23 +26,27 @@ runs:
         set -euo pipefail
         read -r -a browsers <<< "$BROWSERS"
         test "${#browsers[@]}" -gt 0
-        plan=$("$PLAYWRIGHT" install --dry-run)
-        requested=$("$PLAYWRIGHT" install --dry-run "${browsers[@]}")
-        locations=$(printf '%s\n' "$requested" | sed -n 's/^  Install location: *//p')
-        test -n "$locations"
-        cache=$(while IFS= read -r location; do dirname "$location"; done <<< "$locations" | sort -u)
-        test "$(printf '%s\n' "$cache" | wc -l)" -eq 1
+        plan=$("$PLAYWRIGHT" install --dry-run) || exit "$?"
+        requested=$("$PLAYWRIGHT" install --dry-run "${browsers[@]}") || exit "$?"
+        locations=$(printf '%s\n' "$requested" | sed -n 's/^  Install location: *//p') || exit "$?"
+        test -n "$locations" || exit 1
+        cache=$(while IFS= read -r location; do dirname "$location" || exit "$?"; done <<< "$locations" | sort -u) || exit "$?"
+        test -n "$cache" || exit 1
+        count=$(printf '%s\n' "$cache" | wc -l) || exit "$?"
+        test "$count" -eq 1 || exit 1
         # Download URLs include platform-specific revisions; locations vary by runner home.
         fingerprint() {
-          local downloads directories
-          downloads=$(printf '%s\n' "$1" | sed -n 's/^  Download url: *//p' | sort -u)
-          directories=$(printf '%s\n' "$1" | sed -n 's|^  Install location: .*/||p' | sort -u)
-          test -n "$downloads"
-          test -n "$directories"
-          printf '%s\n' "$downloads" "$directories" | sha256sum | cut -d ' ' -f 1
+          local downloads directories digest
+          downloads=$(printf '%s\n' "$1" | sed -n 's/^  Download url: *//p' | sort -u) || return "$?"
+          directories=$(printf '%s\n' "$1" | sed -n 's|^  Install location: .*/||p' | sort -u) || return "$?"
+          test -n "$downloads" || return 1
+          test -n "$directories" || return 1
+          digest=$(printf '%s\n' "$downloads" "$directories" | sha256sum | cut -d ' ' -f 1) || return "$?"
+          test -n "$digest" || return 1
+          echo "$digest"
         }
-        revision=$(fingerprint "$plan")
-        selection=$(fingerprint "$requested")
+        revision=$(fingerprint "$plan") || exit "$?"
+        selection=$(fingerprint "$requested") || exit "$?"
         prefix="playwright-payloads-v1-${RUNNER_OS}-${RUNNER_ARCH}-${revision}-"
         echo "path=$cache" >> "$GITHUB_OUTPUT"
         echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
