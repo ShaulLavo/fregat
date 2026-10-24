@@ -409,6 +409,45 @@ adapter plus the existing server, not another application runtime.
   client reaches the same state home and server. Read/validate a served environment identity
   before trusting an already occupied endpoint as this installation.
 
+#### Approved follow-up: attribute recovered delivery failures
+
+Status: Approved. Keep the two October 24, 2026 failures separate. The installed build was
+`84264edcdc6a2ccb45319388a4d0cd042fedfaf2`; repair work starts at merged main
+`7ccc7cea3f474e8c941187f8f52dc2c395cda108`.
+
+- **Terminal-host startup.** Raw server JSON at `01:24:09.440Z` records
+  `terminal.host.list_failed` with `error: {}`. Subsequent fresh health requests fail with
+  `internal.reason: no-retained-connection`. The service starts at `01:24:03.440Z` and the
+  scope journal records the host launch at `01:24:09Z`. This is consistent with an exhausted
+  five-second connection window, but the missing exception prevents attribution to launch,
+  socket handshake, host identity, or scheduling. Preserve the sanitized error summary at
+  `TerminalService.listHostSessions`. Its regression uses an unanswered real protocol request
+  and checks the persisted warning, including its operation and timeout. It proves the diagnostic
+  repair, not the cause of this incident. Reproduce further only in an isolated state root with
+  an injected launcher and no PTY sessions. Capture monotonic launch, socket, handshake, and
+  deadline timings plus the structured error. Compare a known-good launch first. Do not widen
+  the timeout or add retries without evidence.
+- **Standalone release request.** The first post-refresh check ends at `01:28:43.687Z` with
+  `apiRequestContext.get: Timeout 30000ms exceeded` in `scripts/deploy/live-check.mjs`.
+  The workbench and separate terminal fixture pass. Immediate public and loopback probes return
+  200; the unchanged retry passes. A bounded loopback fixture using `openLiveBrowser` and the
+  same `page.request.get` call passes. Injecting a stalled API reply confirms that
+  `attachObserver` sees page traffic, not this independent API request. Empty page failures
+  therefore cannot locate the stalled request. The production timeout remains unreproduced.
+  Next, add request start/end timing and response request-ID capture around that call in a
+  disposable check, retaining transport errors and timings on failure. Use a loopback fixture
+  with immediate, delayed, and incomplete replies before any authorized live observation.
+  Correlate IDs with server events; current `/release` 200 events cannot identify this caller.
+
+Pickup check from `apps/server`:
+`bun --bun vitest run --config vitest.config.ts src/terminal/tests/service.test.ts -t 'persists the causal error' --maxWorkers=1`.
+Original evidence is immutable under
+`/work/reports/wave-20261022/fregat/owner-server-delivery-r118/`. Diagnosis, the bounded
+Playwright fixture, commands, and cleanup evidence are under
+`/work/reports/wave-20261022/fregat/delivery-transient-diagnosis-r123/`.
+No owner-state changes, production restart, provider call, or repeated live-browser run is needed
+for this follow-up.
+
 #### Approved follow-up: deployed terminal live check
 
 **Status: Approved — implement after the read-only split check in PR #1224.**
