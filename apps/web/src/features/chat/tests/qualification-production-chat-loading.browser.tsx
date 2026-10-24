@@ -1,5 +1,4 @@
-import grammarUrl from 'tree-sitter-md/tree-sitter-markdown.wasm?url'
-import chatGrammarUrl from 'tree-sitter-md/tree-sitter-markdown-chat.wasm?url'
+import { treeSitterMarkdownAssets as assets } from '@workspace/markdown/utils/tree-sitter-runtime'
 import { onTestFinished } from 'vitest'
 import { commands } from 'vitest/browser'
 
@@ -12,7 +11,7 @@ import { createMarkdownBrowser } from '../../../../test/factories/markdown-brows
 
 test('cold production chat waits for CHAT grammar after the base grammar loads', async () => {
   expect(resourceQueryClient.getQueryData(chatMarkdownQueryKeys.runtime)).toBeUndefined()
-  const chatGrammar = new URL(chatGrammarUrl, location.href)
+  const chatGrammar = new URL(assets.chatGrammar, location.href)
   await commands.delayRequest({ ms: 5000, path: `${chatGrammar.pathname}${chatGrammar.search}` })
   const proof = await createMarkdownBrowser({ sessionFactory: null })
   const observations: string[] = []
@@ -25,7 +24,7 @@ test('cold production chat waits for CHAT grammar after the base grammar loads',
   // Module imports can fill the resource timing buffer before the runtime fetches start.
   performance.clearResourceTimings()
   await proof.update('**production**\n\n$$x + y$$', false)
-  const grammar = new URL(grammarUrl, location.href)
+  const grammar = new URL(assets.grammar, location.href)
   await expect
     .poll(() => performance.getEntriesByName(grammar.href).length, { timeout: 15_000 })
     .toBeGreaterThan(0)

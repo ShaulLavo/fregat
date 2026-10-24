@@ -197,10 +197,8 @@
         "server": "workspace:*",
         "shiki": "4.4.3",
         "sonner": "^2.0.8",
-        "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#7e84c579018564b64c023a60008f2a45157a6ef1",
         "uqr": "0.1.3",
         "valibot": "^1.5.0",
-        "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#aab7db1518c19f61c1b13ec3f832b881cf5f1385",
         "zustand": "^5.0.15",
       },
       "devDependencies": {
@@ -443,7 +441,7 @@
         "remark-math": "^6.0.0",
         "remark-parse": "^11.0.0",
         "remend": "1.3.1",
-        "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#7e84c579018564b64c023a60008f2a45157a6ef1",
+        "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#25ddda5e327247a24e3a847dfdb425ca488befd4",
         "unified": "^11.0.5",
         "unist-util-visit": "^5.1.0",
         "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#aab7db1518c19f61c1b13ec3f832b881cf5f1385",
@@ -454,6 +452,8 @@
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
         "happy-dom": "^20.14.5",
+        "micromark": "4.0.3",
+        "micromark-extension-gfm": "3.0.0",
         "oxfmt": "catalog:",
         "oxlint": "catalog:",
         "react": "^19.3.0",
@@ -4207,17 +4207,6 @@
 
     "@oxc-resolver/binding-wasm32-wasi/@emnapi/runtime": ["@emnapi/runtime@1.11.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-kyOl3X0DuTiT1h2ft8r2fYO8JYtU9a9Xis/zBSiGArNaagCOWx90N1k2wxp18czFDH+OgcWGb5ZP/XMt3dcyPA=="],
 
-    "@singapore-editor/collaboration/web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#aab7db1", {}, "ShaulLavo-tree-sitter-x-aab7db1", "sha512-EWZ1/B8wLZNqMy/eX+taAPO/kunhDlSOlDAMRHNoicrsfwrTqMTuSO7016B1UEWv4pJXIBfQglQDU1p07EY1dw=="],
-
-    "@singapore-editor/core/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#7e84c57", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-7e84c57", "sha512-UDGSId96PYKCS9FiMZFW11ZOtJIKw7lLKd+iVSAWajPcPvYxflrQ84Izi7//eKXWRL1XDK9fBbRNoXTQIPSfxw=="],
-
-    "@singapore-editor/markdown/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#7e84c57", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-7e84c57", "sha512-UDGSId96PYKCS9FiMZFW11ZOtJIKw7lLKd+iVSAWajPcPvYxflrQ84Izi7//eKXWRL1XDK9fBbRNoXTQIPSfxw=="],
-
-    "@singapore-editor/tree-sitter/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#7e84c57", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-7e84c57", "sha512-UDGSId96PYKCS9FiMZFW11ZOtJIKw7lLKd+iVSAWajPcPvYxflrQ84Izi7//eKXWRL1XDK9fBbRNoXTQIPSfxw=="],
-
-
-    "@singapore-editor/tree-sitter-languages/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#7e84c57", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-7e84c57", "sha512-UDGSId96PYKCS9FiMZFW11ZOtJIKw7lLKd+iVSAWajPcPvYxflrQ84Izi7//eKXWRL1XDK9fBbRNoXTQIPSfxw=="],
-
     "@playwright/test/playwright": ["playwright@1.64.1", "", { "dependencies": { "playwright-core": "1.64.1" }, "bin": { "playwright": "cli.js" } }, "sha512-HCrVhHr5QQuwYoswEUGTb7gGp522yflbv/ST8nF4sFWGuLjQCt17Q/EubpGGSNKYn1tsTCPZxqHhHCfVURu7UA=="],
 
     "@shikijs/core/@shikijs/types": ["@shikijs/types@4.5.0", "", { "dependencies": { "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.5" } }, "sha512-drtPrtD8N0DENyD2cyt6Ajy+IWsiCLgMxODwLTpvH1UsN6a9jf90tNTPjqwHvA+0Lzu9e0txk8DjfqH1p9UJRw=="],
@@ -4260,9 +4249,7 @@
 
     "@vscode/emmet-helper/jsonc-parser": ["jsonc-parser@2.3.1", "", {}, "sha512-H8jvkz1O50L3dMZCsLqiuB2tA7muqbSg1AtGEkN0leAqGjsUzDJir3Zwr02BhqdcITPg3ei3mZ+HjMocAknhhg=="],
 
-    "@workspace/markdown/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#7e84c57", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-7e84c57", "sha512-UDGSId96PYKCS9FiMZFW11ZOtJIKw7lLKd+iVSAWajPcPvYxflrQ84Izi7//eKXWRL1XDK9fBbRNoXTQIPSfxw=="],
-
-    "@workspace/markdown/web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#aab7db1", {}, "ShaulLavo-tree-sitter-x-aab7db1", "sha512-EWZ1/B8wLZNqMy/eX+taAPO/kunhDlSOlDAMRHNoicrsfwrTqMTuSO7016B1UEWv4pJXIBfQglQDU1p07EY1dw=="],
+    "@workspace/markdown/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#25ddda5", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-25ddda5", "sha512-JNTMAVq0ku/ROZwSaQnEOSA4Th6ddwM1NG1N2rg1JT+J5G5ykxg+972z3xZ9dp6W11oyRS4O+8dXd0D0SDCb5A=="],
 
     "ajv-formats/ajv": ["ajv@8.20.0", "", { "dependencies": { "fast-deep-equal": "^3.1.3", "fast-uri": "^3.0.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2" } }, "sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA=="],
 
@@ -4400,9 +4387,6 @@
 
     "vscode-markdown-languageservice/picomatch": ["picomatch@2.3.2", "", {}, "sha512-V7+vQEJ06Z+c5tSye8S+nHUfI51xoXIXjHQ99cQtKUkQqqO1kO/KCJUfZXuB47h/YBlDhah2H3hdUGXn8ie0oA=="],
 
-    "web/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#7e84c57", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-7e84c57", "sha512-UDGSId96PYKCS9FiMZFW11ZOtJIKw7lLKd+iVSAWajPcPvYxflrQ84Izi7//eKXWRL1XDK9fBbRNoXTQIPSfxw=="],
-
-    "web/web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#aab7db1", {}, "ShaulLavo-tree-sitter-x-aab7db1", "sha512-EWZ1/B8wLZNqMy/eX+taAPO/kunhDlSOlDAMRHNoicrsfwrTqMTuSO7016B1UEWv4pJXIBfQglQDU1p07EY1dw=="],
     "web/shiki": ["shiki@4.4.3", "", { "dependencies": { "@shikijs/core": "4.4.3", "@shikijs/engine-javascript": "4.4.3", "@shikijs/engine-oniguruma": "4.4.3", "@shikijs/langs": "4.4.3", "@shikijs/themes": "4.4.3", "@shikijs/types": "4.4.3", "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.5" } }, "sha512-Mb/GvXPHBAXdgGIcnfU5L3ldpn1XcxrGkPHwqgRx17/I2XRfqlFKk2vGkHWINn1kdXvzJZeuO3is6I9KLPFm0g=="],
 
     "wrap-ansi/ansi-styles": ["ansi-styles@6.2.3", "", {}, "sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg=="],

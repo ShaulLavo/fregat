@@ -152,7 +152,7 @@ const inspectionRequestSchema = v.object({
   options: candidateInspectionOptionsSchema,
 })
 const snapshotSchema = v.object({
-  profile: v.picklist(['commonmark', 'gfm', 'fregat-chat']),
+  profile: v.picklist(['commonmark', 'gfm', 'gfm-extended']),
   capabilities: v.object({
     commonmark: v.boolean(),
     gfm: v.boolean(),
@@ -240,7 +240,7 @@ async function inspectCandidateInRealm(
         : require.resolve('tree-sitter-md/tree-sitter-markdown.wasm'),
       chatGrammar: options.chatGrammar
         ? path.resolve(root, options.chatGrammar)
-        : require.resolve('tree-sitter-md/tree-sitter-markdown-chat.wasm'),
+        : require.resolve('tree-sitter-md/tree-sitter-markdown-math.wasm'),
       resolver: options.resolver
         ? path.resolve(root, options.resolver)
         : require.resolve('tree-sitter-md/tree-sitter-md.wasm'),
@@ -282,7 +282,7 @@ async function inspectCandidateInRealm(
     await runtimeCall(module, 'init', [
       {
         grammar: bytes.get('grammar'),
-        chatGrammar: bytes.get('chatGrammar'),
+        mathGrammar: bytes.get('chatGrammar'),
         resolver: bytes.get('resolver'),
       },
     ])
@@ -373,7 +373,7 @@ async function inspectAdapter(
     {
       parser: { locateFile: () => runtime },
       grammar: bytes.get('grammar'),
-      chatGrammar: bytes.get('chatGrammar'),
+      mathGrammar: bytes.get('chatGrammar'),
       resolver: bytes.get('resolver'),
     },
   ])
@@ -488,7 +488,7 @@ function validateWasm(bytes: Uint8Array, kind: 'grammar' | 'chatGrammar' | 'reso
   )
   const required = {
     grammar: ['tree_sitter_markdown'],
-    chatGrammar: ['tree_sitter_markdown_chat'],
+    chatGrammar: ['tree_sitter_markdown_math'],
     resolver: [
       'tsmd_new',
       'tsmd_free',

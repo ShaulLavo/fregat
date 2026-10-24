@@ -1,9 +1,8 @@
 # Qualify tree-sitter Markdown for chat rendering
 
-Status: Approved, scheduled later by owner decision on 2026-10-24. This work does not block PR
-#1326. The PR's merge bar is green CI, independent actual-code review, and one queued PC
-before/after streaming parsing benchmark on the existing corpus with numbers reported. After
-those checks, merge the PR and update the owner instance. Neither step waits for this follow-up.
+Status: Approved. Mixed-delimiter parity is Required by owner decision on 2026-10-24.
+PR #1326's merge stands. Full chat qualification remains scheduled later and does not block
+this follow-up's merge or the owner instance update.
 
 [Plan 176](176-markdown-parser.md) owns parser migration, and
 [Plan 189](189-tree-sitter-md-improvement.md) owns parser improvements. The
@@ -20,11 +19,28 @@ and streaming measurements of latency, CPU, and memory on the real chat path. Th
 find behavior regressions that the merge benchmark does not cover and show where later parser or
 renderer work would help.
 
-## Mixed delimiters if noticed in real chats
+## Required mixed-delimiter parity
 
-The owner accepted this difference for PR #1326 on 2026-10-24. For `~_~a_~`, remark renders
-`<p>~_<del>a_</del></p>` while tree-sitter renders `<p><del><em>~a</em></del></p>`.
-If the owner notices it in real chats, fix delimiter resolution in `tree-sitter-md` and cover
-this input plus neighboring mixed emphasis/strikethrough cases. Two bounded attempts found no
-safe fix; one upstream candidate changed `*~~a*~~` and `*~~*a~~*` incorrectly and was discarded.
-This item does not block merge or deployment.
+PR #1326's merge stands. The owner made the mixed-delimiter follow-up Required on 2026-10-24.
+For `~_~a_~`, preserve remark's `<p>~_<del>a_</del></p>` output. The shipped tree-sitter
+output was `<p><del><em>~a</em></del></p>`. Two earlier bounded attempts found no safe fix;
+one upstream candidate regressed `*~~a*~~` and `*~~*a~~*` and was discarded.
+
+Acceptance:
+
+- Fix resolver ordering and span ownership in `tree-sitter-md`, then update Fregat's pin.
+  Keep the native parser as the source of delimiter allocation, with no fallback reparse or
+  duplicated adapter resolver.
+- Demonstrate failing-first regression tests for the original input and preserve both neighbors.
+  Cover practical rendering parity with a meaningful nearby corpus, including closed spans,
+  link labels, original run lengths, incremental edits, and both grammar profiles.
+  Use micromark itself with Fregat's established extensions as the oracle in a small deterministic
+  differential test generating nested `**`, `*`, `___`, intraword and punctuation-flanking inputs.
+  Port the micromark attention rules into the native resolver and retain its MIT notice.
+- Pass focused tests and required CI, then obtain one independent review of the actual code.
+- The parent merges the upstream and consumer PRs and updates the owner instance. The
+  implementation lane opens draft PRs and reports evidence without merging or deploying.
+
+Use one bounded implementation attempt per lane. Report each failed approach when it happens.
+After two new failed attempts, the coordinator lists options under Owner decisions before
+continuing. Broad chat qualification above remains nonblocking and separately scheduled.
