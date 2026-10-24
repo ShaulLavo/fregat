@@ -6,7 +6,8 @@ import { getClient, type Client } from '@/lib/client'
 import { test, expect } from '../../../../test/fixtures'
 import { installTestClient } from '../../../../test/factories/client-binding'
 import { createDeferredReadSessionClient } from '../../../../test/factories/deferred-read-session-client'
-import { createTestQueryClient, renderHookWithProviders } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
+import { renderHookWithProviders } from '../../../../test/render'
 import { usePagedFile } from '@/features/workbench/hooks/use-paged-file'
 
 let fileClient: Client

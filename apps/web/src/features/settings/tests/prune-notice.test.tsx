@@ -9,7 +9,8 @@ import { fetchSettings } from '@/features/settings/utils/api'
 import { notifyPrunedSettings } from '@/features/settings/utils/notify-pruned-settings'
 import { admitSettingsEvent } from '@/features/settings/state/snapshot-admission'
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
+import { renderWithProviders } from '../../../../test/render'
 
 // A GET delivery can notify before the application toaster mounts.
 test('shows one transient info notice with every pruned setting detail and ignores cache replays', async ({

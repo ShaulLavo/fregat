@@ -1,37 +1,45 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
-import { createServer } from 'vite'
+import { createServer, type ViteDevServer } from 'vite'
 import { expect, test } from 'vitest'
 import { selectAvailablePort, isPortAvailable } from '../runtime-network'
 import { committedFixture } from './fixture-workspace'
 import { createEvidence } from './evidence'
 import { readLogs } from './logs'
+import { routeHtmlBootstrap } from './html-bootstrap'
+import { attachObserver, serializable, type Observed } from './observe.mjs'
 import { startIsolatedServer } from './isolated-server'
 import { checkoutRoot, scratchPath } from './paths'
 import { isolatedNativeScenario } from './scenarios/native-provider-verification'
 import { selectors, waitForApp } from './selectors'
 import { launchBrowser } from './browser-launch'
 import { chromiumUnavailable } from './browser-prerequisites'
-import type { Browser } from 'playwright'
+import type { Browser, Page } from 'playwright'
 
 const it = test.skipIf(chromiumUnavailable)
 
 it('native fixture opens its workspace before reloading its provider snapshot', async () => {
+  const evidence = await createEvidence('scenario', 'native-workspace-startup')
   const scratch = await mkdtemp(scratchPath('fregat-native-startup-'))
-  const port = await selectAvailablePort({
-    preferredPort: 5496,
-    isAvailable: (candidate) => isPortAvailable('127.0.0.1', candidate),
-  })
-  const webOrigin = new URL(`http://localhost:${port}`)
-  const vite = await createServer({
-    root: path.join(checkoutRoot, 'apps/web'),
-    configFile: path.join(checkoutRoot, 'apps/web/vite.config.ts'),
-    cacheDir: path.join(scratch, 'vite-cache'),
-    server: { host: '127.0.0.1', port, strictPort: true },
-  })
+  let vite: ViteDevServer | undefined
   let server: Awaited<ReturnType<typeof startIsolatedServer>> | undefined
   let browser: Browser | undefined
+  let page: Page | undefined
+  let observed: Observed | undefined
+  const consoleMessages: string[] = []
+  console.log(JSON.stringify({ evidence: evidence.dir }))
   try {
+    const port = await selectAvailablePort({
+      preferredPort: 5496,
+      isAvailable: (candidate) => isPortAvailable('127.0.0.1', candidate),
+    })
+    const webOrigin = new URL(`http://localhost:${port}`)
+    vite = await createServer({
+      root: path.join(checkoutRoot, 'apps/web'),
+      configFile: path.join(checkoutRoot, 'apps/web/vite.config.ts'),
+      cacheDir: path.join(scratch, 'vite-cache'),
+      server: { host: '127.0.0.1', port, strictPort: true },
+    })
     await vite.listen()
     const nodeEnvironment = process.env.NODE_ENV
     process.env.NODE_ENV = 'development'
@@ -41,9 +49,10 @@ it('native fixture opens its workspace before reloading its provider snapshot', 
       process.env.NODE_ENV = nodeEnvironment
     }
     browser = await launchBrowser('chromium', false)
-    const page = await browser.newPage()
+    page = await browser.newPage()
+    observed = attachObserver(page, server.origin)
+    await routeHtmlBootstrap(page.context(), webOrigin.origin, server.origin)
     const failures: unknown[] = []
-    const consoleMessages: string[] = []
     page.on('console', (message) => consoleMessages.push(message.text()))
     const navigations: {
       url: string
@@ -106,7 +115,10 @@ it('native fixture opens its workspace before reloading its provider snapshot', 
     })
     expect(addressResponse.ok()).toBe(true)
     const address = await addressResponse.json()
-    await page.goto(`${webOrigin.origin}/~${address.name}.${address.id}/chat`)
+    const documentResponse = await page.goto(
+      `${webOrigin.origin}/~${address.name}.${address.id}/chat`,
+    )
+    expect(documentResponse?.status()).toBe(200)
     await waitForApp(page)
     await selectors
       .projectSwitcher(page)
@@ -129,11 +141,11 @@ it('native fixture opens its workspace before reloading its provider snapshot', 
         fixturePath = fixture.path
         return fixture
       },
-      drive: async (_page, { sessionId }) => {
+      drive: async (fixturePage, { sessionId }) => {
         fixtureSessionId = sessionId
+        await fixturePage.screenshot({ path: evidence.file('workspace-ready.png') })
       },
     })
-    const evidence = await createEvidence('scenario', 'native-workspace-startup')
     await scenario.run(page, { evidence, server, step: async () => undefined, file: 'a.txt' })
     const logs = await readLogs({ directory: server.logs, since: evidence.startedAt })
     const rpcFailures = logs.filter(
@@ -165,8 +177,34 @@ it('native fixture opens its workspace before reloading its provider snapshot', 
     )
     expect(rpcFailures).toEqual([])
   } finally {
-    const cleanup = await Promise.allSettled([browser?.close(), server?.stop(), vite.close()])
+    const captures: Promise<unknown>[] = [
+      evidence.json('observed.json', observed ? serializable(observed) : null),
+      evidence.json('console.json', consoleMessages),
+    ]
+    if (page)
+      captures.push(
+        page
+          .locator('body')
+          .innerText()
+          .then((body) => evidence.write('body.txt', body)),
+        page.screenshot({ path: evidence.file('startup.png') }),
+      )
+    if (server)
+      captures.push(
+        readLogs({ directory: server.logs, since: evidence.startedAt }).then((logs) =>
+          evidence.json('logs.json', logs),
+        ),
+        readFile(path.join(server.directory, 'server.stdout')).then((text) =>
+          evidence.write('server.stdout', text),
+        ),
+        readFile(path.join(server.directory, 'server.stderr')).then((text) =>
+          evidence.write('server.stderr', text),
+        ),
+      )
+    const captured = await Promise.allSettled(captures)
+    const cleanup = await Promise.allSettled([browser?.close(), server?.stop(), vite?.close()])
     await rm(scratch, { recursive: true, force: true })
+    expect(captured.filter((result) => result.status === 'rejected')).toEqual([])
     expect(cleanup.filter((result) => result.status === 'rejected')).toEqual([])
   }
 }, 90_000)

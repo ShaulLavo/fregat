@@ -140,9 +140,10 @@ runs:
           if [[ "${statuses[1]}" != 0 ]]; then exit "${statuses[1]}"; fi
           status="${statuses[0]}"
           # Fail closed when any diagnostic falls outside the observed download failure.
-          if ! awk '
+          if ! awk -v cache="$cache" '
             /^error: failed to download [^[:space:]]+@https:\/\/github\.com\/[^/[:space:]]+\/[^/[:space:]]+\/releases\/download\/[^[:space:]]+\.tgz: HTTP 5xx$/ { errors++; next }
             /^error: GET https:\/\/github\.com\/[^/[:space:]]+\/[^/[:space:]]+\/releases\/download\/[^[:space:]]+\.tgz - 5[0-9][0-9]$/ { errors++; next }
+            $0 == "warn: Slow filesystem detected. If " cache " is a network drive, consider setting $BUN_INSTALL_CACHE_DIR to a local folder." { next }
             /^$/ || /^bun install v[0-9]/ || /^Resolving dependencies$/ { next }
             /^Resolved, downloaded and extracted \[[0-9]+\]$/ { next }
             /^  https:\/\/github\.com\/[^/[:space:]]+\/[^/[:space:]]+\/releases\/download\/[^[:space:]]+\.tgz$/ { next }

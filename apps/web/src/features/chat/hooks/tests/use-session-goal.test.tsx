@@ -11,7 +11,8 @@ import {
   TEST_ENVIRONMENT_ID,
   TEST_SESSION_ID,
 } from '../../../../../test/factories/chat'
-import { createTestQueryClient, renderHookWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderHookWithProviders } from '../../../../../test/render'
 
 test('goal placeholders stay with their session and environment across turn changes', async ({
   client: _client,

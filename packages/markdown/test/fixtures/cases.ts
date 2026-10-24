@@ -956,13 +956,3 @@ export const WEBKIT_CRITICAL_IDS: readonly string[] = [
   'hebrew-rtl',
   'emoji-zwj',
 ]
-
-export const BASELINE_DEFECTS = [
-  {
-    fixtureId: 'nested-emphasis',
-    checkpointId: NESTED_EMPHASIS_CHECKPOINT.name,
-    reason:
-      'remend 1.3.1 closes the inner emphasis marker and leaves the outer strong marker visible',
-    expected: NESTED_EMPHASIS_CHECKPOINT.expected,
-  },
-]

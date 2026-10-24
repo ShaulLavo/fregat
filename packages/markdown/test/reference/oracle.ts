@@ -22,6 +22,10 @@ const gfm = unified().use(remarkParse).use(remarkGfm)
 export function referenceOutput(source: string, profile: 'commonmark' | 'gfm') {
   const processor = profile === 'gfm' ? gfm : commonmark
   const markdown = processor.runSync(processor.parse(source)) as MarkdownRoot
+  return canonicalMarkdownOutput(markdown)
+}
+
+export function canonicalMarkdownOutput(markdown: MarkdownRoot) {
   const tree = toHast(markdown, { allowDangerousHtml: true, clobberPrefix: '' })
   assert(tree.type === 'root', 'A Markdown root must render to an HTML root')
   const last = tree.children.at(-1)

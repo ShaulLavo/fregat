@@ -6,7 +6,7 @@ import { expect, test } from 'vitest'
 import { useDiagnosticFix } from '@/lib/diagnostic-ai/hooks/use-diagnostic-fix'
 import { DiagnosticFixContext } from '@/lib/diagnostic-ai/providers/context'
 import type { DiagnosticFixRequest } from '@/lib/diagnostic-ai/utils/prompt'
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 
 const request: DiagnosticFixRequest = {
   path: 'repo/app.ts',

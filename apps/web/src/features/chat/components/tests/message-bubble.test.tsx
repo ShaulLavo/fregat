@@ -1,6 +1,8 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ChatAttachment } from '@workspace/contracts'
+import { MarkdownSessionContext } from '@workspace/markdown/providers/session-context'
+import { createMarkdownSession } from '@workspace/markdown/utils/session'
 import type { ReactNode } from 'react'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
@@ -14,7 +16,8 @@ import { createTestApplicationRuntime } from '../../../../../test/factories/appl
 import { chatMessage } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
 import { activeServerOrigin, setActiveServerOrigin } from '@/lib/client'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 
 const LONG_USER_TEXT = Array.from({ length: 40 }, (_, index) => `line ${index}`).join('\n')
 
@@ -215,7 +218,9 @@ function withProviders(children: ReactNode) {
 
   return (
     <EditorStateProvider>
-      <ChatTimelineActionsContext value={actions}>{children}</ChatTimelineActionsContext>
+      <MarkdownSessionContext value={createMarkdownSession}>
+        <ChatTimelineActionsContext value={actions}>{children}</ChatTimelineActionsContext>
+      </MarkdownSessionContext>
     </EditorStateProvider>
   )
 }

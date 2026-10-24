@@ -15,7 +15,7 @@ import type {
   ParsedWorkspaceEdit,
   WorkspaceEditOperation,
 } from '@singapore-editor/lsp-plugin/workspace-edit'
-import { createTestQueryClient } from '../render'
+import { createTestQueryClient } from '../providers'
 import {
   nodeWorkspaceEditFileSystemDriver,
   type WorkspaceEditFileSystemDriver,

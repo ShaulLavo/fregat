@@ -1,0 +1,193 @@
+name: Chat Markdown checks
+
+on:
+  pull_request:
+    paths:
+      - 'packages/markdown/**'
+      - 'editor/packages/tree-sitter/src/treeSitter/markdown.ts'
+      - 'editor/packages/tree-sitter/test/wasm-memory.browser.test.ts'
+      - 'editor/packages/tree-sitter/test/wasm-memory.test.ts'
+      - 'apps/web/src/features/chat/**'
+      - 'apps/web/src/features/workbench/components/markdown-preview*'
+      - 'apps/web/test/factories/markdown*'
+      - 'apps/web/test/providers.tsx'
+      - 'apps/web/test/render.tsx'
+      - 'apps/web/test/env/**'
+      - 'apps/web/vitest*.ts'
+      - 'scripts/markdown/**'
+      - 'package.json'
+      - 'apps/web/package.json'
+      - 'bun.lock'
+      - '.github/workflows/markdown-chat.yml'
+      - '.github/actions/setup/**'
+      - '.github/actions/install-browsers/**'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/markdown/**'
+      - 'editor/packages/tree-sitter/src/treeSitter/markdown.ts'
+      - 'editor/packages/tree-sitter/test/wasm-memory.browser.test.ts'
+      - 'editor/packages/tree-sitter/test/wasm-memory.test.ts'
+      - 'apps/web/src/features/chat/**'
+      - 'apps/web/src/features/workbench/components/markdown-preview*'
+      - 'apps/web/test/factories/markdown*'
+      - 'apps/web/test/providers.tsx'
+      - 'apps/web/test/render.tsx'
+      - 'apps/web/test/env/**'
+      - 'apps/web/vitest*.ts'
+      - 'scripts/markdown/**'
+      - 'package.json'
+      - 'apps/web/package.json'
+      - 'bun.lock'
+      - '.github/workflows/markdown-chat.yml'
+      - '.github/actions/setup/**'
+      - '.github/actions/install-browsers/**'
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: markdown-chat-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+jobs:
+  candidate-check:
+    name: Candidate correctness and chat boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          build-packages: '["web", "@workspace/markdown"]'
+      - uses: ./.github/actions/install-browsers
+        with:
+          playwright: apps/web/node_modules/.bin/playwright
+          browsers: chromium chromium-headless-shell
+      - name: Check the candidate and production boundary
+        env:
+          VITEST_BROWSER_PORT: '5397'
+          VITEST_BROWSER_FILE_SERVER_PORT: '33497'
+        run: bun run markdown:check
+
+  nightly-checks:
+    name: Nightly paired ${{ matrix.suite }} / ${{ matrix.browser }} checks
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - { suite: parity, browser: chromium, install: 'chromium chromium-headless-shell' }
+          - { suite: stream, browser: chromium, install: 'chromium chromium-headless-shell' }
+          - { suite: fuzz, browser: chromium, install: 'chromium chromium-headless-shell' }
+          - { suite: visual, browser: chromium, install: 'chromium chromium-headless-shell' }
+          - { suite: visual, browser: webkit, install: webkit }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          build-packages: '["web", "@workspace/markdown"]'
+      - uses: ./.github/actions/install-browsers
+        with:
+          playwright: apps/web/node_modules/.bin/playwright
+          browsers: ${{ matrix.install }}
+      - name: Run broad paired checks without promotion evidence
+        env:
+          SUITE: ${{ matrix.suite }}
+          BROWSER: ${{ matrix.browser }}
+          VITEST_BROWSER_PORT: '5397'
+          VITEST_BROWSER_FILE_SERVER_PORT: '33497'
+          NODE_OPTIONS: '--max-old-space-size=4096'
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/markdown-nightly/$SUITE-$BROWSER"
+          mkdir -p "$evidence"
+          ps -eo pid,ppid,args > "$evidence/processes-before.txt"
+          ss -ltn > "$evidence/listeners-before.txt"
+          scratch=$(mktemp -d /tmp/md-chat.XXXXXX)
+          cleanup() {
+            rm -rf "$scratch"
+            ss -ltn > "$evidence/listeners-after.txt"
+            test ! -e "$scratch"
+          }
+          trap cleanup EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          export TMPDIR="$scratch" TMP="$scratch" TEMP="$scratch"
+          timeout --signal=TERM --kill-after=30s 40m \
+            bun run markdown:nightly "$SUITE" --browser "$BROWSER" --out "$evidence" \
+            2>&1 | tee "$evidence/execution.log"
+      - name: Upload nightly evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: markdown-nightly-${{ matrix.suite }}-${{ matrix.browser }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/markdown-nightly/
+          if-no-files-found: error
+          retention-days: 14
+
+  nightly-benchmark-smoke:
+    name: Diagnostic paired ${{ matrix.runner }} benchmark smoke
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        runner: [native, production]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          build-packages: '["web", "@workspace/markdown"]'
+      - uses: ./.github/actions/install-browsers
+        with:
+          playwright: apps/web/node_modules/.bin/playwright
+          browsers: chromium chromium-headless-shell
+      - name: Run diagnostic smoke and retain performance failures
+        env:
+          SMOKE_RUNNER: ${{ matrix.runner }}
+          VITEST_BROWSER_PORT: '5397'
+          VITEST_BROWSER_FILE_SERVER_PORT: '33497'
+          NODE_OPTIONS: '--max-old-space-size=4096'
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/markdown-nightly/$SMOKE_RUNNER"
+          mkdir -p "$evidence"
+          ps -eo pid,ppid,args > "$evidence/processes-before.txt"
+          ss -ltn > "$evidence/listeners-before.txt"
+          scratch=$(mktemp -d /tmp/md-chat.XXXXXX)
+          cleanup() {
+            rm -rf "$scratch"
+            ss -ltn > "$evidence/listeners-after.txt"
+            test ! -e "$scratch"
+          }
+          trap cleanup EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          export TMPDIR="$scratch" TMP="$scratch" TEMP="$scratch"
+          printf '%s\n' '{"scope":"diagnostic-smoke","timingHost":"noisy-ci","promotion":"NOT VERIFIED","promotionReceipts":false}' > "$evidence/execution-scope.json"
+          if [[ "$SMOKE_RUNNER" == native ]]; then
+            timeout --signal=TERM --kill-after=30s 35m \
+              bun run markdown:nightly bench --out "$evidence" 2>&1 | tee "$evidence/execution.log"
+          else
+            timeout --signal=TERM --kill-after=30s 35m \
+              bun run markdown:production:smoke --build "$scratch/build" \
+              --directory "$scratch/build" --port 5399 --out "$evidence" \
+              2>&1 | tee "$evidence/execution.log"
+          fi
+      - name: Upload diagnostic samples and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: markdown-diagnostic-${{ matrix.runner }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/markdown-nightly/
+          if-no-files-found: error
+          retention-days: 14

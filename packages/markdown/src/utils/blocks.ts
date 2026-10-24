@@ -2,7 +2,9 @@ import type { Code, Link, Nodes, RootContent } from 'mdast'
 
 import { isUnclosedFencedCode } from './fence'
 import { trackOpenHtmlTags } from './html-tags'
-import { nodeLineStart } from './positions'
+import { cloneTree, nodeLineStart, projectTree } from './positions'
+import type { TrackedText } from './repair-origin'
+import { codeSourcesInWindow, type CodeSources } from './inline-code-source'
 
 /**
  * A run of top-level nodes rendered as one unit. Settled blocks are immutable:
@@ -135,4 +137,55 @@ function markIncomplete(node: Link) {
   const data = node.data ?? {}
   node.url = ''
   node.data = { ...data, hProperties: { ...data.hProperties, dataIncomplete: 'true' } }
+}
+
+type PreparedBlock = {
+  readonly input: TrackedText
+  readonly nodes: readonly RootContent[]
+  readonly sources: CodeSources | null
+}
+const nodeSources = new WeakMap<RootContent, CodeSources>()
+export function retainBlockSources(nodes: readonly RootContent[], sources: CodeSources): void {
+  for (const node of nodes) nodeSources.set(node, sources)
+}
+export function blockCodeSources(block: MarkdownBlock): CodeSources | null {
+  return preparedBlocks.get(block.nodes)?.sources ?? null
+}
+const preparedBlocks = new WeakMap<readonly RootContent[], PreparedBlock>()
+
+export function publishBlock(
+  input: TrackedText,
+  nodes: readonly RootContent[],
+  metadata: Omit<MarkdownBlock, 'source' | 'start' | 'end' | 'nodes'>,
+): MarkdownBlock {
+  const prepared = cloneTree(nodes)
+  const authored = cloneTree(nodes)
+  for (const node of authored) projectTree(node, input)
+  const sources = nodes.length ? nodeSources.get(nodes[0]!) : undefined
+  preparedBlocks.set(authored, {
+    input,
+    nodes: prepared,
+    sources: sources
+      ? codeSourcesInWindow(sources, input.window.start, input.window.start + input.text.length)
+      : null,
+  })
+  return {
+    ...metadata,
+    source: input.window.text,
+    start: input.window.start,
+    end: input.window.start + input.window.text.length,
+    nodes: authored,
+  }
+}
+
+export function blockRenderInput(block: MarkdownBlock):
+  | {
+      readonly kind: 'prepared'
+      readonly input: TrackedText
+      readonly nodes: readonly RootContent[]
+    }
+  | { readonly kind: 'authored'; readonly nodes: readonly RootContent[] } {
+  const prepared = preparedBlocks.get(block.nodes)
+  if (prepared) return { kind: 'prepared', input: prepared.input, nodes: cloneTree(prepared.nodes) }
+  return { kind: 'authored', nodes: cloneTree(block.nodes) }
 }

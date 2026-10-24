@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "matching": "utf16-prefix-any-suffix-v1",
+  "rules": [
+    {
+      "id": "open-file-log",
+      "prefix": "See [the log](",
+      "suffix": ").",
+      "provenance": {
+        "commit": "f60e0310f642e030d6fb47d842169b5f71c4e843",
+        "path": "apps/web/src/features/chat/hooks/tests/use-open-file-reference.test.tsx",
+        "gitBlob": "44a7967c89f5ff27ff8b52fcd6556071d0808c9f",
+        "fileSha256": "81d9777255ae67518e94fa5a8aef10f8a857b9aca5a72c1d08724b4f986942b4",
+        "line": 27,
+        "expression": "`See [the log](${path.join(server.root, 'tmp/deploy.log')}).`",
+        "bindings": []
+      }
+    },
+    {
+      "id": "open-file-notes",
+      "prefix": "See [notes](",
+      "suffix": ").",
+      "provenance": {
+        "commit": "f60e0310f642e030d6fb47d842169b5f71c4e843",
+        "path": "apps/web/src/features/chat/hooks/tests/use-open-file-reference.test.tsx",
+        "gitBlob": "44a7967c89f5ff27ff8b52fcd6556071d0808c9f",
+        "fileSha256": "81d9777255ae67518e94fa5a8aef10f8a857b9aca5a72c1d08724b4f986942b4",
+        "line": 47,
+        "expression": "`See [notes](${outside}).`",
+        "bindings": ["const outside = path.join(path.dirname(server.root), 'elsewhere/notes.md')"]
+      }
+    },
+    {
+      "id": "stream-source-image",
+      "prefix": "<div id=\"base-ui-_r_123_\">User namespace</div>\n\n<span id=\"_r_abc_\">User identity</span>\n\n![source image](",
+      "suffix": ")\n\n[link](https://example.com/docs)",
+      "provenance": {
+        "commit": "f60e0310f642e030d6fb47d842169b5f71c4e843",
+        "path": "apps/web/src/features/chat/tests/qualification-stream.browser.tsx",
+        "gitBlob": "d82568edb0ddda6c76f0b19f41325f25d5e27aba",
+        "fileSha256": "219fae4037066feb1acb4ceb0528489505a738841b1895cf87e826e396cfae2c",
+        "line": 147,
+        "expression": "`<div id=\"base-ui-_r_123_\">User namespace</div>\\n\\n<span id=\"_r_abc_\">User identity</span>\\n\\n![source image](${imageUrl})\\n\\n[link](https://example.com/docs)`",
+        "bindings": ["const imageUrl = new URL('/icons/fregat.svg', location.href).href"]
+      }
+    },
+    {
+      "id": "stream-replaced-id",
+      "prefix": "<div id=\"base-ui-_r_123_\">User namespace</div>\n\n<span id=\"_r_xyz_\">User identity</span>\n\n![source image](",
+      "suffix": ")\n\n[link](https://example.com/docs)",
+      "provenance": {
+        "commit": "f60e0310f642e030d6fb47d842169b5f71c4e843",
+        "path": "apps/web/src/features/chat/tests/qualification-stream.browser.tsx",
+        "gitBlob": "d82568edb0ddda6c76f0b19f41325f25d5e27aba",
+        "fileSha256": "219fae4037066feb1acb4ceb0528489505a738841b1895cf87e826e396cfae2c",
+        "line": 161,
+        "expression": "source.replace('id=\"_r_abc_\"', 'id=\"_r_xyz_\"')",
+        "bindings": ["const imageUrl = new URL('/icons/fregat.svg', location.href).href"]
+      }
+    },
+    {
+      "id": "warmup-final-image",
+      "prefix": "![Answer](",
+      "suffix": "/icons/fregat-favicon.svg)",
+      "provenance": {
+        "commit": "f60e0310f642e030d6fb47d842169b5f71c4e843",
+        "path": "apps/web/src/features/chat/tests/production-oracle-warmup.browser.tsx",
+        "gitBlob": "82efe15a5e670f8812c8d8dcee5cf1831c43d0bf",
+        "fileSha256": "873006a473b38b1fad8865a247391b67ebffeee2bf93ca36279a7dce04f915a6",
+        "line": 51,
+        "expression": "`![Answer](${location.origin}/icons/fregat-favicon.svg)`",
+        "bindings": []
+      }
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ReasoningRow } from '@/features/chat/components/reasoning-row'
@@ -42,7 +42,9 @@ test('reasoning in mixed history starts folded and opens on click', async () => 
 
   expect(screen.queryByRole('region', { name: 'Reasoning' })).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Thought' }))
-  expect(screen.getByRole('region', { name: 'Reasoning' })).toHaveTextContent(reasoning)
+  await waitFor(() =>
+    expect(screen.getByRole('region', { name: 'Reasoning' })).toHaveTextContent(reasoning),
+  )
 })
 
 test('streaming reasoning respects the reader expansion after it settles', async () => {
@@ -51,19 +53,23 @@ test('streaming reasoning respects the reader expansion after it settles', async
   const toggle = screen.getByRole('button', { name: 'Thinking' })
   expect(toggle).toHaveAttribute('aria-expanded', 'false')
   await userEvent.click(toggle)
-  expect(screen.getByRole('region', { name: 'Reasoning' })).toHaveTextContent(reasoning)
+  await waitFor(() =>
+    expect(screen.getByRole('region', { name: 'Reasoning' })).toHaveTextContent(reasoning),
+  )
   view.unmount()
   renderRow(false)
   expect(screen.getByRole('button', { name: 'Thought' })).toHaveAttribute('aria-expanded', 'true')
 })
 
-test('a reasoning-only history shows the text without a second disclosure', () => {
+test('a reasoning-only history shows the text without a second disclosure', async () => {
   resetExpansion()
   renderWithProviders(
     <TestEditorStateProvider>
       <ReasoningRow entry={reasoningEntry()} streaming showHeader={false} />
     </TestEditorStateProvider>,
   )
+  await waitFor(() =>
+    expect(screen.getByRole('region', { name: 'Reasoning' })).toHaveTextContent(reasoning),
+  )
   expect(screen.queryByRole('button')).not.toBeInTheDocument()
-  expect(screen.getByRole('region', { name: 'Reasoning' })).toHaveTextContent(reasoning)
 })

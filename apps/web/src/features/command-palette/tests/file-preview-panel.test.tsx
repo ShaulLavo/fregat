@@ -6,7 +6,8 @@ import { FilePreviewPanel } from '@/features/command-palette/components/file-pre
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { fetchTree } from '@/lib/file-server'
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
+import { renderWithProviders } from '../../../../test/render'
 import { createObservedInProcessClient } from '../../../../test/client'
 import { installTestClient } from '../../../../test/factories/client-binding'
 

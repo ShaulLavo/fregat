@@ -15,11 +15,8 @@ import userEvent from '@testing-library/user-event'
 
 import { BranchActions } from '@/features/git/components/branch-actions'
 import { expect, test } from '../../../../../test/fixtures'
-import {
-  createTestQueryClient,
-  renderHookWithProviders,
-  renderWithProviders,
-} from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderHookWithProviders, renderWithProviders } from '../../../../../test/render'
 import { runGit } from '../../../../../test/factories/git'
 
 // Real git and the real route. These fixtures' origin is a local directory, so

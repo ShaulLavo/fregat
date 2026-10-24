@@ -10,7 +10,7 @@ import { tabId, documentKey, settingsJsonDocument } from '@/lib/documents/utils/
 import { createEditorTextBuffer, createEditorViewSession } from '@singapore-editor/core/document'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 
 test('holds the view, scope, owner and document until the next JSON buffer is ready', async ({
   client,

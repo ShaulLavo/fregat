@@ -11,7 +11,8 @@ import { documentKey, settingsJsonDocument, tabId } from '@/lib/documents/utils/
 import { EditorWorkspaceStateContext } from '@/features/editor/state/workspace-state'
 import { FocusService } from '@/lib/focus/state/service'
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
+import { renderWithProviders } from '../../../../test/render'
 import { createTestCommandRuntime } from '../../../../test/factories/command-runtime'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 

@@ -53,6 +53,8 @@ async function sourceFiles(root: string): Promise<string[]> {
     'packages/markdown/src',
     'packages/markdown/test',
     'apps/web/src/features/chat/components',
+    'apps/web/src/features/chat/providers',
+    'apps/web/src/features/chat/state',
     'apps/web/src/features/chat/utils',
     'apps/web/src/features/chat/tests',
     'scripts/markdown',
@@ -61,8 +63,22 @@ async function sourceFiles(root: string): Promise<string[]> {
     await Promise.all(directories.map((directory) => codeFiles(root, directory)))
   ).flat()
   files.push(
+    'apps/web/test/providers.tsx',
     'apps/web/test/factories/markdown-browser.tsx',
+    'apps/web/test/factories/markdown-observation.ts',
+    'apps/web/test/factories/markdown-production-assets.ts',
+    'apps/web/test/factories/markdown-production-types.ts',
+    'apps/web/test/factories/markdown-production.tsx',
+    'apps/web/test/factories/markdown-timeline-scene.tsx',
+    'apps/web/test/factories/qualification-image-command.ts',
+    'apps/web/test/markdown-production.html',
+    'apps/web/test/markdown-production.ts',
+    'apps/web/vitest.markdown-qualification.config.ts',
+    'apps/web/vite.config.ts',
     'apps/web/vitest.browser.config.ts',
+    'editor/packages/tree-sitter/src/treeSitter/markdown.ts',
+    'editor/packages/tree-sitter/test/wasm-memory.browser.test.ts',
+    'editor/packages/tree-sitter/test/wasm-memory.test.ts',
     'package.json',
   )
   return files.sort()

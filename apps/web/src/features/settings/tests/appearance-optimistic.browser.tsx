@@ -5,7 +5,7 @@ import { flushSync } from 'react-dom'
 import { afterEach, expect, test } from 'vitest'
 
 import { settingsSnapshot } from '../../../../test/factories/settings'
-import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/providers'
 import { useTheme } from '@/features/settings/hooks/use-theme'
 import { getClient, activeServerOrigin, setClient, type Client } from '@/lib/client'
 import { clientInstanceId, instanceHeaderName } from '@/lib/instance-id'

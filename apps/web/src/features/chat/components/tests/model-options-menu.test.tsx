@@ -17,7 +17,8 @@ import {
 } from '@/features/chat/state/chat-input-draft-store'
 import { providerModel, providerSnapshot } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 
 const draftTarget: ChatInputDraftTarget = {
   environmentId: FIXTURE_ENVIRONMENT_ID,

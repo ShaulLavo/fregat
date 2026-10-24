@@ -1,5 +1,6 @@
 import { expect, test } from '../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../test/render'
+import { createTestQueryClient } from '../../test/providers'
+import { renderWithProviders } from '../../test/render'
 import { TestEditorStateProvider } from '../../test/factories/editor-state-provider'
 import { settingsSnapshot } from '../../test/factories/settings'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'

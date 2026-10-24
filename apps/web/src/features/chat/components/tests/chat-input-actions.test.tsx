@@ -21,7 +21,8 @@ import {
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 
 const sessionId = v.parse(sessionIdSchema, 'd587e342-74d2-5b84-b545-b7a49b2bae30')
 const draftTarget: ChatInputDraftTarget = {

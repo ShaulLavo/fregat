@@ -3,7 +3,7 @@ import { createEnvironmentEntry } from '@workspace/client-core/environments/util
 import { activeServerOrigin, setActiveServerOrigin } from '@/lib/client'
 import { environmentLogContext } from '@/lib/environments/state/log-context'
 import { environmentIdSchema } from '@workspace/contracts'
-import { createTestQueryClient } from '../../../test/render'
+import { createTestQueryClient } from '../../../test/providers'
 import { DEFAULT_PROVIDER_DRIVER_KIND, providerInstanceIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { afterEach, beforeEach, vi } from 'vitest'

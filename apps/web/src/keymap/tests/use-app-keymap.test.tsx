@@ -4,7 +4,7 @@ import { vi } from 'vitest'
 import { expect, test } from '../../../test/fixtures'
 import { binding } from '../../../test/factories/key-binding'
 import { createTestCommandRuntime } from '../../../test/factories/command-runtime'
-import { createTestQueryClient } from '../../../test/render'
+import { createTestQueryClient } from '../../../test/providers'
 import { FocusService } from '@/lib/focus/state/service'
 import { useAppKeymap } from '@/keymap/use-app-keymap'
 

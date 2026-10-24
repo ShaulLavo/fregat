@@ -8,7 +8,7 @@ import {
 import { createObservedInProcessClient } from '../../../../test/client'
 import { delayedGitDiffs } from '../../../../test/factories/delayed-git'
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 
 test('leaving eight rows admits only four server Git operations until they finish', async ({
   client,

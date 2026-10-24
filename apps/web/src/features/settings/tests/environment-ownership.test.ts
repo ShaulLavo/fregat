@@ -20,7 +20,7 @@ import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-c
 
 import { createInProcessClient } from '../../../../test/client'
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 import { makeTestServer } from '../../../../test/server'
 
 afterEach(() => resetSettingsIntentStore())

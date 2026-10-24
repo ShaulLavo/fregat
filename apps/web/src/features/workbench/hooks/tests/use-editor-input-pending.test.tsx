@@ -10,7 +10,8 @@ import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 import { fileSystemKeys } from '@/lib/query-keys'
 import { TestEditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 
 test('keeps a resolved file pending until its selected view binds', () => {
   const queryClient = createTestQueryClient()
