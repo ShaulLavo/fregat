@@ -1,7 +1,5 @@
 # TUI worktrees and session creation
 
-Plan 083 completed on 2026-09-08.
-
 The terminal client uses the same [worktree lifecycle](worktree-lifecycle.md) as the web app.
 The [TUI README](../apps/tui/README.md#choose-and-manage-worktrees) describes the controls.
 

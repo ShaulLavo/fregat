@@ -2,7 +2,7 @@
 
 Workspace operations retain their initiating environment, root generation, and source evidence through preparation, confirmation, persistence, and completion. Selecting another machine does not redirect an operation. Changing a workspace root invalidates work that has not committed, including a return to the same path.
 
-This implements Plan 097 on the [document and tab model](document-and-tab-domain.md).
+This builds on the [document and tab model](document-and-tab-domain.md).
 
 ## Transport ownership
 

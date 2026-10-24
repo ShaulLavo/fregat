@@ -2,7 +2,6 @@
 
 The Agent view connects the terminal client to the same orchestration engine, provider adapters,
 and conversation projection as the web app. It provides the missing prompt and session stage.
-Plan 082 completed on 2026-09-07.
 The [TUI README](../apps/tui/README.md#start-an-agent-conversation) describes the controls.
 
 ## Runtime and ownership

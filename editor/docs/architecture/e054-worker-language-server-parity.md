@@ -103,7 +103,7 @@ notification to its socket.
 - `bun run test` in `packages/lsp-plugin`: server-request handlers through the pool, and a close
   after `$/serverExited` reported as that exit.
 - `bunx playwright test` in `examples/app`: `fixes, formats, renames across files and outlines with
-no language server`, with the CDN routed to fail.
+  no language server`, with the CDN routed to fail.
 
 ## Left for later
 

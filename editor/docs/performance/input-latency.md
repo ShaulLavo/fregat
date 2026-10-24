@@ -1,6 +1,6 @@
 # Input latency measurements
 
-Current paired comparisons use Platform's [paired input runner](../../../docs/document-contributions/paired-input-latency.md). It retains warm package pages, uses fixed historical budgets and key-local balanced two-pair blocks, and collects two or four measured pairs under the strict blocking-only stopping guard. Its sensitivity cache keys on measurement identity. The counterbalanced sampler requires fresh controls, loaded A/A reliability evidence and complete-matrix timings before Plan 282 acceptance. The input-latency results below remain historical evidence for their original instrument.
+Current paired comparisons use Platform's [paired input runner](../../../docs/document-contributions/paired-input-latency.md). It retains warm package pages, uses fixed historical budgets and key-local balanced two-pair blocks, and collects two or four measured pairs under the strict blocking-only stopping guard. Its sensitivity cache keys on measurement identity. The counterbalanced sampler requires fresh controls, loaded A/A reliability evidence and complete-matrix timings. The input-latency results below remain historical evidence for their original instrument.
 
 The optimized candidate passes all 108 blocking timing limits
 and the correctness checks across 10,488 measured input events. One screenshot-duration advisory

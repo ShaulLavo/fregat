@@ -1,6 +1,6 @@
 # Document and tab domain
 
-Plan 098 is implemented in the web client. Document identity, filesystem resources, and tab
+The web client implements this model. Document identity, filesystem resources, and tab
 instances have separate types. The existing workspace document service still owns live buffers,
 revisions, views, synchronization, and recovery.
 
