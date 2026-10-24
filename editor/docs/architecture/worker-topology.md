@@ -1,7 +1,5 @@
 # Worker Topology
 
-Status: Phase 11 working note.
-
 This document records cache ownership, cache limits, and restart behavior for worker owners that
 exist today. A worker owner is the object responsible for creating the worker, exposing inspection,
 owning disposal, and defining what happens after a worker failure.
@@ -15,15 +13,13 @@ owning disposal, and defining what happens after a worker failure.
 | `ShikiWorkerOwner`         | `@singapore-editor/core/shiki`     | Owner caches theme-request promises by sorted theme key. Worker caches one tokenizer per open document and highlighters by sorted language/theme key. These caches are lifecycle-scoped, not size-bounded.                                                                                | A crash terminates the worker, rejects pending requests, clears owner theme cache, and leaves lifecycle `crashed`. The next request on the same owner creates a fresh worker generation; failed requests are not replayed automatically. Disposal detaches callbacks and immediately terminates the worker. |
 | `TypeScriptLspWorkerOwner` | `@singapore-editor/typescript-lsp` | No owner-side document cache. The owner tracks posted-message count, listener counts, and last error. The worker owns LSP document/project state for the lifetime of the worker.                                                                                                          | A crash posts `$/serverExited` to the client, terminates the worker, clears listeners, and leaves lifecycle `crashed`. There is no automatic restart on the same owner; recreate the LSP transport/session/connection.                                                                                      |
 
-There is not yet a separate document worker owner. The main-thread document engine remains the
-document truth until that Phase 11 item is implemented.
+There is no separate document worker owner. The main-thread document engine is the document truth ([ADR 003](../adr/003-document-on-main-thread.md)).
 
-## Removed Compatibility Singleton Paths
+## Explicit Worker Owners
 
-These package-level helpers were removed from the first-party route so callers must own worker
-lifetimes explicitly.
+There are no package-level worker helpers. Callers own worker lifetimes explicitly. The helpers in the table do not exist.
 
-| Runtime         | Removed path                                                                                                                                                                                                                | Required owner path                                                                                          | Current status                                                                                                                                   |
+| Runtime         | Missing helper                                                                                                                                                                                                                | Required owner path                                                                                          | Notes                                                                                                                                   |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Tree-sitter     | `registerTreeSitterLanguagesWithWorker`, `parseWithTreeSitter`, `editWithTreeSitter`, `queryRangeWithTreeSitter`, `selectWithTreeSitter`, `disposeTreeSitterDocument`, `disposeTreeSitterWorker`, `inspectTreeSitterWorker` | `TreeSitterWorkerClient` or `createTreeSitterWorkerBackend()` owned by the editor runtime or syntax provider | Removed from the worker client and package index. First-party tests, benchmarks, and structural selection create or receive an owner explicitly. |
 | Shiki tokenizer | `createShikiHighlighterSession`, `loadShikiTheme`, `disposeShikiWorker`                                                                                                                                                     | `createShikiWorkerOwner()` owned by the editor runtime, highlighter provider, or diff syntax service         | Removed from the worker client and Shiki package index. The Shiki plugin and diff syntax service create owners explicitly.                       |
@@ -197,7 +193,7 @@ Limits:
 - Owner-side memory is bounded to counters/listener sets and last error.
 - Worker-side TypeScript service memory is lifecycle-scoped and not size-bounded by the owner. It
   is the program's: 1.1 GB for Platform's `apps/web` (9,341 files), measured by
-  `bench/fileProvider.ts` in E054.
+  `bench/fileProvider.ts`.
 
 Disposal and restart:
 

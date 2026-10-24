@@ -1,6 +1,6 @@
 # Anchor System
 
-## Semantics (Locked)
+## Semantics
 
 - Anchors are stable references into immutable buffers
 - Structurally immutable — never change across edits
@@ -13,7 +13,7 @@
 - Bias (left/right) controls boundary behavior at insertion points
 - An anchor may be live in one snapshot and deleted in another (e.g., across undo/redo)
 
-### Why anchors (locked rationale)
+### Why anchors
 
 - Eliminates rebasing at call sites
 - Natural fit with piece table's immutable buffer model
@@ -54,35 +54,35 @@ not merge affinity-distinct carets merely because their anchors resolve together
 
 ---
 
-## Deletion and Bias Rules (Locked)
+## Deletion and Bias Rules
 
 Resolution produces `ResolvedAnchor`: `{ offset, liveness }`.
 
 - **Live:** exact visible position. Liveness = `live`.
 - **Deleted:** gap where text used to be. Liveness = `deleted`.
-- **Bias at gap:** Left = left edge, Right = right edge. The gap of a deleted piece reaches, on each side, to the nearest piece whose buffer is no newer than its own: another part of the same insert, or text that was there when it was inserted. Text between arrived later, so bias decides which side of it the anchor takes. Until E039 the edges were the nearest pieces of the same buffer only, and an insert deleted whole, which has none, resolved to the document's start or end.
-- **Where text lands:** an insert goes after the last visible piece ending at its offset, and a replacement's text where its hidden text began. Neither goes between two tombstones, so the side a deleted anchor takes never depends on the tree's shape. Until E006 an insert landed after whichever piece the descent reached first, which could be a tombstone.
+- **Bias at gap:** Left = left edge, Right = right edge. The gap of a deleted piece reaches, on each side, to the nearest piece whose buffer is no newer than its own: another part of the same insert, or text that was there when it was inserted. Text between arrived later, so bias decides which side of it the anchor takes. An insert deleted whole has no other piece of its own buffer, so the gap is bounded by the older text around it, never by the document's start or end.
+- **Where text lands:** an insert goes after the last visible piece ending at its offset, and a replacement's text where its hidden text began. Neither goes between two tombstones, so the side a deleted anchor takes never depends on the tree's shape.
 - **Replacement (delete + insert):** delete-first, then insert. Left-biased stays before new text; right-biased stays after.
 - **Boundary clamping:** clamps to 0 / document.length at document edges.
 - **Deterministic** for a given (anchor, snapshot) pair.
 - **Replacement is not a special case.** Fully defined by delete-first + bias.
 
-### Deletion Representation (Locked)
+### Deletion Representation
 
-Phase 2 deletes preserve anchor-resolvable identity by keeping deleted pieces in the tree as invisible pieces.
+Deletes preserve anchor-resolvable identity by keeping deleted pieces in the tree as invisible pieces.
 
 - `Piece` gains `visible: boolean`.
 - Delete marks the affected visible pieces invisible instead of physically discarding them.
 - User-facing document length and offsets use visible length only.
-- `subtreeVisibleLength` becomes the canonical prefix-sum aggregate for document offsets.
+- `subtreeVisibleLength` is the canonical prefix-sum aggregate for document offsets.
 - `subtreeLength` remains physical buffer span length for internal traversal/debugging.
-- Future collaboration can reuse the same visibility model; no separate deleted-span history index is introduced.
+- Collaboration can reuse the same visibility model; no separate deleted-span history index exists.
 
 This is required for deleted anchors to resolve deterministically. If deleted pieces were physically removed, the current direct-node reverse-index design would have no snapshot-local place to find the deleted buffer span.
 
-Since E006, maintenance compacts each run of adjacent invisible pieces. Tombstones whose deleted anchors resolve alike share one textless **stand-in**, and the reverse index leads their entries to it; every anchor resolves exactly as before. See [tombstone compaction](../storage/e006-tombstone-compaction.md).
+Maintenance compacts each run of adjacent invisible pieces. Tombstones whose deleted anchors resolve alike share one textless **stand-in**, and the reverse index leads their entries to it; every anchor resolves exactly as before. See [tombstone compaction](../storage/e006-tombstone-compaction.md).
 
-### Boundary Creation (Locked)
+### Boundary Creation
 
 When `anchorAt(snapshot, offset, bias)` lands exactly between two visible pieces:
 
@@ -95,7 +95,7 @@ When `anchorAt(snapshot, offset, bias)` lands exactly between two visible pieces
 
 ## Resolution Architecture
 
-Revised by [E039](../performance/e039-reverse-index-cost.md). The design locked here first was a second persistent BST keyed by `(buffer, piece.start)` whose entries pointed at pieces; its write cost was twice the sequence tree's. What replaced it:
+The reverse index is not a second persistent tree keyed by `(buffer, piece.start)` with entries that point at pieces: that design cost twice the sequence tree's write cost. See the [reverse-index cost report](../performance/e039-reverse-index-cost.md). The index works as follows.
 
 ### 1. The sequence tree finds original text
 
@@ -116,7 +116,7 @@ Buffer ids are dense and the newest is always next, so inserted buffers are inde
 
 ---
 
-## Snapshot Consistency (Locked)
+## Snapshot Consistency
 
 Snapshot = `(root, reverseIndex)` tuple. Both immutable to their holder. Undo/redo = O(1) swap.
 
@@ -133,7 +133,7 @@ Snapshot = `(root, reverseIndex)` tuple. Both immutable to their holder. Undo/re
 
 ---
 
-## Consumer Direction (Locked)
+## Consumer Use
 
 | Consumer                         | Uses anchors?                                |
 | -------------------------------- | -------------------------------------------- |

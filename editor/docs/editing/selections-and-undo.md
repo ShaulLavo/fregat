@@ -1,6 +1,6 @@
 # Selections & Undo
 
-## Selection Model (Locked: Anchor-Based)
+## Selection Model
 
 Editors need cursor positions and selected ranges that survive edits. Anchor-based selections are
 structurally stable — no rebasing is required at call sites.
@@ -155,7 +155,7 @@ Two stacks (undo, redo). Edit pushes current to undo, clears redo. Undo pushes t
 
 With anchor resolution: snapshot = `(root, reverseIndex)` tuple. Switch = O(1) swap. Memory-efficient via structural sharing.
 
-Phase 3 stores snapshots and selection state together in history entries. Undo and redo stacks are
+History entries store snapshots and selection state together in history entries. Undo and redo stacks are
 linked stacks so push/pop snapshot switching stays O(1). This keeps selection restoration explicit
 while preserving the anchor property that selections can still resolve across snapshots.
 
