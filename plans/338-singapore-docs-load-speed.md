@@ -4,7 +4,7 @@
 
 - Status: Approved. Owner request, 2026-10-08, after choosing the docs-in-editor prototype and observing that it is "slightly slow".
 - Parent: [Plan 336](336-packages-as-products.md), Singapore docs implementation.
-- Order: measure the chosen prototype now. Apply the low-cost load changes while Plan 336 moves the prototype into `editor/site`. Shared editor changes follow a measured site need and their package tests.
+- Order: measure the chosen prototype now. Apply the low-cost load changes while Plan 336 moves the prototype into `packages/singapore/site`. Shared editor changes follow a measured site need and their package tests.
 - Deliverable here: one plan-only PR. Implementation follows the phases below.
 
 ## Outcome
@@ -101,7 +101,7 @@ Expected gains below are hypotheses. Measure each independently, keep it only wh
 
 [PR #1021](https://github.com/ShaulLavo/fregat/pull/1021) supplies a relevant viewport-first experiment, not a ready-made Markdown shortcut. At this plan's writing it is open. Its provisional trees are root-only, exclude injected content, and keep Markdown/MDX on the complete-context path. Check its final merged contract before reusing anything. The small guide startup here differs from its 1–200 MiB TypeScript opens.
 
-The [browser comparison](../editor/docs/performance/browser-compare-2026-10-08.md) and [comparison harness](../editor/bench/compare/README.md) provide calibration and regressions. Their open clocks begin after module loading and use different prerequisite parsing work per editor. This site's clock includes navigation, code loading, preview and swap. Report both; do not infer a docs takeover target or a universal Monaco/CodeMirror ranking from that comparison.
+The [browser comparison](../packages/singapore/docs/performance/browser-compare-2026-10-08.md) and [comparison harness](../packages/singapore/bench/compare/README.md) provide calibration and regressions. Their open clocks begin after module loading and use different prerequisite parsing work per editor. This site's clock includes navigation, code loading, preview and swap. Report both; do not infer a docs takeover target or a universal Monaco/CodeMirror ranking from that comparison.
 
 ## Phases
 
@@ -109,7 +109,7 @@ Each phase ends with its own before/after check. Give an implementation unit two
 
 ### 1. Freeze the baseline and expose missing clocks
 
-- [ ] Move the prototype verify flow into portable site test tooling under `editor/site/tests/`, with explicit fixture routes and local server cleanup. Keep JavaScript-off as the known-good static control.
+- [ ] Move the prototype verify flow into portable site test tooling under `packages/singapore/site/tests/`, with explicit fixture routes and local server cleanup. Keep JavaScript-off as the known-good static control.
 - [ ] Reuse the comparison harness's `open-profile.mjs` probes and trace summary where they fit. Add navigation, idle, import parse/eval, stylesheet, mount, worker creation/ready, grammar fetch/compile/instantiate, root parse, injection parse, first visible highlight, preview coverage and swap marks. Worker durations use the worker clock; correlate them with message round trips, never subtract unrelated clock origins.
 - [ ] Freeze both short guides plus a long Markdown guide containing below-fold shell/TypeScript fences. Record source/build hashes, versions, viewport, DPR, cache state, server headers, scheduler overlap and CPU/network settings. Emit distributions and resource totals through visible takeover and through complete background settlement.
 - [ ] Run the original verify script and new probe against the same build. Inject a known 120 ms delay into mount and one worker response to prove their clocks observe it. Add an incorrect-highlight control to prove the visible-readiness predicate rejects it. Retain screenshot/trace evidence.
@@ -169,7 +169,7 @@ Exit: only the smaller proven approach ships. If neither is correct and cheaper 
 
 - [ ] Run the fixed cold/warm matrix with at least 20 repetitions per accepted cell, CPU and network settings above, separate trace runs and resource accounting. Report each page independently.
 - [ ] Run the prototype verification behaviours on the built site: JavaScript-off, failed grammar/worker, forced phone takeover, tab links/back, scroll restoration, find, selection/copy and immediate typing. Inspect screenshots at the top and a scrolled fence.
-- [ ] Run the [comparison harness](../editor/bench/compare/README.md) smoke for any changed shared editor path. Preserve its controls and explicit feature differences. For Fregat consumer changes use `verify-fregat`, a matching scenario and `trace --compare`; collect render counts only if React consumers changed.
+- [ ] Run the [comparison harness](../packages/singapore/bench/compare/README.md) smoke for any changed shared editor path. Preserve its controls and explicit feature differences. For Fregat consumer changes use `verify-fregat`, a matching scenario and `trace --compare`; collect render counts only if React consumers changed.
 - [ ] Check real phone behaviour when a device is available and accessibility reading order/headings with the Plan 336 owner. Publish public numbers only with committed method, machine, versions, date and a reproducible script.
 - [ ] Run `bun run plans:check`, update this plan's phase receipts and link the final evidence from Plan 336.
 

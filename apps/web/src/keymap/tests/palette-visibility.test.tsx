@@ -5,7 +5,7 @@ import { isCommandVisibleInPalette } from '@/keymap/utils/palette-visibility'
 import { FocusService } from '@/lib/focus/state/service'
 import { createTestCommandRuntime } from '../../../test/factories/command-runtime'
 import { expect, test } from '../../../test/fixtures'
-import { createTestQueryClient } from '../../../test/render'
+import { createTestQueryClient } from '../../../test/providers'
 
 test('offers useful editing actions once while keyboard-only commands still dispatch', async () => {
   const focus = new FocusService()

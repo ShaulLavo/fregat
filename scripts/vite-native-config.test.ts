@@ -8,7 +8,7 @@ import { chromium } from 'playwright'
 import { expect, test } from 'vitest'
 
 const repository = path.resolve(import.meta.dirname, '..')
-const require = createRequire(path.join(repository, 'editor/package.json'))
+const require = createRequire(path.join(repository, 'packages/singapore/package.json'))
 const { createLogger, loadConfigFromFile } = await import(require.resolve('vite'))
 
 const ghosttyNeedsSwiftShader =
@@ -28,17 +28,17 @@ const configurations = [
   'apps/web/vitest.browser.config.ts',
   'apps/web/vitest.tree-browser.config.ts',
   'apps/web/retention-acceptance.vitest.config.ts',
-  'ghostty-webgpu/vitest.browser.config.ts',
-  'editor/packages/editor/vitest.config.ts',
-  'editor/packages/highlighting/vitest.config.ts',
-  'editor/packages/typescript-lsp/vitest.config.ts',
+  'packages/ghostty-webgpu/vitest.browser.config.ts',
+  'packages/singapore/packages/editor/vitest.config.ts',
+  'packages/singapore/packages/highlighting/vitest.config.ts',
+  'packages/singapore/packages/typescript-lsp/vitest.config.ts',
 ]
 
 for (const loader of ['bundle', 'native'] as const) {
   test.for(configurations)(
     '%s loads with ' + loader + ' without native compatibility warnings',
     async (relative, { skip }) => {
-      if (relative === 'ghostty-webgpu/vitest.browser.config.ts' && missingSwiftShader)
+      if (relative === 'packages/ghostty-webgpu/vitest.browser.config.ts' && missingSwiftShader)
         skip(
           'Ghostty Chromium config loading requires the installed Playwright SwiftShader Vulkan driver',
         )

@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import type { Editor } from '@singapore-editor/core/editor'
-import { decodePaintSnapshot } from '../../../../editor/packages/editor/src/editor/paintSnapshot'
+import { decodePaintSnapshot } from '../../../../packages/singapore/packages/editor/src/editor/paintSnapshot'
 import { editorPreparedDocumentTags } from '@/features/editor/utils/prepared-document'
 import {
   editorSyntaxColors,

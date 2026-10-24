@@ -36,11 +36,11 @@ jobs:
           bunx turbo run build --filter=@singapore-editor/collaboration...
       - name: Check types, lint and formatting
         run: |
-          bun run --cwd editor/packages/collab typecheck
-          bun run --cwd editor/packages/collab lint
-          bun run --cwd editor/packages/collab format:check
+          bun run --cwd packages/singapore/packages/collab typecheck
+          bun run --cwd packages/singapore/packages/collab lint
+          bun run --cwd packages/singapore/packages/collab format:check
       - name: Verify both engines, differential replay and independent visibility
         env:
           COLLAB_STRESS: '1'
           COLLAB_STRESS_SHARD: '${{ matrix.shard }}/8'
-        run: bun run --cwd editor/packages/collab test --maxWorkers=2
+        run: bun run --cwd packages/singapore/packages/collab test --maxWorkers=2

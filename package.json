@@ -16,16 +16,16 @@
       "packages/utils",
       "scripts",
       "packages/push",
-      "hotkeys/packages/*",
-      "editor/packages/*",
-      "editor/examples/*",
-      "editor/bench/compare",
-      "ghostty-webgpu",
-      "ghostty-webgpu/packages/*",
-      "ghostty-webgpu/demo",
-      "ghostty-webgpu/site",
-      "ghostty-webgpu/site-classic",
-      "editor/site"
+      "packages/hotkeys/packages/*",
+      "packages/singapore/packages/*",
+      "packages/singapore/examples/*",
+      "packages/singapore/bench/compare",
+      "packages/ghostty-webgpu",
+      "packages/ghostty-webgpu/packages/*",
+      "packages/ghostty-webgpu/demo",
+      "packages/ghostty-webgpu/site",
+      "packages/ghostty-webgpu/site-classic",
+      "packages/singapore/site"
     ],
     "catalog": {
       "@opentui/core": "0.5.12",
@@ -46,7 +46,7 @@
     }
   },
   "scripts": {
-    "bench:input:paired": "bun run --cwd editor/examples/stress bench:input:paired",
+    "bench:input:paired": "bun run --cwd packages/singapore/examples/stress bench:input:paired",
     "bench:large-file": "bun scripts/large-file/bench.ts",
     "build": "bun scripts/prod.ts build",
     "pair": "bun apps/server/src/devices/pair-command.ts",
@@ -62,7 +62,7 @@
     "dev:unserve": "bun scripts/dev-serve.ts --remove",
     "dev:tui": "bun scripts/tui.ts",
     "desktop:dev": "bun --env-file=.env scripts/desktop-dev.ts",
-    "lint": "bun run workspace:check && bun run plans:check && bun run --cwd editor lint:root && bun run dupes:functions && bun run dupes && bun run --parallel --no-exit-on-error --filter '*' lint",
+    "lint": "bun run workspace:check && bun run plans:check && bun run --cwd packages/singapore lint:root && bun run dupes:functions && bun run dupes && bun run --parallel --no-exit-on-error --filter '*' lint",
     "design:census": "node scripts/lint/web-design-census.mjs --check",
     "compiler:census": "node scripts/lint/react-compiler-census.mjs --check",
     "errors:census": "node scripts/lint/error-context-census.mjs --check",
@@ -73,13 +73,13 @@
     "bench:workspace-search": "bun apps/server/scripts/workspace-search-benchmark.ts",
     "start": "bun scripts/prod.ts start",
     "server:install": "bun scripts/install-server.ts",
-    "format": "bun run format:root && bun run --cwd editor format:root && bun run --cwd hotkeys format && bun run --filter '*' format",
-    "format:check": "bun run format:check:root && bun run --cwd editor format:check:root && bun run --cwd hotkeys format:check && bun run --filter '*' format:check",
-    "typecheck": "bun run build:workspaces && bun run --sequential --filter '*' typecheck && bun run --cwd hotkeys docs:check",
+    "format": "bun run format:root && bun run --cwd packages/singapore format:root && bun run --cwd packages/hotkeys format && bun run --filter '*' format",
+    "format:check": "bun run format:check:root && bun run --cwd packages/singapore format:check:root && bun run --cwd packages/hotkeys format:check && bun run --filter '*' format:check",
+    "typecheck": "bun run build:workspaces && bun run --sequential --filter '*' typecheck && bun run --cwd packages/hotkeys docs:check",
     "test": "bun run build:workspaces && bun run test:scripts && bun run --sequential --filter '*' test",
     "generated:check": "bun run workspace:check && bun run icons:generate:check && bun run settings:schema:check && bun run settings:reference:check && bun run themes:palette-css:check && bun run --cwd apps/server codex-protocol:check && bun run syntax:coverage:check && bun run native:workflow:check && bun run --cwd packages/ui tables:check",
-    "native:workflow": "bun ghostty-webgpu/scripts/config-resolver-native/generate-workspace-workflow.ts --write",
-    "native:workflow:check": "bun ghostty-webgpu/scripts/config-resolver-native/generate-workspace-workflow.ts --check",
+    "native:workflow": "bun packages/ghostty-webgpu/scripts/config-resolver-native/generate-workspace-workflow.ts --write",
+    "native:workflow:check": "bun packages/ghostty-webgpu/scripts/config-resolver-native/generate-workspace-workflow.ts --check",
     "settings:reference": "bun --tsconfig-override scripts/tsconfig.settings.json scripts/generate-settings-reference.ts",
     "settings:reference:check": "bun --tsconfig-override scripts/tsconfig.settings.json scripts/generate-settings-reference.ts --check",
     "settings:schema": "bun --tsconfig-override scripts/tsconfig.settings.json scripts/generate-settings-schema.ts",
@@ -110,7 +110,7 @@
     "syntax:coverage": "bun apps/web/scripts/syntax-coverage.ts",
     "syntax:coverage:check": "bun apps/web/scripts/syntax-coverage.ts --check",
     "query:check": "node scripts/lint/query-api.mjs",
-    "build:workspaces": "turbo run build --filter='./editor/packages/*' --filter=ghostty-webgpu --filter=ghostty-webgpu-line-editor --filter=ghostty-webgpu-shaders --filter='@fregat/*' --filter=@workspace/ui",
+    "build:workspaces": "turbo run build --filter='./packages/singapore/packages/*' --filter=ghostty-webgpu --filter=ghostty-webgpu-line-editor --filter=ghostty-webgpu-shaders --filter='@fregat/*' --filter=@workspace/ui",
     "changeset": "node node_modules/@changesets/cli/bin.js",
     "version-packages": "changeset version && bun install --lockfile-only",
     "release": "bun x turbo run build --filter=\"@singapore-editor/*\" --filter=\"@fregat/*\" --filter=ghostty-webgpu --filter=ghostty-webgpu-shaders && bun scripts/release/prepare.mjs && node node_modules/@changesets/cli/bin.js publish",
@@ -128,7 +128,11 @@
     "markdown:stream": "bun scripts/markdown/qualify.ts stream --baseline",
     "markdown:visual": "bun scripts/markdown/qualify.ts visual --baseline",
     "markdown:bench": "bun scripts/markdown/qualify.ts bench --baseline",
-    "markdown:qualify": "bun scripts/markdown/qualify.ts qualify"
+    "markdown:qualify": "bun scripts/markdown/qualify.ts qualify",
+    "markdown:nightly": "bun scripts/markdown/qualify.ts --checks-only",
+    "markdown:production:smoke": "bun scripts/markdown/production-browser.ts --smoke --trials 2 --warmups 1 --negative-controls",
+    "markdown:production:retention": "bun scripts/markdown/production-resource-retention.ts",
+    "markdown:check": "bun run --cwd packages/markdown test qualification-candidate && bun run --cwd apps/web test:markdown"
   },
   "devDependencies": {
     "@changesets/changelog-github": "1.0.1",
@@ -144,19 +148,19 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "pngjs": "7.0.0",
-    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#565bb1a6f2d4428b66a927574ef6683452d913d0",
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#25ddda5e327247a24e3a847dfdb425ca488befd4",
     "turbo": "catalog:",
     "typescript": "catalog:",
     "typescript-api": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#aab7db1518c19f61c1b13ec3f832b881cf5f1385"
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#690443fc704b3b15e38e866c2ccb77a7c2c00467"
   },
   "overrides": {
     "@opentui/core": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-core-0.5.12-bubli.2.tgz",
     "@opentui/react": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-react-0.5.12-bubli.2.tgz",
     "lodash-es": "4.18.1",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#aab7db1518c19f61c1b13ec3f832b881cf5f1385"
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#690443fc704b3b15e38e866c2ccb77a7c2c00467"
   },
   "engines": {
     "node": ">=26.0.0"

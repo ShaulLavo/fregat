@@ -33,7 +33,7 @@ import {
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import type { FileResult } from '@/lib/file-system-types'
 import { expect, test } from '../../../../../test/fixtures'
-import { AppProviders, createTestQueryClient } from '../../../../../test/render'
+import { AppProviders, createTestQueryClient } from '../../../../../test/providers'
 
 test('a clean close returns the exact open tab ids it closed', async () => {
   const hook = renderDirtyTabClose()

@@ -15,7 +15,8 @@ import { createObservedInProcessClient } from '../../../test/client'
 import { installTestClient } from '../../../test/factories/client-binding'
 import { installNativePickerHelper } from '../../../test/factories/native-picker'
 import { expect, test } from '../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../test/render'
+import { createTestQueryClient } from '../../../test/providers'
+import { renderWithProviders } from '../../../test/render'
 
 afterEach(() => {
   delete window.platformBridge

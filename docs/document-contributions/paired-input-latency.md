@@ -64,7 +64,7 @@ default explicitly; worker-backed Tree-sitter requires loaded full or focused ve
 `--only native,disabled` is focused diagnostic coverage and does not establish Platform acceptance.
 `--loaded` records externally applied CPU contention; the runner starts no CPU workers.
 
-Freeze matching `src`, `dist`, manifests, and external dependencies with `editor/examples/stress/package-set.mjs`. The [stress README](../../editor/examples/stress/README.md#input-latency-budgets) describes package freezing. The runner verifies source and build hashes, external receipts, and the bundled page and worker graph before collecting input.
+Freeze matching `src`, `dist`, manifests, and external dependencies with `packages/singapore/examples/stress/package-set.mjs`. The [stress README](../../packages/singapore/examples/stress/README.md#input-latency-budgets) describes package freezing. The runner verifies source and build hashes, external receipts, and the bundled page and worker graph before collecting input.
 
 ## Verdict
 

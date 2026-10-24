@@ -20,7 +20,7 @@ git clone https://github.com/ShaulLavo/fregat.git && cd fregat && bun install --
 ```
 
 The [README](README.md#requirements) says which Bun, Node.js and Git versions you need and why. Read [docs/development.md](docs/development.md) for source builds, checks, version floors and platform prerequisites, and the [monorepo map](docs/monorepo.md) for where code lives. If a command fails, see [troubleshooting](docs/troubleshooting.md).
-Read [AGENTS.md](AGENTS.md) for repository conventions. Singapore changes also follow [editor/AGENTS.md](editor/AGENTS.md); terminal changes follow [ghostty-webgpu/AGENTS.md](ghostty-webgpu/AGENTS.md).
+Read [AGENTS.md](AGENTS.md) for repository conventions. Singapore changes also follow [packages/singapore/AGENTS.md](packages/singapore/AGENTS.md); terminal changes follow [packages/ghostty-webgpu/AGENTS.md](packages/ghostty-webgpu/AGENTS.md).
 
 ## Make and verify a change
 

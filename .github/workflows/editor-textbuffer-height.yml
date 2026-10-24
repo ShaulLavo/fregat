@@ -3,13 +3,13 @@ name: Textbuffer tree height
 on:
   pull_request:
     paths:
-      - 'editor/packages/textbuffer/**'
+      - 'packages/singapore/packages/textbuffer/**'
       - 'bun.lock'
       - '.github/workflows/editor-textbuffer-height.yml'
   push:
     branches: ['main']
     paths:
-      - 'editor/packages/textbuffer/**'
+      - 'packages/singapore/packages/textbuffer/**'
       - 'bun.lock'
       - '.github/workflows/editor-textbuffer-height.yml'
   workflow_dispatch:
@@ -44,19 +44,19 @@ jobs:
         run: bun install --frozen-lockfile --filter '@singapore-editor/textbuffer'
       - name: Check formatting and lint
         run: |
-          bun run --cwd editor/packages/textbuffer format:check
-          bun run --cwd editor/packages/textbuffer lint
+          bun run --cwd packages/singapore/packages/textbuffer format:check
+          bun run --cwd packages/singapore/packages/textbuffer lint
       - name: Build, prepare the pinned control and test the measurements
-        run: bun run --cwd editor/packages/textbuffer bench:check
+        run: bun run --cwd packages/singapore/packages/textbuffer bench:check
       - name: Smoke both engines
-        run: bun run --cwd editor/packages/textbuffer bench:height -- --profile smoke --trace-seeds 7 --out bench/results/height-smoke
+        run: bun run --cwd packages/singapore/packages/textbuffer bench:height -- --profile smoke --trace-seeds 7 --out bench/results/height-smoke
       # The standard sweep is a long replay whose output is an artifact, not a gate; pull requests get the smoke run only.
       - name: Sample both trees across edit seeds
         if: github.event_name != 'pull_request'
-        run: bun run --cwd editor/packages/textbuffer bench:height -- --profile standard
+        run: bun run --cwd packages/singapore/packages/textbuffer bench:height -- --profile standard
       - name: Plot samples
         if: always()
-        working-directory: editor/packages/textbuffer
+        working-directory: packages/singapore/packages/textbuffer
         run: |
           shopt -s nullglob
           reports=(bench/results/height-*/height.json)
@@ -75,5 +75,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: textbuffer-height-${{ github.run_id }}
-          path: editor/packages/textbuffer/bench/results/height-*/
+          path: packages/singapore/packages/textbuffer/bench/results/height-*/
           if-no-files-found: warn

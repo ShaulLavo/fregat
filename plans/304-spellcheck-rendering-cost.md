@@ -12,13 +12,13 @@ Typing with spelling marks pays for the visible rows and the overlays that chang
 
 ## Current code and evidence
 
-[E062](../editor/docs/editing/e062-spellcheck-hardening.md) shipped a measured reduction in repeated CSS decoration parsing. It did not complete incremental overlay painting. Its local dense-mark results improved, but the off baseline varied and background work affected reruns. Treat these as historical evidence, not a current controlled comparison.
+[E062](../packages/singapore/docs/editing/e062-spellcheck-hardening.md) shipped a measured reduction in repeated CSS decoration parsing. It did not complete incremental overlay painting. Its local dense-mark results improved, but the off baseline varied and background work affected reruns. Treat these as historical evidence, not a current controlled comparison.
 
-[virtualizedTextViewHighlights.ts](../editor/packages/editor/src/virtualization/virtualizedTextViewHighlights.ts) still rebuilds the document overlay mask in `refreshHighlightOverlayMask`. [highlightOverlay.ts](../editor/packages/editor/src/virtualization/highlightOverlay.ts) already normalizes shared styles once. Preserve that shipped optimization. Coordinate the remaining mask work through Plan 201 instead of adding a second overlay engine.
+[virtualizedTextViewHighlights.ts](../packages/singapore/packages/editor/src/virtualization/virtualizedTextViewHighlights.ts) still rebuilds the document overlay mask in `refreshHighlightOverlayMask`. [highlightOverlay.ts](../packages/singapore/packages/editor/src/virtualization/highlightOverlay.ts) already normalizes shared styles once. Preserve that shipped optimization. Coordinate the remaining mask work through Plan 201 instead of adding a second overlay engine.
 
-[bench/typing.browser.test.ts](../editor/packages/spellcheck/bench/typing.browser.test.ts) has off, no-mark, dense, and sparse cases, controller/highlight/adoption timers, isolated tokenizer samples, and a Chromium CPU profile. It uses `FakeChecker`, so its numbers describe synchronous integration cost, not dictionary-worker end-to-end latency. The sparse fixture was corrected in E062 to one marked line in four.
+[bench/typing.browser.test.ts](../packages/singapore/packages/spellcheck/bench/typing.browser.test.ts) has off, no-mark, dense, and sparse cases, controller/highlight/adoption timers, isolated tokenizer samples, and a Chromium CPU profile. It uses `FakeChecker`, so its numbers describe synchronous integration cost, not dictionary-worker end-to-end latency. The sparse fixture was corrected in E062 to one marked line in four.
 
-[bench/engine.ts](../editor/packages/spellcheck/bench/engine.ts) already reports total evaluation pairs, target coverage, accepted typos with covered targets, eligible ranking pairs, and conditional top-1/top-5 ranking. Its defaults still carry a `NOT-PORTABLE` comment and absolute owner paths. Make this benchmark reproducible as part of the measurement work.
+[bench/engine.ts](../packages/singapore/packages/spellcheck/bench/engine.ts) already reports total evaluation pairs, target coverage, accepted typos with covered targets, eligible ranking pairs, and conditional top-1/top-5 ranking. Its defaults still carry a `NOT-PORTABLE` comment and absolute owner paths. Make this benchmark reproducible as part of the measurement work.
 
 No benchmarks ran during this planning pass.
 
@@ -32,7 +32,7 @@ The file default remains `off` until the final artifact has a measured input-lat
 
 ## Execution checklist
 
-- [ ] Rerun `bun run bench:typing` from `editor/packages/spellcheck/` before changing code. Record commit, runtime, browser, fixture size, mark count/density, samples, and median/p95 for all four cases. Run a quiet measurement through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill.
+- [ ] Rerun `bun run bench:typing` from `packages/singapore/packages/spellcheck/` before changing code. Record commit, runtime, browser, fixture size, mark count/density, samples, and median/p95 for all four cases. Run a quiet measurement through host-local [heavy-runner](https://github.com/ShaulLavo/heavy-runner), configured in the local `fregat-local` skill.
 - [ ] Attribute controller/tokenization, underline updates, token adoption, and total edit work. Identify whether document-wide mask rebuilding or another measured path is the current bottleneck. Profile both text edits and delayed overlay updates so overlapping timings are labeled correctly.
 - [ ] Land the shared overlay work through Plan 201. Compare offscreen-dense documents at fixed mounted-row count. Count the ranges/rows touched so the regression proves that unrelated offscreen marks do not add per-keystroke rebuilding work.
 - [ ] Exercise sparse, dense, and empty marks during edit, scroll, remount, asynchronous verdict arrival, overlapping dim/underline/diagnostic styles, and surrogate-edge changes. Preserve paint on text that has no syntax provider.

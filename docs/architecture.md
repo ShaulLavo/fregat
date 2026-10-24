@@ -45,7 +45,7 @@ Shells run in a separate terminal host process, not in the server. When the serv
 
 ## Libraries and mirrors
 
-Three folders in this repository are products of their own: `editor/` (Singapore, the editor), `ghostty-webgpu/` (Ghostty's terminal in the browser) and `hotkeys/` (the keymap library). The web app embeds all three. The terminal client uses the editor's core and the keymap library. On every push to `main`, CI copies each folder to a read-only repository. [ADR 001](adr/001-one-repository-with-mirrors.md) explains the choice.
+Three folders in this repository are products of their own: `packages/singapore/` (Singapore, the editor), `packages/ghostty-webgpu/` (Ghostty's terminal in the browser) and `packages/hotkeys/` (the keymap library). The web app embeds all three. The terminal client uses the editor's core and the keymap library. On every push to `main`, CI copies each folder to a read-only repository. [ADR 001](adr/001-one-repository-with-mirrors.md) explains the choice.
 
 ## Platform support
 

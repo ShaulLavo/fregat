@@ -20,13 +20,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - folder: editor
+          - folder: packages/singapore
             repository: ShaulLavo/singapore
             deploy_key: MIRROR_EDITOR_SSH_KEY
-          - folder: ghostty-webgpu
+          - folder: packages/ghostty-webgpu
             repository: ShaulLavo/ghostty-webgpu
             deploy_key: MIRROR_GHOSTTY_SSH_KEY
-          - folder: hotkeys
+          - folder: packages/hotkeys
             repository: ShaulLavo/hotkeys
             deploy_key: MIRROR_HOTKEYS_SSH_KEY
     steps:

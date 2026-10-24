@@ -7,9 +7,9 @@
   overlay) and #304 (first frame in the HTML). Approved 2026-10-01 by the owner, answering two
   site reviews in one pass. The owner's own
   gripe is speed: "we should make it faster … servo render the first frame of the terminal."
-- Site: <https://shaullavo.github.io/ghostty-webgpu/>, built from `ghostty-webgpu/site/` by
-  `.github/workflows/site.yml` on every push to `main` that touches `ghostty-webgpu/**`.
-- Package changes (Phases 1 and 4) land in `ghostty-webgpu/src/` and bump the package version as
+- Site: <https://shaullavo.github.io/ghostty-webgpu/>, built from `packages/ghostty-webgpu/site/` by
+  `.github/workflows/site.yml` on every push to `main` that touches `packages/ghostty-webgpu/**`.
+- Package changes (Phases 1 and 4) land in `packages/ghostty-webgpu/src/` and bump the package version as
   the change warrants; the site consumes `../dist`.
 
 ## Owner decisions

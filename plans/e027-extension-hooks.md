@@ -1,6 +1,6 @@
 # E027: Define and verify the extension hook contract
 
-Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
+Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
 
 - Status: Approved
 - Kind: Design
@@ -11,13 +11,13 @@ Source paths in this document are relative to [`editor/`](../editor/) unless qua
 - Inspected baseline: Editor `9abb944f3a2b8d6516953fdec75e8df5e1a94811`.
 - Research: design pass done 2026-09-25 against Editor `e2fd299`; findings and a draft inventory below. Implementation steps 5–6 and the E028 hand-off remain.
 
-Decided 2026-09-25: owner — unparked. Rebase the plan on the [E050 host contracts](../editor/docs/architecture/e050-host-obligations.md) first, then execute. Platform Plan 122 Phase 0 needs this design pass.
+Decided 2026-09-25: owner — unparked. Rebase the plan on the [E050 host contracts](../packages/singapore/docs/architecture/e050-host-obligations.md) first, then execute. Platform Plan 122 Phase 0 needs this design pass.
 
 ## Outcome
 
 Publish an accurate extension inventory that tells a plugin author which behavior they can
 change, which context they receive, and when their resources disappear. Propose only the
-missing hooks needed to exercise modal input in [E028](../editor/docs/architecture/modal-input-findings.md).
+missing hooks needed to exercise modal input in [E028](../packages/singapore/docs/architecture/modal-input-findings.md).
 
 A developer implementing a custom paste handler or view decoration should find its existing
 public hook. A developer intercepting input should find an explicit ownership contract,
@@ -25,23 +25,23 @@ including how to delegate ordinary typing and composition to the default impleme
 
 ## Current code
 
-[EditorPluginContext](../editor/packages/editor/src/plugins.ts) already registers syntax, highlighter,
+[EditorPluginContext](../packages/singapore/packages/editor/src/plugins.ts) already registers syntax, highlighter,
 view, command, capability, edit, decoration, gutter, injected-row, inline-replacement, and
 selection-range contributions. Its public types are exported through
-[extensions.ts](../editor/packages/editor/src/public/extensions.ts).
+[extensions.ts](../packages/singapore/packages/editor/src/public/extensions.ts).
 
 The same plugin file defines single-owner capabilities, multi-provider language features,
 paste handlers, contribution disposal, and per-view update callbacks. The wishlist's request
 for a hook taxonomy must inventory this existing model before adding another registration API.
 
-[InputSelectionController](../editor/packages/editor/src/editor/inputSelectionController.ts) owns
+[InputSelectionController](../packages/singapore/packages/editor/src/editor/inputSelectionController.ts) owns
 browser keydown, beforeinput, composition, paste, and selection handling.
-[inputState.ts](../editor/packages/editor/src/editor/inputState.ts) tracks browser and session ownership.
-[EditorHotkeys](../editor/packages/editor/src/editor/hotkeys.ts) uses the
-[shared focus dispatcher](../hotkeys/packages/hotkeys/src/dispatch/dispatcher.ts).
+[inputState.ts](../packages/singapore/packages/editor/src/editor/inputState.ts) tracks browser and session ownership.
+[EditorHotkeys](../packages/singapore/packages/editor/src/editor/hotkeys.ts) uses the
+[shared focus dispatcher](../packages/hotkeys/packages/hotkeys/src/dispatch/dispatcher.ts).
 
-[DisplayProjectionRegistry](../editor/packages/editor/src/editor/displayProjectionRegistry.ts) is an
-internal composition point. Public [rendering exports](../editor/packages/editor/src/public/rendering.ts)
+[DisplayProjectionRegistry](../packages/singapore/packages/editor/src/editor/displayProjectionRegistry.ts) is an
+internal composition point. Public [rendering exports](../packages/singapore/packages/editor/src/public/rendering.ts)
 and registered view contributions expose selected display operations, not the entire registry.
 Open, save, and workspace policy also cross host boundaries and are not all plugin callbacks.
 
@@ -101,9 +101,9 @@ proposal and returns evidence before E025 makes a broader stability promise.
 
 ## Verification
 
-Read [public API tests](../editor/packages/editor/test/public-api.test.ts),
-[plugin tests](../editor/packages/editor/test/plugins.test.ts), and
-[lifecycle tests](../editor/packages/editor/src/editor/pluginLifecycle.test.ts) before adding coverage.
+Read [public API tests](../packages/singapore/packages/editor/test/public-api.test.ts),
+[plugin tests](../packages/singapore/packages/editor/test/plugins.test.ts), and
+[lifecycle tests](../packages/singapore/packages/editor/src/editor/pluginLifecycle.test.ts) before adding coverage.
 An export check must catch a documented hook that cannot be imported from the built package.
 A lifecycle check must catch a surviving registration after its owning contribution disappears.
 
@@ -128,7 +128,7 @@ The design is incomplete if host save callbacks are mislabeled as editor documen
 
 Read from Editor `origin/main` at `e2fd299` and Platform `origin/main` at `ed96e9f16`. No open PR
 changes this plan (Editor PRs #20, #34, #35 do not touch it). The draft inventory is
-[extension-hooks.md](../editor/docs/architecture/extension-hooks.md): every category in Scope has rows, each
+[extension-hooks.md](../packages/singapore/docs/architecture/extension-hooks.md): every category in Scope has rows, each
 with its symbol, scope, ordering, disposal, a production consumer, and a status.
 
 All eleven E050 rows are on main, not only rows 2, 5, 7, 8, 9 and 11: rows 1, 3, 4, 6 and 10 came
@@ -144,7 +144,7 @@ Lifecycle claims were checked with four happy-dom probes against the worktree so
 ### Step 1: what exists
 
 `EditorPluginContext` has 13 registration methods and `log`
-([plugins.ts](../editor/packages/editor/src/plugins.ts)). The view context has 33 members. Six contribution
+([plugins.ts](../packages/singapore/packages/editor/src/plugins.ts)). The view context has 33 members. Six contribution
 kinds exist: view, command, capability, edit, decoration, and the internal feature kind, whose
 combined context has DOM, edits, selections, decorations and commands on one object. Only
 `mergeConflictPlugin` reaches it, by casting its plugin context to `EditorInternalPluginContext`.
@@ -156,7 +156,7 @@ change subscription per token (`EditorLanguageFeatureRegistry.subscribe` exists 
 any combine or derive step.
 
 Notification fan-out: every view contribution is visited for every update kind except `viewport`,
-which has its own subscriber set ([viewContributions.ts](../editor/packages/editor/src/editor/viewContributions.ts)).
+which has its own subscriber set ([viewContributions.ts](../packages/singapore/packages/editor/src/editor/viewContributions.ts)).
 Decoration and feature contributions get every `handleEditorChange`. Plan 122 Phase 0 measures this;
 E027 only records who owns it.
 
@@ -168,7 +168,7 @@ E027 only records who owns it.
   Platform Plan 099 owns adding one.
 - Contributions survive a document swap and hear `document` or `clear` afterwards. There is no
   will-change phase. Row handles abort before replacement. `textVersion` rises on every rendered change
-  and every swap in one editor ([documentController.ts](../editor/packages/editor/src/editor/documentController.ts)),
+  and every swap in one editor ([documentController.ts](../packages/singapore/packages/editor/src/editor/documentController.ts)),
   so it rejects stale results across A-to-B-to-A.
 - **Ambiguity 1, factory state.** `createBracketMatchPlugin` (line 44) and `createMergeConflictPlugin`
   (line 118) keep `controller` in the factory closure. With one object in two editors, the second

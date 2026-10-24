@@ -26,7 +26,8 @@ import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 
 import { expect, test } from '../../../../test/fixtures'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
-import { AppProviders, createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { AppProviders, createTestQueryClient } from '../../../../test/providers'
+import { renderWithProviders } from '../../../../test/render'
 
 // The toast is the only door into the conflict editor, so this drives it the way a user does:
 // dirty buffer, file changed underneath, Compare. What must come out is a tab of its own that

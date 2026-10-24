@@ -40,7 +40,7 @@ Move and select by paragraph, delete to line boundaries, transpose characters, r
 ## Existing Fregat and Editor work
 
 Editor source below was verified in `/work/projects/Editor/packages/` before Plan 207.
-Implement it in Fregat `editor/packages/` after that cutover; the external checkout is
+Implement it in Fregat `packages/singapore/packages/` after that cutover; the external checkout is
 read-only for this wave.
 
 [packages/editor/src/editor/commandCatalog.ts](/work/projects/Editor/packages/editor/src/editor/commandCatalog.ts) contains word/subword deletion,
@@ -58,7 +58,7 @@ focus nodes and handlers in the window dispatcher. Preserve Linux/macOS contexts
 payloads, source order, and unbinds from the translation; activate modal rows when
 their mode owner exists. A declined command falls through to its ancestor.
 
-Add pure range/transform helpers in `editor/packages/editor/` and route edits through
+Add pure range/transform helpers in `packages/singapore/packages/editor/` and route edits through
 DocumentSession transactions. Reuse display-line and indentation motion helpers
 for deletion and kill operations; paragraph motion uses logical buffer lines.
 Track one kill entry across editor views in an exposed zustand store owned by the

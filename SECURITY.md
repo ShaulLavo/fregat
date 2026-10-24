@@ -27,4 +27,4 @@ Know these defaults before you expose a server:
 - A browser on the machine itself needs no pairing. Any other browser pairs first. A reverse proxy must preserve the public `Host` header, or always add a forwarding header such as `X-Forwarded-For`. A proxy that rewrites every request to a loopback host and strips every forwarding header makes remote traffic look local. See [reverse proxy device trust](docs/development.md#reverse-proxy-device-trust).
 
 The browser terminal's clipboard behavior and shell connection are part of its integration policy.
-Review the [terminal integration guide](ghostty-webgpu/docs/integration.md) when embedding it in another app.
+Review the [terminal integration guide](packages/ghostty-webgpu/docs/integration.md) when embedding it in another app.

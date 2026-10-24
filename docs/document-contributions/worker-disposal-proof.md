@@ -45,10 +45,10 @@ highlighting and document sharing. This is a teardown proof, not a tokenizer thr
 Commands run from the isolated repository with the machine's heavy-command wrapper:
 
 ```sh
-bunx vitest run --root editor/packages/editor --project dom test/shiki/workerClient-cache.test.ts
-bunx vitest run --root editor/packages/tree-sitter test/treeSitter-workerClient.test.ts test/workerClient-registration.test.ts
-bunx vitest run --root editor/packages/highlighting --project browser test/worker-disposal.browser.test.ts test/review.browser.test.ts test/disposed-admission.browser.test.ts test/service.browser.test.ts
-bunx vitest run --root editor/packages/editor --project browser test/shiki/workerClient.browser.test.ts
+bunx vitest run --root packages/singapore/packages/editor --project dom test/shiki/workerClient-cache.test.ts
+bunx vitest run --root packages/singapore/packages/tree-sitter test/treeSitter-workerClient.test.ts test/workerClient-registration.test.ts
+bunx vitest run --root packages/singapore/packages/highlighting --project browser test/worker-disposal.browser.test.ts test/review.browser.test.ts test/disposed-admission.browser.test.ts test/service.browser.test.ts
+bunx vitest run --root packages/singapore/packages/editor --project browser test/shiki/workerClient.browser.test.ts
 ```
 
 Workspace exports were built before consumer tests. Required commit gates and repository

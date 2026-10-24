@@ -10,13 +10,13 @@ import {
   isRecord,
   type ParityDiagnostic,
   type ParitySession,
-} from '../../../../editor/packages/typescript-lsp/test/parity/contract'
+} from '../../../../packages/singapore/packages/typescript-lsp/test/parity/contract'
 import {
   CORE_PROJECT,
   openAndEditCoreProject,
   positionOf,
-} from '../../../../editor/packages/typescript-lsp/test/parity/cases/project'
-import { diagnosticsFromReport } from '../../../../editor/packages/typescript-lsp/test/parity/validators'
+} from '../../../../packages/singapore/packages/typescript-lsp/test/parity/cases/project'
+import { diagnosticsFromReport } from '../../../../packages/singapore/packages/typescript-lsp/test/parity/validators'
 import { createInternalError } from '../../src/observability/structured-errors'
 import {
   LspSessionPool,

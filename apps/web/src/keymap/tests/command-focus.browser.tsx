@@ -34,12 +34,10 @@ import { FocusProvider } from '@/lib/focus/providers/provider'
 import { FocusService } from '@/lib/focus/state/service'
 import { TestCommandProvider } from '../../../test/factories/command-runtime'
 import { paletteContentQueryOptions } from '@/features/command-palette/utils/content-query'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../test/providers'
 import {
-  AppProviders,
-  createTestQueryClient,
   holdDeferredDialog,
   loadDeferredDialogs,
-  seedHtmlTheme,
   renderHookWithProviders,
 } from '../../../test/render'
 

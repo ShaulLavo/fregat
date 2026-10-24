@@ -29,17 +29,22 @@ export function proposedPlanTitle(planMarkdown: string) {
 }
 
 export function stripDisplayedPlanMarkdown(planMarkdown: string) {
-  const sourceLines = planMarkdown.trimEnd().split(/\r?\n/)
-  const lines =
-    sourceLines[0] && /^\s{0,3}#{1,6}\s+/.test(sourceLines[0]) ? sourceLines.slice(1) : sourceLines
+  const source = planMarkdown.trimEnd()
+  let stripSummary = true
 
-  removeBlankPrefix(lines)
-  if (summaryHeading(lines[0])) {
-    lines.shift()
-    removeBlankPrefix(lines)
+  for (const line of source.matchAll(/([^\r\n]*)(?:\r\n|[\r\n]|$)/g)) {
+    const text = line[1] ?? ''
+    if (line.index === 0 && /^\s{0,3}#{1,6}\s+/.test(text)) continue
+    if (text.trim().length === 0) continue
+    if (stripSummary && summaryHeading(text)) {
+      stripSummary = false
+      continue
+    }
+
+    return source.slice(line.index)
   }
 
-  return lines.join('\n')
+  return ''
 }
 
 export function canCollapseProposedPlan(planMarkdown: string) {
@@ -152,12 +157,6 @@ export function proposedPlanExportFilename(planMarkdown: string) {
 /** A heading of nothing but whitespace is no heading, so callers see one fallback. */
 function planHeading(planMarkdown: string) {
   return planMarkdown.match(/^\s{0,3}#{1,6}\s+(.+)$/m)?.[1]?.trim() || undefined
-}
-
-function removeBlankPrefix(lines: string[]) {
-  while (lines[0]?.trim().length === 0) {
-    lines.shift()
-  }
 }
 
 function removeBlankSuffix(lines: string[]) {

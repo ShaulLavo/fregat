@@ -71,8 +71,8 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         ".env*",
-        "$TURBO_ROOT$/ghostty-webgpu/docs/correctness-results.json",
-        "$TURBO_ROOT$/ghostty-webgpu/docs/benchmarks/**"
+        "$TURBO_ROOT$/packages/ghostty-webgpu/docs/correctness-results.json",
+        "$TURBO_ROOT$/packages/ghostty-webgpu/docs/benchmarks/**"
       ],
       "outputs": ["dist/**"]
     },
@@ -81,10 +81,10 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         ".env*",
-        "$TURBO_ROOT$/ghostty-webgpu/site/src/**",
-        "$TURBO_ROOT$/ghostty-webgpu/site/scripts/**",
-        "$TURBO_ROOT$/ghostty-webgpu/docs/correctness-results.json",
-        "$TURBO_ROOT$/ghostty-webgpu/docs/benchmarks/**"
+        "$TURBO_ROOT$/packages/ghostty-webgpu/site/src/**",
+        "$TURBO_ROOT$/packages/ghostty-webgpu/site/scripts/**",
+        "$TURBO_ROOT$/packages/ghostty-webgpu/docs/correctness-results.json",
+        "$TURBO_ROOT$/packages/ghostty-webgpu/docs/benchmarks/**"
       ],
       "outputs": ["dist/**"]
     },
@@ -123,11 +123,11 @@
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/editor/examples/stress/src/fixtures.ts",
-        "$TURBO_ROOT$/editor/bench/compare/fixture.mjs",
-        "$TURBO_ROOT$/editor/bench/compare/protocol.mjs",
-        "$TURBO_ROOT$/editor/site/src/fonts/jetbrains-mono.woff2",
-        "$TURBO_ROOT$/editor/site/src/fonts/source-serif-4.woff2"
+        "$TURBO_ROOT$/packages/singapore/examples/stress/src/fixtures.ts",
+        "$TURBO_ROOT$/packages/singapore/bench/compare/fixture.mjs",
+        "$TURBO_ROOT$/packages/singapore/bench/compare/protocol.mjs",
+        "$TURBO_ROOT$/packages/singapore/site/src/fonts/jetbrains-mono.woff2",
+        "$TURBO_ROOT$/packages/singapore/site/src/fonts/source-serif-4.woff2"
       ]
     },
     "@singapore-editor/react#typecheck": {
@@ -152,11 +152,17 @@
     },
     "@singapore-editor/highlighting#test": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/singapore/scripts/browser-test-responses.ts"
+      ]
     },
     "@singapore-editor/collaboration#test:browser": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/singapore/scripts/browser-test-responses.ts"
+      ],
       "env": ["COLLABORATION_TEST_TURN"],
       "outputs": []
     },
@@ -186,19 +192,31 @@
     "@singapore-editor/stress#test": {
       "dependsOn": ["^build", "build"],
       "cache": false,
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/docs/performance/e034-*.json.gz"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/singapore/docs/performance/e034-*.json.gz"
+      ]
     },
     "@singapore-editor/core#bench:edit-commands": {
       "dependsOn": ["^build", "build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/singapore/scripts/browser-test-responses.ts"
+      ]
     },
     "@singapore-editor/highlighting#test:browser": {
       "dependsOn": ["^build", "build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/singapore/scripts/browser-test-responses.ts"
+      ]
     },
     "@singapore-editor/highlighting#test:engines": {
       "dependsOn": ["^build", "build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/singapore/scripts/browser-test-responses.ts"
+      ]
     },
     "@singapore-editor/typescript-lsp#test": {
       "dependsOn": ["^build", "build"],
@@ -207,7 +225,10 @@
     "@singapore-editor/typescript-lsp#test:browser": {
       "dependsOn": ["^build", "build"],
       "cache": false,
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/singapore/scripts/browser-test-responses.ts"
+      ]
     },
     "@singapore-editor/tree-sitter#test:memory:browser": {
       "dependsOn": [
@@ -238,8 +259,8 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         ".env*",
-        "$TURBO_ROOT$/editor/package.json",
-        "$TURBO_ROOT$/editor/packages/*/package.json"
+        "$TURBO_ROOT$/packages/singapore/package.json",
+        "$TURBO_ROOT$/packages/singapore/packages/*/package.json"
       ],
       "outputs": ["dist/**"]
     },
@@ -247,21 +268,21 @@
       "dependsOn": ["^build"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/editor/package.json",
-        "$TURBO_ROOT$/editor/packages/*/package.json"
+        "$TURBO_ROOT$/packages/singapore/package.json",
+        "$TURBO_ROOT$/packages/singapore/packages/*/package.json"
       ],
       "outputs": []
     },
     "singapore-editor-site#typecheck": {
       "dependsOn": ["^typecheck"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/package.json"]
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/singapore/package.json"]
     },
     "@singapore-editor/collaboration#test:editor": {
       "dependsOn": ["^build", "@singapore-editor/diff#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/editor/packages/editor/src/**",
-        "$TURBO_ROOT$/editor/examples/app/src/**"
+        "$TURBO_ROOT$/packages/singapore/packages/editor/src/**",
+        "$TURBO_ROOT$/packages/singapore/examples/app/src/**"
       ],
       "env": ["COLLABORATION_MEASURE", "COLLABORATION_EVIDENCE_DIR"],
       "outputs": [],
@@ -269,22 +290,25 @@
     },
     "@singapore-editor/collab#test": {
       "dependsOn": ["^build", "@singapore-editor/collaboration#build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/packages/collaboration/src/**"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/singapore/packages/collaboration/src/**"
+      ],
       "env": ["COLLAB_STRESS", "COLLAB_STRESS_SHARD", "COLLABORATION_LONG_RUN"],
       "outputs": []
     },
     "@singapore-editor/collab#typecheck": {
       "dependsOn": ["^typecheck", "@singapore-editor/collaboration#build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/packages/collaboration/src/**"]
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/singapore/packages/collaboration/src/**"]
     },
     "@singapore-editor/collaboration#test": {
       "dependsOn": ["^build", "@singapore-editor/diff#build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/examples/app/src/**"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/singapore/examples/app/src/**"],
       "outputs": []
     },
     "@singapore-editor/collaboration#typecheck": {
       "dependsOn": ["^typecheck", "@singapore-editor/diff#build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/examples/app/src/**"]
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/singapore/examples/app/src/**"]
     },
     "@workspace/ui#build": {
       "dependsOn": ["^build"],
@@ -303,7 +327,10 @@
     },
     "@singapore-editor/core#bench:paint": {
       "dependsOn": ["^build", "build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/singapore/scripts/browser-test-responses.ts"
+      ]
     },
     "ghostty-webgpu-line-editor#build": {
       "dependsOn": ["^build", "ghostty-webgpu#build"],
@@ -322,15 +349,15 @@
     ".oxlintrc.json",
     "tsconfig.json",
     "patches/**",
-    "hotkeys/tsconfig.json",
-    "hotkeys/.oxfmtrc.json",
-    "hotkeys/.oxlintrc.json",
-    "ghostty-webgpu/.oxlintrc.json",
-    "editor/.oxlintrc.json",
-    "editor/scripts/build-package.ts",
-    "editor/tsconfig.json",
-    "editor/global.d.ts",
-    "editor/examples/app/tsconfig.json",
-    "editor/scripts/workspace-root*"
+    "packages/hotkeys/tsconfig.json",
+    "packages/hotkeys/.oxfmtrc.json",
+    "packages/hotkeys/.oxlintrc.json",
+    "packages/ghostty-webgpu/.oxlintrc.json",
+    "packages/singapore/.oxlintrc.json",
+    "packages/singapore/scripts/build-package.ts",
+    "packages/singapore/tsconfig.json",
+    "packages/singapore/global.d.ts",
+    "packages/singapore/examples/app/tsconfig.json",
+    "packages/singapore/scripts/workspace-root*"
   ]
 }

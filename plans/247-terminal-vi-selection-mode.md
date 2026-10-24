@@ -32,7 +32,7 @@ and select-all. [Terminal panel](../apps/web/src/features/terminal/components/pa
 the emulator across layout changes. ghostty's
 `/work/projects/ghostty-webgpu/src/xterm/terminal.ts` exposes selection and viewport methods;
 no vi-mode owner was found there. Editor's cursor styles and modal plans concern document
-editing. Implement this engine in `ghostty-webgpu/` after Plan 207.
+editing. Implement this engine in `packages/ghostty-webgpu/` after Plan 207.
 
 ## Design
 

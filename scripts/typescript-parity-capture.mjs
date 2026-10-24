@@ -2,9 +2,9 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
-import { CORE_CASES } from '../editor/packages/typescript-lsp/test/parity/cases/core.ts'
-import { unrunParityResults } from '../editor/packages/typescript-lsp/test/parity/contract.ts'
-import { paritySourceIdentity } from '../editor/packages/typescript-lsp/test/parity/source.ts'
+import { CORE_CASES } from '../packages/singapore/packages/typescript-lsp/test/parity/cases/core.ts'
+import { unrunParityResults } from '../packages/singapore/packages/typescript-lsp/test/parity/contract.ts'
+import { paritySourceIdentity } from '../packages/singapore/packages/typescript-lsp/test/parity/source.ts'
 import { REQUIRED_PARITY_BACKENDS, validateParityEvidence } from './typescript-parity.mjs'
 
 export function parityRunsFromLog(log) {

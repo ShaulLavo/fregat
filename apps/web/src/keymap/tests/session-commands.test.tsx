@@ -28,7 +28,7 @@ import type { ProjectId } from '@workspace/contracts'
 import { runGit } from 'server/testing'
 import { FocusService } from '@/lib/focus/state/service'
 import { createTestCommandRuntime } from '../../../test/factories/command-runtime'
-import { createTestQueryClient } from '../../../test/render'
+import { createTestQueryClient } from '../../../test/providers'
 
 test('ours preserves the approved workspace sidebar and document navigation shortcuts', () => {
   const bound = boundCommands('linux', 'ours')

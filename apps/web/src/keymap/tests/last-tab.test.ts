@@ -4,7 +4,7 @@ import { tabId } from '@/lib/documents/utils/identity'
 import { FocusService } from '@/lib/focus/state/service'
 import { selectItemMetadata } from '@workspace/client-core/commands/workspace'
 import { createTestCommandRuntime } from '../../../test/factories/command-runtime'
-import { createTestQueryClient } from '../../../test/render'
+import { createTestQueryClient } from '../../../test/providers'
 import { expect, test } from '../../../test/fixtures'
 
 test.each([4, 12])('slot 9 selects the last of %i editor tabs', async (count) => {

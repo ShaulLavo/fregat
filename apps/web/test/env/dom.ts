@@ -1,3 +1,4 @@
+import { initializeDomMarkdown } from './markdown'
 import { resetSettingsIntentStore } from '@workspace/client-core/settings/intent-store'
 import { resetBootAppearance } from '@/lib/settings-boot-mirror'
 import { removeHtmlBootstrap } from '../factories/html-bootstrap'
@@ -30,6 +31,7 @@ let restoreClient: (() => void) | undefined
 let restoreSocketBridge: (() => void) | undefined
 
 beforeAll(async () => {
+  await initializeDomMarkdown()
   server = await makeTestServer({ environmentId: TEST_ENVIRONMENT_ID })
   const client = createInProcessClient(server)
   restoreClient = installTestClient(client)

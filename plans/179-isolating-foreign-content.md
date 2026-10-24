@@ -115,7 +115,7 @@ reader identities. The repaired scenario passed at
 
 External-device limits: this wave's measurements are Chromium on Linux. No macOS/iPhone WebKit,
 IME or editor-shadow-root experiment was run. The editor remains in light DOM by owner direction.
-Canonical Editor sources now live in `editor/packages/editor/src/`; the historical `editor-ref`
+Canonical Editor sources now live in `packages/singapore/packages/editor/src/`; the historical `editor-ref`
 name below records the original research checkout only.
 
 ## Outcome

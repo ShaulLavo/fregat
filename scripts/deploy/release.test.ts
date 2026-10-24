@@ -274,11 +274,14 @@ function createWebBuildFixture(directory: string, stale: boolean, failedBuild = 
     failedBuild
       ? 'process.exit(17)'
       : `import { mkdirSync, writeFileSync } from 'node:fs'
-mkdirSync('editor/packages/editor/dist', { recursive: true })
-writeFileSync('editor/packages/editor/dist/index.d.ts', 'export type EditorTextBufferChange = { revisionAfter: number }')`,
+mkdirSync('packages/singapore/packages/editor/dist', { recursive: true })
+writeFileSync('packages/singapore/packages/editor/dist/index.d.ts', 'export type EditorTextBufferChange = { revisionAfter: number }')`,
   )
   if (stale)
-    write('editor/packages/editor/dist/index.d.ts', 'export type EditorTextBufferChange = {}')
+    write(
+      'packages/singapore/packages/editor/dist/index.d.ts',
+      'export type EditorTextBufferChange = {}',
+    )
   write(
     'apps/web/tsconfig.json',
     JSON.stringify({
@@ -288,7 +291,7 @@ writeFileSync('editor/packages/editor/dist/index.d.ts', 'export type EditorTextB
   )
   write(
     'apps/web/main.ts',
-    `import type { EditorTextBufferChange } from '../../editor/packages/editor/dist/index'
+    `import type { EditorTextBufferChange } from '../../packages/singapore/packages/editor/dist/index'
 const change: EditorTextBufferChange = { revisionAfter: 1 }
 export const revision = change.revisionAfter`,
   )

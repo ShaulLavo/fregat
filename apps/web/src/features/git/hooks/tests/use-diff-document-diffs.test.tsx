@@ -20,7 +20,8 @@ import { fileResource, filesystemPath } from '@/lib/documents/utils/identity'
 import type { GitComparison } from '@/lib/documents/utils/types'
 import { TEST_SESSION_ID } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderHookWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderHookWithProviders } from '../../../../../test/render'
 
 test('a blob answer for the previously displayed entry never lands on the next one', async ({
   client,

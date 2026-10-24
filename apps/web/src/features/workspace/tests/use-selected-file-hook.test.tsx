@@ -11,7 +11,7 @@ import { settingsTab } from '@/lib/documents/utils/tabs'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { useSelectedFile } from '@/features/workspace/hooks/use-selected-file'
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 
 test('never sends the settings document id to fs.read', async ({ client, server }) => {
   void client

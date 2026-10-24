@@ -40,7 +40,7 @@ top/center/bottom, toggle folds and line numbers, and fold at levels eight and n
 ## Existing Fregat and Editor work
 
 Editor source below was verified in `/work/projects/Editor/packages/` before Plan 207.
-Implement it in Fregat `editor/packages/` after that cutover; the external checkout is
+Implement it in Fregat `packages/singapore/packages/` after that cutover; the external checkout is
 read-only for this wave.
 
 [packages/editor/src/editor/foldOperations.ts](/work/projects/Editor/packages/editor/src/editor/foldOperations.ts) supports fold/unfold/toggle and
@@ -59,7 +59,7 @@ focus nodes and handlers in the window dispatcher. Preserve Linux/macOS contexts
 payloads, source order, and unbinds from the translation; activate modal rows when
 their mode owner exists. A declined command falls through to its ancestor.
 
-Expose view commands in `editor/packages/editor/`. Use the existing wrap/fold/display
+Expose view commands in `packages/singapore/packages/editor/`. Use the existing wrap/fold/display
 mapping for scroll and caret clipping; keep saved locations in the existing navigation
 owner. Fregat handles focus return through its workspace focus service. Fold levels
 8 and 9 use the same depth helper as levels 1–7. Editor view state remains independent

@@ -11,11 +11,8 @@ import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-c
 import { createFederationHarness } from '../../../../../test/factories/federation'
 import { createInProcessClient } from '../../../../../test/client'
 import { expect, test } from '../../../../../test/fixtures'
-import {
-  createTestQueryClient,
-  renderHookWithProviders,
-  renderWithProviders,
-} from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderHookWithProviders, renderWithProviders } from '../../../../../test/render'
 import { makeTestServer } from '../../../../../test/server'
 
 test('adds, relabels, and removes a machine inline through the shared form and real settings file', async ({

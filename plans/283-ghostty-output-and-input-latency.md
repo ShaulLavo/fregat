@@ -6,11 +6,11 @@
 - Gate and evidence: `bun run bench:compare` from Plan 281 on omarchy (i7-14700K, RTX 3060 Ti,
   headless Chromium on Vulkan with a hardware WebGPU adapter), comparing native and xterm in the same session. The
   owner's Mac is in daily use and is not part of the loop; an M1 run is optional, only when the owner offers the time.
-- Original evidence: `ghostty-webgpu/docs/benchmarks.md` (PR #235, Apple M1).
+- Original evidence: `packages/ghostty-webgpu/docs/benchmarks.md` (PR #235, Apple M1).
 
 ## Progress
 
-- [x] Phase 1 attribution: `ghostty-webgpu/docs/perf-attribution.md` (#242).
+- [x] Phase 1 attribution: `packages/ghostty-webgpu/docs/perf-attribution.md` (#242).
 - [x] Fix 1, reuse WASM memory views (#245).
 - [x] Fix 2, packed damaged-row snapshot plus direct-packed DOM frame text (#255).
 - [x] Benchmark repair on omarchy (#343): hardware WebGPU on Linux headless-shell, GPU-idle gate,
@@ -27,7 +27,7 @@
       four balanced pairs per quiet window against `b991384e0`. Renderer/total paired xterm ratios
       remain below one (0.6674/0.8165 after); all 16 cases qualify. Cross-session native total CPU
       is 40.444 → 40.719% core, a descriptive observation. No CPU benefit or proven no-regression
-      claim. Compact records and source verification: `ghostty-webgpu/docs/benchmarks/linux-native-only-2026-10-03/`.
+      claim. Compact records and source verification: `packages/ghostty-webgpu/docs/benchmarks/linux-native-only-2026-10-03/`.
 - [ ] Input: render on the frame that parses the echo (native starts drawing ~15 ms after parse at
       1 terminal; xterm ~0.5 ms).
 - [ ] Full omarchy run of every measure; regenerate `docs/benchmarks.md`; unblock Plan 285's measurements section.
@@ -163,7 +163,7 @@ attributes the time.
 
 ## Phase 1: attribute the cost
 
-No fixes in this phase. Produce `ghostty-webgpu/docs/perf-attribution.md` with evidence:
+No fixes in this phase. Produce `packages/ghostty-webgpu/docs/perf-attribution.md` with evidence:
 
 1. Chrome traces (`bun run agent:browser trace` or the bench runner with tracing on) for 1, 8 and 17
    terminals under ASCII and SGR output, and for the input echo case: main-thread time split into
@@ -217,7 +217,7 @@ font rasterization and GPU calls; shared row readers serve non-GPU consumers.
       interval checks cover 1,000 reordered-sample cases. Reanalysis preserves all reported case
       numbers and records the repaired implementation hash. Raw traces remain outside timing code.
 
-Compact controlled evidence lives in `ghostty-webgpu/docs/benchmarks/linux-zig-frame-2026-10-02/`.
+Compact controlled evidence lives in `packages/ghostty-webgpu/docs/benchmarks/linux-zig-frame-2026-10-02/`.
 All three timing sessions completed their four balanced repetitions; CPU and latency ratios retain
 qualification. The WebGPU/Zig total-CPU gate failed (paired median 2.019× xterm WebGL); the full
 move remains open for review. Native WebGL renderer CPU is 1.837× xterm WebGL, Canvas CPU is
@@ -330,7 +330,7 @@ renderer/total ratios are 0.8902/0.9381 and pass. Before/after sessions are sepa
 WebGL renderer CPU rises 2.17% descriptively, and no statistically proven no-regression or latency
 improvement is claimed. Every after-window still fails the write-p50 comparator.
 
-Evidence is retained in `ghostty-webgpu/docs/benchmarks/linux-zig-unicode-2026-10-03/`.
+Evidence is retained in `packages/ghostty-webgpu/docs/benchmarks/linux-zig-unicode-2026-10-03/`.
 Original correctness proof remains byte-identical in `correctness.json`; measurement verification
 is `verification.json`. `ci-portability.json` records the independently reproduced one-pixel emoji
 ink overhang at the exact CI failure location. Clean logical-row records remain unchanged while
@@ -367,7 +367,7 @@ close. Measure Linux WebGL-default treatment next; a shared WebGPU canvas remain
 Per-canvas attribution and exact texture-acquisition implementation time are unobservable.
 The one-terminal input p95 regression (20.4 → 29.7 ms) belongs to the unmerged coalescer; its cause
 was not confirmed.
-Evidence is retained in `ghostty-webgpu/docs/benchmarks/linux-one-write-2026-10-02/`.
+Evidence is retained in `packages/ghostty-webgpu/docs/benchmarks/linux-one-write-2026-10-02/`.
 
 ### Follow-up causes
 

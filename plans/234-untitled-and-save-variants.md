@@ -36,7 +36,7 @@ already serializes save mutations and coordinates file writes with workspace edi
 Tree NewFile currently creates a named filesystem entry.
 
 Editor citations name the current read-only checkout. After Plan 207, execute the same package
-changes under `editor/packages/` in Fregat and update its public package exports there.
+changes under `packages/singapore/packages/` in Fregat and update its public package exports there.
 
 ## Design
 

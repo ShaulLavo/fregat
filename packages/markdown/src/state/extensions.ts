@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/query-core'
 import type { Pluggable } from 'unified'
-import type { HastExtensions } from '../utils/hast'
+import { loadRawHastExtension, type HastExtensions } from '../utils/hast'
 import { markdownResourceKeys } from './query-keys'
 
 export type MarkdownExtensionName = keyof HastExtensions
@@ -11,7 +11,7 @@ type ExtensionLoaders = Readonly<Record<MarkdownExtensionName, ExtensionLoader>>
 const defaultLoaders: ExtensionLoaders = {
   math: () =>
     import('rehype-katex').then((module) => ({ default: [module.default, { output: 'mathml' }] })),
-  raw: () => import('rehype-raw'),
+  raw: loadRawHastExtension,
 }
 
 const NONE: HastExtensions = Object.freeze({ math: null, raw: null })

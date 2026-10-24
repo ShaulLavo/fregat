@@ -31,6 +31,7 @@ export async function run(
     child.exited,
   ])
   if (options.log) appendFileSync(options.log, formatLog(command, stdout, stderr, code))
+  if (options.log && code !== 0) process.stderr.write(formatLog(command, stdout, stderr, code))
   if (!options.log && stderr) process.stderr.write(stderr)
 
   return { code, stdout }

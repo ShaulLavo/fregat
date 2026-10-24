@@ -5,21 +5,21 @@ import { fileURLToPath } from 'node:url'
 import { parseSync } from 'oxc-parser'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
-const core = 'editor/packages/editor/src/'
+const core = 'packages/singapore/packages/editor/src/'
 const adapters = new Set([
-  'editor/packages/tree-sitter/src/index.ts',
-  'editor/packages/tree-sitter/src/session.ts',
-  'editor/packages/tree-sitter/src/mergeReview.ts',
-  'editor/packages/tree-sitter/src/treeSitter/source.ts',
-  'editor/packages/tree-sitter/src/treeSitter/types.ts',
-  'editor/packages/tree-sitter/src/treeSitter/workerClient.ts',
-  'editor/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts',
-  'editor/packages/minimap/src/documentSource.ts',
-  'editor/packages/minimap/src/sourceIdentity.ts',
-  'editor/packages/minimap/src/sourceProtocol.ts',
-  'editor/packages/minimap/src/types.ts',
-  'editor/packages/minimap/src/workerClient.ts',
-  'editor/packages/lsp-plugin/src/retainedSource.ts',
+  'packages/singapore/packages/tree-sitter/src/index.ts',
+  'packages/singapore/packages/tree-sitter/src/session.ts',
+  'packages/singapore/packages/tree-sitter/src/mergeReview.ts',
+  'packages/singapore/packages/tree-sitter/src/treeSitter/source.ts',
+  'packages/singapore/packages/tree-sitter/src/treeSitter/types.ts',
+  'packages/singapore/packages/tree-sitter/src/treeSitter/workerClient.ts',
+  'packages/singapore/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts',
+  'packages/singapore/packages/minimap/src/documentSource.ts',
+  'packages/singapore/packages/minimap/src/sourceIdentity.ts',
+  'packages/singapore/packages/minimap/src/sourceProtocol.ts',
+  'packages/singapore/packages/minimap/src/types.ts',
+  'packages/singapore/packages/minimap/src/workerClient.ts',
+  'packages/singapore/packages/lsp-plugin/src/retainedSource.ts',
 ])
 const rawRuntimeNames = new Set([
   'TreeSitterWorkerClient',
@@ -30,10 +30,10 @@ const rawRuntimeNames = new Set([
   'setEditorHighlighterSessionFactory',
 ])
 const runtimeFactories = new Set([
-  'editor/packages/tree-sitter/src/index.ts',
-  'editor/packages/tree-sitter/src/session.ts',
-  'editor/packages/tree-sitter/src/mergeReview.ts',
-  'editor/packages/tree-sitter/src/treeSitter/workerClient.ts',
+  'packages/singapore/packages/tree-sitter/src/index.ts',
+  'packages/singapore/packages/tree-sitter/src/session.ts',
+  'packages/singapore/packages/tree-sitter/src/mergeReview.ts',
+  'packages/singapore/packages/tree-sitter/src/treeSitter/workerClient.ts',
   `${core}shiki/plugin.ts`,
   `${core}shiki/workerClient.ts`,
 ])
@@ -49,8 +49,8 @@ const cursorOwners = new Map([
   [`${core}documentSession.ts`, 'canonical mutation owner'],
   [`${core}editor/Editor.ts`, 'canonical view reader adapters'],
   [`${core}editor/documentDelivery.ts`, 'canonical endpoint admission'],
-  ['editor/packages/lsp-plugin/src/documentSnapshot.ts', 'canonical reader adapter'],
-  ['editor/packages/find/src/plugin.ts', 'offscreen match offset projection'],
+  ['packages/singapore/packages/lsp-plugin/src/documentSnapshot.ts', 'canonical reader adapter'],
+  ['packages/singapore/packages/find/src/plugin.ts', 'offscreen match offset projection'],
   [`${core}mergeConflictPlugin.ts`, 'conflict result projection'],
   [`${core}semanticTokenLayer.ts`, 'delayed semantic result projection'],
 ])
@@ -114,12 +114,13 @@ function importFindings(node, filename) {
   const specifier = staticName(node.source)
   if (typeof specifier !== 'string') return []
   const target = sourceTarget(filename, specifier)
-  const singapore = target.startsWith('@singapore-editor/') || target.startsWith('editor/packages/')
+  const singapore =
+    target.startsWith('@singapore-editor/') || target.startsWith('packages/singapore/packages/')
   if (!singapore) return []
   const findings = []
   if (/^@singapore-editor\/[^/]+\/(?:src|dist)(?:\/|$)/.test(target))
     findings.push('Use an exported package entry point')
-  if (!filename.startsWith('editor/packages/editor/') && target.startsWith(core))
+  if (!filename.startsWith('packages/singapore/packages/editor/') && target.startsWith(core))
     findings.push('External consumers use the published document reader')
   if (
     target === '@singapore-editor/core/internal/document-worker' &&
@@ -236,7 +237,7 @@ function runtimeBindings(node, filename) {
 }
 
 function permitsBufferObserver(filename) {
-  return filename.startsWith('editor/packages/editor/') || viewObservers.has(filename)
+  return filename.startsWith('packages/singapore/packages/editor/') || viewObservers.has(filename)
 }
 
 function subscriptionBindings(node, buffers, filename) {
@@ -258,9 +259,20 @@ function cursorBindings(node, filename) {
 }
 
 function productionSource(filename) {
+  if (!inDocumentScope(filename)) return false
   if (!/\.(?:[cm]?[jt]s|[jt]sx)$/.test(filename)) return false
   if (/\.(?:test|browser)\./.test(filename)) return false
   return !/(?:^|\/)(?:node_modules|dist|generated|test|tests|e2e|results)\//.test(filename)
+}
+
+function inDocumentScope(file) {
+  if (file.startsWith('packages/singapore/'))
+    return ['packages/singapore/packages/', 'packages/singapore/examples/'].some((directory) =>
+      file.startsWith(directory),
+    )
+  return !['packages/ghostty-webgpu/', 'packages/hotkeys/'].some((directory) =>
+    file.startsWith(directory),
+  )
 }
 
 function check() {
@@ -273,8 +285,8 @@ function check() {
       '--exclude-standard',
       '-z',
       '--',
-      'editor/packages',
-      'editor/examples',
+      'packages/singapore/packages',
+      'packages/singapore/examples',
       'apps',
       'packages',
     ],

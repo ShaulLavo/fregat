@@ -28,17 +28,17 @@ if selected fregat; then
   cp -R apps/site/dist "$output/fregat"
 fi
 if selected singapore; then
-  SITE_ORIGIN=https://singapore.shaulavo.dev bun run --cwd editor/site build --base /
-  cp -R editor/site/dist "$output/singapore"
+  SITE_ORIGIN=https://singapore.shaulavo.dev bun run --cwd packages/singapore/site build --base /
+  cp -R packages/singapore/site/dist "$output/singapore"
 fi
 if selected demo; then
   VITE_BASE_PATH=/demo/ bun x turbo run build --filter=@singapore-editor/example-app
   mkdir -p "$output/singapore"
-  cp -R editor/examples/app/dist "$output/singapore/demo"
+  cp -R packages/singapore/examples/app/dist "$output/singapore/demo"
 fi
 if selected ghostty-webgpu; then
-  SITE_ORIGIN=https://ghostty.shaulavo.dev bun run --cwd ghostty-webgpu/site build --base /
-  cp -R ghostty-webgpu/site/dist "$output/ghostty-webgpu"
+  SITE_ORIGIN=https://ghostty.shaulavo.dev bun run --cwd packages/ghostty-webgpu/site build --base /
+  cp -R packages/ghostty-webgpu/site/dist "$output/ghostty-webgpu"
 fi
 for site in fregat singapore ghostty-webgpu; do
   if [[ -d "$output/$site" ]]; then cp scripts/product-sites/_headers "$output/$site/_headers"; fi

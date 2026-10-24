@@ -4,7 +4,7 @@
 
 - Status: Approved. Scheduled later, behind the upstream gate below.
 - Owner request: 2026-10-09. Plan the migration and the 0.17 features worth adopting; keep working on 0.16.0 until Ghostty upgrades.
-- Scope: Fregat's `ghostty-webgpu/` (wasm, native helpers, proofs, CI), Fregat's ZLS integration, and the tree-sitter-x repository. No other repository of ours contains Zig (mesh, tree-sitter-md, fast-ulid, place and game of life were checked).
+- Scope: Fregat's `packages/ghostty-webgpu/` (wasm, native helpers, proofs, CI), Fregat's ZLS integration, and the tree-sitter-x repository. No other repository of ours contains Zig (mesh, tree-sitter-md, fast-ulid, place and game of life were checked).
 - Research: two read-only Sol passes on 2026-10-09 against main `b02050a85`. Every compiler result below comes from real builds with the official 0.17.0 archive in scratch copies.
 
 ## Gate
@@ -32,11 +32,11 @@ We build only libghostty-vt from Ghostty's source, never the app, so we are alre
 
 | Purpose                                    | Current pin                                                                        | Where                                                                                                 |
 | ------------------------------------------ | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Shipped terminal wasm and positional proof | `7b11f3dca034d8d24369ad3856afe57946d7902a` (118 commits behind main on 2026-10-09) | `ghostty-webgpu/src/core/version.ts:2`                                                                |
+| Shipped terminal wasm and positional proof | `7b11f3dca034d8d24369ad3856afe57946d7902a` (118 commits behind main on 2026-10-09) | `packages/ghostty-webgpu/src/core/version.ts:2`                                                       |
 | Native config resolver and its proof       | `c8554f28e0efe2f5595f32020371c34b25ec628f`                                         | `scripts/config-resolver-native/constants.ts:9`, `scripts/config-resolver-proof/proof-contract.ts:25` |
 | Owned-VT native proof                      | `befcdfd2c3a1cb24d9ec886e93c95b2b5daa7028`                                         | `scripts/owned-vt-native/run.ts:16`                                                                   |
 
-With 0.17.0, all three fail inside Ghostty or its dependencies (`b.build_root`, the version guard, `zig_lib_directory`, `Optimize.Debug`, `b.args`, `std.meta.fields`). Move each to a 0.17 revision. Paths below are relative to `ghostty-webgpu/` unless they name a repository.
+With 0.17.0, all three fail inside Ghostty or its dependencies (`b.build_root`, the version guard, `zig_lib_directory`, `Optimize.Debug`, `b.args`, `std.meta.fields`). Move each to a 0.17 revision. Paths below are relative to `packages/ghostty-webgpu/` unless they name a repository.
 
 ### Our source
 
@@ -58,13 +58,13 @@ Audited and unaffected: `@bitCast` at `scripts/canvas-compose.zig:131,141` (vect
 
 Update archive names, URLs, byte counts, SHA-256 and extracted-version checks together. Regenerate receipts with the builders; never hand-edit version strings in generated JSON.
 
-- CI: `.github/workflows/ghostty-config-resolver.yml:55–94,247–248,377–416,586`, `.github/workflows/ghostty-config-resolver-proof.yml:53–86,254–255`, and the mirrored copies in `ghostty-webgpu/.github/workflows/config-resolver{,-proof}.yml`. Requalify runner-image identities (`scripts/config-resolver-native/builder.ts:311`).
+- CI: `.github/workflows/ghostty-config-resolver.yml:55–94,247–248,377–416,586`, `.github/workflows/ghostty-config-resolver-proof.yml:53–86,254–255`, and the mirrored copies in `packages/ghostty-webgpu/.github/workflows/config-resolver{,-proof}.yml`. Requalify runner-image identities (`scripts/config-resolver-native/builder.ts:311`).
 - Native resolver: `scripts/config-resolver-native/constants.ts:12–14,30–77`, `build-helper.ts:38–66,338,1581,1955,1966,1982`, `builder.ts:178`, `contract.ts:69,216,330,754`, `build-recipe.schema.json:31`, `provenance.schema.json:93`, regenerated `build-recipe.json`, `native-inputs.json`, `native/config-resolver/bootstrap.json`, plus `src/config-resolver/manifest.ts:111,423`, `src/config-resolver/tests/manifest.test.ts:84,97,100`, `scripts/release-candidate/tests/fixtures.ts:249`.
 - Proof resolver: `scripts/config-resolver-proof/build-helper.ts:37–65,307,1524,1867,1878,1894`, `proof-contract.ts:28,64–116,231,281,1010,1021,1064`, `proof-recipe.schema.json`, regenerated `proof-recipe.json`, `proof-self-test.ts:129–156,1356,2132,2169`, `assemble-recipe.ts:64,230`, `verify-evidence.ts:175`. Move the rejected-version mutations to versions that are wrong for the new pin.
 - Wasm: `scripts/build-wasm.ts` (version check, upstream and bridge invocations), `scripts/build-bridge.ts:62–90`, `scripts/build-canvas-compose.ts:11–45`, `scripts/wasm-provenance.ts`, `scripts/wasm-provenance.test.ts:23`, regenerated `ghostty-vt.provenance.json`, `ghostty-vt.wasm`, `bridge.wasm`, `canvas-compose.wasm`.
 - Native experiments: `scripts/owned-vt-native/identity.ts:38`, `scripts/owned-vt-native/run.ts:37,116–129`, `scripts/positional-native/run.ts:47–52`.
 - tree-sitter-x: `build.zig.zon:5`, `crates/cli/src/templates/build.zig.zon:4,8–10` (also the zig-tree-sitter binding pin), and `crates/xtask/src/upgrade_wasmtime.rs:52–63`, which parses `zig fetch` output that 0.17 moved into the build system.
-- Active docs: `ghostty-webgpu/AGENTS.md:50`, `ghostty-webgpu/docs/api.md:200`, `.internal/ghostty-webgpu-brief.md:36,240`, `.internal/research/packages-as-products/ghostty-webgpu.md:40`, `plans/286-ghostty-extensions.md:163`. Keep the historical records (`docs/config-resolver-feasibility.*`, `.internal/research/packages-as-products/performance-evidence.md:62`, sealed Mac benchmark assets) as they are.
+- Active docs: `packages/ghostty-webgpu/AGENTS.md:50`, `packages/ghostty-webgpu/docs/api.md:200`, `.internal/ghostty-webgpu-brief.md:36,240`, `.internal/research/packages-as-products/ghostty-webgpu.md:40`, `plans/286-ghostty-extensions.md:163`. Keep the historical records (`docs/config-resolver-feasibility.*`, `.internal/research/packages-as-products/performance-evidence.md:62`, sealed Mac benchmark assets) as they are.
 
 0.17 archive identities (from the official download index):
 

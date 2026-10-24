@@ -65,6 +65,7 @@ test.each([
   ['rehype-katex', '7.0.1', 'Junyoung Choi'],
   ['remark-math', '6.0.0', 'Junyoung Choi'],
   ['drizzle-orm', '0.45.3', 'END OF TERMS AND CONDITIONS'],
+  ['drizzle-orm', '0.45.4', 'END OF TERMS AND CONDITIONS'],
   ['http_ece', '1.2.0', 'Martin Thomson'],
   ['standardwebhooks', '1.1.1', 'Svix'],
   ['woff2sfnt-sfnt2woff', '1.0.0', 'Onur Demiralay'],
@@ -77,11 +78,11 @@ test.each([
       await mkdir(directory, { recursive: true })
       const manifest = path.join(directory, 'package.json')
       await writeFile(manifest, JSON.stringify({ name, version }))
+      const result = packageNotices([manifest])
       const expected = await readFile(
         path.join(import.meta.dirname, 'texts', `${name}@${version}.txt`),
         'utf8',
       )
-      const result = packageNotices([manifest])
       expect(result).toContain(expected.trim())
       expect(result).toContain(attribution)
       expect(result).toContain('AS IS')

@@ -1,0 +1,256 @@
+[
+  {
+    "id": "chat-spec-emphasis-original",
+    "source": "A **`*s]de**-` d*$x$$*_x$*```\r\n\n*`\ns$x$s[x]age._\n\n",
+    "sourceUtf8Sha256": "5ec34dd63ae05e92b7b53e537f22eba0cd2c1966c4d6dc5b9047367d81d6e9a3",
+    "profile": {
+      "gfm": false,
+      "math": false,
+      "cjk": false
+    },
+    "affectedField": "canonical.children[0].children",
+    "independentOracle": {
+      "name": "CommonMark original-delimiter-run adjudication",
+      "specVersion": "0.31.2",
+      "cmarkCommit": "eec0eeba6d31189fd828314576494566d539b1e3",
+      "expectedHtml": "<p>A *<em><code>*s]de**-</code> d</em>$x$$<em>_x$</em>```</p>\n<p>*`\ns$x$s[x]age._</p>\n"
+    },
+    "remarkObserved": {
+      "engine": "micromark",
+      "version": "4.0.2",
+      "commonmarkCoreVersion": "2.0.3",
+      "html": "<p>A <em><em><code>*s]de**-</code> d</em>$x$$</em>_x$*```</p>\r\n<p>*`\ns$x$s[x]age._</p>\n"
+    },
+    "reason": "CommonMark rule 9 uses the original delimiter-run lengths for the rule of three. Reusing the remaining lengths after a partial match changes emphasis nesting and which markers stay literal.",
+    "provenance": {
+      "kind": "exact-source-spec-adjudication",
+      "evidence": "parser-emphasis-r5/emphasis-adjudication.json",
+      "evidenceSha256": "b0797af45ec5ff6d37b1314b2bb10ad7d968c796bde0b406915e1445189ff285",
+      "case": "original",
+      "baseline": "20981e83c31b78a917ce5747ee9e5205d69a5cd4",
+      "references": [
+        "https://spec.commonmark.org/0.31.2/#emphasis-and-strong-emphasis",
+        "https://github.com/commonmark/cmark/issues/177"
+      ],
+      "note": "The baseline follows the independent adjudication. The remark-matching candidate was rejected and withdrawn; these records preserve baseline behavior."
+    }
+  },
+  {
+    "id": "chat-spec-emphasis-reduced",
+    "source": "**`x` d*$x$$*_x$*",
+    "sourceUtf8Sha256": "00a19890aeed26e53588705530b7e1ac8ddd31345a7598bc83e3be41136d2341",
+    "profile": {
+      "gfm": false,
+      "math": false,
+      "cjk": false
+    },
+    "affectedField": "canonical.children[0].children",
+    "independentOracle": {
+      "name": "CommonMark original-delimiter-run adjudication",
+      "specVersion": "0.31.2",
+      "cmarkCommit": "eec0eeba6d31189fd828314576494566d539b1e3",
+      "expectedHtml": "<p>*<em><code>x</code> d</em>$x$$<em>_x$</em></p>\n"
+    },
+    "remarkObserved": {
+      "engine": "micromark",
+      "version": "4.0.2",
+      "commonmarkCoreVersion": "2.0.3",
+      "html": "<p><em><em><code>x</code> d</em>$x$$</em>_x$*</p>"
+    },
+    "reason": "CommonMark rule 9 uses the original delimiter-run lengths for the rule of three. Reusing the remaining lengths after a partial match changes emphasis nesting and which markers stay literal.",
+    "provenance": {
+      "kind": "exact-source-spec-adjudication",
+      "evidence": "parser-emphasis-r5/emphasis-adjudication.json",
+      "evidenceSha256": "b0797af45ec5ff6d37b1314b2bb10ad7d968c796bde0b406915e1445189ff285",
+      "case": "reduced",
+      "baseline": "20981e83c31b78a917ce5747ee9e5205d69a5cd4",
+      "references": [
+        "https://spec.commonmark.org/0.31.2/#emphasis-and-strong-emphasis",
+        "https://github.com/commonmark/cmark/issues/177"
+      ],
+      "note": "The baseline follows the independent adjudication. The remark-matching candidate was rejected and withdrawn; these records preserve baseline behavior."
+    }
+  },
+  {
+    "id": "chat-spec-emphasis-punctuation-only",
+    "source": "**a*!*_*",
+    "sourceUtf8Sha256": "16108458d06c4a2617e8bcf5533d55cc99cece419b99cb4b7f75db7121a3bd92",
+    "profile": {
+      "gfm": false,
+      "math": false,
+      "cjk": false
+    },
+    "affectedField": "canonical.children[0].children",
+    "independentOracle": {
+      "name": "CommonMark original-delimiter-run adjudication",
+      "specVersion": "0.31.2",
+      "cmarkCommit": "eec0eeba6d31189fd828314576494566d539b1e3",
+      "expectedHtml": "<p>*<em>a</em>!<em>_</em></p>\n"
+    },
+    "remarkObserved": {
+      "engine": "micromark",
+      "version": "4.0.2",
+      "commonmarkCoreVersion": "2.0.3",
+      "html": "<p><em><em>a</em>!</em>_*</p>"
+    },
+    "reason": "CommonMark rule 9 uses the original delimiter-run lengths for the rule of three. Reusing the remaining lengths after a partial match changes emphasis nesting and which markers stay literal.",
+    "provenance": {
+      "kind": "exact-source-spec-adjudication",
+      "evidence": "parser-emphasis-r5/emphasis-adjudication.json",
+      "evidenceSha256": "b0797af45ec5ff6d37b1314b2bb10ad7d968c796bde0b406915e1445189ff285",
+      "case": "punctuation-only",
+      "baseline": "20981e83c31b78a917ce5747ee9e5205d69a5cd4",
+      "references": [
+        "https://spec.commonmark.org/0.31.2/#emphasis-and-strong-emphasis",
+        "https://github.com/commonmark/cmark/issues/177"
+      ],
+      "note": "The baseline follows the independent adjudication. The remark-matching candidate was rejected and withdrawn; these records preserve baseline behavior."
+    }
+  },
+  {
+    "id": "chat-spec-emphasis-upstream-177",
+    "source": "a***b* c*",
+    "sourceUtf8Sha256": "f993965f23aab242281d140fc1c693c2711ce8863aa552903d29c593885aa4c2",
+    "profile": {
+      "gfm": false,
+      "math": false,
+      "cjk": false
+    },
+    "affectedField": "canonical.children[0].children",
+    "independentOracle": {
+      "name": "CommonMark original-delimiter-run adjudication",
+      "specVersion": "0.31.2",
+      "cmarkCommit": "eec0eeba6d31189fd828314576494566d539b1e3",
+      "expectedHtml": "<p>a*<em><em>b</em> c</em></p>\n"
+    },
+    "remarkObserved": {
+      "engine": "micromark",
+      "version": "4.0.2",
+      "commonmarkCoreVersion": "2.0.3",
+      "html": "<p>a**<em>b</em> c*</p>"
+    },
+    "reason": "CommonMark rule 9 uses the original delimiter-run lengths for the rule of three. Reusing the remaining lengths after a partial match changes emphasis nesting and which markers stay literal.",
+    "provenance": {
+      "kind": "exact-source-spec-adjudication",
+      "evidence": "parser-emphasis-r5/emphasis-adjudication.json",
+      "evidenceSha256": "b0797af45ec5ff6d37b1314b2bb10ad7d968c796bde0b406915e1445189ff285",
+      "case": "upstream-177",
+      "baseline": "20981e83c31b78a917ce5747ee9e5205d69a5cd4",
+      "references": [
+        "https://spec.commonmark.org/0.31.2/#emphasis-and-strong-emphasis",
+        "https://github.com/commonmark/cmark/issues/177"
+      ],
+      "note": "The baseline follows the independent adjudication. The remark-matching candidate was rejected and withdrawn; these records preserve baseline behavior."
+    }
+  },
+  {
+    "id": "chat-spec-emphasis-partial-closer",
+    "source": "*a *b***c",
+    "sourceUtf8Sha256": "9d94c098578a301a9e57424f881eead20adfdc9a81ae8347869b12e6aca9bc03",
+    "profile": {
+      "gfm": false,
+      "math": false,
+      "cjk": false
+    },
+    "affectedField": "canonical.children[0].children",
+    "independentOracle": {
+      "name": "CommonMark original-delimiter-run adjudication",
+      "specVersion": "0.31.2",
+      "cmarkCommit": "eec0eeba6d31189fd828314576494566d539b1e3",
+      "expectedHtml": "<p><em>a <em>b</em></em>*c</p>\n"
+    },
+    "remarkObserved": {
+      "engine": "micromark",
+      "version": "4.0.2",
+      "commonmarkCoreVersion": "2.0.3",
+      "html": "<p>*a <em>b</em>**c</p>"
+    },
+    "reason": "CommonMark rule 9 uses the original delimiter-run lengths for the rule of three. Reusing the remaining lengths after a partial match changes emphasis nesting and which markers stay literal.",
+    "provenance": {
+      "kind": "exact-source-spec-adjudication",
+      "evidence": "parser-emphasis-r5/emphasis-adjudication.json",
+      "evidenceSha256": "b0797af45ec5ff6d37b1314b2bb10ad7d968c796bde0b406915e1445189ff285",
+      "case": "partial-closer",
+      "baseline": "20981e83c31b78a917ce5747ee9e5205d69a5cd4",
+      "references": [
+        "https://spec.commonmark.org/0.31.2/#emphasis-and-strong-emphasis",
+        "https://github.com/commonmark/cmark/issues/177"
+      ],
+      "note": "The baseline follows the independent adjudication. The remark-matching candidate was rejected and withdrawn; these records preserve baseline behavior."
+    }
+  },
+  {
+    "id": "chat-spec-list-code-original-lf",
+    "source": "-\n\n      a\n      b\n",
+    "sourceUtf8Sha256": "d68167bde61ede91c479ab7ddaeac867ce430580ffcdde757694c6d367c17221",
+    "profile": {
+      "gfm": true,
+      "math": false,
+      "cjk": false
+    },
+    "affectedField": "canonical.children",
+    "independentOracle": {
+      "name": "Unmodified upstream cmark",
+      "specVersion": "0.31.2",
+      "cmarkCommit": "eec0eeba6d31189fd828314576494566d539b1e3",
+      "expectedHtml": "<ul>\n<li></li>\n</ul>\n<pre><code>  a\n  b\n</code></pre>\n"
+    },
+    "remarkObserved": {
+      "engine": "remark-parse",
+      "version": "11.0.0",
+      "gfmVersion": "4.0.1",
+      "unifiedVersion": "11.0.5",
+      "html": "<ul>\n<li></li>\n</ul>\n<pre><code>  a\n</code></pre>\n<pre><code>  b\n</code></pre>\n"
+    },
+    "reason": "An empty list item ends before the blank line. The following indented lines form one code block. Direct remark splits the adjacent lines into two code blocks; upstream cmark and the native baseline retain one block and its indentation.",
+    "provenance": {
+      "kind": "exact-source-spec-adjudication",
+      "evidence": "parser-list-code-r5/adjudication.json",
+      "evidenceSha256": "37722afaf244127b50264b7881caa4a76e74b90db9a408e7759ea71594ab5cc5",
+      "case": "code-original-lf",
+      "baseline": "20981e83c31b78a917ce5747ee9e5205d69a5cd4",
+      "references": [
+        "https://spec.commonmark.org/0.31.2/#indented-code-blocks",
+        "https://spec.commonmark.org/0.31.2/#list-items"
+      ],
+      "note": "LF-only source from the independent original/reduction evidence. The authored CRLF original is separate; no source or code-value whitespace normalization is applied."
+    }
+  },
+  {
+    "id": "chat-spec-list-code-reduced",
+    "source": "-\n\n    a\n    b",
+    "sourceUtf8Sha256": "41882e33f879f9f964f39215339e7d71cd1c8ba0c12d90be07f23d375bb3027f",
+    "profile": {
+      "gfm": true,
+      "math": false,
+      "cjk": false
+    },
+    "affectedField": "canonical.children",
+    "independentOracle": {
+      "name": "Unmodified upstream cmark",
+      "specVersion": "0.31.2",
+      "cmarkCommit": "eec0eeba6d31189fd828314576494566d539b1e3",
+      "expectedHtml": "<ul>\n<li></li>\n</ul>\n<pre><code>a\nb\n</code></pre>\n"
+    },
+    "remarkObserved": {
+      "engine": "remark-parse",
+      "version": "11.0.0",
+      "gfmVersion": "4.0.1",
+      "unifiedVersion": "11.0.5",
+      "html": "<ul>\n<li></li>\n</ul>\n<pre><code>a\n</code></pre>\n<pre><code>b\n</code></pre>\n"
+    },
+    "reason": "An empty list item ends before the blank line. The following indented lines form one code block. Direct remark splits the adjacent lines into two code blocks; upstream cmark and the native baseline retain one block and its indentation.",
+    "provenance": {
+      "kind": "exact-source-spec-adjudication",
+      "evidence": "parser-list-code-r5/adjudication.json",
+      "evidenceSha256": "37722afaf244127b50264b7881caa4a76e74b90db9a408e7759ea71594ab5cc5",
+      "case": "code-reduced",
+      "baseline": "20981e83c31b78a917ce5747ee9e5205d69a5cd4",
+      "references": [
+        "https://spec.commonmark.org/0.31.2/#indented-code-blocks",
+        "https://spec.commonmark.org/0.31.2/#list-items"
+      ],
+      "note": "LF-only source from the independent original/reduction evidence. The authored CRLF original is separate; no source or code-value whitespace normalization is applied."
+    }
+  }
+]

@@ -68,7 +68,7 @@ export async function readCheckout(root = checkoutRoot): Promise<Checkout> {
   }
 
   const status = await run(['git', 'status', '--porcelain', '-z'], { cwd: root })
-  const editor = path.join(root, 'editor')
+  const editor = path.join(root, 'packages/singapore')
   return {
     commit,
     branch,

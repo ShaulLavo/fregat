@@ -2,7 +2,7 @@
 
 Status: APPROVED, 2026-10-03.
 
-Owner: `ShaulLavo/fregat`, `editor/packages/spellcheck/` for the reusable service and Platform for settings and persistence. Reported in the read-only Singapore mirror as [Singapore #58](https://github.com/ShaulLavo/singapore/issues/58). Inspected baseline: Fregat `46e47cb7105da5b74dae4b76fc08033f2d6e5dfb`.
+Owner: `ShaulLavo/fregat`, `packages/singapore/packages/spellcheck/` for the reusable service and Platform for settings and persistence. Reported in the read-only Singapore mirror as [Singapore #58](https://github.com/ShaulLavo/singapore/issues/58). Inspected baseline: Fregat `46e47cb7105da5b74dae4b76fc08033f2d6e5dfb`.
 
 Dependencies: [E058](e058-spellcheck.md), [Plan 303](303-spellcheck-correctness.md). Language expansion runs separately from [Plan 304](304-spellcheck-rendering-cost.md). File spellcheck defaults remain governed by its measurements.
 
@@ -14,11 +14,11 @@ English remains the initial selection. Additional dictionaries load when selecte
 
 ## Current code
 
-[engine notes](../editor/packages/spellcheck/docs/engine.md) already document the English-shaped policy and the explicit-language design. This documentation shipped in [E062](../editor/docs/editing/e062-spellcheck-hardening.md). It must not be scheduled as a missing fix.
+[engine notes](../packages/singapore/packages/spellcheck/docs/engine.md) already document the English-shaped policy and the explicit-language design. This documentation shipped in [E062](../packages/singapore/docs/editing/e062-spellcheck-hardening.md). It must not be scheduled as a missing fix.
 
-The current [tokenizer](../editor/packages/spellcheck/src/tokenizer.ts) admits ASCII letters and internal apostrophes. `hola mundo` reaches the English checker; Hebrew, Russian, and `café` are skipped. These are tokenization facts, not assertions about final verdicts or language detection.
+The current [tokenizer](../packages/singapore/packages/spellcheck/src/tokenizer.ts) admits ASCII letters and internal apostrophes. `hola mundo` reaches the English checker; Hebrew, Russian, and `café` are skipped. These are tokenization facts, not assertions about final verdicts or language detection.
 
-[dictionaryAssets.ts](../editor/packages/spellcheck/src/dictionaryAssets.ts) provides one merged English trie. [engine.ts](../editor/packages/spellcheck/src/engine.ts) uses `cspell-trie-lib`, while [service.ts](../editor/packages/spellcheck/src/service.ts), [protocol.ts](../editor/packages/spellcheck/src/protocol.ts), and [controller.ts](../editor/packages/spellcheck/src/controller.ts) have no selected-language generation protocol. Current dictionary versioning reacts to accepted-word changes only.
+[dictionaryAssets.ts](../packages/singapore/packages/spellcheck/src/dictionaryAssets.ts) provides one merged English trie. [engine.ts](../packages/singapore/packages/spellcheck/src/engine.ts) uses `cspell-trie-lib`, while [service.ts](../packages/singapore/packages/spellcheck/src/service.ts), [protocol.ts](../packages/singapore/packages/spellcheck/src/protocol.ts), and [controller.ts](../packages/singapore/packages/spellcheck/src/controller.ts) have no selected-language generation protocol. Current dictionary versioning reacts to accepted-word changes only.
 
 Platform creates its shared service in [runtime.ts](../apps/web/src/features/editor/state/runtime.ts), supplies file options in [use-spellcheck-plugin.ts](../apps/web/src/features/editor/hooks/use-spellcheck-plugin.ts), and registers `editor.spellcheck` and `spellcheck.words` in [settings keys](../packages/contracts/src/settings/keys.ts).
 

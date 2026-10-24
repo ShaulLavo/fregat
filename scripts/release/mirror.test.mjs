@@ -24,9 +24,9 @@ test('every mirror checks out the pinned host keys before configuring SSH', () =
   expect(checkout).toBeLessThan(configure)
   expect(steps[checkout].with['persist-credentials']).toBe(false)
   expect(workflow.jobs.mirror.strategy.matrix.include.map((entry) => entry.folder)).toEqual([
-    'editor',
-    'ghostty-webgpu',
-    'hotkeys',
+    'packages/singapore',
+    'packages/ghostty-webgpu',
+    'packages/hotkeys',
   ])
 })
 
@@ -105,7 +105,7 @@ function git(cwd, ...args) {
   return result.stdout.trim()
 }
 
-function mirror(cwd, family = 'hotkeys') {
+function mirror(cwd, family = 'packages/hotkeys') {
   return spawnSync('bash', ['-c', script], {
     cwd,
     encoding: 'utf8',
@@ -117,7 +117,7 @@ function mirror(cwd, family = 'hotkeys') {
   })
 }
 
-test.each(['editor', 'ghostty-webgpu'])(
+test.each(['packages/singapore', 'packages/ghostty-webgpu'])(
   'mirrors the tracked %s family tree after a legacy link',
   async (family) => {
     await withWorkspace(async ({ root }) => {
@@ -131,6 +131,7 @@ test.each(['editor', 'ghostty-webgpu'])(
       git(source, 'config', 'user.email', 'fixture@example.com')
       git(source, 'config', `url.${destination}.insteadOf`, 'git@github.com:fixture/mirror.git')
       await mkdir(join(source, 'outside'))
+      await mkdir(join(source, 'packages'), { recursive: true })
       await symlink('outside', join(source, family))
       git(source, 'add', family)
       git(source, 'commit', '-m', 'legacy link')
@@ -165,8 +166,8 @@ test.each(['editor', 'ghostty-webgpu'])(
 )
 
 async function commitFamily(root, content) {
-  await writeFile(join(root, 'hotkeys/index.js'), content)
-  git(root, 'add', 'hotkeys/index.js')
+  await writeFile(join(root, 'packages/hotkeys/index.js'), content)
+  git(root, 'add', 'packages/hotkeys/index.js')
   git(
     root,
     '-c',
@@ -187,7 +188,7 @@ test('mirror push reports SSH host verification failures', async () => {
     const ssh = join(root, 'ssh')
     git(root, 'init', '--bare', '--initial-branch=main', origin)
     git(root, 'clone', origin, source)
-    await mkdir(join(source, 'hotkeys'))
+    await mkdir(join(source, 'packages/hotkeys'), { recursive: true })
     await commitFamily(source, 'first')
     await writeFile(ssh, '#!/bin/sh\nprintf "Host key verification failed.\\n" >&2\nexit 255\n')
     await chmod(ssh, 0o700)
@@ -211,7 +212,7 @@ test('mirrors current snapshots and skips an older replay while preserving the n
     git(root, 'init', '--bare', '--initial-branch=main', origin)
     git(root, 'init', '--bare', '--initial-branch=main', destination)
     git(root, 'clone', origin, source)
-    await mkdir(join(source, 'hotkeys'))
+    await mkdir(join(source, 'packages/hotkeys'), { recursive: true })
     await commitFamily(source, 'first')
     git(root, 'clone', origin, older)
     git(older, 'config', `url.${destination}.insteadOf`, 'git@github.com:fixture/mirror.git')

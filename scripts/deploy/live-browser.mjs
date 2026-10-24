@@ -1,7 +1,7 @@
 import {
   swiftShaderArgs,
   swiftShaderEnv,
-} from '../../ghostty-webgpu/scripts/swiftshader-launch.mjs'
+} from '../../packages/ghostty-webgpu/scripts/swiftshader-launch.mjs'
 
 export async function openLiveBrowser(chromium, platform = process.platform, signal) {
   const options =

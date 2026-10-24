@@ -5,12 +5,8 @@ import { fontQueryOptions } from '@/lib/fonts/state/queries'
 
 import { expect, test } from '../../../../test/fixtures'
 import { settingsSnapshot } from '../../../../test/factories/settings'
-import {
-  AppProviders,
-  createTestQueryClient,
-  renderWithProviders,
-  seedHtmlTheme,
-} from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/providers'
+import { renderWithProviders } from '../../../../test/render'
 import { useTheme } from '@/features/settings/hooks/use-theme'
 import { useSettingsIntentStore } from '@/features/settings/state/intent-store'
 import { resetSettingsIntentStore } from '@workspace/client-core/settings/intent-store'

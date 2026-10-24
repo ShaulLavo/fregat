@@ -5,6 +5,7 @@ export const chatMutationKeys = {
   voiceAll: ['chat', 'voice'] as const,
   voice: (ownerKey: string) => ['chat', 'voice', ownerKey] as const,
   sidePanelModule: ['chat', 'sidePanelModule', 'load'] as const,
+  markdownRuntime: ['chat', 'markdown-runtime', 'load'] as const,
   attachmentPreview: (key: ReturnType<typeof attachmentQueryKeys.text>) =>
     ['chat', 'attachment-preview', ...key] as const,
   mermaidRender: ['chat', 'mermaid-render'] as const,

@@ -1,13 +1,13 @@
 # E016: Evaluate bounded structural parsing
 
-Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
+Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
 
 - Status: Approved
 - Kind: Research
 - Owner: Editor
 - Priority: P2
 - Effort: L
-- Dependencies: [E001](../editor/examples/stress/README.md)
+- Dependencies: [E001](../packages/singapore/examples/stress/README.md)
 - Inspected baseline: `9abb944f3a2b8d6516953fdec75e8df5e1a94811`
 
 Decided 2026-09-25: owner — kept, and moved under Platform [Plan 112](112-large-file-ceiling.md) and [E015](e015-massive-file-loading.md): it runs in their lane, after 112's ceiling is measured.
@@ -20,16 +20,16 @@ bounded parsing; a reduced-memory result with silently wrong scopes is a failed 
 
 ## Current code
 
-- [The worker](../editor/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts) parses complete source,
+- [The worker](../packages/singapore/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts) parses complete source,
   retains reusable trees, and answers range queries afterward. A small query window is not a small tree.
-- [Source callbacks](../editor/packages/tree-sitter/src/treeSitter/source.ts) read resident chunks in
+- [Source callbacks](../packages/singapore/packages/tree-sitter/src/treeSitter/source.ts) read resident chunks in
   batches; they reduce transport/materialization cost, not necessarily parser tree memory.
-- [Request types](../editor/packages/tree-sitter/src/treeSitter/types.ts) carry revision, generation,
+- [Request types](../packages/singapore/packages/tree-sitter/src/treeSitter/types.ts) carry revision, generation,
   runtime-session identity, cancellation buffers, and degraded optional-phase outcomes.
-- [Structural selection](../editor/packages/tree-sitter/src/structuralSelection.ts) relies on meaningful
-  syntax ranges. [Editor](../editor/packages/editor/src/editor/Editor.ts) already windows syntax requests.
-- [Worker tests](../editor/packages/tree-sitter/test/treeSitter-worker.test.ts) and
-  [the syntax benchmark](../editor/packages/tree-sitter/bench/treeSitter-syntax.ts) provide the controls.
+- [Structural selection](../packages/singapore/packages/tree-sitter/src/structuralSelection.ts) relies on meaningful
+  syntax ranges. [Editor](../packages/singapore/packages/editor/src/editor/Editor.ts) already windows syntax requests.
+- [Worker tests](../packages/singapore/packages/tree-sitter/test/treeSitter-worker.test.ts) and
+  [the syntax benchmark](../packages/singapore/packages/tree-sitter/bench/treeSitter-syntax.ts) provide the controls.
 
 Recheck parse reuse, injection retention, cancellation, and peak allocation before introducing a
 new mode. A leak or duplicate full parse should be fixed directly, not concealed by a feature cap.

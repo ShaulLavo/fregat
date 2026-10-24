@@ -42,6 +42,8 @@ function installScript() {
 
 const download =
   'error: failed to download @opentui/react@https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-react-0.5.12-bubli.2.tgz: HTTP 5xx'
+const slowFilesystem =
+  'warn: Slow filesystem detected. If <fixture>/cache is a network drive, consider setting $BUN_INSTALL_CACHE_DIR to a local folder.'
 const supported = ['bash', 'git', 'tar'].every((tool) => Bun.which(tool) !== null)
 if (!supported)
   console.info('Skipping dependency installation tests. Bash, Git, and tar are required.')
@@ -69,11 +71,11 @@ function runInstall({
 }) {
   const root = mkdtempSync(path.join(tmpdir(), 'setup-install-'))
   try {
-    writeFileSync(path.join(root, 'failure'), output)
-    writeFileSync(path.join(root, 'first-failure'), firstOutput)
+    writeFileSync(path.join(root, 'failure'), output.replaceAll('<fixture>', root))
+    writeFileSync(path.join(root, 'first-failure'), firstOutput.replaceAll('<fixture>', root))
     writeFileSync(path.join(root, 'package.json'), '{}')
     writeFileSync(path.join(root, '.gitignore'), 'node_modules/\n.npmrc\n')
-    writeFileSync(path.join(root, 'final-output'), finalOutput)
+    writeFileSync(path.join(root, 'final-output'), finalOutput.replaceAll('<fixture>', root))
     writeFileSync(
       path.join(root, 'bun'),
       `#!/usr/bin/env bash
@@ -133,7 +135,7 @@ printf 'Installed dependencies\\n'
     expect(readdirSync(root).filter((name) => /^bun-(prepare|install)\./.test(name))).toEqual([])
     return {
       status: result.exitCode,
-      output: result.stdout.toString() + result.stderr.toString(),
+      output: (result.stdout.toString() + result.stderr.toString()).replaceAll(root, '<fixture>'),
       calls: readFileSync(path.join(root, 'calls'), { encoding: 'utf8', flag: 'a+' })
         .trim()
         .split('\n')
@@ -261,7 +263,15 @@ const realSupported = supported && Bun.which('tar') !== null
 if (!realSupported) console.info('Skipping real Bun lifecycle controls. Bash and tar are required.')
 
 async function lifecycleFixture(
-  mode: 'cold' | 'healthy' | 'warm' | 'workspace' | 'persistent' | 'restored' | 'restored-partial',
+  mode:
+    | 'cold'
+    | 'healthy'
+    | 'warm'
+    | 'workspace'
+    | 'persistent'
+    | 'slow-filesystem'
+    | 'restored'
+    | 'restored-partial',
 ) {
   const warm = mode === 'warm'
   const workspace = mode === 'workspace' || mode === 'persistent'
@@ -377,6 +387,7 @@ if (args.includes('--ignore-scripts')) {
   appendFileSync(${JSON.stringify(path.join(root, 'prep-state'))}, [process.cwd() === ${JSON.stringify(install)}, existsSync(${JSON.stringify(path.join(install, 'node_modules'))}), configEqual].join(' ') + '\\n')
 }
 appendFileSync(${JSON.stringify(path.join(root, 'raw-output'))}, output)
+if (status !== 0 && args.includes('--ignore-scripts') && ${JSON.stringify(mode === 'slow-filesystem')}) process.stdout.write('warn: Slow filesystem detected. If ' + process.env.BUN_INSTALL_CACHE_DIR + ' is a network drive, consider setting $BUN_INSTALL_CACHE_DIR to a local folder.\\n')
 process.stdout.write(output.replaceAll(${JSON.stringify(url)}, 'https://github.com/fixture/packages/releases/download/v1/bad.tgz'))
 if (status !== 0 && args.includes('--ignore-scripts')) await fetch(${JSON.stringify(`http://127.0.0.1:${server.port}/recover`)})
 process.exit(status)
@@ -427,6 +438,10 @@ process.exit(status)
     failing = !healthy
     const result = await runBash(installScript(), install, actionEnv)
     expect(result.status, result.output).toBe(0)
+    if (mode === 'slow-filesystem')
+      expect(result.output).toContain(
+        slowFilesystem.replaceAll('<fixture>/cache', env.BUN_INSTALL_CACHE_DIR),
+      )
     const raw = readFileSync(path.join(root, 'raw-output'), 'utf8')
     if (!healthy)
       expect(
@@ -444,6 +459,7 @@ process.exit(status)
       cold: 2,
       workspace: 2,
       warm: 1,
+      'slow-filesystem': 2,
       restored: 1,
       'restored-partial': 1,
     }
@@ -471,6 +487,13 @@ test.skipIf(!realSupported)(
   'real Bun cold recovery defers trusted and root lifecycle scripts until the final install',
   async () => {
     await lifecycleFixture('cold')
+  },
+)
+
+test.skipIf(!realSupported)(
+  'real Bun cold recovery accepts the exact slow-filesystem advisory and defers lifecycle scripts',
+  async () => {
+    await lifecycleFixture('slow-filesystem')
   },
 )
 
@@ -638,6 +661,54 @@ test.skipIf(!supported)('cached summary in the final normal failure never trigge
   expect(result.sleeps).toEqual(['2'])
 })
 
+for (const diagnostic of [download, getDownload]) {
+  test.skipIf(!supported)(`recovers with the exact cache advisory and ${diagnostic}`, () => {
+    const result = runInstall({ output: slowFilesystem + '\n' + diagnostic })
+    expect(result.status, result.output).toBe(0)
+    expect(result.calls).toHaveLength(3)
+    expect(result.sleeps).toEqual(['2'])
+    expect(result.output).toContain(slowFilesystem)
+  })
+}
+
+for (const output of [
+  slowFilesystem,
+  slowFilesystem + '\n' + getDownload.replace('503', '403'),
+  slowFilesystem + '\n' + getDownload.replace('503', '429'),
+  slowFilesystem + '\n' + getDownload.replace('github.com', 'registry.npmjs.org'),
+  slowFilesystem + '\n' + getDownload.replace('.tgz', '.zip'),
+  slowFilesystem + '\n' + getDownload + '\nerror: Integrity check failed',
+  slowFilesystem + '\n' + getDownload + '\nerror: postinstall script failed',
+  slowFilesystem + '\n' + getDownload + '\nwarn: unknown advisory',
+  slowFilesystem + '\n' + getDownload + '\nunknown diagnostic',
+  slowFilesystem.replace('<fixture>/cache', '<fixture>/other-cache') + '\n' + getDownload,
+  slowFilesystem.replace('local folder.', 'local folder. unknown suffix') + '\n' + getDownload,
+]) {
+  test.skipIf(!supported)(`cache advisory keeps unrecognized failures terminal: ${output}`, () => {
+    const result = runInstall({ output, status: 23 })
+    expect(result.status, result.output).toBe(23)
+    expect(result.calls).toHaveLength(1)
+    expect(result.sleeps).toEqual([])
+    expect(result.output).toContain(output)
+  })
+}
+
+for (const control of [
+  { signal: true, expectedStatus: 143 },
+  { loggingStatus: 74, expectedStatus: 74 },
+  { status: 137, expectedStatus: 137 },
+]) {
+  test.skipIf(!supported)(
+    `cache advisory preserves failure status ${control.expectedStatus}`,
+    () => {
+      const result = runInstall({ output: slowFilesystem + '\n' + getDownload, ...control })
+      expect(result.status, result.output).toBe(control.expectedStatus)
+      expect(result.calls).toHaveLength(1)
+      expect(result.sleeps).toEqual([])
+    },
+  )
+}
+
 function removeCachedPackage(cache: string, name: string) {
   const removed: string[] = []
   for (const entry of readdirSync(cache)) {
@@ -662,6 +733,30 @@ for (const mode of ['restored', 'restored-partial'] satisfies Array<
     },
   )
 }
+
+test.skipIf(!supported)('cache advisory preserves the six-attempt recovery bound', () => {
+  const result = runInstall({
+    output: slowFilesystem + '\n' + getDownload,
+    failures: 10,
+    status: 7,
+  })
+  expect(result.status, result.output).toBe(7)
+  expect(result.calls).toHaveLength(6)
+  expect(result.sleeps).toEqual(['2', '4', '8', '16', '32'])
+})
+
+test.skipIf(!supported)('cache advisory cannot retry a final lifecycle install failure', () => {
+  const finalOutput = slowFilesystem + '\n' + getDownload
+  const result = runInstall({ output: getDownload, finalOutput, finalStatus: 42 })
+  expect(result.status, result.output).toBe(42)
+  expect(result.output).toContain(finalOutput)
+  expect(result.calls).toEqual([
+    'install --frozen-lockfile --ignore-scripts --cache-dir <fixture>/cache',
+    'install --frozen-lockfile --ignore-scripts --cache-dir <fixture>/cache',
+    'install --frozen-lockfile',
+  ])
+  expect(result.sleeps).toEqual(['2'])
+})
 
 test('Bun package caching keeps dependency installation unconditional and precedes workspace builds', () => {
   expect(setupStep('Restore Bun packages')).toMatchObject({

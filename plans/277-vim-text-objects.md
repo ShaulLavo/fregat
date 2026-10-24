@@ -34,11 +34,11 @@ pinned modal keymap, including `around`, punctuation and indentation options.
 
 Editor paths below name the canonical destination after Plan 207. At this plan's source audit,
 those files live under `/work/projects/Editor/packages/`; `editor/` has not landed in Fregat.
-Implement package work in `editor/packages/` after the move.
+Implement package work in `packages/singapore/packages/` after the move.
 
-`editor/packages/editor/src/editor/selectionRanges.ts` owns the structural selection ladder;
-`editor/packages/editor/src/editor/syntaxController.ts`, `editor/packages/editor/src/syntax/index.ts` and `editor/packages/editor/src/syntax/highlighter.ts` own syntax access.
-`editor/packages/editor/src/editor/bracketMatching.ts` and `editor/packages/editor/src/editor/textRanges.ts` provide bracket/text helpers.
+`packages/singapore/packages/editor/src/editor/selectionRanges.ts` owns the structural selection ladder;
+`packages/singapore/packages/editor/src/editor/syntaxController.ts`, `packages/singapore/packages/editor/src/syntax/index.ts` and `packages/singapore/packages/editor/src/syntax/highlighter.ts` own syntax access.
+`packages/singapore/packages/editor/src/editor/bracketMatching.ts` and `packages/singapore/packages/editor/src/editor/textRanges.ts` provide bracket/text helpers.
 `apps/web/src/keymap/editor-commands.ts` exposes smart selection; Plan 224 extends selection.
 These owners supply ranges, but have no Vim inside/around or separator-ownership contract.
 
@@ -46,13 +46,13 @@ These owners supply ranges, but have no Vim inside/around or separator-ownership
 
 Follow [the keymap architecture](../docs/keymap/architecture.md). Add typed commands and
 availability to `apps/web/src/keymap/table.ts` through its owning command module; Editor
-commands also belong in `editor/packages/editor/src/editor/commandCatalog.ts`. Put keys and argument variants in Plan 206's
+commands also belong in `packages/singapore/packages/editor/src/editor/commandCatalog.ts`. Put keys and argument variants in Plan 206's
 `apps/web/src/keymap/presets/` data. Hosted Editor joins the window dispatcher and publishes
 contexts. Standalone Editor exports the modal pack as data. Keep keys out of command metadata.
 Use the existing document mutation/undo path for synchronous edits. Async reads and effects
 use feature-owned TanStack query/mutation options and settle the cache before resolving.
 
-Build a pure object resolver in `editor/packages/vim` over document snapshots and optional
+Build a pure object resolver in `packages/singapore/packages/vim` over document snapshots and optional
 syntax analysis. Return a typed range with inside/around semantics and motion kind, consumed
 by Plan 276 operators and Plan 278 visual state. Share pair lookup with surrounds; make counts,
 escaped delimiters and expansion direction explicit arguments. Keep syntax-query work in

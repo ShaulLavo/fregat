@@ -9,7 +9,7 @@ import { page } from 'vitest/browser'
 
 import { CodeHighlighterReady } from '../../../../test/factories/code-highlighter-ready'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
-import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/providers'
 import {
   ChatTimelineActionsContext,
   type ChatTimelineActions,

@@ -40,7 +40,7 @@ These pages describe how subsystems work today. They are written for contributor
 
 ## Mirrored libraries
 
-Singapore (`editor/`), ghostty-webgpu and hotkeys keep their own docs next to their code: [`editor/`](../editor/README.md), [`ghostty-webgpu/`](../ghostty-webgpu/README.md) and [`hotkeys/`](../hotkeys/README.md).
+Singapore (`packages/singapore/`), ghostty-webgpu and hotkeys keep their own docs next to their code: [`packages/singapore/`](../packages/singapore/README.md), [`packages/ghostty-webgpu/`](../packages/ghostty-webgpu/README.md) and [`packages/hotkeys/`](../packages/hotkeys/README.md).
 
 ## Product site
 

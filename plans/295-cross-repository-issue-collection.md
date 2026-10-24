@@ -23,8 +23,8 @@ Use this default collection scope:
 | `ShaulLavo/tree-sitter-x`  | tree-sitter-x. Its issue tracker is currently disabled; report that state and include its Fregat-prefixed reports. |
 | `ShaulLavo/tree-sitter-md` | tree-sitter-md.                                                                                                    |
 | `ShaulLavo/singapore`      | Fregat's Editor packages. Preserve the mirror issue URL.                                                           |
-| `ShaulLavo/ghostty-webgpu` | Fregat's `ghostty-webgpu/`. Preserve the mirror issue URL.                                                         |
-| `ShaulLavo/hotkeys`        | Fregat's `hotkeys/`. Preserve the mirror issue URL.                                                                |
+| `ShaulLavo/ghostty-webgpu` | Fregat's `packages/ghostty-webgpu/`. Preserve the mirror issue URL.                                                |
+| `ShaulLavo/hotkeys`        | Fregat's `packages/hotkeys/`. Preserve the mirror issue URL.                                                       |
 
 Persist the scope in one versioned collector configuration consumed by both manual and scheduled runs. Do not infer additional repositories from the GitHub account. An eventual app configuration control must use the application settings registry; do not add environment tunables.
 

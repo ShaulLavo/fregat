@@ -3,7 +3,7 @@ import { projectRegistrationResult } from '@workspace/client-core/chat/registrat
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import type { Client } from '@/lib/client'
 import { providerInstanceIdSchema, type ModelSelection } from '@workspace/contracts'
-import { createTestQueryClient } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
 import * as v from 'valibot'
 
 import {

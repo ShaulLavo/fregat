@@ -7,7 +7,7 @@ A new version needs review; unresolved packages fail the build.
 - `rehype-katex`, `remark-math`, `http_ece`, and `standardwebhooks`: copied from the
   npm release's `gitHead`. Standard Webhooks' library MIT licence is in
   `libraries/LICENSE`; its repository root licence covers the specification.
-- `drizzle-orm`: copied from the commit referenced by its `0.45.3` tag.
+- `drizzle-orm`: copied from the commits referenced by its `0.45.3` and `0.45.4` tags.
 - `react-remove-scroll-bar`: copied from upstream's commit adding the licence file.
   The npm archive declares MIT; its registry `gitHead` is unavailable upstream.
   The pinned licence supplies the author's copyright and full MIT terms.

@@ -291,7 +291,7 @@ try {
     api,
     viewport,
     platform: await fingerprint(platformRoot),
-    ghostty: await fingerprint(resolve(platformRoot, 'ghostty-webgpu')),
+    ghostty: await fingerprint(resolve(platformRoot, 'packages/ghostty-webgpu')),
     recipeHash: createHash('sha256')
       .update(await readFile(new URL(import.meta.url)))
       .digest('hex'),

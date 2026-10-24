@@ -102,10 +102,10 @@ afterEach(() => {
   restoreLayoutProperty(Element.prototype, 'getBoundingClientRect', originalRect)
 })
 
-test('the jump-to-latest control stays out of the way while the transcript follows', () => {
+test('the jump-to-latest control stays out of the way while the transcript follows', async () => {
   renderTimeline([userMessage('u1', 'First question')])
 
-  expect(screen.getByText('First question')).toBeInTheDocument()
+  expect(await screen.findByText('First question')).toBeInTheDocument()
   expect(jumpToLatest()).toHaveClass('opacity-0')
   expect(jumpToLatest()).toHaveAttribute('tabindex', '-1')
 })

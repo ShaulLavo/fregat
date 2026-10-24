@@ -87,7 +87,7 @@ The React adapter distinguishes initial waiting from an explicit clear so a null
 
 ## Native paint and replacement
 
-The existing [native view](../editor/packages/editor/src/virtualization/virtualizedTextView.ts) already batches updates through runAtomicRender. Its [row painter](../editor/packages/editor/src/virtualization/virtualizedTextViewRows.ts) owns row pooling, chunk reuse, gutters, and same-line patches. Build the restore path at that boundary.
+The existing [native view](../packages/singapore/packages/editor/src/virtualization/virtualizedTextView.ts) already batches updates through runAtomicRender. Its [row painter](../packages/singapore/packages/editor/src/virtualization/virtualizedTextViewRows.ts) owns row pooling, chunk reuse, gutters, and same-line patches. Build the restore path at that boundary.
 
 Decode saved text/control parts, projected styles, and geometry into the inputs needed by native drawing helpers. Reuse the existing row/chunk DOM and highlight ownership rules. Extract the smallest helpers needed by both sources. Preserve the live projector and incremental update algorithm.
 

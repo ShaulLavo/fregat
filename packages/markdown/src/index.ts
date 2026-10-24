@@ -1,7 +1,9 @@
 export { createMarkdownSession } from './utils/session'
 export type {
   MarkdownSession,
+  MarkdownSessionFactory,
   MarkdownSessionOptions,
+  MarkdownParser,
   MarkdownUpdateOptions,
 } from './utils/session'
 export type { MarkdownBlock } from './utils/blocks'

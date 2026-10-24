@@ -10,24 +10,24 @@ const branch = 'tree-sitter-x/updates'
 const sha = /^[0-9a-f]{40}$/
 const manifests = new Set([
   'package.json',
-  'editor/package.json',
-  'editor/site/package.json',
+  'packages/singapore/package.json',
+  'packages/singapore/site/package.json',
   'scripts/release/editor-fixture.json',
 ])
 const generated = new Set([
   'bun.lock',
-  'editor/packages/tree-sitter-languages/languages.json',
-  'editor/packages/tree-sitter-languages/languages.lock.json',
-  'editor/packages/tree-sitter-languages/NOTICE',
-  'editor/packages/tree-sitter-languages/src/catalog.generated.ts',
-  'editor/packages/tree-sitter-languages/src/metadata.ts',
+  'packages/singapore/packages/tree-sitter-languages/languages.json',
+  'packages/singapore/packages/tree-sitter-languages/languages.lock.json',
+  'packages/singapore/packages/tree-sitter-languages/NOTICE',
+  'packages/singapore/packages/tree-sitter-languages/src/catalog.generated.ts',
+  'packages/singapore/packages/tree-sitter-languages/src/metadata.ts',
 ])
 
 function allowedFile(file) {
   return (
     manifests.has(file) ||
     generated.has(file) ||
-    /^editor\/packages\/[^/]+\/package.json$/.test(file)
+    /^packages\/singapore\/packages\/[^/]+\/package.json$/.test(file)
   )
 }
 
@@ -133,7 +133,9 @@ function commitGenerated(git, patch, metadata, branch) {
     'Pin updates must modify existing files',
   )
   validateManifests(git, files, metadata)
-  const manifest = JSON.parse(git(['show', ':editor/packages/tree-sitter/package.json']))
+  const manifest = JSON.parse(
+    git(['show', ':packages/singapore/packages/tree-sitter/package.json']),
+  )
   assert.equal(
     manifest.dependencies['web-tree-sitter'],
     `github:ShaulLavo/tree-sitter-x#${metadata.runtime}`,

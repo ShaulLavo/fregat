@@ -38,12 +38,12 @@ Recorded 2026-10-09 at `657faea169e3d691ec01949d62a64fc406cad860`, while investi
 [PR #1190](https://github.com/ShaulLavo/fregat/pull/1190)'s shared-work ownership failures.
 Status: Approved repair; implementation remains pending. Effort: S. Fix risk: low.
 
-`editor/packages/plugin-ui/src/hoverController.ts:298` calls the tokenizer's `clear()`
+`packages/singapore/packages/plugin-ui/src/hoverController.ts:298` calls the tokenizer's `clear()`
 when the theme changes. `src/codeTokens.ts:81–84` clears completed tokens and held keys,
 but preserves `inFlight`. A new request joins the old promise at lines 49–50, and the
 old completion repopulates the cache at lines 57–58. The snippet feature captures its
 highlighter providers before awaiting work in
-`editor/packages/editor/src/editor/snippetTokensFeature.ts:57–76`.
+`packages/singapore/packages/editor/src/editor/snippetTokensFeature.ts:57–76`.
 
 The actual exported `createTooltipCodeTokenizer` reproduced this with a controlled
 token-producing feature. Ordinary coalescing, completion, and cache clearing passed first.
@@ -56,7 +56,7 @@ Execution:
 
 1. Reconcile changes since the recorded commit in `codeTokens.ts`, `hoverController.ts`,
    and `snippetTokensFeature.ts`. Keep the existing simple editor path and snippet feature.
-2. Add a gated regression in `editor/packages/plugin-ui/test/codeTokens.test.ts`, using
+2. Add a gated regression in `packages/singapore/packages/plugin-ui/test/codeTokens.test.ts`, using
    the real tokenizer and a controlled external token feature. Prove normal coalescing
    first. Start A, clear, start B for the same block, finish A, and require a second feature
    call, no A tokens in the current cache, and B remaining discoverable. Finish B and
@@ -64,7 +64,7 @@ Execution:
 3. Retire pending work on invalidation and fence both publication and cleanup by the
    captured request or owner identity. Replacing a theme-bound owner is also valid.
    Clearing the promise map alone leaves late publication and deletion unsafe.
-4. From `editor/packages/plugin-ui`, run
+4. From `packages/singapore/packages/plugin-ui`, run
    `bun run test -- --project dom test/codeTokens.test.ts test/hoverController.test.ts`.
    The new theme regression must fail before the repair and pass afterwards. Add a controller
    integration regression that delivers a theme update while snippet work is pending.
@@ -244,7 +244,7 @@ Unsupported syntax may return documented plain text. Operational failures must r
 ### 1. Add the Editor service and adapters
 
 - [x] Recheck source/API drift and package dependency directions.
-  - Editor is `editor/packages/` in this repo since Plan 207; no `editor-ref` exists. `highlighting` depends on core (peer), tree-sitter, tree-sitter-languages and `shiki`; nothing below imports it.
+  - Editor is `packages/singapore/packages/` in this repo since Plan 207; no `editor-ref` exists. `highlighting` depends on core (peer), tree-sitter, tree-sitter-languages and `shiki`; nothing below imports it.
 - [x] Add public package exports, build entries, metadata, and built-entry smoke tests. Keep worker assets lazy.
   - Root workspaces glob, `knip.json`, `.changeset/config.json`; tests import the built core worker asset.
 - [x] Move engine policy, grammar/alias loading, and registration ownership into Editor; reuse current workers/providers. Do not duplicate Platform tables into another live owner.
@@ -278,12 +278,12 @@ Unsupported syntax may return documented plain text. Operational failures must r
 - [x] Migrate affected Editor examples/callers, then remove superseded setup paths. Retain low-level engine APIs only where independent consumers still need them.
   - The example app points at `createHighlightingPlugin`. `examples/stress` keeps the low-level Shiki and Tree-sitter factories because it benchmarks the engines themselves.
 - [x] Document simple-plugin, shared-plugin, standalone, and creator-disposes usage.
-  - `editor/packages/highlighting/README.md`.
+  - `packages/singapore/packages/highlighting/README.md`.
 
 ### 2. Migrate Platform editor documents and Settings previews
 
 - [x] Merge/push/build Editor first; bump Platform's exact `editor-ref` in `.github/actions/setup/action.yml` with the consumer change.
-  - Superseded by Plan 207: Editor is built from `editor/packages/` in this repository; there is no `editor-ref`.
+  - Superseded by Plan 207: Editor is built from `packages/singapore/packages/` in this repository; there is no `editor-ref`.
 - [x] Add the package using existing linked-package symlink/override/CI provisioning conventions. Verify built exports from a clean CI clone.
   - Root workspaces, `knip.json`, `.changeset/config.json`; `bun run build:workspaces` builds it and the web bundle gate imports its dist.
 - [x] Create one shared application resource owner. Platform supplies themes, language census, and product enablement.
@@ -309,7 +309,7 @@ Unsupported syntax may return documented plain text. Operational failures must r
 ### 4. Verify and ship completed consumer units
 
 - [x] Editor API tests: text-only simple plugin; standalone snippet without DOM/document; borrowed/owned disposal; simultaneous themes; same-name changed content; multiline/Unicode/empty/style goldens; unknown language; unavailable/crashed worker; abort during acquisition/tokenization; no leaked transient sessions.
-  - `editor/packages/highlighting/test/`: plugin (text-only, borrowed/owned, theme switch), service (unavailable, abort, disposal, aliases), service.browser (goldens, Unicode, empty, unknown, same-name themes), structure.browser (Tree-sitter palette path and session release, Shiki fallback, revisions, default palette, crashed worker, shared abort, retention, diff reuse, pending reuse, leave-before-settle, bound). Chromium 17 browser + 10 node; Firefox and WebKit 34 via `test:engines`.
+  - `packages/singapore/packages/highlighting/test/`: plugin (text-only, borrowed/owned, theme switch), service (unavailable, abort, disposal, aliases), service.browser (goldens, Unicode, empty, unknown, same-name themes), structure.browser (Tree-sitter palette path and session release, Shiki fallback, revisions, default palette, crashed worker, shared abort, retention, diff reuse, pending reuse, leave-before-settle, bound). Chromium 17 browser + 10 node; Firefox and WebKit 34 via `test:engines`.
 - [x] Document regressions: incremental edits/recoloring, two views, exact prepared revision, diffs, theme switch with pending replies, and Tree-sitter structure under Shiki colors.
   - Unchanged document path: core `test/shiki` 93/93; web `prepared-open`, `syntax-worker`, `tree-pane` browser tests; `diff-tokens`, `diff-view-syntax-source`, `prepared-document` dom tests; full web node+dom suite 4916 passed. Tree-sitter structure under Shiki colours: `plugin.test.ts`.
 - [x] Platform previews: actual editor parity for built-in/imported themes, concurrent mode previews, revision-aware query keys, and rapid scroll/search/toggle without stale output.
@@ -429,7 +429,7 @@ Streaming fence cleanup currently marks active=false but does not cancel underly
 ### Issue 860
 
 Source: [#860: Explore lossless string-representation optimization in V8 and JavaScriptCore on the actual highlighting pipeline](https://github.com/ShaulLavo/fregat/issues/860), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/860).
-Current owner: [editor/packages/editor/src/shiki/shiki.worker.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/editor/packages/editor/src/shiki/shiki.worker.ts).
+Current owner: [packages/singapore/packages/editor/src/shiki/shiki.worker.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/editor/packages/editor/src/shiki/shiki.worker.ts).
 
 String representation is an owner-requested experiment, not an established bottleneck. Map V8 one/two-byte strings and slices/ropes, JSC eight/sixteen-bit strings, Oniguruma WASM and current worker/native boundaries before adding copies. Preserve all UTF-16 code units, offsets, Unicode and lone surrogates. Count conversion, allocation and transfer costs, compare Chromium and WebKit independently, and sequence the work with owned-parser migration. Keep a zero-conversion control; no universal performance claim follows from representation alone.
 

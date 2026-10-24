@@ -24,13 +24,13 @@ editor given text and a URI works; the host supplies project files through the s
 
 ## Current code
 
-- [Plugin entry](../editor/packages/typescript-lsp/src/pluginWithWorker.ts),
-  [worker owner](../editor/packages/typescript-lsp/src/workerOwner.ts) and
-  [LSP integration](../editor/packages/typescript-lsp/src/plugin.ts) supply the reuse boundary.
-  [ProjectHost](../editor/packages/typescript-lsp/src/worker/projectHost.ts) currently uses
+- [Plugin entry](../packages/singapore/packages/typescript-lsp/src/pluginWithWorker.ts),
+  [worker owner](../packages/singapore/packages/typescript-lsp/src/workerOwner.ts) and
+  [LSP integration](../packages/singapore/packages/typescript-lsp/src/plugin.ts) supply the reuse boundary.
+  [ProjectHost](../packages/singapore/packages/typescript-lsp/src/worker/projectHost.ts) currently uses
   Microsoft TypeScript 6.0.3; the server selects classic or native TypeScript separately.
-- [Workspace](../editor/packages/typescript-lsp/src/workspace.ts) owns file updates and
-  [parity tests](../editor/packages/typescript-lsp/test/parity.test.ts) provide useful scenario
+- [Workspace](../packages/singapore/packages/typescript-lsp/src/workspace.ts) owns file updates and
+  [parity tests](../packages/singapore/packages/typescript-lsp/test/parity.test.ts) provide useful scenario
   validators. The prerequisite strengthens these into a real backend/browser acceptance matrix.
 - The fork's [WASM service](https://github.com/ShaulLavo/ts-rust/blob/aa1ded92daa337fa387e296eaf438f99d0651e7f/npm/wasm/README.md#editor-language-service)
   exposes `createLanguageService`, LSP-shaped `request`, `updateFiles`, `deleteFiles` and disposal.

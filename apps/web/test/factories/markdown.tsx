@@ -2,6 +2,8 @@ import {
   ChatWorkspaceRootContext,
   type ChatWorkspaceRoot,
 } from '@/features/chat/providers/workspace-root-context'
+import { MarkdownSessionContext } from '@workspace/markdown/providers/session-context'
+import { createMarkdownSession } from '@workspace/markdown/utils/session'
 import type { ReactNode } from 'react'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -63,7 +65,9 @@ export function renderChatWorkspaceContent(
 function chatWorkspaceContent(content: ReactNode, workspaceRoot: ChatWorkspaceRoot | null) {
   return (
     <TestEditorStateProvider>
-      <ChatWorkspaceRootContext value={workspaceRoot}>{content}</ChatWorkspaceRootContext>
+      <ChatWorkspaceRootContext value={workspaceRoot}>
+        <MarkdownSessionContext value={createMarkdownSession}>{content}</MarkdownSessionContext>
+      </ChatWorkspaceRootContext>
     </TestEditorStateProvider>
   )
 }

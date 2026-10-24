@@ -44,7 +44,10 @@ function readTerminalWorkflow() {
       }),
     }),
     Bun.YAML.parse(
-      readFileSync(new URL('../ghostty-webgpu/.github/workflows/ci.yml', import.meta.url), 'utf8'),
+      readFileSync(
+        new URL('../packages/ghostty-webgpu/.github/workflows/ci.yml', import.meta.url),
+        'utf8',
+      ),
     ),
   )
 }
@@ -165,7 +168,7 @@ test('standalone checks cover every mirror family from an exact folder export', 
   expect(workflow.jobs.standalone!.strategy).toBeUndefined()
   const steps = action.runs.steps
   expect(steps.find((step) => step.name === 'Export exact mirror folder')?.run).toContain(
-    'git archive "HEAD:$FAMILY"',
+    'git archive "HEAD:$folder"',
   )
   expect(steps.find((step) => step.name === 'Install standalone dependencies')?.run).toBe(
     'bun install',
@@ -313,20 +316,20 @@ test('Editor benchmark smoke runs only during full validation and basic regressi
 test('canonical Editor CI checks the generated language catalog', () => {
   const steps = readWorkflow('workspace-libraries.yml').jobs.editor!.steps
   expect(steps.map((step) => step.run).join('\n')).toContain(
-    'bun run --cwd editor/packages/tree-sitter-languages languages:generate -- --check',
+    'bun run --cwd packages/singapore/packages/tree-sitter-languages languages:generate -- --check',
   )
 })
 
 test('Editor architecture health runs for every selected Editor job', () => {
   const steps = readWorkflow('workspace-libraries.yml').jobs.editor!.steps
   const health = steps.find((step) => step.name === 'Check architecture health')!
-  expect(health.run).toBe('bun run --cwd editor health')
+  expect(health.run).toBe('bun run --cwd packages/singapore health')
   expect(health.if).toBeUndefined()
 })
 
 test('canonical ghostty CI runs the standalone verification contract', () => {
   const steps = readWorkflow('workspace-libraries.yml').jobs.ghostty!.steps
-  expect(steps.map((step) => step.run)).toContain('bun run --cwd ghostty-webgpu verify')
+  expect(steps.map((step) => step.run)).toContain('bun run --cwd packages/ghostty-webgpu verify')
 })
 
 test('canonical ghostty CI checks the host package when native artifacts are assembled', () => {
@@ -334,7 +337,9 @@ test('canonical ghostty CI checks the host package when native artifacts are ass
   const classifier = steps.find((step) => step.id === 'native-state')
   expect(classifier?.run).toContain('verify-config-resolver-artifacts.ts --state either')
   expect(classifier?.run).toContain('echo "state=$state" >> "$GITHUB_OUTPUT"')
-  const host = steps.find((step) => step.run === 'bun run --cwd ghostty-webgpu test:package:host')
+  const host = steps.find(
+    (step) => step.run === 'bun run --cwd packages/ghostty-webgpu test:package:host',
+  )
   expect(host?.if).toBe("${{ steps.native-state.outputs.state == 'assembled' }}")
 })
 
@@ -350,7 +355,7 @@ test('standalone Editor also checks the exact clean hoisted graph', () => {
   const steps = action.runs.steps
   const runtime = steps.find((step) => step.name === 'Check hoisted standalone tree-sitter runtime')
   expect(runtime?.if).toBe("${{ inputs.family == 'editor' }}")
-  expect(runtime?.run).toContain('git archive HEAD:editor')
+  expect(runtime?.run).toContain('git archive HEAD:packages/singapore')
   expect(runtime?.run).toContain('bun install --linker=hoisted')
   expect(runtime?.run).toContain('bun run --cwd packages/tree-sitter test:runtime')
 })
@@ -401,21 +406,22 @@ test('automatic bump publication reuses one rolling branch for manual merging', 
 test('canonical ghostty CI verifies the separate line editor package', () => {
   const steps = readWorkflow('workspace-libraries.yml').jobs.ghostty!.steps
   expect(steps.map((step) => step.run)).toContain(
-    'bun run --cwd ghostty-webgpu/packages/line-editor verify',
+    'bun run --cwd packages/ghostty-webgpu/packages/line-editor verify',
   )
   const root = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
-  expect(root.workspaces.packages).toContain('ghostty-webgpu/packages/*')
+  expect(root.workspaces.packages).toContain('packages/ghostty-webgpu/packages/*')
   expect(root.scripts['build:workspaces']).toContain('--filter=ghostty-webgpu-line-editor')
 })
 
-test('the provisional line editor workspace is private until publication is authorized', () => {
+test('the line editor workspace is publishable like the other Ghostty packages', () => {
   const manifest = JSON.parse(
     readFileSync(
-      new URL('../ghostty-webgpu/packages/line-editor/package.json', import.meta.url),
+      new URL('../packages/ghostty-webgpu/packages/line-editor/package.json', import.meta.url),
       'utf8',
     ),
   )
-  expect(manifest.private).toBe(true)
+  expect(manifest.private).toBeUndefined()
+  expect(manifest.name).toBe('ghostty-webgpu-line-editor')
 })
 
 test('line editor builds after the root terminal declarations', () => {
@@ -428,7 +434,7 @@ test('line editor builds after the root terminal declarations', () => {
 test('shader verification builds public artifacts and runs real browser checks', () => {
   const steps = readWorkflow('workspace-libraries.yml').jobs.ghostty!.steps
   expect(steps.map((step) => step.run)).toContain(
-    'bun run --cwd ghostty-webgpu/packages/shaders verify && bun run --cwd ghostty-webgpu/packages/shaders test:browser',
+    'bun run --cwd packages/ghostty-webgpu/packages/shaders verify && bun run --cwd packages/ghostty-webgpu/packages/shaders test:browser',
   )
   const graph = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'))
   expect(graph.tasks['ghostty-webgpu-shaders#build'].dependsOn).toContain('ghostty-webgpu#build')
@@ -436,7 +442,7 @@ test('shader verification builds public artifacts and runs real browser checks',
   expect(root.scripts['build:workspaces']).toContain('--filter=ghostty-webgpu-shaders')
   const manifest = JSON.parse(
     readFileSync(
-      new URL('../ghostty-webgpu/packages/shaders/package.json', import.meta.url),
+      new URL('../packages/ghostty-webgpu/packages/shaders/package.json', import.meta.url),
       'utf8',
     ),
   )

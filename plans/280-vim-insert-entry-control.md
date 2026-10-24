@@ -34,12 +34,12 @@ Keep all 15 `vim::` names below and their pinned modal context/argument variants
 
 Editor paths below name the canonical destination after Plan 207. At this plan's source audit,
 those files live under `/work/projects/Editor/packages/`; `editor/` has not landed in Fregat.
-Implement package work in `editor/packages/` after the move.
+Implement package work in `packages/singapore/packages/` after the move.
 
-`editor/packages/editor/src/editor/editActions.ts`, `editor/packages/editor/src/editor/indentation.ts`, `editor/packages/editor/src/editor/autoClose.ts` and
-`editor/packages/editor/src/editor/input.ts` implement typing/newline/indent behavior. `editor/packages/editor/src/editor/commandCatalog.ts` already lists
-line insertion and completion commands. `editor/packages/editor/src/createPlugin.ts` exposes native text gates;
-`editor/packages/editor/src/documentSession.ts` supplies undo groups. `apps/web/src/keymap/editor-commands.ts` routes those
+`packages/singapore/packages/editor/src/editor/editActions.ts`, `packages/singapore/packages/editor/src/editor/indentation.ts`, `packages/singapore/packages/editor/src/editor/autoClose.ts` and
+`packages/singapore/packages/editor/src/editor/input.ts` implement typing/newline/indent behavior. `packages/singapore/packages/editor/src/editor/commandCatalog.ts` already lists
+line insertion and completion commands. `packages/singapore/packages/editor/src/createPlugin.ts` exposes native text gates;
+`packages/singapore/packages/editor/src/documentSession.ts` supplies undo groups. `apps/web/src/keymap/editor-commands.ts` routes those
 commands. Plans 222–223 supply input/completion integration; Plan 274 establishes basic mode
 exits. Vim position entry, temporary normal and digraph collection remain missing.
 
@@ -47,13 +47,13 @@ exits. Vim position entry, temporary normal and digraph collection remain missin
 
 Follow [the keymap architecture](../docs/keymap/architecture.md). Add typed commands and
 availability to `apps/web/src/keymap/table.ts` through its owning command module; Editor
-commands also belong in `editor/packages/editor/src/editor/commandCatalog.ts`. Put keys and argument variants in Plan 206's
+commands also belong in `packages/singapore/packages/editor/src/editor/commandCatalog.ts`. Put keys and argument variants in Plan 206's
 `apps/web/src/keymap/presets/` data. Hosted Editor joins the window dispatcher and publishes
 contexts. Standalone Editor exports the modal pack as data. Keep keys out of command metadata.
 Use the existing document mutation/undo path for synchronous edits. Async reads and effects
 use feature-owned TanStack query/mutation options and settle the cache before resolving.
 
-Extend `editor/packages/vim` using Plan 274's mode/pending model and Plan 275's caret resolvers.
+Extend `packages/singapore/packages/vim` using Plan 274's mode/pending model and Plan 275's caret resolvers.
 Track the prior insertion mark as an anchor. Open-line operations reuse language indentation
 and auto-close behavior; counted insertions and their exit share one intended undo unit.
 Distinguish opening an insertion line from adding a blank line in normal mode.

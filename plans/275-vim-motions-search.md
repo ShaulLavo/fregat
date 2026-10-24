@@ -40,12 +40,12 @@ All action names below have the `vim::` namespace. Preserve every argument varia
 
 Editor paths below name the canonical destination after Plan 207. At this plan's source audit,
 those files live under `/work/projects/Editor/packages/`; `editor/` has not landed in Fregat.
-Implement package work in `editor/packages/` after the move.
+Implement package work in `packages/singapore/packages/` after the move.
 
-`editor/packages/editor/src/graphemes.ts`, `editor/packages/editor/src/editor/textRanges.ts` and `editor/packages/editor/src/editor/navigationTargets.ts`
-provide boundary and navigation helpers. `editor/packages/editor/src/editor/lineMap.ts` and display projection code map
-wrapped/folded positions. `editor/packages/editor/src/editor/findFeature.ts` owns find; `editor/packages/editor/src/editor/bracketMatching.ts` owns
-bracket matching. `editor/packages/editor/src/editor/commandCatalog.ts` includes word/line movement and selection commands.
+`packages/singapore/packages/editor/src/graphemes.ts`, `packages/singapore/packages/editor/src/editor/textRanges.ts` and `packages/singapore/packages/editor/src/editor/navigationTargets.ts`
+provide boundary and navigation helpers. `packages/singapore/packages/editor/src/editor/lineMap.ts` and display projection code map
+wrapped/folded positions. `packages/singapore/packages/editor/src/editor/findFeature.ts` owns find; `packages/singapore/packages/editor/src/editor/bracketMatching.ts` owns
+bracket matching. `packages/singapore/packages/editor/src/editor/commandCatalog.ts` includes word/line movement and selection commands.
 `apps/web/src/keymap/editor-commands.ts` exposes find and navigation. Plans 225–226 extend
 transforms/view actions, but these lack Vim range-kind/count semantics.
 
@@ -53,13 +53,13 @@ transforms/view actions, but these lack Vim range-kind/count semantics.
 
 Follow [the keymap architecture](../docs/keymap/architecture.md). Add typed commands and
 availability to `apps/web/src/keymap/table.ts` through its owning command module; Editor
-commands also belong in `editor/packages/editor/src/editor/commandCatalog.ts`. Put keys and argument variants in Plan 206's
+commands also belong in `packages/singapore/packages/editor/src/editor/commandCatalog.ts`. Put keys and argument variants in Plan 206's
 `apps/web/src/keymap/presets/` data. Hosted Editor joins the window dispatcher and publishes
 contexts. Standalone Editor exports the modal pack as data. Keep keys out of command metadata.
 Use the existing document mutation/undo path for synchronous edits. Async reads and effects
 use feature-owned TanStack query/mutation options and settle the cache before resolving.
 
-In `editor/packages/vim`, define a pure motion resolver returning destination, cursor goal and
+In `packages/singapore/packages/vim`, define a pure motion resolver returning destination, cursor goal and
 a typed range kind. Keep buffer offsets distinct from display coordinates. Resolve standalone
 movement and operator range construction from the same motion; special cases such as `dw` at
 line end and exclusive motion to column zero belong in that resolver. Use grapheme boundaries

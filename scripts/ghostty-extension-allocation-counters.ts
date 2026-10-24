@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { instrumentAllocations } from './ghostty-extension-allocations.ts'
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../ghostty-webgpu')
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../packages/ghostty-webgpu')
 const output = resolve(process.argv[2]!)
 await mkdir(output)
 const source = await readFile(join(packageRoot, 'src/extensions/manager.ts'), 'utf8')

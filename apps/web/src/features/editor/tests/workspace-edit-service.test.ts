@@ -32,7 +32,7 @@ import type {
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { EditorSaveService } from '@/features/editor/state/save-service'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 import {
   FileSyncService,
   type WorkspaceMutationTransition,

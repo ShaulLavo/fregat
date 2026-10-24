@@ -7,7 +7,7 @@ function targetNames() {
   if (source === 'all') return Array.from(graph.packages.keys())
   if (source === 'editor')
     return Array.from(graph.packages.values())
-      .filter((pkg) => pkg.directory.startsWith('editor/'))
+      .filter((pkg) => pkg.directory.startsWith('packages/singapore/'))
       .map((pkg) => pkg.name)
   return JSON.parse(source)
 }
@@ -50,13 +50,14 @@ if (operation === 'build') {
         'singapore-editor-site',
         'scripts',
       ].includes(name) ||
-      pkg.directory.startsWith('editor/packages/') ||
-      pkg.directory.startsWith('editor/examples/')
+      pkg.directory.startsWith('packages/singapore/packages/') ||
+      pkg.directory.startsWith('packages/singapore/examples/')
     if (operation === 'tests' && dedicatedTest) continue
     if (
       operation === 'editor-tests' &&
       !(
-        pkg.directory.startsWith('editor/packages/') || pkg.directory.startsWith('editor/examples/')
+        pkg.directory.startsWith('packages/singapore/packages/') ||
+        pkg.directory.startsWith('packages/singapore/examples/')
       )
     )
       continue

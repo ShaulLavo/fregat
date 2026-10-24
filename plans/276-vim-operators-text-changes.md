@@ -40,11 +40,11 @@ The full `vim::` action inventory follows.
 
 Editor paths below name the canonical destination after Plan 207. At this plan's source audit,
 those files live under `/work/projects/Editor/packages/`; `editor/` has not landed in Fregat.
-Implement package work in `editor/packages/` after the move.
+Implement package work in `packages/singapore/packages/` after the move.
 
-`editor/packages/editor/src/editor/editActions.ts`, `editor/packages/editor/src/editor/textEdits.ts`, `editor/packages/editor/src/editor/indentation.ts` and
-`editor/packages/editor/src/editor/commandRouter.ts` execute existing edit/indent/comment/join operations. `editor/packages/editor/src/editor/commandCatalog.ts`
-lists those commands. `editor/packages/editor/src/documentSession.ts` owns edit transactions, inverse edits and undo groups.
+`packages/singapore/packages/editor/src/editor/editActions.ts`, `packages/singapore/packages/editor/src/editor/textEdits.ts`, `packages/singapore/packages/editor/src/editor/indentation.ts` and
+`packages/singapore/packages/editor/src/editor/commandRouter.ts` execute existing edit/indent/comment/join operations. `packages/singapore/packages/editor/src/editor/commandCatalog.ts`
+lists those commands. `packages/singapore/packages/editor/src/documentSession.ts` owns edit transactions, inverse edits and undo groups.
 Fregat's `apps/web/src/keymap/state/undo-barrier.ts` coordinates history boundaries; its command
 table routes existing edits. Plan 225 adds transforms; Vim operator composition remains missing.
 
@@ -52,13 +52,13 @@ table routes existing edits. Plan 225 adds transforms; Vim operator composition 
 
 Follow [the keymap architecture](../docs/keymap/architecture.md). Add typed commands and
 availability to `apps/web/src/keymap/table.ts` through its owning command module; Editor
-commands also belong in `editor/packages/editor/src/editor/commandCatalog.ts`. Put keys and argument variants in Plan 206's
+commands also belong in `packages/singapore/packages/editor/src/editor/commandCatalog.ts`. Put keys and argument variants in Plan 206's
 `apps/web/src/keymap/presets/` data. Hosted Editor joins the window dispatcher and publishes
 contexts. Standalone Editor exports the modal pack as data. Keep keys out of command metadata.
 Use the existing document mutation/undo path for synchronous edits. Async reads and effects
 use feature-owned TanStack query/mutation options and settle the cache before resolving.
 
-Implement a typed operator in `editor/packages/vim` consuming Plan 275's resolved range and
+Implement a typed operator in `packages/singapore/packages/vim` consuming Plan 275's resolved range and
 count. Reuse Editor transforms after converting the Vim range once. Keep pending operator,
 exchange range and surround target in Plan 274's state; remap stored ranges through document
 edits. Record successful edits with a semantic change descriptor for Plan 279.

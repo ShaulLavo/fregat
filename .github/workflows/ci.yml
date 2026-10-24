@@ -162,11 +162,11 @@ jobs:
       # `format:check`, never `format` — a CI job that rewrites files and then
       # passes is a job that reports on a tree nobody reviewed.
       - name: Format
-        run: bun run format:check:root && bun run --cwd editor format:check:root && bun run --cwd hotkeys format:check
+        run: bun run format:check:root && bun run --cwd packages/singapore format:check:root && bun run --cwd packages/hotkeys format:check
 
       # Package formatting and linting run with the affected package checks.
       - name: Lint
-        run: bun run plans:check && bun run --cwd editor lint:root && bun run dupes:functions && bun run dupes
+        run: bun run plans:check && bun run --cwd packages/singapore lint:root && bun run dupes:functions && bun run dupes
 
       - name: Query API
         run: bun run query:check
@@ -240,6 +240,22 @@ jobs:
           operation: consume
           targets: ${{ needs.changes.outputs.tooling == 'true' && 'all' || needs.changes.outputs.packages }}
 
+      - name: Archive script test builds
+        if: ${{ needs.changes.outputs.tooling == 'true' }}
+        run: |
+          find editor/packages packages hotkeys ghostty-webgpu -name node_modules -prune -o -type d -name dist -prune -print0 |
+            tar --null -T - -czf "$RUNNER_TEMP/script-test-builds.tar.gz"
+
+      - name: Share script test builds
+        if: ${{ needs.changes.outputs.tooling == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: script-test-builds
+          compression-level: 0
+          path: ${{ runner.temp }}/script-test-builds.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Validate dev task graph
         if: ${{ needs.changes.outputs.web == 'true' }}
         env:
@@ -265,7 +281,7 @@ jobs:
 
       - name: Check Hotkeys documentation
         if: ${{ needs.changes.outputs.hotkeys == 'true' }}
-        run: bun run --cwd hotkeys docs:check
+        run: bun run --cwd packages/hotkeys docs:check
 
       - name: Check generated artifacts
         if: ${{ needs.changes.outputs.tooling == 'true' }}
@@ -286,13 +302,43 @@ jobs:
       # Script tests inspect the whole repository; package source readers are declared in Turbo.
       - name: Script tests
         if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tooling == 'true' }}
-        run: bun run test:scripts
+        run: bun run test:scripts --exclude scripts/markdown/promotion-evidence.test.ts --exclude scripts/agent/browser-launch.test.ts --exclude scripts/browser-gc.test.ts
 
       - name: Package tests
         if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' }}
         env:
           CI_PACKAGES: ${{ needs.changes.outputs.packages }}
         run: bun scripts/ci/packages.mjs tests "$CI_PACKAGES"
+
+  # The complete synthetic promotion controls need their own runner and full job budget.
+  test-promotion-evidence:
+    name: Script tests (promotion evidence)
+    needs: [changes, typecheck]
+    if: ${{ needs.changes.outputs.tooling == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          build-packages: '[]'
+
+      - name: Download script test builds
+        uses: actions/download-artifact@v4
+        with:
+          name: script-test-builds
+          path: ${{ runner.temp }}
+
+      - name: Restore script test builds
+        run: tar -xzf "$RUNNER_TEMP/script-test-builds.tar.gz"
+
+      - name: Script tests
+        run: bun run test:scripts scripts/markdown/promotion-evidence.test.ts
 
   # Web is most of the time, so it is sharded by file, balanced by recorded durations
   # (`apps/web/test/shard-sequencer.ts`). The `test` scripts in `apps/web` and `packages/tree`
@@ -531,7 +577,7 @@ jobs:
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') || contains(needs.changes.outputs.sites, 'fregat') || needs.changes.outputs.tooling == 'true' }}
         uses: ./.github/actions/install-browsers
         with:
-          playwright: editor/site/node_modules/.bin/playwright
+          playwright: packages/singapore/site/node_modules/.bin/playwright
           browsers: chromium firefox webkit
       - name: Build production sites
         env:
@@ -539,7 +585,7 @@ jobs:
         run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites" "$CI_SITES" --reuse-workspace-builds
       - name: Build classic Ghostty site for Pages
         if: ${{ contains(needs.changes.outputs.sites, 'ghostty-webgpu') }}
-        run: bun run --cwd ghostty-webgpu/site-classic build --base /ghostty-webgpu/
+        run: bun run --cwd packages/ghostty-webgpu/site-classic build --base /ghostty-webgpu/
       - name: Check deployment config and cache headers
         run: python3 -m unittest discover -s scripts/product-sites -p 'test_*.py'
       - name: Check Ghostty font assets
@@ -547,7 +593,7 @@ jobs:
         run: bun scripts/product-sites/test-font-assets.mjs "$RUNNER_TEMP/product-sites/ghostty-webgpu"
       - name: Test Singapore documentation checks
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
-        run: bun run --cwd editor/site test
+        run: bun run --cwd packages/singapore/site test
       - name: Test landing page playback
         run: bun run test:scripts scripts/site-player.test.ts
       - name: Test mobile overflow detection
@@ -555,7 +601,7 @@ jobs:
         run: bun scripts/product-sites/test-mobile.mjs
       - name: Test Singapore docs browsing and examples at the root base
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
-        run: bun run --cwd editor/site test:browser
+        run: bun run --cwd packages/singapore/site test:browser
       - name: Check landing page focus, contrast and motion controls
         if: ${{ contains(needs.changes.outputs.sites, 'fregat') }}
         run: bun run --cwd apps/site verify:a11y
@@ -668,6 +714,7 @@ jobs:
         docs,
         lint,
         typecheck,
+        test-promotion-evidence,
         test-web,
         test-server,
         test-tui,

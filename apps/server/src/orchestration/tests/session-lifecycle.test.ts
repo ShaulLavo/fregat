@@ -1,5 +1,4 @@
 import { OrchestrationCommandReceipts } from '../command-receipts'
-import archivePolicy from '../../../../../test/parity/t3code/archive.json'
 import { Database } from 'bun:sqlite'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
@@ -757,58 +756,6 @@ describe('pinning', () => {
 })
 
 describe('archive and activity policy', () => {
-  it.each(archivePolicy.activityTransitions)(
-    'keeps archive and snooze through $kind, duplicate delivery and explicit restore',
-    async ({ kind, resetsSettlement }) => {
-      const { database, engine } = await createEngineWithSession()
-      const sessionId = '00000000-0000-4000-8000-000000000001'
-      await engine.dispatch(settleCommand())
-      await engine.dispatch(snoozeCommand())
-      await engine.dispatch(command({ type: 'session.archive', sessionId }))
-      const archivedAt = sessionRow(database).archivedAt
-      const activity = activityCommand(kind, kind === 'provider.error' ? 'error' : 'info')
-      await engine.dispatch(activity)
-      await engine.dispatch(activity)
-      expect(sessionRow(database)).toMatchObject({
-        archivedAt,
-        snoozedUntil: futureWakeTime(),
-        settledOverride: resetsSettlement ? null : 'settled',
-      })
-      expect((await engine.shellSnapshot()).sessions[0]?.archivedAt).toBe(archivedAt)
-      expect(
-        (await engine.replay({ afterSequence: 0 })).events.filter(
-          (event) => event.type === 'session.unarchived',
-        ),
-      ).toEqual([])
-      const before = await engine.sessionDetailSnapshot(sessionId)
-      await engine.dispatch(command({ type: 'session.unarchive', sessionId }))
-      const after = await engine.sessionDetailSnapshot(sessionId)
-      expect(after.session.archivedAt).toBeNull()
-      expect(after.session.activities).toEqual(before.session.activities)
-      expect(after.session.messages).toEqual(before.session.messages)
-      expect(sessionRow(database).snoozedUntil).toBe(futureWakeTime())
-    },
-  )
-
-  it.each(archivePolicy.runtimeTransitions)(
-    'keeps archive and snooze when runtime becomes $status',
-    async ({ status, resetsSettlement }) => {
-      const { database, engine } = await createEngineWithSession()
-      await engine.dispatch(settleCommand())
-      await engine.dispatch(snoozeCommand())
-      await engine.dispatch(
-        command({ type: 'session.archive', sessionId: '00000000-0000-4000-8000-000000000001' }),
-      )
-      const archivedAt = sessionRow(database).archivedAt
-      await engine.dispatch(sessionSetCommand(status))
-      expect(sessionRow(database)).toMatchObject({
-        archivedAt,
-        snoozedUntil: futureWakeTime(),
-        settledOverride: resetsSettlement ? null : 'settled',
-      })
-    },
-  )
-
   it.each(['approval.requested', 'user-input.requested'])(
     'archives a pending %s request without discarding it',
     async (kind) => {

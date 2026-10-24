@@ -25,7 +25,7 @@ permissions:
 defaults:
   run:
     shell: bash
-    working-directory: ghostty-webgpu
+    working-directory: packages/ghostty-webgpu
 
 env:
   BUN_VERSION: 1.4.4
@@ -446,7 +446,7 @@ jobs:
 
       - name: Validate package source and select native source
         id: release-source
-        working-directory: package-source/ghostty-webgpu
+        working-directory: package-source/packages/ghostty-webgpu
         run: |
           set -euo pipefail
           if [[ ! "$EXPECTED_SOURCE_HEAD" =~ ^[0-9a-f]{40}$ || "$EXPECTED_SOURCE_HEAD" != "$GITHUB_SHA" ]]; then
@@ -497,13 +497,13 @@ jobs:
             echo 'release source checkout is not clean' >&2
             exit 1
           fi
-          native_inputs_sha256="$(shasum -a 256 native-source/ghostty-webgpu/scripts/config-resolver-native/native-inputs.json | awk '{print $1}')"
+          native_inputs_sha256="$(shasum -a 256 native-source/packages/ghostty-webgpu/scripts/config-resolver-native/native-inputs.json | awk '{print $1}')"
           if [[ "$native_inputs_sha256" != "$EXPECTED_NATIVE_INPUTS_SHA256" ]]; then
             echo 'native-build source input digest differs' >&2
             exit 1
           fi
-          cmp native-source/ghostty-webgpu/scripts/config-resolver-native/native-inputs.json \
-            package-source/ghostty-webgpu/scripts/config-resolver-native/native-inputs.json
+          cmp native-source/packages/ghostty-webgpu/scripts/config-resolver-native/native-inputs.json \
+            package-source/packages/ghostty-webgpu/scripts/config-resolver-native/native-inputs.json
           if [[ "$RUNNER_OS" != '${{ matrix.runner_os }}' || "$RUNNER_ARCH" != '${{ matrix.runner_arch }}' ]]; then
             echo 'release rebuild runner does not match the target' >&2
             exit 1
@@ -524,7 +524,7 @@ jobs:
           node -e 'if (Number(process.versions.node.split(".")[0]) < 20) process.exit(1)'
 
       - name: Verify maintained native contract in Bun and Node
-        working-directory: native-source/ghostty-webgpu
+        working-directory: native-source/packages/ghostty-webgpu
         run: |
           set -euo pipefail
           test_root="$RUNNER_TEMP/config-resolver-release-self-test-$NATIVE_TARGET"
@@ -622,7 +622,7 @@ jobs:
           set -euo pipefail
           bun_binary="$(bun -e 'import { realpathSync } from "node:fs"; process.stdout.write(realpathSync(process.argv[1]))' "$(command -v bun)")"
           node_binary="$(bun -e 'import { realpathSync } from "node:fs"; process.stdout.write(realpathSync(process.argv[1]))' "$(command -v node)")"
-          archive_sha256="$(cd native-source/ghostty-webgpu && bun scripts/build-config-resolver.ts \
+          archive_sha256="$(cd native-source/packages/ghostty-webgpu && bun scripts/build-config-resolver.ts \
             --mode build-target \
             --upstream "$NATIVE_UPSTREAM" \
             --zig "$NATIVE_ZIG" \
@@ -644,7 +644,7 @@ jobs:
             echo 'release rebuild archive digest changed' >&2
             exit 1
           fi
-          producer_result="$(cd package-source/ghostty-webgpu && bun scripts/create-release-provenance.ts \
+          producer_result="$(cd package-source/packages/ghostty-webgpu && bun scripts/create-release-provenance.ts \
             --rebuild \
             --run-id "$NATIVE_RUN_ID" \
             --run-attempt "$NATIVE_RUN_ATTEMPT" \
@@ -721,7 +721,7 @@ jobs:
           merge-multiple: false
 
       - name: Validate release package source and rebuild set
-        working-directory: package-source/ghostty-webgpu
+        working-directory: package-source/packages/ghostty-webgpu
         run: |
           set -euo pipefail
           if [[ ! "$EXPECTED_SOURCE_HEAD" =~ ^[0-9a-f]{40}$ || "$EXPECTED_SOURCE_HEAD" != "$GITHUB_SHA" ]]; then
@@ -795,7 +795,7 @@ jobs:
 
       - name: Pack candidate exactly once
         id: pack
-        working-directory: package-source/ghostty-webgpu
+        working-directory: package-source/packages/ghostty-webgpu
         run: |
           set -euo pipefail
           pack_result="$(bun scripts/create-release-candidate.ts \
@@ -924,7 +924,7 @@ jobs:
           merge-multiple: false
 
       - name: Validate smoke host and immutable inputs
-        working-directory: package-source/ghostty-webgpu
+        working-directory: package-source/packages/ghostty-webgpu
         run: |
           set -euo pipefail
           if [[ ! "$EXPECTED_SOURCE_HEAD" =~ ^[0-9a-f]{40}$ || "$EXPECTED_SOURCE_HEAD" != "$GITHUB_SHA" ]]; then
@@ -1019,7 +1019,7 @@ jobs:
 
       - name: Run maintained smoke producer
         id: smoke
-        working-directory: package-source/ghostty-webgpu
+        working-directory: package-source/packages/ghostty-webgpu
         run: |
           set -euo pipefail
           smoke_provenance="$RELEASE_SMOKE_ROOT/smoke-provenance.json"
@@ -1120,7 +1120,7 @@ jobs:
 
       - name: Finalize and verify immutable handoff
         id: finalize
-        working-directory: package-source/ghostty-webgpu
+        working-directory: package-source/packages/ghostty-webgpu
         run: |
           set -euo pipefail
           if [[ ! "$EXPECTED_SOURCE_HEAD" =~ ^[0-9a-f]{40}$ || "$EXPECTED_SOURCE_HEAD" != "$GITHUB_SHA" ]]; then

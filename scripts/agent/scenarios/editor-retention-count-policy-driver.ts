@@ -150,20 +150,20 @@ async function run() {
     join(repo, 'apps/web/src/lib/file-open-intent/state/service.ts'),
     join(repo, 'apps/web/src/features/editor/state/inactive-analysis-retention.ts'),
     join(repo, 'apps/web/src/features/editor/state/inactive-analysis-policy.ts'),
-    join(repo, 'editor/packages/editor/src/editor/documentAnalysis.ts'),
-    join(repo, 'editor/packages/editor/src/editor/Editor.ts'),
-    join(repo, 'editor/packages/editor/src/editor/preparedDocument.ts'),
-    join(repo, 'editor/packages/editor/src/editor/syntaxController.ts'),
-    join(repo, 'editor/packages/editor/src/plugins.ts'),
-    join(repo, 'editor/packages/editor/src/syntax/highlighter.ts'),
-    join(repo, 'editor/packages/editor/src/syntax/providerTheme.ts'),
-    join(repo, 'editor/packages/tree-sitter/src/treeSitter/workerClient.ts'),
-    join(repo, 'editor/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts'),
-    join(repo, 'editor/packages/tree-sitter/src/treeSitter/types.ts'),
-    join(repo, 'editor/packages/editor/src/shiki/workerClient.ts'),
-    join(repo, 'editor/packages/editor/src/shiki/shiki.worker.ts'),
-    join(repo, 'editor/packages/editor/src/shiki/workerTypes.ts'),
-    join(repo, 'editor/packages/editor/src/syntax/tokenStore.ts'),
+    join(repo, 'packages/singapore/packages/editor/src/editor/documentAnalysis.ts'),
+    join(repo, 'packages/singapore/packages/editor/src/editor/Editor.ts'),
+    join(repo, 'packages/singapore/packages/editor/src/editor/preparedDocument.ts'),
+    join(repo, 'packages/singapore/packages/editor/src/editor/syntaxController.ts'),
+    join(repo, 'packages/singapore/packages/editor/src/plugins.ts'),
+    join(repo, 'packages/singapore/packages/editor/src/syntax/highlighter.ts'),
+    join(repo, 'packages/singapore/packages/editor/src/syntax/providerTheme.ts'),
+    join(repo, 'packages/singapore/packages/tree-sitter/src/treeSitter/workerClient.ts'),
+    join(repo, 'packages/singapore/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts'),
+    join(repo, 'packages/singapore/packages/tree-sitter/src/treeSitter/types.ts'),
+    join(repo, 'packages/singapore/packages/editor/src/shiki/workerClient.ts'),
+    join(repo, 'packages/singapore/packages/editor/src/shiki/shiki.worker.ts'),
+    join(repo, 'packages/singapore/packages/editor/src/shiki/workerTypes.ts'),
+    join(repo, 'packages/singapore/packages/editor/src/syntax/tokenStore.ts'),
   ]
   const sourceFiles = []
   for (const file of provenanceFiles) {
@@ -233,7 +233,7 @@ export default {
     '@singapore-editor/tree-sitter > tree-sitter-md', '@singapore-editor/tree-sitter > web-tree-sitter']) },
   server: { ...base.server, fs: { ...base.server.fs, allow: base.server.fs.allow.concat([${JSON.stringify(dependencyRoot)}]) } },
   resolve: { ...base.resolve, alias: Object.entries(${JSON.stringify(packageAliases)}).map(([find, replacement]) => ({ find: new RegExp('^' + find + '$'), replacement })).concat([
-    { find: /^@singapore-editor\\/textbuffer\\/internal\\/(.+)$/, replacement: ${JSON.stringify(join(repo, 'editor/packages/textbuffer/src/$1.ts'))} }],
+    { find: /^@singapore-editor\\/textbuffer\\/internal\\/(.+)$/, replacement: ${JSON.stringify(join(repo, 'packages/singapore/packages/textbuffer/src/$1.ts'))} }],
     Object.entries(base.resolve.alias).map(([find, replacement]) => ({ find, replacement })),
   ) },
   test: {
@@ -400,7 +400,7 @@ export default {
 
   async function editorSourceAliases() {
     const aliases: Record<string, string> = {}
-    const root = join(repo, 'editor/packages')
+    const root = join(repo, 'packages/singapore/packages')
     for (const directory of await readdir(root)) {
       const file = join(root, directory, 'package.json')
       if (!existsSync(file)) continue

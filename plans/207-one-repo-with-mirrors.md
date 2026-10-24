@@ -84,17 +84,17 @@ buy is a public home for packages we want others to use, and mirrors keep that.
 ```
 fregat/
   apps/, packages/, scripts/      unchanged
-  editor/                         mirrored to ShaulLavo/singapore (becomes its root)
+  packages/singapore/             mirrored to ShaulLavo/singapore (becomes its root)
     README.md, LICENSE, AGENTS.md, ARCHITECTURE.md, docs/, plans/, examples/, patches/
     package.json, turbo.json, tsconfig.json, .github/   (standalone root; used by the mirror)
     packages/editor, diff, find, lsp, markdown, textbuffer, react, solid, …   (20 packages)
-  ghostty-webgpu/                 mirrored to ShaulLavo/ghostty-webgpu (one package)
-  hotkeys/                        mirrored to ShaulLavo/hotkeys once 203 creates it
+  packages/ghostty-webgpu/        mirrored to ShaulLavo/ghostty-webgpu (one package)
+  packages/hotkeys/               mirrored to ShaulLavo/hotkeys once 203 creates it
     packages/hotkeys, packages/react-hotkeys
 ```
 
-- Fregat's root `workspaces` adds `editor/packages/*`, `editor/examples/*`, `ghostty-webgpu`
-  and `hotkeys/packages/*`. The nested `editor/package.json` and `turbo.json` are the standalone
+- Fregat's root `workspaces` adds `packages/singapore/packages/*`, `packages/singapore/examples/*`, `packages/ghostty-webgpu`
+  and `packages/hotkeys/packages/*`. The nested `packages/singapore/package.json` and `turbo.json` are the standalone
   roots the mirror uses; confirm Bun and Turbo treat them correctly inside Fregat in the first
   step.
 - Everything a standalone user needs lives inside the family folder, including its `.github/`
@@ -141,9 +141,9 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
   commits); ghostty-webgpu likewise (`fd5c7428`, 73). Old heads stay ancestors after new Fregat
   commits, so mirror pushes fast-forward, provided nothing pushes to the mirrors between the
   freeze and the subtree add.
-- Bun ignores the nested `editor/package.json`; the old `bun.lock` must be regenerated.
-  Root Turbo ignores `editor/turbo.json`: move its per-task overrides into the root
-  `turbo.json`, and set `"agentGuidance": false` in `editor/turbo.json`.
+- Bun ignores the nested `packages/singapore/package.json`; the old `bun.lock` must be regenerated.
+  Root Turbo ignores `packages/singapore/turbo.json`: move its per-task overrides into the root
+  `turbo.json`, and set `"agentGuidance": false` in `packages/singapore/turbo.json`.
 - Typecheck (38 packages, editor built first) and the `apps/web` build pass; the root needs
   `vite` as a devDependency.
 - Knip goes red (~87 files, ~340 exports in `editor/` and `ghostty-webgpu/`): add those
@@ -156,7 +156,7 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
 - oxfmt/oxlint versions already match; `.oxfmtrc.json` configs differ. The vitest patch is
   identical in all three repos. Editor packages are on TypeScript 6.0 against Fregat's 7.0.
 - Lockfiles (owner, 2026-09-29): one root `bun.lock`, as Turbo expects. Delete
-  `editor/bun.lock` and `ghostty-webgpu/bun.lock`; the mirrors' standalone CI runs a plain
+  `packages/singapore/bun.lock` and `packages/ghostty-webgpu/bun.lock`; the mirrors' standalone CI runs a plain
   `bun install`, which also surfaces breakage from new dependency releases.
 
 ## Publishing
@@ -176,7 +176,7 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
   Committed source and version PRs keep their workspace references.
 - Dry run in a scratch copy: a patch changeset for `@fregat/react-hotkeys` versioned both
   hotkeys packages from `0.0.0` to `0.0.1`. After building and preparation,
-  `npm pack --dry-run --json ./hotkeys/packages/react-hotkeys` listed 18 files, including
+  `npm pack --dry-run --json ./packages/hotkeys/packages/react-hotkeys` listed 18 files, including
   `dist/index.js` and `dist/index.d.ts`, with 36,864 unpacked bytes. Reading an actual local
   tarball's `package/package.json` confirmed `@fregat/hotkeys: "0.0.1"` and no workspace or
   catalog references. A second scratch run with the 20 Editor manifests and ghostty's manifest
@@ -246,7 +246,7 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
 
 PR #199 uses one root workspace install, including ghostty's demo and site. Editor-specific Turbo tasks run from the root; root typecheck builds library exports first. Imported-family Knip entries preserve Fregat's existing checks. Protocol-only ABI enums remain available for the native contract.
 
-Editor keeps its standalone lint policy in `editor/.oxlintrc.json`; Fregat's compiler lint policy covers Fregat workspaces.
+Editor keeps its standalone lint policy in `packages/singapore/.oxlintrc.json`; Fregat's compiler lint policy covers Fregat workspaces.
 
 Family formatter options match Fregat; generated-file exclusions remain with each family for standalone installs. Fregat applies the sole Vitest patch at the root. Standalone family CI runs plain `bun install` and uses upstream Vitest.
 

@@ -7,9 +7,9 @@ import { page, userEvent } from 'vitest/browser'
 
 import { expect, test } from '../../../../test/fixtures'
 import { createBrowserWorkspace } from '../../../../test/factories/browser-workspace'
+import { observeMarkdownDom } from '../../../../test/factories/markdown-observation'
 import {
   createMarkdownBrowser,
-  observeMarkdownDom,
   paintedFrame,
   requiredElement,
 } from '../../../../test/factories/markdown-browser'

@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const packageDirectories = ['ghostty-webgpu']
-for (const parent of ['editor/packages', 'hotkeys/packages']) {
+const packageDirectories = ['packages/ghostty-webgpu']
+for (const parent of ['packages/singapore/packages', 'packages/hotkeys/packages']) {
   const entries = await readdir(join(root, parent), { withFileTypes: true })
   packageDirectories.push(
     ...entries.filter((entry) => entry.isDirectory()).map((entry) => `${parent}/${entry.name}`),
@@ -16,7 +17,9 @@ const links = new Set()
 let readmes = 0
 let manifests = 0
 for (const directory of packageDirectories) {
-  const manifest = JSON.parse(await readFile(join(root, directory, 'package.json'), 'utf8'))
+  const manifestPath = join(root, directory, 'package.json')
+  if (!existsSync(manifestPath)) continue
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
   if (manifest.private) continue
   manifests++
   assert(manifest.description?.endsWith('.'), `${manifest.name}: description must be a sentence`)
@@ -44,15 +47,15 @@ for (const directory of packageDirectories) {
     },
     `${manifest.name}: repository provenance`,
   )
-  let homepage = 'https://github.com/ShaulLavo/fregat/tree/main/hotkeys'
-  if (directory === 'ghostty-webgpu') homepage = 'https://ghostty.shaulavo.dev/'
-  if (directory.startsWith('editor/')) {
+  let homepage = 'https://github.com/ShaulLavo/fregat/tree/main/packages/hotkeys'
+  if (directory === 'packages/ghostty-webgpu') homepage = 'https://ghostty.shaulavo.dev/'
+  if (directory.startsWith('packages/singapore/')) {
     homepage = `https://singapore.shaulavo.dev/docs/reference/api/${manifest.name.split('/')[1]}/overview/`
   }
   assert.equal(manifest.homepage, homepage, `${manifest.name}: homepage`)
   links.add(homepage)
   links.add(manifest.bugs.url)
-  if (directory === 'ghostty-webgpu') continue
+  if (directory === 'packages/ghostty-webgpu') continue
   readmes++
   const readme = await readFile(join(root, directory, 'README.md'), 'utf8')
   for (const heading of ['Install', 'Usage', 'API highlights', 'License']) {

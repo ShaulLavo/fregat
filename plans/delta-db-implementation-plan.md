@@ -44,13 +44,13 @@ Corrected 2026-10-08 against Fregat `1e066d38b`.
 
 ### The editor has most of the substrate
 
-| Property              | Where                                                                                                                  | Status for collaboration                                                                                          |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Piece identity        | `editor/packages/textbuffer/src/pieceTableTypes.ts`: `PieceBufferId` is a branded number from a snapshot-local counter | Local only; E066 adds global `CharId` runs beside it                                                              |
-| Tombstones            | Hidden pieces; E006 compacts runs into stand-ins (`standIns.ts`, `compaction.ts`)                                      | Anchors survive compaction, exact deleted order does not; E066 keeps exact tombstones for collaborative documents |
-| Text storage          | `buffers.ts`; E006 reclamation can free unreferenced text                                                              | Fine: ordering never needs reclaimed text                                                                         |
-| Persistent snapshots  | AVL join/balance (`join.ts`), structural sharing                                                                       | Cheap rollback for participant replay                                                                             |
-| Anchors with liveness | `anchors.ts`: `RealAnchor { buffer, offset, bias }` → `{ offset, liveness }`                                           | Become character-ID gaps for transport                                                                            |
+| Property              | Where                                                                                                                              | Status for collaboration                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Piece identity        | `packages/singapore/packages/textbuffer/src/pieceTableTypes.ts`: `PieceBufferId` is a branded number from a snapshot-local counter | Local only; E066 adds global `CharId` runs beside it                                                              |
+| Tombstones            | Hidden pieces; E006 compacts runs into stand-ins (`standIns.ts`, `compaction.ts`)                                                  | Anchors survive compaction, exact deleted order does not; E066 keeps exact tombstones for collaborative documents |
+| Text storage          | `buffers.ts`; E006 reclamation can free unreferenced text                                                                          | Fine: ordering never needs reclaimed text                                                                         |
+| Persistent snapshots  | AVL join/balance (`join.ts`), structural sharing                                                                                   | Cheap rollback for participant replay                                                                             |
+| Anchors with liveness | `anchors.ts`: `RealAnchor { buffer, offset, bias }` → `{ offset, liveness }`                                                       | Become character-ID gaps for transport                                                                            |
 
 ### The server is event-sourced, but not for keystrokes
 
@@ -252,7 +252,7 @@ nothing installed beyond Fregat.
   share ends the room. A guest who could reach
   the server directly would need no WebRTC, so the broker has to sit where both sides reach it:
   the company runs a free one (it relays only sealed packets), or a team self-hosts
-  `editor/packages/collaboration/server/signaling.ts`. The same broker serves standalone
+  `packages/singapore/packages/collaboration/server/signaling.ts`. The same broker serves standalone
   Singapore, which today leaves the broker and STUN/TURN URLs to the embedding app.
 - **The server joins as a WebRTC peer.** Neither Bun nor Node has WebRTC built in. Two libraries
   ran a data channel between two in-process peers under Bun 1.4.2 on Linux (2026-10-09):

@@ -18,11 +18,8 @@ import { editorDiffFiles } from '@workspace/client-core/git/diff-files'
 import { testDiffLanguageHost } from '../../../../../test/factories/diff-language-host'
 import { gitFileDiff } from '../../../../../test/factories/git-diff'
 import { expect, test } from '../../../../../test/fixtures'
-import {
-  createTestQueryClient,
-  renderHookWithProviders,
-  renderWithProviders,
-} from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderHookWithProviders, renderWithProviders } from '../../../../../test/render'
 import { TEST_SESSION_ID } from '../../../../../test/factories/chat'
 import { runGit } from '../../../../../test/factories/git'
 

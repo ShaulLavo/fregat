@@ -180,7 +180,7 @@ async function sourceRevisions(phase: string) {
   return {
     platform: await captureRevision(checkoutRoot, path.join(output, `platform-${phase}.patch`)),
     editor: await captureRevision(
-      path.resolve(checkoutRoot, 'editor'),
+      path.resolve(checkoutRoot, 'packages/singapore'),
       path.join(output, `editor-${phase}.patch`),
     ),
   }

@@ -1,15 +1,23 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { gunzipSync } from 'node:zlib'
-import { describe, expect, test } from 'vitest'
+import { beforeAll, describe, expect, test } from 'vitest'
 
 import commonmark from '../../../test/reference/commonmark.json'
 import gfm from '../../../test/reference/gfm.json'
 import differences from '../../../test/reference/gfm-differences.json'
 import manifest from '../../../test/reference/manifest.json'
 import { expectedOutput, referenceOutput } from '../../../test/reference/oracle'
-import { createRemarkReplay, renderRemark } from '../../../test/qualification'
+import { createRemarkReplay } from '../../../test/qualification'
 import { seededChunks } from '../../../test/schedules'
+import { loadRawHastExtension, type HastExtensions } from '../hast'
+
+let loadedHtml: HastExtensions
+
+beforeAll(async () => {
+  const { default: raw } = await loadRawHastExtension()
+  loadedHtml = { raw, math: null }
+})
 
 describe('independent specification output', () => {
   test.each(commonmark)('$id matches decoded content, nesting and attributes', (example) => {
@@ -72,13 +80,21 @@ describe('published regression corpus', () => {
     expect(createHash('sha256').update(bytes).digest('hex')).toBe(asset.sha256)
   })
 
-  test('all published assistant messages settle to fresh completed output over seeded schedules', () => {
-    const messages: string[] = JSON.parse(
-      readFileSync(new URL('../../../test/reference/chat.json', import.meta.url), 'utf8'),
-    )
+  const messages: string[] = JSON.parse(
+    readFileSync(new URL('../../../test/reference/chat.json', import.meta.url), 'utf8'),
+  )
+
+  test('assistant corpus keeps all published messages', () => {
     expect(messages).toHaveLength(183)
-    for (const source of messages) checkCorpusStream(source)
-  }, 30_000)
+  })
+
+  test.each(messages.map((source, index) => ({ id: `assistant-${index + 1}`, source })))(
+    '$id settles to fresh completed output over the seeded schedule',
+    ({ source }) => {
+      checkCorpusStream(source)
+    },
+    30_000,
+  )
 
   const documents: { name: string; text: string }[] = JSON.parse(
     gunzipSync(
@@ -100,12 +116,14 @@ describe('published regression corpus', () => {
 })
 
 function checkCorpusStream(source: string, maxUnits = 24) {
-  const replay = createRemarkReplay()
+  const replay = createRemarkReplay({ extensions: loadedHtml })
   for (const revision of seededChunks(source, { seed: 176, maxUnits })) {
     replay.update(revision.text, true)
   }
   const completed = replay.update(source, false)
-  expect(hashJson(completed)).toBe(hashJson(renderRemark(source, false)))
+  expect(hashJson(completed)).toBe(
+    hashJson(createRemarkReplay({ extensions: loadedHtml }).update(source, false)),
+  )
 }
 
 function hashJson(value: unknown): string {

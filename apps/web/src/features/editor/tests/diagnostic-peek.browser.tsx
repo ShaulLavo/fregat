@@ -15,7 +15,7 @@ import { DiagnosticPeek } from '@/features/editor/components/diagnostic-peek'
 import { EditorFrame } from '@/features/editor/components/frame'
 import { useDiagnosticPeek } from '@/features/editor/hooks/use-diagnostic-peek'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
-import { AppProviders, createTestQueryClient } from '../../../../test/render'
+import { AppProviders, createTestQueryClient } from '../../../../test/providers'
 
 type BrowserRuntime = {
   readonly claim: (

@@ -1,11 +1,11 @@
 import { loadMarkdownExtension } from '@workspace/markdown/state/extensions'
-import { vi } from 'vitest'
+import { inject, vi } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
+import { observeMarkdownDom } from '../../../../test/factories/markdown-observation'
 import {
   checkChatExpectations,
   createMarkdownBrowser,
-  observeMarkdownDom,
   paintedFrame,
   requiredElement,
   type MarkdownPaintReceipt,
@@ -458,7 +458,11 @@ test('records actual Resource Timing entries exposed during code and math public
 function metric(record: BrowserMetric) {
   console.info(
     'MARKDOWN_BROWSER_METRIC ' +
-      JSON.stringify({ ...record, build: 'development', engine: 'remark' }),
+      JSON.stringify({
+        ...record,
+        build: 'development',
+        engine: inject('markdownEngine') ?? 'remark',
+      }),
   )
 }
 

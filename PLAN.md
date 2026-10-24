@@ -247,8 +247,8 @@ complete cross-backend contract. Runtime implementation follows the owning plans
 
 This is separate from the foundations wave and from the product programs above.
 [207](plans/207-one-repo-with-mirrors.md) delivered source migration on 2026-09-30.
-The scoped cutover hold has ended. Develop Editor in `editor/packages/`, Ghostty in
-`ghostty-webgpu/`, and hotkeys in `hotkeys/`; their standalone repositories are mirrors.
+The scoped cutover hold has ended. Develop Editor in `packages/singapore/packages/`, Ghostty in
+`packages/ghostty-webgpu/`, and hotkeys in `packages/hotkeys/`; their standalone repositories are mirrors.
 npm authentication, initial publication and trusted-publisher setup remain deferred.
 Local development uses the neighboring workspaces. Before 204/205 mirror a consumer of
 hotkeys, qualify the exact standalone dependency source under 207; npm remains deferred.
@@ -311,9 +311,10 @@ contracts a consumer needs:
   [111](plans/111-editor-decorations.md) and [176](plans/176-markdown-parser.md). Reconcile landed
   authoring/parser work before scheduling their remaining parts. [189](plans/189-tree-sitter-md-improvement.md)
   owns subsequent parser correctness and performance work.
-  The approved [chat qualification work package](plans/chat-markdown-qualification.md)
-  starts with the current remark baseline and comparison harness before semantic consumer
-  cutover. Chat migration waits for its correctness, streaming, visual and paired performance gates.
+  The approved [chat qualification follow-up](plans/chat-markdown-qualification.md) is scheduled
+  later and does not block PR #1326. It would measure semantic and streaming correctness, visual
+  behavior and paired performance against remark after the cutover. PR #1326 follows the owner's
+  2026-10-24 merge and delivery bar.
 
 ## TUI UI workstream
 
@@ -336,7 +337,7 @@ shared React/TypeScript logic. The wave-2 queue above is unchanged.
   [document-backed content views](docs/document-backed-content-views.md). Only exact consumed
   contracts are prerequisites, not unrelated whole plans.
 - Plans 203/206 own keymap infrastructure. Plan 202's controls integrate with that dispatcher;
-  they do not introduce a second one. Editor source is canonical in `editor/packages/` after 207.
+  they do not introduce a second one. Editor source is canonical in `packages/singapore/packages/` after 207.
 - The [coordination and research index](.internal/tui-research/ui-plan-links.md) links the retained
   catalog, source evidence, companion plans and implementation handoffs. These are plans, not
   delivered package changes; the existing fork overrides remain until the verified cutover.

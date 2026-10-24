@@ -31,14 +31,14 @@ jobs:
         with:
           node-version: 26
       - name: Pin the newest build
-        run: bun run --cwd editor tree-sitter-x:update
+        run: bun run --cwd packages/singapore tree-sitter-x:update
       - name: Save the generated change
         run: |
           mkdir "$RUNNER_TEMP/pin-update"
           git diff --binary > "$RUNNER_TEMP/pin-update/update.patch"
           base=$(git rev-parse HEAD)
-          runtime=$(jq -r '.dependencies["web-tree-sitter"] | split("#")[1]' editor/packages/tree-sitter/package.json)
-          markdown=$(jq -r '.dependencies["tree-sitter-md"] | split("#")[1]' editor/packages/tree-sitter/package.json)
+          runtime=$(jq -r '.dependencies["web-tree-sitter"] | split("#")[1]' packages/singapore/packages/tree-sitter/package.json)
+          markdown=$(jq -r '.dependencies["tree-sitter-md"] | split("#")[1]' packages/singapore/packages/tree-sitter/package.json)
           jq -n --arg base "$base" --arg runtime "$runtime" --arg markdown "$markdown" \
             '{base: $base, runtime: $runtime, markdown: $markdown}' > "$RUNNER_TEMP/pin-update/metadata.json"
       - uses: actions/upload-artifact@v4
