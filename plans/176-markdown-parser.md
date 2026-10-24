@@ -6,9 +6,9 @@ streaming chat on our parser. Keeping remark for chat and split rendering was
 the scope of the completed integration below. Migrating those consumers remains
 required future work, with streaming and rendering acceptance checks.
 
-The approved [chat qualification work package](chat-markdown-qualification.md) defines the
-remark baseline, semantic and streaming comparisons, real-browser interaction and visual
-checks, paired benchmarks and the gates required before that cutover.
+The approved [chat qualification follow-up](chat-markdown-qualification.md) is scheduled later
+and does not block PR #1326. It lists later semantic, streaming, browser, visual and paired
+performance comparisons against remark under the owner's 2026-10-24 merge and delivery decision.
 
 ## Status and authorization
 
@@ -468,7 +468,7 @@ createMarkdownSession already reuses settled blocks and the React path retains H
 ### Streaming runtime review follow-ups, 2026-10-22
 
 Status: Approved. These observations at `3c8c79b5a73bbf24243b597a21abf4345f29ec51`
-do not establish a parser defect or replace the chat qualification gates.
+do not establish a parser defect.
 
 - [ ] Avoid loading the CHAT grammar for base-profile Editor documents. The Editor's
       `editor/packages/tree-sitter/src/treeSitter/markdown.ts:15` passes `chatGrammar` to
