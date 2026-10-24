@@ -61,22 +61,15 @@ node apps/web/scripts/verify-workspace-navigation.mjs \
   --app-url <running-web-url> --server-url <running-api-url> \
   --second-machine <configured-machine-name> \
   --second-fixture-parent <remote-disposable-parent> \
-  --output-dir /work/tmp/platform-router-verification
+  --output-dir <report-directory>
 ```
 
-The 2026-09-12 WebKit failure control reproduced Safari's history quota after sustained log input.
-The shared publication cadence preserves all 140 characters. A second control reloaded within the
-250 ms interval and lost the latest filter; the per-tab pending record fixes that loss. The final
-WebKit control reloaded 16.10 ms after accepted input and retained the latest filter in both the
-UI and URL, with the pending record consumed. Evidence is in
-`/work/tmp/platform-router-verification/2026-09-12-webkit-reload-fixed/results.json`.
-
-The final replay passed all 72 cases: 24 each in Chromium, Firefox, and macOS WebKit, with no page
-errors. Every browser completed the second-machine dirty-buffer, traversal, and late-read ownership
-case. Quick reload preserved edits made 5.47 ms, 9.62 ms, and 25.54 ms earlier, respectively. The
-verifier removed its own conversations, project registrations, and fixture directories. The report
-records the running Mesh asset `index-M7axwCjS.js`, reached URLs, and cleanup receipts:
-`/work/tmp/platform-router-verification/2026-09-12-all-browsers-verified/results.json`.
+The verifier passes 24 cases in each of Chromium, Firefox and macOS WebKit with no page errors.
+Every browser completes the second-machine dirty-buffer, traversal and late-read ownership case.
+A quick reload keeps edits made 5 ms earlier and the latest filter, and the shared publication
+cadence keeps WebKit under Safari's history quota during sustained log input. The verifier removes
+its own conversations, project registrations and fixture directories, and writes a report of the
+reached URLs and cleanup receipts to the output directory.
 
 The verifier keeps its configured-machine lease alive by draining `/machines/events` through
 cleanup. Startup waits account for observed slow workspace initialization; completed-selection and

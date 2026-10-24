@@ -1,8 +1,7 @@
 # Boot and first load
 
 What must be on screen at first frame, how first-load JavaScript is measured, and how a page open across
-a deploy keeps loading its lazy chunks. Written by Plan 109 (retired 2026-09-25; its measurements are
-in git history).
+a deploy keeps loading its lazy chunks.
 
 ## Initial appearance
 

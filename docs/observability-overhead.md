@@ -1,8 +1,6 @@
 # Observability admission and retention
 
-Plan 125 implementation, 2026-09-20. Evidence and the full census live at
-`/work/tmp/fregat-evidence/plan125-20260920/`. See its `summary.md` for the served release,
-matched production comparisons, verification, and outstanding evidence.
+How the client and server decide which diagnostic events to build, send and keep.
 
 ## Normal operation
 
@@ -62,8 +60,7 @@ HTTP pipeline reports dropped batches to the console without recursively using t
 `agent:browser --no-console` omits console listeners for a capture-overhead control. `observed.json`
 records upload requests, bytes, event counts and client instance IDs. These count attempted uploads,
 including retries; they are not stored server-event counts. Server info sampling remains 25% in the
-measured production deployment. Its log directory is `/work/platform-production/logs`, separate from
-the checkout's development logs.
+measured production deployment. Its log directory is separate from the checkout's development logs.
 
 `scenario editor-diagnostics-lifecycle` opens and closes editors, opts into tracing, exceeds the
 retention bound, stops collection, and reloads without diagnostics. It waits for app readiness after

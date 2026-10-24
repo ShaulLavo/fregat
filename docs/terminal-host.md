@@ -24,17 +24,8 @@ The manifest lives beside the socket. Isolated browser runs stop their host befo
 their temporary home. Host launch, adoption, attach replay and orphan cleanup each log one
 structured event; command lines and terminal output stay out of those events.
 
-A worktree's shells outlive the sessions that use it, with one exception (Plan 126 LIFE-04,
-owner decision 2026-09-26): once the last live session on a worktree settles or archives, its
-shells whose foreground is the shell itself close, and their saved output stays. A shell running
+A worktree's shells outlive the sessions that use it, with one exception (LIFE-04): once the last live session on a worktree settles or archives, its shells whose foreground is the shell itself close, and their saved output stays. A shell running
 a program stays open.
 
-Plan 149's D1–D7 recommendations were accepted for the 2026-09-25 completion wave. The owner
-explicitly chose desktop-quit shutdown. The macOS fallback remains an owner check.
-
-Verification on 2026-09-25 used two real server processes on a spare loopback port and a
-temporary state root. Host PID 3976551 and shell PID 3976577 survived the restart, output
-advanced from byte 124 to 198, and systemd reported the host's own active scope. Evidence:
-`/work/tmp/L4-completion/live-restart.json` and `live-logs/`. A concurrent reconnect regression
-failed before recovery was awaited and passed after it. Production restart verification and
-the 24-hour log census run after the owner deploys.
+Restart check: two real server processes on a spare loopback port and a temporary state root. The host and shell PIDs survive the restart, terminal output advances (byte 124 to 198), and systemd reports the host's own active scope. A reconnect regression test fails if recovery is not awaited. Production restart verification and
+the 24-hour log census are not done yet.

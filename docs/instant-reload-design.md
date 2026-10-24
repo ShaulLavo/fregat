@@ -23,7 +23,7 @@ Source anchors are [bootstrap](../apps/web/src/components/application-bootstrap.
 
 Two live probes warmed the current published workspace and then held API responses during reload. The file view restored its editor preview and 12 tabs, while the tree showed loaders. The preview disappeared after its 1500 ms deadline without live text. The settings probe restored the selected settings tab, but its contents stayed behind a loader.
 
-These probes demonstrate missing content and timeout behavior, not an end-to-end performance target. Their frame samples preceded browser paint, and the broad API hold also intercepted the font endpoint. Separate font and data delays when measuring geometry. Local evidence is in `/work/tmp/platform-instaload/boot-baseline.json` and `settings-baseline.json`.
+These probes demonstrate missing content and timeout behavior, not an end-to-end performance target. Their frame samples preceded browser paint, and the broad API hold also intercepted the font endpoint. Separate font and data delays when measuring geometry.
 
 ## Recommended design
 

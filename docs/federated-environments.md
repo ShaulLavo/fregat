@@ -40,8 +40,7 @@ bun run server:install
 
 This writes a small executable to `~/.local/bin/platform-server`. It records the absolute checkout
 directory and the Bun executable used to install it. It does not copy the checkout, download
-dependencies, or start another server. Keep the checkout and runtime on the data drive, such as
-`/work/projects/platform`; only the launcher goes in the user's home directory.
+dependencies, or start another server. Only the launcher goes in the user's home directory; the checkout and runtime can live anywhere.
 
 Connect machine discovers `platform-server` on the remote PATH, then tries
 `~/.local/bin/platform-server` when SSH's noninteractive PATH omits it. `platform-server --describe`
@@ -162,7 +161,7 @@ node apps/web/scripts/verify-federated-environments.mjs \
   --app-url <running-web-url> --server-url <running-api-url> \
   --machine <configured-machine-name> \
   --primary-root <disposable-local-checkout> --remote-root <disposable-remote-checkout> \
-  --output-dir /work/tmp/platform-federation-verification
+  --output-dir <report-directory>
 ```
 
 Both disposable checkouts need the same unique Git origin and a `federation.txt` file with
@@ -172,35 +171,25 @@ before deleting its own project/session registrations, and leaves the supplied c
 for the caller to remove. Browser verifiers run serially because the primary filesystem index
 has one active root.
 
-The 2026-09-12 Chromium run against Linux and the SSH-connected Mac passed all eight live checks:
-confirmed distinct identities, grouped repository rows and machine filtering, remote folder input,
-retained unsaved text with saves confined to the selected machine, terminal commands on both
-machines, unavailable terminal state with the actual forwarded listener released, and reconnect
-from the browser without reloading. It reported no browser errors. The report, reached state,
-terminal output, and cleanup receipts are in
-`/work/tmp/platform-078-closeout/final/results.json`.
+The verifier passes eight live checks against Linux and an SSH-connected Mac: distinct machine
+identities, grouped repository rows and machine filtering, remote folder input, retained unsaved
+text with saves confined to the selected machine, terminal commands on both machines, an
+unavailable terminal state with the forwarded listener released, and reconnect from the browser
+without reloading. The report, reached state, terminal output and cleanup receipts go to the
+output directory.
 
-The closeout corrected two client bugs. Typed remote paths previously used the active machine's
-HTTP client; the picker now captures its own QueryClient's client. Retained SSH connection notices
-previously disabled their Connect button in browsers; the shared backend connection API now handles
-that action. Focused tests cover both failures alongside the two-server ownership and cold-cache
-checks. Real OpenSSH checks cover host confirmation, encrypted-key prompts, reused authentication,
-forwarded listener release, cancellation, and connection ownership transfer.
+Typed remote paths use the client of the picker's own QueryClient, not the active machine's HTTP
+client. Retained SSH connection notices keep their Connect button enabled in browsers; the shared
+backend connection API handles that action. Focused tests cover both alongside the two-server
+ownership and cold-cache checks. Real OpenSSH checks cover host confirmation, encrypted-key
+prompts, reused authentication, forwarded listener release, cancellation, and connection
+ownership transfer.
 
-The same-day live SSH lifecycle check passed all nine gates. Two aliases reused the active Mac
-server with independent leases and local forwards. Releasing them left its existing user
-connection intact. A separate managed process on remote port `57119` used local ports `41381`
-and `41813`; its first release preserved the remaining alias, and its final release stopped PID
-`50015`. Reconnecting started PID `50082` with the same durable environment ID, then final release
-stopped it. All four tested local forwards closed and the remote launch records returned to their
-baseline. The primary PID `3998664` and existing Mac PID `42071` remained healthy and unchanged.
-
-The primary identity was `13c7d86d-fa6c-4548-a7da-ff69e46b40eb`; the Mac identity was
-`95237832-cbc4-4e61-a7b6-7be96baa2e66`. The report records process start stamps, ports, leases,
-health descriptors, database identity, and the drained client event stream:
-`/work/tmp/platform-closeout-20260912/ssh-lifecycle-2026-09-12T16-16-06.632Z/results.json`.
-At that closeout, the Mac source installation remained at `/Users/shaul/projects/platform-verification`
-because the active `shaul-mac` connection used it. Its launcher and isolated database remained with it.
+A live SSH lifecycle check has nine gates. Two aliases reuse the active Mac server with
+independent leases and local forwards, and releasing them leaves its existing user connection
+intact. A separate managed process on a remote port keeps its remaining alias on first release
+and stops on final release; reconnecting starts a new process with the same durable environment
+ID. All tested local forwards close and the remote launch records return to their baseline.
 
 A production primary now installs its own release on a machine through **Update server** (or
 **Install server** when none is installed): it copies `server/` over SSH into

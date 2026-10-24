@@ -67,7 +67,7 @@ the import retains an unverified-artwork notice and its mapping report. The scri
 portable archive as the settings action:
 
 ```sh
-bun run themes:import-omarchy --theme catppuccin --out /work/tmp/catppuccin.platform-theme.json
+bun run themes:import-omarchy --theme catppuccin --out catppuccin.platform-theme.json
 ```
 
 ## Verification
@@ -81,35 +81,11 @@ cover the reused provider. TUI renderer tests cover explicit terminal-host color
 The gallery and editors now live in the theme studio; `bun run agent:browser scenario theme-studio`
 drives it, and `scenario bundle-wallpapers` previews every bundled theme's paired wallpapers.
 
-Verified on the mesh on 2026-09-19, release
-`20260919T122244Z-e78c4c44-plan117-theme-bundles`. The 12-step browser run passed at
-`/work/tmp/fregat-evidence/20260919T122315Z-scenario-theme-bundles/`, including restoration
-of the original variant image after toggling wallpaper off and on. The focused bundle,
-command-provider and environment-ownership tests passed (19 tests), alongside affected
-package typechecks, generated-file checks, the design census and unused-code checks.
-The source remains uncommitted on `main`.
-
-## Review follow-up
-
-A second review fixed deletion of artwork still referenced by another bundle's default beneath a
-customization, notices lost during export, stale standalone values in TUI theme-part drafts, and
-an unsupported edit action on embedded palettes. TUI drafts capture their variant when opened.
-Palette creation also rejects ids already owned by an imported bundle.
-
-Release `20260919T131135Z-e78c4c44-plan117-reviewed` passed deployment checks. Forty-three focused
-tests passed (9 bundle/server, 26 web appearance/settings, 8 TUI settings), as did affected
-package typechecks, changed-file formatting/lint, generated-file checks and unused-code checks.
-The expanded 13-step live scenario passed; screenshots were inspected:
-`/work/tmp/fregat-evidence/20260919T131206Z-scenario-theme-bundles/`.
-
-The production log window contains machine-events, file-watcher and settings-stream errors at
-13:12:11 UTC during the forced reload; settings refetch succeeded. The browser reported no page
-errors or failed HTTP responses. The CLI's automatic log reader points at the development logs,
-so production logs were checked separately under `/work/platform-production/logs/`.
-
-The reload-time log errors recorded above were addressed by the subsequent
-[page-subscription cleanup](page-subscriptions.md). The production verification for that change
-had no warnings or errors in its structured log window.
+Toggling wallpaper off and on restores the original variant image. Bundle deletion keeps
+artwork still referenced by another bundle's default beneath a customization, export keeps
+notices, TUI theme-part drafts capture their variant when opened, embedded palettes have no edit
+action, and palette creation rejects ids already owned by an imported bundle. Focused tests
+cover the bundle/server, web appearance/settings and TUI settings paths.
 
 ## Appearance settings and the studio
 
