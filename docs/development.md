@@ -50,6 +50,8 @@ exercises the real host's startup scripts, launcher messages, picker cancellatio
 cookies and storage, state-home isolation, and shutdown. It opens temporary verification windows
 and writes protocol receipts to the evidence directory.
 
+<a id="workspace-libraries"></a>
+
 Editor packages live in `editor/packages/`, and the terminal library lives in `ghostty-webgpu/`. Bun installs their workspace links from the root `bun.lock`. Run `bun install --frozen-lockfile` at the root, then `bun run build:workspaces` to prepare the exports used by production builds and typechecking.
 
 Desktop launcher bundle tests load these workspace exports too. Build the libraries before running the launcher checks from a fresh checkout:
