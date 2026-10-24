@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ShaulLavo/fregat/main/apps/web/public/icons/fregat.svg" width="96" alt="Fregat rocket" />
+  <img src="apps/web/public/icons/fregat.svg" width="96" alt="Fregat rocket" />
 </p>
 <h1 align="center">Fregat</h1>
 <p align="center">The complete IDE in your browser, with your agents inside.</p>
@@ -11,30 +11,35 @@
 <p align="center">
   <a href="https://fregat.shaulavo.dev/">Website</a> ·
   <a href="docs/README.md">Documentation</a> ·
-  <a href="PLAN.md">Roadmap</a> ·
   <a href="https://github.com/ShaulLavo/fregat/discussions">Discussions</a>
 </p>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ShaulLavo/fregat/main/docs/images/workbench-dark.webp" />
-  <img src="https://raw.githubusercontent.com/ShaulLavo/fregat/main/docs/images/workbench.webp" alt="Fregat workbench with editor, file tree, and terminal" />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/workbench-dark.webp" />
+  <img src="docs/images/workbench.webp" alt="Fregat workbench with editor, file tree, and terminal" />
 </picture>
 
 Open a folder and get an editor, terminals, Git, and language servers in one workspace.
-Run Claude Code and Codex beside your files. Everything runs on your machine.
+Run Claude Code and Codex beside your files. The Fregat server runs on your machine.
 
-Fregat is early. Expect bugs and changing APIs. You can run it from source today.
+Fregat is pre-1.0 and early. Expect bugs and changing APIs. You can run it from source today. There are no app releases or downloads yet.
 
-## What are you selling me?
+## Why Fregat
 
-"Isn't this just Cursor?" The familiar part is a code workspace with agents.
-The reason to try Fregat is how your work survives, and how much control you have over an agent's changes.
+Plenty of tools put an agent next to your code. Fregat is built around two other things: how your work survives, and how much control you keep over an agent's changes.
 
-- **Our own editor and terminal.** [Singapore](https://singapore.shaulavo.dev/) keeps readable versions of your text. [ghostty-webgpu](https://ghostty.shaulavo.dev/) brings Ghostty's terminal core into the browser.
-- **Work keeps going.** Browser and desktop windows share one machine server. On Linux, terminals survive server restarts and replay output. Updates wait for running agent turns, check the new release, and roll back a failed update. Read the [installed-app contracts](plans/114-installed-app.md).
-- **Review agents like pull requests.** Undo or reapply a hunk, collect line comments into a message, and fork a chat from a turn. Ask a second model to review, or send one prompt to several models in separate worktrees. See the [agent workbench](plans/139-acting-on-agent-diffs.md).
-- **Nothing is lost when you close a file.** The editor's undo graph survives closing its tab and restores when the saved content still matches. File-tree undo restores recent deleted folders with their tabs and unsaved edits. See [undo behavior](.internal/research/packages-as-products/fregat-workbench.md#4-undo-that-goes-further-than-any-editor).
-- **Bring your own agents.** Sign in to Claude Code and Codex, run them side by side, and save permissions as each tool's own rules. Track usage and cost per chat. See [agent sessions](docs/session-domain.md) and [approval rules](plans/145-harness-controls.md).
+- **Our own editor and terminal.** [Singapore](https://singapore.shaulavo.dev/) keeps every version of your text. [ghostty-webgpu](https://ghostty.shaulavo.dev/) brings Ghostty's terminal core into the browser.
+- **One server per machine.** Browser tabs, the desktop window, the terminal client and a paired phone share it, so closing a window leaves your agents and terminals running. On Linux, terminals also survive a server restart and replay their output.
+- **Review agents like pull requests.** Undo or reapply a hunk, attach line comments to a message, and fork a chat from a turn. Ask a second model to review, or send one prompt to several models, each in its own worktree.
+- **Closing a file loses nothing.** Undo history for closed files is kept in the browser and restored when the file is unchanged on disk. Deleted files and folders in the tree can be restored with undo.
+- **Your own agents.** Fregat drives the Claude Code and Codex CLIs you already installed and signed in to, and shows context usage per chat.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture.dark.svg" />
+  <img src="docs/assets/architecture.light.svg" alt="Three clients (a desktop window, the web app and a terminal client) call one machine server. The server holds the orchestration engine, the files, Git and language server routes, and a separate terminal host. It talks to a SQLite state home, to Claude Code and Codex, to your files and to your shells." />
+</picture>
+
+All clients talk to one server on your machine. [Architecture](docs/architecture.md) explains each box.
 
 ## Quick start
 
@@ -44,15 +49,29 @@ Install [Bun](https://bun.sh/), [Node.js 26 or newer](https://nodejs.org/), and 
 git clone https://github.com/ShaulLavo/fregat.git
 cd fregat
 bun install --frozen-lockfile
+bun run build:workspaces
 bun run dev
 ```
 
-1. Open the URL printed by the development server and pick a folder.
-2. Open a terminal in that workspace.
+The dev server prints `[dev] Client: http://127.0.0.1:5173`.
+
+1. Open that URL and pick a folder. On macOS, `bun run dev` also opens a desktop window. Use `bun run dev:web` for the browser only.
+2. Open a terminal in the workspace.
 3. To use agents, install [Claude Code](https://code.claude.com/docs/en/setup) or [Codex](https://developers.openai.com/codex/cli/) and sign in.
 
-[Development and source builds](docs/development.md) covers checks and the desktop launcher.
+If something fails, [troubleshooting](docs/troubleshooting.md) lists the usual causes.
 Remote phone browsers need an HTTPS proxy and device pairing. Keep access private and pair only devices you trust.
+
+## What you can do
+
+| Task                                    | Where                                                                |
+| --------------------------------------- | -------------------------------------------------------------------- |
+| Run it, run the checks, build a release | [Development](docs/development.md)                                   |
+| Pair a phone or another computer        | [Pairing another device](docs/development.md#pairing-another-device) |
+| Change a setting                        | [Settings reference](docs/settings-reference.md)                     |
+| Find your way around the code           | [Monorepo map](docs/monorepo.md)                                     |
+| Use the terminal client                 | [`apps/tui`](apps/tui/README.md)                                     |
+| Understand a subsystem                  | [Documentation index](docs/README.md)                                |
 
 ## The parts
 
@@ -62,19 +81,19 @@ Remote phone browsers need an HTTPS proxy and device pairing. Keep access privat
 | [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu) | Ghostty's terminal, in the browser.                     |
 | [hotkeys](https://github.com/ShaulLavo/hotkeys)               | Keyboard shortcuts for editors and complex apps.        |
 
-These projects live in this monorepo. Their standalone repositories are read-only mirrors.
+These projects live in this monorepo as `editor/`, `ghostty-webgpu/` and `hotkeys/`. Their standalone repositories are read-only mirrors.
 
-## Planned work
+## Status
 
-These are approved directions. The linked plans record what has shipped and what remains.
+Fregat is pre-1.0 and has no app releases. APIs and on-disk formats change without notice.
 
-| Work                                       | Status                                              | Plan                                                                                                         |
-| ------------------------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Shared editing between you and your agents | Planned                                             | [Collaborative text](plans/e066-collaborative-text.md) and [Delta DB](plans/delta-db-implementation-plan.md) |
-| Office documents in tabs                   | Planned. PDF and CSV support has shipped.           | [Documents in the editor](plans/156-documents-in-the-editor.md)                                              |
-| Visual Markdown editing                    | Planned. Source view and live preview have shipped. | [Markdown modes](plans/108-markdown-modes.md)                                                                |
-
-The [full roadmap](PLAN.md) owns scheduling. Planned work has no release date here.
+| Area              | State                                                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Platforms         | Linux and macOS, as the landing page states. Windows is not listed.                                                      |
+| Install           | From source only. `@fregat/hotkeys` is not on npm. The npm releases of Singapore and ghostty-webgpu lag this repository. |
+| Agents            | Claude Code and Codex, through your own installs and logins.                                                             |
+| Terminal restarts | Terminals survive a server restart on Linux. The macOS behavior is not verified.                                         |
+| Remote access     | Needs an HTTPS proxy and device pairing. Treat access to the server as access to your files.                             |
 
 ## Contributing
 

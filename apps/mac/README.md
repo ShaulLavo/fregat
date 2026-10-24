@@ -1,6 +1,6 @@
 # mac
 
-Scaffold and benchmarks for a planned native macOS client. `MacApp` opens a stub window. The shipped Fregat desktop app uses the WebKit host in [`apps/desktop`](../desktop/). See the [native client plan](../../plans/native-plan-of-plans.md) for the editor-first gate and work queue.
+Scaffold and benchmarks for a planned native macOS client. `MacApp` opens a stub window. The shipped Fregat desktop app uses the WebKit host in [`apps/desktop`](../desktop/). The [native editor core design](../../docs/native-editor-core-design.md) records the architecture.
 
 ## Toolchain
 
@@ -23,7 +23,7 @@ swift run MacApp                  # stub window (no .app bundle yet, deliberatel
 
 `EditorBench` prints the web editor's baselines with an empty native column; each plan
 fills the rows it owns. Methodology, provenance tiers and the `os_signpost` → `xctrace`
-recipe are in `docs/native-bench-harness.md`. To check the keystroke instrument itself:
+recipe are in [native-bench-harness.md](../../docs/native-bench-harness.md). To check the keystroke instrument itself:
 
 ```bash
 xcrun xctrace record --template "Logging" --output /tmp/sig.trace \
