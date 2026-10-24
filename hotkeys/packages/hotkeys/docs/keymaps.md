@@ -16,7 +16,7 @@ when several bindings match a key, candidates rank by:
 2. source: `user` over `pack` over `base` over `default`
 3. later entries in the table first
 
-so the focused layer wins, and below it the user beats a keybinding pack. here `Mod+B` makes text bold in a markdown editor and toggles the sidebar everywhere else, until the user takes it back
+so the deepest matching context takes the key, and among equal contexts a user binding outranks a keybinding pack. here `Mod+B` makes text bold in a markdown editor and toggles the sidebar everywhere else, until the user takes it back
 
 ```ts
 const hotkeys = createBrowserDispatcher({
