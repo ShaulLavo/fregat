@@ -6,30 +6,28 @@ Singapore has one source of truth for text, and everything else is a view of it 
 
 The canonical document is a persistent piece table that lives on the main thread. Each edit returns a new snapshot, and old snapshots stay valid. The visible text, the syntax colors, the folds and the minimap are projections of one snapshot. Each projection says which snapshot it describes, so a worker that lags behind typing cannot pass off an old answer as current.
 
-The goals that shape the rest:
+The rules that shape the rest:
 
-- A keystroke reaches the screen within one display frame. Typing never waits for derived work.
-- Large files work. Only rows near the viewport are in the DOM.
+- Typing does not wait for derived work. The editor paints the edit before any worker answers.
+- Only rows near the viewport are in the DOM in the default `virtualized` scroll mode.
 - The browser does the text layout. The editor does not keep a second layout engine.
 - The core is plain text editing. Everything else is an optional package.
 
 ## Layers
 
-The [README](README.md) has a package diagram. This table maps each layer to its packages and its design document.
+The [README](README.md) has a package diagram. Each layer below names its packages and its design document.
 
-| Layer          | Package                                                                | What it owns                                                                  | Design document                                                                                                    |
-| -------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Storage        | `textbuffer`                                                           | Piece table, snapshots, anchors, line mapping                                 | [Piece table](docs/storage/piece-table.md)                                                                         |
-| Positions      | `textbuffer`, `core`                                                   | Offset, point, and anchor types and conversions                               | [Types and conversions](docs/positions/types-and-conversions.md), [Anchors](docs/positions/anchors.md)             |
-| Editing        | `core`                                                                 | Selections, multi-cursor, batch edits, undo                                   | [Selections and undo](docs/editing/selections-and-undo.md)                                                         |
-| Display        | `core`                                                                 | Row virtualization, folds, browser-owned geometry, CSS Custom Highlight paint | [Browser layout and virtualizer](docs/display/browser-virtualization.md), [Transforms](docs/display/transforms.md) |
-| Syntax         | `tree-sitter`, `highlighting`                                          | Parsing, highlight queries, folds, structural selection, injections           | [Tree-sitter](docs/syntax/tree-sitter.md)                                                                          |
-| Workers        | `tree-sitter`, `minimap`, `spellcheck`, `typescript-lsp`, `core/shiki` | One owner object per worker: start, requests, disposal                        | [Worker topology](docs/architecture/worker-topology.md)                                                            |
-| Extension host | `core/extensions`                                                      | Plugin lifecycle and the contribution registries                              | [Extension hooks](docs/architecture/extension-hooks.md)                                                            |
+- **Storage** (`textbuffer`): piece table, snapshots, anchors, line mapping. [Piece table](docs/storage/piece-table.md).
+- **Positions** (`textbuffer`, `core`): offset, point, and anchor types and conversions. [Types and conversions](docs/positions/types-and-conversions.md), [Anchors](docs/positions/anchors.md).
+- **Editing** (`core`): selections, multi-cursor, batch edits, undo. [Selections and undo](docs/editing/selections-and-undo.md).
+- **Display** (`core`): row virtualization, folds, browser-owned geometry, CSS Custom Highlight paint. [Browser layout and virtualizer](docs/display/browser-virtualization.md), [Transforms](docs/display/transforms.md).
+- **Syntax** (`tree-sitter`, `highlighting`): parsing, highlight queries, folds, structural selection, injections. [Tree-sitter](docs/syntax/tree-sitter.md).
+- **Workers** (`tree-sitter`, `minimap`, `spellcheck`, `typescript-lsp`, `core/shiki`): one owner object per worker for start, requests and disposal. [Worker topology](docs/architecture/worker-topology.md).
+- **Extension host** (`core/extensions`): plugin lifecycle and the contribution registries. [Extension hooks](docs/architecture/extension-hooks.md).
 
 ## What happens when you type
 
-One keystroke, in order. Notice that the editor paints the edit before any worker answers.
+One keystroke, in order. The editor paints the edit before any worker answers.
 
 ```mermaid
 sequenceDiagram
@@ -52,12 +50,10 @@ Derived work has to describe the current snapshot, or be projected through the e
 
 The main thread owns the document, selections, undo, row mounting and paint. Workers own derived state:
 
-| Work                              | Owner object               | Package          |
-| --------------------------------- | -------------------------- | ---------------- |
-| Tree-sitter parsing and queries   | `TreeSitterWorkerClient`   | `tree-sitter`    |
-| Minimap drawing (OffscreenCanvas) | `MinimapWorkerOwner`       | `minimap`        |
-| Shiki tokenizing                  | `ShikiWorkerOwner`         | `core/shiki`     |
-| TypeScript language service       | `TypeScriptLspWorkerOwner` | `typescript-lsp` |
+- Tree-sitter parsing and queries: `TreeSitterWorkerClient`, in `tree-sitter`.
+- Minimap drawing (OffscreenCanvas): `MinimapWorkerOwner`, in `minimap`.
+- Shiki tokenizing: `ShikiWorkerOwner`, in `core/shiki`.
+- TypeScript language service: `TypeScriptLspWorkerOwner`, in `typescript-lsp`.
 
 `core/shiki` is the `@singapore-editor/core/shiki` entry point inside the `core` package, not a separate package. See the [Shiki entry point](packages/editor/README.md#shiki-entry-point).
 

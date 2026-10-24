@@ -20,7 +20,7 @@ import '@singapore-editor/core/style.css'
 import '@singapore-editor/file-animation/style.css'
 
 const editor = new Editor(document.querySelector<HTMLElement>('#editor')!, {
-  plugins: [createFileTransitionPlugin({ mode: 'magicMove' }), createFileEditAnimationPlugin()],
+  plugins: [createFileTransitionPlugin(), createFileEditAnimationPlugin()],
 })
 editor.openDocument({
   documentId: 'example.ts',
@@ -31,7 +31,7 @@ editor.openDocument({
 
 ## API highlights
 
-- `createFileTransitionPlugin()` animates a file as it opens. `mode` picks `autoregressive`, `parallel`, `token`, `diffusion`, or `magicMove`, which slides the text two files share from the previous file to the new one.
+- `createFileTransitionPlugin()` animates a file as it opens. The `mode` option picks `autoregressive` (the default), `parallel`, `token`, `diffusion`, or `magicMove`, which slides the text two files share from the previous file to the new one.
 - `createFileEditAnimationPlugin()` animates every edit except typing.
 
 [Generated API reference](https://singapore.shaulavo.dev/docs/reference/api/file-animation/overview/)

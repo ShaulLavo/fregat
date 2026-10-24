@@ -8,6 +8,20 @@ Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the brow
 
 Not on npm yet. Build it from source with the [development guide](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/development.md#set-up).
 
+## Usage
+
+This example validates a presence message. A room needs a document engine, authenticated links, and a clock supplied by your app.
+
+```ts
+import { Presence, parsePresence } from '@singapore-editor/collaboration'
+
+const presence = new Presence('peer-1', 'document-1')
+const message = parsePresence({ clock: 1, state: null }, 'peer-2', 'document-1')
+if (message) presence.receive('peer-2', message)
+console.log(presence.states)
+presence.dispose()
+```
+
 ## What you set up
 
 The library uses no hosted services and has no public defaults. What you need depends on where
@@ -27,20 +41,6 @@ peers are:
 
 Pass the broker URLs, ICE servers and credentials to the transports when joining. The
 [integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collaboration/docs/integration.md#browser-transports) covers each option.
-
-## Usage
-
-This example validates a presence message. A room needs a document engine, authenticated links, and a clock supplied by your app.
-
-```ts
-import { Presence, parsePresence } from '@singapore-editor/collaboration'
-
-const presence = new Presence('peer-1', 'document-1')
-const message = parsePresence({ clock: 1, state: null }, 'peer-2', 'document-1')
-if (message) presence.receive('peer-2', message)
-console.log(presence.states)
-presence.dispose()
-```
 
 ## No end-to-end quick start yet
 

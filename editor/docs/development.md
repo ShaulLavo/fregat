@@ -4,7 +4,7 @@ How to build, test and check the `editor/` packages. This folder lives in the [F
 
 ## Set up
 
-You need [Bun](https://bun.sh/) 1.4.4, the version in `packageManager`, and Node.js 26 or newer. From the Fregat root:
+You need [Bun](https://bun.sh/) 1.4.4, the version in `packageManager` that CI uses, and Node.js 26 or newer, because the Tree-sitter parser needs `WebAssembly.Memory.prototype.toResizableBuffer()` and Vitest and grammar generation run in Node. From the Fregat root:
 
 ```sh
 bun install --frozen-lockfile
@@ -37,28 +37,24 @@ Each package defines its own `test`, `typecheck`, `lint` and `format:check` scri
 
 Run these from `editor/`:
 
-| Command                         | What it checks                                                                        |
-| ------------------------------- | ------------------------------------------------------------------------------------- |
-| `bun run typecheck`             | Typechecks every package through Turborepo                                            |
-| `bun run lint`                  | Runs oxlint on the scripts and every package                                          |
-| `bun run format:check`          | Checks formatting with oxfmt. `bun run format` fixes it across the whole workspace.   |
-| `bun run health`                | Checks the full-text boundary, the command reference and the architecture baselines   |
-| `bun run commands:reference`    | Regenerates [`docs/commands.md`](commands.md). `health` fails when the file is stale. |
-| `bun run --cwd site docs:check` | Compiles every TypeScript example in the site pages and the package READMEs           |
+- `bun run typecheck`: typechecks every package through Turborepo.
+- `bun run lint`: runs oxlint on the scripts and every package.
+- `bun run format:check`: checks formatting with oxfmt. `bun run format` fixes it across the whole workspace.
+- `bun run health`: checks the full-text boundary, the command reference and the architecture baselines.
+- `bun run commands:reference`: regenerates [`docs/commands.md`](commands.md). `health` fails when the file is stale.
+- `bun run --cwd site docs:check`: compiles every TypeScript example in the site pages and the package READMEs.
 
 From the Fregat root, `bun run package-pages:check` checks the package metadata and README structure that npm renders, and `bun run plans:check` checks the Editor plan index and the files it links.
 
 ## Where things live
 
-| Path              | What it holds                                                                             |
-| ----------------- | ----------------------------------------------------------------------------------------- |
-| `packages/<name>` | One published package: `src/`, `test/`, `README.md`, optional `docs/` and `bench/`        |
-| `examples/app`    | The demo app                                                                              |
-| `examples/stress` | The stress and input-latency harness, with committed results                              |
-| `bench/compare`   | The Singapore, Monaco and CodeMirror comparison                                           |
-| `site`            | The documentation site: hand-written pages in `src/content/docs`, API reference generated |
-| `scripts`         | Workspace tooling, such as the architecture health check and the command reference        |
-| `docs`            | [Design documents](README.md)                                                             |
+- `packages/<name>`: one published package, with `src/`, `test/`, `README.md`, optional `docs/` and `bench/`.
+- `examples/app`: the demo app.
+- `examples/stress`: the stress and input-latency harness, with committed results.
+- `bench/compare`: the Singapore, Monaco and CodeMirror comparison.
+- `site`: the documentation site, with hand-written pages in `src/content/docs` and generated API reference.
+- `scripts`: workspace tooling, such as the architecture health check and the command reference.
+- `docs`: [design documents](README.md).
 
 ## Write documentation
 
