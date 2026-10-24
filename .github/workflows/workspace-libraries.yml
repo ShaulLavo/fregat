@@ -3,6 +3,9 @@ name: Workspace libraries
 on:
   workflow_call:
     inputs:
+      reuse_builds:
+        type: boolean
+        default: false
       exhaustive:
         type: boolean
         default: false
@@ -42,7 +45,13 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
         with:
-          build-packages: editor
+          build-packages: ${{ inputs.reuse_builds && '[]' || 'editor' }}
+      - name: Import workspace builds
+        if: ${{ inputs.reuse_builds }}
+        uses: ./.github/actions/workspace-builds
+        with:
+          operation: consume
+          targets: editor
       - name: Install Editor browsers
         timeout-minutes: 8
         uses: ./.github/actions/install-browsers
@@ -131,7 +140,13 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
         with:
-          build-packages: '["ghostty-webgpu","ghostty-webgpu-line-editor","ghostty-webgpu-shaders"]'
+          build-packages: ${{ inputs.reuse_builds && '[]' || '["ghostty-webgpu","ghostty-webgpu-line-editor","ghostty-webgpu-shaders"]' }}
+      - name: Import workspace builds
+        if: ${{ inputs.reuse_builds }}
+        uses: ./.github/actions/workspace-builds
+        with:
+          operation: consume
+          targets: '["ghostty-webgpu","ghostty-webgpu-line-editor","ghostty-webgpu-shaders"]'
       - name: Install Chromium
         timeout-minutes: 5
         uses: ./.github/actions/install-browsers

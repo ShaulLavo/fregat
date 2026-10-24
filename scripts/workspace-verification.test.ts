@@ -254,7 +254,7 @@ test('CI shares one production site build with every mobile shard', () => {
   const workflow = readWorkflow('ci.yml')
   const site = workflow.jobs.site!.steps
   expect(site.find((step) => step.name === 'Build production sites')?.run).toBe(
-    'bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites" "$CI_SITES"',
+    'bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites" "$CI_SITES" --reuse-workspace-builds',
   )
   const upload = site.find((step) => step.uses === 'actions/upload-artifact@v4')
   expect(upload?.with?.name).toBe('ci-product-sites')

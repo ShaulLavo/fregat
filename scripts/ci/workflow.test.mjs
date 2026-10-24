@@ -95,3 +95,107 @@ test('bundle size does not block CI or repository verification', async () => {
     })
   }
 })
+
+test('setup builds have a single early producer and required fail-closed imports', async () => {
+  const producer = workflow.jobs['workspace-builds']
+  expect(producer).toBeDefined()
+  expect(producer.needs).toBe('changes')
+  expect(producer.if).toBe("${{ needs.changes.outputs.code == 'true' }}")
+  expect(
+    producer.steps.find((step) => step.uses === './.github/actions/setup').with['build-packages'],
+  ).toBe('[]')
+  expect(
+    producer.steps.filter((step) => step.uses === './.github/actions/workspace-builds'),
+  ).toHaveLength(1)
+  expect(workflow.jobs.verdict.needs).toContain('workspace-builds')
+  for (const name of [
+    'typecheck',
+    'test-web',
+    'test-server',
+    'test-tui',
+    'browser',
+    'site',
+    'libraries',
+  ]) {
+    const job = workflow.jobs[name]
+    expect(job.needs).toEqual(['changes', 'workspace-builds'])
+    expect(job.needs).not.toContain('typecheck')
+    expect(job.if).not.toContain('always()')
+    if (name === 'libraries') continue
+    expect(
+      job.steps.find((step) => step.uses === './.github/actions/setup').with['build-packages'],
+    ).toBe('[]')
+    const imported = job.steps.find((step) => step.uses === './.github/actions/workspace-builds')
+    expect(imported.id).toBe('builds')
+    expect(imported.with.operation).toBe('consume')
+    for (const step of job.steps.filter((step) => step.run && step.if?.includes('!cancelled()'))) {
+      expect(step.if).toContain("steps.builds.outputs.ready == 'true'")
+    }
+  }
+  expect(workflow.jobs.lint.needs).toBe('changes')
+  expect(workflow.jobs.docs.needs).toBe('changes')
+  expect(workflow.jobs['mobile-layout'].needs).toEqual(['changes', 'site'])
+})
+
+test('reusable library workflows keep direct defaults and import only for the CI opt-in', async () => {
+  const libraries = YAML.parse(
+    await readFile(new URL('.github/workflows/workspace-libraries.yml', root), 'utf8'),
+  )
+  expect(libraries.on.workflow_call.inputs.reuse_builds).toEqual({
+    type: 'boolean',
+    default: false,
+  })
+  expect(workflow.jobs.libraries.with.reuse_builds).toBe(
+    "${{ needs.changes.outputs.code == 'true' }}",
+  )
+  for (const name of ['editor', 'ghostty']) {
+    const job = libraries.jobs[name]
+    const setup = job.steps.find((step) => step.uses === './.github/actions/setup')
+    expect(setup.with['build-packages']).toContain("inputs.reuse_builds && '[]'")
+    const imported = job.steps.find((step) => step.uses === './.github/actions/workspace-builds')
+    expect(imported.if).toBe('${{ inputs.reuse_builds }}')
+    expect(imported.with.operation).toBe('consume')
+  }
+  expect(
+    libraries.jobs.standalone.steps.some(
+      (step) => step.uses === './.github/actions/workspace-builds',
+    ),
+  ).toBe(false)
+})
+
+test('transport is same-run and immutable, with only local build tasks persisted', async () => {
+  const action = YAML.parse(
+    await readFile(new URL('.github/actions/workspace-builds/action.yml', root), 'utf8'),
+  )
+  const steps = action.runs.steps
+  const download = steps.find((step) => step.uses === 'actions/download-artifact@v4')
+  expect(download.with).toEqual({
+    pattern: '${{ steps.plan.outputs.pattern }}',
+    path: '${{ steps.plan.outputs.directory }}/downloads',
+    'merge-multiple': false,
+  })
+  const upload = steps.find((step) => step.uses === 'actions/upload-artifact@v4')
+  expect(upload.with).toMatchObject({
+    'if-no-files-found': 'error',
+    overwrite: false,
+    'include-hidden-files': true,
+  })
+  for (const step of steps.filter((step) => step.uses?.startsWith('actions/cache/'))) {
+    expect(step.with.path).toBe('.turbo/ci-builds')
+    expect(step.if).toContain("inputs.operation == 'produce'")
+  }
+  expect(steps.every((step) => step['continue-on-error'] !== true)).toBe(true)
+  expect(JSON.stringify(action)).not.toMatch(
+    /github-token|repository:|run-id:|GH_TOKEN|GITHUB_TOKEN|secrets\.|TURBO_TOKEN/,
+  )
+  expect(steps.find((step) => step.name === 'Remove workspace transfer files').if).toContain(
+    'always()',
+  )
+  const helper = await readFile(new URL('scripts/ci/build-reuse.mjs', root), 'utf8')
+  expect(helper).toContain("'--cache=local:rw'")
+  expect(helper).toContain("['run', 'build'")
+  const site = await readFile(new URL('scripts/product-sites/build.sh', root), 'utf8')
+  expect(site).toContain(
+    '--reuse-workspace-builds) bun scripts/ci/build-reuse.mjs verify-site "$json"',
+  )
+})
