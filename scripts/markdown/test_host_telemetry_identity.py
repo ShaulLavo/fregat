@@ -85,7 +85,10 @@ class IdentityTests(unittest.TestCase):
 
     def test_unsupported_containment_refuses_producer_launch(self):
         containment = SimpleNamespace(
-            supported=False, adopted=[], cleanup=Mock(return_value=False)
+            supported=False,
+            adopted=[],
+            cleanup_result=False,
+            cleanup=Mock(return_value=False),
         )
         collector = SimpleNamespace(record=Mock(), finish=Mock(), interrupted=False)
         args = SimpleNamespace(interval_seconds=1, timeout_seconds=1)
@@ -98,11 +101,71 @@ class IdentityTests(unittest.TestCase):
             ) as launch,
             self.assertRaisesRegex(RuntimeError, "supported launch containment"),
         ):
-            telemetry.launch_capture(args, collector, ["fake-producer"])
+            telemetry.launch_capture(args, collector, ["fake-producer"], containment)
         launch.assert_not_called()
         containment.cleanup.assert_called_once_with()
         collector.finish.assert_called_once_with()
         self.assertFalse(collector.cleaning)
+
+    def test_unsupported_capture_refuses_all_helpers_before_collector_setup(self):
+        for kind in ("browser", "native"):
+            self.check_unsupported_capture(kind)
+
+    def check_unsupported_capture(self, kind):
+        args = SimpleNamespace(
+            out=MagicMock(),
+            report=Mock(),
+            kind=kind,
+            command=["{hostEvidence}"],
+            adapter_config=Mock(),
+        )
+        args.report.resolve.return_value.exists.return_value = False
+        containment = SimpleNamespace(supported=False, cleanup=Mock(return_value=False))
+        with (
+            patch.object(telemetry, "adapter_config", return_value=["fake-adapter"]),
+            patch.object(telemetry.signal, "getsignal", return_value=signal.SIG_DFL),
+            patch.object(telemetry, "LaunchContainment", return_value=containment),
+            patch.object(telemetry, "Collector") as collector,
+            patch.object(telemetry.subprocess, "Popen") as launch,
+            patch.object(telemetry, "write_json") as write,
+        ):
+            self.assertEqual(telemetry.run_capture(args), 1)
+        collector.assert_not_called()
+        launch.assert_not_called()
+        containment.cleanup.assert_called_once_with()
+        receipt = write.call_args.args[1]
+        self.assertEqual(receipt["status"], "incomplete")
+        self.assertFalse(receipt["launched"])
+        self.assertFalse(receipt["cleanup"])
+
+    def test_lifetime_cleanup_never_reopens_a_restored_scope(self):
+        from host_telemetry_lifetime import LaunchContainment
+
+        containment = LaunchContainment.__new__(LaunchContainment)
+        containment.supported = True
+        containment.cleanup_result = None
+        containment.previous = object()
+        containment.drain = Mock()
+        containment.check_prctl = Mock()
+        self.assertTrue(containment.cleanup())
+        self.assertTrue(containment.cleanup())
+        containment.drain.assert_called_once_with()
+        containment.check_prctl.assert_called_once_with(36, containment.previous)
+
+    def test_failed_lifetime_cleanup_stays_unproven_after_restoration(self):
+        from host_telemetry_lifetime import LaunchContainment
+
+        containment = LaunchContainment.__new__(LaunchContainment)
+        containment.supported = True
+        containment.cleanup_result = None
+        containment.previous = object()
+        containment.drain = Mock(side_effect=TimeoutError("fixture cleanup deadline"))
+        containment.check_prctl = Mock()
+        with self.assertRaises(TimeoutError):
+            containment.cleanup()
+        self.assertFalse(containment.cleanup())
+        containment.drain.assert_called_once_with()
+        containment.check_prctl.assert_called_once_with(36, containment.previous)
 
     def test_reaped_launch_root_never_signals_reused_pid_or_group(self):
         child = subprocess.Popen.__new__(subprocess.Popen)
@@ -111,7 +174,9 @@ class IdentityTests(unittest.TestCase):
         child.returncode = 0
         child.pid = 42
         child._sigint_wait_secs = 0
-        containment = SimpleNamespace(adopted=[], cleanup=Mock(return_value=True))
+        containment = SimpleNamespace(
+            adopted=[], cleanup_result=True, cleanup=Mock(return_value=True)
+        )
         collector = SimpleNamespace(
             finish=Mock(), record=Mock(), capture_owned={(42, 100)}
         )
@@ -173,7 +238,10 @@ class IdentityTests(unittest.TestCase):
             timeout_seconds=1,
         )
         containment = SimpleNamespace(
-            supported=False, adopted=[], cleanup=Mock(return_value=False)
+            supported=False,
+            adopted=[],
+            cleanup_result=False,
+            cleanup=Mock(return_value=False),
         )
         with (
             patch.object(telemetry, "LaunchContainment", return_value=containment),
@@ -187,7 +255,8 @@ class IdentityTests(unittest.TestCase):
             patch.object(telemetry, "finalize") as finalize,
         ):
             self.assertEqual(
-                telemetry.execute_capture(args, collector, "fake-report"), 1
+                telemetry.execute_capture(args, collector, "fake-report", containment),
+                1,
             )
         launch.assert_not_called()
         finalize.assert_not_called()

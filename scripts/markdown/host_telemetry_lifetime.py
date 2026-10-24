@@ -18,6 +18,7 @@ class LaunchContainment:
         self.supported = sys.platform == "linux"
         self.previous = ctypes.c_int()
         self.adopted: list[tuple[int, int]] = []
+        self.cleanup_result: bool | None = None
         if not self.supported:
             return
         if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
@@ -59,13 +60,17 @@ class LaunchContainment:
             os.close(fd)
 
     def cleanup(self) -> bool:
+        if self.cleanup_result is not None:
+            return self.cleanup_result
+        self.cleanup_result = False
         if not self.supported:
             return False
         try:
             self.drain()
-            return True
         finally:
             self.check_prctl(36, self.previous)
+        self.cleanup_result = True
+        return True
 
     def drain(self) -> None:
         deadline = time.monotonic() + 2

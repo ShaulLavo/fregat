@@ -1,6 +1,6 @@
 # Collect telemetry for one native pair launch
 
-Use the [host telemetry collector](host-telemetry.md) inside the already admitted execution job. Select native mode explicitly. Both telemetry and capture output directories must initially be absent. The collector currently proves launch lifetime only on Linux. On macOS producer launch is refused and cleanup remains unproven until a supported lifetime mechanism is available. Linux controls cannot authorize Mac timing qualification.
+Use the [host telemetry collector](host-telemetry.md) inside the already admitted execution job. Select native mode explicitly. Both telemetry and capture output directories must initially be absent. The collector currently proves launch lifetime only on Linux. On macOS collector setup, policy adapters, native runtime probes, and producer launch are refused before any helper can start. Cleanup remains unproven until a supported lifetime mechanism is available. Linux controls cannot authorize Mac timing qualification.
 
 ```sh
 python3 scripts/markdown/host-telemetry.py --kind native \

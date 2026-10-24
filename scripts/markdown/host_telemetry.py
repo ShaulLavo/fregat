@@ -326,9 +326,13 @@ def run_capture(args) -> int:
         raise ValueError("Command must include the literal {hostEvidence} argument")
     command = adapter_config(args.adapter_config)
     out.mkdir(parents=True, exist_ok=False)
+    containment = None
     try:
         if signal.getsignal(signal.SIGCHLD) != signal.SIG_DFL:
             raise RuntimeError("Capture requires exclusive child reaping")
+        containment = LaunchContainment()
+        if not containment.supported:
+            raise RuntimeError("Capture requires supported launch containment")
         collector = Collector(out, command)
     except (
         OSError,
@@ -338,11 +342,14 @@ def run_capture(args) -> int:
         RuntimeError,
         subprocess.SubprocessError,
     ) as error:
+        if containment is not None:
+            containment.cleanup()
         write_json(
             out / "receipt.json",
             {
                 "status": "incomplete",
                 "launched": False,
+                "cleanup": False,
                 "errorType": type(error).__name__,
                 "message": str(error),
             },
@@ -352,7 +359,7 @@ def run_capture(args) -> int:
     try:
         for signum in (signal.SIGINT, signal.SIGTERM):
             previous_handlers[signum] = signal.signal(signum, collector.interrupt)
-        return execute_capture(args, collector, report)
+        return execute_capture(args, collector, report, containment)
     except CaptureInterrupted as error:
         collector.record(
             "interrupted", errorType=type(error).__name__, message=str(error)
@@ -369,10 +376,26 @@ def run_capture(args) -> int:
         )
         return 143
     finally:
-        close_capture(collector, previous_handlers)
+        close_capture(collector, previous_handlers, containment)
 
 
-def close_capture(collector: Collector, previous_handlers: dict) -> None:
+def close_capture(collector: Collector, previous_handlers: dict, containment) -> None:
+    collector.cleaning = True
+    try:
+        drain_capture(collector, containment)
+    finally:
+        close_collector(collector, previous_handlers)
+
+
+def drain_capture(collector: Collector, containment) -> None:
+    try:
+        collector.stop_monitor()
+    finally:
+        if containment.cleanup_result is None:
+            finish_containment(containment, collector)
+
+
+def close_collector(collector: Collector, previous_handlers: dict) -> None:
     try:
         collector.close()
     finally:
@@ -380,7 +403,7 @@ def close_capture(collector: Collector, previous_handlers: dict) -> None:
             signal.signal(signum, handler)
 
 
-def execute_capture(args, collector: Collector, report: Path) -> int:
+def execute_capture(args, collector: Collector, report: Path, containment) -> int:
     native = None
     try:
         if args.kind == "native":
@@ -430,7 +453,11 @@ def execute_capture(args, collector: Collector, report: Path) -> int:
         command = native.command
     try:
         status, reason, launched, exited, cleanup = launch_capture(
-            args, collector, command, native.environment if native is not None else None
+            args,
+            collector,
+            command,
+            containment,
+            native.environment if native is not None else None,
         )
     except (
         OSError,
@@ -485,8 +512,7 @@ def execute_capture(args, collector: Collector, report: Path) -> int:
     return 128 - status if status < 0 else (status or int(receipt["status"] != "bound"))
 
 
-def launch_capture(args, collector, command, environment=None) -> tuple:
-    containment = LaunchContainment()
+def launch_capture(args, collector, command, containment, environment=None) -> tuple:
     collector.record("containment", supported=containment.supported)
     launched = time.time()
     child = None
@@ -527,14 +553,22 @@ def finish_launch(child, containment, collector) -> tuple[bool, float]:
         try:
             collector.finish()
         finally:
-            lifetime_cleanup = containment.cleanup()
-        collector.record(
-            "containment-cleanup", proven=lifetime_cleanup, adopted=containment.adopted
-        )
+            lifetime_cleanup = finish_containment(containment, collector)
     if child is None:
         return lifetime_cleanup, exited
     cleanup = cleanup_group(child.pid, collector.capture_owned) and lifetime_cleanup
     return cleanup, exited
+
+
+def finish_containment(containment, collector) -> bool:
+    try:
+        return containment.cleanup()
+    finally:
+        collector.record(
+            "containment-cleanup",
+            proven=containment.cleanup_result,
+            adopted=containment.adopted,
+        )
 
 
 def wait_child(child, timeout: float) -> tuple[int, str]:
