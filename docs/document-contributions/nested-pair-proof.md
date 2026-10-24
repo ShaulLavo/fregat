@@ -40,7 +40,7 @@ page errors, or application warn/error logs; fixture/GPU console warnings remain
 Commands from this isolated checkout (with the heavy wrapper and local TMPDIR):
 
 ```sh
-cd editor/packages/editor
+cd packages/singapore/packages/editor
 bun --bun vitest run test/autoClose.test.ts src/editor/autoCloseStore.test.ts test/history.test.ts test/documentSession.test.ts
 cd ../../..
 WEB_PORT=5277 bun run agent:browser scenario editor-type-burst --workspace work/tmp/foundations-undo-proof/fixture --file use-events.ts

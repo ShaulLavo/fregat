@@ -1,0 +1,76 @@
+{
+  "name": "@singapore-editor/tree-sitter",
+  "version": "0.2.9",
+  "description": "Worker-based Tree-sitter parsing for Singapore syntax colors, folds, and brackets.",
+  "keywords": [
+    "browser",
+    "editor",
+    "parsing",
+    "singapore",
+    "tree-sitter",
+    "typescript"
+  ],
+  "homepage": "https://singapore.shaulavo.dev/docs/reference/api/tree-sitter/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShaulLavo/fregat.git",
+    "directory": "packages/singapore/packages/tree-sitter"
+  },
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "bun ../../scripts/build-package.ts",
+    "bench:syntax": "bun bench/treeSitter-syntax.ts",
+    "test": "vitest run --exclude '**/*.browser.test.ts' && bun run test:browser",
+    "test:browser": "vitest run --browser.enabled --browser.headless test/viewport-first.browser.test.ts test/viewport-replacement.browser.test.ts test/viewport-cancellation.browser.test.ts test/treeSitter-workerClient.browser.test.ts test/native-coverage.browser.test.ts test/markdown.browser.test.ts test/capture-address.browser.test.ts test/wasm-memory.browser.test.ts test/dist.browser.test.ts test/mergeUnits.browser.test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "test:runtime": "vitest run test/runtime-identity.test.ts",
+    "test:memory:browser": "vitest run --config vitest.memory.config.ts"
+  },
+  "dependencies": {
+    "@singapore-editor/core": "workspace:*",
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#20981e83c31b78a917ce5747ee9e5205d69a5cd4",
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#aab7db1518c19f61c1b13ec3f832b881cf5f1385"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@shikijs/langs": "4.4.3",
+    "@shikijs/themes": "4.4.3",
+    "@types/node": "^26.6.3",
+    "@vitest/browser-playwright": "5.0.2",
+    "happy-dom": "^20.14.5",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.2"
+  },
+  "peerDependencies": {
+    "@singapore-editor/core": "workspace:*"
+  },
+  "engines": {
+    "bun": ">=1.2.22",
+    "node": ">=26.0.0"
+  }
+}

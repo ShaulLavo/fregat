@@ -7,7 +7,8 @@ import { parseSync } from 'oxc-parser'
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const TIMING = 'packages/utils/src/timing.ts'
 const DEFAULT_ALLOW = 'scripts/lint/duplicate-functions-allow.json'
-const EXCLUDED = /(?:\/tests?\/|\.(?:test|spec|browser|test-d)\.|\/generated\/|\/protocol\/)/
+const EXCLUDED =
+  /(?:^packages\/(?:singapore|ghostty-webgpu|hotkeys)\/|\/tests?\/|\.(?:test|spec|browser|test-d)\.|\/generated\/|\/protocol\/)/
 
 function structure(key, value) {
   if (key === 'typeAnnotation' && ['TSAsExpression', 'TSTypeAssertion'].includes(this.type))

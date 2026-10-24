@@ -18,7 +18,7 @@ supports a fix. Simulator controls validate the probe and narrow hypotheses.
 
 ## Current code
 
-- `editor/packages/editor/src/virtualization/fixedRowVirtualizer.ts` attaches a passive native
+- `packages/singapore/packages/editor/src/virtualization/fixedRowVirtualizer.ts` attaches a passive native
   scroll listener. The listener schedules one animation frame. That frame reads scroll metrics,
   updates the visible range, delivers a snapshot when the virtual window changes, and calls
   the scroll-paint callback. Overscan defaults to 12 rows and a stable-window deadband already
@@ -67,7 +67,7 @@ A scroll-linked animation frame does not provide compositor position or make lat
 
 ## Scope and design
 
-The portable probe lives in `editor/bench/ios-scroll/`. Its data model is one run with settings,
+The portable probe lives in `packages/singapore/bench/ios-scroll/`. Its data model is one run with settings,
 source commit, browser and viewport metadata, scroll events, touch phase markers, frame samples,
 optional long tasks and a summary. It uses generated short lines and a real Singapore Editor.
 It collects no user document, account state or provider data. Manual recording stops after
@@ -115,15 +115,15 @@ Bun collector accepts completed JSON runs inside the private disposable app.
 From a fresh clone, run `bun install --frozen-lockfile` at the repository root, then:
 
 ```sh
-node --test editor/bench/ios-scroll/metrics.test.mjs
-node editor/bench/ios-scroll/build.mjs /path/to/output
+node --test packages/singapore/bench/ios-scroll/metrics.test.mjs
+node packages/singapore/bench/ios-scroll/build.mjs /path/to/output
 bun /path/to/output/server.mjs --port 4837
 ```
 
 Choose an unused loopback port. The portable browser control starts and stops its own collector:
 
 ```sh
-node editor/bench/ios-scroll/verify.mjs /path/to/output 4839
+node packages/singapore/bench/ios-scroll/verify.mjs /path/to/output 4839
 ```
 
 Use the editor site's installed Playwright Chromium. The three metric tests catch incorrect
@@ -395,7 +395,7 @@ existing scrolling plan rather than shipping the broad normal-flow experiment.
 
 ### Later normal-flow experiment execution and acceptance
 
-1. Extend the portable `editor/bench/ios-scroll` probe with the native-handle fixture and an
+1. Extend the portable `packages/singapore/bench/ios-scroll` probe with the native-handle fixture and an
    ordered text-window candidate. Keep the current renderer as an explicit baseline. Start
    with the simple `new Editor(element); setText(text)` path, then the inert clone control.
 2. Find the smallest text-plane ancestor/containment combination that passes both calibrated
@@ -440,7 +440,7 @@ Three taps select the same line range as desktop triple-click; four taps select 
 
 Plugin view hooks receive touch start/update/end/cancel events, current selections and anchor geometry. Generic input commands expose the existing paste-provider pipeline, Select all and history. The menu design stays unchanged; the owner withdrew visual variants. There are no selection handles in the current implementation. Optional plugin haptics request 8 ms Vibration API ticks on supported Android browsers. Safari has no Vibration API; a trusted menu label can activate the plugin's hidden native checkbox switch, but physical iPhone feedback from that control remains unverified. Hold-timer and drag-update callbacks cannot request trusted switch haptics. The reviewed WebKit source requires trusted activation; the owner's cited bug 309082 is access-restricted, so its contents and status were not verified. Physical iOS and Android tactile acceptance remains open.
 
-Every browser-specific guard and limitation in this implementation is indexed in [browser quirks](../editor/docs/display/browser-quirks.md), with browser scope, reproduction, source location, and removal criteria. The entries distinguish the observed focus collapse and release-scroll ordering from native-selection ownership and intended viewport, clipboard, and haptic constraints. The haptic entry links the inspected WebKit source and records the access limit on bug 309082. Native row-layout and optional selection handles remain Approved for later.
+Every browser-specific guard and limitation in this implementation is indexed in [browser quirks](../packages/singapore/docs/display/browser-quirks.md), with browser scope, reproduction, source location, and removal criteria. The entries distinguish the observed focus collapse and release-scroll ordering from native-selection ownership and intended viewport, clipboard, and haptic constraints. The haptic entry links the inspected WebKit source and records the access limit on bug 309082. Native row-layout and optional selection handles remain Approved for later.
 
 The recorded native acceptance remains the trusted iOS 26.5 simulator run, including 20 holds with zero native visible-row selections, `[6, 41]` cross-row release, replacement typing, and clipboard actions. Portable synthetic tests check ownership and input synchronization but do not prove UIKit recognition, physical haptics, or pinch behavior. Physical-device haptics and pinch checks remain open; they do not change the approved scope of the current touch-selection work.
 

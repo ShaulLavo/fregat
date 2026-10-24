@@ -41,11 +41,11 @@ an arbitrary server is not advertised as a fully qualified TypeScript engine.
 
 ## Current code
 
-- [Worker session](../editor/packages/typescript-lsp/src/worker/session.ts) handles 21 feature
+- [Worker session](../packages/singapore/packages/typescript-lsp/src/worker/session.ts) handles 21 feature
   requests, including completion/code-action resolution, prepare-rename, workspace symbols,
-  on-type formatting and pull diagnostics. [ProjectHost](../editor/packages/typescript-lsp/src/worker/projectHost.ts)
+  on-type formatting and pull diagnostics. [ProjectHost](../packages/singapore/packages/typescript-lsp/src/worker/projectHost.ts)
   maintains versions and unsaved overlays over supplied workspace files.
-- [Worker parity test](../editor/packages/typescript-lsp/test/parity.test.ts) constructs only
+- [Worker parity test](../packages/singapore/packages/typescript-lsp/test/parity.test.ts) constructs only
   `InProcessTypeScriptWorker`; its useful-answer rows are valuable, but it does not compare
   real server backends. Its completeness check covers top-level capability keys. Existing
   browser coverage concentrates on document symbols and synchronization.
@@ -56,18 +56,18 @@ an arbitrary server is not advertised as a fully qualified TypeScript engine.
 - [Real server tests](../apps/server/src/lsp/tests/typescript-server.test.ts) use real TS6/TS7
   processes with a recording socket. They cover project changes and selected hover,
   definition, completion and token results, rather than the full worker method matrix.
-- [LspClient](../editor/packages/lsp/src/client.ts) already has generic requests, request handles
-  and notifications. [ServerSet](../editor/packages/lsp-plugin/src/serverSet.ts) routes a
+- [LspClient](../packages/singapore/packages/lsp/src/client.ts) already has generic requests, request handles
+  and notifications. [ServerSet](../packages/singapore/packages/lsp-plugin/src/serverSet.ts) routes a
   narrower feature set. The proxy generally forwards client requests; transport reachability
   and editor feature coverage are separate facts.
-- [Code-action application](../editor/packages/lsp-plugin/src/codeActions.ts) explicitly
+- [Code-action application](../packages/singapore/packages/lsp-plugin/src/codeActions.ts) explicitly
   rejects commands before and after resolution; completion application omits item commands.
   The [proxy](../apps/server/src/lsp/proxy-session.ts) deliberately rejects unowned server
   requests, including `workspace/applyEdit`. Extend the transaction contract before enabling it.
-- [Workspace preload](../editor/packages/typescript-lsp/src/workspace.ts) broadcasts custom
+- [Workspace preload](../packages/singapore/packages/typescript-lsp/src/workspace.ts) broadcasts custom
   file notifications to connected clients. Standard external servers need their own provisioning
   contract. The worker currently selects one tsconfig; config glob and multi-project behavior
-  need fixtures before changing [project ownership](../editor/packages/typescript-lsp/src/worker/project.ts).
+  need fixtures before changing [project ownership](../packages/singapore/packages/typescript-lsp/src/worker/project.ts).
 
 The old E054 completion record remains historical evidence. This plan adds a stronger acceptance
 contract. Older Plan 088 references to the removed in-process server must be reconciled against
@@ -93,7 +93,7 @@ the registry; application reads/effects and edit settlement follow the existing 
 
 ## Design
 
-Proposed contract files live under `editor/packages/typescript-lsp/test/parity/`: `contract.ts`
+Proposed contract files live under `packages/singapore/packages/typescript-lsp/test/parity/`: `contract.ts`
 owns typed feature rows, capability paths, wire variants and validators; `cases/` owns source
 fixtures and scenarios; `worker.ts` owns in-process and module-worker adapters. Proposed
 `test/parity-contract.test.ts` validates row completeness and runs worker cases. Proposed
@@ -155,7 +155,7 @@ failing fixture for the current directory-reader membership concern before choos
 ## Steps
 
 Before editing, run `git diff --stat f03e65e7741646d6fe950b2b7405e4f5cd716aa1..HEAD --
-editor/packages/{lsp,lsp-plugin,typescript-lsp} apps/server/src/lsp apps/web/src/features/editor`.
+packages/singapore/packages/{lsp,lsp-plugin,typescript-lsp} apps/server/src/lsp apps/web/src/features/editor`.
 Refresh the cited code and fixtures wherever that diff shows drift.
 
 1. **Freeze the contract and inventory.** Create the proposed contract/test/manifest validator
@@ -187,7 +187,7 @@ Refresh the cited code and fixtures wherever that diff shows drift.
    acceptance, refactors/rename/file moves with undo, shared views and unsaved imports. Cover asset
    loading from an installed package, offline worker operation and the simple editor path. Gate:
    reviewed UI evidence, correct subsequent diagnostics, no leaks or stale paint/edit application.
-   Gate commands: `bun run --cwd editor/packages/typescript-lsp test:browser` and the proposed
+   Gate commands: `bun run --cwd packages/singapore/packages/typescript-lsp test:browser` and the proposed
    `bun run agent:browser scenario typescript-feature-parity` exit 0 for all target
    browsers/backends; the qualified manifest
    validates again. Put scenario/selectors in the existing `scripts/agent/` owners.
@@ -195,7 +195,7 @@ Refresh the cited code and fixtures wherever that diff shows drift.
    and lasting evidence; reconcile Plan 227/088 acceptance references and older E054 claims. Measure
    cold startup, post-edit p50/p95 and memory on representative projects as controls for the Rust
    successor. Gate: baseline/qualification manifests and cleanup receipts are committed under
-   `editor/docs/architecture/` with a green CI matrix; plan checks pass, required implementation
+   `packages/singapore/docs/architecture/` with a green CI matrix; plan checks pass, required implementation
    PRs are merged, and the current TypeScript qualification is complete before Rust feature work.
 
 ## Execution record
@@ -227,7 +227,7 @@ literal-action negotiation. Code-action resolution is unavailable. Preserve thes
 upstream/adapter evidence while completing the action owner; do not lower the useful-edit gate.
 
 Commands, source/artifact rules and browser results belong in
-[the baseline guide](../editor/docs/architecture/typescript-parity-baseline.md). These core
+[the baseline guide](../packages/singapore/docs/architecture/typescript-parity-baseline.md). These core
 checks do not complete feature, project or editor qualification. Rust integration still waits
 for the current TypeScript qualification gate.
 
@@ -238,18 +238,18 @@ These are execution commands, not checks performed during this planning pass:
 
 ```sh
 bun run build:workspaces
-bun run --cwd editor/packages/typescript-lsp test test/parity.test.ts test/methods.test.ts
+bun run --cwd packages/singapore/packages/typescript-lsp test test/parity.test.ts test/methods.test.ts
 # Add these tests during step 1; they are proposed paths, not existing checks.
-bun run --cwd editor/packages/typescript-lsp test test/parity-contract.test.ts
+bun run --cwd packages/singapore/packages/typescript-lsp test test/parity-contract.test.ts
 bun run --cwd apps/server test src/lsp/tests/typescript-feature-parity.test.ts
-bun run --cwd editor/packages/typescript-lsp test:browser
-bun run --cwd editor/packages/lsp test
-bun run --cwd editor/packages/lsp-plugin test
+bun run --cwd packages/singapore/packages/typescript-lsp test:browser
+bun run --cwd packages/singapore/packages/lsp test
+bun run --cwd packages/singapore/packages/lsp-plugin test
 bun run --cwd apps/server test src/lsp/tests/typescript-server.test.ts src/lsp/tests/typescript-runtime.test.ts
 bun run --cwd apps/server test src/lsp/tests/proxy-session.test.ts src/lsp/tests/routes.test.ts src/lsp/tests/watched-files.test.ts
 bun run --cwd apps/web test src/features/editor/tests/language-server-plugin.test.ts src/features/editor/tests/semantic-token-controller.test.tsx
-bun run --cwd editor/packages/typescript-lsp typecheck
-bun run --cwd editor/packages/lsp-plugin typecheck
+bun run --cwd packages/singapore/packages/typescript-lsp typecheck
+bun run --cwd packages/singapore/packages/lsp-plugin typecheck
 bun run --cwd apps/server typecheck
 bun run --cwd apps/web typecheck
 bun run plans:check

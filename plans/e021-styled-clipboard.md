@@ -1,6 +1,6 @@
 # E021: Complete styled copy for multiple selections and portable colors
 
-Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
+Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
 
 - Status: In progress
 - Kind: Implementation
@@ -30,16 +30,16 @@ quadratic. A 65,536-character/65,536-token probe takes 16.3 ms and returns plain
 
 ## Current code
 
-- [richText.ts](../editor/packages/editor/src/editor/richText.ts) already builds inline-styled HTML.
+- [richText.ts](../packages/singapore/packages/editor/src/editor/richText.ts) already builds inline-styled HTML.
   It escapes text, filters unsafe style values, copies typography, and declines source text above 65,536 characters.
-- [inputSelectionController.ts](../editor/packages/editor/src/editor/inputSelectionController.ts) writes HTML synchronously
+- [inputSelectionController.ts](../packages/singapore/packages/editor/src/editor/inputSelectionController.ts) writes HTML synchronously
   through the trusted copy event's `clipboardData` after writing plain text and editor paste metadata.
   It currently handles one selection or one caret's line. Multiple selections deliberately receive no HTML.
-- [clipboardMetadata.ts](../editor/packages/editor/src/editor/clipboardMetadata.ts) carries per-caret paste information.
+- [clipboardMetadata.ts](../packages/singapore/packages/editor/src/editor/clipboardMetadata.ts) carries per-caret paste information.
   Preserve its semantics when HTML is added. Styled export does not replace editor-to-editor plain-text behavior.
-- [richTextCopy.test.ts](../editor/packages/editor/test/richTextCopy.test.ts) covers escaping, overlap, styles, and size limits.
-  [clipboard.test.ts](../editor/packages/editor/test/clipboard.test.ts) covers actual controller event wiring in happy-dom.
-- [tokens.ts](../editor/packages/editor/src/tokens.ts) gives `EditorToken` resolved style values, not semantic token roles.
+- [richTextCopy.test.ts](../packages/singapore/packages/editor/test/richTextCopy.test.ts) covers escaping, overlap, styles, and size limits.
+  [clipboard.test.ts](../packages/singapore/packages/editor/test/clipboard.test.ts) covers actual controller event wiring in happy-dom.
+- [tokens.ts](../packages/singapore/packages/editor/src/tokens.ts) gives `EditorToken` resolved style values, not semantic token roles.
   Arbitrarily turning a dark token color into a light token color cannot recover its syntax meaning.
 - The wishlist's basic feature is shipped. Remaining work is selection coverage, portable theme handling, and browser proof.
 

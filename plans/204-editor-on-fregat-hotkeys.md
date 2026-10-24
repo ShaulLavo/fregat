@@ -8,7 +8,7 @@
   [206](206-platform-one-keymap.md) consumes both.
 - Decisions: [Keymap architecture](../docs/keymap/architecture.md). Research:
   `/work/reports/keymap-architecture/` (`02-codemirror-and-hosts.md`, `04-current-state.md` §1).
-- Work happens in Fregat's `editor/` after [207](207-one-repo-with-mirrors.md) moves it there.
+- Work happens in Fregat's `packages/singapore/` after [207](207-one-repo-with-mirrors.md) moves it there.
   Coordinate the consumer cutover with [206](206-platform-one-keymap.md): migrate every web
   and TUI caller before deleting the old options, runtime and exports in that same completed
   change. Prepare and test 204/205 in parallel; ship their integration with 206 without

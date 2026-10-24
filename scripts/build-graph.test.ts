@@ -130,7 +130,7 @@ test('classic docs build after the scene site finishes generating shared referen
 
 test('a library source change invalidates the ghostty site build cache', () => {
   const before = buildTask('ghostty-webgpu-site').hash
-  const probe = path.join(root, 'ghostty-webgpu/src/turbo-cache-probe.ts')
+  const probe = path.join(root, 'packages/ghostty-webgpu/src/turbo-cache-probe.ts')
   writeFileSync(probe, 'export const cacheProbe = true\n', { flag: 'wx' })
   try {
     expect(buildTask('ghostty-webgpu-site').hash).not.toBe(before)
@@ -140,7 +140,7 @@ test('a library source change invalidates the ghostty site build cache', () => {
 })
 
 test('a ghostty site environment file change invalidates its build cache', () => {
-  const probe = path.join(root, 'ghostty-webgpu/site/.env.turbo-cache-probe')
+  const probe = path.join(root, 'packages/ghostty-webgpu/site/.env.turbo-cache-probe')
   writeFileSync(probe, '# before\n', { flag: 'wx' })
   try {
     const before = buildTask('ghostty-webgpu-site').hash
@@ -157,7 +157,7 @@ test('React hotkeys builds after the core hotkeys package', () => {
 
 test('a shared hotkeys compiler configuration change invalidates its build cache', () => {
   const before = buildTask('@fregat/hotkeys').hash
-  const file = path.join(root, 'hotkeys/tsconfig.json')
+  const file = path.join(root, 'packages/hotkeys/tsconfig.json')
   const source = readFileSync(file, 'utf8')
   try {
     writeFileSync(file, `${source}\n`)
@@ -182,7 +182,7 @@ test('a local hotkeys source change invalidates each catalog consumer build', ()
       .filter((task) => consumers.has(task.taskId))
       .map((task) => [task.taskId, task.hash]),
   )
-  const probe = path.join(root, 'hotkeys/packages/hotkeys/src/turbo-cache-probe.ts')
+  const probe = path.join(root, 'packages/hotkeys/packages/hotkeys/src/turbo-cache-probe.ts')
   writeFileSync(probe, 'export const cacheProbe = true\n', { flag: 'wx' })
   try {
     for (const task of workspaceBuildTasks().filter((task) => consumers.has(task.taskId)))

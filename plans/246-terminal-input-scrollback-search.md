@@ -37,7 +37,7 @@ owns PTY transport. [Terminal panel](../apps/web/src/features/terminal/component
 retains the emulator through keep-alive. ghostty's
 `/work/projects/ghostty-webgpu/src/xterm/terminal.ts` exposes `scrollLines`, `scrollPages`,
 `scrollToTop`, `scrollToBottom`, selection, and bracketed paste. Search requires an emulator
-owner. After Plan 207, extend `ghostty-webgpu/src/`; Editor find APIs remain separate.
+owner. After Plan 207, extend `packages/ghostty-webgpu/src/`; Editor find APIs remain separate.
 
 ## Design
 
@@ -63,7 +63,7 @@ Follow [the keymap architecture](../docs/keymap/architecture.md). Command metada
 
 - [ ] Add failing fixture-PTY command tests for encoding, literal text, paste, and target isolation.
 - [ ] Complete/reuse Plan 205 input handlers and existing ghostty scroll/selection methods.
-- [ ] Add retained-cell search primitives in `ghostty-webgpu/` and the Fregat search widget.
+- [ ] Add retained-cell search primitives in `packages/ghostty-webgpu/` and the Fregat search widget.
 - [ ] Register commands, mode contexts, and exact translated preset rows.
 - [ ] Add `terminal-command-scrollback` scenario and selectors with fixture PTY output.
 

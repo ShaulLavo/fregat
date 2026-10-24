@@ -74,7 +74,7 @@ function publicationFixture() {
   git('config', 'user.name', 'fixture')
   git('config', 'user.email', 'fixture@example.com')
   git('remote', 'add', 'origin', path.join(root, 'origin.git'))
-  const manifest = 'editor/packages/tree-sitter/package.json'
+  const manifest = 'packages/singapore/packages/tree-sitter/package.json'
   mkdirSync(path.dirname(path.join(directory, manifest)), { recursive: true })
   const before = JSON.stringify({
     dependencies: {
@@ -83,7 +83,7 @@ function publicationFixture() {
     },
   })
   writeFileSync(path.join(directory, manifest), before)
-  const secondary = path.join(directory, 'editor/packages/other/package.json')
+  const secondary = path.join(directory, 'packages/singapore/packages/other/package.json')
   mkdirSync(path.dirname(secondary), { recursive: true })
   writeFileSync(secondary, before)
   git('add', '.')
@@ -309,7 +309,7 @@ test.each(['tree-sitter-x', 'tree-sitter-md'])(
   'a changed secondary manifest cannot carry a different %s pin',
   async (parser) => {
     const fixture = publicationFixture()
-    const secondary = path.join(fixture.directory, 'editor/packages/other/package.json')
+    const secondary = path.join(fixture.directory, 'packages/singapore/packages/other/package.json')
     const changed = fixture.before
       .replace(/tree-sitter-x#0{40}/g, `tree-sitter-x#${fixture.metadata.runtime}`)
       .replace(/tree-sitter-md#0{40}/g, `tree-sitter-md#${fixture.metadata.markdown}`)
@@ -338,7 +338,7 @@ test('all changed manifests accept the same exact metadata pin replacements', as
   const changed = fixture.before
     .replace(/tree-sitter-x#0{40}/g, `tree-sitter-x#${fixture.metadata.runtime}`)
     .replace(/tree-sitter-md#0{40}/g, `tree-sitter-md#${fixture.metadata.markdown}`)
-  for (const manifest of [fixture.manifest, 'editor/packages/other/package.json'])
+  for (const manifest of [fixture.manifest, 'packages/singapore/packages/other/package.json'])
     writeFileSync(path.join(fixture.directory, manifest), changed)
   const result = await publishPins({
     api: fixture.api,
@@ -378,9 +378,15 @@ test.skipIf(process.platform === 'win32')(
       'packages/tree-sitter-languages/scripts/generate.mjs',
       'packages/tree-sitter-languages/src/query-captures.ts',
     ]) {
-      writeFileSync(path.join(editor, file), readFileSync(path.join(source, 'editor', file)))
+      writeFileSync(
+        path.join(editor, file),
+        readFileSync(path.join(source, 'packages/singapore', file)),
+      )
     }
-    const dependencies = path.join(source, 'editor/packages/tree-sitter-languages/node_modules')
+    const dependencies = path.join(
+      source,
+      'packages/singapore/packages/tree-sitter-languages/node_modules',
+    )
     // This fixture uses the installed formatter and runtime, and performs no package downloads.
     symlinkSync(dependencies, path.join(languages, 'node_modules'), 'junction')
     symlinkSync(path.join(source, 'node_modules'), path.join(editor, 'node_modules'), 'junction')

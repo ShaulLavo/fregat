@@ -32,9 +32,9 @@ The facts that change the plan:
 - **npm serves ten-day-old code.** `@singapore-editor/core` and `ghostty-webgpu` are 0.1.2 on npm
   (2026-09-28); the repo has 0.2.6 and 0.3.20. 21 version PRs merged since, but the publish job only
   runs when the `NPM_TRUSTED_PUBLISHING` variable is `true`, and it was never set.
-  `@fregat/hotkeys` was never published. `ghostty-webgpu/package.json` points `repository.url` at the
+  `@fregat/hotkeys` was never published. `packages/ghostty-webgpu/package.json` points `repository.url` at the
   mirror, which trusted publishing rejects; the pinned npm 11.19.0 cannot move dist-tags (11.21.0+).
-- **There is no license** on the fregat root, `editor/`, or any `@singapore-editor/*` package, so
+- **There is no license** on the fregat root, `packages/singapore/`, or any `@singapore-editor/*` package, so
   neither can be called open source. ghostty-webgpu and hotkeys are MIT.
 - **Several claims we wanted are false or unproven today.** ghostty-webgpu is not faster in every
   scenario (WebGL loses on Unicode and scroll, DOM on interactive edits, p95 input latency is worse);
@@ -148,7 +148,7 @@ Sold through Singapore's pages and their own READMEs.
 
 ## Track 0: Prerequisites (starts now)
 
-1. Done 2026-10-08: MIT `LICENSE` at the root, in `editor/` and in every published package, with
+1. Done 2026-10-08: MIT `LICENSE` at the root, in `packages/singapore/` and in every published package, with
    `license` fields.
 2. Fix wrong live copy: the site's native phone app and "no releases yet", the README's "native mac",
    remaining "Platform" names in `apps/mac` and `apps/tui`.
@@ -167,7 +167,7 @@ On the owner's host, benchmarks use the private [heavy-runner tool](https://gith
 
 From the [performance report](../.internal/research/packages-as-products/performance-evidence.md):
 
-1. Copy the reviewed 2026-10-08 terminal wave results into `ghostty-webgpu/docs/benchmarks/`, then one
+1. Copy the reviewed 2026-10-08 terminal wave results into `packages/ghostty-webgpu/docs/benchmarks/`, then one
    Mac session across all six renderers with equal history. Rewrite `benchmarks.md` like for like,
    with fair memory figures, and turn on the site's "Measured" block.
 2. Singapore: add CodeMirror 6 to the text-buffer CI benchmark; then a browser comparison of
@@ -210,7 +210,7 @@ Follow the [landing-sites report](../.internal/research/packages-as-products/lan
    [Plan 155](155-site-demo-replica.md)'s animated replica, upgraded so the editor and terminal panes
    become the real libraries on click; a bring-your-own-agents section with the login commands; speed
    proven through the library benchmark pages; links to the Singapore and ghostty-webgpu sites.
-2. **Singapore** (new, `editor/site`): CodeMirror-style plain home page; a live "edit this" editor
+2. **Singapore** (new, `packages/singapore/site`): CodeMirror-style plain home page; a live "edit this" editor
    whose first frame is rendered at build time and which loads when scrolled into view; a
    "million-line file" button; then docs.
 3. **ghostty-webgpu**: keep the site; add the benchmark chart under the terminal, the docs section,
@@ -233,7 +233,7 @@ workflow remain in git history; they are outside the current execution path.
    [deployment runbook](../scripts/product-sites/README.md) owns authentication, generated-output
    cleanup, native status commands and rollback. CI builds the sites and verifies mobile layouts.
    Automatic deployment needs separate owner approval for a Cloudflare API token in GitHub.
-3. Build every site at `/`. Build `editor/examples/app` separately with `VITE_BASE_PATH=/demo/`
+3. Build every site at `/`. Build `packages/singapore/examples/app` separately with `VITE_BASE_PATH=/demo/`
    and copy it into Singapore's output. Record landing-page requests through network idle and
    verify that none loads `/demo/` or the example app's JS/CSS bundles. Exercise the demo
    separately at desktop and phone widths. After Singapore's replacement docs merge, rebuild and
@@ -250,7 +250,7 @@ checklist:
 1. Sections: Start here, Guides, Examples, Reference, Concepts. No empty sections; ★ pages first.
 2. Singapore: "Coming from Monaco" and "Coming from CodeMirror"; guides for themes, languages and
    tree-sitter, LSP, React and Solid, large files, decorations, plugins; concepts from
-   `editor/ARCHITECTURE.md` and `editor/docs/`; an embedded live-editor examples gallery.
+   `packages/singapore/ARCHITECTURE.md` and `packages/singapore/docs/`; an embedded live-editor examples gallery.
 3. ghostty-webgpu: "Coming from xterm.js" (API mapping table) and "Coming from ghostty-web"; guides for
    a PTY over WebSocket, renderers and fallbacks, fonts, themes, workers, hotkeys; concepts for damage
    tracking and the wasm core; the benchmarks and correctness pages. Engineering notes stay in the repo.
@@ -325,7 +325,7 @@ correctness controls pass.
 The original committed traces capture scrolling after open. They contain no open-clock markers
 or CPU-profile samples, so they cannot explain the original 1,517.7 ms median.
 
-Use `editor/bench/compare/run.mjs --profile-open --open-only` for the missing measurement. It runs
+Use `packages/singapore/bench/compare/run.mjs --profile-open --open-only` for the missing measurement. It runs
 the original constructor, fixture, geometry checks and 30-second highlighting deadline, and retains
 failed-open traces. Its opt-in worker probe records existing parser phase timings and request
 metadata. Initial source chunk sizes and synchronous `postMessage` times are measured without
@@ -408,9 +408,9 @@ unvisited while in-range diagnostics remain identical. This narrow correction do
 full-document bootstrap or the 200 MiB cancellation.
 
 Evidence is retained in
-[the raw matrix](../editor/docs/performance/singapore-open-2026-10-08/baseline/experiment.json.gz),
-[the 10 MiB open trace](../editor/docs/performance/singapore-open-2026-10-08/baseline/singapore-10-0-open.trace.json.gz)
-and [the failed 200 MiB open trace](../editor/docs/performance/singapore-open-2026-10-08/baseline/singapore-200-0-open.trace.json.gz).
+[the raw matrix](../packages/singapore/docs/performance/singapore-open-2026-10-08/baseline/experiment.json.gz),
+[the 10 MiB open trace](../packages/singapore/docs/performance/singapore-open-2026-10-08/baseline/singapore-10-0-open.trace.json.gz)
+and [the failed 200 MiB open trace](../packages/singapore/docs/performance/singapore-open-2026-10-08/baseline/singapore-200-0-open.trace.json.gz).
 The three settled 10 MiB editor screenshots were read back. All display highlighted initial rows.
 
 ### Bounded correction and repeated experiment
@@ -452,15 +452,15 @@ The larger dependency remains. All three after Singapore 200 MiB attempts still 
 parse result; no visible query follows. All competitor attempts complete. Keep the viewport-first
 bootstrap below as Approved work, with cancellation accounting and correctness controls.
 
-[The after matrix](../editor/docs/performance/singapore-open-2026-10-08/after/experiment.json.gz),
-[the diagnostic comparison](../editor/docs/performance/singapore-open-2026-10-08/after/comparison.json)
-and [the after 10 MiB trace](../editor/docs/performance/singapore-open-2026-10-08/after/singapore-10-0-open.trace.json.gz)
+[The after matrix](../packages/singapore/docs/performance/singapore-open-2026-10-08/after/experiment.json.gz),
+[the diagnostic comparison](../packages/singapore/docs/performance/singapore-open-2026-10-08/after/comparison.json)
+and [the after 10 MiB trace](../packages/singapore/docs/performance/singapore-open-2026-10-08/after/singapore-10-0-open.trace.json.gz)
 retain the proof. Reproduce the phase comparison with:
 
 ```sh
-node editor/bench/compare/summarize-open.mjs \
-  editor/docs/performance/singapore-open-2026-10-08/after/experiment.json.gz \
-  --compare editor/docs/performance/singapore-open-2026-10-08/baseline/experiment.json.gz
+node packages/singapore/bench/compare/summarize-open.mjs \
+  packages/singapore/docs/performance/singapore-open-2026-10-08/after/experiment.json.gz \
+  --compare packages/singapore/docs/performance/singapore-open-2026-10-08/baseline/experiment.json.gz
 ```
 
 ### Approved viewport-first follow-up
@@ -619,15 +619,15 @@ annotations; they do not prove large-file syntax coloring in Fregat. Its analysi
 policies were left unchanged. Screenshot capture records GPU warnings and a
 1 MiB LSP socket-close warning, with no structured warning/error log entries.
 
-Evidence: `editor/docs/performance/singapore-viewport-first-2026-10-08/` retains compressed
+Evidence: `packages/singapore/docs/performance/singapore-viewport-first-2026-10-08/` retains compressed
 before/after experiments, raw diagnostic traces, comparison JSON, geometry controls and reviewed
 screenshots. Reproduction from a built checkout with comparison dependencies installed:
 
 ```sh
-node editor/bench/compare/build.mjs
-node editor/bench/compare/run.mjs --profile-open --open-only --sizes 1,10,200 --repetitions 3 --condition noisy --timeout 180000 --output <diagnostic-directory>
-node editor/bench/compare/summarize-open.mjs <after>/experiment.json --compare <before>/experiment.json
-node editor/bench/compare/run.mjs --sizes 1,10,200 --repetitions 3 --condition noisy --timeout 180000 --output <original-directory>
+node packages/singapore/bench/compare/build.mjs
+node packages/singapore/bench/compare/run.mjs --profile-open --open-only --sizes 1,10,200 --repetitions 3 --condition noisy --timeout 180000 --output <diagnostic-directory>
+node packages/singapore/bench/compare/summarize-open.mjs <after>/experiment.json --compare <before>/experiment.json
+node packages/singapore/bench/compare/run.mjs --sizes 1,10,200 --repetitions 3 --condition noisy --timeout 180000 --output <original-directory>
 ```
 
 Retained trial directories contain `experiment.json.gz`; the summarizer also reads gzip directly.
@@ -647,7 +647,7 @@ separate from the five CI-runner assertions: DejaVu Serif reproduces the Firefox
 exact word-wrap values, and DejaVu Sans Mono reproduces the four WebKit runner failures.
 
 - Firefox and WebKit fail the unchanged proportional-row hit-test assertion in
-  `editor/packages/editor/test/proportionalRows.browser.test.ts`: the character under a native
+  `packages/singapore/packages/editor/test/proportionalRows.browser.test.ts`: the character under a native
   viewport point falls outside the expected adjacent-character set.
 - For 20,000 `i` characters, the face-change extent checks miss the native width by
   `2010.234375` pixels in Firefox and `2100.5` pixels in WebKit. Their existing 1% bounds are
@@ -656,7 +656,7 @@ exact word-wrap values, and DejaVu Sans Mono reproduces the four WebKit runner f
   and `306.5`, against the existing minimum-fill bounds `307.4499969482422` and `307.4375`.
 
 Reproduce with the retained explicit-font harness before changing production code. Copy its
-setup/config inputs into `editor/packages/editor/` and its `reviewCi*` fixtures into `test/`,
+setup/config inputs into `packages/singapore/packages/editor/` and its `reviewCi*` fixtures into `test/`,
 then run `bun --bun vitest run --config .ci-free-fixed.config.ts` from that package. The
 owner-host archive is `/work/reports/virtualizer-cross-engine-2026-10-09/ci-fonts/`;
 `harness/` contains the inputs, `virtualizer-ci-free-all-fixed.log` records the eight failing
@@ -716,7 +716,7 @@ proportional rows: the horizontal window starts at zero and keeps the complete r
 Monospace and inline replacements keep their strict text windows, including nonzero starts when
 scrolled. Every caret, paint and extent oracle remains unchanged. Rows at or above the ceiling
 remain editable with bounded approximate geometry and the structured state documented in
-[known limits](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/limitations.md#proportional-row-measurement).
+[known limits](https://github.com/ShaulLavo/fregat/blob/main/packages/singapore/docs/limitations.md#proportional-row-measurement).
 Existing oversized-BiDi refusal remains unchanged. Native lookup uses collapsed Ranges in the
 connected text node, caches unchanged mounted rows, and measures only the changed row on typing.
 Canvas shaping remains the document projection owner.
@@ -767,7 +767,7 @@ it does not remove the measured browser layout/paint cost above.
 Evidence is retained in `/work/reports/freesans-geometry/native-cost/`: `results.json`,
 `chromium-trace.json`, `chromium-layout-paint.json`, pre-scan-fix evidence, the CPU profile,
 `run.mjs`, `profile.mjs` and `harness/`. Restore the retained `.native-before/` and
-`.native-cost.*` inputs into `editor/packages/editor/`, start Vite on an explicit free port,
+`.native-cost.*` inputs into `packages/singapore/packages/editor/`, start Vite on an explicit free port,
 and set the retained `run.mjs` target to that port to reproduce this experiment. Do not edit
 source while the paired run is active: Vite reload invalidates the comparison. The experiment
 uses no model providers. Retired mounted rows release native caches; unchanged rows survive

@@ -5,7 +5,7 @@
 - Status: APPROVED 2026-10-02 by the owner: "we started building features that shouldn't be in the
   base … all we need to do now is to write a plan for an extension model, similar to xterm, and a
   line editor is gonna be one of the first ones."
-- Owns: `ghostty-webgpu/` (core and new extension packages), its site, and Platform's terminal
+- Owns: `packages/ghostty-webgpu/` (core and new extension packages), its site, and Platform's terminal
   feature (`apps/web/src/features/terminal/`), the package's only consumer.
 - Versions: patch bumps only, including public API changes, under the owner's 2026-10-03
   package-version decision. Update all consumers in the same delivery unit.
@@ -71,12 +71,12 @@ The owner asked for a model better and simpler than xterm's. Surveyed: CodeMirro
 Lexical, VS Code, Vite/Rollup, kitty kittens, WezTerm, xterm.js, and our own Singapore Editor.
 
 - **Singapore's model is the one to avoid.** It runs two lifecycle systems side by side
-  (`install/activate/update/deactivate/dispose` in `editor/packages/editor/src/plugins.ts` and
+  (`install/activate/update/deactivate/dispose` in `packages/singapore/packages/editor/src/plugins.ts` and
   scoped setup in `createPlugin.ts`), asks authors to learn about ten concepts (dependencies,
   providers, registrations, scopes, state, channels, derived values, watchers, phases, render
   ownership), dedupes by object identity while documenting names, keys typed channels by strings
   with no runtime check, and real plugins keep state per factory so one plugin cannot safely serve
-  two editors (`editor/packages/diff/src/editorDiffPlugin.ts`). Its one good idea is scoped
+  two editors (`packages/singapore/packages/diff/src/editorDiffPlugin.ts`). Its one good idea is scoped
   cleanup.
 - **xterm.js** is small but weak on ownership: mutable addon instances, a manager that overwrites
   the addon's `dispose`, no rollback when `activate` throws, no guard against reusing an instance.
@@ -142,7 +142,7 @@ pointer selection, the scrollbar and the fallback chain, and explicitly on links
 appearance updates.
 
 House style to match: the Editor's plugins attach through a small typed context and return
-disposables (`editor/packages/editor/src/plugins.ts`, `createPlugin.ts`); capabilities are either
+disposables (`packages/singapore/packages/editor/src/plugins.ts`, `createPlugin.ts`); capabilities are either
 single-owner or multi-provider (`editor/src/editor/Editor.ts`). The terminal takes that shape
 without the Editor's composition machinery.
 
@@ -162,7 +162,7 @@ records use the current input closure. Public X6 remains failed/held, and full P
       `81b09d4b0dff5f5f39a54df0320a9bdf770572df`. No upstream patch or fork is used.
       The smallest proven candidate builds with Zig 0.16.0 without production ABI adaptation.
 - [x] Regenerate the checked-in WASM with `bun run build:wasm`. Its generated
-      `ghostty-webgpu/ghostty-vt.provenance.json` records the official source tree, Git archive and
+      `packages/ghostty-webgpu/ghostty-vt.provenance.json` records the official source tree, Git archive and
       codeload archive digests, compiler executable, build-input hashes and artifact hashes.
       Rebuilding preserves the bridge byte-for-byte and keeps the frame ABI unchanged.
 - [x] Observe native unknown OSC callbacks through real writes. Portable tests install a
@@ -379,7 +379,7 @@ native default is disabled.
 
 ### Phase 0 implementation checklist
 
-- [x] Internal lifecycle/index scaffold in `ghostty-webgpu/src/extensions/`: typed contributions,
+- [x] Internal lifecycle/index scaffold in `packages/ghostty-webgpu/src/extensions/`: typed contributions,
       identity-based attachment, nested presets, transactional rollback, lazy scoped resources,
       interested-only indexes, reentrant dispatch and reverse disposal. Node tests exercise the
       manager with the real main terminal; type assertions also accept the async shared contract.

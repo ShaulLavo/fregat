@@ -34,7 +34,7 @@ Navigate completion boundaries, replace a suffix, compose a completion and reque
 ## Existing Fregat and Editor work
 
 Editor source below was verified in `/work/projects/Editor/packages/` before Plan 207.
-Implement it in Fregat `editor/packages/` after that cutover; the external checkout is
+Implement it in Fregat `packages/singapore/packages/` after that cutover; the external checkout is
 read-only for this wave.
 
 [packages/lsp-plugin/src/keyCommands.ts](/work/projects/Editor/packages/lsp-plugin/src/keyCommands.ts) already maps trigger, next/previous,
@@ -56,7 +56,7 @@ payloads, source order, and unbinds from the translation; activate modal rows wh
 their mode owner exists. A declined command falls through to its ancestor.
 
 Extend the Editor command declarations and LSP widget handlers in
-`editor/packages/lsp-plugin/`. Publish completion/code-action visibility from the
+`packages/singapore/packages/lsp-plugin/`. Publish completion/code-action visibility from the
 controllers and use that context for list commands. Preserve typed completion
 intent and optional item index through the router. Keep snippet parsing, additional
 text edits, server commands, and undo grouping in the existing commit pipeline.

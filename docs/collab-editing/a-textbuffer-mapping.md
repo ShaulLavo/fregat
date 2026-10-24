@@ -38,23 +38,23 @@ A piece references an insertion buffer and a **chunk-relative UTF-16 offset**. M
 
 Sources:
 
-- `editor/packages/textbuffer/src/pieceTableTypes.ts:6–12`
-- `editor/packages/textbuffer/src/buffers.ts:792–848`
-- `editor/packages/textbuffer/src/buffers.ts:851–863`
+- `packages/singapore/packages/textbuffer/src/pieceTableTypes.ts:6–12`
+- `packages/singapore/packages/textbuffer/src/buffers.ts:792–848`
+- `packages/singapore/packages/textbuffer/src/buffers.ts:851–863`
 
 Within an unreordered insertion span, this pair is usable as the identity of a code unit, provided membership and snapshot extent are checked. It is not necessarily a Unicode character, nor is an anchor necessarily a character ID: left-biased anchors refer to the preceding unit.
 
 Sources:
 
-- `editor/packages/textbuffer/src/reverseIndex.ts:522–536`
-- `editor/packages/textbuffer/src/anchors.ts:30–42`
+- `packages/singapore/packages/textbuffer/src/reverseIndex.ts:522–536`
+- `packages/singapore/packages/textbuffer/src/anchors.ts:30–42`
 
 **G1 remains real and has an additional branch-replay implication.** Buffer numbering starts at one and is derived from snapshot-local `nextBufferSequence`. Two replicas—and two divergent edits of the same retained snapshot—can allocate the same pair for different text.
 
 Sources:
 
-- `editor/packages/textbuffer/src/buffers.ts:815–845`
-- `editor/packages/textbuffer/src/buffers.ts:893–905`
+- `packages/singapore/packages/textbuffer/src/buffers.ts:815–845`
+- `packages/singapore/packages/textbuffer/src/buffers.ts:893–905`
 
 Simply adding a replica name to today’s buffer sequence is insufficient if speculative replay reallocates sequence numbers or changes coalescing. Global IDs must be allocated once when authoring an operation, outside rollback state, and survive every replay.
 
@@ -67,9 +67,9 @@ Before compaction, tombstone pieces retain their buffer ranges. Those ranges cou
 
 Sources:
 
-- `editor/packages/textbuffer/src/anchors.ts:67–86`
-- `editor/packages/textbuffer/src/anchors.ts:228–238`
-- `editor/packages/textbuffer/src/tree.ts:250–255`
+- `packages/singapore/packages/textbuffer/src/anchors.ts:67–86`
+- `packages/singapore/packages/textbuffer/src/anchors.ts:228–238`
+- `packages/singapore/packages/textbuffer/src/tree.ts:250–255`
 
 Therefore, `resolveAnchor(X)` followed by `insertIntoPieceTable(offset, text)` cannot implement Weidner’s exact “insert after deleted X” semantics. Distinct deleted characters can resolve to the same visible offset while defining different known-order insertion boundaries.
 
@@ -77,23 +77,23 @@ Therefore, `resolveAnchor(X)` followed by `insertIntoPieceTable(offset, text)` c
 
 Sources:
 
-- `editor/packages/textbuffer/src/compaction.ts:8–11`
-- `editor/packages/textbuffer/src/compaction.ts:171–189`
-- `editor/packages/textbuffer/src/compaction.ts:303–340`
-- `editor/packages/textbuffer/src/standIns.ts:94–118`
+- `packages/singapore/packages/textbuffer/src/compaction.ts:8–11`
+- `packages/singapore/packages/textbuffer/src/compaction.ts:171–189`
+- `packages/singapore/packages/textbuffer/src/compaction.ts:303–340`
+- `packages/singapore/packages/textbuffer/src/standIns.ts:94–118`
 
 Original-buffer tombstones retain actual ranges, but inserted tombstones do not universally retain enough information for arbitrary future insert-after/before operations.
 
 Source:
 
-- `editor/packages/textbuffer/src/compaction.ts:158–167`
+- `packages/singapore/packages/textbuffer/src/compaction.ts:158–167`
 
 Reclamation is a different concern: it retains visible text ranges across supplied snapshots and can free deleted text. It does not itself erase piece ordering, but exact collaborative ordering must not require reading reclaimed character contents.
 
 Sources:
 
-- `editor/packages/textbuffer/src/reclamation.ts:30–58`
-- `editor/packages/textbuffer/src/buffers.ts:132–146`
+- `packages/singapore/packages/textbuffer/src/reclamation.ts:30–58`
+- `packages/singapore/packages/textbuffer/src/buffers.ts:132–146`
 
 **Recommendation:** collaborative lineages initially keep exact tombstone ranges and disable lossy stand-in compaction. Keep physical text reclamation, retaining all confirmed/speculative snapshots that may still need their visible text. Later compact identity metadata only under a proven protocol rule; acknowledgement alone does not prove that future operations cannot reference old deleted IDs.
 
@@ -103,9 +103,9 @@ Sources:
 
 Sources:
 
-- `editor/packages/textbuffer/src/orders.ts:18–47`
-- `editor/packages/textbuffer/src/snapshot.ts:72–94`
-- `editor/packages/textbuffer/src/tree.ts:855–869`
+- `packages/singapore/packages/textbuffer/src/orders.ts:18–47`
+- `packages/singapore/packages/textbuffer/src/snapshot.ts:72–94`
+- `packages/singapore/packages/textbuffer/src/tree.ts:855–869`
 
 With an authoritative sequence and ID-space operations, these labels need not be shared across replicas. Relabeling can remain a local implementation detail. Replicas may even have different piece fragmentation and labels while agreeing on global character order.
 
@@ -117,9 +117,9 @@ Current coalescing extends the newest inserted piece when its text ends at the c
 
 Sources:
 
-- `editor/packages/textbuffer/src/tree.ts:34–51`
-- `editor/packages/textbuffer/src/tree.ts:108–114`
-- `editor/packages/textbuffer/src/edits.ts:202–212`
+- `packages/singapore/packages/textbuffer/src/tree.ts:34–51`
+- `packages/singapore/packages/textbuffer/src/tree.ts:108–114`
+- `packages/singapore/packages/textbuffer/src/edits.ts:202–212`
 
 Retain that fast path only when the new global IDs are the next counters of the same identity run and placement/provenance metadata remains representable. Consecutive physical storage alone cannot justify merging distinct global runs.
 
@@ -127,8 +127,8 @@ Current replace already hides the selected range and places replacement text in 
 
 Sources:
 
-- `editor/packages/textbuffer/src/edits.ts:215–249`
-- `editor/packages/textbuffer/src/edits.ts:159–182`
+- `packages/singapore/packages/textbuffer/src/edits.ts:215–249`
+- `packages/singapore/packages/textbuffer/src/edits.ts:159–182`
 
 Wire-level replace should nevertheless decompose into explicit delete-ID spans plus an insertion, carried in **one atomic operation envelope**. A remote concurrent insertion inside the original selected range must survive unless its ID was explicitly selected for deletion.
 
@@ -207,23 +207,23 @@ Retain confirmed and exposed speculative snapshots explicitly when using transie
 
 Sources:
 
-- `editor/packages/textbuffer/src/snapshot.ts:56–69`
-- `editor/packages/textbuffer/src/snapshot.ts:97–115`
-- `editor/packages/textbuffer/src/compaction.ts:430–462`
+- `packages/singapore/packages/textbuffer/src/snapshot.ts:56–69`
+- `packages/singapore/packages/textbuffer/src/snapshot.ts:97–115`
+- `packages/singapore/packages/textbuffer/src/compaction.ts:430–462`
 
 ## Required textbuffer changes
 
-1. **Global identity runs separate from storage buffers.** Add snapshot-consistent run mappings between global counters and local buffer/chunk spans. Keep numeric storage IDs on existing hot paths. Provide the reverse mapping for authoring selections and origins. Relevant contracts are in `editor/packages/textbuffer/src/pieceTableTypes.ts:39–50,63–88,150–175`.
+1. **Global identity runs separate from storage buffers.** Add snapshot-consistent run mappings between global counters and local buffer/chunk spans. Keep numeric storage IDs on existing hot paths. Provide the reverse mapping for authoring selections and origins. Relevant contracts are in `packages/singapore/packages/textbuffer/src/pieceTableTypes.ts:39–50,63–88,150–175`.
 
-2. **Exact structural insertion.** Add insertion beside a located piece/code-unit boundary, including hidden pieces; split hidden ranges where necessary. Reuse AVL joins and local order labels. Do not round-trip through visible offsets. Existing landing behavior is at `editor/packages/textbuffer/src/tree.ts:235–288`.
+2. **Exact structural insertion.** Add insertion beside a located piece/code-unit boundary, including hidden pieces; split hidden ranges where necessary. Reuse AVL joins and local order labels. Do not round-trip through visible offsets. Existing landing behavior is at `packages/singapore/packages/textbuffer/src/tree.ts:235–288`.
 
-3. **ID-span deletion.** Enumerate every matching fragment, hide only visible targeted IDs, and publish one transaction. A counter span may have concurrent text between its fragments; its two visible endpoints cannot define a safe ordinary range delete. Existing hide/split machinery is at `editor/packages/textbuffer/src/tree.ts:354–435`.
+3. **ID-span deletion.** Enumerate every matching fragment, hide only visible targeted IDs, and publish one transaction. A counter span may have concurrent text between its fragments; its two visible endpoints cannot define a safe ordinary range delete. Existing hide/split machinery is at `packages/singapore/packages/textbuffer/src/tree.ts:354–435`.
 
 4. **Reuse the reverse index.** It already maps local buffer plus unit to piece order, followed by an order-tree lookup accumulating visible length. It can serve the local half of global-ID lookup while exact tombstones remain. Entries contain no lengths, so callers must check membership. Sources:
-   - `editor/packages/textbuffer/src/reverseIndex.ts:149–170,527–541`
-   - `editor/packages/textbuffer/src/tree.ts:719–764`
+   - `packages/singapore/packages/textbuffer/src/reverseIndex.ts:149–170,527–541`
+   - `packages/singapore/packages/textbuffer/src/tree.ts:719–764`
 
-5. **Collaboration-aware maintenance and coalescing.** Preserve exact deleted identity order; coalesce only compatible global runs. Relevant implementations are `editor/packages/textbuffer/src/compaction.ts:303–340` and `editor/packages/textbuffer/src/tree.ts:34–51`.
+5. **Collaboration-aware maintenance and coalescing.** Preserve exact deleted identity order; coalesce only compatible global runs. Relevant implementations are `packages/singapore/packages/textbuffer/src/compaction.ts:303–340` and `packages/singapore/packages/textbuffer/src/tree.ts:34–51`.
 
 ## Risks and hot-path estimate
 

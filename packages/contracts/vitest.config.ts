@@ -6,7 +6,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@fregat/hotkeys': fileURLToPath(
-        new URL('../../hotkeys/packages/hotkeys/src/index.ts', import.meta.url),
+        new URL('../hotkeys/packages/hotkeys/src/index.ts', import.meta.url),
       ),
     },
   },

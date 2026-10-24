@@ -8,13 +8,13 @@ import {
   unrunParityResults,
   type ParityCaseResult,
   type ParityDiagnostic,
-} from '../../../../../editor/packages/typescript-lsp/test/parity/contract'
-import { CORE_CASES } from '../../../../../editor/packages/typescript-lsp/test/parity/cases/core'
+} from '../../../../../packages/singapore/packages/typescript-lsp/test/parity/contract'
+import { CORE_CASES } from '../../../../../packages/singapore/packages/typescript-lsp/test/parity/cases/core'
 import {
   CORE_PROJECT,
   positionOf,
-} from '../../../../../editor/packages/typescript-lsp/test/parity/cases/project'
-import { paritySourceIdentity } from '../../../../../editor/packages/typescript-lsp/test/parity/source'
+} from '../../../../../packages/singapore/packages/typescript-lsp/test/parity/cases/project'
+import { paritySourceIdentity } from '../../../../../packages/singapore/packages/typescript-lsp/test/parity/source'
 import {
   createTypeScriptParityFixture,
   TYPESCRIPT_PARITY_RUNTIMES,

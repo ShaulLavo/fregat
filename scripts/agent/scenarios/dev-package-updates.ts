@@ -61,14 +61,14 @@ export const devPackageUpdates: Scenario = {
     strictEqual(startupReloads, 0, 'Cold dependency loading must avoid optimizer page reloads')
     await step('mounted-editor-and-terminal')
     for (const relative of [
-      'editor/packages/react/src/index.tsx',
-      'editor/packages/editor/src/editor.ts',
-      'ghostty-webgpu/src/core/runtime.ts',
-      'ghostty-webgpu/src/dom/terminal.ts',
+      'packages/singapore/packages/react/src/index.tsx',
+      'packages/singapore/packages/editor/src/editor.ts',
+      'packages/ghostty-webgpu/src/core/runtime.ts',
+      'packages/ghostty-webgpu/src/dom/terminal.ts',
     ]) {
       const before = await page.evaluate(() => performance.timeOrigin)
       const oldSurface = await (
-        relative.startsWith('ghostty-webgpu/')
+        relative.startsWith('packages/ghostty-webgpu/')
           ? selectors.terminalSurface(page).first().locator('canvas').first()
           : selectors.editorSurface(page).first()
       ).elementHandle()
@@ -92,7 +92,11 @@ export const devPackageUpdates: Scenario = {
     }
     const before = await page.evaluate(() => performance.timeOrigin)
     const now = new Date()
-    await utimes(path.join(checkoutRoot, 'editor/packages/react/dist/index.js'), now, now)
+    await utimes(
+      path.join(checkoutRoot, 'packages/singapore/packages/react/dist/index.js'),
+      now,
+      now,
+    )
     await page.waitForTimeout(1500)
     strictEqual(
       await page.evaluate(() => performance.timeOrigin),

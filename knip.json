@@ -1,12 +1,12 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
-    "editor/bench/compare": {
+    "packages/singapore/bench/compare": {
       "entry": ["page.js", "singapore.js", "monaco.js", "codemirror.js"],
       "ignoreBinaries": ["cc"],
       "ignoreDependencies": ["ACTOR", "FIXTURE"]
     },
-    "hotkeys/packages/hotkeys": {
+    "packages/hotkeys/packages/hotkeys": {
       "entry": ["bench/lookup.ts"]
     },
     "apps/desktop": {
@@ -126,7 +126,7 @@
       "ignoreBinaries": ["ssh-keygen", "systemd-run", "taskset"]
     },
     ".": {
-      "entry": ["hotkeys/scripts/check-samples.mjs"],
+      "entry": ["packages/hotkeys/scripts/check-samples.mjs"],
       "ignoreDependencies": ["typescript-api"],
       "vitest": {
         "config": ["vitest.scripts.config.mjs", "vitest.t3code.config.mjs"]
@@ -148,15 +148,15 @@
     "packages/pty": {
       "entry": ["test/nvim-smoke.ts", "test/fixtures/child.ts"]
     },
-    "editor/packages/file-animation": {
+    "packages/singapore/packages/file-animation": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
-    "editor/packages/diff": {
+    "packages/singapore/packages/diff": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
-    "editor/packages/editor": {
+    "packages/singapore/packages/editor": {
       "entry": [
         "src/debug.ts",
         "src/document/workerReader.ts",
@@ -182,25 +182,25 @@
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
       "ignoreDependencies": ["@playwright/test"]
     },
-    "editor/packages/find": {
+    "packages/singapore/packages/find": {
       "entry": ["src/index.ts", "bench/**/*.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
       "ignoreDependencies": ["@playwright/test"]
     },
-    "editor/packages/gutters": {
+    "packages/singapore/packages/gutters": {
       "entry": ["src/foldGutter.ts", "src/index.ts", "src/lineGutter.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
-    "editor/packages/highlighting": {
+    "packages/singapore/packages/highlighting": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
       "ignoreDependencies": ["@playwright/test"]
     },
-    "editor/packages/lsp": {
+    "packages/singapore/packages/lsp": {
       "entry": ["src/index.ts", "src/positions.ts", "src/types.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
-    "editor/packages/lsp-plugin": {
+    "packages/singapore/packages/lsp-plugin": {
       "entry": [
         "src/completion.ts",
         "src/completionController.ts",
@@ -220,23 +220,23 @@
       ],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
-    "editor/packages/markdown": {
+    "packages/singapore/packages/markdown": {
       "entry": ["src/index.ts", "test/reading-order.fixture.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
-    "editor/packages/minimap": {
+    "packages/singapore/packages/minimap": {
       "entry": ["src/index.ts", "src/**/*.worker.ts", "bench/**/*.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"]
     },
-    "editor/packages/paged": {
+    "packages/singapore/packages/paged": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
-    "editor/packages/panes": {
+    "packages/singapore/packages/panes": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
-    "editor/packages/plugin-ui": {
+    "packages/singapore/packages/plugin-ui": {
       "entry": [
         "src/anchoredSurface.ts",
         "src/hoverController.ts",
@@ -252,25 +252,25 @@
       ],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
-    "editor/packages/react": {
+    "packages/singapore/packages/react": {
       "entry": ["src/index.tsx"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
       "ignoreDependencies": ["@playwright/test"]
     },
-    "editor/packages/scope-lines": {
+    "packages/singapore/packages/scope-lines": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
       "ignoreDependencies": ["@playwright/test"]
     },
-    "editor/packages/solid": {
+    "packages/singapore/packages/solid": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
-    "editor/packages/spellcheck": {
+    "packages/singapore/packages/spellcheck": {
       "entry": ["src/index.ts", "src/**/*.worker.ts", "bench/**/*.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"]
     },
-    "editor/packages/textbuffer": {
+    "packages/singapore/packages/textbuffer": {
       "entry": [
         "src/*.ts",
         "src/debug.ts",
@@ -280,17 +280,17 @@
       ],
       "project": ["src/**/*.{ts,tsx}", "bench/*.mjs"]
     },
-    "editor/packages/tree-sitter": {
+    "packages/singapore/packages/tree-sitter": {
       "entry": ["src/index.ts", "src/**/*.worker.ts", "bench/**/*.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
       "ignoreDependencies": ["@playwright/test"]
     },
-    "editor/packages/tree-sitter-languages": {
+    "packages/singapore/packages/tree-sitter-languages": {
       "entry": ["src/index.ts", "src/metadata.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
       "ignoreDependencies": ["tree-sitter-cli"]
     },
-    "editor/packages/typescript-lsp": {
+    "packages/singapore/packages/typescript-lsp": {
       "entry": [
         "src/index.ts",
         "src/server.ts",
@@ -300,11 +300,11 @@
       ],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"]
     },
-    "editor": {
+    "packages/singapore": {
       "entry": ["scripts/*.{ts,mjs}", "knip.ts"],
       "project": ["scripts/**/*.{ts,mjs}"]
     },
-    "editor/examples/stress": {
+    "packages/singapore/examples/stress": {
       "entry": [
         "*.html",
         "*.mjs",
@@ -316,25 +316,25 @@
       "ignoreBinaries": ["taskset"],
       "ignoreDependencies": ["@singapore-editor/gutters"]
     },
-    "editor/examples/app": {
+    "packages/singapore/examples/app": {
       "entry": ["src/collaboration.ts", "index.html", "src/jumpHistoryDemo.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     },
-    "ghostty-webgpu": {
+    "packages/ghostty-webgpu": {
       "ignoreBinaries": ["zig"],
       "entry": ["src/index.ts", "src/worker/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],
       "project": ["src/**/*.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"]
     },
-    "ghostty-webgpu/packages/line-editor": {
+    "packages/ghostty-webgpu/packages/line-editor": {
       "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"],
       "ignoreDependencies": ["ghostty-webgpu"]
     },
-    "ghostty-webgpu/demo": {
+    "packages/ghostty-webgpu/demo": {
       "entry": ["src/client.ts"],
       "project": ["src/**/*.ts"]
     },
-    "ghostty-webgpu/site": {
+    "packages/ghostty-webgpu/site": {
       "entry": [
         "src/landing.ts",
         "src/pages/**/*.{astro,ts}",
@@ -344,11 +344,11 @@
       ],
       "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts", "worker/**/*.ts"]
     },
-    "ghostty-webgpu/site-classic": {
+    "packages/ghostty-webgpu/site-classic": {
       "entry": ["src/main.ts", "src/docs-theme.ts", "src/pages/**/*.{astro,ts}", "scripts/*.ts"],
       "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts"]
     },
-    "editor/packages/collaboration": {
+    "packages/singapore/packages/collaboration": {
       "entry": [
         "src/index.ts",
         "src/transports.ts",
@@ -367,17 +367,17 @@
         "bench/**/*.ts"
       ]
     },
-    "editor/site": {
+    "packages/singapore/site": {
       "entry": ["scripts/capture-page.ts", "src/examples/*.ts"],
       "ignoreDependencies": ["@singapore-editor/*", "satteri", "react", "@types/react", "solid-js"]
     },
-    "ghostty-webgpu/packages/shaders": {
+    "packages/ghostty-webgpu/packages/shaders": {
       "entry": ["src/index.ts", "src/tests/**/*.ts", "scripts/*.mjs"],
       "project": ["src/**/*.ts", "scripts/*.mjs"]
     }
   },
-  "ignore": ["editor/**/*.d.css.ts"],
+  "ignore": ["packages/singapore/**/*.d.css.ts"],
   "ignoreIssues": {
-    "ghostty-webgpu/src/core/abi.ts": ["types", "enumMembers"]
+    "packages/ghostty-webgpu/src/core/abi.ts": ["types", "enumMembers"]
   }
 }

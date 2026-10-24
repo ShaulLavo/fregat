@@ -3,7 +3,7 @@ import { readFile, realpath } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
 const root = new URL('../../', import.meta.url)
-const family = new URL('ghostty-webgpu/', root)
+const family = new URL('packages/ghostty-webgpu/', root)
 const classic = new URL('site-classic/', family)
 const scene = new URL('site/', family)
 const text = (url) => readFile(url, 'utf8')
@@ -30,7 +30,7 @@ test('Pages publishes the classic output while the Worker builds the scene site'
   expect(manifest.workspaces.packages).toEqual(expect.arrayContaining(['site', 'site-classic']))
   expect(manifest.scripts['site:classic:build']).toBe('bun run --cwd site-classic build')
   const workerBuild = await text(new URL('scripts/product-sites/build.sh', root))
-  expect(workerBuild).toContain('bun run --cwd ghostty-webgpu/site build --base /')
+  expect(workerBuild).toContain('bun run --cwd packages/ghostty-webgpu/site build --base /')
   expect(workerBuild).not.toContain('site-classic')
 })
 
@@ -55,7 +55,7 @@ test('both editions keep their footer link to the other edition', async () => {
 
 test('the mirror includes both site trees without filtering their shared paths', async () => {
   const workflow = await text(new URL('.github/workflows/mirror.yml', root))
-  expect(workflow).toContain('folder: ghostty-webgpu')
+  expect(workflow).toContain('folder: packages/ghostty-webgpu')
   expect(workflow).toContain('split --prefix="$FAMILY_FOLDER" HEAD')
   expect(await realpath(new URL('src/content/docs', classic))).toBe(
     fileURLToPath(new URL('src/content/docs', scene)).replace(/\/$/, ''),

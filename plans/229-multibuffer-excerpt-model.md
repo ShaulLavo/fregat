@@ -34,7 +34,7 @@ Represent several source ranges in one editor while keeping every caret and edit
 ## Existing Fregat and Editor work
 
 Editor source below was verified in `/work/projects/Editor/packages/` before Plan 207.
-Implement it in Fregat `editor/packages/` after that cutover; the external checkout is
+Implement it in Fregat `packages/singapore/packages/` after that cutover; the external checkout is
 read-only for this wave.
 
 [packages/editor/src/documentSession.ts](/work/projects/Editor/packages/editor/src/documentSession.ts) provides shared source sessions,
@@ -55,7 +55,7 @@ focus nodes and handlers in the window dispatcher. Preserve Linux/macOS contexts
 payloads, source order, and unbinds from the translation; activate modal rows when
 their mode owner exists. A declined command falls through to its ancestor.
 
-Build the reusable excerpt model in `editor/packages/editor/` and its textbuffer
+Build the reusable excerpt model in `packages/singapore/packages/editor/` and its textbuffer
 mapping contracts. Define branded source-document, excerpt, source-offset, and
 view-offset types. A snapshot carries its source revisions and resolves view spans
 into source spans. Synthetic headers/separators are distinct noneditable segments.

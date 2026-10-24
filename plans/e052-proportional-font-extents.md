@@ -1,13 +1,13 @@
 # E052: Wrap and horizontal extent from measured advances when the font is not monospace
 
-Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
+Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
 
 - Status: Approved
 - Kind: Implementation
 - Owner: Editor
 - Priority: P3
 - Effort: L
-- Dependencies: [E036](../editor/docs/display/e036-monaco-geometry-comparison.md), [E001](../editor/examples/stress/README.md)
+- Dependencies: [E036](../packages/singapore/docs/display/e036-monaco-geometry-comparison.md), [E001](../packages/singapore/examples/stress/README.md)
 - Inspected baseline: `40d841583659d2889fc03f61979e607f56df4c86`, 2026-09-24.
 
 **Proportional part implemented 2026-09-26** (wave 2 lane E2, branch `w2/e2-e052`), see
@@ -36,13 +36,13 @@ still column arithmetic. Monospace fonts must not pay anything for this work.
 ## Current code
 
 - **Wrap** is column counts end to end.
-  - `horizontalViewportColumns` ([rows](../editor/packages/editor/src/virtualization/virtualizedTextViewRows.ts))
+  - `horizontalViewportColumns` ([rows](../packages/singapore/packages/editor/src/virtualization/virtualizedTextViewRows.ts))
     turns the viewport width into `ceil(width / characterWidth)`. `refreshWrapWidth` in
-    [virtualizedTextView.ts](../editor/packages/editor/src/virtualization/virtualizedTextView.ts) passes
+    [virtualizedTextView.ts](../packages/singapore/packages/editor/src/virtualization/virtualizedTextView.ts) passes
     that to the projection as `wrapColumn`.
-  - [displayProjectionWrap.ts](../editor/packages/editor/src/virtualization/displayProjectionWrap.ts)
+  - [displayProjectionWrap.ts](../packages/singapore/packages/editor/src/virtualization/displayProjectionWrap.ts)
     scans whole-document spans in 256-line blocks and counts cells (tabs expand to stops).
-  - [displayProjectionText.ts](../editor/packages/editor/src/virtualization/displayProjectionText.ts)
+  - [displayProjectionText.ts](../packages/singapore/packages/editor/src/virtualization/displayProjectionText.ts)
     summarizes one line as `uniform` (`k × width`) or `indexed` (explicit row ends, only when the
     line has tabs). `wrapRange` and `wrapSegmentForColumn` read both shapes.
 - **Long rows:** rows over `MAX_SINGLE_NODE_ROW_LENGTH` (512) render a window of chunks. The
@@ -51,7 +51,7 @@ still column arithmetic. Monospace fonts must not pay anything for this work.
 - **Horizontal extent:** `applyContentWidth` multiplies `maxVisualColumnsSeen` by
   `characterWidth`. The columns come from `estimatedDisplayRowColumns`.
 - **The monospace verdict:** `measureTextMetrics` in
-  [browserMetrics.ts](../editor/packages/editor/src/virtualization/browserMetrics.ts) sets it, and it is
+  [browserMetrics.ts](../packages/singapore/packages/editor/src/virtualization/browserMetrics.ts) sets it, and it is
   re-read whenever the rendered face changes.
 - **Control:** VS Code's `wrappingStrategy: 'advanced'`
   (`references/vscode/src/vs/editor/browser/view/domLineBreaksComputer.ts`, under Platform)
@@ -196,18 +196,18 @@ It does not promise that compact layout is cheap or production-ready before the 
 
 ### Current code
 
-- [fixedRowVirtualizer.ts](../editor/packages/editor/src/virtualization/fixedRowVirtualizer.ts) already accepts `rowSizes`
+- [fixedRowVirtualizer.ts](../packages/singapore/packages/editor/src/virtualization/fixedRowVirtualizer.ts) already accepts `rowSizes`
   and can derive virtual rows from a variable-height index.
-- [rowHeightIndex.ts](../editor/packages/editor/src/virtualization/rowHeightIndex.ts) stores dense sizes and prefix starts.
+- [rowHeightIndex.ts](../packages/singapore/packages/editor/src/virtualization/rowHeightIndex.ts) stores dense sizes and prefix starts.
   Updating scans for the first change and rewrites the suffix. Its update transfers ownership of previous offset storage.
   A one-line change near the top can therefore do work proportional to the document's row count.
-- [virtualizedTextViewLayout.ts](../editor/packages/editor/src/virtualization/virtualizedTextViewLayout.ts) currently passes
+- [virtualizedTextViewLayout.ts](../packages/singapore/packages/editor/src/virtualization/virtualizedTextViewLayout.ts) currently passes
   only count, row gap, and uniform height to the virtualizer. `rowTop` multiplies row by stride.
   Pointer-row lookup also uses fixed-stride arithmetic. Wiring `rowSizes` alone would leave hit testing inconsistent.
-- [virtualizedTextViewGeometry.ts](../editor/packages/editor/src/virtualization/virtualizedTextViewGeometry.ts),
-  [selection painting](../editor/packages/editor/src/virtualization/virtualizedTextViewSelectionLayer.ts), and
-  [displayTransforms.ts](../editor/packages/editor/src/displayTransforms.ts) are downstream geometry consumers.
-- Existing [virtualizer tests](../editor/packages/editor/test/fixedRowVirtualizer.test.ts) cover the retained index path.
+- [virtualizedTextViewGeometry.ts](../packages/singapore/packages/editor/src/virtualization/virtualizedTextViewGeometry.ts),
+  [selection painting](../packages/singapore/packages/editor/src/virtualization/virtualizedTextViewSelectionLayer.ts), and
+  [displayTransforms.ts](../packages/singapore/packages/editor/src/displayTransforms.ts) are downstream geometry consumers.
+- Existing [virtualizer tests](../packages/singapore/packages/editor/test/fixedRowVirtualizer.test.ts) cover the retained index path.
   Text-view geometry has both happy-dom and real-browser tests.
   The wishlist correctly says no production text-row producer feeds variable sizes today.
 
@@ -219,7 +219,7 @@ Use strictly empty logical lines initially. Whitespace-only lines introduce wrap
 Do not fake compaction by squashing glyphs while retaining the original scroll footprint; that cannot show more code.
 Editor owns reusable layout options. Platform owns any eventual preference registration and app setting UI.
 Do not redesign the entire display-transform stack unless the measurements identify a necessary shared contract.
-[E031](../editor/docs/performance/e031-projection.md) has landed: prototype against its projection/geometry
+[E031](../packages/singapore/docs/performance/e031-projection.md) has landed: prototype against its projection/geometry
 owner; do not reintroduce an eager display-row array for compact heights. Row geometry is still a
 fixed stride (`virtualizedTextViewLayout.ts`), which it shares with E052.
 
@@ -257,7 +257,7 @@ Decide whether mirrored compaction improves navigation only after comparing the 
 
 ### Steps
 
-1. Add compact-layout scenarios to [E001](../editor/examples/stress/README.md)'s fixtures and record the normal-layout baseline.
+1. Add compact-layout scenarios to [E001](../packages/singapore/examples/stress/README.md)'s fixtures and record the normal-layout baseline.
    Include alternating empty lines, long blank runs, huge files, folds, wraps, injected rows, and edits near the top.
 2. Build prototype A and route all vertical mapping through one row geometry contract.
    Prove a click, caret rectangle, and virtualized row agree before benchmarking it.

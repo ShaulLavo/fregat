@@ -7,6 +7,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -58,7 +59,10 @@ test.each([
   }
   const scripts = ['check-turbo-inputs.mjs', 'workspace-root.ts']
   for (const file of scripts) {
-    copyFileSync(path.join(repository, 'editor/scripts', file), path.join(family, 'scripts', file))
+    copyFileSync(
+      path.join(repository, 'packages/singapore/scripts', file),
+      path.join(family, 'scripts', file),
+    )
   }
   try {
     mkdirSync(path.join(root, 'node_modules'))
@@ -74,7 +78,9 @@ test.each([
       { cwd: family },
     )
     expect(result.exitCode, result.stderr.toString()).toBe(0)
-    expect(path.resolve(result.stdout.toString().trim())).toBe(layout === 'nested' ? root : family)
+    expect(realpathSync(result.stdout.toString().trim())).toBe(
+      realpathSync(layout === 'nested' ? root : family),
+    )
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -95,7 +101,7 @@ async function withUpdater(
   layout: 'nested' | 'standalone' = 'nested',
   runtimeVersion = '0.28.1',
 ) {
-  const root = await mkdtemp(path.join(tmpdir(), 'editor-runtime-update-'))
+  const root = realpathSync(await mkdtemp(path.join(tmpdir(), 'editor-runtime-update-')))
   const family = layout === 'nested' ? 'editor' : 'singapore'
   const editor = path.join(root, family)
   const scripts = path.join(editor, 'scripts')
@@ -107,7 +113,7 @@ async function withUpdater(
     for (const name of ['update-tree-sitter-x.ts', 'workspace-root.ts']) {
       await writeFile(
         path.join(scripts, name),
-        await readFile(path.resolve(import.meta.dirname, '../editor/scripts', name)),
+        await readFile(path.resolve(import.meta.dirname, '../packages/singapore/scripts', name)),
       )
     }
     await writeFile(
@@ -331,13 +337,13 @@ test('parser consumers and release fixtures declare the Node runtime that suppor
   const read = (relative: string) =>
     JSON.parse(readFileSync(path.join(repository, relative), 'utf8'))
   const fixtures = read('scripts/release/editor-fixture.json').packages
-  for (const relative of ['package.json', 'editor/package.json']) {
+  for (const relative of ['package.json', 'packages/singapore/package.json']) {
     const range = read(relative).engines.node
     expect(Bun.semver.satisfies('26.0.0', range)).toBe(true)
     expect(Bun.semver.satisfies('25.9.0', range)).toBe(false)
   }
   for (const name of ['tree-sitter', 'tree-sitter-languages', 'markdown']) {
-    const relative = `editor/packages/${name}/package.json`
+    const relative = `packages/singapore/packages/${name}/package.json`
     const range = read(relative).engines.node
     expect(Bun.semver.satisfies('26.0.0', range)).toBe(true)
     expect(Bun.semver.satisfies('25.9.0', range)).toBe(false)
@@ -351,17 +357,19 @@ test('parser consumers and release fixtures declare the Node runtime that suppor
 test('authored host, Markdown, catalog, and release fixture pins agree with the required peer', () => {
   const read = (relative: string) =>
     JSON.parse(readFileSync(path.join(repository, relative), 'utf8'))
-  const host = read('editor/packages/tree-sitter/package.json').dependencies
+  const host = read('packages/singapore/packages/tree-sitter/package.json').dependencies
   const runtimePin = host['web-tree-sitter']
   const markdownPin = host['tree-sitter-md']
   expect(runtimePin).toMatch(/^github:ShaulLavo\/tree-sitter-x#[0-9a-f]{40}$/)
   expect(markdownPin).toMatch(/^github:ShaulLavo\/tree-sitter-md#[0-9a-f]{40}$/)
   expect(read('package.json').overrides['web-tree-sitter']).toBe(runtimePin)
-  expect(read('editor/package.json').overrides['web-tree-sitter']).toBe(runtimePin)
-  const site = read('editor/site/package.json')
+  expect(read('packages/singapore/package.json').overrides['web-tree-sitter']).toBe(runtimePin)
+  const site = read('packages/singapore/site/package.json')
   expect(site.dependencies['@singapore-editor/core']).toBe('workspace:*')
   expect(site.devDependencies['web-tree-sitter']).toBeUndefined()
-  const require = createRequire(path.join(repository, 'editor/packages/tree-sitter/package.json'))
+  const require = createRequire(
+    path.join(repository, 'packages/singapore/packages/tree-sitter/package.json'),
+  )
   const markdownName = Object.keys(host).find((name) => host[name] === markdownPin)
   const peer = JSON.parse(readFileSync(require.resolve(`${markdownName}/package.json`), 'utf8'))
   const runtimeName = Object.keys(host).find((name) => host[name] === runtimePin)
@@ -378,7 +386,7 @@ test('authored host, Markdown, catalog, and release fixture pins agree with the 
   expect(peer.dependencies?.['web-tree-sitter']).toBeUndefined()
   const fixtures = read('scripts/release/editor-fixture.json').packages
   for (const name of ['editor', 'markdown', 'tree-sitter', 'tree-sitter-languages']) {
-    const relative = `editor/packages/${name}/package.json`
+    const relative = `packages/singapore/packages/${name}/package.json`
     for (const manifest of [read(relative), fixtures[relative]]) {
       const dependencies = { ...manifest.dependencies, ...manifest.devDependencies }
       expect(dependencies['tree-sitter-md']).toBe(markdownPin)
@@ -387,7 +395,7 @@ test('authored host, Markdown, catalog, and release fixture pins agree with the 
       }
     }
   }
-  const catalog = read('editor/packages/tree-sitter-languages/languages.json')
+  const catalog = read('packages/singapore/packages/tree-sitter-languages/languages.json')
   expect(catalog.sources['tree-sitter-md'].revision).toBe(markdownPin.split('#')[1])
 })
 

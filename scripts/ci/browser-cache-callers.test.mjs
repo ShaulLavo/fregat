@@ -44,7 +44,7 @@ test('both docs sites install Chromium and WebKit with their own workspace execu
       name: 'Install Chromium and WebKit',
       uses: browserAction,
       with: {
-        playwright: 'ghostty-webgpu/${{ matrix.site }}/node_modules/.bin/playwright',
+        playwright: 'packages/ghostty-webgpu/${{ matrix.site }}/node_modules/.bin/playwright',
         browsers: 'chromium webkit',
       },
     },

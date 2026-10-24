@@ -40,7 +40,7 @@ There is no existing source-breakpoint owner in Fregat.
 Editor `packages/editor/src/plugins.ts` defines interactive `EditorGutterContribution` cells,
 source row mapping and disposal. `packages/gutters/src/lineGutter.ts` and `foldGutter.ts`
 demonstrate their lifecycle. The verified baseline files live under `/work/projects/Editor/`;
-new reusable breakpoint/active-line contributions belong in `editor/packages/` after Plan 207.
+new reusable breakpoint/active-line contributions belong in `packages/singapore/packages/` after Plan 207.
 Hosted diff or injected rows must resolve their real source location before creating a breakpoint.
 
 ## Design

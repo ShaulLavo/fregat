@@ -1,6 +1,6 @@
 # E066: Collaborative text with one ordering host
 
-Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
+Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
 
 - Status: In progress
 - Kind: Implementation
@@ -188,7 +188,7 @@ Types' and Fugue's test suites. The research settles the rest:
     from 2,005,001 to 4,001; editor publications fell from 2,001 to two. These are runtime
     document measurements, not browser frame or isolated-machine headline claims.
   - Reproduce the counted bounds and existing ordering assertions with
-    `COLLABORATION_LONG_RUN=1 bun run --cwd editor/packages/collab test
+    `COLLABORATION_LONG_RUN=1 bun run --cwd packages/singapore/packages/collab test
 test/offline-order.test.ts test/order-independence.test.ts test/replay-work.test.ts
 test/document-replay.test.ts --maxWorkers=1`. Both engines passed all 44 tests in
     171.84 s. The counted 2,000/2,000 case bounds envelope applies by three times the

@@ -373,16 +373,16 @@ The editor has both lower-level `EditorPlugin` contribution registration and the
 
 Evidence:
 
-- `editor/packages/spellcheck/src/plugin.ts:14–38`
-- `editor/packages/plugin-ui/src/hoverPlugin.ts:27–65`
-- `editor/packages/editor/src/createPlugin.ts:131–198`
-- `editor/packages/editor/src/public/extensions.ts:64–85`
+- `packages/singapore/packages/spellcheck/src/plugin.ts:14–38`
+- `packages/singapore/packages/plugin-ui/src/hoverPlugin.ts:27–65`
+- `packages/singapore/packages/editor/src/createPlugin.ts:131–198`
+- `packages/singapore/packages/editor/src/public/extensions.ts:64–85`
 
 **Proposed API:** `createCollaborationPlugin({ session, transport, presence, … })`. The session is explicitly shared across views of the same collaborative buffer; view attachments own their individual selections and overlays.
 
 The simple path must work with `new Editor(element)` plus plain plugin options. `openDocument` must remain optional.
 
-Evidence: `editor/AGENTS.md:19–24`.
+Evidence: `packages/singapore/AGENTS.md:19–24`.
 
 ### Existing edit stream and revision support
 
@@ -396,13 +396,13 @@ There are useful hooks already:
 
 Evidence:
 
-- `editor/packages/editor/src/documentSession.ts:148–162, 260, 324–332`
-- `editor/packages/editor/src/plugins.ts:706–718, 772–785, 680–684`
-- `editor/packages/editor/src/createPlugin.ts:150–155`
+- `packages/singapore/packages/editor/src/documentSession.ts:148–162, 260, 324–332`
+- `packages/singapore/packages/editor/src/plugins.ts:706–718, 772–785, 680–684`
+- `packages/singapore/packages/editor/src/createPlugin.ts:150–155`
 
 **Caution:** the synchronization edit chain has a 128-entry bound and can return composed changes. It is not a durable, exact authored-operation log. The transport must capture its own complete collaboration records.
 
-Evidence: `editor/packages/editor/src/editor/editChain.ts:14–47`.
+Evidence: `packages/singapore/packages/editor/src/editor/editChain.ts:14–47`.
 
 ### Existing remote-cursor and presence UI surfaces
 
@@ -410,9 +410,9 @@ Selections can use owner-scoped highlights or tracked decorations. Cursor carets
 
 Evidence:
 
-- `editor/packages/editor/src/plugins.ts:531–541, 615–634, 737–744, 884–903`
-- `editor/packages/editor/src/editor/decorationStore.ts:34–58, 94–112`
-- `editor/docs/architecture/e050-host-obligations.md:6–24`
+- `packages/singapore/packages/editor/src/plugins.ts:531–541, 615–634, 737–744, 884–903`
+- `packages/singapore/packages/editor/src/editor/decorationStore.ts:34–58, 94–112`
+- `packages/singapore/docs/architecture/e050-host-obligations.md:6–24`
 
 Remote caret visibility across folding, wrapping, injected rows and horizontal chunking still needs browser qualification. The inspected APIs demonstrate attachment opportunities, not a completed remote-cursor renderer.
 
@@ -420,29 +420,29 @@ Remote caret visibility across folding, wrapping, injected rows and horizontal c
 
 1. **Exact transaction subscription through the plugin surface.**  
    Expose all logical text transactions with pre-edit snapshot, atomic edit batch and author/origin metadata, including typing, IME, paste, commands, undo and programmatic changes. Coalesced view changes are insufficient as the only operation source.  
-   Evidence: `editor/packages/editor/src/plugins.ts:168–173, 706–718`; `editor/packages/editor/src/documentSession.ts:148–162`.
+   Evidence: `packages/singapore/packages/editor/src/plugins.ts:168–173, 706–718`; `packages/singapore/packages/editor/src/documentSession.ts:148–162`.
 
 2. **Explicit collaboration-origin application.**  
    Coarse `external | view` origin does not distinguish remote confirmations, optimistic replay, rollback and local programmatic commands. Public plugin `applyEdits` does not expose history/origin options.  
-   Evidence: `editor/packages/editor/src/documentSession.ts:158–159, 324–332`; `editor/packages/editor/src/plugins.ts:781–785`; `editor/packages/editor/src/createPlugin.ts:150–155`.
+   Evidence: `packages/singapore/packages/editor/src/documentSession.ts:158–159, 324–332`; `packages/singapore/packages/editor/src/plugins.ts:781–785`; `packages/singapore/packages/editor/src/createPlugin.ts:150–155`.
 
 3. **Atomic reconciliation.**  
    A public network-agnostic batch must replace the confirmed base and replay pending operations without intermediate paints, echoes, extra undo entries or disturbed IME ownership. Calling ordinary undo repeatedly is not the desired contract. This specific collaboration transaction is absent from the inspected plugin contexts.  
-   Evidence: `editor/packages/editor/src/plugins.ts:772–808`; `editor/packages/editor/src/createPlugin.ts:131–162`.
+   Evidence: `packages/singapore/packages/editor/src/plugins.ts:772–808`; `packages/singapore/packages/editor/src/createPlugin.ts:131–162`.
 
 4. **Transportable character identity bridge.**  
    Existing tracked points and branded revision scopes are local API values. The collaboration engine needs explicit stable-ID/offset conversion and snapshot/checkpoint identity serialization, owned by the host-ordered data model.  
-   Evidence: `editor/packages/editor/src/plugins.ts:507–520, 624–628`; `editor/packages/editor/src/editor/editChain.ts:3–18`.
+   Evidence: `packages/singapore/packages/editor/src/plugins.ts:507–520, 624–628`; `packages/singapore/packages/editor/src/editor/editChain.ts:3–18`.
 
 5. **Collaborative undo policy.**  
    Remote confirmation and replay must not become ordinary local undo entries. Local undo should submit a new intent for the author’s operation, not rewind everybody to an old shared snapshot. `history: 'skip'` is a useful primitive, not the complete policy.  
-   Evidence: `editor/packages/editor/src/documentSession.ts:170–181, 324–345`.
+   Evidence: `packages/singapore/packages/editor/src/documentSession.ts:170–181, 324–345`.
 
 The extension-hook design inventory has unfinished implementation items; it is not proof that all desired hooks shipped. The host-obligations record lists completed public contracts. Inspect current code rather than treating either as blanket coverage.
 
 Evidence:
 
-- `editor/docs/architecture/e050-host-obligations.md:1–18`
+- `packages/singapore/docs/architecture/e050-host-obligations.md:1–18`
 
 ### Extension cost budget
 
@@ -450,9 +450,9 @@ Register only the inputs a collaboration attachment consumes. Existing contribut
 
 Evidence:
 
-- `editor/packages/editor/src/plugins.ts:646–684`
-- `editor/packages/editor/src/editor/viewContributions.ts:395–417`
-- `editor/packages/editor/src/createPlugin.ts:35–59`
+- `packages/singapore/packages/editor/src/plugins.ts:646–684`
+- `packages/singapore/packages/editor/src/editor/viewContributions.ts:395–417`
+- `packages/singapore/packages/editor/src/createPlugin.ts:35–59`
 
 Proposed qualification: 0/100/1,000 inert plugins must produce zero transaction/presence callbacks for uninterested extensions. Serialize only the operation, not a full document, on typing. Network, encryption and presence throttling stay off the synchronous edit path. No idle collaboration timers when unattached.
 

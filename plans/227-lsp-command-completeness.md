@@ -36,7 +36,7 @@ Choose code actions, confirm rename, organize imports, control diagnostics/inlay
 ## Existing Fregat and Editor work
 
 Editor source below was verified in `/work/projects/Editor/packages/` before Plan 207.
-Implement it in Fregat `editor/packages/` after that cutover; the external checkout is
+Implement it in Fregat `packages/singapore/packages/` after that cutover; the external checkout is
 read-only for this wave.
 
 [packages/lsp-plugin/src/plugin.ts](/work/projects/Editor/packages/lsp-plugin/src/plugin.ts), [packages/lsp-plugin/src/codeActions.ts](/work/projects/Editor/packages/lsp-plugin/src/codeActions.ts),
@@ -57,7 +57,7 @@ focus nodes and handlers in the window dispatcher. Preserve Linux/macOS contexts
 payloads, source order, and unbinds from the translation; activate modal rows when
 their mode owner exists. A declined command falls through to its ancestor.
 
-Extend `editor/packages/lsp-plugin/` contracts for declarations, action confirmation,
+Extend `packages/singapore/packages/lsp-plugin/` contracts for declarations, action confirmation,
 imports, inlay hints, and explicit diagnostic refresh. Honor server capabilities,
 response revisions, location links, and cancellation. Pass host navigation a typed
 same-pane/split destination. Plan 237 owns split creation and focus; the plugin

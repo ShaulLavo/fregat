@@ -35,11 +35,11 @@ Zed publishes `vim_mode`, `vim_operator`, and `VimControl`; motion-taking operat
 
 Editor paths below name the canonical destination after Plan 207. At this plan's source audit,
 those files live under `/work/projects/Editor/packages/`; `editor/` has not landed in Fregat.
-Implement package work in `editor/packages/` after the move.
+Implement package work in `packages/singapore/packages/` after the move.
 
-`editor/packages/editor/src/createPlugin.ts` exposes `textGate`, `cursorStyle` and the current
-`keyParticipant`; `editor/packages/editor/src/editor/Editor.ts` consults text gates for native input. `editor/packages/editor/src/plugins.ts` defines
-line/block/underline cursors. `editor/packages/editor/src/documentSession.ts` owns selections and history.
+`packages/singapore/packages/editor/src/createPlugin.ts` exposes `textGate`, `cursorStyle` and the current
+`keyParticipant`; `packages/singapore/packages/editor/src/editor/Editor.ts` consults text gates for native input. `packages/singapore/packages/editor/src/plugins.ts` defines
+line/block/underline cursors. `packages/singapore/packages/editor/src/documentSession.ts` owns selections and history.
 `apps/web/src/keymap/editor-commands.ts` routes existing editing commands through the app table.
 No Vim package or modal state machine exists in the audited Editor source. Plan 204 removes
 `keyParticipant`; modal input must use the dispatcher plus the retained native text gate.
@@ -48,13 +48,13 @@ No Vim package or modal state machine exists in the audited Editor source. Plan 
 
 Follow [the keymap architecture](../docs/keymap/architecture.md). Add typed commands and
 availability to `apps/web/src/keymap/table.ts` through its owning command module; Editor
-commands also belong in `editor/packages/editor/src/editor/commandCatalog.ts`. Put keys and argument variants in Plan 206's
+commands also belong in `packages/singapore/packages/editor/src/editor/commandCatalog.ts`. Put keys and argument variants in Plan 206's
 `apps/web/src/keymap/presets/` data. Hosted Editor joins the window dispatcher and publishes
 contexts. Standalone Editor exports the modal pack as data. Keep keys out of command metadata.
 Use the existing document mutation/undo path for synchronous edits. Async reads and effects
 use feature-owned TanStack query/mutation options and settle the cache before resolving.
 
-Create `editor/packages/vim` with a typed mode/pending-input union and one per-view controller.
+Create `packages/singapore/packages/vim` with a typed mode/pending-input union and one per-view controller.
 Its zustand store publishes the snapshot; workspace-scoped state for future registers/replay
 has an explicit owner. Keep counts, pending operator and replacement inverses in the model.
 Register an application-scope Vim setting alongside its consumer and run `settings:reference`.

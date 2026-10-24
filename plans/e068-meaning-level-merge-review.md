@@ -1,6 +1,6 @@
 # E068: Review edits that merged cleanly but may not make sense together
 
-Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
+Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
 
 - Status: Approved
 - Kind: Implementation
@@ -127,8 +127,8 @@ them).
    snapshots in both engines. Tests cover 50 seeded reference histories, different host arrival
    orders, 30 incremental/eviction histories, transitive dependencies through undo, same-author
    exclusions, the replay cap, UTF-16 spans, and projection snapshot consistency.
-   Run `bun run --cwd editor/packages/collab bench:concurrency` after its package build.
-   Cost evidence lives in `editor/packages/collab/bench/concurrency-evidence.json`.
+   Run `bun run --cwd packages/singapore/packages/collab bench:concurrency` after its package build.
+   Cost evidence lives in `packages/singapore/packages/collab/bench/concurrency-evidence.json`.
    The [append cost follow-up](#concurrency-append-cost) reduces retained-window bookkeeping.
    These are shared-machine experiments; the current cost decision is recorded in the batch phase follow-up below.
 2. **Merge-unit queries** in `packages/tree-sitter-languages`, first for TypeScript, TSX,
@@ -214,7 +214,7 @@ them).
 
    **The independent-unit median and marked 8 ms median passed in this earlier experiment.**
    The current acceptance decision is recorded in the batch phase follow-up.
-   Run `bun run --cwd editor/packages/collaboration bench:merge-review` after workspace builds.
+   Run `bun run --cwd packages/singapore/packages/collaboration bench:merge-review` after workspace builds.
    The 2026-10-09 detector-cost follow-up includes append, exact pairs, identity mapping and
    real syntax queries. Current parsing, authoring, window construction, application, IPC and
    UI remain outside timing. `bench/detector-cost-comparison.json` records four complete
@@ -424,7 +424,7 @@ canonical sorting path and exact live-position intervals. The extra array holds 
 to existing entries; suffix copies remain proportional to the window size. There is no new
 public API, timer, parser work, or whole-document text read.
 
-Evidence is `editor/packages/collab/bench/concurrency-append-evidence.json`. Both runs are
+Evidence is `packages/singapore/packages/collab/bench/concurrency-append-evidence.json`. Both runs are
 **experiment, shared machine**, under bench-class admission without quiet mode. Each run
 alternates baseline/current/current/baseline with 102 timed samples per mode after 40 warmups.
 The baseline is `c1b3da7076daf38dd0a6a3bb1a43c2c6a2ccc39b`. Prefix setup, real textbuffer
@@ -443,7 +443,7 @@ bound. Parsing, unit mapping, and version reconstruction remain excluded. The fu
 budget is unchanged and still belongs to step 3.
 
 After building the baseline and current collab packages, rerun the paired measurement with
-`node editor/packages/collab/bench/concurrency.mjs --compare <baseline-collab-dist/index.js>`.
+`node packages/singapore/packages/collab/bench/concurrency.mjs --compare <baseline-collab-dist/index.js>`.
 The original `bench:concurrency` command still measures full construction against incremental
 append-and-query. Final comparison samples assert identical retained edits and exact pairs.
 Property tests add 30 seeded causally ready arrival histories with mixed canonical insertion
@@ -455,7 +455,7 @@ atomic rejection of malformed batches.
 Status: Approved. The allocation and cursor changes are implemented. The latency work listed
 below remains open; this follow-up does not waive the 2 ms target.
 
-`editor/packages/collaboration/bench/runtime-cost-comparison.json` retains the final source
+`packages/singapore/packages/collaboration/bench/runtime-cost-comparison.json` retains the final source
 hashes, complete Mac A/B/B/A invocations, raw samples, per-message measurements, power/load
 records and Linux allocation profiles. The baseline is
 `73cca5d261ab9b2a987c53b90d461b218593053c`. All numbers below are **experiment, shared machine**.
@@ -539,7 +539,7 @@ units from the same 100-edit batch; every run asserts all 50 overlap marks.
 | Result JSON UTF-8 bytes per batch            | 61,444–61,644    | 92,166–92,466          |
 
 The ordinary bridge awaits one worker query per range in
-`editor/packages/tree-sitter/src/mergeReview.ts:160–182`. The dense batch adds 50 current-range
+`packages/singapore/packages/tree-sitter/src/mergeReview.ts:160–182`. The dense batch adds 50 current-range
 queries. Byte counts cover these query envelopes, are computed after timing and are a
 reproducible JSON-size proxy. They are not structured-clone wire bytes or a count of all
 worker traffic. Round trips include worker query/projection work and any source reads.
@@ -585,9 +585,9 @@ Rerun from the checkout after workspace builds, with an absolute evidence direct
 
 ```sh
 bun run build:workspaces
-E068_EVIDENCE_DIR="$PWD/evidence" bun run --cwd editor/packages/collaboration bench:merge-review bench/tail.test.ts bench/cursor.test.ts
-bun run --cwd editor/packages/collaboration bench:merge-review bench/detector.test.ts
-COLLABORATION_EVIDENCE_DIR="$PWD/evidence" bun run --cwd editor/packages/collaboration bench:review-runtime
+E068_EVIDENCE_DIR="$PWD/evidence" bun run --cwd packages/singapore/packages/collaboration bench:merge-review bench/tail.test.ts bench/cursor.test.ts
+bun run --cwd packages/singapore/packages/collaboration bench:merge-review bench/detector.test.ts
+COLLABORATION_EVIDENCE_DIR="$PWD/evidence" bun run --cwd packages/singapore/packages/collaboration bench:review-runtime
 ```
 
 Keep benchmark sources fixed while alternating the recorded baseline and current production
@@ -631,7 +631,7 @@ constant count of source-transfer messages for arbitrary projection-heavy histor
 
 JSON sizes remain a payload-size proxy. They are not structured-clone wire bytes. Linux
 elapsed times are excluded from verdicts while the PC runs the owner's Bevy workload.
-`editor/packages/collaboration/bench/batched-worker-evidence.json` records source hashes,
+`packages/singapore/packages/collaboration/bench/batched-worker-evidence.json` records source hashes,
 request counts and guarded Mac A/B/B/A samples. Both portable JavaScript/WASM versions were
 built on Linux before taking the Mac turn. The controller enforces AC and one-minute load
 below 3 immediately before every sample block; recorded loads were 2.98, 2.76, 2.44 and 2.27.
@@ -724,7 +724,7 @@ costs. Instrumentation and the shared machine limit the comparison; it is not an
 uninstrumented release-speed claim. The ordinary complete median is still above 2 ms,
 and no other optimization was attempted. Portable samples, guards, counts and final
 production source hashes at `9bdfb67152b9928f075287bc04ee2670523f76fe` are in
-`editor/packages/collaboration/bench/worker-phase-evidence.json`. Raw evidence is retained
+`packages/singapore/packages/collaboration/bench/worker-phase-evidence.json`. Raw evidence is retained
 under `/work/reports/e068-i-20261010/profile-mac/` and the before/after Linux profile directories.
 
 #### Immutable snapshot ownership correction
@@ -849,7 +849,7 @@ on the same 50 latest competing pairs reduces causal identity-index reads from 8
 100 with identical successor results. These are counts only, not a Linux timing verdict.
 
 Portable guarded samples, phase summaries, source revision, measured patch hash and Linux
-counts are in `editor/packages/collaboration/bench/batch-phase-evidence.json`. Raw evidence
+counts are in `packages/singapore/packages/collaboration/bench/batch-phase-evidence.json`. Raw evidence
 and private controllers are retained under `/work/reports/e068-j-20261010/`; Mac temporary
 sources are removed after each turn. The new successor regression fails on the original
 source and passes after the change. Final narrow checks pass 32 collab tests across both

@@ -65,9 +65,9 @@ They wait for Track N.
 Fregat is the source repository for development and release preparation.
 The [mirror workflow](../.github/workflows/mirror.yml) splits these folders on pushes to `main`:
 
-- `editor/` goes to [singapore](https://github.com/ShaulLavo/singapore).
-- `ghostty-webgpu/` goes to [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu).
-- `hotkeys/` goes to [hotkeys](https://github.com/ShaulLavo/hotkeys).
+- `packages/singapore/` goes to [singapore](https://github.com/ShaulLavo/singapore).
+- `packages/ghostty-webgpu/` goes to [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu).
+- `packages/hotkeys/` goes to [hotkeys](https://github.com/ShaulLavo/hotkeys).
 
 Submit changes and release notes to Fregat. Mirrors receive the folder contents, including package manifests and changelogs.
 The current mirror workflow pushes `main` only. It does not copy tags or create GitHub Releases.

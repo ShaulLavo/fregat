@@ -1,0 +1,96 @@
+{
+  "name": "@singapore-editor/collaboration",
+  "version": "0.0.4",
+  "description": "Session protocols, transports, and remote cursor presence for host-ordered collaboration.",
+  "keywords": [
+    "browser",
+    "collaboration",
+    "editor",
+    "presence",
+    "singapore",
+    "typescript"
+  ],
+  "homepage": "https://singapore.shaulavo.dev/docs/reference/api/collaboration/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShaulLavo/fregat.git",
+    "directory": "packages/singapore/packages/collaboration"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "server",
+    "examples/signaling-server.ts"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "exports": {
+    "./style.css": "./dist/presence.css",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./presence-plugin": {
+      "types": "./dist/presence-plugin.d.ts",
+      "import": "./dist/presence-plugin.js",
+      "default": "./dist/presence-plugin.js"
+    },
+    "./transports": {
+      "types": "./dist/transports.d.ts",
+      "import": "./dist/transports.js",
+      "default": "./dist/transports.js"
+    },
+    "./server": {
+      "types": "./server/signaling.ts",
+      "bun": "./server/signaling.ts"
+    },
+    "./merge-review": {
+      "types": "./dist/merge-review.d.ts",
+      "import": "./dist/merge-review.js",
+      "default": "./dist/merge-review.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "bun ../../scripts/build-package.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:server": "bun --bun vitest run --config vitest.server.config.ts",
+    "test:editor": "vitest run --config vitest.editor.config.ts",
+    "bench:merge-review": "vitest run --config vitest.cost.config.ts",
+    "bench:review-runtime": "vitest run --config vitest.review-cost.config.ts"
+  },
+  "dependencies": {
+    "@noble/hashes": "2.4.0",
+    "@singapore-editor/collab": "workspace:*",
+    "@singapore-editor/core": "workspace:*",
+    "@singapore-editor/plugin-ui": "workspace:*",
+    "@singapore-editor/textbuffer": "workspace:*"
+  },
+  "devDependencies": {
+    "@singapore-editor/tree-sitter": "workspace:*",
+    "@singapore-editor/tree-sitter-languages": "workspace:*",
+    "@types/bun": "1.4.2",
+    "@types/node": "26.6.3",
+    "@vitest/browser-playwright": "5.0.2",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.2",
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#aab7db1518c19f61c1b13ec3f832b881cf5f1385"
+  }
+}

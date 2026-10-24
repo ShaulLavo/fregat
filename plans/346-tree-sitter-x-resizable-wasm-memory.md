@@ -23,8 +23,8 @@ A caller that keeps the `Uint8Array` returned by `heap()` sees the enlarged heap
 - `UTF8ToString()` passes a heap subarray to `TextDecoder.decode()`. `stringToUTF8()` passes one to `TextEncoder.encodeInto()`. These exact operations need a runtime matrix check.
 - `src/text_buffer.ts` rebuilds bounded `Uint16Array` views around its current C allocation. Its `reserve()` can move that allocation through `_realloc()`. Stable backing memory does not make the old address valid.
 - `src/extension.ts` exports `heap()` and `loadExtension()`. Here, extensions share one ordinary Wasm memory. This is distinct from `SharedArrayBuffer` or Wasm threads.
-- [Fregat's memory test](../editor/packages/tree-sitter/test/wasm-memory.test.ts) deliberately forces growth. It asserted replacement of the buffer and detachment of the old view. Adoption replaces those expectations with stable length-tracking views.
-- Fregat pins the generated runtime commit in its root manifest, overrides, Editor manifests, release fixture, and `bun.lock`. [`update-tree-sitter-x.ts`](../editor/scripts/update-tree-sitter-x.ts) updates these but also advances tree-sitter-md to remote HEAD.
+- [Fregat's memory test](../packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts) deliberately forces growth. It asserted replacement of the buffer and detachment of the old view. Adoption replaces those expectations with stable length-tracking views.
+- Fregat pins the generated runtime commit in its root manifest, overrides, Editor manifests, release fixture, and `bun.lock`. [`update-tree-sitter-x.ts`](../packages/singapore/scripts/update-tree-sitter-x.ts) updates these but also advances tree-sitter-md to remote HEAD.
 - The consumed Markdown revision is `e2ae3f735f614b3b618b5de71fc41644a180b9e7`, package 0.1.3. Its peer range is `web-tree-sitter ^0.28.1`. Inspected Markdown `origin/main` is `aca967752732f8eefcbb6ccba94d70f3ec96e65e`, package 0.1.4. Neither revision owns a separate parser heap.
 
 ## Scope and design
@@ -83,11 +83,11 @@ In the Fregat worktree, run these existing consumer entry points after installin
 ```bash
 	bun install
 	bun run build:workspaces
-	bun run --cwd editor/packages/tree-sitter test:runtime
-	bun run --cwd editor/packages/tree-sitter test
-	bun run --cwd editor/packages/tree-sitter-languages test
-	bun run --cwd editor/packages/markdown test
-	bun run --cwd editor/packages/tree-sitter test:memory:browser
+	bun run --cwd packages/singapore/packages/tree-sitter test:runtime
+	bun run --cwd packages/singapore/packages/tree-sitter test
+	bun run --cwd packages/singapore/packages/tree-sitter-languages test
+	bun run --cwd packages/singapore/packages/markdown test
+	bun run --cwd packages/singapore/packages/tree-sitter test:memory:browser
 ```
 
 The tree-sitter `test` script runs its non-browser tests and then its browser script. Extend the real shared-heap test to assert that the old `heap()` view remains attached and increases in length. Verify `tree-sitter-md` `memoryBytes()`, highlighting, Unicode Markdown edits, extension calls, disposal, and worker results after actual growth. Run the browser growth scenario in Chromium, Firefox, and WebKit with explicit provider instances. Record actual Safari versions separately from Playwright WebKit. Follow the host's WebKit prerequisite instructions after browser downloads.

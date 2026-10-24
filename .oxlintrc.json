@@ -10,7 +10,7 @@
   ],
   "ignorePatterns": [
     "apps/desktop/build/**",
-    "editor/packages/textbuffer/bench/vscode-textbuffer/**"
+    "packages/singapore/packages/textbuffer/bench/vscode-textbuffer/**"
   ],
   "rules": {
     "no-alert": "error",

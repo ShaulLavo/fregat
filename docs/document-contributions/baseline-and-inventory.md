@@ -201,7 +201,7 @@ After `bun install --frozen-lockfile` and `bun run build:workspaces`, core's con
 passes 154 tests in six files:
 
 ```sh
-bun run --cwd editor/packages/editor test -- test/documentPublication.node.test.ts test/documentAnalysis.node.test.ts test/documentSession.test.ts test/editChain.test.ts test/publicationContributions.test.ts test/preparedDocument.test.ts
+bun run --cwd packages/singapore/packages/editor test -- test/documentPublication.node.test.ts test/documentAnalysis.node.test.ts test/documentSession.test.ts test/editChain.test.ts test/publicationContributions.test.ts test/preparedDocument.test.ts
 ```
 
 These checks cover exact nested publication, mutation/transaction paths, eventless segment rotation,
@@ -212,7 +212,7 @@ not implement or accept the unit 2 worker reader, a complete first-frame matrix 
 Twenty LSP document/buffer synchronization tests pass through the configured package script:
 
 ```sh
-bun run --cwd editor/packages/lsp-plugin test -- test/documentSync.test.ts test/bufferSync.test.ts
+bun run --cwd packages/singapore/packages/lsp-plugin test -- test/documentSync.test.ts test/bufferSync.test.ts
 ```
 
 From `apps/web`, the configured Node project passes 36 runtime, preparation, retention and
@@ -228,16 +228,16 @@ so new browser rendering, latency measurements and package release changes are o
 
 ## Baseline identity
 
-| Item               | Value                                                                                                                                                                                                                                          |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Platform           | `origin/main` `9f343825858b10a3b70b86250946e562956fbf13`, clean worktree                                                                                                                                                                       |
-| Editor             | `origin/main` `e2fd299`. The shared checkout is at `c23cd306`, clean, 5 commits behind; `git diff c23cd30 origin/main -- packages examples` is empty, so every probe that imports the checkout measures `e2fd299` code                         |
-| Link resolution    | `packages/editor-*` in Platform are relative symlinks to `../editor/packages/*`, which resolves to the shared Editor checkout. `apps/web/node_modules/@singapore-editor/*` resolves to the same checkout through the global Bun cache          |
-| What Platform runs | Dev: Editor `src/` through `platform-dev-sources` (`apps/web/vite.config.ts:103`). Build: each package's `dist/`. `packages/editor/dist` was built 18:51, before the 20:19 source commit, so a Platform build today would not match source     |
-| Package versions   | `@singapore-editor/core` 0.1.2, `diff` 0.2.0, `find`/`gutters`/`lsp`/`lsp-plugin`/`minimap`/`react`/`scope-lines`/`tree-sitter`/`tree-sitter-languages` 0.1.1, `decode`/`markdown`/`plugin-ui`/`textbuffer` 0.1.0 (`apps/web/package.json:49`) |
-| Tools              | Bun 1.4.0, Node 26.7.0, Vite 8.0.16, Playwright 1.63.0 (Chromium headless)                                                                                                                                                                     |
-| Hardware           | Intel Core i7-14700K, 31 GB RAM, shared with other workloads (runs went through the 3-slot memory wrapper)                                                                                                                                     |
-| Capability flags   | The browser probe records `crossOriginIsolated` and `SharedArrayBuffer` per run. Platform passes no `useSharedBuffers`; deleting the SAB text arm is proposed and not landed                                                                   |
+| Item               | Value                                                                                                                                                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform           | `origin/main` `9f343825858b10a3b70b86250946e562956fbf13`, clean worktree                                                                                                                                                                          |
+| Editor             | `origin/main` `e2fd299`. The shared checkout is at `c23cd306`, clean, 5 commits behind; `git diff c23cd30 origin/main -- packages examples` is empty, so every probe that imports the checkout measures `e2fd299` code                            |
+| Link resolution    | `packages/editor-*` in Platform are relative symlinks to `../packages/singapore/packages/*`, which resolves to the shared Editor checkout. `apps/web/node_modules/@singapore-editor/*` resolves to the same checkout through the global Bun cache |
+| What Platform runs | Dev: Editor `src/` through `platform-dev-sources` (`apps/web/vite.config.ts:103`). Build: each package's `dist/`. `packages/editor/dist` was built 18:51, before the 20:19 source commit, so a Platform build today would not match source        |
+| Package versions   | `@singapore-editor/core` 0.1.2, `diff` 0.2.0, `find`/`gutters`/`lsp`/`lsp-plugin`/`minimap`/`react`/`scope-lines`/`tree-sitter`/`tree-sitter-languages` 0.1.1, `decode`/`markdown`/`plugin-ui`/`textbuffer` 0.1.0 (`apps/web/package.json:49`)    |
+| Tools              | Bun 1.4.0, Node 26.7.0, Vite 8.0.16, Playwright 1.63.0 (Chromium headless)                                                                                                                                                                        |
+| Hardware           | Intel Core i7-14700K, 31 GB RAM, shared with other workloads (runs went through the 3-slot memory wrapper)                                                                                                                                        |
+| Capability flags   | The browser probe records `crossOriginIsolated` and `SharedArrayBuffer` per run. Platform passes no `useSharedBuffers`; deleting the SAB text arm is proposed and not landed                                                                      |
 
 Platform's enabled contributions for an ordinary file (`features/editor/utils/plugins.ts:35`):
 Tree-sitter syntax always, plus Shiki when the selected theme is not a built-in
@@ -360,7 +360,7 @@ non-built-in theme.
 - **Main-thread reads at open differ per consumer.** Shiki materializes the whole text once per
   view (`materializeFullText`, 624,000 units). Minimap reads the whole document line by line:
   32,045 reads and 592,799 units for one view on the medium file without materializing it, the
-  pattern [projection performance notes](../../editor/docs/performance/e031-projection.md) warns a full-read counter
+  pattern [projection performance notes](../../packages/singapore/docs/performance/e031-projection.md) warns a full-read counter
   hides. Tree-sitter shows 43 reads because it builds chunks from the piece table's buffers
   (`treeSitter/source.ts:172`), below the `TextSnapshot` counter; its cost appears only in the
   message column. Typing costs the view about 900 reads and 16,000 units per 20 keystrokes in

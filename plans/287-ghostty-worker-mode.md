@@ -5,7 +5,7 @@
 - Status: APPROVED 2026-10-02 by the owner: "I do like the worker idea. And I do think we should add
   it as a mode … either import the regular one that runs on the main thread or you import the
   offscreen canvas version, which [Fregat] will end up using."
-- Owns: `ghostty-webgpu/` (a new worker entry point) and Platform's terminal feature
+- Owns: `packages/ghostty-webgpu/` (a new worker entry point) and Platform's terminal feature
   (`apps/web/src/features/terminal/`), which switches to it.
 - Order: starts after Plan 283's Zig frame full move, so the worker carries the new pipeline and
   nothing is ported twice. Coordinates its public API with Plan 286's extension model.

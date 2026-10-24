@@ -39,7 +39,7 @@ reviews. [GitService](../apps/server/src/git/service.ts) reads diffs and object 
 operation was found. Editor has `createDiffRegionStore` in
 `/work/projects/Editor/packages/diff/src/regions.ts` and document change subscriptions in
 `/work/projects/Editor/packages/editor/src/documentSession.ts`; no edit-location change-list owner
-was found. Extend these as `editor/packages/diff/` and `editor/packages/editor/` after Plan 207.
+was found. Extend these as `packages/singapore/packages/diff/` and `packages/singapore/packages/editor/` after Plan 207.
 
 ## Design
 

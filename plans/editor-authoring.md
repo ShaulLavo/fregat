@@ -7,7 +7,7 @@ remains the execution scheduler. The Editor backlog index recommends an order wi
 
 ## Write a plan another engineer can execute
 
-Read [Editor instructions](../editor/AGENTS.md), the relevant [wishlist](editor-wishlist.md)
+Read [Editor instructions](../packages/singapore/AGENTS.md), the relevant [wishlist](editor-wishlist.md)
 section, and the actual source before writing.
 The initial inspection baseline is Editor `9abb944f3a2b8d6516953fdec75e8df5e1a94811`.
 Later plans record their actual inspected commit in a per-entry `baseline` in `editor-backlog.json`;
@@ -60,7 +60,7 @@ changes to the root author. Run the backlog verifier after changes to the invent
 
 Schema version 2 keeps executable entries under `file`. Only an entry with status `Completed`
 or `Moved` uses `reference` instead. A completed entry points outside `plans/` to a permanent
-reference, such as `../editor/docs/performance/input-latency.md`. A moved entry points to the
+reference, such as `../packages/singapore/docs/performance/input-latency.md`. A moved entry points to the
 plan that owns the work now in root `plans/`, or to the root roadmap. Neither may contain `file`; other statuses
 must not contain `reference` and retain every executable-plan check.
 

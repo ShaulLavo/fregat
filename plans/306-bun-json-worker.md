@@ -19,9 +19,9 @@ The issue's source/artifact inspection attributes the expression to `web-tree-si
 Current source still has the relevant boundaries:
 
 - [apps/web/vitest.config.ts](../apps/web/vitest.config.ts) selects [happy-dom-ssr.ts](../apps/web/test/env/happy-dom-ssr.ts), whose `viteEnvironment` is `ssr` and whose canvas setup acknowledges native Worker transfer constraints.
-- [workerClient.ts](../editor/packages/tree-sitter/src/treeSitter/workerClient.ts) constructs a module Worker from `new URL('./treeSitter.worker.ts', import.meta.url)` and propagates worker responses/errors through its lifecycle owner.
-- [treeSitter.worker.ts](../editor/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts) initializes the parser and calls `Language.load(descriptor.wasmUrl)` in `createRuntime`.
-- [tree-sitter/package.json](../editor/packages/tree-sitter/package.json) pins `web-tree-sitter` to tree-sitter-x `059451d3c167443643630d471c2c2d61c13b10ff`. Recheck the pinned implementation and resolved artifact during execution.
+- [workerClient.ts](../packages/singapore/packages/tree-sitter/src/treeSitter/workerClient.ts) constructs a module Worker from `new URL('./treeSitter.worker.ts', import.meta.url)` and propagates worker responses/errors through its lifecycle owner.
+- [treeSitter.worker.ts](../packages/singapore/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts) initializes the parser and calls `Language.load(descriptor.wasmUrl)` in `createRuntime`.
+- [tree-sitter/package.json](../packages/singapore/packages/tree-sitter/package.json) pins `web-tree-sitter` to tree-sitter-x `059451d3c167443643630d471c2c2d61c13b10ff`. Recheck the pinned implementation and resolved artifact during execution.
 
 No tests or builds ran for this plan. The Markdown dependency's filesystem warning alone does not establish the cause of a JSON failure.
 
@@ -48,6 +48,6 @@ Browser code must retain browser asset loading. A native filesystem adapter belo
 
 ## Verification and acceptance
 
-Use the new Bun DOM regression, the original `page-held-selection.test.tsx`, and [treeSitter-workerClient.browser.test.ts](../editor/packages/tree-sitter/test/treeSitter-workerClient.browser.test.ts). Read package scripts before selecting browser commands. Committed fixtures resolve assets from the checkout or test temporary directories and run in CI without owner-specific paths.
+Use the new Bun DOM regression, the original `page-held-selection.test.tsx`, and [treeSitter-workerClient.browser.test.ts](../packages/singapore/packages/tree-sitter/test/treeSitter-workerClient.browser.test.ts). Read package scripts before selecting browser commands. Committed fixtures resolve assets from the checkout or test temporary directories and run in CI without owner-specific paths.
 
 Completion requires real JSON structural success in the affected environment and the production browser control. A missing error log, a passing surrounding settings assertion, or a Markdown build-warning change alone is insufficient. Record any nonreproducing environment precisely; do not declare a production regression without observing one.

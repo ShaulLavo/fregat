@@ -1,6 +1,6 @@
 # Performance Trace Report And Plan
 
-Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
+Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
 
 ## Scope
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 platform_root=$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
-editor_root=$(realpath "$platform_root/editor")
+editor_root=$(realpath "$platform_root/packages/singapore")
 
 cd "$platform_root/apps/web"
 bun run typecheck

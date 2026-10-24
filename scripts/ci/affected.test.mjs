@@ -52,15 +52,15 @@ test('the four documentation files in PR 1207 do not consume application or libr
 
 const terminalPrFiles = [
   '.changeset/desktop-linux-webgl-auto.md',
-  'ghostty-webgpu/docs/api.md',
-  'ghostty-webgpu/src/render/shared/backend-order.test.ts',
-  'ghostty-webgpu/src/render/shared/backend-order.ts',
-  'ghostty-webgpu/src/render/shared/selector.ts',
-  'ghostty-webgpu/src/render/tests/platforms.ts',
-  'ghostty-webgpu/src/render/tests/selector.browser.test.ts',
-  'ghostty-webgpu/src/worker/runtime.ts',
-  'ghostty-webgpu/src/worker/terminal.browser.test.ts',
-  'ghostty-webgpu/src/worker/tests/platform-backend.worker.ts',
+  'packages/ghostty-webgpu/docs/api.md',
+  'packages/ghostty-webgpu/src/render/shared/backend-order.test.ts',
+  'packages/ghostty-webgpu/src/render/shared/backend-order.ts',
+  'packages/ghostty-webgpu/src/render/shared/selector.ts',
+  'packages/ghostty-webgpu/src/render/tests/platforms.ts',
+  'packages/ghostty-webgpu/src/render/tests/selector.browser.test.ts',
+  'packages/ghostty-webgpu/src/worker/runtime.ts',
+  'packages/ghostty-webgpu/src/worker/terminal.browser.test.ts',
+  'packages/ghostty-webgpu/src/worker/tests/platform-backend.worker.ts',
 ]
 
 test('PR 1208 selects terminal verification and patch-note formatting only', () => {
@@ -80,7 +80,7 @@ test('PR 1208 selects terminal verification and patch-note formatting only', () 
 })
 
 test('shader-only edits select the dedicated Ghostty library/browser gate', () => {
-  const plan = select(['ghostty-webgpu/packages/shaders/src/addon.ts'])
+  const plan = select(['packages/ghostty-webgpu/packages/shaders/src/addon.ts'])
   expect(plan).toMatchObject({
     packages: ['ghostty-webgpu-shaders'],
     ghostty: true,
@@ -130,19 +130,19 @@ test.each([
   ['apps/web/src/features/chat/components/message.tsx', 'web'],
   ['apps/server/src/provider/service.ts', 'server'],
   ['apps/tui/src/main.tsx', 'tui'],
-  ['editor/packages/highlighting/src/index.ts', '@singapore-editor/highlighting'],
-  ['hotkeys/packages/hotkeys/src/index.ts', '@fregat/hotkeys'],
+  ['packages/singapore/packages/highlighting/src/index.ts', '@singapore-editor/highlighting'],
+  ['packages/hotkeys/packages/hotkeys/src/index.ts', '@fregat/hotkeys'],
   ['packages/contracts/src/index.ts', '@workspace/contracts'],
-  ['ghostty-webgpu/site/src/main.ts', 'ghostty-webgpu-site'],
-  ['ghostty-webgpu/site-classic/src/main.ts', 'ghostty-webgpu-classic-site'],
-  ['ghostty-webgpu/docs/correctness-results.json', 'ghostty-webgpu'],
+  ['packages/ghostty-webgpu/site/src/main.ts', 'ghostty-webgpu-site'],
+  ['packages/ghostty-webgpu/site-classic/src/main.ts', 'ghostty-webgpu-classic-site'],
+  ['packages/ghostty-webgpu/docs/correctness-results.json', 'ghostty-webgpu'],
 ])('%s selects only its owning package', (file, name) => {
   expect(select([file]).packages).toEqual([name])
   expect(select([file]).tooling).toBe(false)
 })
 
 test('classic Ghostty changes select the site build', () => {
-  expect(select(['ghostty-webgpu/site-classic/src/main.ts'])).toMatchObject({
+  expect(select(['packages/ghostty-webgpu/site-classic/src/main.ts'])).toMatchObject({
     site: true,
     sites: 'ghostty-webgpu',
   })
@@ -152,24 +152,24 @@ test('PR 1232 selects Editor health when changing its baseline and workflow', ()
   expect(
     select([
       '.github/workflows/workspace-libraries.yml',
-      'editor/docs/architecture/phase-0/health-baseline.json',
+      'packages/singapore/docs/architecture/phase-0/health-baseline.json',
       'scripts/workspace-verification.test.ts',
     ]),
   ).toMatchObject({ editor: true, ghostty: true, web: true, server: true })
 })
 
 test.each([
-  'editor/docs/architecture/phase-0/health-baseline.json',
-  'editor/docs/architecture/phase-0/core-public-api.json',
-  'editor/docs/architecture/phase-0/timer-usage.json',
-  'editor/docs/architecture/e056-platform-agnostic-core-sources.json',
-  'editor/scripts/architecture-health.mjs',
-  'editor/scripts/check-full-text-boundary.mjs',
-  'editor/scripts/full-text-boundary-allow.json',
-  'editor/scripts/command-reference.ts',
-  'editor/docs/commands.md',
-  'editor/package.json',
-  'editor/site/package.json',
+  'packages/singapore/docs/architecture/phase-0/health-baseline.json',
+  'packages/singapore/docs/architecture/phase-0/core-public-api.json',
+  'packages/singapore/docs/architecture/phase-0/timer-usage.json',
+  'packages/singapore/docs/architecture/e056-platform-agnostic-core-sources.json',
+  'packages/singapore/scripts/architecture-health.mjs',
+  'packages/singapore/scripts/check-full-text-boundary.mjs',
+  'packages/singapore/scripts/full-text-boundary-allow.json',
+  'packages/singapore/scripts/command-reference.ts',
+  'packages/singapore/docs/commands.md',
+  'packages/singapore/package.json',
+  'packages/singapore/site/package.json',
 ])('%s selects Editor health without unrelated library or application tests', (file) => {
   expect(select([file])).toMatchObject({
     editor: true,
@@ -182,10 +182,10 @@ test.each([
 })
 
 test.each([
-  'editor/docs/architecture/phase-0/README.md',
-  'editor/docs/architecture/phase-0/performance-baseline.md',
-  'editor/docs/architecture/extension-hooks.md',
-  'editor/docs/development.md',
+  'packages/singapore/docs/architecture/phase-0/README.md',
+  'packages/singapore/docs/architecture/phase-0/performance-baseline.md',
+  'packages/singapore/docs/architecture/extension-hooks.md',
+  'packages/singapore/docs/development.md',
 ])('%s does not select Editor health', (file) => {
   expect(select([file]).editor).toBe(false)
 })
@@ -225,11 +225,11 @@ test.each([
   '.oxfmtrc.json',
   '.oxlintrc.json',
   'patches/example.patch',
-  'editor/tsconfig.json',
-  'editor/scripts/workspace-root.ts',
-  'editor/scripts/build-package.ts',
-  'editor/examples/app/tsconfig.json',
-  'hotkeys/tsconfig.json',
+  'packages/singapore/tsconfig.json',
+  'packages/singapore/scripts/workspace-root.ts',
+  'packages/singapore/scripts/build-package.ts',
+  'packages/singapore/examples/app/tsconfig.json',
+  'packages/hotkeys/tsconfig.json',
   '.github/workflows/ci.yml',
   '.github/actions/setup/action.yml',
   'scripts/dev-sources.ts',
@@ -320,7 +320,7 @@ test.skipIf(!gitAvailable).each([
   [[], '', 'changed', []],
   [['apps/site/index.html'], 'fregat', 'changed', ['site']],
   [
-    ['apps/site/index.html', 'editor/site/index.html'],
+    ['apps/site/index.html', 'packages/singapore/site/index.html'],
     'fregat,singapore',
     'changed',
     ['singapore-editor-site', 'site'],
@@ -334,19 +334,19 @@ test.skipIf(!gitAvailable).each([
   const directory = mkdtempSync(path.join(tmpdir(), 'ci-affected-output-'))
   const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim()
   try {
-    for (const folder of ['apps/site', 'editor/site', 'docs'])
+    for (const folder of ['apps/site', 'packages/singapore/site', 'docs'])
       mkdirSync(path.join(directory, folder), { recursive: true })
     writeFileSync(
       path.join(directory, 'package.json'),
       JSON.stringify({
-        workspaces: { packages: ['apps/*', 'editor/site'] },
+        workspaces: { packages: ['apps/*', 'packages/singapore/site'] },
         scripts: { 'build:workspaces': 'turbo run build --filter=site' },
       }),
     )
     writeFileSync(path.join(directory, 'turbo.json'), '{"globalDependencies":[],"tasks":{}}')
     writeFileSync(path.join(directory, 'apps/site/package.json'), '{"name":"site"}')
     writeFileSync(
-      path.join(directory, 'editor/site/package.json'),
+      path.join(directory, 'packages/singapore/site/package.json'),
       '{"name":"singapore-editor-site"}',
     )
     git('init', '-q')

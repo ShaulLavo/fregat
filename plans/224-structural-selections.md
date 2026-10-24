@@ -33,7 +33,7 @@ Add the previous matching cursor, select lines or enclosing symbols and walk sib
 ## Existing Fregat and Editor work
 
 Editor source below was verified in `/work/projects/Editor/packages/` before Plan 207.
-Implement it in Fregat `editor/packages/` after that cutover; the external checkout is
+Implement it in Fregat `packages/singapore/packages/` after that cutover; the external checkout is
 read-only for this wave.
 
 [packages/editor/src/selections.ts](/work/projects/Editor/packages/editor/src/selections.ts) and
@@ -53,7 +53,7 @@ focus nodes and handlers in the window dispatcher. Preserve Linux/macOS contexts
 payloads, source order, and unbinds from the translation; activate modal rows when
 their mode owner exists. A declined command falls through to its ancestor.
 
-Implement selection semantics in `editor/packages/editor/`; extend syntax range
+Implement selection semantics in `packages/singapore/packages/editor/`; extend syntax range
 providers with explicit enclosing/sibling queries. Keep AST lookup in the syntax
 package and pass ranges through the plugin contract. A fold range alone cannot
 answer sibling syntax navigation. Use symbol ranges from an existing symbol

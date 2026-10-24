@@ -247,8 +247,8 @@ complete cross-backend contract. Runtime implementation follows the owning plans
 
 This is separate from the foundations wave and from the product programs above.
 [207](plans/207-one-repo-with-mirrors.md) delivered source migration on 2026-09-30.
-The scoped cutover hold has ended. Develop Editor in `editor/packages/`, Ghostty in
-`ghostty-webgpu/`, and hotkeys in `hotkeys/`; their standalone repositories are mirrors.
+The scoped cutover hold has ended. Develop Editor in `packages/singapore/packages/`, Ghostty in
+`packages/ghostty-webgpu/`, and hotkeys in `packages/hotkeys/`; their standalone repositories are mirrors.
 npm authentication, initial publication and trusted-publisher setup remain deferred.
 Local development uses the neighboring workspaces. Before 204/205 mirror a consumer of
 hotkeys, qualify the exact standalone dependency source under 207; npm remains deferred.
@@ -336,7 +336,7 @@ shared React/TypeScript logic. The wave-2 queue above is unchanged.
   [document-backed content views](docs/document-backed-content-views.md). Only exact consumed
   contracts are prerequisites, not unrelated whole plans.
 - Plans 203/206 own keymap infrastructure. Plan 202's controls integrate with that dispatcher;
-  they do not introduce a second one. Editor source is canonical in `editor/packages/` after 207.
+  they do not introduce a second one. Editor source is canonical in `packages/singapore/packages/` after 207.
 - The [coordination and research index](.internal/tui-research/ui-plan-links.md) links the retained
   catalog, source evidence, companion plans and implementation handoffs. These are plans, not
   delivered package changes; the existing fork overrides remain until the verified cutover.

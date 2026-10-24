@@ -3,12 +3,12 @@ name: ghostty docs
 on:
   pull_request:
     paths:
-      - ghostty-webgpu/site/**
-      - ghostty-webgpu/site-classic/**
-      - ghostty-webgpu/src/dom/**
-      - ghostty-webgpu/docs/correctness-results.json
-      - ghostty-webgpu/docs/benchmarks/**
-      - hotkeys/packages/hotkeys/**
+      - packages/ghostty-webgpu/site/**
+      - packages/ghostty-webgpu/site-classic/**
+      - packages/ghostty-webgpu/src/dom/**
+      - packages/ghostty-webgpu/docs/correctness-results.json
+      - packages/ghostty-webgpu/docs/benchmarks/**
+      - packages/hotkeys/packages/hotkeys/**
       - package.json
       - scripts/workspace-tooling.mjs
       - bun.lock
@@ -17,12 +17,12 @@ on:
   push:
     branches: [main]
     paths:
-      - ghostty-webgpu/site/**
-      - ghostty-webgpu/site-classic/**
-      - ghostty-webgpu/src/dom/**
-      - ghostty-webgpu/docs/correctness-results.json
-      - ghostty-webgpu/docs/benchmarks/**
-      - hotkeys/packages/hotkeys/**
+      - packages/ghostty-webgpu/site/**
+      - packages/ghostty-webgpu/site-classic/**
+      - packages/ghostty-webgpu/src/dom/**
+      - packages/ghostty-webgpu/docs/correctness-results.json
+      - packages/ghostty-webgpu/docs/benchmarks/**
+      - packages/hotkeys/packages/hotkeys/**
       - package.json
       - scripts/workspace-tooling.mjs
       - bun.lock
@@ -46,14 +46,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
       - name: Check samples, generate reference and validate links
-        run: bun run --cwd ghostty-webgpu/${{ matrix.site }} build --base /fregat/ghostty-webgpu/
+        run: bun run --cwd packages/ghostty-webgpu/${{ matrix.site }} build --base /fregat/ghostty-webgpu/
       - name: Install Chromium and WebKit
         uses: ./.github/actions/install-browsers
         with:
-          playwright: ghostty-webgpu/${{ matrix.site }}/node_modules/.bin/playwright
+          playwright: packages/ghostty-webgpu/${{ matrix.site }}/node_modules/.bin/playwright
           browsers: chromium webkit
       - name: Start docs preview
-        working-directory: ghostty-webgpu/${{ matrix.site }}
+        working-directory: packages/ghostty-webgpu/${{ matrix.site }}
         run: |
           bun run preview --ignore-lock --base /fregat/ghostty-webgpu/ --host 127.0.0.1 --port 4327 > "$RUNNER_TEMP/ghostty-preview.log" 2>&1 &
           preview=$!
@@ -69,7 +69,7 @@ jobs:
           done
           test "$ready" = 1 || { cat "$RUNNER_TEMP/ghostty-preview.log"; exit 1; }
       - name: Verify docs, echo example and search
-        working-directory: ghostty-webgpu/${{ matrix.site }}
+        working-directory: packages/ghostty-webgpu/${{ matrix.site }}
         run: bun scripts/verify-docs.ts http://127.0.0.1:4327/fregat/ghostty-webgpu/docs/ "$RUNNER_TEMP/ghostty-docs-evidence"
       - name: Stop docs preview
         if: always()
@@ -85,4 +85,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ghostty-docs-${{ matrix.site }}
-          path: ghostty-webgpu/${{ matrix.site }}/dist
+          path: packages/ghostty-webgpu/${{ matrix.site }}/dist

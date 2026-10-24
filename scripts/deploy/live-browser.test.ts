@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { expect, test, vi } from 'vitest'
-import { swiftShaderArgs } from '../../ghostty-webgpu/scripts/swiftshader-launch.mjs'
+import { swiftShaderArgs } from '../../packages/ghostty-webgpu/scripts/swiftshader-launch.mjs'
 import { openLiveBrowser } from './live-browser.mjs'
 
 vi.mock('node:fs', () => ({ existsSync: () => true }))

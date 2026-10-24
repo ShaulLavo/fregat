@@ -12,7 +12,7 @@ avoiding element-screenshot stability/scroll waits. It also removes the follow-u
 from the disabled configuration, which has no worker or minimap jobs. Worker-backed settlement,
 all source/output/lifetime checks, sampling counts, pair order, and latency budgets stay intact.
 
-The rerunnable `editor/examples/stress/test/profile-input-capture.mjs` experiment compares both
+The rerunnable `packages/singapore/examples/stress/test/profile-input-capture.mjs` experiment compares both
 screenshot paths on one frozen view with counterbalanced order. Twenty pairs produce identical
 PNGs, with median elapsed capture 66.745 ms for the element path and 32.420 ms for the clipped
 path, and complete resource retirement. These are headless observer-overhead measurements,
@@ -79,7 +79,7 @@ Undo verdicts keep their original identities and do not describe the final candi
   (still gated) and any other change that can slow typing.
 - Starting evidence: PR #224 records the partial calibration (5 of 10 configurations accepted,
   `tree-sitter-shiki` holdout failed) and keeps its instrument and harness in
-  `editor/examples/stress/`.
+  `packages/singapore/examples/stress/`.
 
 ## Outcome
 

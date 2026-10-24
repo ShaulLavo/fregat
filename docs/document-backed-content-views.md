@@ -114,14 +114,14 @@ A live read for a different document throws. Search results and composer mention
 
 | Area                         | Files                                                                                                                                                                                                                                             |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Analysis resource            | `editor/packages/editor/src/editor/documentAnalysis.ts` (`createEditorDocumentAnalysis`, `borrowHighlighter`, `borrowStructural`, `reclaimInactive`, `inspectRetention`, `inspectLeases`)                                                         |
-| View attachment              | `editor/packages/editor/src/editor/Editor.ts`, `syntaxController.ts`, `preparedDocument.ts`; `editor/packages/react/src/index.tsx`                                                                                                                |
-| Edit chain                   | `editor/packages/editor/src/editor/editChain.ts`                                                                                                                                                                                                  |
+| Analysis resource            | `packages/singapore/packages/editor/src/editor/documentAnalysis.ts` (`createEditorDocumentAnalysis`, `borrowHighlighter`, `borrowStructural`, `reclaimInactive`, `inspectRetention`, `inspectLeases`)                                             |
+| View attachment              | `packages/singapore/packages/editor/src/editor/Editor.ts`, `syntaxController.ts`, `preparedDocument.ts`; `packages/singapore/packages/react/src/index.tsx`                                                                                        |
+| Edit chain                   | `packages/singapore/packages/editor/src/editor/editChain.ts`                                                                                                                                                                                      |
 | Live documents and retention | `apps/web/src/features/editor/state/workspace-document-service.ts`, `inactive-analysis-policy.ts`, `inactive-analysis-retention.ts`; `features/editor/utils/inactive-analysis-budget.ts`                                                          |
 | Hover and open preparation   | `apps/web/src/lib/file-open-intent/state/service.ts`, `apps/web/src/features/editor/utils/prepared-document.ts`                                                                                                                                   |
 | Disk reads                   | `apps/web/src/lib/file-snapshot-query-cache.ts`                                                                                                                                                                                                   |
 | Comparisons                  | `apps/web/src/lib/snapshot-comparison.ts`, `lib/saved-comparison.ts`, `lib/diff-attachment.ts`; `features/editor/state/snapshot-comparison-owner.ts`, `diff-presentation.ts`, `tab-presentation.ts`; `features/git/hooks/use-diff-reload-view.ts` |
-| Diff syntax                  | `editor/packages/diff/src/diffSyntax.ts`, `apps/web/src/features/editor/state/diff-syntax-preparation.ts`                                                                                                                                         |
+| Diff syntax                  | `packages/singapore/packages/diff/src/diffSyntax.ts`, `apps/web/src/features/editor/state/diff-syntax-preparation.ts`                                                                                                                             |
 | Conflicts                    | `apps/web/src/features/workspace/state/event-conflict-adapter.ts`, `conflict-editor-resolution.ts`; `features/editor/state/conflict-state.tsx`                                                                                                    |
 | Previews and source ranges   | `apps/web/src/lib/file-preview/utils/source.ts`, `preview-query.ts`, `components/text-preview.tsx`; `features/workbench/components/markdown-preview-pane.tsx`                                                                                     |
 | WorkspaceEdit preview        | `apps/web/src/features/editor/components/workspace-edit-preview-dialog.tsx`                                                                                                                                                                       |
@@ -130,7 +130,7 @@ A live read for a different document throws. Search results and composer mention
 ## Tests and scenarios
 
 Editor package: `test/documentAnalysis.node.test.ts`, `test/analysisDisplayDemand.test.ts` and
-`test/editChain.test.ts` under `editor/packages/editor/`. `bun editor/packages/editor/bench/editChain.ts`
+`test/editChain.test.ts` under `packages/singapore/packages/editor/`. `bun packages/singapore/packages/editor/bench/editChain.ts`
 measures edit-chain composition.
 
 Web client, run with real Editor workers in Playwright Chromium:

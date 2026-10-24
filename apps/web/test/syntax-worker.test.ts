@@ -3,7 +3,7 @@ import { installSyntaxWorker } from './factories/syntax-worker'
 import type {
   TreeSitterWorkerRequestPayload,
   TreeSitterWorkerResponse,
-} from '../../../editor/packages/tree-sitter/src/treeSitter/types'
+} from '../../../packages/singapore/packages/tree-sitter/src/treeSitter/types'
 
 const identity = {
   documentId: 'review',

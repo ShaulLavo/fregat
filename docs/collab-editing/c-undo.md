@@ -176,32 +176,32 @@ Undo moves to the parent; redo follows the preferred child. Editing after undo r
 
 Evidence:
 
-- `editor/packages/editor/src/history.ts:3–37,211–246`.
-- `editor/docs/editing/undo-graph.md:15–39`.
+- `packages/singapore/packages/editor/src/history.ts:3–37,211–246`.
+- `packages/singapore/docs/editing/undo-graph.md:15–39`.
 
 Transactions also contain offset-space `edits` and `inverseEdits`, before/after snapshots, before/after anchored selections, and metadata. `DocumentSession.undo` changes the history state and publishes the transaction’s inverse edits; redo publishes its forward edits.
 
 Thus the answer to “offset-space inverse edits?” is **yes, but not exclusively**: the current authority is the snapshot graph, with inverse edit scripts carried for transactions/publication.
 
-Evidence: `editor/packages/editor/src/documentSession.ts:351–358,784–846`.
+Evidence: `packages/singapore/packages/editor/src/documentSession.ts:351–358,784–846`.
 
 **Collaboration consequence, inferred:** installing an old node snapshot as the live document would discard later remote edits. Updating only the current node for each remote edit would leave ancestor/sibling snapshots stale. Neither is a correct collaborative undo implementation.
 
 The existing `replaceEditorHistoryState` updates only the current node, confirming why that helper alone is insufficient.
 
-Evidence: `editor/packages/editor/src/history.ts:260–276`.
+Evidence: `packages/singapore/packages/editor/src/history.ts:260–276`.
 
 ### Persisted undo
 
 The serialized graph stores parent-relative forward/inverse `TextEdit` scripts, selection offsets, branch identity, and metadata. It does not serialize the snapshot objects. Selection anchors are resolved into numeric offsets when serializing.
 
-Evidence: `editor/packages/editor/src/historySerialization.ts:28–63,79–99,120–145`.
+Evidence: `packages/singapore/packages/editor/src/historySerialization.ts:28–63,79–99,120–145`.
 
 Fregat stores history in IndexedDB and restores it when the newly opened document’s content hash matches. The actual adoption path checks `fileVersion` against `contentHash` before asking the buffer to restore the history.
 
 Evidence:
 
-- `editor/docs/editing/e018-persisted-undo.md:6–20`.
+- `packages/singapore/docs/editing/e018-persisted-undo.md:6–20`.
 - `apps/web/src/features/editor/state/history-persistence.ts:88–95,126–136`.
 
 **Collaboration consequence, inferred:** equal text is insufficient. Two collaborative documents can contain the same string with completely different character/operation IDs. Restoring ID-space history requires the matching document identity and retained identity universe.
@@ -215,9 +215,9 @@ These are separate domains today:
 
 Evidence:
 
-- `editor/packages/editor/src/editor/cursorHistory.ts:7–67`.
-- `editor/docs/editing/jump-history.md:25–37`.
-- `editor/packages/editor/src/editor/jumpHistory.ts:37–99`.
+- `packages/singapore/packages/editor/src/editor/cursorHistory.ts:7–67`.
+- `packages/singapore/docs/editing/jump-history.md:25–37`.
+- `packages/singapore/packages/editor/src/editor/jumpHistory.ts:37–99`.
 
 **Design implication:** Jump history provides the useful pattern for collaborative selection restoration, but its piece-table anchors must become transport/persistence-stable character-ID anchors. Cursor undo should remain separate; converting it to anchors is a distinct scope decision.
 
@@ -332,7 +332,7 @@ Old snapshots may remain immutable inspection evidence, but must never replace l
 
 Pruning must preserve the established baseline: advancing the graph root does not deactivate its former ancestors’ already accepted effects.
 
-Grounding for preserved graph behavior: `editor/docs/editing/undo-graph.md:24–44`.
+Grounding for preserved graph behavior: `packages/singapore/docs/editing/undo-graph.md:24–44`.
 
 ### 3.5 Grouping and redo
 
@@ -363,7 +363,7 @@ Resolve against the current accepted-plus-pending document after reversal/replay
 
 Only the initiating view restores its captured selection. Other local views and collaborators keep their own anchors and observe text changes.
 
-Grounding: `editor/packages/editor/src/editor/jumpHistory.ts:37–99` and `editor/docs/editing/jump-history.md:25–37`.
+Grounding: `packages/singapore/packages/editor/src/editor/jumpHistory.ts:37–99` and `packages/singapore/docs/editing/jump-history.md:25–37`.
 
 ### 3.7 Persistence and host handoff
 
@@ -412,7 +412,7 @@ These are proposed semantic outcomes, not tested results.
 
 **Unresolved product choice:** same-ID revival can make an old anchored waypoint or annotation become live again. That is consistent with jump history’s current deleted-waypoint behavior, but collaborative annotations and richer content need their own explicit policies.
 
-Grounding: `editor/docs/editing/jump-history.md:29–31`.
+Grounding: `packages/singapore/docs/editing/jump-history.md:29–31`.
 
 ## 5. Tests to port
 
@@ -498,9 +498,9 @@ Grounded in the branching snapshot, persisted undo and jump history contracts:
 
 Existing local contract sources:
 
-- `editor/docs/editing/undo-graph.md:24–44`.
-- `editor/docs/editing/e018-persisted-undo.md:6–23`.
-- `editor/docs/editing/jump-history.md:25–44`.
+- `packages/singapore/docs/editing/undo-graph.md:24–44`.
+- `packages/singapore/docs/editing/e018-persisted-undo.md:6–23`.
+- `packages/singapore/docs/editing/jump-history.md:25–44`.
 - .
 
 ## Verification and limitations

@@ -32,26 +32,26 @@ jobs:
         run: bun install --frozen-lockfile --filter '@singapore-editor/textbuffer'
       - name: Check formatting and lint
         run: |
-          bun run --cwd editor/packages/textbuffer format:check
-          bun run --cwd editor/packages/textbuffer lint
+          bun run --cwd packages/singapore/packages/textbuffer format:check
+          bun run --cwd packages/singapore/packages/textbuffer lint
       - name: Verify the package and adapter contracts
         run: |
-          bun run --cwd editor/packages/textbuffer verify
-          bun run --cwd editor/packages/textbuffer bench:check
-          bun run --cwd editor/packages/textbuffer bench:profile:check
+          bun run --cwd packages/singapore/packages/textbuffer verify
+          bun run --cwd packages/singapore/packages/textbuffer bench:check
+          bun run --cwd packages/singapore/packages/textbuffer bench:profile:check
       - name: Smoke the complete measurement pipeline
-        run: bun run --cwd editor/packages/textbuffer bench -- --profile smoke
+        run: bun run --cwd packages/singapore/packages/textbuffer bench -- --profile smoke
       # Timing and profiling on shared runners are artifacts, not gates; pull requests stop at the smoke run.
       - name: Compare buffers without performance pass/fail thresholds
         if: github.event_name != 'pull_request'
-        run: bun run --cwd editor/packages/textbuffer bench -- --profile standard
+        run: bun run --cwd packages/singapore/packages/textbuffer bench -- --profile standard
       - name: Profile separately from clean timing runs
         if: github.event_name != 'pull_request'
-        run: bun run --cwd editor/packages/textbuffer bench:profile -- --profile standard --repeats 12
+        run: bun run --cwd packages/singapore/packages/textbuffer bench:profile -- --profile standard --repeats 12
       - name: Publish summary
         if: always()
         run: |
-          for report in editor/packages/textbuffer/bench/results/*.md editor/packages/textbuffer/bench/results/profile-*/report.md; do
+          for report in packages/singapore/packages/textbuffer/bench/results/*.md packages/singapore/packages/textbuffer/bench/results/profile-*/report.md; do
             if [ -f "$report" ]; then cat "$report" >> "$GITHUB_STEP_SUMMARY"; fi
           done
       - name: Retain raw samples and provenance
@@ -59,5 +59,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: textbuffer-benchmarks-${{ github.run_id }}
-          path: editor/packages/textbuffer/bench/results/
+          path: packages/singapore/packages/textbuffer/bench/results/
           if-no-files-found: warn

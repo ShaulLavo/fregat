@@ -1,6 +1,6 @@
 # E067: Peer-to-peer collaboration plugin over WebRTC
 
-Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
+Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
 
 - Status: In progress
 - Kind: Implementation
@@ -26,7 +26,7 @@ sides' work survives the rejoin.
   that declare `inputs` only receive those update kinds (`packages/editor/src/plugins.ts`).
 - Remote selections and carets can use owner-scoped highlights, tracked decorations, per-view DOM
   contributions and range geometry (`plugins.ts`, `editor/decorationStore.ts`,
-  [E050](../editor/docs/architecture/e050-host-obligations.md)).
+  [E050](../packages/singapore/docs/architecture/e050-host-obligations.md)).
 - Missing core contracts (exact transaction stream with origin, atomic reconcile, character-ID
   conversion, collaborative undo) belong to E066 step 6.
 - y-webrtc is coupled to a Y.Doc; its signaling server is a small topic broker; its code default
@@ -143,8 +143,8 @@ Not in scope: accounts, permissions, persistent rooms, a server peer, and rooms 
 ## Follow-up verification finding, 2026-10-10
 
 - [ ] Resolve the demo's transport recovery check on Chromium on the Raspberry Pi.
-      Run `bun run --cwd editor/examples/app test:e2e -- --workers=1 --grep 'connection errors are replaced'`.
-      At `editor/examples/app/test/collaboration.spec.ts:179`, after both simulated
+      Run `bun run --cwd packages/singapore/examples/app test:e2e -- --workers=1 --grep 'connection errors are replaced'`.
+      At `packages/singapore/examples/app/test/collaboration.spec.ts:179`, after both simulated
       BroadcastChannel failures are cleared, `#status` still says `Peer connection stopped`
       after 5 seconds. The expected text is `Session ready. Share the invitation link to add peers.`
       This occurred twice, including with the original demo source at `917e6da49` restored,

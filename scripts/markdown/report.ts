@@ -77,7 +77,9 @@ function digest(value: unknown): string {
 }
 
 export async function inspectCandidate(root: string) {
-  const require = createRequire(path.join(root, 'editor/packages/tree-sitter/package.json'))
+  const require = createRequire(
+    path.join(root, 'packages/singapore/packages/tree-sitter/package.json'),
+  )
   const packageFile = require.resolve('tree-sitter-md/package.json')
   const metadata: { readonly version: string } = JSON.parse(await readFile(packageFile, 'utf8'))
   const module = await import(pathToFileURL(require.resolve('tree-sitter-md')).href)

@@ -20,7 +20,7 @@ const tools = [
 const root = JSON.parse(await readFile('package.json', 'utf8'))
 const catalog = root.workspaces.catalog
 const patterns = root.workspaces.packages
-const families = ['editor', 'ghostty-webgpu', 'hotkeys']
+const families = ['packages/singapore', 'packages/ghostty-webgpu', 'packages/hotkeys']
 const sharedPatches = Object.entries(root.patchedDependencies ?? {}).filter(([key]) =>
   tools.includes(key.slice(0, key.lastIndexOf('@'))),
 )
@@ -37,9 +37,9 @@ function expectedVersion(file, name) {
     name === 'typescript' &&
     [
       'apps/site/package.json',
-      'editor/site/package.json',
-      'ghostty-webgpu/site/package.json',
-      'ghostty-webgpu/site-classic/package.json',
+      'packages/singapore/site/package.json',
+      'packages/ghostty-webgpu/site/package.json',
+      'packages/ghostty-webgpu/site-classic/package.json',
     ].includes(file)
   )
     return catalog['typescript-api']
