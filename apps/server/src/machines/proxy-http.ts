@@ -74,6 +74,8 @@ export async function forwardMachineRequest(
         redirect: 'error',
         signal: retryRequest.signal,
       })
+      // A response can arrive while the fetcher still owns an unread upload body.
+      retryRequest = null
     }
     const responseHeaders = endToEndHeaders(response.headers)
     responseHeaders.delete('set-cookie')

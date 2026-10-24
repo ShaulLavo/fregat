@@ -1157,6 +1157,41 @@ describe('terminal service', () => {
     expect(socket.messages.some((message) => message.type === 'ready')).toBe(true)
   })
 
+  it('persists the causal error when the boot host listing times out', async () => {
+    const root = await fixtureRoot()
+    const host = await fakeHost()
+    const logDir = observedLogDir(root)
+    const service = testService(root, { hostClient: host.connect({ requestTimeoutMs: 100 }) })
+    host.unanswered.add('list')
+
+    try {
+      expect(await service.listHostSessions()).toBeNull()
+      await service.reattach()
+      await expect(service.probeHost()).rejects.toMatchObject({
+        internal: { reason: 'no-retained-connection' },
+      })
+      await flushObservability()
+      const events: WideEvent[] = []
+      for await (const event of readFsLogs({ dir: logDir })) {
+        if (event.action === 'terminal.host.list_failed') events.push(event)
+      }
+      expect(events).toEqual([
+        expect.objectContaining({
+          area: 'terminal',
+          level: 'warn',
+          error: expect.objectContaining({
+            code: 'terminal.HOST_UNREACHABLE',
+            message: 'The terminal host did not answer.',
+            internal: { reason: 'request-timeout', operation: 'list', timeoutMs: 100 },
+          }),
+        }),
+      ])
+      expect(host.sessions.size).toBe(0)
+    } finally {
+      await resetObservabilityForTests()
+    }
+  })
+
   it('keeps the same unreachable host snapshot for lease adoption and orphan recovery', async () => {
     const root = await fixtureRoot()
     const host = await nativeHost()

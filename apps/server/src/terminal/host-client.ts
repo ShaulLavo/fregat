@@ -171,6 +171,7 @@ export class TerminalHostClient {
     const paths = hostPaths(this.stateRoot, this.env)
     const token = ensureToken(paths)
     const startedAt = performance.now()
+    let readinessStartedAt = startedAt
     let launched = false
     let attempts = 0
     for (;;) {
@@ -183,7 +184,7 @@ export class TerminalHostClient {
             socket,
             token,
             generation,
-            HOST_CONNECT_TIMEOUT_MS - elapsedMs(startedAt),
+            HOST_CONNECT_TIMEOUT_MS - elapsedMs(readinessStartedAt),
           )
         : null
       this.assertOpening(generation, socket)
@@ -225,12 +226,14 @@ export class TerminalHostClient {
         await this.launch(this.hostArgv(), this.env)
         this.assertOpening(generation)
         launched = true
+        readinessStartedAt = performance.now()
       }
-      if (elapsedMs(startedAt) > HOST_CONNECT_TIMEOUT_MS)
+      if (elapsedMs(readinessStartedAt) > HOST_CONNECT_TIMEOUT_MS)
         throw terminalHostErrors.HOST_UNREACHABLE({
           internal: {
             attempts,
             elapsedMs: elapsedMs(startedAt),
+            readinessElapsedMs: elapsedMs(readinessStartedAt),
             launched,
             socket: paths.socket,
             socketExists: existsSync(paths.socket),

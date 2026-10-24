@@ -104,6 +104,7 @@ export function readWorkspaceGraph(root) {
   const globalInputs = turbo.globalDependencies.concat([
     'package.json',
     'bun.lock',
+    'turbo.json',
     'bunfig.toml',
     '.npmrc',
     '.env*',
@@ -143,8 +144,9 @@ function productionDependencies(pkg) {
 }
 
 function changedOwners(graph, files) {
-  const seeds = new Set()
-  let tooling = false
+  const globalChanged = files.some((file) => matches(file, graph.globalInputs))
+  const seeds = new Set(globalChanged ? graph.packages.keys() : [])
+  let tooling = globalChanged
   for (const file of files) {
     if (matches(file, generatedDocs)) {
       tooling = true
