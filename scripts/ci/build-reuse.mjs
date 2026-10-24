@@ -15,12 +15,13 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { release, tmpdir } from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { parseEnv } from 'node:util'
 import { readWorkspaceGraph, requiredLibraries } from './affected.mjs'
 
-const schema = 'fregat-ci-ws-v1'
+const schema = 'fregat-ci-ws-v2'
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex')
 const git = (root, ...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
 const cacheDirectory = '.turbo/ci-builds'
@@ -132,6 +133,28 @@ function environmentSeal(root, graph) {
   )
 }
 
+function imageOS(image) {
+  const match = typeof image === 'string' && image.match(/^([a-z][a-z0-9-]*)\/(\d[\d.]+)$/)
+  assert(match, 'Missing or invalid runner image provenance')
+  return match[1]
+}
+
+// Image patch stamps are provenance; these generated outputs bind to the live OS and toolchain.
+function platformIdentity(runtime) {
+  assert.equal(runtime.platform, process.platform, 'Node/Bun operating systems differ')
+  assert.equal(runtime.arch, process.arch, 'Node/Bun architectures differ')
+  const distribution =
+    process.platform === 'linux' ? parseEnv(readFileSync('/etc/os-release', 'utf8')) : null
+  const system = distribution
+    ? { distribution: distribution.ID, version: distribution.VERSION_ID, libc: runtime.libc }
+    : { release: release() }
+  assert(
+    Object.values(system).every((value) => typeof value === 'string' && value.length > 0),
+    'Missing operating system compatibility metadata',
+  )
+  return { os: process.platform, arch: process.arch, system }
+}
+
 function identity(root, graph, context) {
   assert(/^[\w.-]+\/[\w.-]+$/.test(context.repository), 'Missing repository identity')
   assert(
@@ -140,23 +163,39 @@ function identity(root, graph, context) {
   )
   assert(/^[a-f0-9]{40}$/.test(context.source), 'Invalid source identity')
   assert(
-    [context.os, context.arch, context.image].every(
-      (part) => typeof part === 'string' && part.length > 0,
-    ),
+    [context.os, context.arch].every((part) => typeof part === 'string' && part.length > 0),
     'Missing platform identity',
   )
   assert(
     /^[A-Za-z0-9]+$/.test(context.os) && /^[A-Za-z0-9]+$/.test(context.arch),
     'Invalid platform namespace',
   )
+  const runtime = JSON.parse(
+    execFileSync(
+      'node',
+      [
+        '-e',
+        `
+    process.stdout.write(JSON.stringify({
+      version: process.version, platform: process.platform, arch: process.arch,
+      libc: process.report.getReport().header.glibcVersionRuntime,
+    }))
+  `,
+      ],
+      { encoding: 'utf8' },
+    ),
+  )
   const toolchain = {
     bun: Bun.version,
-    node: execFileSync('node', ['-e', 'process.stdout.write(process.version)'], {
-      encoding: 'utf8',
-    }).trim(),
+    bunRevision: Bun.revision,
+    node: runtime.version,
     turbo: JSON.parse(readFileSync(path.join(root, 'node_modules/turbo/package.json'), 'utf8'))
       .version,
   }
+  assert(
+    Object.values(toolchain).every((value) => typeof value === 'string' && value.length > 0),
+    'Missing build toolchain metadata',
+  )
   return {
     schema,
     repository: context.repository,
@@ -166,7 +205,8 @@ function identity(root, graph, context) {
     run: context.run,
     os: context.os,
     arch: context.arch,
-    image: context.image,
+    imageOS: imageOS(context.image),
+    platform: platformIdentity(runtime),
     toolchain,
     environment: environmentSeal(root, graph),
     inputs: inputSeal(root, graph),
@@ -180,13 +220,14 @@ export function prepare({ root, temporary = tmpdir(), selection, targets: source
     : requiredLibraries(graph, targets(graph, source))
   const seal = identity(root, graph, context)
   const namespace = `${schema}-${seal.os}-${seal.arch}-${seal.run}-${seal.checkout}-a`
-  const cachePrefix = `${schema}-${digest(JSON.stringify([seal.os, seal.arch, seal.image, seal.toolchain, seal.environment, seal.inputs]))}-`
+  const cachePrefix = `${schema}-${digest(JSON.stringify([seal.os, seal.arch, seal.imageOS, seal.platform, seal.toolchain, seal.environment, seal.inputs]))}-`
   mkdirSync(temporary, { recursive: true })
   return {
     root,
     directory: mkdtempSync(path.join(temporary, 'workspace-builds-')),
     libraries,
     identity: seal,
+    provenance: { image: context.image },
     attempt: context.attempt,
     artifactPattern: `${namespace}*`,
     namespace,
@@ -369,6 +410,20 @@ export function produce(request) {
     planned.map((task) => [task.taskId, task.hash]).sort(),
     'Build task identities changed during execution',
   )
+  assert.deepEqual(
+    identity(request.root, readWorkspaceGraph(request.root), {
+      ...request.identity,
+      attempt: request.attempt,
+      image: request.provenance.image,
+    }),
+    request.identity,
+    'Build inputs changed during execution',
+  )
+  assert.deepEqual(
+    buildTasks(request).map((task) => taskRecord(graph, task)),
+    planned.map((task) => taskRecord(graph, task)),
+    'Build task/output identity changed during execution',
+  )
   const records = planned.map((task) => taskRecord(graph, task))
   const outputs = outputFiles(
     request.root,
@@ -383,6 +438,7 @@ export function produce(request) {
   const cacheFiles = names.map((name) => entry(request.root, `${cacheDirectory}/${name}`))
   const manifest = JSON.stringify({
     identity: request.identity,
+    provenance: request.provenance,
     attempt: request.attempt,
     libraries: request.libraries,
     tasks: records,
@@ -432,6 +488,11 @@ function validateBundle(request, directory, selected) {
   assert.equal(digest(content), selected.digest, 'Build manifest digest mismatch')
   const manifest = JSON.parse(content.toString('utf8'))
   assert.deepEqual(manifest.identity, request.identity, 'Build identity mismatch')
+  assert.equal(
+    imageOS(manifest.provenance?.image),
+    request.identity.imageOS,
+    'Build image OS mismatch',
+  )
   assert.equal(manifest.attempt, selected.attempt, 'Build attempt mismatch')
   const graph = readWorkspaceGraph(request.root)
   assert.deepEqual(
@@ -506,6 +567,7 @@ export function consume(request, downloads) {
     path.join(request.root, receiptFile),
     JSON.stringify({
       identity: request.identity,
+      provenance: { producer: manifest.provenance, consumer: request.provenance },
       files: manifest.files.filter((file) => under(file.path, roots)),
       libraries: request.libraries,
     }),
@@ -521,6 +583,16 @@ export function verifyImported(request) {
   if (!request.libraries.length) return
   const receipt = JSON.parse(readFileSync(path.join(request.root, receiptFile), 'utf8'))
   assert.deepEqual(receipt.identity, request.identity, 'Missing matching workspace import')
+  assert.deepEqual(
+    receipt.provenance?.consumer,
+    request.provenance,
+    'Import runner provenance mismatch',
+  )
+  assert.equal(
+    imageOS(receipt.provenance?.producer?.image),
+    request.identity.imageOS,
+    'Import image OS mismatch',
+  )
   assert(
     request.libraries.every((name) => receipt.libraries.includes(name)),
     'Missing site prerequisites',
@@ -539,6 +611,8 @@ function telemetry(event, request, detail = {}) {
     run: request.identity.run,
     checkout: request.identity.checkout,
     attempt: request.attempt,
+    identity: request.identity,
+    provenance: request.provenance,
     ...detail,
   })
   process.stdout.write(`${record}\n`)

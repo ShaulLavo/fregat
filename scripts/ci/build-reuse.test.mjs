@@ -52,7 +52,7 @@ function selected(values = {}) {
   )
 }
 
-function fixture() {
+function fixture(drift = '') {
   const directory = mkdtempSync(path.join(tmpdir(), 'ci-build-reuse-'))
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
   const write = (file, value) => {
@@ -86,8 +86,9 @@ function fixture() {
     },
   })
   write('.gitignore', 'node_modules\n.turbo\ntransport\n**/dist\n')
+  write('shared.txt', 'committed input')
   write('turbo.json', {
-    globalDependencies: ['builder.mjs'],
+    globalDependencies: ['builder.mjs', 'shared.txt'],
     globalEnv: ['NODE_ENV'],
     tasks: {
       build: { dependsOn: ['^build'], outputs: ['dist/**'] },
@@ -121,12 +122,18 @@ function fixture() {
   write('packages/ui/src/lib/generated/cn-tables.ts', 'export const classes = []\n')
   write(
     'builder.mjs',
-    `import {mkdirSync,writeFileSync,appendFileSync} from 'node:fs';
+    `import {mkdirSync,readFileSync,writeFileSync,appendFileSync} from 'node:fs';
 const ui = process.cwd().endsWith('/ui');
+const drift = ${JSON.stringify(drift)};
+if (!ui && drift === 'shared') writeFileSync('../../shared.txt', 'changed while building');
+if (!ui && drift === 'task-local') writeFileSync('input.txt', 'changed while building');
+if (!ui && drift === 'environment') writeFileSync('../../.env.local', 'NODE_ENV=production');
+const input = readFileSync(drift === 'task-local' ? 'input.txt' : '../../shared.txt', 'utf8');
 const file = ui ? 'src/lib/generated/cn-tables.ts' : 'dist/index.js';
 mkdirSync(ui ? 'src/lib/generated' : 'dist/worker', {recursive:true});
 if(!ui) mkdirSync('dist/node_modules/dependency', {recursive:true});
-writeFileSync(file,ui ? 'export const classes = []\\n' : 'export const value = 1\\n');
+const generated = drift === 'generated' ? 'export const classes = [1]\\n' : 'export const classes = []\\n';
+writeFileSync(file,ui ? generated : 'export const value = '+JSON.stringify(input)+'\\n');
 if(!ui){ writeFileSync('dist/index.d.ts','export declare const value = 1\\n'); writeFileSync('dist/style.css','body{}'); writeFileSync('dist/types.js',''); writeFileSync('dist/node_modules/dependency/index.js','export const bundled = true'); writeFileSync('dist/worker/parser.js','self.onmessage=()=>{}'); }
 appendFileSync('../../compiles.log',process.cwd()+'\\n');`,
   )
@@ -168,7 +175,7 @@ appendFileSync('../../compiles.log',process.cwd()+'\\n');`,
     source: git(['rev-parse', 'HEAD']),
     os: 'Linux',
     arch: 'X64',
-    image: 'fixture-image',
+    image: 'ubuntu24/20261023.334.3',
   }
   const request = (targets = 'all', override = {}) =>
     prepare({
@@ -280,6 +287,39 @@ test('cold producer builds each task once, imports exact outputs and warm produc
   expect(warm.tasks.every((task) => task.cache.status === 'HIT')).toBe(true)
 })
 
+test.each([
+  ['shared', 'Build inputs changed during execution'],
+  ['task-local', 'Build task/output identity changed during execution'],
+  ['environment', 'Build inputs changed during execution'],
+])('producer rejects %s drift before staging or successful cache publication', (drift, message) => {
+  const f = fixture(drift)
+  const request = f.request()
+  expect(() => produce(request)).toThrow(message)
+  expect(existsSync(path.join(request.directory, 'bundle'))).toBe(false)
+  expect(compiles(f.directory)).toHaveLength(2)
+  if (drift === 'environment') return
+  expect(readFileSync(path.join(f.directory, 'packages/base/dist/index.js'), 'utf8')).toContain(
+    'changed while building',
+  )
+  const after = f.request()
+  expect(after.identity.inputs === request.identity.inputs).toBe(drift === 'task-local')
+})
+
+test('producer accepts declared generated UI output changes without resealing source inputs', () => {
+  const f = fixture('generated')
+  const request = f.request()
+  const publication = produce(request)
+  const manifest = JSON.parse(readFileSync(path.join(publication.directory, 'manifest.json')))
+  expect(
+    readFileSync(path.join(f.directory, 'packages/ui/src/lib/generated/cn-tables.ts'), 'utf8'),
+  ).toBe('export const classes = [1]\n')
+  expect(manifest.identity).toEqual(request.identity)
+  expect(f.request().identity).toEqual(request.identity)
+  const downloads = path.join(f.directory, 'transport/generated-download')
+  cpSync(publication.directory, path.join(downloads, publication.name), { recursive: true })
+  expect(consume(f.request(), downloads)).toHaveLength(2)
+})
+
 test('partial warm cache compiles only the missing build task and never saves test entries', () => {
   const f = fixture()
   const bundle = f.publication()
@@ -348,7 +388,8 @@ test.each([
   'run',
   'os',
   'arch',
-  'image',
+  'imageOS',
+  'platform',
   'toolchain',
   'environment',
   'inputs',
@@ -361,6 +402,125 @@ test.each([
   rmSync(path.join(f.directory, 'packages/base/dist'), { recursive: true })
   expect(() => consume(f.request(), bundle.downloads)).toThrow()
   expect(existsSync(path.join(f.directory, 'packages/base/dist'))).toBe(false)
+})
+
+test('observed hosted image patch difference imports only with equal live build inputs', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  const producer = f.request()
+  const consumer = f.request('all', { image: 'ubuntu24/20261012.334.1', attempt: 2 })
+  rmSync(path.join(f.directory, 'packages/base/dist'), { recursive: true })
+  expect(consume(consumer, bundle.downloads)).toHaveLength(2)
+  expect(consumer.cachePrefix).toBe(producer.cachePrefix)
+  expect(compiles(f.directory)).toHaveLength(2)
+  const receipt = JSON.parse(
+    readFileSync(path.join(f.directory, '.turbo/workspace-builds-receipt.json')),
+  )
+  expect(receipt.provenance).toEqual({
+    producer: { image: 'ubuntu24/20261023.334.3' },
+    consumer: { image: 'ubuntu24/20261012.334.1' },
+  })
+  expect(() => verifyImported(consumer)).not.toThrow()
+  const warm = produce(f.request('all', { image: 'ubuntu24/20261012.334.1', attempt: 2 }))
+  expect(warm.tasks.every((task) => task.cache.status === 'HIT')).toBe(true)
+  expect(compiles(f.directory)).toHaveLength(2)
+})
+
+test.each([undefined, '', 'undefined/undefined', 'ubuntu24/', '/20261023.334.3'])(
+  'missing or malformed image metadata %s fails closed',
+  (image) => {
+    expect(() => fixture().request('all', { image })).toThrow()
+  },
+)
+
+test.each([
+  ['OS', ['platform', 'os'], process.platform === 'win32' ? 'linux' : 'win32'],
+  ['architecture', ['platform', 'arch'], process.arch === 'arm64' ? 'x64' : 'arm64'],
+  ['distribution', ['platform', 'system', 'distribution'], 'different-linux'],
+  ['OS release', ['platform', 'system', 'version'], '26.04'],
+  ['libc', ['platform', 'system', 'libc'], 'different-libc'],
+  ['Bun', ['toolchain', 'bun'], '1.4.2'],
+  ['Bun revision', ['toolchain', 'bunRevision'], '0'.repeat(40)],
+  ['Node', ['toolchain', 'node'], 'v26.7.1'],
+  ['Turbo', ['toolchain', 'turbo'], '2.11.4'],
+  ['old schema', ['schema'], 'fregat-ci-ws-v1'],
+])('image patch tolerance still rejects incompatible %s', (_, keys, value) => {
+  const f = fixture()
+  const bundle = f.publication()
+  rewriteBundle(bundle, (manifest) => {
+    const parent = keys.slice(0, -1).reduce((object, key) => object[key], manifest.identity)
+    parent[keys.at(-1)] = value
+  })
+  rmSync(path.join(f.directory, 'packages/base/dist'), { recursive: true })
+  expect(() =>
+    consume(f.request('all', { image: 'ubuntu24/20261012.334.1' }), bundle.downloads),
+  ).toThrow()
+  expect(existsSync(path.join(f.directory, 'packages/base/dist'))).toBe(false)
+})
+
+test.each([
+  [['provenance']],
+  [['provenance', 'image']],
+  [['identity', 'platform']],
+  [['identity', 'platform', 'system']],
+  [['identity', 'platform', 'system', process.platform === 'linux' ? 'libc' : 'release']],
+  [['identity', 'toolchain', 'bunRevision']],
+  [['identity', 'toolchain', 'node']],
+])('missing mandatory bundle metadata %s rejects', (keys) => {
+  const f = fixture()
+  const bundle = f.publication()
+  rewriteBundle(bundle, (manifest) => {
+    const parent = keys.slice(0, -1).reduce((object, key) => object[key], manifest)
+    delete parent[keys.at(-1)]
+  })
+  expect(() => consume(f.request(), bundle.downloads)).toThrow()
+})
+
+test('runtime platform and exact build tools are measured independently of image provenance', () => {
+  const f = fixture()
+  const identity = f.request().identity
+  expect(identity.platform.os).toBe(process.platform)
+  expect(identity.platform.arch).toBe(process.arch)
+  expect(
+    Object.values(identity.platform.system).every(
+      (value) => typeof value === 'string' && value.length > 0,
+    ),
+  ).toBe(true)
+  expect(identity.toolchain.bun).toBe(Bun.version)
+  expect(identity.toolchain.bunRevision).toBe(Bun.revision)
+  expect(identity.toolchain.node).toBe(
+    execFileSync('node', ['-p', 'process.version'], { encoding: 'utf8' }).trim(),
+  )
+  expect(identity.imageOS).toBe('ubuntu24')
+  expect(identity).not.toHaveProperty('image')
+})
+
+test('cross-image consumer still rejects changed source and environment', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  const override = { image: 'ubuntu24/20261012.334.1' }
+  f.write('packages/base/input.txt', 'changed source')
+  expect(() => consume(f.request('all', override), bundle.downloads)).toThrow(
+    'Build task/output identity mismatch',
+  )
+  f.write('packages/base/input.txt', 'base source')
+  f.write('.env.local', 'NODE_ENV=production')
+  expect(() => consume(f.request('all', override), bundle.downloads)).toThrow(
+    'Build identity mismatch',
+  )
+})
+
+test('cross-image consumer requires the exact non-dist UI output root', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  rewriteBundle(bundle, (manifest, directory) => {
+    const file = 'packages/ui/src/lib/generated/cn-tables.ts'
+    manifest.files = manifest.files.filter((entry) => entry.path !== file)
+    rmSync(path.join(directory, 'files', file))
+  })
+  expect(() =>
+    consume(f.request('all', { image: 'ubuntu24/20261012.334.1' }), bundle.downloads),
+  ).toThrow('Required build output root is empty')
 })
 
 test('digest and file-byte changes reject', () => {
@@ -466,7 +626,9 @@ test('cache identity separates toolchain/environment/shared inputs and primary t
   f.write('bun.lock', lock)
   f.write('builder.mjs', 'changed root helper')
   expect(f.request().cachePrefix).not.toBe(initial.cachePrefix)
-  expect(f.request('all', { image: 'other-image' }).cachePrefix).not.toBe(initial.cachePrefix)
+  expect(f.request('all', { image: 'ubuntu26/20261023.334.3' }).cachePrefix).not.toBe(
+    initial.cachePrefix,
+  )
   const beforeTool = f.request()
   f.write('node_modules/turbo/package.json', { version: '0.0.0' })
   expect(f.request().cachePrefix).not.toBe(beforeTool.cachePrefix)
