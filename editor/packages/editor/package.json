@@ -153,7 +153,7 @@
     "happy-dom": "^20.14.5",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
-    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#6889cfde712bbc1f189eab4821e895590226faaf",
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#aa1f9f6480b0842628af065fe8858b688b4e0df6",
     "typescript": "7.0.2",
     "typescript-api": "npm:typescript@6.0.3",
     "vite": "8.3.1",

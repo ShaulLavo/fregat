@@ -33,7 +33,7 @@
 `anchorAt(snapshot, offset, bias)`:
 
 1. **Validate offset.** Must be at a code-point boundary — rejects mid-surrogate-pair offsets.
-2. Walk treap to find containing Piece.
+2. Walk the tree to find the containing Piece.
 3. Compute buffer-relative offset: `piece.start + (offset - pieceStartInDocument)`.
 4. Return `{ buffer: piece.buffer, offset: bufferRelativeOffset, bias }`.
 
@@ -50,7 +50,7 @@ anchor can resolve to the same offset while the selection affinity changes, and 
 not merge affinity-distinct carets merely because their anchors resolve together. See
 [Selections & Undo](../editing/selections-and-undo.md#caret-affinity).
 
-**Reference:** Treap walk and buffer structure in `packages/textbuffer/src/pieceTable.ts`. Piece type in `packages/textbuffer/src/pieceTableTypes.ts`.
+**Reference:** Tree walk and buffer structure in `packages/textbuffer/src/pieceTable.ts`. Piece type in `packages/textbuffer/src/pieceTableTypes.ts`.
 
 ---
 
@@ -69,7 +69,7 @@ Resolution produces `ResolvedAnchor`: `{ offset, liveness }`.
 
 ### Deletion Representation (Locked)
 
-Phase 2 deletes preserve anchor-resolvable identity by keeping deleted pieces in the treap as invisible pieces.
+Phase 2 deletes preserve anchor-resolvable identity by keeping deleted pieces in the tree as invisible pieces.
 
 - `Piece` gains `visible: boolean`.
 - Delete marks the affected visible pieces invisible instead of physically discarding them.

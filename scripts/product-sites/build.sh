@@ -18,7 +18,11 @@ if selected singapore; then targets+=('"singapore-editor-site"'); fi
 if selected demo; then targets+=('"@singapore-editor/example-app"'); fi
 if selected ghostty-webgpu; then targets+=('"ghostty-webgpu-site"'); fi
 json="[$(IFS=,; echo "${targets[*]}")]"
-bun scripts/ci/packages.mjs build "$json"
+case "${3:-}" in
+  '') bun scripts/ci/packages.mjs build "$json" ;;
+  --reuse-workspace-builds) bun scripts/ci/build-reuse.mjs verify-site "$json" ;;
+  *) echo "Unknown prerequisite mode" >&2; exit 2 ;;
+esac
 if selected fregat; then
   SITE_ORIGIN=https://fregat.shaulavo.dev bun run --cwd apps/site site:build
   cp -R apps/site/dist "$output/fregat"

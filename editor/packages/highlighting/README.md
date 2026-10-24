@@ -6,9 +6,7 @@ Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the brow
 
 ## Install
 
-```sh
-npm install @singapore-editor/highlighting
-```
+Not on npm yet. Build it from source with the [development guide](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/development.md#set-up).
 
 ## Usage
 

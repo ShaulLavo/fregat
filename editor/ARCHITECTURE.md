@@ -1,244 +1,72 @@
-# Browser Code Editor — Architecture
+# Architecture
 
-## 1. Goals
+Singapore has one source of truth for text, and everything else is a view of it or work derived from it. This page explains how the pieces fit and why. The [design documents](docs/README.md) hold the detail, and the [ADRs](docs/adr/) record the decisions.
 
-- Ultra-low latency typing (target: <1-2ms perceived)
-- Fully in-browser editor
-- Heavy use of Web Workers
-- Modular, decoupled architecture
-- High performance on large files (MBs, long lines)
-- High flexibility (future plugins, languages, features)
+## The idea
 
----
+The canonical document is a persistent piece table that lives on the main thread. Each edit returns a new snapshot, and old snapshots stay valid. The visible text, the syntax colors, the folds and the minimap are projections of one snapshot. Each projection says which snapshot it describes, so a worker that lags behind typing cannot pass off an old answer as current.
 
-## 2. Non-Goals (for now)
+The goals that shape the rest:
 
-- Collaboration (CRDT/OT) — maybe later
-- Full IDE features (LSP, etc.)
-- Accessibility completeness
-- Mobile-first UX
+- A keystroke reaches the screen within one display frame. Typing never waits for derived work.
+- Large files work. Only rows near the viewport are in the DOM.
+- The browser does the text layout. The editor does not keep a second layout engine.
+- The core is plain text editing. Everything else is an optional package.
 
----
+## Layers
 
-## 3. Core Principles
+The [README](README.md) has a package diagram. This table maps each layer to its packages and its design document.
 
-- Single canonical document model
-- Everything else = derived projections
-- Strict sync vs async split
-- Minimal work on main thread
-- Eventual consistency for non-critical systems
-- Piece-based thinking (not whole document)
+| Layer          | Package                                                                | What it owns                                                                  | Design document                                                                                                    |
+| -------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Storage        | `textbuffer`                                                           | Piece table, snapshots, anchors, line mapping                                 | [Piece table](docs/storage/piece-table.md)                                                                         |
+| Positions      | `textbuffer`, `core`                                                   | Offset, point, and anchor types and conversions                               | [Types and conversions](docs/positions/types-and-conversions.md), [Anchors](docs/positions/anchors.md)             |
+| Editing        | `core`                                                                 | Selections, multi-cursor, batch edits, undo                                   | [Selections and undo](docs/editing/selections-and-undo.md)                                                         |
+| Display        | `core`                                                                 | Row virtualization, folds, browser-owned geometry, CSS Custom Highlight paint | [Browser layout and virtualizer](docs/display/browser-virtualization.md), [Transforms](docs/display/transforms.md) |
+| Syntax         | `tree-sitter`, `highlighting`                                          | Parsing, highlight queries, folds, structural selection, injections           | [Tree-sitter](docs/syntax/tree-sitter.md)                                                                          |
+| Workers        | `tree-sitter`, `minimap`, `spellcheck`, `typescript-lsp`, `core/shiki` | One owner object per worker: start, requests, disposal                        | [Worker topology](docs/architecture/worker-topology.md)                                                            |
+| Extension host | `core/extensions`                                                      | Plugin lifecycle and the contribution registries                              | [Extension hooks](docs/architecture/extension-hooks.md)                                                            |
 
----
+## What happens when you type
 
-## 4. High-Level Architecture
+One keystroke, in order. Notice that the editor paints the edit before any worker answers.
 
-### Main Thread (Sync / Immediate)
+```mermaid
+sequenceDiagram
+    participant Editor as Editor (main thread)
+    participant Buffer as textbuffer (main thread)
+    participant Browser as Browser layout and paint
+    participant Worker as Worker (tree-sitter, minimap, ...)
+    Editor->>Buffer: apply edit
+    Buffer-->>Editor: new snapshot
+    Editor->>Browser: mount changed rows
+    Browser-->>Editor: geometry and paint
+    Editor->>Worker: send edit and snapshot version
+    Worker-->>Editor: derived result tagged with its version
+    Editor->>Browser: paint result if the version matches
+```
 
-- Input handling
-- Caret & selection
-- Minimal text echo
-- Browser-owned layout for mounted rows
-- 2D viewport virtualization
-- Rendering / DOM / CSS highlights
-- Reconciliation with worker
+Derived work has to describe the current snapshot, or be projected through the edits that followed it. Sending the version with each request is what lets the editor tell the difference.
 
-### Worker(s) (Async / Authoritative)
+## Main thread and workers
 
-- Document model
-- Transactions / edits
-- Tree-sitter syntax parsing
-- Decorations
-- Scheduling
+The main thread owns the document, selections, undo, row mounting and paint. Workers own derived state:
 
----
+| Work                              | Owner object               | Package          |
+| --------------------------------- | -------------------------- | ---------------- |
+| Tree-sitter parsing and queries   | `TreeSitterWorkerClient`   | `tree-sitter`    |
+| Minimap drawing (OffscreenCanvas) | `MinimapWorkerOwner`       | `minimap`        |
+| Shiki tokenizing                  | `ShikiWorkerOwner`         | `core/shiki`     |
+| TypeScript language service       | `TypeScriptLspWorkerOwner` | `typescript-lsp` |
 
-## 5. Core Systems
+Each owner starts its worker, tracks requests, and disposes it. The plugin or service that creates an owner disposes it at teardown, and the package-level worker singletons are gone. [Worker topology](docs/architecture/worker-topology.md) lists each owner's cache limits and what happens after a crash. [ADR 003](docs/adr/003-document-on-main-thread.md) explains why the document stays on the main thread.
 
-### 5.1 Document Engine (Locked)
+## Plugins
 
-Piece table on a persistent AVL tree with immutable snapshots.
+A plugin is an object with `activate` and optional `install`, `update`, `deactivate`, and `dispose` hooks. Each editor gets its own install of a plugin and its own context. Whatever a plugin registers through that context is released when the plugin goes. Plugins reach the editor through typed registries (commands, decorations, gutters, language features) exported from `@singapore-editor/core/extensions`, not through a general editor object. A view contribution is the escape hatch for features that need mounted DOM or viewport snapshots. [Extension hooks](docs/architecture/extension-hooks.md) maps every hook, its scope and ordering.
 
-See: [Storage: Piece Table](docs/storage/piece-table.md) for full design.
-Implementation: `packages/textbuffer/src/`
+## Open design questions
 
----
-
-### 5.2 Transaction System
-
-Batch edit API designed. Full transaction format still open.
-
-See: [Editing: Selections & Undo](docs/editing/selections-and-undo.md) for batch edits.
-
-**Open:** Full transaction format, where undo/redo lives (main vs worker).
-
----
-
-### 5.3 Position Model (Locked)
-
-Three-tier: Offset (UTF-16) -> Point (row/column) -> Anchor (durable buffer reference).
-
-See: [Positions: Types & Conversions](docs/positions/types-and-conversions.md)
-See: [Positions: Anchors](docs/positions/anchors.md)
-
----
-
-### 5.4 Layout System
-
-The editor will not build a parallel text layout engine. Browser layout is the visual source of
-truth for mounted text.
-
-See: [Browser Layout + 2D Virtualizer](docs/display/browser-virtualization.md).
-
-**Key principles (locked):** native browser layout, custom viewport virtualization, CSS Highlight
-API for current selection/syntax paint, and DOM `Range`/caret APIs for geometry on mounted content.
-
-**Implemented:** projected text-row input, fixed-height vertical virtualization, FoldMap integration,
-and conservative horizontal chunking for eligible long rows. **Open:** variable-height row producers,
-complete horizontal windowing for measurement-refusal rows, and the worker/main ownership boundary
-for viewport inputs.
-
----
-
-### 5.5 Sync vs Async Split
-
-**Open:** How much layout on main, optimistic behavior scope, reconciliation strategy.
-
----
-
-### 5.6 Invalidation Model
-
-Display transform invalidation protocol designed. Virtual row/chunk invalidation still open.
-
-See: [Display: Transforms](docs/display/transforms.md) for the invalidation protocol.
-
----
-
-### 5.7 Syntax Tree System (Committed)
-
-Tree-sitter is the canonical syntax engine. It replaces Shiki as the long-term source of syntax data.
-
-See: [Syntax: Tree-sitter](docs/syntax/tree-sitter.md)
-
-**Locked:**
-
-- Parse state is a derived projection over a specific `PieceTableSnapshot`.
-- All Tree-sitter parser creation, parsing, incremental reparsing, and query execution runs in workers.
-- The main thread never loads grammars, owns parse trees, walks syntax nodes, or runs Tree-sitter queries during typing.
-- The main thread only consumes snapshot-tagged syntax outputs: highlight decorations, fold ranges, structural-selection ranges, indentation hints, and bracket/tag match ranges.
-- Worker-side Tree-sitter queries drive highlights, folds, structural selections, bracket/tag matching, indentation, language injections, and outline-style features.
-- Selection behavior may be syntax-native, but active selections are stored as anchors so they survive stale parses, syntax errors, unknown languages, undo/redo, and snapshot changes.
-- Syntax decorations emitted from Tree-sitter must not allocate one anchor per token/node.
-
-**Open:** worker protocol, parser package loading, query asset format, edit-to-parser input bridge, parser memory limits, and snapshot retention policy for parse trees.
-
----
-
-### 5.8 Scheduling System
-
-Designed as a two-level scheduler: a small main-thread frame scheduler for input, mounted-row DOM
-work, and viewport reconciliation, plus a worker-side document scheduler for serialized
-transactions and derived projections.
-
-**Locked:** typing is never queued behind derived work; document transactions are serialized per
-document; syntax, folds, decorations, and background analysis are snapshot-tagged, coalesced, and
-stale-droppable.
-
-**Open:** worker topology, exact pressure thresholds, and whether undo/redo ownership moves fully
-into worker transactions.
-
----
-
-### 5.9 Decoration System
-
-Constraints defined, design deferred. Dense decorations must not use per-token anchors.
-
-See: [Display: Transforms](docs/display/transforms.md) for decoration constraints.
-
----
-
-### 5.10 Viewport & Virtualization (Implemented)
-
-The virtualized view mounts projected text rows around the viewport and delegates glyph layout,
-BiDi caret geometry, hit testing, and selection rectangles to the browser. See
-[Display: Browser Virtualization](docs/display/browser-virtualization.md).
-
----
-
-### 5.11 Rendering Layer (Partially Implemented)
-
-CSS Highlight API renderer implemented. See `packages/editor/src/editor.ts`.
-
----
-
-### 5.12 Extension System (In Progress)
-
-Extensions run through a host lifecycle with explicit `install`, `activate`, `update`,
-`deactivate`, and `dispose` hooks. The public surface is `@singapore-editor/core/extensions`; consumers get
-power through typed domain registries instead of a broad editor service locator.
-
-**Public contribution APIs:**
-
-- Commands
-- Capabilities
-- Edit helpers
-- Decorations
-- Gutters
-- Injected rows
-- Syntax and highlighters
-- View contributions
-
-`EditorViewContribution` is the public escape hatch for features that genuinely need mounted DOM
-access or viewport snapshots. Domain features should prefer their registry before using a view
-contribution.
-
-**Internal-only migration bridge:** `EditorPluginHost`, host events, `EditorInternalPluginContext`,
-and the broad `EditorFeatureContribution*` context are implementation/test surfaces. They are exposed
-through internal/testing entry points only while first-party features finish migrating to domain
-registries.
-
-**Locked:**
-
-- Public plugins do not receive `registerEditorFeatureContribution`.
-- Contribution conflicts fail near registration: duplicate command handlers, duplicate gutter ids,
-  and duplicate row-decoration source ownership are rejected.
-- Contribution factory, `update()`, and disposal failures are contained and logged so one extension
-  does not break unrelated editor systems.
-- Each plugin has its own context; what a plugin or a contribution registers is released with it,
-  including registrations made after `activate` or after the contribution was created.
-
-Every hook, its scope, ordering and stability label (supported, experimental, internal) is in the
-[extension hook contract map](docs/architecture/extension-hooks.md).
-
-**Open:** migrate the remaining first-party feature bridge users to public domain/view APIs, then
-delete the broad internal feature contribution bridge.
-
----
-
-## 6. Data Flow
-
-### Typing Flow (Target)
-
-1. Input event (main)
-2. Minimal text update (main)
-3. Browser lays out mounted rows
-4. Paint immediately
-5. Send edit to worker
-6. Worker updates document-derived projections
-7. Worker sends authoritative result
-8. Main updates visible row/chunk window and reconciles
-
----
-
-## 7. Remaining Open Questions
-
-1. ~~Position model?~~ **Locked.**
-2. ~~Text storage structure?~~ **Locked.**
-3. Virtual row/chunk model?
-4. ~~Invalidation strategy?~~ **Partially designed.**
-5. Main vs worker virtualization split?
-6. ~~Scheduler design?~~ **Locked at contract level.**
-7. Decoration system design?
-8. Tree-sitter parser/query loading and memory policy?
-9. ~~Extension service locator?~~ **Replaced with typed domain registries; internal bridge pending
-   deletion.**
+- **Document worker.** No separate worker owns the document. The main-thread engine stays the truth until that work lands.
+- **Row heights.** Rows have a fixed height today. Variable-height rows and complete horizontal handling of long lines are in progress. See [Known limits](docs/limitations.md).
+- **Plugin surface.** A few first-party features, such as `mergeConflictPlugin.ts`, still register through the internal `registerEditorFeatureContribution` bridge. Moving them to the public registries and deleting the bridge is unfinished.
