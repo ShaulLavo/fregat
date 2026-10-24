@@ -10,7 +10,8 @@ import { createTestApplicationRuntime } from '../../../../../test/factories/appl
 import { TestEditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import { settingsSnapshot } from '../../../../../test/factories/settings'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 
 test('dismissal expires after switching from A to B and back to A', async () => {
   const application = createTestApplicationRuntime()

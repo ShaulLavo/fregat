@@ -311,9 +311,10 @@ contracts a consumer needs:
   [111](plans/111-editor-decorations.md) and [176](plans/176-markdown-parser.md). Reconcile landed
   authoring/parser work before scheduling their remaining parts. [189](plans/189-tree-sitter-md-improvement.md)
   owns subsequent parser correctness and performance work.
-  The approved [chat qualification work package](plans/chat-markdown-qualification.md)
-  starts with the current remark baseline and comparison harness before semantic consumer
-  cutover. Chat migration waits for its correctness, streaming, visual and paired performance gates.
+  The approved [chat qualification follow-up](plans/chat-markdown-qualification.md) is scheduled
+  later and does not block PR #1326. It would measure semantic and streaming correctness, visual
+  behavior and paired performance against remark after the cutover. PR #1326 follows the owner's
+  2026-10-24 merge and delivery bar.
 
 ## TUI UI workstream
 

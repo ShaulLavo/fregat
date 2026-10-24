@@ -23,7 +23,7 @@ import {
   unusedFileOperations,
 } from '../../../test/factories/command-runtime'
 import { expect, test } from '../../../test/fixtures'
-import { createTestQueryClient } from '../../../test/render'
+import { createTestQueryClient } from '../../../test/providers'
 import { navigationWorkspace } from '../../../test/factories/navigation-workspace'
 import { renderAddressHarness, seedWorkspaceCache, waitForNavigation } from '../../../test/address'
 import { waitFor } from '@testing-library/react'

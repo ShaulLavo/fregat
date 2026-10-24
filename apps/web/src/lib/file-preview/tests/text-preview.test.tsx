@@ -5,7 +5,8 @@ import { TextPreview } from '@/lib/file-preview/components/text-preview'
 import { lineNumbers } from '@/lib/file-preview/utils/preview'
 import { previewQueryOptions } from '@/lib/file-preview/utils/preview-query'
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
+import { renderWithProviders } from '../../../../test/render'
 
 const BUDGET = 64 * 1024
 

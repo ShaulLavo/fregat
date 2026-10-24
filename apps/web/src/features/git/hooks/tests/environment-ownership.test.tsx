@@ -13,7 +13,8 @@ import { activeServerOrigin, getClient, setActiveServerOrigin, setClient } from 
 
 import { createInProcessClient } from '../../../../../test/client'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderHookWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderHookWithProviders } from '../../../../../test/render'
 import { makeTestServer } from '../../../../../test/server'
 import { runGit } from '../../../../../test/factories/git'
 

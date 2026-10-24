@@ -52,7 +52,7 @@ import type { PlatformCommandBus } from '@/keymap/providers/command-context'
 import { FocusService } from '@/lib/focus/state/service'
 import type { TreeEntry, TreeResult } from '@/lib/file-system-types'
 import { treeModel, type TreeModel } from '@/lib/tree-model'
-import { AppProviders, seedHtmlTheme } from '../../../../test/render'
+import { AppProviders, seedHtmlTheme } from '../../../../test/providers'
 
 const ROOT_PATH = 'repo'
 const PREPARED_ROOT_PATH = 'repo'

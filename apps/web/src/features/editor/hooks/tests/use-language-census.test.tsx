@@ -13,7 +13,8 @@ import { filesystemPath } from '@/lib/documents/utils/identity'
 import { openWorkspaceRootPath } from '@/lib/file-server'
 import { expect, test } from '../../../../../test/fixtures'
 import { watchFilesystem } from '../../../../../test/factories/filesystem-events'
-import { createTestQueryClient, renderHookWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderHookWithProviders } from '../../../../../test/render'
 
 test('the hook loads the census the preload getter reads for the bound root and machine', async ({
   client,

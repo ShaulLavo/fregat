@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 
 import { createInProcessClient } from '../../../../test/client'
 import { expect, test } from '../../../../test/fixtures'
-import { AppProviders, createTestQueryClient } from '../../../../test/render'
+import { AppProviders, createTestQueryClient } from '../../../../test/providers'
 import { Toaster } from '@workspace/ui/components/sonner'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useSettingsSaving } from '@/features/settings/hooks/use-settings-saving'

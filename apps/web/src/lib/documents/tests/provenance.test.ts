@@ -1,7 +1,7 @@
 import { snapshotComparisonQueryOptions } from '@/lib/snapshot-comparison-query'
 import { expect, test } from '../../../../test/fixtures'
 import { historyRepository } from '../../../../test/factories/git-history'
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 import {
   historicalDocument,
   matchesHistoricalTarget,

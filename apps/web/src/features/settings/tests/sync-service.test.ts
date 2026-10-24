@@ -5,7 +5,7 @@ import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import { fetchSettings, saveSettingsText } from '@/features/settings/utils/api'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 import { expect, test } from '../../../../test/fixtures'
 
 const ID = documentKey(settingsJsonDocument('user'))

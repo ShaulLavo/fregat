@@ -20,7 +20,8 @@ import {
   TEST_ENVIRONMENT_ID,
 } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 
 const target = { environmentId: TEST_ENVIRONMENT_ID, draftKey: 'model-switch', rootPath: '/repo' }
 

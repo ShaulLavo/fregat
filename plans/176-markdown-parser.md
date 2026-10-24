@@ -6,9 +6,9 @@ streaming chat on our parser. Keeping remark for chat and split rendering was
 the scope of the completed integration below. Migrating those consumers remains
 required future work, with streaming and rendering acceptance checks.
 
-The approved [chat qualification work package](chat-markdown-qualification.md) defines the
-remark baseline, semantic and streaming comparisons, real-browser interaction and visual
-checks, paired benchmarks and the gates required before that cutover.
+The approved [chat qualification follow-up](chat-markdown-qualification.md) is scheduled later
+and does not block PR #1326. It lists later semantic, streaming, browser, visual and paired
+performance comparisons against remark under the owner's 2026-10-24 merge and delivery decision.
 
 ## Status and authorization
 
@@ -464,3 +464,25 @@ Current owner: [packages/markdown/src/utils/session.ts](https://github.com/Shaul
 createMarkdownSession already reuses settled blocks and the React path retains HAST/JSX caches. Current reusableBlocks still validates every settled prefix with startsWith, and a growing open fence can repeatedly parse its growing tail. Characterize settled-history and growing-tail work before migration, then carry delta/document ownership through tree-sitter parsing, transfer and token projection. Compare each result to a fresh parse, including link definitions, footnotes, Unicode, sanitization and scroll anchoring. A parser swap alone does not prove bounded incremental work.
 
 - [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Streaming runtime review follow-ups, 2026-10-22
+
+Status: Approved. These observations at `3c8c79b5a73bbf24243b597a21abf4345f29ec51`
+do not establish a parser defect.
+
+- [ ] Avoid loading the CHAT grammar for base-profile Editor documents. The Editor's
+      `editor/packages/tree-sitter/src/treeSitter/markdown.ts:15` passes `chatGrammar` to
+      `tree-sitter-md.init`, which fetches and compiles it unconditionally. The Editor's
+      `MarkdownDocument` callers omit `math`. The review observed an extra 143 KB module,
+      with no load-time measurement. Change initialization ownership in `tree-sitter-md`
+      without breaking chat's math-enabled grammar or synchronous document construction.
+      Verify real asset requests and CommonMark/GFM plus math controls before repinning.
+- [ ] Resolve mutable session lifetime in `packages/markdown/src/hooks/use-markdown-blocks.ts:18`.
+      The factory and plugin list currently key a `useMemo` session. Follow the React skill's
+      lifetime rule while preserving reset behavior on either input change and settled-block
+      identity across unrelated renders. Add lifecycle regressions before replacing the owner.
+- [ ] Characterize repeated full parsing after a reference definition in
+      `packages/markdown/src/utils/session.ts:106–121` and tail-cloning work in
+      `packages/markdown/src/utils/blocks.ts:161–189`. The existing review found these work
+      patterns, not a measured budget failure. Extend Issue 856's bounded workloads, retain
+      fresh-prefix equality and source positions, and tune only a demonstrated bottleneck.

@@ -413,13 +413,14 @@ test('canonical ghostty CI verifies the separate line editor package', () => {
   expect(root.scripts['build:workspaces']).toContain('--filter=ghostty-webgpu-line-editor')
 })
 
-test('line editor uses its nested package manifest', () => {
+test('the line editor workspace is publishable like the other Ghostty packages', () => {
   const manifest = JSON.parse(
     readFileSync(
       new URL('../packages/ghostty-webgpu/packages/line-editor/package.json', import.meta.url),
       'utf8',
     ),
   )
+  expect(manifest.private).toBeUndefined()
   expect(manifest.name).toBe('ghostty-webgpu-line-editor')
 })
 

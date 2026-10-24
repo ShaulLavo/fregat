@@ -104,3 +104,7 @@ export const chatPanelQueryKeys = {
 export const providerSignInDialogQueryKeys = {
   module: ['chat', 'providerSignInDialogModule'] as const,
 }
+
+export const chatMarkdownQueryKeys = {
+  runtime: ['chat', 'markdown-runtime'] as const,
+}

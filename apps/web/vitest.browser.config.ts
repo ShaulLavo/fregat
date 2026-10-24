@@ -1,3 +1,4 @@
+import { mockQualificationImages } from './test/factories/qualification-image-command.ts'
 import { rendererLifecycleControl } from './src/state/tests/renderer-lifecycle.command.ts'
 import { browserTestResponses } from '../../packages/singapore/scripts/browser-test-responses.ts'
 import fs from 'node:fs'
@@ -82,6 +83,13 @@ export default defineConfig({
     include: ['src/**/*.browser.tsx'],
     // The tree's own browser tests run alone, in vitest.tree-browser.config.ts.
     exclude: [
+      'src/features/chat/tests/qualification-semantics.browser.tsx',
+      'src/features/chat/tests/qualification-production.browser.tsx',
+      'src/features/chat/tests/qualification-layout.browser.tsx',
+      'src/features/chat/tests/qualification-state.browser.tsx',
+      'src/features/chat/tests/qualification-stream.browser.tsx',
+      'src/features/chat/tests/qualification.browser.tsx',
+      'src/features/chat/tests/qualification-bench.browser.tsx',
       'src/features/editor/tests/retention-acceptance-reload.browser.tsx',
       // Settings writers share one fixture server and run serially in their own project.
       'src/features/editor/tests/syntax-settings.browser.tsx',
@@ -96,6 +104,7 @@ export default defineConfig({
     browser: {
       commands: {
         rendererLifecycleControl,
+        mockQualificationImages,
         delayRequest,
         diffMouseWheel,
         proofContextClick,

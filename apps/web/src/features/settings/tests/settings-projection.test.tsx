@@ -10,7 +10,7 @@ import { vi } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
 import { settingsSnapshot } from '../../../../test/factories/settings'
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 import { providerQueryKeys } from '@/lib/query-keys'
 import { useSettingsIntentStore } from '@/features/settings/state/intent-store'
 import {

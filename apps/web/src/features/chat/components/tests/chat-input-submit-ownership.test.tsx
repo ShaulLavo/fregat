@@ -13,7 +13,8 @@ import { environmentScopedStorage } from '@/lib/environments/state/scoped-storag
 import { providerListQueryOptions } from '@/lib/provider-query'
 import type { ChatInputSubmitResult } from '../../utils/composed-message'
 import { expect, test } from '../../../../../test/fixtures'
-import { renderWithProviders, createTestQueryClient } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders } from '../../../../../test/render'
 import { TestEditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import {
   fixtureSessionId,

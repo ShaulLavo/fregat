@@ -1,10 +1,9 @@
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from './providers'
+import type { TestCommandRuntimeOptions } from './factories/command-runtime'
 import { paletteContentQueryOptions } from '@/features/command-palette/utils/content-query'
-import { installHtmlBootstrap } from './factories/html-bootstrap'
-import { readHtmlBootstrap } from '@/lib/html-bootstrap'
 import { filePickerDialogQueryOptions } from '@/features/file-picker/utils/dialog-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
-import { ComposerAttachProvider } from '@/providers/composer-attach-provider'
-import { QueryClient, QueryClientProvider, type QueryKey } from '@tanstack/react-query'
+import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import {
   render,
   renderHook,
@@ -12,40 +11,20 @@ import {
   type RenderOptions,
   type RenderResult,
 } from '@testing-library/react'
-import { TooltipProvider } from '@workspace/ui/components/tooltip'
-import { StrictMode, useEffect, useState, type ReactElement, type ReactNode } from 'react'
+import { StrictMode, type ReactElement, type ReactNode } from 'react'
 
-import { EditorColorThemeProvider } from '@/features/editor/providers/color-theme-provider'
-import { AppearanceProvider } from '@/features/settings/providers/appearance-provider'
 import { FocusProvider } from '@/lib/focus/providers/provider'
 import type { FocusService } from '@/lib/focus/state/service'
-import { TestCommandProvider, type TestCommandRuntimeOptions } from './factories/command-runtime'
-import { LanguageServerMatchProvider } from '@/features/editor/providers/language-server-match-provider'
-import { activeServerOrigin, getClient } from '@/lib/client'
-import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
 import { CommandBusProvider } from '@/keymap/providers/bus-provider'
-import { createCommandRuntimeBinding } from '@/keymap/state/runtime-binding'
 import { ActiveEnvironmentApplication } from '@/components/active-environment-application'
 import { ApplicationRuntimeProvider } from '@/providers/application-runtime-provider'
-import { createApplicationRuntime, type ApplicationRuntime } from '@/state/application-runtime'
+import type { ApplicationRuntime } from '@/state/application-runtime'
 import { NavigationProvider } from '@/providers/navigation-provider'
 import { bindNavigation } from '@/state/navigation-binding'
 import type { Navigation } from '@/state/navigation'
 import { createTestNavigation } from './factories/navigation'
-import { readWorkspaceCache } from '@/features/workspace/state/cache'
-import { testScopedStorage } from './factories/scoped-storage'
 import type { EnvironmentConnections } from '@/state/environment-connections'
 import { EnvironmentConnectionsContext } from '@/providers/environment-connections-context'
-import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
-
-// Retry/gc off so failing queries surface immediately and no timers outlive a test.
-export function createTestQueryClient() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { gcTime: Number.POSITIVE_INFINITY, retry: false } },
-  })
-  registerEnvironmentQueryClient(queryClient, activeServerOrigin(), getClient())
-  return queryClient
-}
 
 export type RenderWithProvidersOptions = Omit<RenderOptions, 'wrapper'> & {
   application?: ApplicationRuntime
@@ -59,125 +38,6 @@ export type RenderWithProvidersOptions = Omit<RenderOptions, 'wrapper'> & {
 }
 
 export type RenderWithProvidersResult = RenderResult & { queryClient: QueryClient }
-
-// Mirrors the app's top-level provider stack (main.tsx) so components render the
-// way they do in production. Exported for the browser tests, which mount through
-// `createRoot` rather than Testing Library and would otherwise grow a second,
-// drifting copy of this stack.
-export function AppProviders({
-  application,
-  navigation,
-  connections,
-  settingsOwner,
-  children,
-  command,
-  focusService,
-  queryClient,
-}: {
-  readonly application?: ApplicationRuntime
-  readonly navigation?: Navigation
-  readonly connections?: EnvironmentConnections
-  readonly settingsOwner?: QueryClient
-  readonly children: ReactNode
-  readonly command?: TestCommandRuntimeOptions | false
-  readonly focusService?: FocusService
-  readonly queryClient: QueryClient
-}) {
-  const [binding] = useState(createCommandRuntimeBinding)
-  const [runtime, setRuntime] = useState<{
-    readonly application: ApplicationRuntime
-    readonly navigation: Navigation
-  } | null>(null)
-  useEffect(() => {
-    const navigationOwner =
-      application ??
-      createApplicationRuntime({
-        workspaceCache: readWorkspaceCache(testScopedStorage),
-        preparation: {
-          appliedThemeContentHash: null,
-          appliedThemeId: null,
-          selectedThemeId: 'dark',
-          syntaxHighlightingEnabled: false,
-          analysisLimitMiCodeUnits: 10,
-          tabSize: 4,
-        },
-      })
-    const activeNavigation = navigation ?? createTestNavigation({ application: navigationOwner })
-    const detach = activeNavigation.attach(navigationOwner)
-    // Binding in an effect is safe only here: children mount after setRuntime below.
-    // App code binds at boot, in createBootstrap.
-    const unbind = bindNavigation(activeNavigation)
-    navigationOwner.start()
-    // Runtime subscriptions belong to this effect's lifetime, including StrictMode replay.
-    // oxlint-disable-next-line oxc-react-compiler/set-state-in-effect
-    setRuntime({ application: navigationOwner, navigation: activeNavigation })
-    return () => {
-      unbind()
-      detach()
-      if (!navigation) activeNavigation.dispose()
-      if (!application) navigationOwner.dispose()
-    }
-  }, [application, navigation])
-  if (!runtime) return null
-  const { application: navigationOwner, navigation: activeNavigation } = runtime
-  const content = (
-    <EnvironmentConnectionsContext value={connections ?? navigationOwner.connections}>
-      <TooltipProvider delay={0}>
-        <ComposerAttachProvider>{children}</ComposerAttachProvider>
-      </TooltipProvider>
-    </EnvironmentConnectionsContext>
-  )
-
-  return (
-    <ApplicationRuntimeProvider application={navigationOwner}>
-      <NavigationProvider navigation={activeNavigation}>
-        <QueryClientProvider client={queryClient}>
-          <SettingsOwnerProvider queryClient={settingsOwner ?? queryClient}>
-            <LanguageServerMatchProvider>
-              <FocusProvider service={focusService}>
-                <AppearanceProvider>
-                  <EditorColorThemeProvider>
-                    {command === false ? (
-                      <CommandBusProvider binding={binding}>{content}</CommandBusProvider>
-                    ) : (
-                      <TestCommandProvider options={command} queryClient={queryClient}>
-                        {content}
-                      </TestCommandProvider>
-                    )}
-                  </EditorColorThemeProvider>
-                </AppearanceProvider>
-              </FocusProvider>
-            </LanguageServerMatchProvider>
-          </SettingsOwnerProvider>
-        </QueryClientProvider>
-      </NavigationProvider>
-    </ApplicationRuntimeProvider>
-  )
-}
-
-/** Simulate the appearance supplied in a document before its settings query resolves. */
-export function seedHtmlTheme(theme: 'dark' | 'light') {
-  if (!readHtmlBootstrap())
-    installHtmlBootstrap({
-      'workbench.colorTheme': theme,
-      'workbench.wallpaper': { enabled: false, source: { kind: 'desktop' } },
-    })
-  seedPrefersColorScheme(theme)
-}
-
-// The initial document only rules until the real settings snapshot lands, and the
-// shipped default for `workbench.colorTheme` is `system` - so the media query
-// decides from then on. happy-dom reports light unless the device is told
-// otherwise, which would flip the theme mid-test and re-run everything keyed on
-// it. No-op in the browser project, where the Playwright context sets the scheme.
-function seedPrefersColorScheme(theme: 'dark' | 'light') {
-  const happyDom = (window as Window & { happyDOM?: HappyDomDeviceApi }).happyDOM
-  if (!happyDom) return
-
-  happyDom.settings.device.prefersColorScheme = theme
-}
-
-type HappyDomDeviceApi = { settings: { device: { prefersColorScheme: string } } }
 
 // Returns the QueryClient for cache assertions.
 export function renderWithProviders(

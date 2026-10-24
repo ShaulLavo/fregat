@@ -7,7 +7,7 @@ import { ActivityGroupRow } from '@/features/chat/components/activity-group-row'
 import { LiveActivityRow } from '@/features/chat/components/live-activity-row'
 import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-log-expansion-store'
 import { workLogEntry } from '../../../../test/factories/work-log'
-import { AppProviders, createTestQueryClient } from '../../../../test/render'
+import { AppProviders, createTestQueryClient } from '../../../../test/providers'
 
 const entries = Array.from({ length: 40 }, (_, index) =>
   workLogEntry({ id: `tool-${index}`, title: `Command ${index}`, outcome: 'succeeded' }),

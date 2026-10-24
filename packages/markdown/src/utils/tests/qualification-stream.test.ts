@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 
-import { BASELINE_DEFECTS, MARKDOWN_CASES, type MarkdownCase } from '../../../test/fixtures/cases'
+import { MARKDOWN_CASES, type MarkdownCase } from '../../../test/fixtures/cases'
 import {
   checkExpectations,
   createRemarkReplay,
@@ -16,12 +16,9 @@ import {
 } from '../../../test/schedules'
 
 const STREAM_CASES = MARKDOWN_CASES.filter((fixture) => fixture.checkpoints.length > 0)
-const EXPECTED_CHECKPOINT_CASES = STREAM_CASES.filter(
-  (fixture) => !BASELINE_DEFECTS.some((defect) => defect.fixtureId === fixture.id),
-)
 const EXHAUSTIVE_CASES = STREAM_CASES
 
-test.each(EXPECTED_CHECKPOINT_CASES)(
+test.each(STREAM_CASES)(
   '$id: named live checkpoints match independent product expectations',
   (fixture) => {
     const replay = createRemarkReplay()
@@ -38,19 +35,6 @@ test.each(EXPECTED_CHECKPOINT_CASES)(
     expect(replay.update(fixture.source, false)).toEqual(renderRemark(fixture.source, false))
   },
 )
-
-test.fails.each(BASELINE_DEFECTS)(
-  '$fixtureId/$checkpointId: retains the independently expected render while the baseline defect is open',
-  (defect) => {
-    expect(
-      checkExpectations(observeHast(renderRemark('**outside *inside', true)), defect.expected),
-    ).toEqual([])
-  },
-)
-
-test('the tracked baseline defect reproduces the exact leaked outer marker', () => {
-  expect(observeHast(renderRemark('**outside *inside', true)).text).toBe('**outside inside')
-})
 
 test.each(EXHAUSTIVE_CASES)(
   '$id: every scalar prefix keeps raw and healed incremental output equal to fresh output',

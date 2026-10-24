@@ -7,7 +7,7 @@ import {
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { useLayoutEffect } from 'react'
 
-import { createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
 import { expect, test } from '../../../../test/fixtures'
 import { useSettingsProjection } from '../hooks/use-settings-projection'
 import { AppearanceProvider } from '../providers/appearance-provider'

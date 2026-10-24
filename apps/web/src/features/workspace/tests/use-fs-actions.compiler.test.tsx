@@ -36,7 +36,7 @@ import {
 } from '@/features/workspace/state/tree-intents'
 
 import { expect, test } from '../../../../test/fixtures'
-import { AppProviders, createTestQueryClient } from '../../../../test/render'
+import { AppProviders, createTestQueryClient } from '../../../../test/providers'
 import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 import { fileSystemKeys } from '@/lib/query-keys'
 import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'

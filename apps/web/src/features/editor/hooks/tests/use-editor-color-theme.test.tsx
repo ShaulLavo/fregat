@@ -37,7 +37,8 @@ test('a late older theme load cannot overwrite the newer applied theme id', asyn
   const { installTestEnvironment } = await import('../../../../../test/factories/client-binding')
   restoreClient = await installTestEnvironment(activeServerOrigin(), client)
   const { useEditorColorTheme } = await import('@/lib/editor-theme/hooks/use-editor-color-theme')
-  const { renderWithProviders, createTestQueryClient } = await import('../../../../../test/render')
+  const { renderWithProviders } = await import('../../../../../test/render')
+  const { createTestQueryClient } = await import('../../../../../test/providers')
   const { settingsKeys } = await import('@workspace/client-core/settings/query-keys')
   const { fetchSettings, saveSettings } = await import('@/features/settings/utils/api')
   await saveSettings(

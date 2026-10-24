@@ -10,7 +10,7 @@ import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { afterEach } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
-import { AppProviders, createTestQueryClient } from '../../../../test/render'
+import { AppProviders, createTestQueryClient } from '../../../../test/providers'
 
 afterEach(() => localStorage.clear())
 

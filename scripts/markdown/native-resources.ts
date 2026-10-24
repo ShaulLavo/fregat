@@ -1,0 +1,488 @@
+import { hash } from 'node:crypto'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { parseArgs } from 'node:util'
+
+import { MARKDOWN_CASES } from '../../packages/markdown/test/fixtures/cases'
+import { observeHast, readyRemarkExtensions } from '../../packages/markdown/test/qualification'
+import { seededChunks } from '../../packages/markdown/test/schedules'
+import {
+  blockToHast,
+  createHastProcessor,
+  type HastExtensions,
+} from '../../packages/markdown/src/utils/hast'
+import {
+  createMarkdownSession,
+  type MarkdownSession,
+  type MarkdownSessionFactory,
+} from '../../packages/markdown/src/utils/session'
+import {
+  createTreeSitterMarkdownSession,
+  initializeTreeSitterMarkdown,
+} from '../../packages/markdown/src/utils/tree-sitter-session'
+import type { MarkdownBlock } from '../../packages/markdown/src/utils/blocks'
+import { qualificationProvenance } from './provenance'
+import { createScriptError } from '../structured-errors'
+
+type Engine = 'remark' | 'tree-sitter'
+type NativeStatus = 'FAILED' | 'INCONCLUSIVE' | 'OBSERVED_PLATEAU'
+const RESOURCE_ENGINES: readonly Engine[] = ['remark', 'tree-sitter']
+const RESOURCE_CYCLES: readonly number[] = [20, 100, 500]
+type Root = ReturnType<typeof blockToHast>
+type ResourceSource = { readonly id: string; readonly source: string; readonly sha256: string }
+type MemoryReading = {
+  readonly heapUsedBytes: number
+  readonly rssBytes: number
+  readonly wasmReservedBytes: number
+  readonly gcPerformed: boolean
+}
+export type ResourceWindow = {
+  readonly engine: Engine
+  readonly cycles: number
+  readonly window: number
+  readonly before: MemoryReading
+  readonly after: MemoryReading
+  readonly outputFailures: readonly string[]
+  readonly cleanupFailures: readonly string[]
+  readonly clearedSessions: number
+  readonly clearedProjectionEntries: number
+}
+
+function digest(roots: readonly Root[]): string {
+  const root: Root = { type: 'root', children: roots.flatMap((entry) => entry.children) }
+  return hash('sha256', JSON.stringify(observeHast(root)), 'hex')
+}
+
+export function resourceSession(input: {
+  readonly factory: MarkdownSessionFactory
+  readonly extensions: HastExtensions
+  readonly project?: typeof blockToHast
+}) {
+  let session: MarkdownSession | null = input.factory()
+  const processor = createHastProcessor(input.extensions)
+  const projections = new Map<MarkdownBlock, Root>()
+  let roots: readonly Root[] = []
+  const project = input.project ?? blockToHast
+  return {
+    update(text: string, live: boolean): string {
+      if (!session)
+        throw createScriptError('The resource-probe session has been released.', {
+          internal: { boundary: 'native-resource-session' },
+        })
+      roots = session.update(text, { heal: live }).map((block) => {
+        const cached = projections.get(block)
+        if (cached) return cached
+        const converted = project(block, processor)
+        projections.set(block, converted)
+        return converted
+      })
+      return digest(roots)
+    },
+    release() {
+      const entries = projections.size
+      try {
+        const cleared = session?.update('', { heal: false })
+        return { cleared: cleared === undefined || cleared.length === 0, entries }
+      } finally {
+        projections.clear()
+        roots = []
+        session = null
+      }
+    },
+    retainedProjectionEntries: () => projections.size,
+  }
+}
+
+function cycle(input: {
+  readonly engine: Engine
+  readonly source: ResourceSource
+  readonly expectedDigest: string
+  readonly extensions: HastExtensions
+}) {
+  const context = resourceSession({
+    factory: input.engine === 'remark' ? createMarkdownSession : createTreeSitterMarkdownSession,
+    extensions: input.extensions,
+  })
+  let matches = false
+  let error: string | null = null
+  let cleanup = { cleared: false, entries: 0 }
+  try {
+    for (const frame of seededChunks(input.source.source, { seed: 176, maxUnits: 24 }))
+      context.update(frame.text, true)
+    matches = context.update(input.source.source, false) === input.expectedDigest
+  } catch {
+    error = 'The native session or safe projection failed.'
+  } finally {
+    try {
+      cleanup = context.release()
+    } catch {
+      error = 'The native session could not clear its retained source.'
+    }
+  }
+  return { matches, error, cleanup, retained: context.retainedProjectionEntries() }
+}
+
+function collectGarbage(): boolean {
+  if (typeof Bun !== 'undefined') {
+    Bun.gc(true)
+    return true
+  }
+  if (typeof globalThis.gc !== 'function') return false
+  globalThis.gc()
+  return true
+}
+
+type Mutable<T> = { -readonly [K in keyof T]: T[K] }
+type PlannedWindow = Mutable<
+  Omit<ResourceWindow, 'before' | 'after' | 'outputFailures' | 'cleanupFailures'>
+> & {
+  readonly before: Mutable<MemoryReading>
+  readonly after: Mutable<MemoryReading>
+  readonly outputFailures: string[]
+  readonly cleanupFailures: string[]
+}
+
+function unreadMemory(): Mutable<MemoryReading> {
+  return { heapUsedBytes: 0, rssBytes: 0, wasmReservedBytes: 0, gcPerformed: false }
+}
+
+/**
+ * Every window's record exists before the first reading and is filled in place,
+ * so retained probe results never count as post-release heap growth.
+ */
+export function planResourceWindows(windows: number): PlannedWindow[] {
+  const rows: PlannedWindow[] = []
+  for (const cycles of RESOURCE_CYCLES)
+    for (let window = 0; window < windows; window++) {
+      const engines: readonly Engine[] =
+        window % 2 ? ['tree-sitter', 'remark'] : ['remark', 'tree-sitter']
+      for (const engine of engines)
+        rows.push({
+          engine,
+          cycles,
+          window,
+          before: unreadMemory(),
+          after: unreadMemory(),
+          outputFailures: [],
+          cleanupFailures: [],
+          clearedSessions: 0,
+          clearedProjectionEntries: 0,
+        })
+    }
+  return rows
+}
+
+function readMemory(readWasm: () => number, reading: Mutable<MemoryReading>) {
+  reading.gcPerformed = collectGarbage()
+  const usage = process.memoryUsage()
+  reading.heapUsedBytes = usage.heapUsed
+  reading.rssBytes = usage.rss
+  reading.wasmReservedBytes = readWasm()
+}
+
+function validMemoryReading(reading: MemoryReading): boolean {
+  return (
+    Number.isSafeInteger(reading.heapUsedBytes) &&
+    reading.heapUsedBytes >= 0 &&
+    Number.isSafeInteger(reading.rssBytes) &&
+    reading.rssBytes >= 0 &&
+    Number.isSafeInteger(reading.wasmReservedBytes) &&
+    reading.wasmReservedBytes > 0
+  )
+}
+
+function resourceGroupObservation(input: {
+  readonly group: readonly ResourceWindow[]
+  readonly heapWindowDeltasBytes: readonly number[]
+  readonly wasmHighWaterReuseObserved: boolean
+}): { status: NativeStatus; reason: string } {
+  const { group } = input
+  const failed = group.some(
+    (row) =>
+      row.outputFailures.length > 0 ||
+      row.cleanupFailures.length > 0 ||
+      row.clearedSessions !== row.cycles ||
+      !Number.isSafeInteger(row.clearedProjectionEntries) ||
+      row.clearedProjectionEntries <= 0,
+  )
+  if (failed)
+    return { status: 'FAILED', reason: 'At least one source projection or cleanup check failed.' }
+  const complete =
+    group.length >= 3 &&
+    group.length <= 8 &&
+    group.every(
+      (row, index) =>
+        row.window === index &&
+        RESOURCE_ENGINES.includes(row.engine) &&
+        RESOURCE_CYCLES.includes(row.cycles) &&
+        row.before.gcPerformed === true &&
+        row.after.gcPerformed === true &&
+        validMemoryReading(row.before) &&
+        validMemoryReading(row.after),
+    )
+  if (!complete)
+    return {
+      status: 'INCONCLUSIVE',
+      reason: 'Native observation needs 3–8 consecutive windows with complete post-GC readings.',
+    }
+  if (
+    !input.wasmHighWaterReuseObserved ||
+    !input.heapWindowDeltasBytes.slice(-2).every((bytes) => bytes <= 0)
+  )
+    return {
+      status: 'INCONCLUSIVE',
+      reason: 'The final two native post-release windows still show heap or WASM changes.',
+    }
+  return {
+    status: 'OBSERVED_PLATEAU',
+    reason:
+      'The final two native post-GC heap deltas are nonpositive and positive WASM reservations are stable. Browser resources require separate measurement.',
+  }
+}
+
+export function summarizeResourceWindows(rows: readonly ResourceWindow[]) {
+  const groups = new Map<string, ResourceWindow[]>()
+  for (const row of rows) {
+    const key = `${row.engine}/${row.cycles}`
+    const group = groups.get(key) ?? []
+    group.push(row)
+    groups.set(key, group)
+  }
+  return Array.from(groups.values(), (group) => {
+    group.sort((a, b) => a.window - b.window)
+    const first = group[0]
+    const tail = group.slice(1)
+    const after = group.map((row) => row.after)
+    const heaps = after.map((row) => row.heapUsedBytes)
+    const reserved = after.map((row) => row.wasmReservedBytes)
+    const delta = (field: keyof Omit<MemoryReading, 'gcPerformed'>) =>
+      tail.map((row, index) => row.after[field] - (group[index]?.after[field] ?? row.after[field]))
+    const heapWindowDeltasBytes = delta('heapUsedBytes')
+    const wasmWindowDeltasBytes = delta('wasmReservedBytes')
+    const wasmHighWaterReuseObserved =
+      group.length >= 3 &&
+      reserved.every((bytes) => bytes > 0) &&
+      wasmWindowDeltasBytes.slice(-2).every((bytes) => bytes === 0)
+    const observation = resourceGroupObservation({
+      group,
+      heapWindowDeltasBytes,
+      wasmHighWaterReuseObserved,
+    })
+    return {
+      engine: first?.engine,
+      cycles: first?.cycles,
+      windows: group.length,
+      status: observation.status,
+      gcStatus: group.every((row) => row.before.gcPerformed && row.after.gcPerformed)
+        ? 'POST_GC'
+        : 'NOT_MEASURED',
+      heapAfterReleaseBytes: heaps,
+      rssAfterReleaseBytes: after.map((row) => row.rssBytes),
+      wasmReservedBytes: reserved,
+      heapWindowDeltasBytes,
+      rssWindowDeltasBytes: delta('rssBytes'),
+      wasmWindowDeltasBytes,
+      heapObservedRangeBytes: Math.max(...heaps) - Math.min(...heaps),
+      wasmHighWaterReuseObserved,
+      reason: observation.reason,
+    }
+  })
+}
+
+export function summarizeNativeResources(rows: readonly ResourceWindow[]) {
+  const summaries = summarizeResourceWindows(rows)
+  const complete =
+    summaries.length === RESOURCE_ENGINES.length * RESOURCE_CYCLES.length &&
+    summaries.every(
+      (summary) =>
+        summary.engine !== undefined &&
+        RESOURCE_ENGINES.includes(summary.engine) &&
+        summary.cycles !== undefined &&
+        RESOURCE_CYCLES.includes(summary.cycles),
+    )
+  let nativeStatus: NativeStatus = 'INCONCLUSIVE'
+  if (complete && summaries.every((summary) => summary.status === 'OBSERVED_PLATEAU'))
+    nativeStatus = 'OBSERVED_PLATEAU'
+  if (summaries.some((summary) => summary.status === 'FAILED')) nativeStatus = 'FAILED'
+  return { nativeStatus, summaries }
+}
+
+async function runWindow(
+  row: PlannedWindow,
+  input: {
+    readonly sources: readonly ResourceSource[]
+    readonly expected: ReadonlyMap<string, string>
+    readonly extensions: HastExtensions
+    readonly readWasm: () => number
+  },
+) {
+  readMemory(input.readWasm, row.before)
+  for (let index = 0; index < row.cycles; index++) {
+    const source = input.sources[index % input.sources.length]
+    if (!source)
+      throw createScriptError('The native probe needs a source.', { internal: { sourceCount: 0 } })
+    const result = cycle({
+      engine: row.engine,
+      source,
+      expectedDigest: input.expected.get(source.id) ?? '',
+      extensions: input.extensions,
+    })
+    if (!result.matches || result.error) row.outputFailures.push(source.id)
+    if (!result.cleanup.cleared || result.retained !== 0) row.cleanupFailures.push(source.id)
+    if (result.cleanup.cleared) row.clearedSessions++
+    row.clearedProjectionEntries += result.cleanup.entries
+  }
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  readMemory(input.readWasm, row.after)
+}
+
+export async function captureNativeResourceAssets(root: string, outputDirectory: string) {
+  const require = createRequire(path.join(root, 'packages/markdown/package.json'))
+  const directory = path.join(outputDirectory, 'native-assets')
+  await mkdir(directory, { recursive: true })
+  const assets: { asset: string; file: string; bytes: number; sha256: string }[] = []
+  for (const asset of [
+    'tree-sitter-markdown.wasm',
+    'tree-sitter-markdown-chat.wasm',
+    'tree-sitter-md.wasm',
+  ]) {
+    const bytes = await readFile(require.resolve(`tree-sitter-md/${asset}`))
+    const file = path.join('native-assets', asset)
+    await writeFile(path.join(outputDirectory, file), bytes)
+    assets.push({ asset, file, bytes: bytes.length, sha256: hash('sha256', bytes, 'hex') })
+  }
+  return assets
+}
+
+async function candidateIdentity(root: string, outputDirectory: string) {
+  const require = createRequire(path.join(root, 'packages/markdown/package.json'))
+  const packageFile = require.resolve('tree-sitter-md/package.json')
+  const metadata: unknown = JSON.parse(await readFile(packageFile, 'utf8'))
+  if (
+    !metadata ||
+    typeof metadata !== 'object' ||
+    !('version' in metadata) ||
+    typeof metadata.version !== 'string'
+  )
+    throw createScriptError('The candidate package needs a version.', {
+      internal: { boundary: 'candidate-package' },
+    })
+  const entry = require.resolve('tree-sitter-md')
+  const module = await import(pathToFileURL(entry).href)
+  const assets = await captureNativeResourceAssets(root, outputDirectory)
+  if (typeof module.memoryBytes !== 'function')
+    throw createScriptError('The candidate must expose native memory accounting.', {
+      internal: { boundary: 'candidate-memory-export' },
+    })
+  return {
+    identity: {
+      version: metadata.version,
+      javascriptSha256: hash('sha256', await readFile(entry), 'hex'),
+      assets,
+    },
+    readWasm: (): number => {
+      const bytes: unknown = module.memoryBytes()
+      if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes <= 0)
+        throw createScriptError('The initialized candidate needs a positive WASM byte count.', {
+          internal: { boundary: 'candidate-memory-bytes' },
+        })
+      return bytes
+    },
+  }
+}
+
+async function runNativeResourceProbe(root: string, outputDirectory: string, windows = 4) {
+  const provenance = await qualificationProvenance(root)
+  const candidate = await candidateIdentity(root, outputDirectory)
+  await initializeTreeSitterMarkdown()
+  const extensions = await readyRemarkExtensions()
+  const sources = MARKDOWN_CASES.map(({ id, source }) => ({
+    id,
+    source,
+    sha256: hash('sha256', source, 'hex'),
+  }))
+  const expected = new Map<string, string>()
+  for (const source of sources) {
+    const context = resourceSession({ factory: createMarkdownSession, extensions })
+    try {
+      expected.set(source.id, context.update(source.source, false))
+    } finally {
+      context.release()
+    }
+  }
+  const rows = planResourceWindows(windows)
+  for (const row of rows)
+    await runWindow(row, { sources, expected, extensions, readWasm: candidate.readWasm })
+  const native = summarizeNativeResources(rows)
+  return {
+    schemaVersion: 1,
+    verdict: 'NOT VERIFIED',
+    nativeStatus: native.nativeStatus,
+    provenance,
+    candidate: candidate.identity,
+    sources: sources.map(({ id, source, sha256 }) => ({
+      id,
+      sha256,
+      sourceBytes: Buffer.byteLength(source),
+    })),
+    measurementBoundary:
+      'One realm initializes the parser and HTML/math stages once. Both engines use actual sessions and safe HAST transforms. Every cycle streams, settles, clears its session and releases projection roots/cache. Candidate parse handles dispose inside the production adapter. WASM reserved bytes describe the shared runtime, including during remark windows. RSS and JS heap are process-wide. Raw GC readings retain no DOM or browser claims.',
+    rawWindows: rows,
+    summaries: native.summaries,
+    browser: {
+      status: 'NOT_MEASURED',
+      fields: [
+        'browser-live-heap',
+        'retained-DOM-nodes',
+        'retained-workers',
+        'retained-subscriptions',
+        'actual-timeline-unmount',
+      ],
+      reason:
+        'This is a native session probe. Browser lifecycle/resource qualification runs separately.',
+    },
+    cleanup: {
+      created: ['finite native process, session and projection objects'],
+      stopped: ['all cycle consumers before session reset/cache release'],
+      retained: [
+        'shared initialized WASM runtime until this finite process exits',
+        'requested report, raw samples and captured native assets',
+      ],
+      ownerDataAccessed: false,
+    },
+  }
+}
+
+async function main() {
+  const { values } = parseArgs({
+    options: { out: { type: 'string' }, windows: { type: 'string', default: '4' } },
+  })
+  const windows = Number(values.windows)
+  if (!values.out || !Number.isSafeInteger(windows) || windows < 3 || windows > 8)
+    throw createScriptError('Choose --out DIRECTORY and 3–8 repeated windows.', {
+      internal: { boundary: 'native-resource-arguments' },
+    })
+  const root = path.resolve(import.meta.dirname, '../..')
+  const report = await runNativeResourceProbe(root, values.out, windows)
+  await mkdir(values.out, { recursive: true })
+  await writeFile(
+    path.join(values.out, 'native-resources.json'),
+    JSON.stringify(report, null, 2) + '\n',
+  )
+  await writeFile(
+    path.join(values.out, 'native-resources.jsonl'),
+    report.rawWindows.map((row) => JSON.stringify(row)).join('\n') + '\n',
+  )
+  process.stdout.write(
+    JSON.stringify({
+      nativeStatus: report.nativeStatus,
+      summaries: report.summaries,
+      output: values.out,
+    }) + '\n',
+  )
+  process.exitCode = report.nativeStatus === 'FAILED' ? 1 : 0
+}
+
+if (import.meta.main) await main()

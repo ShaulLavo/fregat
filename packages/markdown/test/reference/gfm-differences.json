@@ -88,7 +88,8 @@
     "kind": "autolink-extension",
     "reason": "The literal email extension links decoded escaped email text inside brackets.",
     "actualSha256": "98aaea705a8b54e88e97d7b3f1da995aebff240290d99eaf08ef8fcebc659bb0",
-    "expectedSha256": "2d798819792a0f77755eb8b09957b2b11292701705551c811061e68b64585eb5"
+    "expectedSha256": "2d798819792a0f77755eb8b09957b2b11292701705551c811061e68b64585eb5",
+    "candidateSha256": "2d798819792a0f77755eb8b09957b2b11292701705551c811061e68b64585eb5"
   },
   {
     "id": "gfm-616",

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "status": "frozen",
+  "plan": "plans/chat-markdown-qualification.md",
+  "baselineCommit": "296264ed670c307527722d4033b367d66f64e280",
+  "independentPairedTrials": 20,
+  "semantics": { "unexplainedDifferences": 0 },
+  "visuals": { "unexplainedChangedStates": 0, "contentFlashes": 0, "settledFenceColorDrops": 0 },
+  "ordinaryStreaming": {
+    "maximumSourceBytes": 32768,
+    "scheduleUtf16Units": 24,
+    "p95PrefixProjectionMs": 33.4,
+    "p95HeldSyntaxReleaseMs": 33.4,
+    "p95MainThreadMs": 8,
+    "maximumAttributableTaskMs": 50
+  },
+  "pairedLatency": {
+    "p95UpdateRatio": 1.1,
+    "p95UpdateAllowanceMs": 1,
+    "p95SettlementRatio": 1.1,
+    "p95SettlementAllowanceMs": 1,
+    "p95MountRatio": 1.1,
+    "p95MountAllowanceMs": 5
+  },
+  "totalStreamCpu": { "ratio": 1.1, "allowanceMs": 5 },
+  "resources": { "persistentGrowthAfterCachePlateau": 0, "wasmHighWaterReuseRequired": true },
+  "timing": {
+    "productionBuildRequired": true,
+    "quietIdentifiedHostRequired": true,
+    "pairedConfidenceBoundMustPass": true
+  },
+  "missingEvidence": "NOT VERIFIED"
+}

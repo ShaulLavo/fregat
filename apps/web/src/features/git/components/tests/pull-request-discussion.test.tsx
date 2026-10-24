@@ -8,11 +8,8 @@ import { pullRequestDiscussionKeys } from '@/features/git/utils/query-keys'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { test as base, expect } from '../../../../../test/fixtures'
 import { makeTestServer } from '../../../../../test/server'
-import {
-  renderWithProviders,
-  renderHookWithProviders,
-  createTestQueryClient,
-} from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderWithProviders, renderHookWithProviders } from '../../../../../test/render'
 import { runGit } from '../../../../../test/factories/git'
 import { createForgeDiscussionBoundary } from '../../../../../test/factories/forge'
 

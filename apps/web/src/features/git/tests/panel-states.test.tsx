@@ -13,7 +13,8 @@ import { TestEditorStateProvider as EditorStateProvider } from '../../../../test
 import { Panel } from '@/features/git/components/panel'
 import { GitStoreProvider } from '@/features/git/providers/store-provider'
 import { expect, test } from '../../../../test/fixtures'
-import { renderWithProviders, createTestQueryClient } from '../../../../test/render'
+import { createTestQueryClient } from '../../../../test/providers'
+import { renderWithProviders } from '../../../../test/render'
 import { runGit } from '../../../../test/factories/git'
 
 // The machine-checkable form of "loading and empty are not the same picture".

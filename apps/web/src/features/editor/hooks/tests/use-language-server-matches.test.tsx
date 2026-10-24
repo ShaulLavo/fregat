@@ -8,7 +8,8 @@ import { useLanguageServerMatchConfiguration } from '@/features/editor/providers
 import { languageServerMatchQueryOptions } from '@/features/editor/utils/language-server-match-query'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderHookWithProviders } from '../../../../../test/render'
+import { createTestQueryClient } from '../../../../../test/providers'
+import { renderHookWithProviders } from '../../../../../test/render'
 
 test('returns every match for a path through the real match route', async ({ client, server }) => {
   void client
