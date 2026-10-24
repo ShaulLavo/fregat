@@ -3,7 +3,7 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 
 const root = path.resolve(import.meta.dirname, '..')
-const readme = readFileSync(path.join(root, 'hotkeys/README.md'), 'utf8')
+const readme = readFileSync(path.join(root, 'packages/hotkeys/README.md'), 'utf8')
 
 test('hotkeys introduces the library without a Fregat hero or a prescribed keymap', () => {
   expect(readme).not.toContain('docs/images/workbench.webp')

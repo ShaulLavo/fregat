@@ -34,7 +34,7 @@ The build also writes a standalone project index; none of these Workers publishe
 To use output built elsewhere, copy its `fregat`, `singapore` and `ghostty-webgpu` directories
 into `scripts/product-sites/dist`. The three native Wrangler configs declare those directories,
 exact Custom Domains, and asset serving. Fregat and Singapore are assets-only, and their unknown
-pages and assets return 404. Ghostty's Worker (`ghostty-webgpu/site/worker/index.ts`) runs in
+pages and assets return 404. Ghostty's Worker (`packages/ghostty-webgpu/site/worker/index.ts`) runs in
 front of its pages only: it picks the visitor's scene and writes the scene's colours, and on the
 landing page its first frame, into the HTML. Scripts, fonts, frames and WASM are served directly.
 Its missing pages return the site's `404.html` with status 404.

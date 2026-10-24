@@ -77,7 +77,7 @@ The server listens on `127.0.0.1` only. A phone or another computer reaches it t
 - [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu): Ghostty's terminal, in the browser.
 - [hotkeys](https://github.com/ShaulLavo/hotkeys): keyboard shortcuts for editors and complex apps.
 
-These three are folders of this repository: `editor/` (Singapore), `ghostty-webgpu/` and `hotkeys/`. Fregat's own build uses them from here. A workflow publishes each folder to its standalone repository, so those repositories are read-only copies. Send issues and changes to this one.
+These three are folders of this repository: `packages/singapore/` (Singapore), `packages/ghostty-webgpu/` and `packages/hotkeys/`. Fregat's own build uses them from here. A workflow publishes each folder to its standalone repository, so those repositories are read-only copies. Send issues and changes to this one.
 
 ## Status
 

@@ -39,7 +39,7 @@ ownership and rejection history still need a contract.
 
 Editor document transactions and view contributions live in
 `/work/projects/Editor/packages/editor/src/` at this baseline, including `createPlugin.ts` and
-`plugins.ts`. After Plan 207, work belongs in `editor/packages/editor/`, with host behavior in
+`plugins.ts`. After Plan 207, work belongs in `packages/singapore/packages/editor/`, with host behavior in
 Fregat. Never implement document reversal as a view-only decoration.
 
 ## Design

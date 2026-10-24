@@ -2,7 +2,7 @@
 
 Status: APPROVED, 2026-10-03.
 
-Owner: `ShaulLavo/fregat`, `editor/packages/diff/` and Platform diff position, clipboard, comment, and git-action consumers. Source: [Fregat #342](https://github.com/ShaulLavo/fregat/issues/342). Editor packages are mirrored read-only; implementation stays in Fregat. Inspected baseline: `46e47cb7105da5b74dae4b76fc08033f2d6e5dfb`.
+Owner: `ShaulLavo/fregat`, `packages/singapore/packages/diff/` and Platform diff position, clipboard, comment, and git-action consumers. Source: [Fregat #342](https://github.com/ShaulLavo/fregat/issues/342). Editor packages are mirrored read-only; implementation stays in Fregat. Inspected baseline: `46e47cb7105da5b74dae4b76fc08033f2d6e5dfb`.
 
 Dependencies: None. Preserve the CRLF/BOM fixes shipped in #231 and normal-file save round-tripping shipped in #287.
 
@@ -16,13 +16,13 @@ For `first\nkeep\rmore\nlast`, git has three LF-delimited lines. The middle disp
 
 The issue retains a confirmed 2026-10-01 observation of four editor lines for three diff rows. It also documents exact token offsets despite the row mismatch. No fresh browser reproduction ran during issue filing or this planning pass.
 
-[lines.ts](../editor/packages/diff/src/lines.ts) still splits full source text on LF, then normalizes embedded CR/U+2028/U+2029 through `editorLineText`. `joinRenderLines` joins rows by LF. [textbuffer lineEndings.ts](../editor/packages/textbuffer/src/lineEndings.ts) normalizes those embedded characters into line breaks at normal editor ingestion. That normal-editor contract remains valid and must stay intact.
+[lines.ts](../packages/singapore/packages/diff/src/lines.ts) still splits full source text on LF, then normalizes embedded CR/U+2028/U+2029 through `editorLineText`. `joinRenderLines` joins rows by LF. [textbuffer lineEndings.ts](../packages/singapore/packages/textbuffer/src/lineEndings.ts) normalizes those embedded characters into line breaks at normal editor ingestion. That normal-editor contract remains valid and must stay intact.
 
-[types.ts](../editor/packages/diff/src/types.ts), [model.ts](../editor/packages/diff/src/model.ts), and [projection.ts](../editor/packages/diff/src/projection.ts) currently conflate source line text and row text. [diffSyntax.ts](../editor/packages/diff/src/diffSyntax.ts) projects tokens from parsed source sides. Platform's [diff-position-map.ts](../apps/web/src/features/editor/utils/diff-position-map.ts) accounts for normalized internal breaks and requires a row to match a source line verbatim before mapping it. A glyph substitution without updating these owners would disable or misdirect language-service positions.
+[types.ts](../packages/singapore/packages/diff/src/types.ts), [model.ts](../packages/singapore/packages/diff/src/model.ts), and [projection.ts](../packages/singapore/packages/diff/src/projection.ts) currently conflate source line text and row text. [diffSyntax.ts](../packages/singapore/packages/diff/src/diffSyntax.ts) projects tokens from parsed source sides. Platform's [diff-position-map.ts](../apps/web/src/features/editor/utils/diff-position-map.ts) accounts for normalized internal breaks and requires a row to match a source line verbatim before mapping it. A glyph substitution without updating these owners would disable or misdirect language-service positions.
 
 The real app [DiffPane](../apps/web/src/features/editor/components/diff-pane.tsx) is a read-only Editor holding the synthetic projected-row buffer. [diff-documents.ts](../apps/web/src/features/editor/utils/diff-documents.ts) separately constructs language-service side documents. This gives the fix a bounded display owner.
 
-Existing [lineEndings.test.ts](../editor/packages/diff/test/lineEndings.test.ts) and [diff-line-endings.browser.test.ts](../editor/packages/highlighting/test/diff-line-endings.browser.test.ts) verify text/token-offset contracts, including lone CR. They do not establish one rendered row per git line, so keep their useful checks and update assumptions explicitly.
+Existing [lineEndings.test.ts](../packages/singapore/packages/diff/test/lineEndings.test.ts) and [diff-line-endings.browser.test.ts](../packages/singapore/packages/highlighting/test/diff-line-endings.browser.test.ts) verify text/token-offset contracts, including lone CR. They do not establish one rendered row per git line, so keep their useful checks and update assumptions explicitly.
 
 ## Raw text, display text, and position ownership
 

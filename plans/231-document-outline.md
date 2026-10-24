@@ -41,7 +41,7 @@ needs subject identity when reused in the outline. Breadcrumbs consume this tree
 [packages/editor/src/documentSession.ts](/work/projects/Editor/packages/editor/src/documentSession.ts) provides shared revisions and source ranges.
 
 Editor citations name the current read-only checkout. After Plan 207, execute the same package
-changes under `editor/packages/` in Fregat and update its public package exports there.
+changes under `packages/singapore/packages/` in Fregat and update its public package exports there.
 
 ## Design
 

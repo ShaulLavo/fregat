@@ -1,5 +1,5 @@
 import { strictEqual } from 'node:assert/strict'
-import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
+import { detectPlatform } from '../../packages/hotkeys/packages/hotkeys/src/platform'
 import { copyFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium, type CDPSession, type Page } from 'playwright'

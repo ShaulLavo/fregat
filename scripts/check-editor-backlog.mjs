@@ -184,8 +184,7 @@ function checkPlanningDirectory(path) {
   }
 }
 
-for (const family of ['apps', 'packages', 'editor', 'ghostty-webgpu', 'hotkeys'])
-  checkPlanningDirectory(resolve(root, family))
+for (const family of ['apps', 'packages']) checkPlanningDirectory(resolve(root, family))
 
 for (const file of planDocuments)
   check(planIndex.includes(`](${file})`), `Plan absent from root index: ${file}`)

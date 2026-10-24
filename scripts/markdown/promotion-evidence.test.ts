@@ -1436,9 +1436,9 @@ async function writeSyntheticTree(root: string) {
   ]
   for (const directory of directories) await mkdir(path.join(root, directory), { recursive: true })
   const files = [
-    'editor/packages/tree-sitter/src/treeSitter/markdown.ts',
-    'editor/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-    'editor/packages/tree-sitter/test/wasm-memory.test.ts',
+    'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
+    'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
+    'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
     'apps/web/test/providers.tsx',
     'apps/web/test/factories/markdown-browser.tsx',
     'apps/web/test/factories/markdown-observation.ts',
@@ -1835,9 +1835,9 @@ test('uses an actual clean disposable candidate and completed synthetic100 ledge
   expect(fixture.captured.sources).toEqual(
     expect.arrayContaining(
       [
-        'editor/packages/tree-sitter/src/treeSitter/markdown.ts',
-        'editor/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-        'editor/packages/tree-sitter/test/wasm-memory.test.ts',
+        'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
+        'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
+        'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
       ].map((file) => expect.objectContaining({ file })),
     ),
   )

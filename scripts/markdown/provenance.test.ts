@@ -30,9 +30,9 @@ const fixtureFiles = [
   'apps/web/vitest.markdown-qualification.config.ts',
   'apps/web/vitest.browser.config.ts',
   'apps/web/vite.config.ts',
-  'editor/packages/tree-sitter/src/treeSitter/markdown.ts',
-  'editor/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-  'editor/packages/tree-sitter/test/wasm-memory.test.ts',
+  'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
+  'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
+  'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
   'package.json',
   'bun.lock',
 ]
@@ -48,9 +48,9 @@ test('candidate source identity includes the production probe and its shared pro
         file,
       ).toBe(true)
     for (const file of [
-      'editor/packages/tree-sitter/src/treeSitter/markdown.ts',
-      'editor/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-      'editor/packages/tree-sitter/test/wasm-memory.test.ts',
+      'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
+      'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
+      'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
       'apps/web/test/providers.tsx',
       'apps/web/src/features/chat/providers/control.tsx',
       'apps/web/src/features/chat/state/control.ts',

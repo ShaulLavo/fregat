@@ -9,7 +9,7 @@ receipts remain in Git history.
 
 - **One library, no keymaps inside.** `@fregat/hotkeys` is our fork of TanStack Hotkeys: its API
   shape and pure key functions, with our trie, editor-grade chords and Zed's context resolution.
-  It lives in Fregat's `hotkeys/`, mirrored to its own public repo
+  It lives in Fregat's `packages/hotkeys/`, mirrored to its own public repo
   ([ADR 001](../adr/001-one-repository-with-mirrors.md)). Local consumers use the workspace;
   standalone consumers qualify a pinned dependency artifact while npm remains deferred.
   The core is DOM-free; adapters turn browser and terminal input into its key events.

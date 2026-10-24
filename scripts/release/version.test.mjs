@@ -286,17 +286,20 @@ test('versions the public Editor group with versioned and unversioned private ex
       name: 'fregat',
       private: true,
       workspaces: [
-        'editor/packages/*',
-        'editor/examples/*',
-        'hotkeys/packages/*',
-        'ghostty-webgpu',
+        'packages/singapore/packages/*',
+        'packages/singapore/examples/*',
+        'packages/hotkeys/packages/*',
+        'packages/ghostty-webgpu',
       ],
     })
     for (const [file, manifest] of Object.entries(fixture.packages))
       await put(dirname(file), manifest)
-    await put('hotkeys/packages/hotkeys', { name: '@fregat/hotkeys', version: '0.0.0' })
-    await put('hotkeys/packages/react-hotkeys', { name: '@fregat/react-hotkeys', version: '0.0.0' })
-    await put('ghostty-webgpu', { name: 'ghostty-webgpu', version: '0.1.2' })
+    await put('packages/hotkeys/packages/hotkeys', { name: '@fregat/hotkeys', version: '0.0.0' })
+    await put('packages/hotkeys/packages/react-hotkeys', {
+      name: '@fregat/react-hotkeys',
+      version: '0.0.0',
+    })
+    await put('packages/ghostty-webgpu', { name: 'ghostty-webgpu', version: '0.1.2' })
     await writeFile(join(root, 'bun.lock'), '{}\n')
     await symlink(join(checkout, 'node_modules'), join(root, 'node_modules'), 'junction')
     await mkdir(join(root, '.changeset'))
@@ -326,9 +329,9 @@ test('versions the public Editor group with versioned and unversioned private ex
       expect(published.version).toBe('0.2.1')
       expect(published.engines).toEqual(manifest.engines)
     }
-    expect((await read('editor/examples/app')).version).toBe('0.0.0')
-    expect(await read('editor/examples/stress')).not.toHaveProperty('version')
-    expect((await read('hotkeys/packages/hotkeys')).version).toBe('0.0.0')
-    expect((await read('ghostty-webgpu')).version).toBe('0.1.2')
+    expect((await read('packages/singapore/examples/app')).version).toBe('0.0.0')
+    expect(await read('packages/singapore/examples/stress')).not.toHaveProperty('version')
+    expect((await read('packages/hotkeys/packages/hotkeys')).version).toBe('0.0.0')
+    expect((await read('packages/ghostty-webgpu')).version).toBe('0.1.2')
   })
 })

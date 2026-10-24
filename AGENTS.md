@@ -131,7 +131,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 - `bun run build-release` builds a portable release anyone can make. Installing one onto the owner's machine is covered under Owner-only below.
 - Desktop windows, browser tabs and remote clients share the machine server. The launcher reuses the recorded service and release; closing or uninstalling a client leaves shared services and terminals running. Packaged service activation and updates follow [Plan 114](plans/114-installed-app.md).
 - The release endpoint under the configured base path (`GET <base>/release`) reports the served release, commit and dirty count, plus `pending`, `phase` and `liveCheck` for a staged update.
-- Editor packages live in `editor/packages/`; the terminal library lives in `ghostty-webgpu/`. Both are root Bun workspaces mirrored to their standalone repositories. Change their source here, follow each folder's `AGENTS.md`, and run `bun run build:workspaces` before checking consumers. CI builds those workspaces from this checkout.
+- Editor packages live in `packages/singapore/packages/`; the terminal library lives in `packages/ghostty-webgpu/`. Both are root Bun workspaces mirrored to their standalone repositories. Change their source here, follow each folder's `AGENTS.md`, and run `bun run build:workspaces` before checking consumers. CI builds those workspaces from this checkout.
 - A source-checkout release's `server/node_modules` can link to the checkout's installed packages, so rollback does not undo a `bun install`.
 
 ## Testing

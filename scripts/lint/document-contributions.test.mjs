@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { documentContributionFindings } from './document-contributions.mjs'
 
-const consumer = 'editor/examples/app/src/main.ts'
+const consumer = 'packages/singapore/examples/app/src/main.ts'
 
 test.each([
   "import { TreeSitterWorkerClient as Parser } from '@singapore-editor/tree-sitter'; new Parser()",
@@ -39,19 +39,25 @@ test.each([
 
 test.each([
   [
-    'editor/packages/tree-sitter/src/mergeReview.ts',
+    'packages/singapore/packages/tree-sitter/src/mergeReview.ts',
     "import { DocumentDelivery } from '@singapore-editor/core/internal/document-worker'; import { TreeSitterWorkerClient } from './treeSitter/workerClient'; new TreeSitterWorkerClient()",
   ],
   [
-    'editor/packages/tree-sitter/src/session.ts',
+    'packages/singapore/packages/tree-sitter/src/session.ts',
     "import { waitForDocumentWork } from '@singapore-editor/core/internal/document-worker'",
   ],
-  ['editor/packages/find/src/plugin.ts', 'snapshot.changesSinceDocumentSyncPoint(point, null)'],
   [
-    'editor/packages/editor/src/semanticTokenLayer.ts',
+    'packages/singapore/packages/find/src/plugin.ts',
     'snapshot.changesSinceDocumentSyncPoint(point, null)',
   ],
-  ['editor/packages/editor/src/editor/documentDelivery.ts', 'buffer.subscribe(listener)'],
+  [
+    'packages/singapore/packages/editor/src/semanticTokenLayer.ts',
+    'snapshot.changesSinceDocumentSyncPoint(point, null)',
+  ],
+  [
+    'packages/singapore/packages/editor/src/editor/documentDelivery.ts',
+    'buffer.subscribe(listener)',
+  ],
   [
     'apps/web/src/features/workbench/components/csv-table.tsx',
     'const { subscribe: observe } = context.buffer; observe.call(context.buffer, listener)',

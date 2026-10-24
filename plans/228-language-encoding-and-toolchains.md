@@ -37,7 +37,7 @@ Change the active document language/encoding and manage LSP arguments and langua
 ## Existing Fregat and Editor work
 
 Editor source below was verified in `/work/projects/Editor/packages/` before Plan 207.
-Implement it in Fregat `editor/packages/` after that cutover; the external checkout is
+Implement it in Fregat `packages/singapore/packages/` after that cutover; the external checkout is
 read-only for this wave.
 
 Fregat identifies languages with [file-language.ts](../apps/web/src/lib/file-language.ts)

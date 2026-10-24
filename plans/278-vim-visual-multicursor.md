@@ -32,11 +32,11 @@ All covered `vim::` names are listed below; selection kind and match direction s
 
 Editor paths below name the canonical destination after Plan 207. At this plan's source audit,
 those files live under `/work/projects/Editor/packages/`; `editor/` has not landed in Fregat.
-Implement package work in `editor/packages/` after the move.
+Implement package work in `packages/singapore/packages/` after the move.
 
-`editor/packages/editor/src/selections.ts` and `editor/packages/editor/src/editor/selectionRanges.ts` own local
-multi-selection and structural selection. `editor/packages/editor/src/editor/Editor.ts` exposes selections, cursor undo
-and projections; `editor/packages/editor/src/documentSelectionEdits.ts` plans edits for multiple selections.
+`packages/singapore/packages/editor/src/selections.ts` and `packages/singapore/packages/editor/src/editor/selectionRanges.ts` own local
+multi-selection and structural selection. `packages/singapore/packages/editor/src/editor/Editor.ts` exposes selections, cursor undo
+and projections; `packages/singapore/packages/editor/src/documentSelectionEdits.ts` plans edits for multiple selections.
 `apps/web/src/keymap/editor-commands.ts` already exposes occurrence and secondary-selection
 commands. Plans 224 and 277 provide selection/object foundations, but Vim inclusive visual
 endpoints and restored/block selection state remain missing.
@@ -45,13 +45,13 @@ endpoints and restored/block selection state remain missing.
 
 Follow [the keymap architecture](../docs/keymap/architecture.md). Add typed commands and
 availability to `apps/web/src/keymap/table.ts` through its owning command module; Editor
-commands also belong in `editor/packages/editor/src/editor/commandCatalog.ts`. Put keys and argument variants in Plan 206's
+commands also belong in `packages/singapore/packages/editor/src/editor/commandCatalog.ts`. Put keys and argument variants in Plan 206's
 `apps/web/src/keymap/presets/` data. Hosted Editor joins the window dispatcher and publishes
 contexts. Standalone Editor exports the modal pack as data. Keep keys out of command metadata.
 Use the existing document mutation/undo path for synchronous edits. Async reads and effects
 use feature-owned TanStack query/mutation options and settle the cache before resolving.
 
-Represent character/line/block visual state as a tagged model in `editor/packages/vim`.
+Represent character/line/block visual state as a tagged model in `packages/singapore/packages/vim`.
 Store anchors for both ends, selection kind and block column goals. Convert to Editor ranges
 at the view boundary; keep inclusive Vim endpoints distinct from half-open document edits.
 Reuse Plan 275 motions and Plan 277 objects. Visual marks remap through edits and survive a

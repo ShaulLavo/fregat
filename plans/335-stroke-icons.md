@@ -17,7 +17,7 @@
 
 ## Current code
 
-- `@phosphor-icons/react` is imported by about 330 files in `apps/web/src` and `packages/ui/src`; 170 distinct icons. `editor/`, `ghostty-webgpu/` and `apps/tui` import none.
+- `@phosphor-icons/react` is imported by about 330 files in `apps/web/src` and `packages/ui/src`; 170 distinct icons. `packages/singapore/`, `packages/ghostty-webgpu/` and `apps/tui` import none.
 - Weight props: `fill` 16, `duotone` 17, `bold` 10, `regular` 2 call sites (about 30 files, e.g. `features/chat/components/chat-input-submit-button.tsx`, `features/file-picker/components/pin-folder-button.tsx`, `packages/ui/src/components/sonner.tsx`, `packages/ui/src/patterns/render-error-state.tsx`).
 - Phosphor's `type Icon` is used as a prop type (`keymap/editor-title-actions.ts`, `features/file-picker/utils/sidebar-locations.ts`, menu models under `keymap/menus/utils/`).
 - `apps/web/scripts/phosphor-weight-plugin.ts` (+ test) prunes unused Phosphor weights at build, wired in `apps/web/vite.config.ts:131`; `apps/web/vitest.browser.config.ts:64` pre-bundles `@phosphor-icons/react`.

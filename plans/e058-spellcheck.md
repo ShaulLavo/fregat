@@ -5,7 +5,7 @@ are tracked in [303](303-spellcheck-correctness.md) for validation of shipped co
 [304](304-spellcheck-rendering-cost.md) for incremental overlay cost through Plan 201,
 and [305](305-spellcheck-language-support.md) for explicit spelling languages.
 
-Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
+Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
 
 - Status: In progress
 - PR preparation: plain-text paint regression fails before the fix in WebKit, with zero
@@ -32,7 +32,7 @@ Source paths in this document are relative to [`editor/`](../editor/) unless qua
 - Inspected baseline: `74e76bef2af674ad80b3c13024fa47f692e2bb7c`, 2026-09-26 (Platform `97bfbf2ba`).
 
 Research done 2026-09-26. The measurements, licence audit and survey are in
-[spellcheck-research.md](../editor/docs/editing/spellcheck-research.md). Decided 2026-09-26: owner. The
+[spellcheck-research.md](../packages/singapore/docs/editing/spellcheck-research.md). Decided 2026-09-26: owner. The
 chat composer keeps Lexical until this lands, so this plan gates Platform
 [Plan 171](171-composer-on-our-editor.md) phase 3. Only permissive licences
 may be used, with as few dependencies as possible.
@@ -52,16 +52,16 @@ comments and strings.
 
 - **No native path.** The Editor paints text outside its input element. The EditContext host and
   the textarea both set `spellcheck = false`
-  ([virtualizedTextViewHelpers.ts](../editor/packages/editor/src/virtualization/virtualizedTextViewHelpers.ts)).
+  ([virtualizedTextViewHelpers.ts](../packages/singapore/packages/editor/src/virtualization/virtualizedTextViewHelpers.ts)).
   The EditContext explainer states that native spellcheck is unreachable under EditContext, and the
   web platform has no API that reports misspellings. A hidden mirror is rejected in the findings.
 - **Squiggles already paint.** LSP errors draw `underline wavy` through
-  `setRangeHighlight(name, ranges, style)` ([plugin.styles.ts](../editor/packages/lsp-plugin/src/plugin.styles.ts),
-  [diagnosticsPresenter.ts](../editor/packages/lsp-plugin/src/diagnosticsPresenter.ts) `renderHighlights`),
+  `setRangeHighlight(name, ranges, style)` ([plugin.styles.ts](../packages/singapore/packages/lsp-plugin/src/plugin.styles.ts),
+  [diagnosticsPresenter.ts](../packages/singapore/packages/lsp-plugin/src/diagnosticsPresenter.ts) `renderHighlights`),
   and colours are registered ids (`registerEditorColor`).
 - **The contribution context has the rest.** Contributions have `trackRanges`,
   `getDocumentSyncPoint` / `changesSinceDocumentSyncPoint`, `textOffsetFromPoint` (E047),
-  `getRangeClientRect` and `getSelections` ([plugins.ts](../editor/packages/editor/src/plugins.ts)
+  `getRangeClientRect` and `getSelections` ([plugins.ts](../packages/singapore/packages/editor/src/plugins.ts)
   `EditorViewContributionContext`). Workers follow the minimap pattern
   (`new Worker(new URL('./minimap.worker.ts', import.meta.url))`).
 - **Captures are tied to replacement providers.** They reach only inline replacement providers.

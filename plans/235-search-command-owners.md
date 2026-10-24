@@ -41,7 +41,7 @@ flags, histories, replacement visibility and collapsed paths.
 already map in Editor contexts; the remaining work includes their project and chat contexts.
 
 Editor citations name the current read-only checkout. After Plan 207, execute the same package
-changes under `editor/packages/` in Fregat and update its public package exports there.
+changes under `packages/singapore/packages/` in Fregat and update its public package exports there.
 
 ## Design
 

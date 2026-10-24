@@ -585,15 +585,15 @@ function nativeInput(
       sha256: hash('full closure source'),
     },
     {
-      file: 'editor/packages/tree-sitter/src/treeSitter/markdown.ts',
+      file: 'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
       sha256: hash('editor markdown loader'),
     },
     {
-      file: 'editor/packages/tree-sitter/test/wasm-memory.browser.test.ts',
+      file: 'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
       sha256: hash('editor browser memory test'),
     },
     {
-      file: 'editor/packages/tree-sitter/test/wasm-memory.test.ts',
+      file: 'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
       sha256: hash('editor memory test'),
     },
     { file: 'scripts/markdown/paired-native.ts', sha256: hash('native source') },
@@ -657,15 +657,15 @@ function nativeInput(
         bytes: Buffer.from('full closure source'),
       },
       {
-        path: 'snapshot/editor/packages/tree-sitter/src/treeSitter/markdown.ts',
+        path: 'snapshot/packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
         bytes: Buffer.from('editor markdown loader'),
       },
       {
-        path: 'snapshot/editor/packages/tree-sitter/test/wasm-memory.browser.test.ts',
+        path: 'snapshot/packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
         bytes: Buffer.from('editor browser memory test'),
       },
       {
-        path: 'snapshot/editor/packages/tree-sitter/test/wasm-memory.test.ts',
+        path: 'snapshot/packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
         bytes: Buffer.from('editor memory test'),
       },
       { path: 'snapshot/scripts/markdown/paired-native.ts', bytes: Buffer.from('native source') },

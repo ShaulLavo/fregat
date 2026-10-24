@@ -5,15 +5,15 @@ import { execFileSync } from 'node:child_process'
 
 const generatedDocs = ['docs/settings-reference.md', 'docs/native-syntax-coverage.*']
 const editorHealthInputs = [
-  'editor/docs/architecture/**/*.json',
-  'editor/docs/commands.md',
-  'editor/scripts/architecture-health.mjs',
-  'editor/scripts/check-full-text-boundary.mjs',
-  'editor/scripts/full-text-boundary-allow.json',
-  'editor/scripts/command-reference.ts',
-  'editor/scripts/workspace-root.ts',
-  'editor/package.json',
-  'editor/site/package.json',
+  'packages/singapore/docs/architecture/**/*.json',
+  'packages/singapore/docs/commands.md',
+  'packages/singapore/scripts/architecture-health.mjs',
+  'packages/singapore/scripts/check-full-text-boundary.mjs',
+  'packages/singapore/scripts/full-text-boundary-allow.json',
+  'packages/singapore/scripts/command-reference.ts',
+  'packages/singapore/scripts/workspace-root.ts',
+  'packages/singapore/package.json',
+  'packages/singapore/site/package.json',
   'package.json',
   '.github/workflows/workspace-libraries.yml',
 ]
@@ -199,13 +199,15 @@ export function selectAffected(graph, files, full = false) {
     sites: sites.join(','),
     editor:
       files.some((file) => matches(file, editorHealthInputs)) ||
-      familyChanged('editor') ||
-      packages.some((name) => graph.packages.get(name).directory.startsWith('editor/examples/')),
+      familyChanged('packages/singapore') ||
+      packages.some((name) =>
+        graph.packages.get(name).directory.startsWith('packages/singapore/examples/'),
+      ),
     ghostty:
       selected.has('ghostty-webgpu') ||
       selected.has('ghostty-webgpu-line-editor') ||
       selected.has('ghostty-webgpu-shaders'),
-    hotkeys: familyChanged('hotkeys'),
+    hotkeys: familyChanged('packages/hotkeys'),
     docs: files.some(rootDocument),
     docs_files: files.filter(
       (file) => rootDocument(file) && existsSync(path.join(graph.root, file)),

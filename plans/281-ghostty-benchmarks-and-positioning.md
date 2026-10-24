@@ -122,6 +122,6 @@ artifact directory. Historical source labels, completed windows and Canvas rejec
 
 ## Done when
 
-- `docs/benchmarks.md` and its JSON artifacts are published in `ghostty-webgpu/`, losses included.
+- `docs/benchmarks.md` and its JSON artifacts are published in `packages/ghostty-webgpu/`, losses included.
 - Every README claim names its evidence (source path, link, or a benchmark artifact).
 - Each part lands as its own reviewed PR, and the mirror is updated.

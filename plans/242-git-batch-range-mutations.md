@@ -35,7 +35,7 @@ tracked restore and untracked trash as one operation.
 per repository and settles status. [Diff line selection](../apps/web/src/features/git/utils/diff-line-selection.ts)
 preserves old/new addresses across projections. Editor supplies diff rows and region expansion
 in `/work/projects/Editor/packages/diff/src/editorDiffPlugin.ts` and `regions.ts`, but those
-APIs do not build a selected patch. After Plan 207, extend `editor/packages/diff/`.
+APIs do not build a selected patch. After Plan 207, extend `packages/singapore/packages/diff/`.
 
 ## Design
 
@@ -62,7 +62,7 @@ Follow [the keymap architecture](../docs/keymap/architecture.md). Command metada
 ## Steps
 
 - [ ] Add failing real temporary-repository tests for batch and partial-hunk targets.
-- [ ] Add target contracts and Editor selected-hunk/patch primitives under `editor/packages/diff/`.
+- [ ] Add target contracts and Editor selected-hunk/patch primitives under `packages/singapore/packages/diff/`.
 - [ ] Split tracked restore and untracked trash from discard, with fresh path admission.
 - [ ] Implement serialized mutations, settlement, list interval anchors, and next-change targeting.
 - [ ] Register commands/preset rows and add `git-range-mutations` scenario and selectors.

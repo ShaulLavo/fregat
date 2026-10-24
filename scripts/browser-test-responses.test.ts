@@ -1,20 +1,24 @@
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { expect, test } from 'vitest'
-import { workspaceRoot } from '../editor/scripts/workspace-root'
+import { workspaceRoot } from '../packages/singapore/scripts/workspace-root'
 
-const require = createRequire(path.join(workspaceRoot, 'editor/package.json'))
+const require = createRequire(path.join(workspaceRoot, 'packages/singapore/package.json'))
 const { createServer } = await import(require.resolve('vite'))
 
 const configurations = [
-  { config: 'editor/packages/editor/vitest.config.ts', project: 'browser', source: 'src/index.ts' },
   {
-    config: 'editor/packages/editor/vitest.config.ts',
+    config: 'packages/singapore/packages/editor/vitest.config.ts',
+    project: 'browser',
+    source: 'src/index.ts',
+  },
+  {
+    config: 'packages/singapore/packages/editor/vitest.config.ts',
     project: 'highlight-paint',
     source: 'src/index.ts',
   },
   {
-    config: 'editor/packages/highlighting/vitest.config.ts',
+    config: 'packages/singapore/packages/highlighting/vitest.config.ts',
     project: 'browser',
     source: 'src/index.ts',
   },

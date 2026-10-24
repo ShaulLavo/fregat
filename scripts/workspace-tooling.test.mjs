@@ -77,17 +77,17 @@ async function prepare({ root, put }) {
     workspaces: {
       packages: [
         'apps/*',
-        'hotkeys/packages/*',
-        'editor/site',
-        'ghostty-webgpu/site',
-        'ghostty-webgpu/site-classic',
+        'packages/hotkeys/packages/*',
+        'packages/singapore/site',
+        'packages/ghostty-webgpu/site',
+        'packages/ghostty-webgpu/site-classic',
       ],
       catalog,
     },
   })
   const format = JSON.stringify({ semi: false, singleQuote: true })
   await writeFile(`${root}/.oxfmtrc.json`, format)
-  for (const family of ['editor', 'ghostty-webgpu', 'hotkeys']) {
+  for (const family of ['packages/singapore', 'packages/ghostty-webgpu', 'packages/hotkeys']) {
     await mkdir(`${root}/${family}`, { recursive: true })
     await writeFile(`${root}/${family}/.oxfmtrc.json`, format)
   }
@@ -104,23 +104,23 @@ test('checks workspace tools, standalone catalogs and the Astro compiler API', a
       name: 'site',
       devDependencies: { typescript: catalog['typescript-api'] },
     })
-    await fixture.put('editor/site', {
+    await fixture.put('packages/singapore/site', {
       name: 'singapore-editor-site',
       devDependencies: { typescript: catalog['typescript-api'] },
     })
-    await fixture.put('ghostty-webgpu/site', {
+    await fixture.put('packages/ghostty-webgpu/site', {
       name: 'ghostty-webgpu-site',
       devDependencies: { typescript: catalog['typescript-api'] },
     })
-    await fixture.put('ghostty-webgpu/site-classic', {
+    await fixture.put('packages/ghostty-webgpu/site-classic', {
       name: 'ghostty-webgpu-classic-site',
       devDependencies: { typescript: catalog['typescript-api'] },
     })
-    await fixture.put('hotkeys', {
+    await fixture.put('packages/hotkeys', {
       name: 'hotkeys-workspace',
       workspaces: { packages: ['packages/*'], catalog: { vitest: '5.0.2' } },
     })
-    await fixture.put('hotkeys/packages/core', {
+    await fixture.put('packages/hotkeys/packages/core', {
       name: 'core',
       devDependencies: { typescript: '7.0.2', vitest: 'catalog:' },
     })
@@ -132,7 +132,7 @@ test('checks workspace tools, standalone catalogs and the Astro compiler API', a
 test('rejects and synchronizes tool versions, Bun pins and standalone catalog drift', async () => {
   await withWorkspace(async (fixture) => {
     await prepare(fixture)
-    await fixture.put('editor', {
+    await fixture.put('packages/singapore', {
       name: 'editor-workspace',
       packageManager: 'bun@1.3.14',
       devDependencies: { typescript: '~6.0.3' },
@@ -145,7 +145,7 @@ test('rejects and synchronizes tool versions, Bun pins and standalone catalog dr
     expect(failed.stderr).toContain('catalog vitest must be 5.0.2')
     expect(run(fixture.root, '--write').status).toBe(0)
     expect(run(fixture.root).status).toBe(0)
-    const manifest = await fixture.read('editor')
+    const manifest = await fixture.read('packages/singapore')
     expect(manifest.devDependencies.typescript).toBe('7.0.2')
     expect(manifest.packageManager).toBe('bun@1.4.4')
     expect(manifest.workspaces.catalog.vitest).toBe('5.0.2')
@@ -156,7 +156,7 @@ test('rejects formatter drift while allowing family-specific generated-file excl
   await withWorkspace(async (fixture) => {
     await prepare(fixture)
     await writeFile(
-      `${fixture.root}/ghostty-webgpu/.oxfmtrc.json`,
+      `${fixture.root}/packages/ghostty-webgpu/.oxfmtrc.json`,
       JSON.stringify({ semi: true, singleQuote: true, ignorePatterns: ['native/**'] }),
     )
     const result = run(fixture.root)
@@ -170,7 +170,7 @@ test('root and standalone terminal install Node types ahead of ancestor packages
   const require = createRequire(join(checkout, 'package.json'))
   const compiler = join(dirname(require.resolve('typescript/package.json')), 'bin/tsc')
 
-  for (const workspace of ['.', 'ghostty-webgpu']) {
+  for (const workspace of ['.', 'packages/ghostty-webgpu']) {
     const manifestPath = join(checkout, workspace, 'package.json')
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
     expect(manifest.devDependencies['@types/node']).toBe('26.6.3')
@@ -220,16 +220,19 @@ test('root and standalone terminal install Node types ahead of ancestor packages
 
 test('terminal workspace version agrees with the root lockfile', async () => {
   const manifest = JSON.parse(
-    await readFile(new URL('../ghostty-webgpu/package.json', import.meta.url), 'utf8'),
+    await readFile(new URL('../packages/ghostty-webgpu/package.json', import.meta.url), 'utf8'),
   )
   const lockfile = JSON5.parse(await readFile(new URL('../bun.lock', import.meta.url), 'utf8'))
-  expect(lockfile.workspaces['ghostty-webgpu'].version).toBe(manifest.version)
+  expect(lockfile.workspaces['packages/ghostty-webgpu'].version).toBe(manifest.version)
 })
 
 test('terminal native input closure agrees with its package dependencies', () => {
-  const terminal = fileURLToPath(new URL('../ghostty-webgpu/', import.meta.url))
+  const terminal = fileURLToPath(new URL('../packages/ghostty-webgpu/', import.meta.url))
   const verifier = fileURLToPath(
-    new URL('../ghostty-webgpu/scripts/verify-config-resolver-artifacts.ts', import.meta.url),
+    new URL(
+      '../packages/ghostty-webgpu/scripts/verify-config-resolver-artifacts.ts',
+      import.meta.url,
+    ),
   )
   const result = spawnSync('bun', [verifier, '--state', 'either'], {
     cwd: terminal,
@@ -240,7 +243,7 @@ test('terminal native input closure agrees with its package dependencies', () =>
 })
 
 test.each(
-  ['editor', 'ghostty-webgpu', 'hotkeys'].flatMap((family) =>
+  ['packages/singapore', 'packages/ghostty-webgpu', 'packages/hotkeys'].flatMap((family) =>
     [
       { key: 'vitest@5.0.2', patch: 'patches/vitest@5.0.2.patch' },
       { key: '@vitest/mocker@5.0.2', patch: 'patches/@vitest%2Fmocker@5.0.2.patch' },
@@ -256,7 +259,7 @@ test.each(
       await fixture.put('.', { ...root, patchedDependencies: { [key]: patch } })
       await mkdir(join(fixture.root, 'patches'))
       await writeFile(join(fixture.root, patch), source)
-      for (const name of ['editor', 'ghostty-webgpu', 'hotkeys']) {
+      for (const name of ['packages/singapore', 'packages/ghostty-webgpu', 'packages/hotkeys']) {
         await fixture.put(name, { name, patchedDependencies: { [key]: patch } })
         await mkdir(join(fixture.root, name, 'patches'))
         await writeFile(join(fixture.root, name, patch), source)

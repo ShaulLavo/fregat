@@ -44,7 +44,7 @@ locations, but LSP and structured Logs do not supply DAP.
 
 Editor view and document contributions are in `/work/projects/Editor/packages/editor/src/`
 at this baseline. After Plan 207, reusable source-position decorations belong in
-`editor/packages/`; Fregat owns the debugger service, process selection and panels.
+`packages/singapore/packages/`; Fregat owns the debugger service, process selection and panels.
 
 ## Design
 

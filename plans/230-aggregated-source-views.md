@@ -40,12 +40,12 @@ Zed opens a searchable all-match picker seeded from the active item or the last 
 These provide source ownership; Plan 229 supplies the shared excerpt mapping engine.
 
 Editor citations name the current read-only checkout. After Plan 207, execute the same package
-changes under `editor/packages/` in Fregat and update its public package exports there.
+changes under `packages/singapore/packages/` in Fregat and update its public package exports there.
 
 ## Design
 
 Use Plan 229's excerpt document and source anchors for search, selected ranges and editable
-agent-review excerpts. Fregat owns tab placement and picker UI; `editor/packages/editor` owns
+agent-review excerpts. Fregat owns tab placement and picker UI; `packages/singapore/packages/editor` owns
 selection-to-source mapping and edit/undo behavior. Expose typed source-open requests carrying
 source identity, ranges and split intent. Publish `Editor` with excerpt capabilities and a
 `TextFinder` node beneath the workspace. Project search hands Plan 235's query/results to the

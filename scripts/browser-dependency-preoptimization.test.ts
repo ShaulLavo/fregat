@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { expect, test } from 'vitest'
-import { workspaceRoot } from '../editor/scripts/workspace-root'
+import { workspaceRoot } from '../packages/singapore/scripts/workspace-root'
 
 const configurations = [
   'apps/web/vitest.browser.config.ts',

@@ -41,7 +41,7 @@ Plan 252 supplies agent edit dispositions. There is no inline assistant widget o
 Editor `packages/editor/src/createPlugin.ts` provides selections, view-owned contributions and
 one-undo-entry `applyEdits`; `plugins.ts` provides inline replacements and view geometry.
 Those verified files currently live under `/work/projects/Editor/`. Implement reusable editor
-work in `editor/packages/editor/` after Plan 207. Inline replacements alone do not establish a
+work in `packages/singapore/packages/editor/` after Plan 207. Inline replacements alone do not establish a
 revision-safe generated-edit preview.
 
 ## Design

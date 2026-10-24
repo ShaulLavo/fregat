@@ -21,8 +21,8 @@ async function freshSettingsCheckout(root: string): Promise<void> {
     'packages/contracts/package.json',
     'packages/contracts/tsconfig.json',
     'packages/contracts/vitest.config.ts',
-    'hotkeys/packages/hotkeys/src',
-    'hotkeys/packages/hotkeys/package.json',
+    'packages/hotkeys/packages/hotkeys/src',
+    'packages/hotkeys/packages/hotkeys/package.json',
     'docs/settings-reference.md',
   ]) {
     const destination = path.join(root, relative)
@@ -30,12 +30,17 @@ async function freshSettingsCheckout(root: string): Promise<void> {
     await cp(path.join(repository, relative), destination, { recursive: true })
   }
 
-  for (const workspace of ['', 'scripts', 'packages/contracts', 'hotkeys/packages/hotkeys']) {
+  for (const workspace of [
+    '',
+    'scripts',
+    'packages/contracts',
+    'packages/hotkeys/packages/hotkeys',
+  ]) {
     await linkDependencies(root, workspace)
   }
   await mkdir(path.join(root, 'node_modules/@fregat'), { recursive: true })
   await symlink(
-    path.join(root, 'hotkeys/packages/hotkeys'),
+    path.join(root, 'packages/hotkeys/packages/hotkeys'),
     path.join(root, 'node_modules/@fregat/hotkeys'),
     'dir',
   )
@@ -57,7 +62,7 @@ test('settings hook checks run without hotkeys build output', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'fregat-settings-checks-'))
   try {
     await freshSettingsCheckout(root)
-    const buildOutput = path.join(root, 'hotkeys/packages/hotkeys/dist')
+    const buildOutput = path.join(root, 'packages/hotkeys/packages/hotkeys/dist')
     expect(existsSync(buildOutput)).toBe(false)
 
     for (const args of [
@@ -92,8 +97,8 @@ test('production contracts bundles resolve the built hotkeys export', async () =
     for (const args of [
       [
         'build',
-        'hotkeys/packages/hotkeys/src/index.ts',
-        '--outdir=hotkeys/packages/hotkeys/dist',
+        'packages/hotkeys/packages/hotkeys/src/index.ts',
+        '--outdir=packages/hotkeys/packages/hotkeys/dist',
         '--target=browser',
         '--packages=external',
       ],
@@ -111,7 +116,7 @@ test('production contracts bundles resolve the built hotkeys export', async () =
 
     const metadata = JSON.parse(await readFile(path.join(root, 'consumer.json'), 'utf8'))
     const hotkeysInputs = Object.keys(metadata.inputs).filter((input) =>
-      input.replaceAll('\\', '/').includes('hotkeys/packages/hotkeys/'),
+      input.replaceAll('\\', '/').includes('packages/hotkeys/packages/hotkeys/'),
     )
     expect(hotkeysInputs).toHaveLength(1)
     expect(hotkeysInputs[0]?.replaceAll('\\', '/')).toMatch(

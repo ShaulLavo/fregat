@@ -15,7 +15,7 @@ const patterns = {
   sourceHistory: String.raw`private (readonly )?(snapshot|syncPoint|workerDocumentState|structuralDispatchPoint|highlightDispatchPoint|parsedPoint|elsewhereSyncPoint|queuedRevision|rangeRevision|snapshotVersion|parsedSnapshotVersion|sourceDocumentEpochs|sentSourceChunkLengths|latestDescriptors|sourceChunkRetention|sourceCache|documentSources)\s*(:|=)|#(entries|point):|(const|let) (syncPoint|syncPointsByTextVersion|sourceOwners|sourceCache|documentSources|documentCaches|markdownDocuments|documentTasks)\b|const documents = new Map|composeSkippedChanges\(|incrementalEditsForChange\(|createSyntaxTextEdits\(|createTreeSitterSourceDescriptor\(|(invalidate|dispose|retire)Document\(`,
   privateImport: String.raw`from ['"](\.\./)+(editor|tree-sitter|minimap|lsp|lsp-plugin|diff)/src|@singapore-editor/[a-z-]+/(src|dist|internal)/|@singapore-editor/core/debug|from ['"][^'"]*/dist/`,
 }
-const roots = ['editor/packages', 'editor/examples', 'apps', 'packages']
+const roots = ['packages/singapore/packages', 'packages/singapore/examples', 'apps', 'packages']
 const sources = readSources()
 
 function readSources() {
@@ -38,9 +38,18 @@ function readSources() {
 }
 
 function isSource(file) {
+  if (!inDocumentScope(file)) return false
   if (!/\.(ts|tsx|js|jsx|mjs)$/.test(file)) return false
   if (/\.(test|browser)\./.test(file)) return false
   return !/(^|\/)(node_modules|dist|test|tests|bench|e2e)(\/|$)/.test(file)
+}
+
+function inDocumentScope(file) {
+  if (file.startsWith('packages/singapore/'))
+    return roots.slice(0, 2).some((directory) => file.startsWith(`${directory}/`))
+  return !['packages/ghostty-webgpu/', 'packages/hotkeys/'].some((directory) =>
+    file.startsWith(directory),
+  )
 }
 
 function sourceOrder(left, right) {
@@ -57,33 +66,37 @@ function sourceOrder(left, right) {
 }
 
 function ownership(file) {
-  if (file.startsWith('editor/packages/textbuffer/')) return 'core mutation'
+  if (file.startsWith('packages/singapore/packages/textbuffer/')) return 'core mutation'
   if (
-    /editor\/packages\/editor\/src\/(documentSession|historySerialization|editor\/editChain)/.test(
+    /packages\/singapore\/packages\/editor\/src\/(documentSession|historySerialization|editor\/editChain)/.test(
       file,
     )
   )
     return 'core mutation'
-  if (/editor\/packages\/editor\/src\/document\//.test(file)) return 'document contribution'
+  if (/packages\/singapore\/packages\/editor\/src\/document\//.test(file))
+    return 'document contribution'
   if (
-    /editor\/packages\/editor\/src\/editor\/(documentDelivery|contributionOperation|contributionDemand)/.test(
+    /packages\/singapore\/packages\/editor\/src\/editor\/(documentDelivery|contributionOperation|contributionDemand)/.test(
       file,
     )
   )
     return 'document contribution'
-  if (/editor\/packages\/editor\/src\/editor\/syntaxController/.test(file))
+  if (/packages\/singapore\/packages\/editor\/src\/editor\/syntaxController/.test(file))
     return 'view presentation'
-  if (/editor\/packages\/(tree-sitter|lsp|lsp-plugin|typescript-lsp|diff)\//.test(file))
-    return 'domain adapter'
-  if (/editor\/packages\/editor\/src\/shiki\//.test(file)) return 'domain adapter'
-  if (/editor\/packages\/(minimap|highlighting)\//.test(file)) return 'document contribution'
   if (
-    /editor\/packages\/editor\/src\/editor\/(documentAnalysis|syntaxController|preparedDocument|snippetTokensFeature)/.test(
+    /packages\/singapore\/packages\/(tree-sitter|lsp|lsp-plugin|typescript-lsp|diff)\//.test(file)
+  )
+    return 'domain adapter'
+  if (/packages\/singapore\/packages\/editor\/src\/shiki\//.test(file)) return 'domain adapter'
+  if (/packages\/singapore\/packages\/(minimap|highlighting)\//.test(file))
+    return 'document contribution'
+  if (
+    /packages\/singapore\/packages\/editor\/src\/editor\/(documentAnalysis|syntaxController|preparedDocument|snippetTokensFeature)/.test(
       file,
     )
   )
     return 'document contribution'
-  if (file.startsWith('editor/')) return 'view presentation'
+  if (file.startsWith('packages/singapore/')) return 'view presentation'
   if (/apps\/(server|tui)\/src\/.*lsp|result-syntax-(cache|plugin)/.test(file))
     return 'domain adapter'
   if (file.startsWith('apps/server/')) return 'host transaction policy'
@@ -99,33 +112,34 @@ function ownership(file) {
 
 function migration(file, category) {
   if (
-    /editor\/packages\/editor\/src\/(editor\.ts|public\/testing)/.test(file) &&
+    /packages\/singapore\/packages\/editor\/src\/(editor\.ts|public\/testing)/.test(file) &&
     category === 'session'
   )
     return '2'
-  if (/editor\/packages\/(tree-sitter|highlighting)\//.test(file)) return '2'
+  if (/packages\/singapore\/packages\/(tree-sitter|highlighting)\//.test(file)) return '2'
   if (
-    /editor\/packages\/editor\/src\/(shiki|syntax|editor\/(documentAnalysis|syntaxController|preparedDocument|snippetTokensFeature|runtime))/.test(
+    /packages\/singapore\/packages\/editor\/src\/(shiki|syntax|editor\/(documentAnalysis|syntaxController|preparedDocument|snippetTokensFeature|runtime))/.test(
       file,
     )
   )
     return '2'
   if (
-    /editor\/packages\/diff\/src\/diffSyntax|result-syntax-(cache|plugin)|features\/editor\/utils\/prepared-document/.test(
+    /packages\/singapore\/packages\/diff\/src\/diffSyntax|result-syntax-(cache|plugin)|features\/editor\/utils\/prepared-document/.test(
       file,
     )
   )
     return '2'
-  if (/editor\/packages\/editor\/src\/plugins/.test(file) && category === 'session') return '2'
-  if (file.startsWith('editor/packages/minimap/')) return '3'
+  if (/packages\/singapore\/packages\/editor\/src\/plugins/.test(file) && category === 'session')
+    return '2'
+  if (file.startsWith('packages/singapore/packages/minimap/')) return '3'
   if (
-    /editor\/packages\/(lsp|lsp-plugin|typescript-lsp)\/|language-server|document-symbols|apps\/server\/src\/.*lsp/.test(
+    /packages\/singapore\/packages\/(lsp|lsp-plugin|typescript-lsp)\/|language-server|document-symbols|apps\/server\/src\/.*lsp/.test(
       file,
     )
   )
     return '4'
   if (
-    /editor\/packages\/find\/|mergeConflictPlugin|semanticToken|semantic-token|editorDiffPlugin/.test(
+    /packages\/singapore\/packages\/find\/|mergeConflictPlugin|semanticToken|semantic-token|editorDiffPlugin/.test(
       file,
     )
   )
@@ -134,7 +148,7 @@ function migration(file, category) {
 }
 
 function notes(file, category) {
-  if (file.startsWith('editor/examples/'))
+  if (file.startsWith('packages/singapore/examples/'))
     return 'Example or benchmark caller; preserve supported simple construction'
   if (/spellcheck\//.test(file))
     return 'Word-service worker; carries words, outside document source synchronization'
@@ -175,12 +189,12 @@ function scanLines(category, expression, { file, lines }) {
 function relevantMatch(category, line) {
   if (category !== 'publish') return true
   if (!/this\.publish\(|private publish\(/.test(line)) return true
-  return line.startsWith('editor/packages/editor/src/documentSession.ts:')
+  return line.startsWith('packages/singapore/packages/editor/src/documentSession.ts:')
 }
 
 function row(category, line) {
   const [file, position, ...source] = line.split(':')
-  const repo = file.startsWith('editor/') ? 'Editor' : 'Platform'
+  const repo = file.startsWith('packages/singapore/') ? 'Editor' : 'Platform'
   const text = source.join(':').trim().replaceAll('\t', ' ')
   return [
     repo,

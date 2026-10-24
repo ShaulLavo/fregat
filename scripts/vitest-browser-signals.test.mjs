@@ -4,7 +4,9 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { test } from 'vitest'
 
-const editor = createRequire(new URL('../editor/packages/editor/package.json', import.meta.url))
+const editor = createRequire(
+  new URL('../packages/singapore/packages/editor/package.json', import.meta.url),
+)
 const providerUrl = pathToFileURL(editor.resolve('@vitest/browser-playwright')).href
 
 test('Playwright providers share and release SIGTERM trace cleanup', () => {

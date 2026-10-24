@@ -60,7 +60,7 @@ and writes protocol receipts to the evidence directory.
 
 <a id="workspace-libraries"></a>
 
-Editor packages live in `editor/packages/`, and the terminal library lives in `ghostty-webgpu/`. Bun installs their workspace links from the root `bun.lock`. Run `bun install --frozen-lockfile` at the root, then `bun run build:workspaces` to prepare the exports used by production builds and typechecking.
+Editor packages live in `packages/singapore/packages/`, and the terminal library lives in `packages/ghostty-webgpu/`. Bun installs their workspace links from the root `bun.lock`. Run `bun install --frozen-lockfile` at the root, then `bun run build:workspaces` to prepare the exports used by production builds and typechecking.
 
 Desktop launcher bundle tests load these workspace exports too. Build the libraries before running the launcher checks from a fresh checkout:
 
@@ -76,9 +76,9 @@ bun --bun vitest run src/launcher/tests/build-native.test.ts src/launcher/tests/
 
 Browser verification gives terminal IDs a per-run namespace in session storage before navigation. New tabs, restored tabs, chat terminals and terminal actions use those actual IDs. The harness observes and kills its own terminals through the normal API. It uses the browser's native `WebSocket`.
 
-Ghostty's `ghostty-vt.wasm` and `bridge.wasm` are compiled artifacts. Run `bun run build:wasm` in `ghostty-webgpu/` after changing their native inputs. To rebuild only the bridge, run `bun run build:bridge --source /absolute/path/to/ghostty` from that directory, with a clean official Ghostty checkout at `GHOSTTY_SOURCE_REVISION` in `ghostty-webgpu/src/core/version.ts` (currently `c8554f28e0efe2f5595f32020371c34b25ec628f`). Both commands verify the source revision and clean tree before compiling. Production builds read `dist`; run `bun run build:workspaces` after source changes. Restart dev after changing a package's export map.
+Ghostty's `ghostty-vt.wasm` and `bridge.wasm` are compiled artifacts. Run `bun run build:wasm` in `packages/ghostty-webgpu/` after changing their native inputs. To rebuild only the bridge, run `bun run build:bridge --source /absolute/path/to/ghostty` from that directory, with a clean official Ghostty checkout at `GHOSTTY_SOURCE_REVISION` in `packages/ghostty-webgpu/src/core/version.ts` (currently `c8554f28e0efe2f5595f32020371c34b25ec628f`). Both commands verify the source revision and clean tree before compiling. Production builds read `dist`; run `bun run build:workspaces` after source changes. Restart dev after changing a package's export map.
 
-The family folders are mirrored to their standalone repositories. Make library changes here and follow `editor/AGENTS.md` and `ghostty-webgpu/AGENTS.md` for their package rules.
+The family folders are mirrored to their standalone repositories. Make library changes here and follow `packages/singapore/AGENTS.md` and `packages/ghostty-webgpu/AGENTS.md` for their package rules.
 
 ## CI turnaround
 

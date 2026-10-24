@@ -33,11 +33,11 @@ All are private workspace packages (`@workspace/*`). None is published.
 
 Each folder is copied to a read-only repository on every push to `main`. Edit it here, never in the mirror. [ADR 001](adr/001-one-repository-with-mirrors.md) records why.
 
-| Folder            | Mirror                                                                  | What it is                                       |
-| ----------------- | ----------------------------------------------------------------------- | ------------------------------------------------ |
-| `editor/`         | [ShaulLavo/singapore](https://github.com/ShaulLavo/singapore)           | Singapore, a code editor for the browser.        |
-| `ghostty-webgpu/` | [ShaulLavo/ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu) | Ghostty's terminal, in the browser.              |
-| `hotkeys/`        | [ShaulLavo/hotkeys](https://github.com/ShaulLavo/hotkeys)               | Keyboard shortcuts for editors and complex apps. |
+| Folder                     | Mirror                                                                  | What it is                                       |
+| -------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------ |
+| `packages/singapore/`      | [ShaulLavo/singapore](https://github.com/ShaulLavo/singapore)           | Singapore, a code editor for the browser.        |
+| `packages/ghostty-webgpu/` | [ShaulLavo/ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu) | Ghostty's terminal, in the browser.              |
+| `packages/hotkeys/`        | [ShaulLavo/hotkeys](https://github.com/ShaulLavo/hotkeys)               | Keyboard shortcuts for editors and complex apps. |
 
 Each folder has its own `AGENTS.md` and its own docs.
 

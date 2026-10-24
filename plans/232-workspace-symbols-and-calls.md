@@ -34,12 +34,12 @@ servers; [packages/lsp/src/client.ts](/work/projects/Editor/packages/lsp/src/cli
 or call-hierarchy owner in these paths. Reuse Plan 227's language navigation and result-opening contracts.
 
 Editor citations name the current read-only checkout. After Plan 207, execute the same package
-changes under `editor/packages/` in Fregat and update its public package exports there.
+changes under `packages/singapore/packages/` in Fregat and update its public package exports there.
 
 ## Design
 
-Add typed workspace-symbol and prepare/incoming/outgoing call requests in `editor/packages/lsp`
-and capability publication in `editor/packages/lsp-plugin`. Fregat owns the symbol picker and
+Add typed workspace-symbol and prepare/incoming/outgoing call requests in `packages/singapore/packages/lsp`
+and capability publication in `packages/singapore/packages/lsp-plugin`. Fregat owns the symbol picker and
 call-tree feature. Include environment, workspace, server, document revision, query or prepared
 item data, and direction in query ownership; preserve opaque LSP item `data` through requests.
 Cancel superseded work and deduplicate results by source identity and range. Register

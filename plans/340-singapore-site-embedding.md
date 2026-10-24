@@ -34,7 +34,7 @@ PR #1233 highlighted unexpected focus/selection changes, unnamed editor inputs a
 
 ## Verification commands
 
-Build editor workspaces, then `bun run --cwd editor/site build`. Run `bun run --cwd editor/site test` and `bun run --cwd editor/site test:browser`. Review `bun run agent:browser look --site --static-dir editor/site/dist --width 390 --height 844` and corresponding desktop/WebKit runs. Host-local heavy scheduling and private previews follow the owner's local skills; contributor commands stay portable.
+Build editor workspaces, then `bun run --cwd packages/singapore/site build`. Run `bun run --cwd packages/singapore/site test` and `bun run --cwd packages/singapore/site test:browser`. Review `bun run agent:browser look --site --static-dir packages/singapore/site/dist --width 390 --height 844` and corresponding desktop/WebKit runs. Host-local heavy scheduling and private previews follow the owner's local skills; contributor commands stay portable.
 
 No public editor package changes are needed. The format-6 document-paint API and content-height layout already shipped; their implementation remains in the editor packages.
 
@@ -99,14 +99,14 @@ it is not watched or assumed green.
 ### WebKit retry failure — slow optional font identified
 
 The [hosting integration run](https://github.com/ShaulLavo/fregat/actions/runs/38071251341/job/114269009967)
-failed at `editor/site/tests/review.browser.ts:114`: after two announced download
+failed at `packages/singapore/site/tests/review.browser.ts:114`: after two announced download
 failures, the third activation still had no `data-example-live` after 20 seconds.
 Chromium passed. The old assertion recorded neither the final status nor the
 request and click sequence, so this does not establish a module-cache cause.
 
 - [x] Run a bounded Linux baseline from `c7e6e27b` with a root-base build:
-      `bun run --cwd editor/site build` then
-      `bun run --cwd editor/site test:browser -- tests/review.browser.ts -t "failed runtime download"`.
+      `bun run --cwd packages/singapore/site build` then
+      `bun run --cwd packages/singapore/site test:browser -- tests/review.browser.ts -t "failed runtime download"`.
       All 41 repetitions passed in both engines; the complete 37-test browser
       suite also passed. A broken root-base runtime URL was not reproduced.
 - [x] Record actual clicks, runtime URLs, failed requests, browser errors and the
@@ -145,7 +145,7 @@ request and click sequence, so this does not establish a module-cache cause.
       response finishes. Await font route cleanup before closing the context.
 - [x] Reduce WebKit's optional-font paint bug to plain HTML with a real delayed
       HTTP response and a fallback-only control. Document the workaround in
-      `editor/docs/display/browser-quirks.md` and add the ready-to-file upstream
+      `packages/singapore/docs/display/browser-quirks.md` and add the ready-to-file upstream
       entry to the owner's local queue. No upstream issue was posted.
 
 The final 2026-10-10 Mac qualification preserves optional fonts: all four
@@ -183,7 +183,7 @@ CSS before scripts.
       cause: the static paint splits token runs into separate spans differently from
       the live rows, which moves glyphs by subpixel amounts. Make the static markup
       split runs exactly as the live editor does, then tighten `expectSameInk` in
-      `editor/site/tests/review.browser.ts` back to exact equality.
+      `packages/singapore/site/tests/review.browser.ts` back to exact equality.
 - [x] **WebKit reload colour flash (2026-10-10).** The static spans retained their
       colours. A prepared editor's snapshot above them had explicit
       `visibility: visible`, overriding its wrapper's `visibility: hidden`, and

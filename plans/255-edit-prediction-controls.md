@@ -43,7 +43,7 @@ Editor `packages/lsp-plugin/src/keyCommands.ts` owns completion commands; its
 `packages/editor/src/plugins.ts` has inline replacements and injected rows, and
 `packages/editor/src/createPlugin.ts` has view-scoped command/edit contributions. These are
 adjacent rendering and transaction hooks, not a predictor. They currently live under
-`/work/projects/Editor/`; implement Editor work in `editor/packages/` after Plan 207.
+`/work/projects/Editor/`; implement Editor work in `packages/singapore/packages/` after Plan 207.
 
 ## Design
 

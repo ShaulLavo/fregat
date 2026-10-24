@@ -10,7 +10,7 @@
   Platform (web, plus the TUI's matcher).
 - Decisions: [Keymap architecture](../docs/keymap/architecture.md). Research:
   `/work/reports/keymap-architecture/` (`03-tanstack-hotkeys.md` for this plan).
-- Authorized: add the library under `hotkeys/` in Fregat; change nothing in consumers. Consumers
+- Authorized: add the library under `packages/hotkeys/` in Fregat; change nothing in consumers. Consumers
   adopt it in 204–206. Independent of 207's move; the mirror follows when 207 lands.
 
 ## Why
@@ -36,9 +36,9 @@ editor-grade chord handling. The core never touches the DOM.
 
 ## Repository and packaging
 
-- The code lives in Fregat under `hotkeys/` (layout and mirroring in
-  [207](207-one-repo-with-mirrors.md)): `hotkeys/packages/hotkeys` as `@fregat/hotkeys` (core) and
-  `hotkeys/packages/react-hotkeys` as `@fregat/react-hotkeys` only if 206 still needs hooks.
+- The code lives in Fregat under `packages/hotkeys/` (layout and mirroring in
+  [207](207-one-repo-with-mirrors.md)): `packages/hotkeys/packages/hotkeys` as `@fregat/hotkeys` (core) and
+  `packages/hotkeys/packages/react-hotkeys` as `@fregat/react-hotkeys` only if 206 still needs hooks.
   207 mirrors the folder to a public `hotkeys` repo and publishes both to npm.
 - Bring TanStack's `packages/hotkeys` (and `react-hotkeys`) in from `TanStack/hotkeys` (MIT) with
   their licence and attribution. Keep a clone at `references/tanstack-hotkeys` to watch upstream;
@@ -91,7 +91,7 @@ source: 'default' | 'base' | 'pack' | 'user' }`. Removal copies Zed: `command: n
 
 ## Steps
 
-- [x] Import TanStack's core and React packages under `hotkeys/`, renamed; CI green.
+- [x] Import TanStack's core and React packages under `packages/hotkeys/`, renamed; CI green.
 - [x] Add `KeyInput` and the browser adapter; move the pure functions onto it.
 - [x] Port the Editor's trie and runtime tests into the library before porting the code
       (`packages/editor/src/keymap/trie.test.ts`, the runtime contract tests behind Plan 057's
@@ -126,8 +126,8 @@ redesign plan), and any Settings UI.
 Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`).
 
 - Step 1 done. Upstream `TanStack/hotkeys@536da97` (hotkeys 0.10.1, react-hotkeys 0.12.1) under
-  `hotkeys/packages/{hotkeys,react-hotkeys}`, renamed `@fregat/*`, 0.0.0, `publishConfig.access`
-  public. Workspace `hotkeys/packages/*`; CI package tests run `--filter '@fregat/*'`. Tests:
+  `packages/hotkeys/packages/{hotkeys,react-hotkeys}`, renamed `@fregat/*`, 0.0.0, `publishConfig.access`
+  public. Workspace `packages/hotkeys/packages/*`; CI package tests run `--filter '@fregat/*'`. Tests:
   594 core + 44 React pass. Build is `bun build` (ESM, externals) plus `tsc` declarations.
   Decision (revised in review): `exports` point at `dist/` as the Editor packages do, because
   `npm publish` does not apply `publishConfig.exports`; the React package reads the core's

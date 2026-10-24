@@ -1,13 +1,13 @@
 # E011: Evaluate a packed representation of persistent piece trees
 
-Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
+Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
 
 - Status: Approved
 - Kind: Research
 - Owner: Editor
 - Priority: P3
 - Effort: L
-- Dependencies: [E005](../editor/docs/storage/piece-tree-inspection.md), [E009](099-document-contributions.md)
+- Dependencies: [E005](../packages/singapore/docs/storage/piece-tree-inspection.md), [E009](099-document-contributions.md)
 - Inspected baseline: `9abb944f3a2b8d6516953fdec75e8df5e1a94811`, 2026-09-05.
 
 Decided 2026-09-25: owner — parked under Platform [Plan 112](112-large-file-ceiling.md)'s large-file work. Revive it only if 112 shows piece memory dominates. Its dependency E009 is folded into Platform Plan 099 unit 6.
@@ -24,22 +24,22 @@ A negative result leaves the production representation alone.
 
 Rechecked 2026-09-25 at Editor `c23cd30`, after E039, E040, E041, E045 and E006.
 
-- [Piece tree types](../editor/packages/textbuffer/src/pieceTableTypes.ts) store object links,
+- [Piece tree types](../packages/singapore/packages/textbuffer/src/pieceTableTypes.ts) store object links,
   floating-point order values, an AVL height (E040 replaced the treap and its priorities),
   piece records, and cached aggregates.
-- [Tree operations](../editor/packages/textbuffer/src/tree.ts) apply an edit call in one descent
+- [Tree operations](../packages/singapore/packages/textbuffer/src/tree.ts) apply an edit call in one descent
   (E040, E045) and reuse nodes created inside the same edit (E041).
-  [Order allocation](../editor/packages/textbuffer/src/orders.ts) uses fractional numeric gaps above a
+  [Order allocation](../packages/singapore/packages/textbuffer/src/orders.ts) uses fractional numeric gaps above a
   small-integer floor; values below it name E006 stand-ins.
-- [The reverse index](../editor/packages/textbuffer/src/reverseIndex.ts) is a persistent vector of
+- [The reverse index](../packages/singapore/packages/textbuffer/src/reverseIndex.ts) is a persistent vector of
   inserted buffers with thin entries (E039), not a second tree. Anchor work still reads it, so
   packing only the forward tree leaves it unchanged.
 - E006 compaction bounds the tree: after 20,000 paragraph replacements it holds 4 pieces instead
   of 20,002. Any memory case for packing is measured against that compacted tree.
-- [Buffers](../editor/packages/textbuffer/src/buffers.ts) keep LF offset indexes beside text.
-  [The walker](../editor/packages/textbuffer/src/walker.ts) currently traverses object nodes.
-- [Public document exports](../editor/packages/editor/src/public/document.ts) and
-  [debug exports](../editor/packages/editor/src/debug.ts) need inspection for representation exposure.
+- [Buffers](../packages/singapore/packages/textbuffer/src/buffers.ts) keep LF offset indexes beside text.
+  [The walker](../packages/singapore/packages/textbuffer/src/walker.ts) currently traverses object nodes.
+- [Public document exports](../packages/singapore/packages/editor/src/public/document.ts) and
+  [debug exports](../packages/singapore/packages/editor/src/debug.ts) need inspection for representation exposure.
   Do not promise an internal swap before checking all consumers.
 
 ## Scope

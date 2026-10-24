@@ -1,0 +1,68 @@
+{
+  "name": "@singapore-editor/minimap",
+  "version": "0.2.9",
+  "description": "A worker-rendered file overview with scroll controls for the Singapore editor.",
+  "keywords": [
+    "browser",
+    "editor",
+    "minimap",
+    "offscreen-canvas",
+    "singapore",
+    "typescript"
+  ],
+  "homepage": "https://singapore.shaulavo.dev/docs/reference/api/minimap/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShaulLavo/fregat.git",
+    "directory": "packages/singapore/packages/minimap"
+  },
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./src/index.ts",
+    "./src/style.css",
+    "./dist/index.js",
+    "./dist/style.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "bun ../../scripts/build-package.ts",
+    "bench:update": "bun bench/update.ts",
+    "bench:browser": "node bench/browser-runner.mjs",
+    "test": "vitest run && vitest run --browser.enabled --browser.headless test/workerClient.browser.test.ts test/renderer.browser.test.ts test/wheelScroll.browser.test.ts test/documentSource.browser.test.ts test/documentIntegration.browser.test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@singapore-editor/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@vitest/browser-playwright": "5.0.2",
+    "happy-dom": "^20.14.5",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.2"
+  }
+}

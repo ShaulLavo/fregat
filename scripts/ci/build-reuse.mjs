@@ -37,7 +37,7 @@ function targets(graph, source) {
   if (source === 'all') return Array.from(graph.packages.keys())
   if (source === 'editor')
     return Array.from(graph.packages.values())
-      .filter((pkg) => pkg.directory.startsWith('editor/'))
+      .filter((pkg) => pkg.directory.startsWith('packages/singapore/'))
       .map((pkg) => pkg.name)
   if (!source.startsWith('sites:')) return JSON.parse(source)
   const sites = source.slice(6).split(',').filter(Boolean)

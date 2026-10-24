@@ -27,9 +27,9 @@ test('rejects a different publishing repository before writing any manifests', a
 })
 
 test.each([
-  ['editor/packages/editor', '@singapore-editor/core', undefined],
+  ['packages/singapore/packages/editor', '@singapore-editor/core', undefined],
   [
-    'ghostty-webgpu',
+    'packages/ghostty-webgpu',
     'ghostty-webgpu',
     { type: 'git', url: 'git+https://github.com/ShaulLavo/ghostty-webgpu.git' },
   ],
@@ -37,7 +37,10 @@ test.each([
   'packs Fregat provenance metadata for %s',
   async (directory, name, repository) => {
     await withWorkspace(async ({ root, put }) => {
-      await put('', { private: true, workspaces: ['editor/packages/*', 'ghostty-webgpu'] })
+      await put('', {
+        private: true,
+        workspaces: ['packages/singapore/packages/*', 'packages/ghostty-webgpu'],
+      })
       await put(directory, { name, version: '0.2.1', repository })
       const prepared = spawnSync('bun', [prepare], { cwd: root, encoding: 'utf8' })
       expect(prepared.status, prepared.stderr).toBe(0)

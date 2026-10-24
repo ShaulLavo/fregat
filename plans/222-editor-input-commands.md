@@ -32,7 +32,7 @@ Use Enter, copy/cut/paste, Escape and snippet tab stops through the command cata
 ## Existing Fregat and Editor work
 
 Editor source below was verified in `/work/projects/Editor/packages/` before Plan 207.
-Implement it in Fregat `editor/packages/` after that cutover; the external checkout is
+Implement it in Fregat `packages/singapore/packages/` after that cutover; the external checkout is
 read-only for this wave.
 
 [packages/editor/src/editor/Editor.ts](/work/projects/Editor/packages/editor/src/editor/Editor.ts) wires native input through `acceptsText`
@@ -53,7 +53,7 @@ focus nodes and handlers in the window dispatcher. Preserve Linux/macOS contexts
 payloads, source order, and unbinds from the translation; activate modal rows when
 their mode owner exists. A declined command falls through to its ancestor.
 
-Expose the eight commands through the Editor catalog/router in `editor/packages/editor/`.
+Expose the eight commands through the Editor catalog/router in `packages/singapore/packages/editor/`.
 Reuse Plan 204's base handlers. Publish snippet and popup context keys from the
 session/widget owners. Keep clipboard events, browser clipboard permission, IME,
 input types, and text gates in the native input owner. A handled shortcut must
@@ -100,15 +100,15 @@ completion acceptance extensions from Plan 223.
 ## Follow-up verification finding, 2026-10-10
 
 - [ ] Resolve the demo's newline event assertion on Chromium on the Raspberry Pi.
-      Run `bun run --cwd editor/examples/app test:e2e -- --workers=1 --grep 'routes native line break'`.
-      `editor/examples/app/test/editor-input.spec.ts:208` expects
+      Run `bun run --cwd packages/singapore/examples/app test:e2e -- --workers=1 --grep 'routes native line break'`.
+      `packages/singapore/examples/app/test/editor-input.spec.ts:208` expects
       `beforeinput:insertLineBreak:` in the captured input events but receives an empty
       array after 5 seconds. The preceding assertion confirms that Enter inserts
       `abc\ndef` at the intended caret. This occurred twice, including with the original
       demo source at `917e6da49` restored, ruling out lazy GitHub loading. The test creates
       a standalone editor from source and replaces the demo shell. Inspect
       `installInputEventProbe` at line 17 and the textarea/EditContext input dispatch in
-      `editor/packages/editor/src/editor/inputSelectionController.ts` before changing
+      `packages/singapore/packages/editor/src/editor/inputSelectionController.ts` before changing
       the event expectation. Typing, Space, Tab, focus, history and live diff checks passed.
       Evidence is retained locally in
       `/work/tmp/fregat-evidence/20261010t110053-heavy-4cb273e69898-cc26f1-pi/playwright/`.

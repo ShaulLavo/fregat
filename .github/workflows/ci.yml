@@ -162,11 +162,11 @@ jobs:
       # `format:check`, never `format` — a CI job that rewrites files and then
       # passes is a job that reports on a tree nobody reviewed.
       - name: Format
-        run: bun run format:check:root && bun run --cwd editor format:check:root && bun run --cwd hotkeys format:check
+        run: bun run format:check:root && bun run --cwd packages/singapore format:check:root && bun run --cwd packages/hotkeys format:check
 
       # Package formatting and linting run with the affected package checks.
       - name: Lint
-        run: bun run plans:check && bun run --cwd editor lint:root && bun run dupes:functions && bun run dupes
+        run: bun run plans:check && bun run --cwd packages/singapore lint:root && bun run dupes:functions && bun run dupes
 
       - name: Query API
         run: bun run query:check
@@ -281,7 +281,7 @@ jobs:
 
       - name: Check Hotkeys documentation
         if: ${{ needs.changes.outputs.hotkeys == 'true' }}
-        run: bun run --cwd hotkeys docs:check
+        run: bun run --cwd packages/hotkeys docs:check
 
       - name: Check generated artifacts
         if: ${{ needs.changes.outputs.tooling == 'true' }}
@@ -577,7 +577,7 @@ jobs:
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') || contains(needs.changes.outputs.sites, 'fregat') || needs.changes.outputs.tooling == 'true' }}
         uses: ./.github/actions/install-browsers
         with:
-          playwright: editor/site/node_modules/.bin/playwright
+          playwright: packages/singapore/site/node_modules/.bin/playwright
           browsers: chromium firefox webkit
       - name: Build production sites
         env:
@@ -585,7 +585,7 @@ jobs:
         run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites" "$CI_SITES" --reuse-workspace-builds
       - name: Build classic Ghostty site for Pages
         if: ${{ contains(needs.changes.outputs.sites, 'ghostty-webgpu') }}
-        run: bun run --cwd ghostty-webgpu/site-classic build --base /ghostty-webgpu/
+        run: bun run --cwd packages/ghostty-webgpu/site-classic build --base /ghostty-webgpu/
       - name: Check deployment config and cache headers
         run: python3 -m unittest discover -s scripts/product-sites -p 'test_*.py'
       - name: Check Ghostty font assets
@@ -593,7 +593,7 @@ jobs:
         run: bun scripts/product-sites/test-font-assets.mjs "$RUNNER_TEMP/product-sites/ghostty-webgpu"
       - name: Test Singapore documentation checks
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
-        run: bun run --cwd editor/site test
+        run: bun run --cwd packages/singapore/site test
       - name: Test landing page playback
         run: bun run test:scripts scripts/site-player.test.ts
       - name: Test mobile overflow detection
@@ -601,7 +601,7 @@ jobs:
         run: bun scripts/product-sites/test-mobile.mjs
       - name: Test Singapore docs browsing and examples at the root base
         if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
-        run: bun run --cwd editor/site test:browser
+        run: bun run --cwd packages/singapore/site test:browser
       - name: Check landing page focus, contrast and motion controls
         if: ${{ contains(needs.changes.outputs.sites, 'fregat') }}
         run: bun run --cwd apps/site verify:a11y

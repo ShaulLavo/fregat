@@ -35,21 +35,21 @@ jobs:
         run: bunx turbo run build --filter=@singapore-editor/collaboration... --filter=@singapore-editor/diff...
       - name: Check types, lint and formatting
         run: |
-          bun run --cwd editor/packages/collaboration typecheck
-          bun run --cwd editor/packages/collaboration lint
-          bun run --cwd editor/packages/collaboration format:check
+          bun run --cwd packages/singapore/packages/collaboration typecheck
+          bun run --cwd packages/singapore/packages/collaboration lint
+          bun run --cwd packages/singapore/packages/collaboration format:check
       - name: Verify session and network invariants
         env:
           COLLABORATION_LONG_RUN: ${{ (github.event_name == 'schedule' || inputs.long_run) && '1' || '0' }}
-        run: bun run --cwd editor/packages/collaboration test
+        run: bun run --cwd packages/singapore/packages/collaboration test
       - name: Verify self-hosted signaling broker
-        run: bun run --cwd editor/packages/collaboration test:server
+        run: bun run --cwd packages/singapore/packages/collaboration test:server
       - name: Install Chromium
         uses: ./.github/actions/install-browsers
         with:
-          playwright: editor/packages/editor/node_modules/.bin/playwright
+          playwright: packages/singapore/packages/editor/node_modules/.bin/playwright
           browsers: chromium
       - name: Verify native WebRTC, same-origin tabs and presence
-        run: bun run --cwd editor/packages/collaboration test:browser
+        run: bun run --cwd packages/singapore/packages/collaboration test:browser
       - name: Verify concurrent editor input and author undo
-        run: bun run --cwd editor/packages/collaboration test:editor
+        run: bun run --cwd packages/singapore/packages/collaboration test:editor

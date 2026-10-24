@@ -1,6 +1,6 @@
 # TODO
 
-Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
+Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
 
 The original wishlist and later additions are covered in the
 [Editor backlog](editor-backlog.md): 60 entries with dependencies, ownership, and acceptance checks.
@@ -250,12 +250,12 @@ live in the SAB TODO, stepping stone 4.
 
 ## Input latency as an enforced budget
 
-Implemented by E002 on 2026-09-07. The [measurement reference](../editor/docs/performance/input-latency.md)
+Implemented by E002 on 2026-09-07. The [measurement reference](../packages/singapore/docs/performance/input-latency.md)
 defines the synchronous input path, deferred-work ownership, and separate dispatch, frame, and
 paint observations. The browser suite covers typing, repeat, composition updates and commits,
 paste, and undo across ordinary, 500,000-line, and one-megabyte-line documents and multiple views.
 
-The [recorded local gate](../editor/examples/stress/results/input-latency/README.md) accepts an independent
+The [recorded local gate](../packages/singapore/examples/stress/results/input-latency/README.md) accepts an independent
 unchanged run and rejects a real 20 ms delay in all 36 synchronous input groups. Range indexing
 removes the measured whole-source scan from large-file paste. Document-generation checks prevent
 pending secondary work from reaching a replacement document.
@@ -673,8 +673,8 @@ Requested on 2026-09-20. Extract existing document and editing behavior from DOM
 execution dependencies, preserve the DOM editor and Fregat's consumer contracts, and prove a
 Strict DOM native host before claiming editable native support.
 [E056](e056-platform-agnostic-core.md) owns this approved work, parked by the owner on
-2026-09-25. [Detailed research](../editor/docs/architecture/e056-platform-agnostic-core.md) and the
-[pinned source ledger](../editor/docs/architecture/e056-platform-agnostic-core-sources.json) preserve its
+2026-09-25. [Detailed research](../packages/singapore/docs/architecture/e056-platform-agnostic-core.md) and the
+[pinned source ledger](../packages/singapore/docs/architecture/e056-platform-agnostic-core-sources.json) preserve its
 input, geometry, lifecycle, packaging and performance evidence. Implementation has not started.
 Plan 207 establishes the canonical Fregat source before relocation or package cutover; the
 cross-project roadmap schedules the remaining units. Native macOS keeps its existing roadmap.

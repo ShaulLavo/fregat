@@ -1,6 +1,6 @@
 # E063: More editor features from tree-sitter queries
 
-Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
+Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
 
 - Status: Approved
 - Kind: Implementation

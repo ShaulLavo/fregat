@@ -109,8 +109,8 @@ The implementation publishes monotonic document revisions and an edit chain, the
 
 Evidence:
 
-- `editor/packages/editor/src/documentSession.ts:1731-1769`
-- `editor/packages/editor/src/editor/documentDelivery.ts:137-174`
+- `packages/singapore/packages/editor/src/documentSession.ts:1731-1769`
+- `packages/singapore/packages/editor/src/editor/documentDelivery.ts:137-174`
 
 **Recommended authority split:** the machine server owns the committed host revision; clients own optimistic projections and view state; disk owns a recorded materialization of a host revision.
 
@@ -265,29 +265,29 @@ Illustrative sizing only: 10 accepted operations/second is 36,000 operations/hou
 
 **Most named editor consumers already consume document changes without checking whether they originated from a keyboard.** Remote edits can use these paths if reconciliation publishes correct effective edits, snapshots, revisions, and reset boundaries.
 
-| Consumer                 | Current evidence                                                                                                                                                                                                                           | Collaborative requirement                                                                                               |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| **Tree-sitter**          | Uses retained source reads and `changesBetween`; passes incremental edits against the previous analysed read. `editor/packages/tree-sitter/src/session.ts:120-159`                                                                         | Publish exact effective changes; reset/reparse when history cannot bridge a reconciliation                              |
-| **LSP incremental sync** | Retained projection opens a snapshot when no baseline exists, otherwise updates it with canonical edits and logical revision count. `editor/packages/lsp-plugin/src/retainedSource.ts:210-260`                                             | Make accepted host text the pooled server source; version client speculative requests/results explicitly                |
-| **Decorations**          | Editor flush projects every pending change’s edits; the store projects ranges with endpoint biases. `editor/packages/editor/src/editor/Editor.ts:4430-4434`; `editor/packages/editor/src/editor/decorationStore.ts:169-186`                | Feed the final reconciliation edits, not unrelated full-string replacements                                             |
-| **Spellcheck**           | View contribution receives updates; document/content/token changes cause rechecking against current text. `editor/packages/spellcheck/src/plugin.ts:20-30`; `editor/packages/spellcheck/src/controller.ts:28-39,104-112`                   | Normal content publication suffices; no local-only edit filter found in inspected code                                  |
-| **Minimap**              | Source protocol accepts full/reset summaries or incremental source patches with baseline identity checks. `editor/packages/minimap/src/sourceProtocol.ts:18-23,54-63`                                                                      | Preserve baseline identity and clipped projection behavior                                                              |
-| **In-buffer find**       | Projects offscreen result ranges through canonical changes since its sync point. `editor/packages/find/src/plugin.ts:475-479`                                                                                                              | Retain effective history or trigger fresh query after a history gap                                                     |
-| **Workspace search**     | Builds a dirty-buffer overlay from client live documents, then combines open-buffer results with disk search. `apps/web/src/features/search/state/dirty-documents.ts:7-22,25-47`; `apps/web/src/features/search/utils/providers.ts:79-113` | Extend search’s authoritative overlay to host-held unsaved documents, including documents edited by another participant |
+| Consumer                 | Current evidence                                                                                                                                                                                                                                    | Collaborative requirement                                                                                               |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Tree-sitter**          | Uses retained source reads and `changesBetween`; passes incremental edits against the previous analysed read. `packages/singapore/packages/tree-sitter/src/session.ts:120-159`                                                                      | Publish exact effective changes; reset/reparse when history cannot bridge a reconciliation                              |
+| **LSP incremental sync** | Retained projection opens a snapshot when no baseline exists, otherwise updates it with canonical edits and logical revision count. `packages/singapore/packages/lsp-plugin/src/retainedSource.ts:210-260`                                          | Make accepted host text the pooled server source; version client speculative requests/results explicitly                |
+| **Decorations**          | Editor flush projects every pending change’s edits; the store projects ranges with endpoint biases. `packages/singapore/packages/editor/src/editor/Editor.ts:4430-4434`; `packages/singapore/packages/editor/src/editor/decorationStore.ts:169-186` | Feed the final reconciliation edits, not unrelated full-string replacements                                             |
+| **Spellcheck**           | View contribution receives updates; document/content/token changes cause rechecking against current text. `packages/singapore/packages/spellcheck/src/plugin.ts:20-30`; `packages/singapore/packages/spellcheck/src/controller.ts:28-39,104-112`    | Normal content publication suffices; no local-only edit filter found in inspected code                                  |
+| **Minimap**              | Source protocol accepts full/reset summaries or incremental source patches with baseline identity checks. `packages/singapore/packages/minimap/src/sourceProtocol.ts:18-23,54-63`                                                                   | Preserve baseline identity and clipped projection behavior                                                              |
+| **In-buffer find**       | Projects offscreen result ranges through canonical changes since its sync point. `packages/singapore/packages/find/src/plugin.ts:475-479`                                                                                                           | Retain effective history or trigger fresh query after a history gap                                                     |
+| **Workspace search**     | Builds a dirty-buffer overlay from client live documents, then combines open-buffer results with disk search. `apps/web/src/features/search/state/dirty-documents.ts:7-22,25-47`; `apps/web/src/features/search/utils/providers.ts:79-113`          | Extend search’s authoritative overlay to host-held unsaved documents, including documents edited by another participant |
 
 ### Ownership assumptions that need changes
 
 - **View identity:** buffer changes from a different `sourceViewId` mark the attached view’s selections dirty and continue through the same publication path. This supports other-view edits; a remote participant should not impersonate a local source view.  
-  `editor/packages/editor/src/editor/Editor.ts:3668-3687`
+  `packages/singapore/packages/editor/src/editor/Editor.ts:3668-3687`
 
 - **Mutation entry point:** the buffer accepts offset edits, normalizes/snaps them, and updates the piece table. It does not yet accept wire stable-ID operations.  
-  `editor/packages/editor/src/documentSession.ts:697-717`
+  `packages/singapore/packages/editor/src/documentSession.ts:697-717`
 
 - **Origin metadata:** existing origin is only `'external' | 'view'`, with optional source view ID. This is insufficient provenance for participant, model, turn, tool, and host acknowledgement.  
-  `editor/packages/editor/src/documentSession.ts:148-159`
+  `packages/singapore/packages/editor/src/documentSession.ts:148-159`
 
 - **Undo:** the existing buffer undo changes its history state and publishes inverse edits. Collaborative undo needs participant-scoped intent; restoring an old whole-document history state must not erase other participants’ later edits.  
-  `editor/packages/editor/src/documentSession.ts:794-813`
+  `packages/singapore/packages/editor/src/documentSession.ts:794-813`
 
 - **External replacement:** the current filesystem refresh can replace the live document after fetching disk. That route must submit/import host operations instead of establishing a new competing text authority.  
   `apps/web/src/features/workspace/hooks/use-events.ts:782-810`
@@ -304,7 +304,7 @@ The plan names an old `editor/src/pieceTable` location, a treap, immortal tombst
 
 Current implementation:
 
-- Storage lives in `editor/packages/textbuffer`.
+- Storage lives in `packages/singapore/packages/textbuffer`.
 - `PieceBufferId` is a **branded number**, not a `'b7'` string.
 - The sequence tree uses **persistent AVL join/balance**, not treap split/merge.
 - Tombstones can compact into stand-ins.
@@ -312,17 +312,17 @@ Current implementation:
 
 Evidence:
 
-- `editor/packages/textbuffer/src/pieceTableTypes.ts:6-12,52-70,107-112`
-- `editor/packages/textbuffer/src/join.ts:4-6,83-92`
-- `editor/packages/textbuffer/src/standIns.ts:3-6`
-- `editor/packages/textbuffer/src/compaction.ts:430-463`
-- `editor/packages/textbuffer/src/buffers.ts:107-125`
+- `packages/singapore/packages/textbuffer/src/pieceTableTypes.ts:6-12,52-70,107-112`
+- `packages/singapore/packages/textbuffer/src/join.ts:4-6,83-92`
+- `packages/singapore/packages/textbuffer/src/standIns.ts:3-6`
+- `packages/singapore/packages/textbuffer/src/compaction.ts:430-463`
+- `packages/singapore/packages/textbuffer/src/buffers.ts:107-125`
 
 Existing anchors do preserve deleted liveness and resolve compacted pieces through stand-ins. That is valuable, but **does not by itself prove stand-ins preserve every deleted-character insertion position required by the wire protocol**.
 
 Evidence:
 
-- `editor/packages/textbuffer/src/anchors.ts:67-72,124-146`
+- `packages/singapore/packages/textbuffer/src/anchors.ts:67-72,124-146`
 
 The checkpoint reference claim is also stale. Current refs are `refs/platform/checkpoints/<encoded-session>/turn/<count>`, and the helper lives under orchestration.
 
@@ -333,13 +333,13 @@ Evidence:
 ### Section 2 — The gaps
 
 - **G1 remains:** local numeric insertion IDs are not participant-global wire identities. Introduce stable document/epoch and participant operation/run identity. Do not assume replacing numeric hot-path IDs with strings is the right implementation; a compact mapping/sidecar is an option requiring proof.  
-  `editor/packages/textbuffer/src/buffers.ts:496`
+  `packages/singapore/packages/textbuffer/src/buffers.ts:496`
 
 - **G2 disappears as a distributed-ordering requirement in hosted mode.** Fractional local order and normalization still exist, but can remain local indexes if wire ordering uses stable IDs and the host sequence. Never transmit those numeric order labels as collaborative authority.  
-  `editor/packages/textbuffer/src/orders.ts:18-38,50-69`
+  `packages/singapore/packages/textbuffer/src/orders.ts:18-38,50-69`
 
 - **G3 remains:** offset edits must become ID-space intent at the submission boundary.  
-  `editor/packages/editor/src/documentSession.ts:697-717`
+  `packages/singapore/packages/editor/src/documentSession.ts:697-717`
 
 Add two missing gaps: **disk/live authority** and **optimistic pending reconciliation**.
 
@@ -372,7 +372,7 @@ The cause-gated coalescing requirement should be reconsidered rather than copied
 
 Evidence:
 
-- `editor/packages/textbuffer/src/tree.ts:34-51`
+- `packages/singapore/packages/textbuffer/src/tree.ts:34-51`
 
 ### Remaining sections
 

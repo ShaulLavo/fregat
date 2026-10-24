@@ -18,7 +18,7 @@ test('release rebuild paths work with two nested family checkouts', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'platform-native-checkouts-'))
   try {
     for (const checkout of ['package-source', 'native-source']) {
-      const scripts = path.join(root, checkout, 'ghostty-webgpu/scripts')
+      const scripts = path.join(root, checkout, 'packages/ghostty-webgpu/scripts')
       mkdirSync(path.join(scripts, 'config-resolver-native'), { recursive: true })
       writeFileSync(path.join(scripts, 'config-resolver-native/native-inputs.json'), '{}\n')
       writeFileSync(path.join(scripts, 'build-config-resolver.ts'), "console.log('built')\n")
@@ -55,6 +55,6 @@ test('release rebuild paths work with two nested family checkouts', () => {
 
 test('the native build job keeps the single family checkout default', () => {
   const workflow = readWorkflow('ghostty-config-resolver.yml')
-  expect(workflow.defaults?.run['working-directory']).toBe('ghostty-webgpu')
+  expect(workflow.defaults?.run['working-directory']).toBe('packages/ghostty-webgpu')
   expect(workflow.jobs['build-native']!.defaults).toBeUndefined()
 })
