@@ -37,7 +37,7 @@ Fregat uses your own CLI login. For Claude Code, sign in from the provider menu 
 
 ## A phone or second computer shows a pairing screen
 
-Any browser that is not on the machine itself pairs before it gets access. Make a code on the machine, or on a device that is already paired, under Settings › Machines › Pair a device. On the machine you can also run `bun run pair`. A code works once and expires after 5 minutes. The [development guide](development.md#pairing-another-device) covers pairing and reverse proxies.
+Any browser that is not on the machine itself pairs before it gets access. Make a code on the machine, or on a device that is already paired, under Settings › Machines › Pair a device. On the machine you can also run `bun run pair`. A code works once and expires after 5 minutes. [Remote access](remote-access.md) covers getting the server to another device, and the [development guide](development.md#pairing-another-device) covers pairing and reverse proxies. A `403` with `This app address cannot access the machine` means the page's origin is missing from `SERVER_ALLOWED_ORIGINS`.
 
 ## Terminals vanished after a server restart
 

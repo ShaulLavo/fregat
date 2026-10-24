@@ -4,7 +4,8 @@ Start with the [README](../README.md) if you want to know what Fregat is. This i
 
 ## Run it and fix it
 
-- [Development](development.md): run from a checkout, run the checks, build and install a release, pair a device.
+- [Development](development.md): run from a checkout, run the checks, build a release, pair a device, and the maintainer's owner-only setup.
+- [Remote access](remote-access.md): reach the server from a phone or another computer.
 - [Troubleshooting](troubleshooting.md): the failures a new checkout hits first.
 - [Releasing packages](releasing.md): changesets and the version PR.
 
