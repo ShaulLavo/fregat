@@ -1,4 +1,7 @@
-import { expect, test } from 'vitest'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { expect, onTestFinished, test } from 'vitest'
 import { PNG } from 'pngjs'
 import {
   decodeWallpaper,
@@ -73,6 +76,26 @@ test.each(['png', 'jpeg', 'webp'] as const)('rejects truncated %s', async (forma
     code: 'wallpapers.INVALID',
   })
 })
+
+test('reads a JPEG header but rejects decoding without the end-of-image marker', async () => {
+  const bytes = await new Bun.Image(still()).jpeg().bytes()
+  expect(bytes.subarray(-2)).toEqual(Uint8Array.of(0xff, 0xd9))
+  const truncated = bytes.subarray(0, bytes.length - 2)
+  expect(await readWallpaperHeader(truncated)).toMatchObject({ width: 48, height: 32 })
+  await expect(decodeWallpaper(truncated)).rejects.toMatchObject({ code: 'wallpapers.INVALID' })
+})
+
+test.each(['thumbnail', 'display'] as const)(
+  'rejects a truncated JPEG when deriving its %s',
+  async (kind) => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'wallpaper-decode-'))
+    onTestFinished(() => rm(directory, { recursive: true, force: true }))
+    const file = path.join(directory, 'truncated.jpg')
+    const bytes = await new Bun.Image(still()).jpeg().bytes()
+    await Bun.write(file, bytes.subarray(0, bytes.length - 20))
+    await expect(deriveRendition(file, kind)).rejects.toMatchObject({ code: 'wallpapers.INVALID' })
+  },
+)
 
 test('rejects unsupported formats', async () => {
   const gif = Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64')
