@@ -9,6 +9,36 @@ const browserConfigurations = [
   'retention-acceptance-layout.vitest.config.ts',
 ]
 
+const markdownQualificationFiles = [
+  'src/features/chat/tests/qualification-semantics.browser.tsx',
+  'src/features/chat/tests/qualification-production.browser.tsx',
+  'src/features/chat/tests/qualification-layout.browser.tsx',
+  'src/features/chat/tests/qualification-state.browser.tsx',
+  'src/features/chat/tests/qualification-stream.browser.tsx',
+  'src/features/chat/tests/qualification.browser.tsx',
+  'src/features/chat/tests/qualification-bench.browser.tsx',
+]
+
+test('Markdown qualification files stay in the dedicated browser project', async () => {
+  const root = path.resolve(import.meta.dirname, '..')
+  const generic = await loadConfigFromFile(
+    { command: 'serve', mode: 'test' },
+    path.join(root, 'vitest.browser.config.ts'),
+    root,
+  )
+  const qualification = await loadConfigFromFile(
+    { command: 'serve', mode: 'candidate' },
+    path.join(root, 'vitest.markdown-qualification.config.ts'),
+    root,
+  )
+
+  expect(generic?.config.test?.exclude).toEqual(expect.arrayContaining(markdownQualificationFiles))
+  expect(qualification?.config.test?.include).toEqual([
+    'src/features/chat/tests/qualification*.browser.tsx',
+  ])
+  expect(qualification?.config.test?.exclude).toEqual([])
+})
+
 test('standalone browser projects have distinct optimizer cache identities', async () => {
   const root = path.resolve(import.meta.dirname, '..')
   const names = []

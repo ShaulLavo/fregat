@@ -39,6 +39,7 @@ export default defineConfig(({ mode }) => {
       ...base.test,
       name: `markdown-${engine}-${browser}`,
       include: ['src/features/chat/tests/qualification*.browser.tsx'],
+      exclude: [],
       provide: { markdownEngine: engine },
       browser: {
         ...base.test?.browser,
