@@ -161,7 +161,7 @@ while preserving the anchor property that selections can still resolve across sn
 
 ### Anchor Identity Across Undo
 
-Anchors reference immutable buffers, not the treap. Resolvable against any snapshot. Same anchor may be live/deleted depending on snapshot. Undoing deletion restores liveness.
+Anchors reference immutable buffers, not the tree. Resolvable against any snapshot. Same anchor may be live/deleted depending on snapshot. Undoing deletion restores liveness.
 
 ### Serialized History
 

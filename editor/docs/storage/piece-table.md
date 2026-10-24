@@ -65,7 +65,7 @@ All subtree aggregates (`subtreeVisibleLength`, `subtreePieces`, `subtreeLineBre
 
 The original tree was a treap. [E040](../performance/e040-balanced-tree.md) records the completed move to an AVL tree. The earlier line-break and anchor-resolution phases introduced the metadata described above.
 
-Future work is scheduled in Fregat's [root roadmap](../../../PLAN.md).
+Future work is scheduled in Fregat's [root roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md).
 
 ## Buffer storage
 
