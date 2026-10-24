@@ -94,9 +94,11 @@ test('malformed and missing test counters fail rather than inventing executed co
 test('actual native semantics and adapter probes report availability without certification', async () => {
   const root = path.resolve(import.meta.dirname, '../..')
   const candidate = await inspectCandidate(root)
-  expect(candidate.status).toBe('available-unqualified')
-  expect(candidate.profile).toBe('fregat-chat')
-  expect(candidate.semanticChecks).toMatchObject({ executed: 8, passed: 8, failed: 0 })
+  expect(candidate.status, candidate.semanticChecks.findings.join('\n')).toBe(
+    'available-unqualified',
+  )
+  expect(candidate.profile).toBe('gfm-extended')
+  expect(candidate.semanticChecks).toEqual({ executed: 8, passed: 8, failed: 0, findings: [] })
   expect(candidate.observedCapabilities).toEqual({
     commonmark: true,
     gfm: true,
@@ -111,6 +113,16 @@ test('actual native semantics and adapter probes report availability without cer
     'binding',
     'semantic-binding',
     'runtime',
+  ])
+  const require = createRequire(path.join(root, 'packages/markdown/package.json'))
+  const binding = require.resolve('tree-sitter-md')
+  expect(candidate.artifacts.map((artifact) => path.resolve(root, artifact.file))).toEqual([
+    require.resolve('tree-sitter-md/tree-sitter-markdown.wasm'),
+    require.resolve('tree-sitter-md/tree-sitter-markdown-math.wasm'),
+    require.resolve('tree-sitter-md/tree-sitter-md.wasm'),
+    binding,
+    path.join(path.dirname(binding), 'semantic.js'),
+    require.resolve('web-tree-sitter/web-tree-sitter.wasm'),
   ])
   for (const artifact of candidate.artifacts)
     expect(artifact.sha256).toBe(
@@ -132,7 +144,7 @@ test.each(['grammar', 'chatGrammar', 'resolver'] as const)(
       expect(before.status).toBe('available-unqualified')
       const original = await readFile(
         require.resolve(
-          `tree-sitter-md/${{ grammar: 'tree-sitter-markdown.wasm', chatGrammar: 'tree-sitter-markdown-chat.wasm', resolver: 'tree-sitter-md.wasm' }[kind]}`,
+          `tree-sitter-md/${{ grammar: 'tree-sitter-markdown.wasm', chatGrammar: 'tree-sitter-markdown-math.wasm', resolver: 'tree-sitter-md.wasm' }[kind]}`,
         ),
       )
       const bytes = Buffer.concat([original, Buffer.from([0, 2, 1, 120])])
@@ -161,13 +173,13 @@ test.each(['grammar', 'chatGrammar', 'resolver'] as const)(
 )
 
 test.each(['cold', 'inspection-warm', 'native-warm'])(
-  'CHAT-named non-language bytes fail semantic loading with %s native state',
+  'Math-named non-language bytes fail semantic loading with %s native state',
   async (mode) => {
     const directory = await mkdtemp(path.join(tmpdir(), 'markdown-inspection-'))
     try {
       const root = path.resolve(import.meta.dirname, '../..')
       const require = createRequire(path.join(root, 'packages/markdown/package.json'))
-      const name = Array.from(new TextEncoder().encode('tree_sitter_markdown_chat'))
+      const name = Array.from(new TextEncoder().encode('tree_sitter_markdown_math'))
       const bytes = new Uint8Array(
         [
           0,
@@ -216,7 +228,7 @@ test.each(['cold', 'inspection-warm', 'native-warm'])(
         }
         const candidate = await inspectCandidate(root, { chatGrammar: ${JSON.stringify(chatGrammar)} })
         console.log(JSON.stringify(candidate))
-        assert.equal(candidate.status, 'unavailable', 'CHAT bytes must be loaded even after native initialization')
+        assert.equal(candidate.status, 'unavailable', 'Math bytes must be loaded even after native initialization')
         assert.equal(candidate.semanticChecks.executed, 0)
         assert.deepEqual(candidate.observedCapabilities, {})
         assert.deepEqual(candidate.semanticChecks.findings, ['Language module has no dylink.0 section'])
@@ -233,14 +245,14 @@ test.each(['cold', 'inspection-warm', 'native-warm'])(
   40_000,
 )
 
-test('a loadable alternate CHAT grammar cannot inherit observed math support', async () => {
+test('a loadable alternate math grammar cannot inherit observed math support', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'markdown-inspection-'))
   try {
     const root = path.resolve(import.meta.dirname, '../..')
     const require = createRequire(path.join(root, 'packages/markdown/package.json'))
     const before = await inspectCandidate(root)
     expect(before.observedCapabilities.math).toBe(true)
-    const bytes = await readFile(require.resolve('tree-sitter-md/tree-sitter-markdown-chat.wasm'))
+    const bytes = await readFile(require.resolve('tree-sitter-md/tree-sitter-markdown-math.wasm'))
     let offset = bytes.indexOf('math_flow')
     expect(offset).toBeGreaterThan(0)
     while (offset !== -1) {
@@ -320,7 +332,7 @@ test.each(['grammar', 'chatGrammar', 'resolver'] as const)(
 test.each([
   { kind: 'chatGrammar', file: 'tree-sitter-markdown.wasm' },
   { kind: 'chatGrammar', file: 'tree-sitter-md.wasm' },
-  { kind: 'grammar', file: 'tree-sitter-markdown-chat.wasm' },
+  { kind: 'grammar', file: 'tree-sitter-markdown-math.wasm' },
 ] as const)(
   'rejects $file supplied as $kind after singleton initialization',
   async ({ kind, file }) => {
