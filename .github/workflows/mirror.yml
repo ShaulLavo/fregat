@@ -21,12 +21,15 @@ jobs:
       matrix:
         include:
           - folder: packages/singapore
+            previous_folder: editor
             repository: ShaulLavo/singapore
             deploy_key: MIRROR_EDITOR_SSH_KEY
           - folder: packages/ghostty-webgpu
+            previous_folder: ghostty-webgpu
             repository: ShaulLavo/ghostty-webgpu
             deploy_key: MIRROR_GHOSTTY_SSH_KEY
           - folder: packages/hotkeys
+            previous_folder: hotkeys
             repository: ShaulLavo/hotkeys
             deploy_key: MIRROR_HOTKEYS_SSH_KEY
     steps:
@@ -58,6 +61,8 @@ jobs:
       - name: Split and push family
         env:
           FAMILY_FOLDER: ${{ matrix.folder }}
+          FAMILY_PREVIOUS_FOLDER: ${{ matrix.previous_folder }}
+          FAMILY_RELOCATION_COMMIT: ddf0527c59168f51e96bc0a96e68e0771cdbaadd
           MIRROR_REPOSITORY: ${{ matrix.repository }}
         run: |
           set -euo pipefail
@@ -72,7 +77,26 @@ jobs:
           fi
           # Dash caps recursion at 1000 calls; the imported history needs Bash.
           git_exec_path="$(git --exec-path)"
-          split=$(GIT_EXEC_PATH="$git_exec_path" PATH="$git_exec_path:$PATH" bash "$git_exec_path/git-subtree" split --prefix="$FAMILY_FOLDER" HEAD)
+          split_family() {
+            GIT_EXEC_PATH="$git_exec_path" PATH="$git_exec_path:$PATH" bash "$git_exec_path/git-subtree" split --prefix="$1" "$2"
+          }
+          split_revision=HEAD
+          if [ -n "${FAMILY_PREVIOUS_FOLDER:-}" ]; then
+            git merge-base --is-ancestor "$FAMILY_RELOCATION_COMMIT" HEAD
+            previous_main=$(git rev-parse "$FAMILY_RELOCATION_COMMIT^")
+            previous_split=$(split_family "$FAMILY_PREVIOUS_FOLDER" "$previous_main")
+            # Rejoin metadata connects the renamed prefix to its existing split history.
+            # This temporary commit leaves HEAD and the checkout unchanged.
+            split_revision=$(printf 'Seed relocated subtree history\n\ngit-subtree-dir: %s\ngit-subtree-mainline: %s\ngit-subtree-split: %s\n' \
+              "$FAMILY_FOLDER" "$previous_main" "$previous_split" | \
+              git -c user.name='Fregat mirrors' -c user.email='mirrors@users.noreply.github.com' \
+              commit-tree HEAD^{tree} -p HEAD -p "$previous_split")
+          fi
+          split=$(split_family "$FAMILY_FOLDER" "$split_revision")
+          if [ "$(git rev-parse "$split^{tree}")" != "$(git rev-parse "HEAD:$FAMILY_FOLDER")" ]; then
+            echo "::error::Mirror split tree differs from $FAMILY_FOLDER."
+            exit 1
+          fi
           if ! git push "git@github.com:$MIRROR_REPOSITORY.git" "$split:refs/heads/main"; then
             echo "::error::Mirror push rejected or failed for $MIRROR_REPOSITORY. Reconcile its main with the family split before retrying."
             exit 1

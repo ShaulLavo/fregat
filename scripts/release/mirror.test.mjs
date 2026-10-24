@@ -30,6 +30,15 @@ test('every mirror checks out the pinned host keys before configuring SSH', () =
   ])
 })
 
+test('every relocated family keeps its old prefix and the shared relocation boundary', () => {
+  expect(
+    workflow.jobs.mirror.strategy.matrix.include.map((entry) => entry.previous_folder),
+  ).toEqual(['editor', 'ghostty-webgpu', 'hotkeys'])
+  const splitStep = workflow.jobs.mirror.steps.find((step) => step.name === 'Split and push family')
+  expect(splitStep.env.FAMILY_RELOCATION_COMMIT).toBe('ddf0527c59168f51e96bc0a96e68e0771cdbaadd')
+  expect(splitStep.env.FAMILY_PREVIOUS_FOLDER).toBe('${{ matrix.previous_folder }}')
+})
+
 test('pinned GitHub host keys match all three published SHA256 fingerprints', () => {
   const found = spawnSync('ssh-keygen', ['-F', 'github.com', '-f', knownHosts], {
     encoding: 'utf8',
@@ -105,13 +114,15 @@ function git(cwd, ...args) {
   return result.stdout.trim()
 }
 
-function mirror(cwd, family = 'packages/hotkeys') {
+function mirror(cwd, family = 'packages/hotkeys', previous = {}) {
   return spawnSync('bash', ['-c', script], {
     cwd,
     encoding: 'utf8',
     env: {
       ...process.env,
       FAMILY_FOLDER: family,
+      FAMILY_PREVIOUS_FOLDER: previous.folder ?? '',
+      FAMILY_RELOCATION_COMMIT: previous.commit ?? '',
       MIRROR_REPOSITORY: 'fixture/mirror',
     },
   })
@@ -253,3 +264,87 @@ test('mirrors current snapshots and skips an older replay while preserving the n
     expect(git(destination, 'rev-parse', 'main')).toBe(outside)
   })
 })
+
+const families = workflow.jobs.mirror.strategy.matrix.include
+
+test.each(families)(
+  'preserves $previous_folder mirror history after moving to $folder',
+  async ({ folder, previous_folder }) => {
+    await withWorkspace(async ({ root }) => {
+      const origin = join(root, 'origin.git')
+      const destination = join(root, 'mirror.git')
+      const source = join(root, 'source')
+      const imported = join(root, 'imported')
+      git(root, 'init', '--bare', '--initial-branch=main', origin)
+      git(root, 'init', '--bare', '--initial-branch=main', destination)
+      git(root, 'init', '--initial-branch=main', imported)
+      git(imported, 'config', 'user.name', 'Fixture')
+      git(imported, 'config', 'user.email', 'fixture@example.com')
+      await writeFile(join(imported, 'index.js'), 'first')
+      git(imported, 'add', '.')
+      git(imported, 'commit', '-m', 'imported history')
+      const importedHead = git(imported, 'rev-parse', 'HEAD')
+      git(root, 'clone', origin, source)
+      git(source, 'config', 'user.name', 'Fixture')
+      git(source, 'config', 'user.email', 'fixture@example.com')
+      git(source, 'config', `url.${destination}.insteadOf`, 'git@github.com:fixture/mirror.git')
+      await writeFile(join(source, 'outside.txt'), 'monorepo file')
+      git(source, 'add', '.')
+      git(source, 'commit', '-m', 'monorepo root')
+      git(source, 'subtree', 'add', `--prefix=${previous_folder}`, imported, 'main')
+      git(source, 'push', 'origin', 'main')
+      const initial = mirror(source, previous_folder)
+      expect(initial.status, `${initial.stdout}\n${initial.stderr}`).toBe(0)
+      const oldMirror = git(destination, 'rev-parse', 'main')
+      expect(oldMirror).toBe(importedHead)
+      await mkdir(join(source, 'packages'))
+      git(source, 'mv', previous_folder, folder)
+      await writeFile(join(source, folder, 'index.js'), 'moved')
+      git(source, 'add', '.')
+      git(source, 'commit', '-m', 'relocate family with changes')
+      const relocation = git(source, 'rev-parse', 'HEAD')
+      git(source, 'push', 'origin', 'main')
+      const previous = { folder: previous_folder, commit: relocation }
+      const moved = mirror(source, folder, previous)
+      expect(moved.status, `${moved.stdout}\n${moved.stderr}`).toBe(0)
+      const movedMirror = git(destination, 'rev-parse', 'main')
+      git(destination, 'merge-base', '--is-ancestor', oldMirror, movedMirror)
+      expect(git(destination, 'rev-parse', 'main^{tree}')).toBe(
+        git(source, 'rev-parse', `HEAD:${folder}`),
+      )
+      expect(git(destination, 'rev-list', '--count', `${oldMirror}..main`)).toBe('1')
+      const repeated = mirror(source, folder, previous)
+      expect(repeated.status, `${repeated.stdout}\n${repeated.stderr}`).toBe(0)
+      expect(git(destination, 'rev-parse', 'main')).toBe(movedMirror)
+      await writeFile(join(source, folder, 'index.js'), 'later')
+      git(source, 'add', '.')
+      git(source, 'commit', '-m', 'later family change')
+      const laterHead = git(source, 'rev-parse', 'HEAD')
+      git(source, 'push', 'origin', 'main')
+      const later = mirror(source, folder, previous)
+      expect(later.status, `${later.stdout}\n${later.stderr}`).toBe(0)
+      git(destination, 'merge-base', '--is-ancestor', movedMirror, 'main')
+      expect(git(destination, 'show', 'main:index.js')).toBe('later')
+      expect(git(source, 'rev-parse', 'HEAD')).toBe(laterHead)
+      expect(git(source, 'status', '--porcelain')).toBe('')
+      const outsider = join(root, 'outsider')
+      git(root, 'clone', destination, outsider)
+      await writeFile(join(outsider, 'outside.txt'), 'mirror-only work')
+      git(outsider, 'add', '.')
+      git(
+        outsider,
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.com',
+        'commit',
+        '-m',
+        'outside work',
+      )
+      git(outsider, 'push', 'origin', 'main')
+      const outside = git(destination, 'rev-parse', 'main')
+      expect(mirror(source, folder, previous).status).toBe(1)
+      expect(git(destination, 'rev-parse', 'main')).toBe(outside)
+    })
+  },
+)
