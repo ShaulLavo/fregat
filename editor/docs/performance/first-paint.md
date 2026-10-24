@@ -12,12 +12,12 @@ Detached `setContent` retains its synchronous behavior.
 
 ## What the measurement found
 
-The initial E001 diagnostic run measured a 36–37 ms fallback-fold scan inside attachment of the
+The initial stress harness diagnostic run measured a 36–37 ms fallback-fold scan inside attachment of the
 500,000-line fixture. The scan ran even when no fold gutter was installed. Text had reached the DOM,
 but the browser could not paint until the synchronous call returned.
 
 Grammar resolution and parsing already complete asynchronously. First-party session creation did
-not contain a synchronous parse, so E003 keeps the existing preparation and session APIs.
+not contain a synchronous parse, so first-paint keeps the existing preparation and session APIs.
 Required font metrics, line geometry, and indentation-width detection stay before text readiness.
 The latter samples at most 10,000 lines and controls caret and editing behavior.
 

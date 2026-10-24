@@ -1,4 +1,4 @@
-# E047: Point and row queries
+# Point and row queries
 
 Implemented 2026-09-21 in Editor `6656eb7`; Platform Plan 130 Phases 1 and 4 consume it
 (`ee6f97e0`). A plugin or host asks the editor what sits under a pointer and gets the answer the

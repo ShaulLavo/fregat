@@ -1,6 +1,6 @@
-# E050: Host obligations now owned by the API
+# Host obligations now owned by the API
 
-Completed 2026-09-25. The eleven audited workarounds have public contracts and migrated callers.
+The eleven audited workarounds have public contracts and migrated callers.
 Platform Plan 130 removes the host copies; Editor owns the presentation and interaction ordering.
 
 | Former host obligation                           | Public contract                                                                                         |

@@ -14,7 +14,7 @@ Tests and checks read some of the data here, and Fregat's plans link to these pa
 | Report                                                     | What it settles                                                            |
 | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
 | [Browser editor comparison](browser-compare-2026-10-08.md) | Singapore against Monaco and CodeMirror 6 on one fixture, with raw samples |
-| [E040 AVL tree](e040-balanced-tree.md)                     | Why the sequence tree is an AVL tree edited in one descent                 |
+| [balanced tree AVL tree](e040-balanced-tree.md)                     | Why the sequence tree is an AVL tree edited in one descent                 |
 | [Heap cost per piece](piece-heap-cost.md)                  | What a piece costs the garbage collector                                   |
 | [SAB transport](sab-transport-2026-09-12.md)               | Why workers get strings instead of shared document storage                 |
 | [Input latency](input-latency.md)                          | The paired input-latency gate and its limits                               |

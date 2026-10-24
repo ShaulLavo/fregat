@@ -1,6 +1,6 @@
-# E031 display projection measurements
+# Display projection measurements
 
-The 500,000-line E001 fixture retains 52 display rows and 2,152 bytes of row text in its first
+The 500,000-line stress harness fixture retains 52 display rows and 2,152 bytes of row text in its first
 40-row viewport with overscan. The eager control retains 500,000 rows and 24,668,130 bytes of row
 text. The projection stores plain lines in one sequence entry. A top-of-file newline changes one
 entry and reads only the new viewport's text, with no unchanged suffix row replacements.
@@ -16,11 +16,11 @@ These measurements ran on an Intel Core i7-14700K with Bun 1.4.0, Node 26.7.0, a
 148.0.7778.96. The eager source is commit `ff1dfeda9e52b308f57915da7372f7ac6e5f04f9`.
 Browser results record the source hash and frozen package path used by each run. The final input
 gate uses source hash `75c50664ed249aac317237d1172e5993974d57766d416e69fb1757e31dd133e3`.
-First-paint and E001 use the earlier built source hash
+First-paint and stress harness use the earlier built source hash
 `b9dea046e7b96362e71a88277f64fcaf202b1439fdb54ab78203ec8628008dc7`. Subsequent changes fix
 inline caret mapping, folded decorations after edits, distant inline widget widths, and suggestion
 selection synchronization. Focused browser and DOM checks cover those paths on the final source.
-The first-paint and E001 fixtures do not exercise those inline and fold cases, so their earlier
+The first-paint and stress harness fixtures do not exercise those inline and fold cases, so their earlier
 measurements are retained separately from the final input gate.
 
 The happy-dom table measures real view operations with numeric diagnostics enabled. Each cell
@@ -42,17 +42,17 @@ happen outside the timed operation. Cold open includes layout construction and t
 Text byte counters use two bytes per UTF-16 code unit. They count requested range payloads,
 including repeated reads. Retained text counters describe payload size, excluding engine object
 headers, string deduplication, and immutable source storage. `summaryBytes` estimates index
-metadata and typed array storage; it is not a measured heap size. The E001 browser artifacts
+metadata and typed array storage; it is not a measured heap size. The stress harness browser artifacts
 record actual renderer heap measurements separately.
 
-In these E031 measurements, a cold plain view built the source buffer's newline index. The 500,000-line fixture scans
+In these projection measurements, a cold plain view built the source buffer's newline index. The 500,000-line fixture scans
 25,668,128 UTF-16 bytes once and retains a 2,097,152-byte newline array capacity. New layouts and
 distant windows reuse that source index. Inserting `x\n` needs four bytes of new-buffer indexing.
 The row text read is 2,152 bytes for the first viewport and 2,112 bytes after the top edit.
 
-[E034](e034-snapshot-indentation-folds.md) now builds the original index during buffer creation,
+[snapshot indentation folds](e034-snapshot-indentation-folds.md) now builds the original index during buffer creation,
 using its count instead of scanning newlines separately. Initial painting reuses that index;
-headless buffers retain its offset storage earlier. The E031 measurements above remain historical.
+headless buffers retain its offset storage earlier. The projection measurements above remain historical.
 
 The eager control's full-read counter stays at zero while it reads and retains every line.
 That control demonstrates why full-read counts alone cannot establish bounded work. The capture
@@ -60,7 +60,7 @@ also observes 499,999 replaced suffix row identities after the top newline. Prod
 counters report one touched sequence entry for the same edit.
 
 Exact wrapping still inspects document text. Wrap summaries use blocks of up to 256 source lines,
-with typed row prefixes and tab checkpoints. The 500,000-line E001 fixture retains about 2.3 MB
+with typed row prefixes and tab checkpoints. The 500,000-line stress harness fixture retains about 2.3 MB
 of summaries. The separate tabbed, folded 500,000-line transform fixture retains about 6.8 MB.
 These scans use bounded text reads and preserve exact projected row counts. Width changes repeat
 summary work; cold metric work is reported independently from row and string retention.
@@ -74,10 +74,10 @@ They also cover graphemes and ranged inline content, including distant widget ge
 separate [BiDi browser tests](../../packages/editor/test/bidiGeometry.browser.test.ts) pass all
 108 cases.
 
-The first-paint and E001 browser runs use built package exports through Playwright request
+The first-paint and stress harness browser runs use built package exports through Playwright request
 routing. They open no listening server. Each uses one measured repetition after a warmup.
 First-paint checks include direct and prepared attachment, plain rendering and Tree-sitter,
-and cold and warm contexts. All 16 first-paint samples pass their correctness checks. E001 checks
+and cold and warm contexts. All 16 first-paint samples pass their correctness checks. Stress harness checks
 open, jump, input, search, scroll, and edit churn across all five fixtures, with all 60 samples
 correct. Screenshot completion remains an upper bound on paint latency.
 
@@ -103,7 +103,7 @@ Raw measurements accompany this report:
 - [Projection view counters](e031-virtualization-after.json)
 - [Projection transform counters](e031-transforms-after.jsonl)
 - [First-paint before](e031-first-paint-before.json) and [after](e031-first-paint-after.json)
-- [E001 before](e031-stress-before.json.gz) and [after](e031-stress-after.json.gz)
+- [stress harness before](e031-stress-before.json.gz) and [after](e031-stress-after.json.gz)
 - [Paired input before](e031-input-before.json.gz) and [after](e031-input-after.json.gz)
 - [Final input gate](e031-input-gate-after.json.gz) and [comparison](e031-input-gate-comparison.json)
 

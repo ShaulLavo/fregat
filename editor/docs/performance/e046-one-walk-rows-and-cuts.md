@@ -1,15 +1,15 @@
-# E046 one-walk rows and cuts
+# One-walk rows and cuts
 
-E046 is complete on 2026-09-17. A row's two ends come from one descent, a piece knows where its
+A row's two ends come from one descent, a piece knows where its
 line breaks sit in its chunk's index, and a document that never held a surrogate is edited without
 looking for one. A single range edit checks its ends for a cut pair on the pass that hides the
-range. `position-to-offset` is 46% to 53% faster than the E039 head, line reads 46% to 56%,
+range. `position-to-offset` is 46% to 53% faster than the reverse-index cost head, line reads 46% to 56%,
 `offset-to-position` 40%, replacements 14% to 19% and churn 14% to 18%. The equivalence test written for the folded check found a placement
 bug that is older than this plan: replacement text could land ahead of tombstones that precede its
 range, depending on the shape of the tree. Raw reports are in
 [`e046-evidence.tar.gz`](e046-evidence.tar.gz).
 
-Inspected baseline: `7cafb67`, whose textbuffer is the E039 head `0330aae`, on branch
+Inspected baseline: `7cafb67`, whose textbuffer is the reverse-index cost head `0330aae`, on branch
 `e046-one-walk-rows-and-cuts`.
 
 ## The premises
@@ -219,7 +219,7 @@ walks at 0.06 to 0.08 ms, too short to read anything into.
   seven. Collecting the text on the walk from the landing to the row's end would remove it.
 - A document that once held an emoji pays the batch path's two descents per range for the rest
   of its history. Clearing the flag belongs to
-  [E006](../storage/e006-tombstone-compaction.md).
+  [text reclamation](../storage/e006-tombstone-compaction.md).
 - `findOriginalPiece` is 54% of `anchor-density` and reads a piece per node on its path; the two
   modes above say the lane is bound by memory, not by instructions.
 - A multi-edit batch still snaps up front. Folding it would need the sibling rules inside the

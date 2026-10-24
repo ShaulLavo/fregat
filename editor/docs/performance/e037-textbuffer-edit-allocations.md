@@ -1,6 +1,6 @@
-# E037 textbuffer edit allocations
+# Textbuffer edit allocations
 
-E037 is complete on 2026-09-16. Every edit in `@singapore-editor/textbuffer` stopped paying for
+Every edit in `@singapore-editor/textbuffer` stopped paying for
 work unrelated to persistence, anchors or tombstones: buffer-id string parsing, string hashing for
 node priorities, a range read for a two-unit surrogate probe, a batch pipeline for a single edit, a
 redundant reverse-index removal per split, and a whole-chunk prefix compare on every caret lookup
@@ -65,7 +65,7 @@ medians averaged over seeds `20260916`, `7` and `42`. Fixture hashes matched acr
 
 No lane is slower than baseline beyond run variation; the load lanes are unchanged within 1%.
 The comparison with the control is unchanged in kind: the mutable red-black tree still wins the
-small-edit lanes by a wide margin, which is what E038, E039 and E040 address.
+small-edit lanes by a wide margin, which is what append-only buffer store, reverse-index cost and balanced tree address.
 
 Sampled JS-heap allocation per replay, `random-insertions` and `sequential-typing`, 12 replays:
 
@@ -81,7 +81,7 @@ Priority hashing fell from 632 KiB to 57 KiB per replay of attributed allocation
 `random-insertions`; the residue is sampling attributed to inlined callers. `collectTextInRange`
 left the `sequential-typing` allocator list entirely. The `random-insertions` figure did not halve:
 what remains is the paged buffer-store copy (`appendChunksToBuffers` and `append`, about 13.5 MiB)
-and the two persistent trees, which are E038 and E040 respectively.
+and the two persistent trees, which are append-only buffer store and balanced tree respectively.
 
 `typing-with-lookups` before and after step 7: median replay 6.17 ms to 0.87 ms, sampled
 allocation 7.00 MiB to 2.21 MiB, prefix compares 1,524 (2,578,026 code units) to zero. Typing
@@ -123,7 +123,7 @@ split and a churn sequence; `bench/budgets.test.mjs` is the counter gate.
 ## Left for the successors
 
 - The buffer store still copies a page per append and concatenates the tail per keystroke; any
-  first reader of that chunk flattens it. That is [E038](e038-append-only-buffer-store.md).
-- The reverse index still copies a path per write. That is [E039](e039-reverse-index-cost.md).
+  first reader of that chunk flattens it. That is [append-only buffer store](e038-append-only-buffer-store.md).
+- The reverse index still copies a path per write. That is [reverse-index cost](e039-reverse-index-cost.md).
 - A `Map` per store version is still allocated to retain line indexes for ancestor snapshots
-  (`:0:Map`, about 0.3 MiB per 1,500 keystrokes). E038 decides where that record lives.
+  (`:0:Map`, about 0.3 MiB per 1,500 keystrokes). Append-only buffer store decides where that record lives.

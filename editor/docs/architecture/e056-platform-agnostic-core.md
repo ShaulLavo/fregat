@@ -1,14 +1,14 @@
-# E056 research: platform-agnostic core and React Strict DOM
+# Platform-agnostic core and React Strict DOM
 
-Status: supporting design for approved E056, researched on 2026-09-20.
-E056 remains parked by the owner; implementation has not started.
+Status: supporting design for approved platform-agnostic core, researched on 2026-09-20.
+platform-agnostic core remains parked by the owner; implementation has not started.
 
-Execution entry: [E056](https://github.com/ShaulLavo/fregat/blob/main/plans/e056-platform-agnostic-core.md).
+Execution entry: [platform-agnostic core](https://github.com/ShaulLavo/fregat/blob/main/plans/e056-platform-agnostic-core.md).
 Machine-readable evidence: [source ledger](e056-platform-agnostic-core-sources.json).
 
 **Proposed direction:** make Singapore's editor engine independent of React, DOM and browser worker construction; retain the existing fast DOM renderer; build a Strict DOM host only against capabilities demonstrated on the intended native runtime. Fregat remains the compatibility contract, not collateral damage.
 
-This document preserves the detailed research, contracts and delivery units behind E056. It is not a report of implemented or passing changes. Source references resolve to pinned source URLs; the companion JSON ledger preserves all 57 source descriptions, reviewed ranges, evidence classes and research limitations. Implementation status and scheduling remain with the executable plan and the cross-project roadmap.
+This document preserves the detailed research, contracts and delivery units behind platform-agnostic core. It is not a report of implemented or passing changes. Source references resolve to pinned source URLs; the companion JSON ledger preserves all 57 source descriptions, reviewed ranges, evidence classes and research limitations. Implementation status and scheduling remain with the executable plan and the cross-project roadmap.
 
 Reconciled on 2026-09-29: Plan 207 owns the move to canonical Fregat `editor/` sources and
 public mirrors. References below to sibling links, `editor-ref` and paired repositories describe

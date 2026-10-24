@@ -1,6 +1,6 @@
-# E018: Persisted undo history
+# Persisted undo history
 
-Implemented 2026-09-20 in Editor `2e2ded1` and Platform `2acc3b73` and `0bb995a1`. Closing a file
+Closing a file
 keeps its undo graph; reopening the same content restores it, branches included.
 
 Editor: `buffer.serializeHistory()` and `buffer.restoreHistory(data)` in

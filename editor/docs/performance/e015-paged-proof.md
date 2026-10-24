@@ -1,4 +1,4 @@
-# E015 bounded read-only proof
+# Bounded read-only proof
 
 ## Contracts and decision
 

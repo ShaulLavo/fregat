@@ -46,7 +46,7 @@ pushes to `main`, and manual dispatch.
   observers. Some older entries retain their Phase 0 legacy justification; new entries require a
   specific scheduler justification in `timer-usage.json`.
 
-The E032 refresh includes earlier public facade additions for chord keymaps, piece-table inspection,
+The edit batches refresh includes earlier public facade additions for chord keymaps, piece-table inspection,
 visible paint capture, text-content rendering, and syntax folding. The additional source-cycle
 memberships include type dependencies for text measurements, display projection, paint snapshots,
 selection reveal, scroll viewports, and row decoration projection; these remain visible to the gate.

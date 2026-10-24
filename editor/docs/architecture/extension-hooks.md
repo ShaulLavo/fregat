@@ -1,8 +1,6 @@
 # Extension hooks: the contract map
 
-Draft from the [E027](https://github.com/ShaulLavo/fregat/blob/main/plans/e027-extension-hooks.md) research pass on 2026-09-25, read from Editor
-`e2fd299`. It records what the code does today. Rows marked proposed are E027's recommendations and
-are not implemented. Every public type named here is exported from `@singapore-editor/core/extensions`
+This page records what the code does today, read from the `packages/editor` source. Every public type named here is exported from `@singapore-editor/core/extensions`
 unless the row says otherwise.
 
 ## Scopes
@@ -21,8 +19,7 @@ Every registry a contribution reaches is per editor: the plugin host
 ([Editor.ts:370](../../packages/editor/src/editor/Editor.ts)), commands, and keymap context keys.
 Two views of one document share an `EditorTextBuffer` (text and undo) through separate
 `createEditorViewSession` sessions, so selections stay per view. There
-is no document-scoped contribution; Platform [Plan 099](https://github.com/ShaulLavo/fregat/blob/main/plans/099-document-contributions.md)
-owns adding one.
+is no document-scoped contribution.
 
 Rules the code already implies:
 
@@ -44,7 +41,7 @@ Rules the code already implies:
 
 Status values are stability labels: **supported** (exported and used; changes follow the usual
 review), **experimental** (exported, may change without notice), **internal** (exists, not
-exported), **host** (the host's API, not a plugin hook), **proposed** (lands experimental), **gap**,
+exported), **host** (the host's API, not a plugin hook), **gap** (not available),
 **unsupported** (deliberately absent).
 
 ### Document edits
@@ -55,7 +52,7 @@ exported), **host** (the host's API, not a plugin hook), **proposed** (lands exp
 | `startSnippetSession`                                   | Per editor, edit context.                                                            | Ends on the snippet's own exit rules.                        | lsp-plugin          | supported |
 | `materializeFullText`, `getTextSnapshot`                | Per editor, edit and decoration contexts. `TextReadSnapshot` reads rows and windows. | Full text is O(n) and gated by `check:full-text`.            | diff                | supported |
 | `getDocumentSyncPoint`, `changesSinceDocumentSyncPoint` | Per editor. Recovers every edit since a point.                                       | Returns null across a gap or segment change.                 | diff, lsp           | supported |
-| `Editor.edit`, `setText`, `syncText`                    | Host.                                                                                | `setText(text, { tokens })` paints atomically (E050 row 1).  | Platform            | host      |
+| `Editor.edit`, `setText`, `syncText`                    | Host.                                                                                | `setText(text, { tokens })` paints atomically.               | Platform            | host      |
 | Edit from a view contribution                           | A view contribution has no `applyEdits`. Features bridge through a closure.          | Creation order between contribution kinds is not guaranteed. | find, bracket match | gap       |
 
 ### Selections
@@ -80,35 +77,35 @@ exported), **host** (the host's API, not a plugin hook), **proposed** (lands exp
 
 | Hook                       | Scope, phase, rights                                                                           | Order, cancel, dispose                                                          | Consumer                         | Status       |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------- | ------------ |
-| `registerPressParticipant` | View context. Asked before a press becomes a caret; `true` claims it (E050 row 5).             | Registration order; first claim wins; the editor prevents the default.          | diff, definition links           | supported    |
+| `registerPressParticipant` | View context. Asked before a press becomes a caret; `true` claims it.                          | Registration order; first claim wins; the editor prevents the default.          | diff, definition links           | supported    |
 | `registerNonCaretRows`     | View context. Caret moves step over the rows.                                                  | Claimed during creation only.                                                   | diff                             | supported    |
-| `registerKeymapContextKey` | View context. Read when a key is matched (E050 row 6).                                         | Unregistered keys read false.                                                   | find, completion, signature help | supported    |
+| `registerKeymapContextKey` | View context. Read when a key is matched.                                                      | Unregistered keys read false.                                                   | find, completion, signature help | supported    |
 | `onDidType`                | View context. After the typed edit lands.                                                      | Not claimed by the editor; the contribution must dispose it.                    | auto-close consumers             | supported    |
 | `EDITOR_PASTE_HANDLER`     | Language feature token. First handler that answers takes the paste.                            | Selector score, then priority, then registration order.                         | built-in paste handlers          | supported    |
 | Keymap bindings            | Host only, through `EditorKeymapOptions.packs` and `.bindings`. A plugin cannot add a binding. | Shared dispatcher precedence and context predicates; handlers enforce readonly. | Hosted Editor binds nothing      | host         |
-| Text commit gate           | View context. Allow or reject text from every source before it commits.                        | See the input section below.                                                    | E028                             | experimental |
+| Text commit gate           | View context. Allow or reject text from every source before it commits.                        | See the input section below.                                                    | modal example                    | experimental |
 | Replace the input loop     | —                                                                                              | Rejected below.                                                                 | —                                | unsupported  |
 
 ### Syntax and language features
 
-| Hook                                                                   | Scope, phase, rights                                                      | Order, cancel, dispose                                               | Consumer                       | Status    |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------ | --------- |
-| `registerSyntaxProvider`                                               | Per editor. Creates a session per document.                               | First provider returning a session wins; change reloads the session. | tree-sitter                    | supported |
-| `registerHighlighter`                                                  | Per editor. Session per document; `initialHighlightStatus` (E050 row 11). | First provider returning a session wins.                             | shiki                          | supported |
-| `createEditorLanguageFeatureToken`, `registerProvider`, `getProviders` | Library-defined, many providers.                                          | Language match, then priority, then registration order.              | lsp-plugin, hover              | supported |
-| `createEditorCapabilityToken`, `registerFeature`, `getFeature`         | Library-defined, one owner per editor.                                    | A second owner throws. No change subscription.                       | find, minimap, merge conflicts | supported |
-| Provider-change subscription                                           | `EditorLanguageFeatureRegistry.subscribe` exists but is internal.         | Used by ambient plugins.                                             | hover demand                   | internal  |
+| Hook                                                                   | Scope, phase, rights                                              | Order, cancel, dispose                                               | Consumer                       | Status    |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------ | --------- |
+| `registerSyntaxProvider`                                               | Per editor. Creates a session per document.                       | First provider returning a session wins; change reloads the session. | tree-sitter                    | supported |
+| `registerHighlighter`                                                  | Per editor. Session per document; `initialHighlightStatus`.       | First provider returning a session wins.                             | shiki                          | supported |
+| `createEditorLanguageFeatureToken`, `registerProvider`, `getProviders` | Library-defined, many providers.                                  | Language match, then priority, then registration order.              | lsp-plugin, hover              | supported |
+| `createEditorCapabilityToken`, `registerFeature`, `getFeature`         | Library-defined, one owner per editor.                            | A second owner throws. No change subscription.                       | find, minimap, merge conflicts | supported |
+| Provider-change subscription                                           | `EditorLanguageFeatureRegistry.subscribe` exists but is internal. | Used by ambient plugins.                                             | hover demand                   | internal  |
 
 ### Display projection
 
-| Hook                                | Scope, phase, rights                                             | Order, cancel, dispose                                             | Consumer                 | Status    |
-| ----------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------ | --------- |
-| `EditorInjectedTextRowProvider`     | Per editor. Rows derived from a `TextReadSnapshot`.              | `onDidChangeInjectedTextRows` invalidates.                         | diff, merge conflicts    | supported |
-| `EditorInlineReplacementProvider`   | Per editor. Called when the parse settles; providers compose.    | Outermost span first.                                              | markdown                 | supported |
-| `EditorGutterContribution`          | Per editor. Cells created, updated, disposed by the gutter.      | Unique `id`; `interactive` cells take pointer events (E050 row 9). | line, fold, diff gutters | supported |
-| `getRowPresentation`                | View context. Element handle with an abort signal (E050 row 10). | Aborts before text replacement, recycling and view disposal.       | decode                   | supported |
-| Fold map, word wrap, `setInlineMap` | Host methods.                                                    | —                                                                  | Platform                 | host      |
-| `DisplayProjectionRegistry`         | Internal composition point.                                      | —                                                                  | —                        | internal  |
+| Hook                                | Scope, phase, rights                                          | Order, cancel, dispose                                       | Consumer                 | Status    |
+| ----------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------ | --------- |
+| `EditorInjectedTextRowProvider`     | Per editor. Rows derived from a `TextReadSnapshot`.           | `onDidChangeInjectedTextRows` invalidates.                   | diff, merge conflicts    | supported |
+| `EditorInlineReplacementProvider`   | Per editor. Called when the parse settles; providers compose. | Outermost span first.                                        | markdown                 | supported |
+| `EditorGutterContribution`          | Per editor. Cells created, updated, disposed by the gutter.   | Unique `id`; `interactive` cells take pointer events.        | line, fold, diff gutters | supported |
+| `getRowPresentation`                | View context. Element handle with an abort signal.            | Aborts before text replacement, recycling and view disposal. | decode                   | supported |
+| Fold map, word wrap, `setInlineMap` | Host methods.                                                 | —                                                            | Platform                 | host      |
+| `DisplayProjectionRegistry`         | Internal composition point.                                   | —                                                            | —                        | internal  |
 
 ### Decorations
 
@@ -132,8 +129,8 @@ exported), **host** (the host's API, not a plugin hook), **proposed** (lands exp
 | Hook                                                     | Scope, phase, rights                                  | Order, cancel, dispose                         | Consumer               | Status    |
 | -------------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------- | ---------------------- | --------- |
 | `updateViewport`                                         | View contribution. Display rate, no snapshot rebuild. | Only contributions that define it are visited. | minimap, sticky scroll | supported |
-| `setScrollPosition`, `revealLine`                        | View context. Updates both axes (E050 row 8).         | —                                              | find, diff             | supported |
-| `reserveOverlayWidth`, `onDidChangeReservedOverlayWidth` | View context (E050 row 7).                            | Never coalesced.                               | find, minimap          | supported |
+| `setScrollPosition`, `revealLine`                        | View context. Updates both axes.                      | —                                              | find, diff             | supported |
+| `reserveOverlayWidth`, `onDidChangeReservedOverlayWidth` | View context.                                         | Never coalesced.                               | find, minimap          | supported |
 | `registerWheelScrollTarget`                              | External overlay joins native scrolling.              | Dispose with the contribution.                 | find widget            | supported |
 | `Editor.onDidScroll`                                     | Host.                                                 | After the virtualizer folds the scroll in.     | Platform               | host      |
 
@@ -145,7 +142,7 @@ exported), **host** (the host's API, not a plugin hook), **proposed** (lands exp
 | `handleEditorChange(null)`                           | Decoration and feature contributions on replacement. | —                                                           | diff, merge conflicts   | supported |
 | `onChange`, `onInitialPaint`, `onPresentationChange` | Host options.                                        | —                                                           | Platform                | host      |
 | Open, save, dirty state, file identity               | Host.                                                | —                                                           | Platform                | host      |
-| Document-scoped contributions                        | —                                                    | —                                                           | —                       | Plan 099  |
+| Document-scoped contributions                        | —                                                    | —                                                           | —                       | gap       |
 
 ### View lifecycle
 
@@ -176,7 +173,7 @@ Text reaches the document from five sources, the `pendingTextSource` values in
 
 `registerKeymapNode` attaches a widget element below the Editor focus node and installs its named commands. The host supplies the binding table. Standalone widgets can use `createEditorWidgetKeymap` to own a base dispatcher. Contributions dispose their node registrations with their lifecycle.
 
-The modal example exports `modalPack` and contributes live `modalNormal`/`modalInsert` identifiers. Its grammar executes through `example.modal.stroke`; `keyParticipant` and its capture listener have been removed.
+The modal example exports `modalPack` and contributes live `modalNormal`/`modalInsert` identifiers. Its grammar executes through `example.modal.stroke`.
 
 ### Text commit gate (experimental)
 
@@ -192,5 +189,5 @@ VS Code lets an extension overwrite the `type` command and keeps `default:type` 
 ([coreCommands.ts:2153](https://github.com/microsoft/vscode/blob/c1c5b32e3fd5a2f3922ea20d7d65055b8b4c47e2/src/vs/editor/browser/coreCommands.ts#L2153)).
 Here the loop is `InputSelectionController`, 3,758 lines owning two input routes, composition,
 hidden-input reconciliation, auto-closing, snippets and linked editing. A replacement inherits all of
-that or breaks it, and two owners of one `beforeinput` is the failure E027 must rule out. The command and
-text gate express the bounded E028 grammar without it.
+that or breaks it, and two owners of one `beforeinput` is the failure a hook must rule out. The command and
+text gate express the bounded modal grammar without it.

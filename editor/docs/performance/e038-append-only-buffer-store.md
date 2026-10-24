@@ -1,14 +1,14 @@
-# E038 append-only buffer store
+# Append-only buffer store
 
-E038 is complete on 2026-09-16. Inserting text into `@singapore-editor/textbuffer` costs the text
+Inserting text into `@singapore-editor/textbuffer` costs the text
 itself: the chunk store is one append-only log per lineage, appended in place on a linear history
 and copied once per branch point, and an insert fills the newest chunk before it opens another, so
 chunk count follows text volume rather than edit count. The structural counters that prove it gate
 `bench:check`, and a branch-heavy lane measures the one copy that remains.
 
-The inspected baseline was `69dfef7425539165ec05a457bd6f0516fb6607fa`, on top of the E037 commits
+The inspected baseline was `69dfef7425539165ec05a457bd6f0516fb6607fa`, on top of the textbuffer edit allocations commits
 at `16736ad`. The execution plan has been removed; the
-[E037 report](e037-textbuffer-edit-allocations.md) records the starting point and the
+[textbuffer edit allocations report](e037-textbuffer-edit-allocations.md) records the starting point and the
 [ablation](#measured-results) below records the ceiling the plan asked for first.
 
 ## Contracts that remain
@@ -18,7 +18,7 @@ at `16736ad`. The execution plan has been removed; the
   spans two chunks, so `(buffer, start)` is still the insertion identity the reverse index and
   anchors are keyed by. This is what keeps the deleted-anchor edge rules, which read same-buffer
   neighbours as the gap edges, meaning the same thing they meant with one chunk per insert. The
-  plan's "keys per chunk grow" premise for E039 did not happen; its plan is corrected.
+  plan's "keys per chunk grow" premise for reverse-index cost did not happen; its plan is corrected.
 - The log is `{ chunks, chunkOfBuffer, lineIndexes }`, shared by every snapshot of a lineage and
   internal to `buffers.ts`. A snapshot's `PieceBufferChunkView` holds its extent: chunk count,
   tail length and buffer count. `get` resolves an id below the extent through `chunkOfBuffer` and
@@ -37,7 +37,7 @@ at `16736ad`. The execution plan has been removed; the
   `buffers.lineIndexes`. A chunk only grows at its end, so an index scanned for a shorter version
   is a valid prefix and a longer one serves shorter extents by clamping. A fork shares an index
   only when the chunk string is final and fully scanned, and trims a copy otherwise. The text
-  identity check and the per-store-version retention map from E037 are gone; the log's contract
+  identity check and the per-store-version retention map from textbuffer edit allocations are gone; the log's contract
   replaces them.
 - The inspector checks the store extent against `nextBufferSequence` and `chunks.size` and that
   no append chunk exceeds `BUFFER_CHUNK_SIZE`, next to its per-chunk line-index checks.
@@ -87,7 +87,7 @@ Two lanes read slower and both were chased before acceptance:
   lookup. Twelve full reads of a 400 KB document pay 0.17 ms for it; the edit lanes above are
   the trade.
 
-Ablation ceiling from step 1, measured in-process on the E037 build with the page copies stubbed
+Ablation ceiling from step 1, measured in-process on the textbuffer edit allocations build with the page copies stubbed
 to in-place mutation (linear lanes only): `random-insertions` 22%, `eight-cursor-batches` 20%,
 `sequential-typing` 6%, `mixed-edit-churn` 5%, `large-paste-delete` 0%. The final result beats
 the ceiling on churn (-26%) because filling also removes a chunk object, a line index and a map
@@ -146,20 +146,20 @@ place; and deleted anchors inside a shared chunk take their gap edges from their
 ## Found on the way
 
 A deleted anchor whose tombstone has no same-buffer neighbour resolves to 0 with left bias and to
-the document end with right bias, on the E037 build as much as here, because the edge rules fall
+the document end with right bias, on the textbuffer edit allocations build as much as here, because the edge rules fall
 back to infinite orders when no neighbour exists. Every deletion of a whole insert hits it, and
-the linear resolver shares the code, so no test sees it. It is unchanged by E038 and recorded in
-[E039](e039-reverse-index-cost.md), which redesigns the neighbour lookup.
+the linear resolver shares the code, so no test sees it. It is unchanged by append-only buffer store and recorded in
+[reverse-index cost](e039-reverse-index-cost.md), which redesigns the neighbour lookup.
 
 ## Left for the successors
 
 - The tail chunk is a cons string while it grows and V8 flattens it on the first read after each
-  append, one copy of up to 16K units per read-after-write. Typing already paid this in E037; the
+  append, one copy of up to 16K units per read-after-write. Typing already paid this in textbuffer edit allocations; the
   fill path now pays it for every insert. It is the cost behind the full-read lane above.
 - A fork copies the id map, one slot per buffer id in the lineage. A paged map would make that
   logarithmic; the branch lane is the place to see whether it ever matters.
-- [E006](../storage/e006-tombstone-compaction.md) needs to swap the log for a compacted one. The
+- [text reclamation](../storage/e006-tombstone-compaction.md) needs to swap the log for a compacted one. The
   log is internal to `buffers.ts` and every read goes through a view, so a generation swap is a
   new log plus new views, not a second copy path.
 - The reverse index still copies a path per write and now keys one small range per insert, not
-  per chunk. That is [E039](e039-reverse-index-cost.md).
+  per chunk. That is [reverse-index cost](e039-reverse-index-cost.md).

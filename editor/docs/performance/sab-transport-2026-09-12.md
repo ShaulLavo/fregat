@@ -1,6 +1,6 @@
 # SAB transport measurements, 2026-09-12
 
-The contribution refactor will use ordinary strings and retained chunks with incremental edits,
+The editor uses ordinary strings and retained chunks with incremental edits,
 keep the existing separate workers, and remove Tree-sitter's SAB text transport. Shared document
 storage and worker co-location are outside the refactor. The separate atomic cancellation flag stays.
 
@@ -9,26 +9,22 @@ It reduces synchronous `postMessage` duration, but encoding and worker decoding 
 Four synthetic direct readers improved in both runs; one reader regressed. Those conditional savings
 do not justify shared document storage's representation, synchronization, and lifetime complexity.
 
-These are instrumented worker-request measurements, not input-to-paint measurements or a completed
-E009 evaluation. Production code was not changed.
+These are instrumented worker-request measurements, not input-to-paint measurements or a complete
+evaluation of worker transport costs. Production code was not changed.
 
-## Decision, 2026-09-25
+## Outcome
 
-Decided 2026-09-25: owner — delete the SAB text transport. After the transport fixes it runs at the
-same speed as the string path and never got faster; the numbers below predate those fixes.
+The SAB text transport is deleted. After the transport fixes it ran at the same speed as the string
+path and never got faster; the numbers below predate those fixes.
 
-- E057 deleted it on 2026-09-26, ahead of Platform
-  [Plan 099](https://github.com/ShaulLavo/fregat/blob/main/plans/099-document-contributions.md): source chunks reach the
+- Source chunks reach the
   worker as strings only, the `useSharedBuffers` option and the transport comparison benchmarks are
   gone, and the atomic cancellation flag stays. `bench:syntax` (Bun, string path both times) was
   unchanged: 100,000-line initial total 1,233 / 1,187 ms before and 1,188 / 1,181 ms after, the
   200-fence edit 7.8 / 7.2 ms before and 9.3 / 6.8 ms after.
-- E010 (shared allocator and hash map), E012 (epoch reclamation) and E013 (shared document
-  snapshots) are closed as no-go for this reason. Their plans are in git history before this
-  commit.
-- E009 (worker transport costs) is folded into Plan 099 unit 6 and closed in the Editor backlog.
-- E011 (packed piece tree) is parked under Platform
-  [Plan 112](https://github.com/ShaulLavo/fregat/blob/main/plans/112-large-file-ceiling.md), revived only if 112 shows piece
+- A shared allocator and hash map, epoch reclamation and shared document snapshots are not
+  pursued, for this reason.
+- A packed piece tree is parked. It becomes worth revisiting only if measurement shows piece
   memory dominates.
 
 ## Current Tree-sitter path
@@ -118,9 +114,9 @@ The common API does not require identical payloads or another worker. Keep bound
 clipped line summaries, and LSP serialization behind consumer-specific adapters. Shared document
 storage, immutable shared pages, and worker co-location are excluded from this work.
 
-The text-transport decision is settled. Broader latency, memory, and result-representation research
-remains incomplete under E009. E010 through E013 are deferred independent research and require an
-explicit decision to revisit shared document storage. These measurements and the prototype remain
+Broader latency, memory, and result-representation research
+remains incomplete. A shared allocator, epoch reclamation and shared document snapshots are
+deferred; revisiting shared document storage needs a new decision. These measurements and the prototype remain
 available as evidence, without making shared storage a prerequisite for the contribution refactor.
 
 ## Method and reproducibility

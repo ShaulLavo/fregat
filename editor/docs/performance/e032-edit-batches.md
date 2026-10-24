@@ -1,6 +1,6 @@
-# E032 incremental edit-batch rendering
+# Incremental edit-batch rendering
 
-The inspected baseline is `64926519bfdd39f4afcfae225019a932d3e27785`. E031 had already
+The inspected baseline is `64926519bfdd39f4afcfae225019a932d3e27785`. Projection had already
 removed full-document materialization from the batch fallback. A sparse batch at that revision
 calls `VirtualizedTextView.setText` and resets the display projection. It reads bounded viewport
 text, but discards all installed tokens and collapsed folds. The before measurements record
@@ -83,7 +83,7 @@ earlier runtime with two reads. The full-position query is the positive measurem
 All 110 BiDi geometry tests and 185 view, geometry, and provisional-paint tests pass.
 
 [Final-source evidence](e032-ci-final-validation.json.gz) records a fresh frozen package from
-`1d7f7cc`, 300 source samples and 100 browser samples across all ten E032 groups, and twenty
+`1d7f7cc`, 300 source samples and 100 browser samples across all ten edit batches groups, and twenty
 separate diagnostic samples. The browser runner rebuilt that package before capture. Active
 source, frozen source, and rebuilt output match the recorded hashes. All source diagnostics
 have zero full-text reads, projection resets, and unchanged-gap reads. All browser diagnostics
@@ -105,7 +105,7 @@ selection synchronization and mounted DOM reconciliation. It uses happy-dom with
 plugins. Timing samples disable diagnostics; one separate instrumented sample follows each
 group. Every sample checks the exact resulting document and all mounted text-node parts.
 
-The seeded E001 fixtures are ordinary code (200 lines), a 1,048,594-code-unit long line, and
+The seeded stress harness fixtures are ordinary code (200 lines), a 1,048,594-code-unit long line, and
 500,000 short lines (12,834,064 code units). A single edit inserts `prefix\n` at offset zero.
 The sparse batch additionally inserts `\nsuffix` at the original document end. Both edits
 address the original snapshot. Decorated ordinary and short-line groups install 199 and
@@ -127,7 +127,7 @@ fixtures allow at most 16 KiB of requested snapshot text, 4,096 code units per r
 projection entries, 64 cached rows and one final view notification. Those are work bounds for
 these fixtures, not calibrated latency budgets. Source-index scans are reported separately.
 
-The browser companion uses the built package and the existing E001 Playwright request routing.
+The browser companion uses the built package and the existing stress harness Playwright request routing.
 It opens no listening server. Each sample starts with an already painted editor, performs the
 same programmatic edit, then captures the final prefix row. Decorated groups additionally capture
 source row 2, which contains a retained token, and require at least 20 chromatic pixels. Protocol 3
@@ -180,7 +180,7 @@ The frozen reviewed candidate at `/work/tmp/e032-reviewed/packages/editor` passe
 source-work bound and every strengthened browser preservation check. Source capture contains
 two runs of 30 measured samples after five warmups per group, or 600 measured samples per
 revision. Its baseline captures are retained because the source harness is unchanged; candidate
-captures use the E032 runtime at `fe21ebd`. Both browser revisions were recaptured with protocol 3,
+captures use the edit batches runtime at `fe21ebd`. Both browser revisions were recaptured with protocol 3,
 in baseline → candidate → candidate → baseline order. Each browser run contains ten measured
 samples after two warmups per group, or 200 measured samples per revision. Each run also has
 one separate diagnostic sample per group. The machine is an Intel Core i7-14700K with Bun 1.4.0,

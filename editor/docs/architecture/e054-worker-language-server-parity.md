@@ -1,6 +1,6 @@
-# E054: the TypeScript worker at language-server parity
+# The TypeScript worker at language-server parity
 
-Completed 2026-09-25. `@singapore-editor/typescript-lsp` answers every method Platform gets from its
+`@singapore-editor/typescript-lsp` answers every method Platform gets from its
 server-side TypeScript backend, loads its standard library without the network, takes project files
 one at a time, and reports its own crash the way a server process does. The Editor demo renames
 across files, applies a quick fix, formats, and shows an outline with no server running.

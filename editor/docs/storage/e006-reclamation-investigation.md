@@ -1,11 +1,11 @@
-# E006 reclamation investigation
+# Reclamation investigation
 
 Measured 2026-09-22 against Editor `6656eb7113040f7489a15f4c6e2293e511a55edd`.
 The initial working tree was clean. This records the first investigation and its rejected
 tombstone-removal candidate. Its broad stop conclusion was corrected on 2026-09-23:
 the [automatic text reclamation](e006-text-reclamation.md) preserves position metadata,
 passes retained-anchor/snapshot checks and reduces measured heap in Bun and Chromium.
-[Tombstone compaction](e006-tombstone-compaction.md) completed E006 on 2026-09-25 with an
+[Tombstone compaction](e006-tombstone-compaction.md) completed text reclamation on 2026-09-25 with an
 equivalent compact representation, so the lifetime handles proposed below were not needed. The
 rest of this report records the original observations and proposal.
 
@@ -19,14 +19,14 @@ bun run --cwd packages/editor bench:reclamation > examples/stress/results/reclam
 bun run --cwd packages/editor test test/reclamation-proof.node.test.ts test/pieceTable-anchors.test.ts test/pieceTable-snapshot.test.ts test/documentSession.test.ts
 ```
 
-The [runner](../../packages/editor/bench/reclamation-run.ts) uses E001's seeded ordinary
+The [runner](../../packages/editor/bench/reclamation-run.ts) uses the stress harness work's seeded ordinary
 document, three real view sessions, and the real buffer edit/history path. Each cycle inserts
-and deletes a 1,024-code-unit paragraph at offset 7. This amplifies E001's four-code-unit
+and deletes a 1,024-code-unit paragraph at offset 7. This amplifies the stress harness work's four-code-unit
 churn payload to expose text retention. An initial extra cycle supplies an external deleted
 anchor and an inserted-state snapshot. Another snapshot is pinned every 100 cycles.
 
 Every seed/workload runs in its own Bun subprocess after warmup. Each run checks retained
-snapshot readability, deleted-anchor resolution, current text, and E005 invariants. It then
+snapshot readability, deleted-anchor resolution, current text, and tree-invariant invariants. It then
 releases external snapshot references, clears history, and marks the current state clean.
 The zero-history control never retains undo states in the first place.
 
@@ -54,7 +54,7 @@ marking clean:
 
 The other two seeds reproduce the same node and stored-text growth. At 5,000 cycles their
 post-clear heap deltas are 11,637,386 B and 11,611,767 B. All runs have one history node after
-clearing, no E005 issue, and 1,024 bytes of line-index capacity. GC deltas are approximate:
+clearing, no tree-invariant issue, and 1,024 bytes of line-index capacity. GC deltas are approximate:
 one small run's heap reading rises slightly after pin release, so a single delta is not a
 reclamation assertion.
 
@@ -78,7 +78,7 @@ to a session.
    `old`, delete it, and insert `NEW` at its former position. The current text is
    `prefix NEWsuffix`. The anchors resolve to deleted offsets **7 and 10**. After removing
    tombstones they both resolve to **0**. The visible text is identical, the original retained
-   snapshot remains readable, and **E005 still reports no invariant issue**. Tree validity
+   snapshot remains readable, and **tree-invariant still reports no invariant issue**. Tree validity
    does not prove external-anchor validity. Keeping the buffer log also reclaims no text.
 2. Fork twice from the same snapshot and insert `AAA` and `BBB` at the same position.
    Both anchors have identical public fields and both snapshots share `buffers.identity`,
@@ -118,11 +118,11 @@ the old log leaves the largest measured storage cost intact.
 
 Keeping every deleted-position record can preserve structural anchor values, but the
 records still grow with every distinct deleted insertion. Redacting text while keeping
-all those records is a possible narrower improvement; it does not satisfy E006's bounded
+all those records is a possible narrower improvement; it does not satisfy the text reclamation work's bounded
 piece-count outcome. It also needs a textless-piece representation because current piece
 bounds, original-offset lookup, line indexes, and the inspector assume text-backed pieces.
 
-The proposed route to full E006 is **explicit lifetime ownership**, including the host
+The proposed route to full text reclamation is **explicit lifetime ownership**, including the host
 callers. This is a proposed API direction, not a checked or implemented contract:
 
 1. Give storage branches/generations opaque identities independent of dense numeric buffer
@@ -152,8 +152,8 @@ After that contract lands, the observed churn fixture supplies an initial memory
 after releases, retained text and nodes must plateau as cycle count grows. Use a bound
 derived from live pieces, explicitly protected records and chunk slack, rather than
 historical edit count. These observations do not establish a browser pause budget.
-Calibrate E001/E002 on the target browser before selecting a maintenance turn budget,
-and retain the existing E002 p95 input limits.
+Calibrate stress harness/input-latency on the target browser before selecting a maintenance turn budget,
+and retain the existing input-latency p95 input limits.
 
 No scheduler, maintenance API, production representation change, or new setting ships
 from this investigation. Maintenance-boundary undo/redo, prepared-work preservation,
@@ -166,7 +166,4 @@ remain unrun because there is no safe maintenance implementation to test.
 - The focused command above passed 105 tests across four files.
 - Core typecheck and repository formatting check passed.
 - Repository lint exited successfully with four warnings in unchanged files.
-- The backlog checker still reports broken links/status metadata in unchanged E030,
-  E033, E036, E047 and E051 entries. E006's new local links resolve. Those unrelated
-  backlog repairs are outside this investigation.
 - Diff whitespace checks passed. There are no production source changes.

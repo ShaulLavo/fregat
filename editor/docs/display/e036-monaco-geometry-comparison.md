@@ -1,6 +1,6 @@
-# E036: Monaco's view mechanisms against the calculated geometry path
+# Monaco's view mechanisms against the calculated geometry path
 
-Completed on 2026-09-24. Planned against `5f68ce6` (2026-09-14), measured on `10b0ac4` and later
+Planned against `5f68ce6` (2026-09-14), measured on `10b0ac4` and later
 in Chromium 148 through Playwright. Monaco's mechanisms were the control, not the spec.
 
 Each of the six candidates ended in a measured decision. Three went in: monospace verification
@@ -44,7 +44,7 @@ per font and style.
 
 Proportional fonts still misplace what is estimated from `characterWidth` outside row geometry:
 soft-wrap column counts and the spacers of windowed long rows.
-[E052](https://github.com/ShaulLavo/fregat/blob/main/plans/e052-proportional-font-extents.md) plans the fix.
+[proportional font extents](https://github.com/ShaulLavo/fregat/blob/main/plans/e052-proportional-font-extents.md) plans the fix.
 
 ## Re-measuring when the face changes
 

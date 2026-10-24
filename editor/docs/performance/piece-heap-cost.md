@@ -53,5 +53,5 @@ and would relabel the whole tree far more often.
 A survey of the tree-shape-dependent code (about 1,700 lines) found nothing a B-tree would delete
 except the rotations: epochs, orders and relabelling, stand-ins, `subtreeMinBuffer` gap scans and
 the one-descent landing rules all carry over, and `hideVisibleRange` with a pending replacement
-becomes a multi-leaf rewrite. [E039](e039-reverse-index-cost.md) already found path-copy bytes
+becomes a multi-leaf rewrite. [reverse-index cost](e039-reverse-index-cost.md) already found path-copy bytes
 lowest for a binary tree; a wide leaf copies its whole row per edit, so retained history grows.

@@ -8,7 +8,7 @@ Explicit colors are necessary: Firefox and WebKit resolve a colorless highlight 
 
 ## Verification
 
-E053 completed September 25, 2026. Core tests: 2,789; LSP plugin: 416; Find: 102. All three browser engines pass the paint suite in CI. Platform scenarios `editor-lsp-deprecated` and `editor-lsp-unnecessary` passed in Chromium and Firefox; screenshots show a syntax-colored strike and a faded unused name.
+Diagnostic overlays completed September 25, 2026. Core tests: 2,789; LSP plugin: 416; Find: 102. All three browser engines pass the paint suite in CI. Platform scenarios `editor-lsp-deprecated` and `editor-lsp-unnecessary` passed in Chromium and Firefox; screenshots show a syntax-colored strike and a faded unused name.
 
 Local typing benchmark (median/p95): original empty mask 0.194/0.295 ms; current empty mask 0.188/0.296 ms; mask over 10% of the viewport 0.332/0.416 ms. DOM timing measures update work; pixel tests validate browser painting.
 

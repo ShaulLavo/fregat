@@ -38,7 +38,7 @@ Without a directory argument, that command prints only the manifest. Generated d
 belong in Git. `results/manifest.json` pins the seed, generator version, UTF-8 bytes, UTF-16 length,
 normalized line count, longest line, search count, and SHA-256 for every fixture.
 
-## Full-text boundary workload (E033)
+## Full-text boundary workload (full-text boundary)
 
 `node boundary.mjs --output /work/tmp/editor-e033/boundary/run.json` opens two views over a
 document fragmented by 32 replacements at 65,536, 4,194,304 and 50,331,648 units. The content above
@@ -58,7 +58,7 @@ capture a screenshot before input. Their results also report each worker's post-
 separately from the main renderer. Worker `backingStorageSize` includes ArrayBuffers and
 external strings; it is not a measurement of live WASM trees alone.
 
-## Row geometry workload (E036)
+## Row geometry workload (Monaco geometry comparison)
 
 `node geometry.mjs --output /work/tmp/editor-e036/run.json` opens one 900x600 view over 3,000-line
 fixtures: Go indented with tabs and the same text with four spaces, both again padded to 180 columns,
@@ -153,14 +153,14 @@ or interrupted run does not replace the requested result file.
 
 ## First text and highlighted paint
 
-Build the public packages, then run the E003 open matrix:
+Build the public packages, then run the first-paint open matrix:
 
 ```sh
 bun run stress:build
 bun run --cwd examples/stress bench:first-paint --output /work/tmp/editor-e003/before.json
 ```
 
-The runner opens the E001 ordinary and 500,000-line fixtures, with and without the real
+The runner opens the stress harness ordinary and 500,000-line fixtures, with and without the real
 TypeScript plugin, directly and through ready prepared documents. Each configuration has fresh
 browser contexts for cold samples and one unrecorded open before warm samples. Prepared stages
 use the existing one-shot transfer contract and an initial 4,096-character query. Preparation
@@ -190,7 +190,7 @@ source changes during a run and writes the output only after every sample succee
 
 ### Snapshot indentation folding
 
-E034 adds `--fallback-cases` to exercise folding and 36 trusted keyboard inputs on the seeded
+Snapshot indentation folds adds `--fallback-cases` to exercise folding and 36 trusted keyboard inputs on the seeded
 500,000-line document. The [implementation report](../../docs/performance/e034-snapshot-indentation-folds.md)
 separates production latency from diagnostic work counts, ready preparation, and cold fold commands.
 
@@ -227,20 +227,20 @@ Frame and screenshot-completion times remain separate secondary measurements. Th
 
 ## Hidden retained views
 
-Build the public packages, then run the focused E004 measurement:
+Build the public packages, then run the focused hidden-rendering measurement:
 
 ```sh
 bun run stress:build
 bun run --cwd examples/stress bench:hidden --expect-suspended --output /work/tmp/editor-e004/result.json
 ```
 
-The runner reuses E001 fixtures, document churn, and the browser entry. It records initial and
+The runner reuses stress harness fixtures, document churn, and the browser entry. It records initial and
 measured row counts, CSS ranges per view, retained memory, and reveal timing without a selection
 or edit to force repaint. Three repetitions use one fresh context per fixture, followed by two
 warm repetitions. `--core-dist PATH` measures a preserved build; its package dependencies must
 remain resolvable from that directory. Omit `--expect-suspended` to measure the old behavior.
-The [E004 results](results/hidden-rendering.md) include matching baseline, unchanged control, and
-candidate artifacts. Their reveal measurements are separate from E001's original latency limits.
+The [hidden-rendering results](results/hidden-rendering.md) include matching baseline, unchanged control, and
+candidate artifacts. Their reveal measurements are separate from the stress harness work's original latency limits.
 
 ## CPU profiling
 

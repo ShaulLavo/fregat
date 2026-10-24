@@ -1,6 +1,6 @@
-# E007: Consumer text copies
+# Consumer text copies
 
-Implemented against Editor `4c03e0d`, 2026-09-20. The production change is in
+The production change is in
 [`ShikiHighlighterSession`](../../packages/editor/src/shiki/workerClient.ts).
 The full-document copy inventory found one justified change: catch-up after skipped
 Shiki updates. Ordinary find, minimap, and incremental LSP updates already avoid flattening.
@@ -22,19 +22,19 @@ No worker transport format, public export, host save path, or settings contract 
 
 | Consumer                                                                  | Normal path                                                          | Whole-text boundary and retention                                                                                                                                                                                  | Decision                                                                                                        |
 | ------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| [Text snapshots](../../packages/editor/src/documentTextSnapshot.ts)       | Piece-backed range and chunk reads                                   | Supplied strings can be reused. New materializations are not cached by the snapshot. E033 removed the lazy `fullText` properties.                                                                                  | Keep extraction explicit; E033 removed the getters.                                                             |
+| [Text snapshots](../../packages/editor/src/documentTextSnapshot.ts)       | Piece-backed range and chunk reads                                   | Supplied strings can be reused. New materializations are not cached by the snapshot. Full-text boundary removed the lazy `fullText` properties.                                                                                  | Keep extraction explicit; full-text boundary removed the getters.                                                             |
 | [Shiki client](../../packages/editor/src/shiki/workerClient.ts)           | Valid edits and catch-up diffs send range edits                      | Initial open and worker replacement serialize one current document. The session retains its acknowledged piece snapshot and packed tokens.                                                                         | Remove the two catch-up materializations and the redundant whole-text payload.                                  |
 | [Shiki tokenizer](../../packages/editor/src/shiki/tokenizer.ts)           | Applies edits to worker-owned line/token state                       | The worker retains its own flat `code` plus line states. Its string slicing and grammar cost remain. Owner disposal terminates the worker.                                                                         | Keep the existing tokenizer representation. This measurement does not justify a worker storage rewrite.         |
-| [Find](../../packages/find/src/search.ts)                                 | Proven line-local searches read bounded line windows                 | Multiline literals and regexes not proven line-local need larger windows. Results retain offsets, not a private document copy.                                                                                     | No consumer rewrite. Matcher changes remain E008.                                                               |
-| [Find adapter](../../packages/find/src/plugin.ts)                         | Uses `snapshot.textSnapshot`                                         | E033 made the text source required; no `fullText` fallback remains.                                                                                                                                                | Done in E033.                                                                                                   |
-| [Minimap](../../packages/minimap/src/workerClient.ts)                     | Snapshot ranges supply clipped line summaries; edits patch summaries | Initial summaries allocate a line-start array and clipped line strings. Missing-source fallbacks materialize text. Pending updates retain snapshots until consumed; worker document state is released on disposal. | Normal production path passed without full reads. Keep bounded summaries; implicit-source removal remains E033. |
-| [Tree-sitter source](../../packages/tree-sitter/src/treeSitter/source.ts) | Piece descriptors and retained worker chunks                         | Shared chunks decode once; strings/chunks remain under the existing document-epoch retention protocol.                                                                                                             | No per-edit flattening found. Transport choices remain E009.                                                    |
+| [Find](../../packages/find/src/search.ts)                                 | Proven line-local searches read bounded line windows                 | Multiline literals and regexes not proven line-local need larger windows. Results retain offsets, not a private document copy.                                                                                     | No consumer rewrite. Matcher changes remain in-buffer search.                                                               |
+| [Find adapter](../../packages/find/src/plugin.ts)                         | Uses `snapshot.textSnapshot`                                         | full-text boundary made the text source required; no `fullText` fallback remains.                                                                                                                                                | Done in full-text boundary.                                                                                                   |
+| [Minimap](../../packages/minimap/src/workerClient.ts)                     | Snapshot ranges supply clipped line summaries; edits patch summaries | Initial summaries allocate a line-start array and clipped line strings. Missing-source fallbacks materialize text. Pending updates retain snapshots until consumed; worker document state is released on disposal. | Normal production path passed without full reads. Keep bounded summaries; implicit-source removal remains full-text boundary. |
+| [Tree-sitter source](../../packages/tree-sitter/src/treeSitter/source.ts) | Piece descriptors and retained worker chunks                         | Shared chunks decode once; strings/chunks remain under the existing document-epoch retention protocol.                                                                                                             | No per-edit flattening found. Transport choices remain worker transport.                                                    |
 | [LSP positions](../../packages/lsp/src/positions.ts)                      | Snapshot positions and incremental change arrays                     | Full sync, missing edits, invalid edits, and length mismatch serialize the authoritative next snapshot once.                                                                                                       | Preserve recovery; add diagnostics assertions for each reason.                                                  |
 | [LSP document sync](../../packages/lsp-plugin/src/documentSync.ts)        | Composes changes from the retained edit chain                        | A gap or uncomposable chain sends full text. Active descriptors retain the current snapshot, not a newly cached string.                                                                                            | Verify the 128-entry retention boundary and logical revision count.                                             |
 
 Initial-open reads are recorded separately from edit reads. A full read of an already
 supplied string is not proof of an allocation. The combined fixture reports three full
-reads while opening, then zero through typing, undo, and find. E033 owns the remaining
+reads while opening, then zero through typing, undo, and find. Full-text boundary owns the remaining
 implicit attachment/provider getters; this change does not rename or remove those APIs.
 
 ## Reproduction
@@ -100,7 +100,7 @@ capture shows 12,288 matches and a painted minimap.
 
 The [saved evidence](../../examples/stress/results/e007/README.md) includes the final
 `verified-control-copies.json` and `verified-candidate-copies.json` timing runs,
-read counters, combined consumers, and E001 results. Screenshots and exploratory runs
+read counters, combined consumers, and stress harness results. Screenshots and exploratory runs
 remain in `/work/tmp/editor-e007/`. The first matching timing pair independently observed
 114.45 ms to 8.25 ms catch-up and 708 MB to 54 MB sampled request heap.
 
@@ -109,30 +109,23 @@ remain in `/work/tmp/editor-e007/`. The first matching timing pair independently
 Focused snapshot, edit-chain, real-worker, LSP position/client, and document-sync checks passed
 96 tests. A separate rerun passed the queued-request test after its gate was tightened.
 Core, LSP, LSP-plugin, and stress typechecks passed, as did focused lint and formatting.
-The backlog verifier reports two pre-existing missing links, in E030 and E036, and no E007 errors.
 
-E001 passed all 72 samples per build for ordinary and 500,000-line documents through open,
+Stress harness passed all 72 samples per build for ordinary and 500,000-line documents through open,
 jump, typing, find, scroll, and shared-view churn. Its next-frame p95 stayed at 15–16 ms,
 slightly lower in every candidate group. Cold input-to-applied p95 rose by 0.1 ms on ordinary
 text and 0.2 ms on short lines; warm values were unchanged or lower. This is not a calibrated
-whole-editor speedup claim. E001's typing path has no Shiki plugin; the catch-up benchmark
+whole-editor speedup claim. The stress harness work's typing path has no Shiki plugin; the catch-up benchmark
 provides the evidence for the changed code. One warm churn sample in each build retained one
-weakly tracked object at E001's observation point; the dedicated disposal checks retained none.
+weakly tracked object at the stress harness work's observation point; the dedicated disposal checks retained none.
 
 The development API was down. The mesh browser drive typed 300 characters and undid them,
 and its screenshot was inspected. Evidence is
 `/work/tmp/fregat-evidence/20260920T124010Z-trace-editor-type-burst/`, compared with
 `20260920T121934Z-trace-editor-type-burst`. A concurrent archive-lifecycle release changed
 Platform between those captures, so the app trace is functional evidence, not causal timing
-evidence for E007. Neither drive reported page errors or warn/error application logs.
-
-Release `20260920T123935Z-02885149-editor-e007` passed the production live check. It preserves
-the previously deployed archive-lifecycle web changes and reuses that release's server bundle,
-without a server restart. An earlier isolated build briefly omitted those web changes and was
-rolled back before this final deployment. Platform source was not changed by the deployment;
-its sole documentation edit redirects the completed E007 backlink in Plan 099.
+evidence for consumer-copies. Neither drive reported page errors or warn/error application logs.
 
 No claim is made about worker heap size, other browsers, regex speed, or live remote-LSP
 behavior. The original hypothesis that every ordinary consumer flattens on each edit is
-rejected by the combined read counters. E033 can now continue with its explicit API boundary;
-E008 and E009 retain their separate matcher and transport scope.
+rejected by the combined read counters. Full-text boundary can now continue with its explicit API boundary;
+in-buffer search and worker transport retain their separate matcher and transport scope.

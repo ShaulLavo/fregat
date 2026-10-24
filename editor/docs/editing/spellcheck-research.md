@@ -1,6 +1,6 @@
 # Spellcheck for painted text: research findings
 
-Research for [E058](https://github.com/ShaulLavo/fregat/blob/main/plans/e058-spellcheck.md), 2026-09-26, at Editor `74e76be` and Platform
+Research for [spellcheck](https://github.com/ShaulLavo/fregat/blob/main/plans/e058-spellcheck.md), 2026-09-26, at Editor `74e76be` and Platform
 `97bfbf2ba`. Probe scripts, corpora and raw output are in `/work/tmp/research2/spellcheck/`
 (`bench.mjs <engine>`, `vocab.mjs`, `tok.mjs`, `buildtrie.mjs`). The survey clones are in Platform
 `references/` (`cspell`, `cspell-dicts`, `vscode-spell-checker`, `harper`, `codebook`, `zed`).
@@ -140,4 +140,4 @@ extension as a whole is GPL-3.0-or-later; `cspell` and `cspell-trie-lib` are MIT
   ranges, with suggestions and "Add to dictionary" in a tooltip. Obsidian itself relies on
   Electron's native checker.
 - **Neovim** marks tree-sitter nodes with `@spell` and `@nospell` captures, so its built-in checker
-  reads only comments, strings and prose. E058 takes this model.
+  reads only comments, strings and prose. Spellcheck takes this model.

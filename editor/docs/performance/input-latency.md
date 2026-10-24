@@ -1,14 +1,14 @@
 # Input latency measurements
 
-Current paired comparisons use Platform's [paired input runner](../../../docs/document-contributions/paired-input-latency.md). It retains warm package pages, uses fixed historical budgets and key-local balanced two-pair blocks, and collects two or four measured pairs under the strict blocking-only stopping guard. Its sensitivity cache keys on measurement identity. The counterbalanced sampler requires fresh controls, loaded A/A reliability evidence and complete-matrix timings before Plan 282 acceptance. The E002 results below remain historical evidence for their original instrument.
+Current paired comparisons use Platform's [paired input runner](../../../docs/document-contributions/paired-input-latency.md). It retains warm package pages, uses fixed historical budgets and key-local balanced two-pair blocks, and collects two or four measured pairs under the strict blocking-only stopping guard. Its sensitivity cache keys on measurement identity. The counterbalanced sampler requires fresh controls, loaded A/A reliability evidence and complete-matrix timings before Plan 282 acceptance. The input-latency results below remain historical evidence for their original instrument.
 
-E002 was implemented on 2026-09-07. The optimized candidate passes all 108 blocking timing limits
+The optimized candidate passes all 108 blocking timing limits
 and the correctness checks across 10,488 measured input events. One screenshot-duration advisory
 remains visible. The independent unchanged reference passes, and a real 20 ms delay fails all 36
 dispatch groups. Earlier failures and the calibration investigation remain in the recorded results.
 
 The Editor input suite measures native browser events against the built public package.
-It uses the E001 seeded ordinary, 500,000-line, and one-megabyte-line fixtures, with either one
+It uses the stress harness seeded ordinary, 500,000-line, and one-megabyte-line fixtures, with either one
 view or two visible views plus one hidden view. Each scenario has a fresh browser context.
 Warmups and measured repetitions reuse that context; it closes before results are accepted.
 

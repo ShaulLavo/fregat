@@ -1,13 +1,13 @@
-# E045 one pass per edit call
+# One pass per edit call
 
-E045 is complete on 2026-09-17. An edit call now writes with one epoch, walks the tree once per
+An edit call now writes with one epoch, walks the tree once per
 edit and writes the reverse index once, a replacement hides its range and places its text on the
-same descent, and both trees are AVL. Replacements are 6% to 8% faster than the E040 head,
+same descent, and both trees are AVL. Replacements are 6% to 8% faster than the balanced tree head,
 multi-cursor batches 7% to 13%, anchor resolution 17% to 22%. Sequential typing is 7% slower,
 27 ns a keystroke: 0.76x the control in the bench's default regime and 1.15x warmed up. Raw reports are in
 [`e045-evidence.tar.gz`](e045-evidence.tar.gz).
 
-Inspected baseline: the E040 head, `97555fa`, on branch `e045-one-pass-edits`.
+Inspected baseline: the balanced tree head, `97555fa`, on branch `e045-one-pass-edits`.
 
 ## What changed
 
@@ -40,15 +40,15 @@ Inspected baseline: the E040 head, `97555fa`, on branch `e045-one-pass-edits`.
 
 ## Measured results
 
-Standard profile, 9 samples, three seeds, the E040 head in a worktree with the same adapter,
+Standard profile, 9 samples, three seeds, the balanced tree head in a worktree with the same adapter,
 interleaved per seed. The bench's replacement now goes through `applyBatchToPieceTable` with one
 edit, which is the call the editor makes; both trees were measured with that adapter. Two
-regimes, because the E038 and E043 reports found the default two warmups still inside the JIT
+regimes, because the append-only buffer store and one-descent insert reports found the default two warmups still inside the JIT
 transient: milliseconds per lane, median over seeds, ratio to the control of the same regime.
 The control warms up too: an earlier version of this table divided every column by one pooled
 control and showed typing at 0.71x with 8 warmups, where it is 1.15x.
 
-| Lane                          | Control, 2 warmups | E040, 2 warmups | E045, 2 warmups | Control, 8 warmups | E040, 8 warmups | E045, 8 warmups |
+| Lane                          | Control, 2 warmups | balanced tree, 2 warmups | one-pass edits, 2 warmups | Control, 8 warmups | balanced tree, 8 warmups | one-pass edits, 8 warmups |
 | ----------------------------- | -----------------: | --------------- | --------------- | -----------------: | --------------- | --------------- |
 | sequential-typing             |               0.61 | 0.42 (0.70x)    | 0.46 (0.76x)    |               0.37 | 0.39 (1.06x)    | 0.42 (1.15x)    |
 | typing-with-lookups           |               0.92 | 0.63 (0.69x)    | 0.67 (0.72x)    |               0.76 | 0.61 (0.80x)    | 0.64 (0.85x)    |
@@ -60,7 +60,7 @@ control and showed typing at 0.71x with 8 warmups, where it is 1.15x.
 | branch-edits                  |                  — | 0.31            | 0.29            |                  — | 0.28            | 0.25            |
 | anchor-resolution-after-churn |                  — | 0.81            | 0.67            |                  — | 0.65            | 0.51            |
 
-Structural counters, standard profile, against the E040 budgets:
+Structural counters, standard profile, against the balanced tree budgets:
 
 | Lane                 | Tree nodes cloned | Tree nodes touched | Index nodes cloned |
 | -------------------- | ----------------- | ------------------ | ------------------ |
@@ -79,16 +79,16 @@ trace. The reverse index was 31 to 35 as a treap.
   the newest buffer, so it copies two full paths whatever the shape, and the treap's mean depth
   was already close to the AVL's. Balance helped the readers: anchor resolution descends the
   index two or three times and is a fifth faster. The writers need
-  [E039](e039-reverse-index-cost.md)'s redesign, and these numbers are its baseline.
+  [reverse-index cost](e039-reverse-index-cost.md)'s redesign, and these numbers are its baseline.
 - **Typing pays for it.** A keystroke rewrites the entry of the piece it extends, which always
   has the largest key, and the largest key of an AVL tree sits at full depth where a treap often
   had it near the top. In steady state that is 0.179 ms against 0.138 ms for 1,500 keystrokes,
   27 ns each. An editor resolves several anchors per keystroke at 47 ns less each, so the trade
   is kept. The structural fix is a slot outside the tree for the entry being typed into, so a
-  keystroke writes no index path at all; that belongs to E039's deferred-maintenance option.
+  keystroke writes no index path at all; that belongs to the reverse-index cost work's deferred-maintenance option.
 - **Order gaps run out sooner than they should.** On the churn trace the smallest gap between
   neighbouring orders falls from 1,024 to 2e-6 within 100 random edits and reaches the 1e-9 floor
-  near edit 1,000, which forces a relabel of every piece. The E040 head is on the same
+  near edit 1,000, which forces a relabel of every piece. The balanced tree head is on the same
   trajectory and crosses just after the lane's 1,500 edits end, so the first measurement of this
   plan showed churn 6% slower until the relabel stopped rebuilding the index. A relabel is still
   linear in the piece count. Relabelling only the smallest crowded subtree, as order-maintenance
@@ -96,7 +96,7 @@ trace. The reverse index was 31 to 35 as a treap.
 
 ## What remains
 
-- E039: per-buffer index structure or deferred maintenance, plus the typing slot above.
+- reverse-index cost: per-buffer index structure or deferred maintenance, plus the typing slot above.
 - A replacement still snaps its two ends with two read descents before the edit. The hide
   descent visits both ends anyway and could report a cut pair as a retry, as the insert probe
   does. It is 7% of the replacement lane.
@@ -115,7 +115,7 @@ trace. The reverse index was 31 to 35 as a treap.
   snapped ranges reused for their own snapshot and snapped again for another; the index carried
   through a relabel without a rebuild and equal to one; and an edit that runs out of orders.
 - `packages/editor`: 2,675 of 2,676 tests. The one failure, the BiDi drag-selection timing probe
-  at 5.2x against a 5x threshold, fails identically on the E040 head and performs no edits.
+  at 5.2x against a 5x threshold, fails identically on the balanced tree head and performs no edits.
 - `bun run bench:test`: 73 tests with the counter budgets regenerated.
   `bun run bench:height -- --profile standard`: 0 failures. The height harness lost its
   priority-seed sweep with the treaps.

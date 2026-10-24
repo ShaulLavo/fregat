@@ -176,7 +176,7 @@ second validation layer instead of collapsing immediately to a monolithic mapper
   ends (the `breaks` of a wrapped entry, shared with tabbed lines). Building the 500k-line
   `bench:transforms` fixture costs 123 ms against 69 ms for character wrap; the character path is
   unchanged.
-- A proportional face wraps by measured advances (E052): `wrapAdvance` carries the row width in pixels
+- A proportional face wraps by measured advances (proportional font extents): `wrapAdvance` carries the row width in pixels
   and a per-face glyph table read from a canvas, and both break modes place ends where the running
   advance would pass the width less a 1 px margin. Monospace faces never build the table.
 

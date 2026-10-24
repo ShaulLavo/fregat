@@ -1,6 +1,6 @@
-# E034 snapshot indentation folds
+# Snapshot indentation folds
 
-E034 is completed by user acceptance on 2026-09-13. The user accepted the implementation with
+The user accepted the implementation with
 the measured performance limitations below, including the unresolved warm prepared input result.
 Its p95 is 0.9 ms against 1.0 ms for the pooled controls, with an upper difference bound of +0.1 ms.
 Seven of eight primary checks pass. The recorded statistical verdict and thresholds remain unchanged.
@@ -14,15 +14,15 @@ corrections. Those measurements and the first isolated study remain separate fro
 both study reports and the direct-input profile analysis byte for byte.
 
 Snapshot indexing removes repeated whole-document scans from fallback folding.
-The E034 browser comparison measures fallback folding on the same 500,000-line document before
+The snapshot indentation folds browser comparison measures fallback folding on the same 500,000-line document before
 and after the snapshot index. The baseline core is commit
 `88cd55da61e895542cfe248082221cf992be74e5`, exported with `git archive` and rebuilt under
-`/work/tmp/editor-e034/baseline-88cd55d-core`. The archive excludes the uncommitted E034 work.
+`/work/tmp/editor-e034/baseline-88cd55d-core`. The archive excludes the uncommitted snapshot indentation folds work.
 The unrelated LSP changes do not enter this core build.
 
 Earlier pilot runs used `30ae9ec`. Two concurrent viewport fixes, `b4ddbc3` and `6244aca`, then
 changed when attachment measures and renders the initial visible rows. Comparing those pilots
-with the later candidate would attribute viewport work to E034. The final comparison repeats
+with the later candidate would attribute viewport work to snapshot indentation folds. The final comparison repeats
 the baseline and control at `88cd55d`, which includes both fixes. The earlier runs remain under
 `/work/tmp/editor-e034/historical-30ae9` and are excluded from the results below.
 
@@ -70,7 +70,7 @@ map queues the normal render.
 
 ## Original implementation measurements
 
-`--fallback-cases` adds fixed indentation and explicit regions to the existing seeded E003
+`--fallback-cases` adds fixed indentation and explicit regions to the existing seeded first-paint
 fixture. Top-level sections start every 5,000 rows. Nested headers occur every 500 rows, and
 region comments span each section. The generator preserves exactly 500,000 rows and records
 the fixture's SHA-256, `1e1bd3e405a41e11241ad87baacf631e877dccdef975eef36ee9aa59981ce3c9`.
@@ -252,7 +252,7 @@ Prepared adoption records the completed generation's 500,000 historical rows wit
 work. Its separate preparation event accounts for building those facts. Explicit cold fold commands
 are unrestricted synchronous demand, so their diagnostic maximum step is not a background slice.
 
-A separate background control uses the original flat 500,000-line E003 fixture, with 12,834,064
+A separate background control uses the original flat 500,000-line first-paint fixture, with 12,834,064
 code units and no folds. Baseline cold/warm scans take 41.0/36.8 ms in one task and complete
 190.2/186.7 ms after attachment. Candidate cold/warm discovery uses 83.3/95.8 ms of controller
 work and completes 242.3/255.0 ms after attachment. The largest candidate background steps are

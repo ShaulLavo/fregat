@@ -23,7 +23,7 @@ Text lives in a piece table. A piece is a slice of an append-only buffer. A pers
 
 ## Consequences
 
-An edit descends once and rejoins the path on the way back, with no split or merge. Against the treap, random edit lanes are 22% to 34% faster, typing is 17% faster, and tree height is 12 to 15 levels. The measurements are in [E040](../performance/e040-balanced-tree.md).
+An edit descends once and rejoins the path on the way back, with no split or merge. Against the treap, random edit lanes are 22% to 34% faster, typing is 17% faster, and tree height is 12 to 15 levels. The measurements are in [balanced tree](../performance/e040-balanced-tree.md).
 
 Deleted pieces stay in the tree, so the tree only grows. The cost is memory per piece: [heap cost per piece](../performance/piece-heap-cost.md) measures what a piece costs the garbage collector, and [tombstone compaction](../storage/e006-tombstone-compaction.md) shrinks the position metadata of the current snapshot. Deleting a whole document can take O(n), because hiding a subtree visits its visible descendants.
 

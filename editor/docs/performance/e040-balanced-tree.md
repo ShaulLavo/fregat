@@ -1,14 +1,14 @@
-# E040 an AVL sequence tree edited in one descent
+# An AVL sequence tree edited in one descent
 
-E040 is complete on 2026-09-17. The sequence tree is an AVL tree instead of a treap, and an edit
+The sequence tree is an AVL tree instead of a treap, and an edit
 no longer splits and merges: an insert and a delete each descend once and rejoin the path on the
-way back. Every random edit lane is 22% to 34% faster than the E044 head, typing is 17% faster,
+way back. Every random edit lane is 22% to 34% faster than the node summaries head, typing is 17% faster,
 every read lane after churn is 7% to 14% faster, and the tree's height is 12 to 15 levels where
 the treap's was 26 to 33. The plan's own candidate, a balanced tree driven through split and join,
 was measured and rejected: it is slower than the treap. Raw reports are in
 [`e040-evidence.tar.gz`](e040-evidence.tar.gz).
 
-Inspected baseline: the E044 head, `55c4cea`, on branch `e040-balanced-tree`.
+Inspected baseline: the node summaries head, `55c4cea`, on branch `e040-balanced-tree`.
 
 ## The bake-off
 
@@ -48,7 +48,7 @@ Three findings decided the design.
   also maintains `height`, and the summary getters. `priority` is gone from the sequence node and
   `priorityForPiece` from `priority.ts`; `prioritySeed` stays because the reverse index is still
   a treap.
-- `insertAtVisibleOffset` descends once. The landing runs the E043 probe, then places the new
+- `insertAtVisibleOffset` descends once. The landing runs the one-descent insert probe, then places the new
   pieces before, after or inside its piece, and each ancestor rejoins once. A rejoin joins two
   subtrees whose heights differ by at most two, so it is constant work per level. Orders come
   from the landing's neighbours, carried down the descent as a lower and an upper bound.
@@ -67,15 +67,15 @@ Three findings decided the design.
 `PieceBufferChunkView.unitAt` served a view's last tail unit from the log's record of it
 whenever the index matched, including for an older view whose tail chunk was no longer the log's
 last chunk. Inserting into an older snapshot after a newer one had opened a chunk could then
-miss a surrogate pair and cut it. This shipped with E043. The shortcut now requires the chunk to
+miss a surrogate pair and cut it. This shipped with one-descent insert. The shortcut now requires the chunk to
 be the log's last, and `reads.test.ts` holds the regression test. The editor's
 `pieceTable-edits` surrogate sweep is what caught it.
 
 ## Measured results
 
-The final code against the E044 head in a worktree, same method, three seeds.
+The final code against the node summaries head in a worktree, same method, three seeds.
 
-| Lane                          | Control | E044 head    | E040         | Change |
+| Lane                          | Control | node summaries head    | balanced tree         | Change |
 | ----------------------------- | ------: | ------------ | ------------ | -----: |
 | sequential-typing             |    0.61 | 0.52 (0.85x) | 0.43 (0.70x) |   -17% |
 | typing-with-lookups           |    0.93 | 0.73 (0.79x) | 0.63 (0.68x) |   -14% |
@@ -98,7 +98,7 @@ The final code against the E044 head in a worktree, same method, three seeds.
 Anchor resolution is within run variation of the treap; it is bounded by the reverse index, which
 this plan did not touch.
 
-Structural counters, standard profile, from the regenerated budgets against the E044 budgets:
+Structural counters, standard profile, from the regenerated budgets against the node summaries budgets:
 
 | Lane                | Nodes touched (`own`) | Nodes cloned     | Nodes created  |
 | ------------------- | --------------------- | ---------------- | -------------- |
@@ -106,14 +106,14 @@ Structural counters, standard profile, from the regenerated budgets against the 
 | random-replacements | 112,832 to 36,775     | 40,529 to 32,066 | 7,520 to 4,525 |
 | mixed-edit-churn    | 92,506 to 31,010      | 31,838 to 26,445 | 6,960 to 3,993 |
 
-The plan expected clones to fall with height. They fell 9% to 21%, because E041's epochs had
+The plan expected clones to fall with height. They fell 9% to 21%, because the transient edits work's epochs had
 already stopped an edit cloning a node twice. What fell by 60% to 67% is the nodes an edit
 touches and re-summarizes: 12 per insert against 31. An insert performs 0.43 rotations.
 
 Height, standard replay, 4,662 samples, every invariant passing. Maximum sequence-tree height per
-workload, with the treap's figures from the E044 replay:
+workload, with the treap's figures from the node summaries replay:
 
-| Trace               | Pieces | Treap | E040 | Control |
+| Trace               | Pieces | Treap | balanced tree | Control |
 | ------------------- | -----: | ----: | ---: | ------: |
 | random-insertions   |  2,498 | 26–33 |   14 |      14 |
 | random-replacements |  4,437 | 26–33 |   15 |      14 |
@@ -133,12 +133,12 @@ index 27.9%, buffer store and line index 20.8%. Self: `insertReverseIndexNode` 1
 ## What remains
 
 - The reverse index is now the largest single cost of an insert at 28%, with the hottest self
-  frame and a treap 31 to 35 levels tall. [E039](e039-reverse-index-cost.md) is next,
+  frame and a treap 31 to 35 levels tall. [reverse-index cost](e039-reverse-index-cost.md) is next,
   and if it keeps a keyed tree the AVL `join` here applies to it directly.
 - `firstLineBreakAtOrAfter` at 10% is the line-index search a cut pays on chunk 0. Bounding it to
   the piece's own range is a small change.
 - A replacement still descends twice, once to hide and once to insert, and a range delete snaps
-  its two ends with two more descents before it starts. Fusing those is the same move E043 made
+  its two ends with two more descents before it starts. Fusing those is the same move one-descent insert made
   for inserts.
 - A random insertion is 2.1x the mutable control and a replacement 3.0x. The tree itself is no
   longer the gap: the control's tree work and ours are now the same height and one path each.

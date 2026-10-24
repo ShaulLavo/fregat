@@ -1,4 +1,4 @@
-# E006: Automatic text reclamation
+# Automatic text reclamation
 
 Live buffers now reclaim unused portions of original text and append chunks. Logical piece
 coordinates, anchors, snapshots, revision, dirty state and retained undo remain unchanged.
@@ -263,7 +263,7 @@ passes all 108 correctness samples with the same manifests, options, browser, ha
 runtime as the previous borrowed-page run. Of 36 input-to-applied p95 rows, 16 improve, 10 worsen
 and 10 are unchanged. Long-line/multiple-view composition commit is 3.8 → 3.2 ms; ordinary
 multiple-view paste-to-frame remains 16.8 ms. This is one observational run, not the calibrated
-E002 gate. Report analysis near startup and artifact compression during part of the long-line
+input-latency gate. Report analysis near startup and artifact compression during part of the long-line
 section add a further reason not to infer small performance gains.
 
 The [portable Node probe](../../examples/stress/reclamation-paste.md) uses three fresh processes
@@ -299,7 +299,7 @@ Chromium 153, machine and Node version. Input-to-applied p95 observations:
 
 The last case's median stays 1.7 ms; its first commit is slower in two final repetitions.
 That tail is retained in the report, not dismissed as noise. These are observations from one
-baseline run and one final run, not a newly calibrated E002 gate or proof that every latency
+baseline run and one final run, not a newly calibrated input-latency gate or proof that every latency
 improved. Raw compressed baseline, intermediate small-page and final artifacts are kept beside
 the summary.
 

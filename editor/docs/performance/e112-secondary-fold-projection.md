@@ -15,7 +15,7 @@ node examples/stress/boundary.mjs --configs minimap,folds --sizes 10485760 \
   --operations 50 --warmups 10 --key-delay 80 --output /work/tmp/editor-112/run.json
 ```
 
-The E033 workload opens two shared views over 10 MiB of repeating indented functions, with 32
+The full-text boundary workload opens two shared views over 10 MiB of repeating indented functions, with 32
 fragmenting edits before opening. It waits five seconds, captures both views, performs ten warm-up
 keys, then fifty measured native keys. Text export, undo and object release checks all pass.
 This fixture stresses fold count. It does not represent every language or long-line document.

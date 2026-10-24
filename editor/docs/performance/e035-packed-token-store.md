@@ -1,6 +1,6 @@
-# E035 packed token store
+# Packed token store
 
-E035 is complete on 2026-09-17. The document's syntax tokens are one immutable
+The document's syntax tokens are one immutable
 [`EditorTokenStore`](../../packages/editor/src/syntax/tokenStore.ts): packed offsets and palette
 ids, sorted by start. The highlighter contract, the syntax controller, the view, the view snapshot,
 the minimap, sticky scroll, diff, decode and rich-text copy read it; nothing unpacks a document.

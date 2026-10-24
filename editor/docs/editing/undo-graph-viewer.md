@@ -1,10 +1,10 @@
-# E019 undo graph viewer
+# Undo graph viewer
 
-E019 is complete on 2026-09-16. `historyViewer.ts` in the editor package is the framework-neutral
+`historyViewer.ts` in the editor package is the framework-neutral
 model: focus, up to two selected states, a cancellable comparison and a deterministic lane layout.
 The demo app under `examples/app` renders it as a History panel with keyboard traversal, a diff
-between two selected states and an explicit Restore. The execution plan has been removed; the graph
-it browses is [undo-graph.md](undo-graph.md) (E017).
+between two selected states and an explicit Restore. The graph
+it browses is [undo-graph.md](undo-graph.md).
 
 ## Contracts that remain
 

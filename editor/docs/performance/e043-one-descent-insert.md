@@ -1,6 +1,6 @@
-# E043 one descent per insert
+# One descent per insert
 
-E043 is complete on 2026-09-17. An insert used to walk the tree three times to the same offset:
+An insert used to walk the tree three times to the same offset:
 once to see whether the offset splits a surrogate pair, once to find the piece ending there for
 coalescing, and once to split. It now walks once. The split's descent answers the other two
 questions at its landing, and where it can extend the piece ending there it replaces that piece
@@ -9,7 +9,7 @@ lanes are flat to slightly better once warm, and the typing lane pays a cold-JIT
 bench's default regime that turns into a gain with more warmups. Raw reports are in
 [`e043-evidence.tar.gz`](e043-evidence.tar.gz).
 
-Inspected baseline: the E042 head, `b7fea3c`, on branch `e043-one-descent-insert`.
+Inspected baseline: the fixed edit overhead head, `b7fea3c`, on branch `e043-one-descent-insert`.
 
 ## What changed
 
@@ -45,11 +45,11 @@ Inspected baseline: the E042 head, `b7fea3c`, on branch `e043-one-descent-insert
 
 ## Measured results
 
-Standard profile, 9 samples, three seeds, the E042 head in a worktree and the change in the
+Standard profile, 9 samples, three seeds, the fixed edit overhead head in a worktree and the change in the
 checkout, alternating. The default regime is 2 warmups; the warm column is 6 warmups on one
 seed. Milliseconds per lane, ratio to the control's median.
 
-| Lane                 | Control | E042 head, 2 warmups | E043, 2 warmups | E042 head, 6 warmups | E043, 6 warmups |
+| Lane                 | Control | fixed edit overhead head, 2 warmups | one-descent insert, 2 warmups | fixed edit overhead head, 6 warmups | one-descent insert, 6 warmups |
 | -------------------- | ------: | -------------------- | --------------- | -------------------- | --------------- |
 | sequential-typing    |    0.60 | 0.64 1.06x           | 0.70 1.17x +10% | 0.53 1.50x           | 0.50 1.41x -6%  |
 | typing-with-lookups  |    0.93 | 0.89 0.95x           | 0.95 1.02x +7%  | 0.78 1.06x           | 0.76 1.02x -3%  |
@@ -64,7 +64,7 @@ The typing lane at 2 warmups is a JIT transient: the bench times the third repla
 process, `splitByVisibleOffset` is larger now and typing calls it 1,500 times where it called it
 once, and the same lane with 25 samples at 2 warmups reads +9% while 15 samples at 6 warmups
 read -5% and the profiler's 24 steady-state replays read -17% (0.30 ms against 0.36). The
-E038 report recorded the same third-iteration effect on `large-paste-delete`.
+append-only buffer store report recorded the same third-iteration effect on `large-paste-delete`.
 
 Call counts from the instrumented replay, `random-replacements`: `findVisiblePieceEndingAt`
 recursions 20,775 to 2,539, `splitsSurrogatePair` 5,906 to 2,906 (the deletes still snap through
@@ -82,8 +82,8 @@ Self: `insertReverseIndexNode` 13.4%, `splitByVisibleOffset` 11.6%, `merge` 8.4%
 
 An insert is one descent, one split-and-merge, and three reverse-index writes. The reverse index
 is now a quarter of the profile and its keyed insert is the hottest self frame; that is
-[E039](e039-reverse-index-cost.md). The split and merges are the other half, and their
-cost is the treap's height; that is [E040](e040-balanced-tree.md), whose
+[reverse-index cost](e039-reverse-index-cost.md). The split and merges are the other half, and their
+cost is the treap's height; that is [balanced tree](e040-balanced-tree.md), whose
 join-based split should keep the probe: the landing logic here is independent of how the tree
 balances. Deletes still descend for their two snaps and then split twice; folding the snaps into
 the two splits the same way is a smaller version of this change.

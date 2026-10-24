@@ -1,12 +1,12 @@
-# E042 fixed per-edit overhead
+# Fixed per-edit overhead
 
-E042 is complete on 2026-09-17. [E041](e041-transient-edits.md) measured that persistence is
+[transient edits](e041-transient-edits.md) measured that persistence is
 about a tenth of the small-edit gap and profiled the rest; this entry takes the three leads that
 profile named, each a few lines, and measures them on the same lanes and seeds. Every edit lane
 is about a fifth faster: a random insertion goes from 4.62x the mutable control to 3.63x, a
 random replacement from 6.44x to 5.05x. Raw reports are in [`e042-evidence.tar.gz`](e042-evidence.tar.gz).
 
-Inspected baseline: the E041 head, `26e805c`, on branch `e042-fixed-edit-overhead`.
+Inspected baseline: the transient edits head, `26e805c`, on branch `e042-fixed-edit-overhead`.
 
 ## What changed
 
@@ -29,11 +29,11 @@ and priorities are identical and the counter budgets pass unchanged.
 
 ## Measured results
 
-Standard profile, three seeds, 9 samples of 2 warmups, the E041 head timed in a worktree and the
+Standard profile, three seeds, 9 samples of 2 warmups, the transient edits head timed in a worktree and the
 change in the checkout, alternating per seed. Milliseconds per lane, median over seeds with the
 range, ratio to the control's median.
 
-| Lane                 | Control | E041 head              | E042                   | Change |
+| Lane                 | Control | transient edits head              | fixed edit overhead                   | Change |
 | -------------------- | ------: | ---------------------- | ---------------------- | -----: |
 | sequential-typing    |    0.61 | 0.66 [0.54–0.66] 1.08x | 0.64 [0.52–0.65] 1.05x |    -3% |
 | typing-with-lookups  |    0.94 | 0.91 [0.74–0.91] 0.97x | 0.89 [0.73–0.90] 0.95x |    -2% |
@@ -43,7 +43,7 @@ range, ratio to the control's median.
 | mixed-edit-churn     |    1.20 | 7.70 [7.59–8.24] 6.39x | 6.20 [6.13–6.36] 5.14x |   -20% |
 | persistent-history   |       — | 7.71 [7.66–7.87]       | 6.34 [6.19–6.35]       |   -18% |
 
-Against unmodified main, before E041's in-edit node reuse, a random insertion is 27% faster and a
+Against unmodified main, before the transient edits work's in-edit node reuse, a random insertion is 27% faster and a
 random replacement 39%. Per random insertion: 3.6 µs on main, 2.6 µs now, 0.72 µs for the control.
 
 CPU after the change, `random-insertions`, 24 replays, 511 in-workload samples: piece tree
@@ -62,11 +62,11 @@ measured at 25 against 14 for the control. The control does one descent. The str
 is one descent per edit that answers all three questions, and it is worth more than any
 remaining local tweak: the three walks are about a third of the insert profile between them.
 
-- [E040](e040-balanced-tree.md) lowers the cost of every walk by bounding
+- [balanced tree](e040-balanced-tree.md) lowers the cost of every walk by bounding
   height. Its payoff is bounded by the 55% the tree still takes, now that cloning is gone.
-- [E039](e039-reverse-index-cost.md) owns the 20% in the reverse index. Its keyed
+- [reverse-index cost](e039-reverse-index-cost.md) owns the 20% in the reverse index. Its keyed
   insert with a hashed priority per node is now the single hottest self frame.
-- A fused descent is not in either plan. It belongs in E040, which already rewrites the split,
+- A fused descent is not in either plan. It belongs in balanced tree, which already rewrites the split,
   or in a small plan of its own that adds `splitAtVisibleOffsetWithContext` returning the
   neighbouring units and the piece ending at the offset alongside the two halves.
 

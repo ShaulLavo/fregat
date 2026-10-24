@@ -1,6 +1,6 @@
-# E041 transient edits between retained snapshots
+# Transient edits between retained snapshots
 
-E041 is complete on 2026-09-17. The question was how much of the small-edit gap against
+The question was how much of the small-edit gap against
 `microsoft/vscode-textbuffer` is persistence itself. The answer is about a tenth: with every path
 copy removed from both trees, a random insertion still costs 4.35x the mutable control and a
 random replacement 6.2x. The plan's decision rule said no-go above 3x, so transient snapshots do
@@ -8,8 +8,8 @@ not become an editor contract. What does ship from the prototype is the ownershi
 the default mode, where it reuses the nodes one edit has already cloned and removes most of the
 cloning without any retain point outside the library.
 
-The inspected baseline was `b6a265a786b08c61318a3e02b666f17cb7ef50fc`, on top of the E038
-commits. The execution plan has been removed; the [E038 report](e038-append-only-buffer-store.md)
+The inspected baseline was `b6a265a786b08c61318a3e02b666f17cb7ef50fc`, on top of the append-only buffer store
+commits. The execution plan has been removed; the [append-only buffer store report](e038-append-only-buffer-store.md)
 records the starting point. Raw timing, counter and CPU reports are in
 [`e041-evidence.tar.gz`](e041-evidence.tar.gz); the branch is `e041-transient-edits`.
 
@@ -102,13 +102,13 @@ fixed per-edit work, and the profile names it:
 
 - `allocateOrdersBetween` builds its result with `Array.from` and a closure, twice per insert
   (the split's right half and the inserted pieces), and is the single hottest frame at 15% of
-  self time in every mode. A plain loop with a one-element fast path is the first lead E037's
+  self time in every mode. A plain loop with a one-element fast path is the first lead the textbuffer edit allocations work's
   successors should take.
 - `createPiece` counts line breaks for both halves of a split by binary-searching the chunk's
   line index (`firstLineBreakAtOrAfter`, 7%), when the parent's count minus one half is the other.
 - The surrogate snap reads a code unit by tree descent twice per edit (`codeUnitAt`, 6.5%).
 - Priority hashing (`mixWord`, 3.3%) runs per created node, and the reverse index at 12% is
-  E039's subject with the clone half of it already gone.
+  the reverse-index cost work's subject with the clone half of it already gone.
 
 What ships from the branch is the `always` mode: the epoch check with `autoRetain` on. It keeps
 every snapshot persistent exactly as today, needs no retain point anywhere in the editor, and
@@ -118,9 +118,9 @@ would add a few percent on batches and replacements for a per-transaction retain
 could place in `applyEdits` and `commitPrepared`, but the audit below shows it is not free, and
 the number does not justify it.
 
-E039 and E040 keep their shape, with their expected payoff bounded by this measurement. E040's
+Reverse-index cost and balanced tree keep their shape, with their expected payoff bounded by this measurement. The balanced tree work's
 height bound lowers descent and summary work in `splitByVisibleOffset` and `merge`, which is 12%
-of the zero-copy profile, not the 40% clone share it was framed around. E039's reverse index is
+of the zero-copy profile, not the 40% clone share it was framed around. The reverse-index cost work's reverse index is
 12% at zero copies. The fixed-overhead leads above are cheaper than either and come first.
 
 ## Editor audit
