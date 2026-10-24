@@ -191,11 +191,13 @@ async function finish(preexisting) {
 // After a restart the check waits until the new server answers through the mesh.
 async function serverReports(release, timeoutMs) {
   const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
+  do {
     controller.signal.throwIfAborted()
     if ((await servedServerRelease()) === release) return true
-    await new Promise((done) => setTimeout(done, 1_000))
-  }
+    const remainingMs = deadline - Date.now()
+    if (remainingMs <= 0) return false
+    await new Promise((done) => setTimeout(done, Math.min(1_000, remainingMs)))
+  } while (Date.now() < deadline)
   return false
 }
 
