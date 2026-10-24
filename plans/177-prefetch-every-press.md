@@ -10,7 +10,7 @@
 - [Plan 175](../docs/workspace-indexing.md) Phase 6 caps speculative directory prefetch at four in
   flight per surface, skipping a guess when full (a click shares the prefetch's query key). This
   plan inherits the cap and the skip rule as its default per-surface budget.
-- Findings, with the full inventory and every measurement: [docs/prefetch-every-press.md](../docs/prefetch-every-press.md).
+- Findings, with the full inventory and every measurement: [.internal/prefetch-every-press.md](../.internal/prefetch-every-press.md).
 
 ## Outcome
 

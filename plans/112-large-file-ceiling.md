@@ -2,7 +2,7 @@
 
 Status: **Done 2026-09-28.** All five phases shipped; see the execution checklist. Typing with analysis on
 continues in [Plan 201](201-cheap-overlay-marks.md). Requested
-2026-09-13. Measurements: [docs/large-file-ceiling/](../docs/large-file-ceiling/README.md).
+2026-09-13. Measurements: [.internal/large-file-ceiling/](../.internal/large-file-ceiling/README.md).
 
 Decided 2026-09-25: owner — this plan and Editor
 [E015 massive file loading](e015-massive-file-loading.md) run as one lane, 112
@@ -158,7 +158,7 @@ limit is owned, and the executable plans this becomes.
 ## Research findings (2026-09-25)
 
 Read from `origin/main` 9f3438258; no lane branch changes this plan. Method, tables and raw rows
-are in [docs/large-file-ceiling/](../docs/large-file-ceiling/README.md). All app numbers come from
+are in [.internal/large-file-ceiling/](../.internal/large-file-ceiling/README.md). All app numbers come from
 a production build of this tree in Chromium 153, one file per run, inside a 7 GB memory scope
 covering browser, server and language servers.
 
@@ -298,7 +298,7 @@ No new large-file performance measurement is claimed by this budget change.
 
 Owner clarified that this run must finish the full plan and linked E015 work, not stop
 after the first independently shippable change. Decision trail:
-[execution.tsv](../docs/large-file-ceiling/execution.tsv).
+[execution.tsv](../.internal/large-file-ceiling/execution.tsv).
 
 - [x] Read the execution principles and reconcile scope with E015.
 - [x] Review the delivered budget and fix misleading oversized-file results.
@@ -337,7 +337,7 @@ reviewed independently before edits because saved snapshots also serve compariso
 
 ### Integrated candidate evidence, 2026-09-28
 
-[The results report](../docs/large-file-ceiling/results/resident-20260928.md) preserves the six-size
+[The results report](../.internal/large-file-ceiling/results/resident-20260928.md) preserves the six-size
 before/after rows, per-worker interpretation, trace comparison and E015 decision. Final resident
 200 MiB saves exactly 209,715,200 bytes; typing p95 is 15.5ms, saved main heap 223.5 MiB plus
 71.1 MiB backing. The 10/50/150 MiB p95 values remain above a 60Hz frame, and 200 MiB save still

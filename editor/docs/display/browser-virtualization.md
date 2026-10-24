@@ -10,7 +10,7 @@ CSS Highlight API, selection APIs, and measured browser boxes for geometry.
 - CSS Highlight API remains the selection and syntax paint path until a better paint path exists.
 - Virtualization owns visibility, mounting, and scroll-space management, not glyph measurement.
 - Geometry queries should be local to mounted DOM. Avoid full-document `Range` walks.
-- The implementation uses a custom 2D virtualizer inspired by `/Users/shaul/vibe2`.
+- The implementation uses a custom 2D virtualizer inspired by an earlier prototype.
 
 ## Architecture
 
@@ -104,7 +104,7 @@ use an endpoint-only fallback, keeping work bounded while preserving determinist
 
 ## Inspired By vibe2
 
-Useful patterns from `/Users/shaul/vibe2/packages/code-editor`:
+Useful patterns from that prototype:
 
 - `createFixedRowVirtualizer.ts`: small fixed-row math, scroll listener, `ResizeObserver`, overscan, stable `VirtualItem` records
 - `createTextEditorLayout.ts`: browser-measured char/line metrics, fixed-row virtualizer, visible range, content width from visible scans

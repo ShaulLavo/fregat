@@ -78,7 +78,7 @@ collection. Further reduction would require changing mounted-text construction a
 the original full-line classifier, width, and whitespace scans are no longer dominant.
 Warm active typing samples fell from 1,167.5 ms in the original profile to 101.1 ms; churn fell
 from 10,920.2 ms to 815.7 ms. The final eight traces and matching source maps remain in
-`/work/tmp/editor-long-line-fixed-profile-retry`. A prior capture was rejected because Chromium
+the local run directory. A prior capture was rejected because Chromium
 returned one negative sampling interval; the replacement capture passed the summary validator.
 
 ## Reproduce
@@ -86,8 +86,8 @@ returned one negative sampling interval; the replacement capture passed the summ
 From the repository root:
 
 ```sh
-bun run bench:stress --fixtures ordinary,long-line,unicode --repetitions 3 --output /work/tmp/editor-long-line-candidate.json
-node examples/stress/test/summarize-change.mjs examples/stress/results/long-line-fix-before.json /work/tmp/editor-long-line-candidate.json
+bun run bench:stress --fixtures ordinary,long-line,unicode --repetitions 3 --output /tmp/editor-long-line-candidate.json
+node examples/stress/test/summarize-change.mjs examples/stress/results/long-line-fix-before.json /tmp/editor-long-line-candidate.json
 bun run --cwd packages/editor test --project node src/textMeasurements.test.ts
 bun run --cwd packages/editor test --project browser test/longLineMeasurements.browser.test.ts
 ```

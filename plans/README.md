@@ -1,5 +1,12 @@
 # Plans
 
+> **Internal working material, not user documentation.** Agents read and write this folder
+> as part of their workflow, so the path stays. Nothing in `README.md` or `docs/` links here.
+> A finished plan leaves in one of three ways: its lasting decision becomes a record in
+> `docs/adr/`, its behavior becomes a page in `docs/`, or it is deleted. Git history keeps
+> the text. The goal is zero to two live plans. Finished plans and dated reports are listed
+> in the AUDIT for the owner to confirm before anything is deleted.
+
 [PLAN.md](../PLAN.md) owns execution order and cross-plan dependencies. Each plan below owns
 its current status, scope, authorization and acceptance checks. This index lists the files that
 exist; it does not duplicate status summaries that drift when a plan changes.
@@ -277,7 +284,7 @@ the same contract to our maintained ts-rust WASM service before browser/default 
 
 ## Supporting work
 
-- [Command foundation delivery](../docs/keymap/command-foundation-delivery.md) records
+- [Command foundation delivery](../.internal/keymap/command-foundation-delivery.md) records
   Plans 204–206 and their exact standalone dependency qualification under Plan 207.
 
 - [Document-backed content views](../docs/document-backed-content-views.md) holds the contracts,
@@ -292,7 +299,7 @@ the same contract to our maintained ts-rust WASM service before browser/default 
 - [Editor backlog](editor-backlog.md) and [native client roadmap](native-plan-of-plans.md)
   preserve package/client scopes under the shared roadmap.
 - [Research, architecture and delivery records](../docs/README.md) are reference material.
-- [Unresolved September 12 audit questions](../docs/defect-audit-follow-ups.md) need current
+- [Unresolved September 12 audit questions](../.internal/defect-audit-follow-ups.md) need current
   reproduction before they become implementation work.
 
 ## Maintenance

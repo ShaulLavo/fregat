@@ -17,11 +17,11 @@ test('portable release and installation have separate commands', () => {
 
 test.each([
   [
-    'docs/verification/2026-09-19-chat-follow-up.md',
+    '.internal/verification/2026-09-19-chat-follow-up.md',
     'bun run deploy --server --slug=chat-follow-up',
   ],
   [
-    'docs/verification/2026-09-19-editor-splits.md',
+    '.internal/verification/2026-09-19-editor-splits.md',
     "bun run deploy --slug=editor-splits --reason='Add editor split views'",
   ],
   [

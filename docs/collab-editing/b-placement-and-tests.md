@@ -296,7 +296,7 @@ Effort estimates assume one shared adapter already supports replicas, local inde
 - `L:crates/loro-internal/src/tests/replay_base.rs:64–495`
 - `L:crates/loro/tests/fork_at_deleted_container.rs:78–417`
 
-These do not all become plain-text tests unchanged. Container recreation, trees and movable lists require capabilities outside this lane.
+These do not all become plain-text tests unchanged. Container recreation, trees and movable lists require capabilities outside this report.
 
 **Caution:** Loro’s GC fuzzer explicitly skips complete-history sync checks when either document is shallow. Do not describe it as proving that arbitrary empty/offline replicas can merge with a trimmed document. `L:crates/fuzz/src/crdt_fuzzer.rs:473–479`.
 
@@ -483,11 +483,10 @@ These are recommendations derived from the approved host/pending-replay architec
 Completed:
 
 - Read `CLAUDE.md` and loaded `fregat-local`.
-- Verified `/work` mount/free space; recorded logical capacity and the 1.7 TiB physical VDO backing size.
 - Cloned and pinned all four authorized repositories.
 - Inspected algorithm generation/integration code, test definitions/oracles, licenses and nested-license exceptions.
-- Confirmed `git status --short` in `/work/projects/platform` remained empty.
-- Removed the temporary inventory file created under `/work/tmp/collab-research-B/`.
+- Confirmed `git status --short` in the repository stayed empty.
+- Removed the temporary inventory file.
 
 Not performed, intentionally:
 

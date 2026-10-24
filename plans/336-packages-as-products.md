@@ -3,7 +3,7 @@
 ## Status and authorization
 
 - Status: APPROVED. Owner request 2026-10-08. Revised the same day after the research round in
-  [docs/research/packages-as-products/](../docs/research/packages-as-products/README.md).
+  [.internal/research/packages-as-products/](../.internal/research/packages-as-products/README.md).
 - Scope: Fregat, Singapore, ghostty-webgpu and hotkeys, plus tree-sitter-x and tree-sitter-md as the
   parsers behind Singapore. Their GitHub repositories, npm pages, websites, documentation, release
   cycle and issue tracker. Mesh, fast-ulid and the other owned repos stay out until the owner adds them.
@@ -26,7 +26,7 @@ outside users.
 
 ## What the research found
 
-Twelve reports, summarized in the [research README](../docs/research/packages-as-products/README.md).
+Twelve reports, summarized in the [research README](../.internal/research/packages-as-products/README.md).
 The facts that change the plan:
 
 - **npm serves ten-day-old code.** `@singapore-editor/core` and `ghostty-webgpu` are 0.1.2 on npm
@@ -61,7 +61,7 @@ The facts that change the plan:
    WebGL, DOM against DOM. A claim without proof waits for Track P.
 3. **Planned work shows as a status table**, Ghostty-roadmap style (done / in progress / planned), each
    row linking its plan. Announce only items that are Approved and started, or that the
-   [roadmap report](../docs/research/packages-as-products/roadmap-highlights.md) marks "announce now".
+   [roadmap report](../.internal/research/packages-as-products/roadmap-highlights.md) marks "announce now".
 4. **Astro everywhere; Starlight for docs** with Pagefind search and `starlight-typedoc` reference,
    generated from built `.d.ts` with `typescript@6` pinned in the docs workspace.
 5. **Every code sample in docs and READMEs is type-checked in CI.** Long examples are real files the
@@ -165,7 +165,7 @@ on npm. Until then, READMEs and docs install from npm as written; the published 
 
 On the owner's host, benchmarks use the private [heavy-runner tool](https://github.com/ShaulLavo/heavy-runner) described in the local `fregat-local` skill. Contributor and CI commands run directly.
 
-From the [performance report](../docs/research/packages-as-products/performance-evidence.md):
+From the [performance report](../.internal/research/packages-as-products/performance-evidence.md):
 
 1. Copy the reviewed 2026-10-08 terminal wave results into `ghostty-webgpu/docs/benchmarks/`, then one
    Mac session across all six renderers with equal history. Rewrite `benchmarks.md` like for like,
@@ -189,7 +189,7 @@ From the [performance report](../docs/research/packages-as-products/performance-
 
 ## Track C: Repositories and npm pages (after the pitch is approved)
 
-Follow the [README report](../docs/research/packages-as-products/readme-exemplars.md) templates and
+Follow the [README report](../.internal/research/packages-as-products/readme-exemplars.md) templates and
 checklist:
 
 1. Rewrite the four READMEs (centered header, pitch, 3–4 badges, link row, hero, proof chart, quick
@@ -204,7 +204,7 @@ checklist:
 
 ## Track D: Sites (after the pitch is approved; D1–D3 in parallel)
 
-Follow the [landing-sites report](../docs/research/packages-as-products/landing-sites.md) outlines:
+Follow the [landing-sites report](../.internal/research/packages-as-products/landing-sites.md) outlines:
 
 1. **Fregat** (`apps/site`): headline names the category; execute
    [Plan 155](155-site-demo-replica.md)'s animated replica, upgraded so the editor and terminal panes
@@ -244,7 +244,7 @@ workflow remain in git history; they are outside the current execution path.
 
 ## Track F: Documentation (after Track 0; alongside D)
 
-Follow the [docs report](../docs/research/packages-as-products/docs-exemplars.md) contents and
+Follow the [docs report](../.internal/research/packages-as-products/docs-exemplars.md) contents and
 checklist:
 
 1. Sections: Start here, Guides, Examples, Reference, Concepts. No empty sections; ★ pages first.
@@ -261,7 +261,7 @@ checklist:
 
 Owner decision: versions are untouched while we set up. Patch bumps only, no 1.0.0, no new version
 policy. This track improves how releases read, not how they are numbered. Follow the
-[release report](../docs/research/packages-as-products/release-cycles.md):
+[release report](../.internal/research/packages-as-products/release-cycles.md):
 
 1. `docs/releasing.md` describes today's cycle: Changesets, patch only, fixed groups, the version PR.
    Channels (`next` snapshots, pkg.pr.new previews) wait for Track N.
@@ -777,7 +777,7 @@ reports healthy with no browser problems, and its screenshot was read back.
 ## Kickoff prompt for an executing coordinator
 
 > Execute Plan 336 (`plans/336-packages-as-products.md`) in fregat. Load the `orchestrate` and
-> `fregat-local` skills, and read `docs/research/packages-as-products/README.md` and the report each
+> `fregat-local` skills, and read `.internal/research/packages-as-products/README.md` and the report each
 > lane needs. Start Track 0, Track P and Track H now in parallel. When Track P's first results land,
 > run Track B and send the owner the pitch as a private Mesh app link. After the owner approves it,
 > run Tracks C, D, F and G in parallel lanes. Do not change package versions. Track E is authorized

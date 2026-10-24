@@ -13,18 +13,4 @@ children have explicit access states rather than making the whole root fail to o
 
 A pending workspace switch retains the previous subject and shields it during the switch.
 Directory prefetch admits at most four concurrent speculative listings and skips excess guesses;
-a click may share the same query, so speculative eviction cannot cancel its load. See
-[prefetch ownership](prefetch-every-press.md) for current consumers.
-
-## Evidence and remaining work
-
-The retired [two-client plan](https://github.com/ShaulLavo/fregat/blob/8ca59fd7df915cccae0f3b920b8746c7a7651956/plans/173-two-devices-one-workspace.md)
-records the `workspace-two-roots` scenario and ownership decisions. The retired
-[large-folder plan](https://github.com/ShaulLavo/fregat/blob/8ca59fd7df915cccae0f3b920b8746c7a7651956/plans/175-large-folder-open.md#progress-2026-09-26)
-records the watch-worker, unreadable-child, switch and prefetch scenarios plus review fixes.
-These are historical measurements, not a new certification of the current build.
-
-[Plan 110](../plans/110-workspace-indexing.md) owns further index capabilities;
-[170](../plans/170-language-census.md) owns language census and remaining measurement;
-[177](../plans/177-prefetch-every-press.md) owns intent preparation. Their open work remains in
-those plans.
+a click may share the same query, so speculative eviction cannot cancel its load.

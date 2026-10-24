@@ -1,6 +1,6 @@
-# E033: Full-document text reads are an explicit boundary
+# Full-document text reads are an explicit boundary
 
-Implemented 2026-09-23 in Editor `10b0ac4`, with Platform `312f4419` and `c2af88b4`. Reading
+Reading
 state, delivering a plugin update, rendering and applying an edit no longer flatten the document.
 A caller that needs the whole text asks for it by name.
 
@@ -23,10 +23,10 @@ Enforcement: `bun run check:full-text` runs first in `health`. Each remaining wh
 named function in [full-text-boundary-allow.json](../../scripts/full-text-boundary-allow.json) with
 its reason: view serialization, Shiki's open payload, LSP didOpen/didSave and full-sync recovery,
 the live diff, `useFullText` and save serialization. On 2026-09-25
-[E055](e055-edit-commands-read-lines.md) removed the edit-command entry, `commandDocumentText`.
+[edit commands reading lines](e055-edit-commands-read-lines.md) removed the edit-command entry, `commandDocumentText`.
 `test/fullTextBoundary.test.ts` reads the same number of units at 64K and 1M.
 
-Measured on two views over a fragmented document, median p95 input-to-applied, control → E033:
+Measured on two views over a fragmented document, median p95 input-to-applied, control → full-text boundary:
 
 | Configuration | Size | Typing          | Undo             |
 | ------------- | ---- | --------------- | ---------------- |

@@ -1,9 +1,7 @@
 # TUI workbench
 
 The workbench connects the existing TUI foundation to the server's filesystem, Git, search,
-logs, workspace-edit, LSP, and terminal routes. Plan 081 completed this slice on 2026-09-07.
-[Agent sessions](tui-agent.md) followed in Plan 082. Worktree parity and distribution remain
-subsequent work in [the strategy](../plans/tui-plan.md).
+logs, workspace-edit, LSP, and terminal routes. [Agent sessions](tui-agent.md) build on it. Worktree parity and distribution are not built yet.
 
 ## Implementation
 
@@ -28,13 +26,6 @@ an asynchronous load acknowledge focus after their commit. An open dialog owns i
 closes; background focus requests stay deferred without exposing a target to terminal input.
 Commands stay registered while their pane is visible, including when the palette captures the
 originating pane. History persistence observes every navigation change, including Back and Forward.
-
-## Feasibility
-
-- [Terminal feasibility](tui-research/terminal-feasibility.md) covers byte rendering, input,
-  multiple viewers, real Neovim, raw attach, host resize, and terminal restoration.
-- [Viewer feasibility](tui-research/viewer-feasibility.md) records the published tree-sitter
-  worker failure and the bundled Shiki path that passes Bun and standalone compilation.
 
 The server tracks negotiated in-band resize mode 2048. It reports dimensions through that
 protocol when enabled, in addition to the PTY resize. A joining viewer gets replay followed by
@@ -65,12 +56,10 @@ The workbench review added these permanent regressions:
 
 Run TUI checks with `bun --bun vitest run` in `apps/tui`. The TUI build also checks types and the
 generated palette. Shared extraction checks include client-core and affected web callers.
-After the review fixes, the full TUI suite passes 234 tests across 66 files. The TUI build, lint,
+The full TUI suite passes 234 tests across 66 files. The TUI build, lint,
 and client-core typecheck pass. The original shared-code extraction also passed web and server
 typechecks, nine DOM diff-view tests, and ten shared-model/SSE tests.
-The working decision trail is `/work/tmp/platform-tui-workbench/decisions.tsv`.
 
-The existing preview service on port 3301 was started with an older origin allowlist and rejects
-`platform-tui://local`. Its normal launcher must be restarted with that origin before attaching.
-The complete interactive app is verified against the real server fixtures. No additional dev
-server is started. Native host verification is on Linux; testing in a physical terminal running Kitty remains unverified.
+A preview service started with an older origin allowlist rejects `platform-tui://local`; restart
+it with that origin before attaching. The interactive app is verified against the real server
+fixtures. Native host verification is on Linux; a physical terminal running Kitty is unverified.

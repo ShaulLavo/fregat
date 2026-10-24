@@ -1,6 +1,6 @@
 # Provisional editor display state
 
-Status: implemented and verified across Editor and Platform. See [implementation and verification results](editor-first-paint-verification.md). This replaces the separate preview-owner proposal and refines [workspace reload delivery](instant-reload-implementation.md).
+Status: implemented across Editor and Platform. This replaces the separate preview-owner proposal and refines [workspace reload delivery](instant-reload-implementation.md).
 
 A saved snapshot supplies provisional display state inside the editor's native view. The first authoritative paint replaces that state in one commit. There is one viewport, one painter, and one presented set of rows. Platform persists opaque paint and supplies authoritative file data.
 
@@ -189,14 +189,6 @@ The migration removes Platform's former `editor-visible-snapshot.tsx` renderer, 
 - Compare distributions for actual first visible paint, normal startup, live readiness, typing, scrolling, and capture. Include code evaluation and constructor cost, not only native DOM drawing time.
 
 Set performance tolerances from the baseline before implementation. A repeatable material regression in ordinary editing requires redesign. If current constructor cost prevents useful early paint, return with that measurement and a targeted design; do not silently expand this into the rejected staged lifecycle.
-
-## Implementation handoff
-
-Implement this design inside `/work/projects/platform`, including `editor/`. Scope is editor snapshot restoration and Platform integration, not the other milestones in Plan 085. Reconcile current source, the workspace install, the worktree, and the build served by the existing app before editing. Preserve unrelated work and use the running server. Store browser/profile artifacts under `/work/tmp/editor-provisional-paint/`.
-
-Start by recording the immediate-document/delayed-highlights browser case and ordinary startup/typing baseline. Then establish the native presentation boundary and implement in the order above. Keep provisional data out of document/session/line-index state, preserve synchronous construction and incremental rendering, and replace paint in one commit based on render-data readiness. Do not use a separate preview owner, second editor text tree, or document arrival as the completion signal.
-
-Complete the paired package/adapter/Platform migration and delete the superseded renderer in the same delivery. Run only the focused native, adapter, and browser checks that prove the listed behavior. Report changed files, baseline-versus-result timings, frame/minimap evidence, and any unsupported contribution or unfinished acceptance check. A typecheck alone does not complete this work.
 
 ## Workspace reload integration, 2026-09-21
 

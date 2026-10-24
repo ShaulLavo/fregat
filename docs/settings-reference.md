@@ -178,7 +178,7 @@ stays safe to read, share and export.
 
 ### Details
 
-- `files.watchDirectoryLimit`: Each watched folder uses one inotify watch from a per-user pool that every watcher on the machine shares (524,288 on the owner's machine). Opening /work took 484,687 watches and other apps began failing with ENOSPC. 200,000 fits four roots the size of the Fregat checkout (45,036 folders) and leaves 62% of the pool free.
+- `files.watchDirectoryLimit`: Each watched folder uses one inotify watch from a per-user pool that every watcher on the machine shares (524,288 on the machine that set this default). Opening a 484,687-folder tree took 484,687 watches and other apps began failing with ENOSPC. 200,000 fits four roots the size of the Fregat checkout (45,036 folders) and leaves 62% of the pool free.
 
 ## Git
 

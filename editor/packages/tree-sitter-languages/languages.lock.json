@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "manifestHash": "af704c30b1a4ced980350a485f4fdca2082810c45fba438a8484d9b59d97a2d3",
+  "manifestHash": "e57eb5b605173fa32fe84b8d287c204370db1c06caeffeb88f2d3757c98ac7c0",
   "languages": [
     {
       "id": "javascript",
@@ -722,7 +722,7 @@
         "package": "tree-sitter-md",
         "version": "0.1.32",
         "repository": "https://github.com/ShaulLavo/tree-sitter-md",
-        "revision": "aa1f9f6480b0842628af065fe8858b688b4e0df6",
+        "revision": "565bb1a6f2d4428b66a927574ef6683452d913d0",
         "license": "MIT",
         "compiler": "wasi-sdk 34"
       },

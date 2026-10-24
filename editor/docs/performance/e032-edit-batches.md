@@ -1,6 +1,6 @@
-# E032 incremental edit-batch rendering
+# Incremental edit-batch rendering
 
-The inspected baseline is `64926519bfdd39f4afcfae225019a932d3e27785`. E031 had already
+The inspected baseline is `64926519bfdd39f4afcfae225019a932d3e27785`. Projection had already
 removed full-document materialization from the batch fallback. A sparse batch at that revision
 calls `VirtualizedTextView.setText` and resets the display projection. It reads bounded viewport
 text, but discards all installed tokens and collapsed folds. The before measurements record
@@ -83,7 +83,7 @@ earlier runtime with two reads. The full-position query is the positive measurem
 All 110 BiDi geometry tests and 185 view, geometry, and provisional-paint tests pass.
 
 [Final-source evidence](e032-ci-final-validation.json.gz) records a fresh frozen package from
-`1d7f7cc`, 300 source samples and 100 browser samples across all ten E032 groups, and twenty
+`1d7f7cc`, 300 source samples and 100 browser samples across all ten edit batches groups, and twenty
 separate diagnostic samples. The browser runner rebuilt that package before capture. Active
 source, frozen source, and rebuilt output match the recorded hashes. All source diagnostics
 have zero full-text reads, projection resets, and unchanged-gap reads. All browser diagnostics
@@ -105,7 +105,7 @@ selection synchronization and mounted DOM reconciliation. It uses happy-dom with
 plugins. Timing samples disable diagnostics; one separate instrumented sample follows each
 group. Every sample checks the exact resulting document and all mounted text-node parts.
 
-The seeded E001 fixtures are ordinary code (200 lines), a 1,048,594-code-unit long line, and
+The seeded stress harness fixtures are ordinary code (200 lines), a 1,048,594-code-unit long line, and
 500,000 short lines (12,834,064 code units). A single edit inserts `prefix\n` at offset zero.
 The sparse batch additionally inserts `\nsuffix` at the original document end. Both edits
 address the original snapshot. Decorated ordinary and short-line groups install 199 and
@@ -116,7 +116,7 @@ compare every retained token offset and both fold boundaries with the expected f
 Run the source proof from the repository root:
 
 ```sh
-bun packages/editor/bench/editBatches.mjs --output /work/tmp/e032-source.json --require-incremental
+bun packages/editor/bench/editBatches.mjs --output /tmp/e032-source.json --require-incremental
 ```
 
 It records full-read calls and bytes, range-read count and maximum span, reads spanning the
@@ -127,7 +127,7 @@ fixtures allow at most 16 KiB of requested snapshot text, 4,096 code units per r
 projection entries, 64 cached rows and one final view notification. Those are work bounds for
 these fixtures, not calibrated latency budgets. Source-index scans are reported separately.
 
-The browser companion uses the built package and the existing E001 Playwright request routing.
+The browser companion uses the built package and the existing stress harness Playwright request routing.
 It opens no listening server. Each sample starts with an already painted editor, performs the
 same programmatic edit, then captures the final prefix row. Decorated groups additionally capture
 source row 2, which contains a retained token, and require at least 20 chromatic pixels. Protocol 3
@@ -138,8 +138,8 @@ screenshots. It also requires zero synchronous and zero deferred full-document r
 diagnostic sample. Full-document correctness reads happen after timing and diagnostics.
 
 ```sh
-TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
-  --output /work/tmp/e032-browser.json --require-incremental
+TMPDIR=/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+  --output /tmp/e032-browser.json --require-incremental
 ```
 
 Both runners accept `--core-directory` to compare a frozen package. Before capturing, the browser
@@ -165,22 +165,22 @@ An unknown group fails before building or capturing results.
 The original baseline can be recreated without switching the checkout:
 
 ```sh
-mkdir -p /work/tmp/e032-baseline
-git archive 6492651 packages/editor/src packages/editor/package.json | tar -x -C /work/tmp/e032-baseline
-ln -sfn "$(pwd)/packages/editor/node_modules" /work/tmp/e032-baseline/node_modules
-bun packages/editor/bench/editBatches.mjs --core-directory /work/tmp/e032-baseline/packages/editor \
-  --output /work/tmp/e032-before-source.json
-TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
-  --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-before-browser.json
+mkdir -p /tmp/e032-baseline
+git archive 6492651 packages/editor/src packages/editor/package.json | tar -x -C /tmp/e032-baseline
+ln -sfn "$(pwd)/packages/editor/node_modules" /tmp/e032-baseline/node_modules
+bun packages/editor/bench/editBatches.mjs --core-directory /tmp/e032-baseline/packages/editor \
+  --output /tmp/e032-before-source.json
+TMPDIR=/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+  --core-directory /tmp/e032-baseline/packages/editor --output /tmp/e032-before-browser.json
 ```
 
 ## Results
 
-The frozen reviewed candidate at `/work/tmp/e032-reviewed/packages/editor` passes every
+The frozen reviewed candidate at the local run directory passes every
 source-work bound and every strengthened browser preservation check. Source capture contains
 two runs of 30 measured samples after five warmups per group, or 600 measured samples per
 revision. Its baseline captures are retained because the source harness is unchanged; candidate
-captures use the E032 runtime at `fe21ebd`. Both browser revisions were recaptured with protocol 3,
+captures use the edit batches runtime at `fe21ebd`. Both browser revisions were recaptured with protocol 3,
 in baseline → candidate → candidate → baseline order. Each browser run contains ten measured
 samples after two warmups per group, or 200 measured samples per revision. Each run also has
 one separate diagnostic sample per group. The machine is an Intel Core i7-14700K with Bun 1.4.0,
@@ -304,9 +304,9 @@ decorated cases fail the gate. The runner also asserts post-screenshot token off
 observations, benchmark fingerprint, and exact source/build hashes for both revisions.
 
 ```sh
-TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
-  --core-directory /work/tmp/e032-reviewed/packages/editor --verify-guards \
-  --output /work/tmp/e032-reviewed-guard-proof.json
+TMPDIR=/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+  --core-directory /tmp/e032-reviewed/packages/editor --verify-guards \
+  --output /tmp/e032-reviewed-guard-proof.json
 ```
 
 ## Build correspondence control
@@ -322,9 +322,9 @@ the clean reference build, and the repaired build.
 
 ```sh
 node packages/editor/bench/editBatchesBuildProof.mjs \
-	--baseline-core-directory /work/tmp/e032-baseline/packages/editor \
-	--candidate-core-directory /work/tmp/e032-reviewed/packages/editor \
-	--output /work/tmp/e032-build-proof.json
+	--baseline-core-directory /tmp/e032-baseline/packages/editor \
+	--candidate-core-directory /tmp/e032-reviewed/packages/editor \
+	--output /tmp/e032-build-proof.json
 ```
 
 ## Small single-edit control
@@ -351,13 +351,13 @@ a separate comparison from the ten-group matrix.
 
 ```sh
 e032_control() {
-	TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+	TMPDIR=/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
 		--group ordinary:single-edit:decorated --repetitions 100 --warmups 10 "$@"
 }
-e032_control --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-control-a1.json
-e032_control --core-directory /work/tmp/e032-reviewed/packages/editor --output /work/tmp/e032-control-b1.json --require-incremental
-e032_control --core-directory /work/tmp/e032-reviewed/packages/editor --output /work/tmp/e032-control-b2.json --require-incremental
-e032_control --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-control-a2.json
+e032_control --core-directory /tmp/e032-baseline/packages/editor --output /tmp/e032-control-a1.json
+e032_control --core-directory /tmp/e032-reviewed/packages/editor --output /tmp/e032-control-b1.json --require-incremental
+e032_control --core-directory /tmp/e032-reviewed/packages/editor --output /tmp/e032-control-b2.json --require-incremental
+e032_control --core-directory /tmp/e032-baseline/packages/editor --output /tmp/e032-control-a2.json
 ```
 
 ## Earlier large single-edit control
@@ -387,20 +387,20 @@ The slower observations remain in the artifact, including the 4.2 ms baseline ma
 
 ```sh
 e032_large_control() {
-  TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+  TMPDIR=/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
     --group short-lines:single-edit:decorated --repetitions 100 --warmups 10 "$@"
 }
-e032_large_control --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-large-a1.json
-e032_large_control --core-directory /work/tmp/e032-reviewed/packages/editor --output /work/tmp/e032-large-b1.json --require-incremental
-e032_large_control --core-directory /work/tmp/e032-reviewed/packages/editor --output /work/tmp/e032-large-b2.json --require-incremental
-e032_large_control --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-large-a2.json
+e032_large_control --core-directory /tmp/e032-baseline/packages/editor --output /tmp/e032-large-a1.json
+e032_large_control --core-directory /tmp/e032-reviewed/packages/editor --output /tmp/e032-large-b1.json --require-incremental
+e032_large_control --core-directory /tmp/e032-reviewed/packages/editor --output /tmp/e032-large-b2.json --require-incremental
+e032_large_control --core-directory /tmp/e032-baseline/packages/editor --output /tmp/e032-large-a2.json
 ```
 
 ## Earlier single-edit control
 
 Before the review fixes, the small decorated browser group's higher p95 in the initial
 ten-sample runs prompted a separate matched control. This historical capture uses browser
-protocol 1 and the earlier `/work/tmp/e032-final` candidate; it does not validate the final
+protocol 1 and the earlier the local run directory candidate; it does not validate the final
 reviewed source or protocol 2 highlighted-source paint checks. The sequence is baseline, candidate, candidate, baseline, with
 100 measured samples and ten warmups in each run. It uses only
 `ordinary:single-edit:decorated`. The larger sample count and longer warmup change the tail

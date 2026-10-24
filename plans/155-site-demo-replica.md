@@ -8,7 +8,7 @@
   browser scenarios and second site build. The landing page has no link to the retired demo.
 - Production site: https://fregat.shaulavo.dev/.
 - Planned at: Platform `9c1c45d1`, 2026-09-25. Origin: the UI library survey
-  ([docs/ui-research/brainless.md](../docs/ui-research/brainless.md)).
+  ([.internal/ui-research/brainless.md](../.internal/ui-research/brainless.md)).
 
 ## Outcome
 
@@ -37,7 +37,7 @@ loops, pauses off-screen and holds a final frame under reduced motion.
 2. **Survey what else exists.** brainless is one good find: MIT, dependency-free HTML replicas of
    the Claude Code, Codex and Grok terminal screens, and a fit for the agent panes. More is
    needed: other products' landing-page replicas and any libraries or tools for scripted UI
-   replays. Write each find up in `docs/ui-research/`, like the rest of the survey.
+   replays. Write each find up in `.internal/ui-research/`, like the rest of the survey.
 3. **Choose the build.** Candidates so far:
    - Astro markup plus one small vanilla player script. This was option B in `brainless.md`:
      no React on the site, the components are small enough to own.
@@ -63,10 +63,10 @@ link in the last open question. Probes were headless Chromium 1243 (Playwright 1
 the wave-heavy wrapper. Their scripts, screenshots and downloaded chunks are in
 `/work/tmp/research/155/`, which is scratch. Write-ups:
 
-- [docs/ui-research/cursor-demo.md](../docs/ui-research/cursor-demo.md): the cursor.com teardown
-- [docs/ui-research/landing-replicas.md](../docs/ui-research/landing-replicas.md): 15 other
+- [.internal/ui-research/cursor-demo.md](../.internal/ui-research/cursor-demo.md): the cursor.com teardown
+- [.internal/ui-research/landing-replicas.md](../.internal/ui-research/landing-replicas.md): 15 other
   landing pages, measured
-- [docs/ui-research/replay-tools.md](../docs/ui-research/replay-tools.md): libraries and tools for
+- [.internal/ui-research/replay-tools.md](../.internal/ui-research/replay-tools.md): libraries and tools for
   scripted replays, with sizes and licences
 
 ### Today's hero, measured
@@ -91,7 +91,7 @@ the wave-heavy wrapper. Their scripts, screenshots and downloaded chunks are in
 
 ### 1. cursor.com's demo
 
-Full notes are in [cursor-demo.md](../docs/ui-research/cursor-demo.md).
+Full notes are in [cursor-demo.md](../.internal/ui-research/cursor-demo.md).
 
 - **Built as:** server-rendered React DOM with Tailwind theme tokens. No canvas and no video. The
   first frame is in the 125 KB-gz HTML document.
@@ -114,8 +114,8 @@ Full notes are in [cursor-demo.md](../docs/ui-research/cursor-demo.md).
 
 ### 2. What else exists
 
-Details in [landing-replicas.md](../docs/ui-research/landing-replicas.md) and
-[replay-tools.md](../docs/ui-research/replay-tools.md).
+Details in [landing-replicas.md](../.internal/ui-research/landing-replicas.md) and
+[replay-tools.md](../.internal/ui-research/replay-tools.md).
 
 - **The editor and agent products draw their app as DOM**: Cursor, Zed, Linear and Devin/Windsurf.
   Others use video (opencode's hero loop is 10.4 MB), screenshots (Conductor, Kiro, t3code) or
@@ -247,7 +247,7 @@ font remains as a test fixture with its license.
    `visibilitychange`, reduced motion → end frame), `pointerdown` → end frame, and a loop. Then the
    script in 4. magic-move for the edit landing only if it stays within budget.
 3. **Agents section.** The brainless Claude and Codex ports replace the static `<ol>` sessions in
-   `#agents` (as in [brainless.md](../docs/ui-research/brainless.md)), sharing the player.
+   `#agents` (as in [brainless.md](../.internal/ui-research/brainless.md)), sharing the player.
 4. **The live demo.** Delete it, as decided in question 1 and confirmed 2026-10-08.
 
 ## Follow-up: Firefox resize verification

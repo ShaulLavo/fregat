@@ -1,6 +1,6 @@
-# E034 snapshot indentation folds
+# Snapshot indentation folds
 
-E034 is completed by user acceptance on 2026-09-13. The user accepted the implementation with
+The user accepted the implementation with
 the measured performance limitations below, including the unresolved warm prepared input result.
 Its p95 is 0.9 ms against 1.0 ms for the pooled controls, with an upper difference bound of +0.1 ms.
 Seven of eight primary checks pass. The recorded statistical verdict and thresholds remain unchanged.
@@ -14,17 +14,17 @@ corrections. Those measurements and the first isolated study remain separate fro
 both study reports and the direct-input profile analysis byte for byte.
 
 Snapshot indexing removes repeated whole-document scans from fallback folding.
-The E034 browser comparison measures fallback folding on the same 500,000-line document before
+The snapshot indentation folds browser comparison measures fallback folding on the same 500,000-line document before
 and after the snapshot index. The baseline core is commit
 `88cd55da61e895542cfe248082221cf992be74e5`, exported with `git archive` and rebuilt under
-`/work/tmp/editor-e034/baseline-88cd55d-core`. The archive excludes the uncommitted E034 work.
+the local run directory. The archive excludes the uncommitted snapshot indentation folds work.
 The unrelated LSP changes do not enter this core build.
 
 Earlier pilot runs used `30ae9ec`. Two concurrent viewport fixes, `b4ddbc3` and `6244aca`, then
 changed when attachment measures and renders the initial visible rows. Comparing those pilots
-with the later candidate would attribute viewport work to E034. The final comparison repeats
+with the later candidate would attribute viewport work to snapshot indentation folds. The final comparison repeats
 the baseline and control at `88cd55d`, which includes both fixes. The earlier runs remain under
-`/work/tmp/editor-e034/historical-30ae9` and are excluded from the results below.
+the local run directory and are excluded from the results below.
 
 The runner is [`examples/stress/first-paint.mjs`](../../examples/stress/first-paint.mjs).
 It builds against the selected core package and serves production assets through Playwright
@@ -70,7 +70,7 @@ map queues the normal render.
 
 ## Original implementation measurements
 
-`--fallback-cases` adds fixed indentation and explicit regions to the existing seeded E003
+`--fallback-cases` adds fixed indentation and explicit regions to the existing seeded first-paint
 fixture. Top-level sections start every 5,000 rows. Nested headers occur every 500 rows, and
 region comments span each section. The generator preserves exactly 500,000 rows and records
 the fixture's SHA-256, `1e1bd3e405a41e11241ad87baacf631e877dccdef975eef36ee9aa59981ce3c9`.
@@ -139,21 +139,21 @@ From the repository root, with workspace dependencies and the gutter package alr
 create the frozen core build:
 
 ```sh
-mkdir -p /work/tmp/editor-e034/baseline-88cd55d-core
+mkdir -p /tmp/editor-e034/baseline-88cd55d-core
 git archive 88cd55da61e895542cfe248082221cf992be74e5 \
 	packages/editor/src packages/editor/package.json packages/editor/tsconfig.json |
-	tar -x --strip-components=2 -C /work/tmp/editor-e034/baseline-88cd55d-core
-ln -s "$PWD/packages/editor/node_modules" /work/tmp/editor-e034/baseline-88cd55d-core/node_modules
-bun scripts/build-package.ts /work/tmp/editor-e034/baseline-88cd55d-core
+	tar -x --strip-components=2 -C /tmp/editor-e034/baseline-88cd55d-core
+ln -s "$PWD/packages/editor/node_modules" /tmp/editor-e034/baseline-88cd55d-core/node_modules
+bun scripts/build-package.ts /tmp/editor-e034/baseline-88cd55d-core
 ```
 
 The matched production command is:
 
 ```sh
 taskset -c 8,10,12,14 bun run --cwd examples/stress bench:first-paint \
-	--core-directory /work/tmp/editor-e034/baseline-88cd55d-core \
+	--core-directory /tmp/editor-e034/baseline-88cd55d-core \
 	--repetitions 5 --fixtures short-lines --plugins none --modes direct,prepared \
-	--fallback-cases --output /work/tmp/editor-e034/baseline.json
+	--fallback-cases --output /tmp/editor-e034/baseline.json
 ```
 
 The unchanged control changes only the output to `control.json`. The candidate omits
@@ -252,7 +252,7 @@ Prepared adoption records the completed generation's 500,000 historical rows wit
 work. Its separate preparation event accounts for building those facts. Explicit cold fold commands
 are unrestricted synchronous demand, so their diagnostic maximum step is not a background slice.
 
-A separate background control uses the original flat 500,000-line E003 fixture, with 12,834,064
+A separate background control uses the original flat 500,000-line first-paint fixture, with 12,834,064
 code units and no folds. Baseline cold/warm scans take 41.0/36.8 ms in one task and complete
 190.2/186.7 ms after attachment. Candidate cold/warm discovery uses 83.3/95.8 ms of controller
 work and completes 242.3/255.0 ms after attachment. The largest candidate background steps are
@@ -304,7 +304,7 @@ The raw results are in [`e034-index.json`](e034-index.json).
 
 ```sh
 bun packages/editor/bench/indentationFolds.ts \
-	--output /work/tmp/editor-e034/index-benchmark.json
+	--output /tmp/editor-e034/index-benchmark.json
 ```
 
 ## Remaining costs
@@ -350,7 +350,7 @@ The current deep-stack case is reproducible with
 
 ```sh
 bun packages/editor/bench/indentationFoldStack.ts --depth 250000 \
-	--output /work/tmp/editor-e034-fixes/deep-stack-after.json
+	--output /tmp/editor-e034-fixes/deep-stack-after.json
 ```
 
 The existing index benchmark also ran against frozen `33e632a` and the corrected source with
@@ -370,7 +370,7 @@ fallback materializations. The image below is from that corrected build.
 taskset -c 8,10,12,14 bun run --cwd examples/stress bench:first-paint \
 	--repetitions 1 --fixtures short-lines --plugins none --modes direct,prepared \
 	--fallback-cases --fold-gutter --diagnostics \
-	--output /work/tmp/editor-e034-fixes/browser-diagnostic.json
+	--output /tmp/editor-e034-fixes/browser-diagnostic.json
 ```
 
 ![Corrected fallback markers after thirty-six typed characters](e034-review-folds.png)

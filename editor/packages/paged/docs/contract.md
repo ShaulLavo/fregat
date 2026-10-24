@@ -48,7 +48,7 @@ returned windows and copies belong to the caller. a host that keeps every result
 after building the workspace, run the browser proof and the resident, streamed and paged comparison from the editor root:
 
 ```sh
-node examples/stress/paged.mjs --output /work/tmp/editor-paged/result.json
+node examples/stress/paged.mjs --output /tmp/editor-paged/result.json
 ```
 
 results and the capability decision are in [the paged proof report](../../../docs/performance/e015-paged-proof.md).

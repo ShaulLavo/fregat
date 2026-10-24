@@ -43,7 +43,7 @@ command coverage.
 ## Nightly planning baseline
 
 [Plan 343](../../plans/343-t3code-nightly-orchestration.md) and the
-[current reference guide](../../docs/t3code-reference.md) use published nightly
+[current reference guide](../../.internal/t3code-reference.md) use published nightly
 `v0.0.46-nightly.20261010.2922`, commit `bd2346eda2e2c380d1844869c7fd16c279d2190f`.
 The rewrite is Approved and deferred. This directory's acceptance pin, inventory, and reports
 retain September provenance. A newer reference checkout can retain both Git objects. These

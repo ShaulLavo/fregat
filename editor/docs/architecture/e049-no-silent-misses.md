@@ -1,6 +1,6 @@
-# E049: A miss is an error, not a default
+# A miss is an error, not a default
 
-Implemented 2026-09-23 in Editor `f715d11`. When the core cannot do what it was asked, the caller
+When the core cannot do what it was asked, the caller
 finds out through a type error, a structured error or a `null` it must handle.
 
 - Every optional member on the view, document, capability, edit and plugin contexts is required.

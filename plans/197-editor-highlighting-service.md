@@ -111,7 +111,7 @@ the unfinished absolute-threshold calibration. Units 2–7 remain gated. CPU tel
 signed estimate, and the original host-contention cause remains unproven. The Tree-sitter
 capture-decoding repair in [PR #234](https://github.com/ShaulLavo/fregat/pull/234) remains open.
 
-The [wave record](../docs/next-wave.md#foundations-wave-2026-09-30) owns combined deployment
+The [wave record](../.internal/next-wave.md#foundations-wave-2026-09-30) owns combined deployment
 facts, the closed wave and remaining follow-ups. The older progress and failed captures below describe their
 original runs. The bounded request trace establishes no scheduling performance improvement.
 

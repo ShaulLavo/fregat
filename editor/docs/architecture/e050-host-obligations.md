@@ -1,7 +1,7 @@
-# E050: Host obligations now owned by the API
+# Host obligations now owned by the API
 
-Completed 2026-09-25. The eleven audited workarounds have public contracts and migrated callers.
-Platform Plan 130 removes the host copies; Editor owns the presentation and interaction ordering.
+The eleven audited workarounds have public contracts and migrated callers.
+Editor owns the presentation and interaction ordering; hosts no longer need their own copies.
 
 | Former host obligation                           | Public contract                                                                                         |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
@@ -22,7 +22,7 @@ Acquisition is blocked during invalidation, including from abort callbacks, unti
 presentation is complete. Decoration, position and chunk-window updates preserve the handle;
 releasing it does not abort its signal. Decode owns its animations, listens for invalidation, and
 cancels active reveals on every viewport change. Viewport restoration while highlighting is
-pending preserves the wait. This follows the owner's 2026-09-25 choice to keep reveal in the plugin.
+pending preserves the wait. Reveal stays in the plugin.
 
 The theme API registers diff colors explicitly when the plugin is created, so tree shaking cannot
 remove their defaults. Popup copies remove variables the source has cleared. `DiffPlugin.getStackedRows()`

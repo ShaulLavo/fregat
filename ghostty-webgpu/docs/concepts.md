@@ -15,12 +15,10 @@ Ghostty's `libghostty-vt` parses the byte stream and owns the active screen, cur
 
 Four classes expose that state at different depths.
 
-| Class             | Adds                                                    | Runs where                                |
-| ----------------- | ------------------------------------------------------- | ----------------------------------------- |
-| `GhosttyRuntime`  | Loads the wasm core.                                    | Browser or Node.                          |
-| `GhosttyTerminal` | Headless reads and writes of one terminal.              | Browser or Node.                          |
-| `TerminalSession` | The native session model, with selection and events.    | Browser or Node.                          |
-| `Terminal`        | The DOM host: fitting, focus, input, links, a renderer. | The page, or a page host around a worker. |
+- `GhosttyRuntime` (browser or Node): loads the wasm core.
+- `GhosttyTerminal` (browser or Node): headless reads and writes of one terminal.
+- `TerminalSession` (browser or Node): the native session model, with selection and events.
+- `Terminal` (the page, or a page host around a worker): the DOM host, with fitting, focus, input, links, and a renderer.
 
 Selection, `readLines`, accessibility text, and every renderer read the same native state. That is why a resize or a renderer switch never loses the screen.
 
@@ -53,7 +51,7 @@ flowchart TD
   canvas -- unavailable --> dom["DomTerminalRenderer"]
 ```
 
-Automatic selection skips software WebGPU adapters. An explicit `backend: 'webgpu'` on the worker entry accepts any adapter. After a lost WebGL context, the main entry follows the remaining order. The order lives in `src/render/shared/backend-order.ts` and `src/render/shared/selector.ts`. Desktop Linux tries WebGL2 first because it measured lower CPU work there ([changelog 0.3.22](https://github.com/ShaulLavo/fregat/blob/main/ghostty-webgpu/CHANGELOG.md)).
+Automatic selection skips software WebGPU adapters. `backend` is an option of the worker entry only, and an explicit `backend: 'webgpu'` there accepts any adapter. The main entry has no `backend` option. It takes `rendererMode` or a `rendererFactory`. After a lost WebGL context, the main entry follows the remaining order. The order lives in `src/render/shared/backend-order.ts` and `src/render/shared/selector.ts`. Desktop Linux tries WebGL2 first because it measured lower CPU work there ([changelog 0.3.22](https://github.com/ShaulLavo/fregat/blob/main/ghostty-webgpu/CHANGELOG.md)).
 
 ## The worker entry
 

@@ -9,12 +9,12 @@ Call log:
 
 steps:
 failure capture: after scenario execution; scenario cleanup may have run
-failure screenshot: /work/worktrees/platform/singapore-viewport-first/editor/docs/performance/singapore-viewport-first-2026-10-08/atomic-replacement/fregat/20261008T160620Z-scenario-editor-fast-scroll-bV2qp1/failure-after-scenario.png
-failure metadata: /work/worktrees/platform/singapore-viewport-first/editor/docs/performance/singapore-viewport-first-2026-10-08/atomic-replacement/fregat/20261008T160620Z-scenario-editor-fast-scroll-bV2qp1/observed.json
+failure screenshot: failure-after-scenario.png
+failure metadata: observed.json
 problems:
 
 - console warnings: ["No available adapters.","[.WebGL-0x1d5c0a57e000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"]
 
 logs (warn+, 2026-10-08T16:06:20.774Z..now): none
 api server: http://localhost:35749, throwaway state /tmp/fregat-agent-G7tp2x (removed after the run)
-full log: /work/worktrees/platform/singapore-viewport-first/editor/docs/performance/singapore-viewport-first-2026-10-08/atomic-replacement/fregat/20261008T160620Z-scenario-editor-fast-scroll-bV2qp1/2026-10-08.jsonl
+full log: 2026-10-08.jsonl

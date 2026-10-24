@@ -20,5 +20,11 @@ Fregat runs a server with access to your files and agent tools. Pair only device
 Keep remote access private, configure HTTPS, and review the [filesystem boundaries](docs/filesystem-boundaries.md).
 Pairing grants access to your machine's workspace. Treat access to the server as access to that work.
 
+Know these defaults before you expose a server:
+
+- The file server starts at the system root, subject to operating-system permissions. `FS_WORKSPACE_ROOT` restricts it, and it is not an operating-system sandbox.
+- New agent sessions start in `full-access` mode (`chat.defaultRuntimeMode`). A restricted file API does not confine an agent's shell commands.
+- A browser on the machine itself needs no pairing. Any other browser pairs first. A reverse proxy must preserve the public `Host` header, or always add a forwarding header such as `X-Forwarded-For`. A proxy that rewrites every request to a loopback host and strips every forwarding header makes remote traffic look local. See [reverse proxy device trust](docs/development.md#reverse-proxy-device-trust).
+
 The browser terminal's clipboard behavior and shell connection are part of its integration policy.
 Review the [terminal integration guide](ghostty-webgpu/docs/integration.md) when embedding it in another app.

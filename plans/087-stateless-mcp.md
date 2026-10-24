@@ -7,7 +7,7 @@ anything else in this plan starts; M0's exit result is the input to that convers
 
 This is the prerequisite for [native code intelligence](088-native-code-intelligence.md).
 [Root PLAN.md](../PLAN.md) owns execution order. The
-[implementation comparison](../docs/serena-implementation-comparison.md) records the evidence and design choices.
+[implementation comparison](../.internal/serena-implementation-comparison.md) records the evidence and design choices.
 
 ## Deliver the prerequisite
 

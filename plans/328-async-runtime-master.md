@@ -9,21 +9,21 @@ Build one purpose-built package for the async machinery we already own: worker l
 
 The source working name is `packages/async-runtime`. Choose its public name at the packaging gate; this planning pass creates no package, dependency or implementation. Library adoption is an internal decision, with no Comlink/Coaction proxy or store types leaking into consumer APIs.
 
-The [research index](../docs/async-runtime/README.md) records current workers, terminal work in flight, source/release pins, two distinct architectures and the independent review. Source findings identify proof obligations; they are not runtime benchmark results.
+The [research index](../.internal/async-runtime/README.md) records current workers, terminal work in flight, source/release pins, two distinct architectures and the independent review. Source findings identify proof obligations; they are not runtime benchmark results.
 
 ## Direction and rationale
 
 Choose modular owned services as the base. `createService` owns the complete lifecycle/admission/send/settlement transaction. Small scheduling modules remain independently usable; endpoint-specific adapters handle browser workers/ports and the existing Bun worker. Explicit optional scopes share budgets or aggregate diagnostics only where consumers need them.
 
-The alternative, an owner-scoped actor/executor registry, scored 19/25 against 21/25 for modular services. It offers useful aggregate ownership, but adds registration to simple local queues and risks growing a pool/runtime before a consumer benefits. Graft its unified accounting transaction, finite control progress, subscription readiness and optional close/inventory receipts into the base. The [architecture and review](../docs/async-runtime/architecture.md) retain both candidates and the reasons.
+The alternative, an owner-scoped actor/executor registry, scored 19/25 against 21/25 for modular services. It offers useful aggregate ownership, but adds registration to simple local queues and risks growing a pool/runtime before a consumer benefits. Graft its unified accounting transaction, finite control progress, subscription readiness and optional close/inventory receipts into the base. The [architecture and review](../.internal/async-runtime/architecture.md) retain both candidates and the reasons.
 
 Learn from all three libraries:
 
-| Library                                                   | Useful lesson                                                                     | Initial package decision                                                                                                |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| [Comlink](../docs/async-runtime/comlink.md)               | Typed remote calls, explicit transfers, endpoint separation                       | Qualify narrow private dispatch against a finite typed channel; lifecycle/error/ordering guarantees belong to us        |
-| [Multithreading](../docs/async-runtime/multithreading.md) | Movement/ownership vocabulary, independent jobs, queues and shared-memory tools   | Use static entries and bounded admission; no closure serialization, automatic pool or mandatory shared memory           |
-| [Coaction](../docs/async-runtime/coaction.md)             | Authority versus projection, epoch/sequence recovery, action observation barriers | Borrow the invariants; keep bulk buffers/streams and domain authority; factor recovery only after two consumers qualify |
+| Library                                                        | Useful lesson                                                                     | Initial package decision                                                                                                |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| [Comlink](../.internal/async-runtime/comlink.md)               | Typed remote calls, explicit transfers, endpoint separation                       | Qualify narrow private dispatch against a finite typed channel; lifecycle/error/ordering guarantees belong to us        |
+| [Multithreading](../.internal/async-runtime/multithreading.md) | Movement/ownership vocabulary, independent jobs, queues and shared-memory tools   | Use static entries and bounded admission; no closure serialization, automatic pool or mandatory shared memory           |
+| [Coaction](../.internal/async-runtime/coaction.md)             | Authority versus projection, epoch/sequence recovery, action observation barriers | Borrow the invariants; keep bulk buffers/streams and domain authority; factor recovery only after two consumers qualify |
 
 The provisional private backend is a finite request/event channel derived from our best existing owners. Comlink can win if the released artifact meets all cleanup/outcome requirements and reduces total maintained code, including its supervisor and adapters. We do not need its entire remote object model. Full Coaction, worker pools, SharedWorker and new shared-memory representations require a concrete consumer and a bounded comparison; none is part of the initial dependency set.
 
@@ -49,7 +49,7 @@ One deep service coordinates the machinery internally. Callers do not manually c
 
 ## Inventory and migration ownership
 
-The [inventory](../docs/async-runtime/inventory.md) covers five dedicated Editor worker owners, the server native-watch Bun worker, same-thread orchestration, PDF.js's configured dependency worker, push/MSW service workers, native IPC/processes and terminal work in flight.
+The [inventory](../.internal/async-runtime/inventory.md) covers five dedicated Editor worker owners, the server native-watch Bun worker, same-thread orchestration, PDF.js's configured dependency worker, push/MSW service workers, native IPC/processes and terminal work in flight.
 
 The terminal is the demanding stream/ownership consumer. [PR #480](https://github.com/ShaulLavo/fregat/pull/480) merged its async API agreement; #483's worker renderer gate and #494's extension scaffold were open at research time. OffscreenCanvas support and a renderer fixture do not mean the production terminal actor/worker entry or Platform switch has shipped. Refresh those heads before implementation and coordinate through Plans 287/286/283.
 

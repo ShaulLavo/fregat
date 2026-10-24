@@ -180,7 +180,7 @@ Loro’s website sync tutorial returned HTTP 403; no claim here relies on its in
 
 ### Safety boundary
 
-The owner’s requirement allows each partition to have a host. Consequently, **confirmation cannot mean irreversible global consensus**. It means accepted on the current branch. A branch-confirmed operation can become pending after rejoin.
+The requirement allows each partition to have a host. Consequently, **confirmation cannot mean irreversible global consensus**. It means accepted on the current branch. A branch-confirmed operation can become pending after rejoin.
 
 The Weidner article provides stable character IDs, tombstones and server reconciliation—undo pending operations, apply authoritative operations, redo pending operations. It does **not** specify host handoff or partition recovery.
 
@@ -191,7 +191,7 @@ Evidence: [Text without CRDTs — “Some Corrections,” “Client Side,” “
 | Approach                                    | Useful property                                                         | Limitation here                                                                                                                   |
 | ------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | Bully election                              | Simple election/answer/coordinator messages and deterministic ID winner | Classical assumptions include known membership and reliable bounded communication; browser suspension and partitions violate them |
-| Newest confirmed state, then lowest peer ID | Matches the owner’s preference and favors an existing history holder    | Edit number alone cannot distinguish conflicting histories with the same length                                                   |
+| Newest confirmed state, then lowest peer ID | Matches the stated preference and favors an existing history holder     | Edit number alone cannot distinguish conflicting histories with the same length                                                   |
 | Raft-like terms and host claims             | Fences stale messages and distinguishes authority generations           | Terms alone do not provide Raft safety                                                                                            |
 | Full quorum-based Raft                      | Majority elections and replicated-log rules provide stronger safety     | Minority partitions cannot keep committing; contradicts both-sides-active requirement                                             |
 
@@ -438,11 +438,10 @@ Remote caret visibility across folding, wrapping, injected rows and horizontal c
    Remote confirmation and replay must not become ordinary local undo entries. Local undo should submit a new intent for the author’s operation, not rewind everybody to an old shared snapshot. `history: 'skip'` is a useful primitive, not the complete policy.  
    Evidence: `editor/packages/editor/src/documentSession.ts:170–181, 324–345`.
 
-E027 remains an Approved design inventory with unfinished implementation items; it is not proof that all desired hooks shipped. E050 explicitly records completed public contracts. Inspect current code rather than interpreting either plan as blanket coverage.
+The extension-hook design inventory has unfinished implementation items; it is not proof that all desired hooks shipped. The host-obligations record lists completed public contracts. Inspect current code rather than treating either as blanket coverage.
 
 Evidence:
 
-- `plans/e027-extension-hooks.md:5–14, 26–46, 63–85`
 - `editor/docs/architecture/e050-host-obligations.md:1–18`
 
 ### Extension cost budget
@@ -508,7 +507,7 @@ Do not introduce hardcoded endpoints or environment-only knobs. Signaling and TU
 ## 7. Open questions
 
 1. **What exactly does “confirmed” promise?** Branch acceptance is compatible with active partitions; irrevocable global commitment is not.
-2. **Which character-ID engine and checkpoint format will the other lanes choose?** Transport cannot implement reliable replay before this is specified.
+2. **Which character-ID engine and checkpoint format will the other reports choose?** Transport cannot implement reliable replay before this is specified.
 3. **How long must losing suffixes, intents and tombstones survive?** Unlimited offline replay conflicts with aggressive history compaction.
 4. **How are concurrent three-way reconciliations resolved?** The proposed message vocabulary is sufficient to express them, but the state machine and convergence argument are unverified.
 5. **How are transformed/rejected parent operations handled during dependent replay?** Explicit conflict outcomes are required.

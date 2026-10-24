@@ -4,16 +4,17 @@ How to build, test, and change ghostty-webgpu. Development happens in the [Frega
 
 ## Set up
 
-You need [Bun](https://bun.sh/) (the repo pins 1.4.4 in `packageManager`) and Node 20 or newer.
+You need [Bun](https://bun.sh/) (the repo pins 1.4.4 in `packageManager`) and Node 20 or newer, the range `package.json` declares in `engines.node`. The benchmark verifier and `node --test` steps run on Node.
 
 ```sh
 git clone https://github.com/ShaulLavo/fregat.git
 cd fregat
 bun install --frozen-lockfile
+bun run --cwd hotkeys/packages/hotkeys build
 bun run --cwd ghostty-webgpu build
 ```
 
-`build` compiles TypeScript to `dist/` and bundles the worker. Consumers import `dist`, so rebuild after every source change.
+The first build is `@fregat/hotkeys`, which ghostty-webgpu imports from its own `dist/`. The second `build` compiles TypeScript to `dist/` and bundles the worker. Consumers import `dist`, so rebuild after every source change.
 
 To see your build in a browser, run `bun run --cwd ghostty-webgpu demo`. It serves a terminal lab with a real shell at `http://127.0.0.1:4173`.
 
@@ -62,7 +63,7 @@ The public docs live in three places.
 - `site/src/content/docs/` holds the tutorials and guides on [ghostty.shaulavo.dev](https://ghostty.shaulavo.dev/docs/). Put code in `site/src/examples/` and show it with `Code`. The checker rejects handwritten `ts` fences. See the [site README](../site/README.md).
 - `docs/` holds reference, concepts, and decision records.
 
-Two generated pieces are locked. `docs/benchmarks.md` and the README table between `## Performance` and `### Correctness` come from `docs/benchmarks/mac-m1-2026-10-10/scores.json`. Edit the data or `report.mjs`, then run `node docs/benchmarks/mac-m1-2026-10-10/report.mjs`. `report.mjs --check` fails when either file drifts.
+Two pieces are generated. `docs/benchmarks.md` and the README table between `## Performance` and `### Correctness` come from `docs/benchmarks/mac-m1-2026-10-10/scores.json`. Edit the data or `report.mjs`, then run `node docs/benchmarks/mac-m1-2026-10-10/report.mjs`. `report.mjs --check` fails when either file drifts.
 
 From the repository root, `bun scripts/check-package-pages.mjs` checks the package manifest, including the homepage, which must stay `https://ghostty.shaulavo.dev/`.
 

@@ -1,5 +1,7 @@
 # MDX and SQL admission follow-up
 
+> Internal investigation record, not user documentation. `scripts/syntax/candidates.json` cites this file by path, so it stays here.
+
 Investigated 2026-09-20. Neither language is externally blocked. The investigation below preceded admission.
 Generic SQL and repaired MDX have since shipped as partial coverage. See the
 [SQL increment](native-syntax-implementation.md#generic-sql-increment) and
@@ -72,5 +74,5 @@ Write the cases above to `.mdx` or `.sql` files and run `tree-sitter parse --qui
 For SQL categories, run `tree-sitter query queries/highlights.scm <file>`.
 
 The investigation used native CLI parsers, not the browser WASM runtime. SQL browser admission and incremental edit checks are now recorded in the implementation notes.
-MDX browser-worker admission now passes with inline grammar and scanner repairs; see the implementation notes. The wider performance checks remain. Captured probe inputs and output
-are in `/work/tmp/fregat-evidence/native-syntax-mdx-sql-20260920/`.
+MDX browser-worker admission now passes with inline grammar and scanner repairs; see the implementation notes. The wider performance checks remain. Probe inputs and output are
+in `<report-directory>`.

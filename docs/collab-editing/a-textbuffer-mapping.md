@@ -1,4 +1,4 @@
-# Lane A: Weidner's model on the Singapore textbuffer
+# Weidner's model on the Singapore textbuffer
 
 Sol research, 2026-10-08, Fregat main 1e066d38b. Articulated at 2332042a240327c7ade5fd1ba1a367f230b539c1.
 
@@ -58,7 +58,7 @@ Sources:
 
 Simply adding a replica name to today’s buffer sequence is insufficient if speculative replay reallocates sequence numbers or changes coalescing. Global IDs must be allocated once when authoring an operation, outside rollback state, and survive every replay.
 
-### 3. E006 preserves anchor behavior, not exact deleted-character order
+### 3. Compaction stand-ins preserve anchor behavior, not exact deleted-character order
 
 Before compaction, tombstone pieces retain their buffer ranges. Those ranges could support exact structural placement with a new tree primitive. The existing APIs do not provide it:
 

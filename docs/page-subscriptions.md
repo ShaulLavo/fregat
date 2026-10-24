@@ -23,8 +23,6 @@ three ordinary reloads, and simulated retained-page events. The latter tests res
 not whether the browser will admit the whole app into its back/forward cache.
 
 Verified 2026-09-19 on release `20260919T160144Z-e78c4c44-page-subscriptions`.
-The seven-step production run is at
-`/work/tmp/fregat-evidence/20260919T160213Z-scenario-page-lifecycle/`; its final screenshot was
-inspected. Production logs for 16:02:13–16:02:20 UTC had no warning or error events. Ten focused
+The seven-step production run's final screenshot was inspected. Production logs for 16:02:13–16:02:20 UTC had no warning or error events. Ten focused
 lifecycle/settings-stream tests and six environment-connection tests passed, with web/scripts
 typechecks, changed-file lint/format and unused-code checks. The deploy reused the running server.

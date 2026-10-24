@@ -1,27 +1,20 @@
 # Web layering and shared helpers
 
-Plan 096 implementation landed on `main` on 2026-09-12. The original checkout was
-`3c935f6a`; existing local work was captured before editing and committed as `bfbdbf6d`.
-That baseline includes Plan 098's document domain and shared-layer lint guard. This
-refactor reuses both.
-
-Implementation and review are complete. The repository-wide Knip audit is clean,
-including the unused code that predated this refactor. The executable plan is retired.
-`bun run unused:check` now runs in CI and in `bun run verify`.
+How the web app's folders are layered and where shared helpers live. The document domain and the
+shared-layer lint guard are the base this layering reuses. The repository-wide Knip audit is
+clean, and `bun run unused:check` runs in CI and in `bun run verify`.
 
 ## Module ownership
 
-`keymap/menus` owns command-aware menu resolution and its presentation. Pass A is
-`0126a305`, containing only moves and import changes. The census counted 58 production
+`keymap/menus` owns command-aware menu resolution and its presentation. The census counted 58 production
 imports in 39 files, including the menus subtree. Outside that subtree there were
 43 imports in 32 files across seven feature buckets.
 
 Git callers now import `GitFileStatus`, `GitTreeStatus`, `GitRepositoryInfo`,
-`GitStatusResult`, and `GitFileDiff` from contracts. Pass B is `f2a2f8f2`, containing
-only the alias removal and caller updates. Sixteen production files used those aliases
+`GitStatusResult`, and `GitFileDiff` from contracts. The change was only the alias removal and caller updates. Sixteen production files used those aliases
 across Git, workspace, workbench, chat, and chat-mode. Git's feature-specific types remain.
 
-Pass C is `6e004c41`. Environment UI and discovery live in their feature. Shared phase
+Environment UI and discovery live in their feature. Shared phase
 and stale-connection components live in `lib/environments/components`. The network client
 lives directly in `lib/environments`, because subscriptions do not belong in `utils`.
 The old app-level `utils` directory is empty and removed.
@@ -33,7 +26,7 @@ settings and environment dialogs use them and the hook submits settings actions.
 is the plan's per-module consumer rule applied to the current source, rather than moving
 every environment-named module into a feature.
 
-The following table records production imports before Pass C. Tests do not count toward
+The following table records production imports before the environment modules moved. Tests do not count toward
 shared ownership. Paths are relative to `apps/web/src`.
 
 | Previous path                                | Current path                                             | Imports | Consumer buckets before move                            |
@@ -85,7 +78,6 @@ including static template literals.
 
 ## Storage behavior
 
-Accessor hardening landed first in `24568319`, before adoption in `f15f4904`.
 All four browser accessors catch blocked-storage failures. Reads and enumeration return
 empty results; removal returns. Writes return `written`, `unavailable`, or `storage-failed`.
 The shared cache writer preserves that result and handles serialization and size limits.
@@ -128,7 +120,7 @@ the model picker retains its overlapping tiers. A baseline comparison checked 11
 query/limit combinations across 169 candidates for each calibration.
 
 Local and remote address builders share literal route prefixes while retaining typed
-parameters. The Plan 098 document descriptors and empty-payload distinctions remain the
+parameters. The document descriptors and empty-payload distinctions remain the
 source of truth. No standalone codec factory was introduced.
 
 Both search result navigators share keyboard dispatch and ignore modified keys. Sidebar
@@ -146,17 +138,12 @@ scrolling uses the existing reduced-motion helper; missing `matchMedia` allows s
 scrolling, while initial reveals remain immediate. SSH Retry disables and shows a spinner
 while fetching, matching tailnet behavior.
 
-Unused `planPinnedReorder`, `sortByOrderKey`, and `generateSpreadOrderKeys` were removed in
-`946166e2`, along with orphan helpers and tests. The live order-key primitives remain.
-The two unused orchestration HTTP SSE registrations were removed in that commit.
+Unused `planPinnedReorder`, `sortByOrderKey`, and `generateSpreadOrderKeys` are gone, along with orphan helpers and tests. The live order-key primitives remain.
+The two unused orchestration HTTP SSE registrations are gone too.
 WebSocket RPC still consumes the engine generators; other SSE routes retain their shared
 server utility. The Logseq gap matrix now cites the live rail reorder implementation.
 
 ## Verification
-
-All implementation commits after the baseline and initial subtraction/accessor commits
-ran the normal formatting, lint, and repository typecheck hooks. A cumulative check also
-validated all 448 changed source files, including the pre-existing local work.
 
 Focused checks cover:
 
@@ -170,46 +157,29 @@ Focused checks cover:
 - The actual Oxlint CLI boundary calibration through `bun run test:scripts`.
 - The repaired in-process integration check, which had referenced a deleted search client.
 
-Production build and browser checks cover the actual notice icon dimensions, hover/focus
-reveal, grid columns, and the rebuilt application's moved command and machine-picker paths.
-The existing preview and public proxy were reused; no server was started.
+Browser checks cover the notice icon dimensions, hover/focus reveal, grid columns, and the
+command and machine-picker paths.
 
-## Review and Knip closeout
+## Unused-code checks
 
-The review compared the original implementations with the final callers, then checked the
-ownership decisions against the consumer census. It found and fixed four gaps:
+Static template literals used to bypass the shared-layer lint rule. Real Oxlint CLI probes now
+reject both quoted and backtick imports and keep an allowed shared-module control. The import
+census extracts imports from the syntax tree, so comments and strings do not count, test
+factories are not production, and app-level tests are included. Corrupt-cache recovery reports
+the cache key and failure reason without exposing data, and chat projection caching uses the
+shared storage helpers while keeping environment validation and full-to-shell quota retry.
 
-- Static template literals bypassed the shared-layer lint rule. Real Oxlint CLI probes now
-  reject both quoted and backtick imports and retain an allowed shared-module control.
-- The import census could count comments and strings, treated test factories as production,
-  and omitted app-level tests. AST extraction and a CLI fixture check cover those cases.
-- Corrupt-cache recovery showed a filesystem-error toast and omitted the cache key and
-  failure reason. Cache-specific diagnostics now describe recovery without exposing data.
-- Chat projection caching still duplicated serialization and storage access. It now uses
-  the shared helpers while retaining environment validation and full-to-shell quota retry.
-
-Knip cleanup removed unused export modifiers from declarations still needed locally and
-removed dead declarations, orphan editor activation context wiring, and unused TUI root-list
+The Knip configuration removed unused export modifiers from declarations still needed locally,
+dead declarations, orphan editor activation context wiring, and unused TUI root-list
 persistence. TUI still stores the last location and each root's location. The server's pure
-orchestration schema barrel was deleted; callers import canonical contracts directly.
-Duplicate revived-event schema aliases were removed without changing wire tags or schema
-objects. Seven inert filesystem type aliases became compiler assertions that fail on drift.
+orchestration schema barrel is gone; callers import canonical contracts directly. Duplicate
+revived-event schema aliases were removed without changing wire tags or schema objects. Seven
+inert filesystem type aliases became compiler assertions that fail on drift.
 
-Knip entry declarations describe real standalone scripts, workers, compiler assertions,
-and child-process scenarios. Exact exceptions cover editor fixture content, runtime-selected
+Knip entry declarations describe real standalone scripts, workers, compiler assertions, and
+child-process scenarios. Exact exceptions cover editor fixture content, runtime-selected
 language-server binaries, and subprocess arguments resolved under a different working
-directory. The root-only Turbo exception covers its actual launches in `scripts/dev.ts` and
-`scripts/prod.ts`; the installed CLI was checked directly. Stale exceptions were removed.
-The navigation proof script declares its existing `@tanstack/history` dependency, and web
-no longer declares the unused `@shikijs/themes` dependency owned by client-core.
-
-No unused-export or unused-type exceptions were added. The full Knip run is clean,
-including configuration hints. Source removal is checked by the repository typecheck and
-focused lint. Existing tests cover event revival, TUI history restoration, and projection
-quota fallback. The review also independently compared ranker ordering, keyboard adapters,
-route-builder output, hash encodings, tab selection, and search metadata against the baseline.
-
-The closeout rebuilt the web app and exercised the command palette, Connect and Switch
-machine dialogs, SSH/tailnet discovery, and titlebar menu through the existing preview.
-No page or console errors occurred. Final repository typecheck, touched-source lint and
-format checks, and the full Knip audit pass.
+directory. The root-only Turbo exception covers its launches in `scripts/dev.ts` and
+`scripts/prod.ts`. The navigation proof script declares its `@tanstack/history` dependency, and
+web does not declare the unused `@shikijs/themes` dependency owned by client-core. No
+unused-export or unused-type exceptions exist.

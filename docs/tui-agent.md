@@ -2,7 +2,6 @@
 
 The Agent view connects the terminal client to the same orchestration engine, provider adapters,
 and conversation projection as the web app. It provides the missing prompt and session stage.
-Plan 082 completed on 2026-09-07.
 The [TUI README](../apps/tui/README.md#start-an-agent-conversation) describes the controls.
 
 ## Runtime and ownership
@@ -93,11 +92,10 @@ external process boundary.
 | Terminal selection survives palette focus and reaches the correct prompt                  | [Terminal context](../apps/tui/src/terminal/tests/agent-context.test.tsx)                                                        |
 | Reconnect reuses the existing shell                                                       | [Terminal reconnect](../apps/tui/src/terminal/tests/reconnect.test.tsx)                                                          |
 
-The working verification artifacts and decision trail are under `/work/tmp/platform-tui-agent/`.
 The full TUI suite passes 282 tests across 86 files. The final composer checks pass 11 tests;
 terminal/provider checks pass 58 tests, and migrated web logic checks pass 168 tests. TUI and
 server builds, TUI lint and formatting, and client-core, server, and web typechecks pass.
 The live check rebuilt and restarted the existing server on port 3301, wrote a native Agent frame,
 and launched the desktop terminal. Structured TUI logs confirm the interactive connection is live.
 Worktree creation and cleanup are covered by the [TUI worktree record](tui-worktrees.md).
-Distribution with machine selection (084) remains a separate slice in the [strategy](../plans/tui-plan.md).
+The TUI has no standalone distribution yet.

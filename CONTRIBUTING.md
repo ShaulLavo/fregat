@@ -10,21 +10,16 @@ The standalone package repositories are read-only mirrors. Send changes here.
 - For a feature, explain the problem and a concrete example of who needs it. Link related discussions or issues.
 - Report vulnerabilities through [private security advisories](SECURITY.md).
 
-The [roadmap](PLAN.md) records approved work. Discuss a large change before implementing it so we can agree on scope.
+Discuss a large change in an issue or Discussion before you implement it, so we can agree on scope.
 If you take an open issue, check for an `in progress` label or claim comment first. Claim available work with a comment naming your branch or PR.
 
 ## Set up a checkout
 
-Install [Bun](https://bun.sh/) and [Git](https://git-scm.com/), then run:
-
 ```sh
-git clone https://github.com/ShaulLavo/fregat.git
-cd fregat
-bun install --frozen-lockfile
-bun run dev
+git clone https://github.com/ShaulLavo/fregat.git && cd fregat && bun install --frozen-lockfile && bun run build:workspaces && bun run dev
 ```
 
-Read [docs/development.md](docs/development.md) for the package layout, source builds, and platform prerequisites.
+The [README](README.md#requirements) says which Bun, Node.js and Git versions you need and why. Read [docs/development.md](docs/development.md) for source builds, checks, version floors and platform prerequisites, and the [monorepo map](docs/monorepo.md) for where code lives. If a command fails, see [troubleshooting](docs/troubleshooting.md).
 Read [AGENTS.md](AGENTS.md) for repository conventions. Singapore changes also follow [editor/AGENTS.md](editor/AGENTS.md); terminal changes follow [ghostty-webgpu/AGENTS.md](ghostty-webgpu/AGENTS.md).
 
 ## Make and verify a change
@@ -39,6 +34,11 @@ Tests must run from a fresh checkout. Use temporary fixtures and mock external p
 Keep credentials, private paths, and personal data out of fixtures, screenshots, logs, and reports.
 
 Docs-only changes need no changeset. Package code changes follow the repository's patch-release policy and Changesets workflow.
+
+## Write documentation
+
+Put pages for users and contributors in `docs/`, and package pages next to the package. Plans, audits, research and measurement dumps do not belong in `docs/`. `plans/` and `.internal/` hold working material, and neither is linked from the README or `docs/`.
+Before you push a docs change, run `bunx oxfmt --check <files>` on the files you touched and `bun run plans:check` when you touch `plans/` or `PLAN.md`. `bun run package-pages:check` covers the published package READMEs. `bun --bun vitest run --config vitest.scripts.config.mjs scripts/public-copy.test.ts` checks the root README.
 
 ## AI contributions
 

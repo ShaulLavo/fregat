@@ -3,7 +3,7 @@
 ## Status and authorization
 
 - Status: APPROVED 2026-09-26. Owner direction: permissive licences only and as few
-  dependencies as possible. Source: the round-2 audit, [dependency licences](../docs/dependency-licences.md) §3.
+  dependencies as possible. Source: the round-2 audit, [dependency licences](../.internal/dependency-licences.md) §3.
 - Amended 2026-09-26: web push stays. Decided 2026-09-26: owner — "Web push: KEEP. Rewrite Plan 184
   so web push is never dropped. If a permissive-only dependency set is wanted, isolate the MPL-2.0
   `web-push` code in its own small package, loaded only when push is used." Slice 4 changed to match.

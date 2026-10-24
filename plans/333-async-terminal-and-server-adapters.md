@@ -10,7 +10,7 @@ The terminal actor and native-watch event worker share lifecycle, bounded channe
 
 ## Terminal work in flight
 
-The dated [inventory](../docs/async-runtime/inventory.md) distinguishes merged API agreement [#480](https://github.com/ShaulLavo/fregat/pull/480), open native worker-renderer gate [#483](https://github.com/ShaulLavo/fregat/pull/483), open extension scaffold [#494](https://github.com/ShaulLavo/fregat/pull/494) and native-only renderer merge [#470](https://github.com/ShaulLavo/fregat/pull/470). These are background dependencies, not PRs managed by this planning task. Refresh their source and state before implementation.
+The dated [inventory](../.internal/async-runtime/inventory.md) distinguishes merged API agreement [#480](https://github.com/ShaulLavo/fregat/pull/480), open native worker-renderer gate [#483](https://github.com/ShaulLavo/fregat/pull/483), open extension scaffold [#494](https://github.com/ShaulLavo/fregat/pull/494) and native-only renderer merge [#470](https://github.com/ShaulLavo/fregat/pull/470). These are background dependencies, not PRs managed by this planning task. Refresh their source and state before implementation.
 
 Renderer feasibility/cleanup tests are not a public worker entry, production actor protocol, full dual-entry suite or Platform switch. Plan 287 remains the owner of those deliverables. This package introduces no competing worker migration or release deadline for that plan.
 

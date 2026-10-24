@@ -38,8 +38,7 @@ Base UI's forwarded zero-detail checkbox click stays silent.
 in `packages/ui/src/styles/globals.css`. Run `bun scripts/generate-spring-easings.ts` to regenerate;
 its drift and settling tests run with `test:scripts`.
 
-Plan 154 phases 1–6 are implemented. `physical-mode` verifies settings, presses, surfaces and
+The physical-feel work is implemented. `physical-mode` verifies settings, presses, surfaces and
 reduced motion; `physical-chat` checks streamed arrivals and virtualized scrolling. Browser tests
 render every voice through Chromium's OfflineAudioContext and pin Flat geometry and keyboard focus.
-The owner still needs to judge the feel on the merged mesh build. Phone haptics remain parked with
-Plan 143.
+The feel has not been judged on the merged mesh build yet. Phone haptics are parked.

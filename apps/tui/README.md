@@ -20,27 +20,25 @@ its normal launcher restarted to accept that origin. Custom launchers must inclu
 
 These are the defaults. Settings overrides take effect immediately, including displayed hints.
 
-| Action                                  | Keys                 |
-| --------------------------------------- | -------------------- |
-| Command palette                         | F1 or Ctrl+K, then P |
-| File picker                             | Ctrl+P               |
-| Agent view                              | Ctrl+K, then R       |
-| New session                             | Ctrl+N               |
-| Focus prompt                            | Ctrl+K, then C       |
-| Choose model                            | Ctrl+K, then M       |
-| Open workbench                          | Ctrl+K, then W       |
-| Choose another workbench folder         | Ctrl+K, then O       |
-| Settings                                | Ctrl+K, then S       |
-| Views                                   | Ctrl+K, then V       |
-| Back / Forward                          | Ctrl+K, then B / N   |
-| Edit / change scope / reset setting     | F2 / F3 / F4         |
-| Retry / discard failed settings changes | F5 / F6              |
-| Confirm an editing dialog               | F2                   |
-| Change focus                            | Tab / Shift+Tab      |
-| Close or return                         | Escape               |
-| Reconnect                               | Ctrl+R               |
-| Quit / suspend to shell                 | Ctrl+C / Ctrl+Z      |
-| Quit while a terminal owns input        | Ctrl+K, then Q       |
+- Command palette: F1 or Ctrl+K, then P
+- File picker: Ctrl+P
+- Agent view: Ctrl+K, then R
+- New session: Ctrl+N
+- Focus prompt: Ctrl+K, then C
+- Choose model: Ctrl+K, then M
+- Open workbench: Ctrl+K, then W
+- Choose another workbench folder: Ctrl+K, then O
+- Settings: Ctrl+K, then S
+- Views: Ctrl+K, then V
+- Back / Forward: Ctrl+K, then B / N
+- Edit / change scope / reset setting: F2 / F3 / F4
+- Retry / discard failed settings changes: F5 / F6
+- Confirm an editing dialog: F2
+- Change focus: Tab / Shift+Tab
+- Close or return: Escape
+- Reconnect: Ctrl+R
+- Quit / suspend to shell: Ctrl+C / Ctrl+Z
+- Quit while a terminal owns input: Ctrl+K, then Q
 
 Type to search settings. Up and Down move immediately while search keeps accepting text.
 Every selectable list wraps in both directions. Tab moves between search, list, and details.
@@ -144,22 +142,20 @@ Within a workbench, **Ctrl+P** opens files directly into the viewer. Back and Fo
 agent, file, and settings locations. The last workbench, file position, pane, and terminal tabs persist
 per environment and folder.
 
-| View or action         | Default keys   |
-| ---------------------- | -------------- |
-| File tree              | Ctrl+K, then E |
-| File viewer            | Ctrl+K, then I |
-| Git                    | Ctrl+K, then G |
-| Workspace search       | Ctrl+K, then F |
-| Terminal               | Ctrl+K, then T |
-| Problems               | Ctrl+K, then D |
-| Logs                   | Ctrl+K, then L |
-| Hide or show file tree | Ctrl+K, then U |
-| Find in the viewer     | Ctrl+F         |
-| Next or previous match | F3 or Shift+F3 |
-| Go to line             | Ctrl+K, then J |
-| Go to definition       | F12            |
-| Hover information      | Ctrl+K, then H |
-| Edit file              | Ctrl+K, then X |
+- File tree: Ctrl+K, then E
+- File viewer: Ctrl+K, then I
+- Git: Ctrl+K, then G
+- Workspace search: Ctrl+K, then F
+- Terminal: Ctrl+K, then T
+- Problems: Ctrl+K, then D
+- Logs: Ctrl+K, then L
+- Hide or show file tree: Ctrl+K, then U
+- Find in the viewer: Ctrl+F
+- Next or previous match: F3 or Shift+F3
+- Go to line: Ctrl+K, then J
+- Go to definition: F12
+- Hover information: Ctrl+K, then H
+- Edit file: Ctrl+K, then X
 
 The wide layout keeps the tree beside the active view. At narrow widths, the file tree and
 viewer share the available space. Use their commands to switch. Problems lists diagnostics
@@ -230,7 +226,7 @@ terminal defaults. `workbench.reduceMotion` slows the shared loaders.
 ## Frames and development
 
 ```sh
-bun run dev:tui --headless-frame /work/tmp/platform-tui.txt --width 100 --height 30
+bun run dev:tui --headless-frame platform-tui.txt --width 100 --height 30
 ```
 
 A failed connection still writes an error frame and exits 1; a live frame exits 0. Interactive
@@ -263,7 +259,5 @@ the native value, including input that arrived before React committed its next r
 
 See the [foundation record](../../docs/tui-foundation.md),
 [workbench record](../../docs/tui-workbench.md), and [Agent view record](../../docs/tui-agent.md)
-for implementation and verification details. Worktree creation parity and distribution remain
-separate slices in [the TUI strategy](../../plans/tui-plan.md).
-The [binding audit](../../docs/tui-bindings.md) records the original foundation dispositions;
-the command catalog and in-app shortcut help contain the current defaults.
+for implementation and verification details. The command catalog and in-app shortcut help
+contain the current defaults.

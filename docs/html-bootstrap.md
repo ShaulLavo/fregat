@@ -3,7 +3,6 @@
 The app's initial document carries its current appearance before React mounts. Wallpaper links
 start image transfers when the browser discovers the HTML. A small classic script selects the
 viewing device's color mode and applies appearance; application modules reuse its parsed data.
-[Plan 341](../plans/341-html-bootstrap.md) owns execution and delivery checks.
 
 ## Producers and consumers
 

@@ -14,7 +14,6 @@ Read the applicable skills before writing or reviewing code, or running their wo
 - React components, hooks, providers, state, or compiler diagnostics: [react-development](.agents/skills/react-development/SKILL.md).
 - Web UI and shared UI primitives, including loading, focus, motion, and truncation: [web-ui](.agents/skills/web-ui/SKILL.md). React UI work requires both skills.
 - UI verification and performance/render/cache claims: [verify-fregat](.agents/skills/verify-fregat/SKILL.md).
-- Owner-host Mesh, deployment, or heavy-job scheduling: read the local `fregat-local` skill when working on that configured integration. Contributor setup follows the repository docs.
 
 ## Contributor portability
 
@@ -24,14 +23,16 @@ Read the applicable skills before writing or reviewing code, or running their wo
 
 ## Planning ownership
 
-- Root `PLAN.md` schedules all packages and clients. Plans, backlogs, and wishlists live in root `plans/`; package `PLAN.md`, `ROADMAP.md`, instructions, and READMEs link to Fregat's root roadmap.
-- Index plans in `plans/README.md`. Run `bun run plans:check` when editing the Editor inventory.
-- `docs/` holds architecture, research, and delivery evidence. Execution checklists and work ordering belong in the owning root plan and roadmap.
+- Root `PLAN.md` schedules all packages and clients. Plans, backlogs, and wishlists live in root `plans/`. The path stays because this workflow reads it. Package instructions link to the root roadmap; package READMEs and `docs/` do not.
+- Index every top-level plan in `plans/README.md`. Run `bun run plans:check` after editing `plans/` or `PLAN.md`.
+- A finished plan leaves `plans/`: put its lasting decision in `docs/adr/`, fold its behavior into `docs/`, then delete it. Aim for at most two live plans.
+- `docs/` holds public documentation only: guides, architecture, reference, decision records. Research, audits, measurement dumps and delivery receipts go in `.internal/`. `README.md` and `docs/` never link into `plans/` or `.internal/`.
+- Execution checklists and work ordering belong in the owning root plan and roadmap.
 
 ## Reference Clones
 
 - Upstream clones (vscode, t3code, opencode, codex, …) belong in gitignored root `references/`. Check there before cloning. Tests and `scripts/parity` resolve `references/t3code` relatively; CI skips these checks because it does not fetch the clone.
-- Pull outdated clones before use. T3 Code architecture uses the published nightly pinned in `plans/343-t3code-nightly/reference-pin.json`; follow `docs/t3code-reference.md`. Plan 126 comparison records retain their historical pin. Record a reviewed nightly delta before changing the active pin.
+- Pull outdated clones before use. T3 Code architecture uses the published nightly pinned in `plans/343-t3code-nightly/reference-pin.json`; follow `.internal/t3code-reference.md`. Plan 126 comparison records retain their historical pin. Record a reviewed nightly delta before changing the active pin.
 
 ## Code Organization
 
@@ -113,21 +114,21 @@ Read the applicable skills before writing or reviewing code, or running their wo
 
 ## Desktop app
 
-- `apps/desktop/src/launcher/index.ts` is the desktop entry point. On machines with registered Mesh dev routes, `bun run desktop:dev` opens those routes; `bun run app:mac` builds the self-contained macOS bundle. Automatic selection uses the native WebKit host on macOS and prefers the installed Chrome app on Linux. Transparent-window mode selects the native system-webview host; an explicit browser executable overrides automatic selection. Native hosts are Zig 0.17 on Linux and Swift with AppKit and WKWebView on macOS.
+- `apps/desktop/src/launcher/index.ts` is the desktop entry point. `bun run app:mac` builds the self-contained macOS bundle. Automatic selection uses the native WebKit host on macOS and prefers the installed Chrome app on Linux. Transparent-window mode selects the native system-webview host; an explicit browser executable overrides automatic selection. Native hosts are Zig 0.17 on Linux and Swift with AppKit and WKWebView on macOS.
 - Installed-browser features work from OS shortcuts without a running launcher or injected globals. Native window transport belongs to the retained host. Production clients share one server per machine/state home; installation reuses its service or registers OS activation. Closing a client leaves shared services and terminals running. [Plan 114](plans/114-installed-app.md) owns these contracts.
 
 ## Dev, Gates, Verification
 
 - Bundle size is not gated; deal with it when it's a real problem (owner, 2026-10-09).
-- Follow `README.md` and `docs/development.md` for development setup; Mesh is an optional integration. Browser verification uses an isolated state home. `/dev` is the component gallery; add a tab for anything worth eyeballing.
+- Follow `README.md` and `docs/development.md` for development setup. Run `bun run build:workspaces` before the first `bun run dev` or typecheck: the server imports the mirrored libraries from their built `dist`. Browser verification uses an isolated state home. `/dev` is the component gallery; add a tab for anything worth eyeballing.
 - A private dev server takes an explicit free `--port` on a known loopback address, and stops after verification.
-- Run the narrowest checks that can catch the change's plausible failures. Heavy-job scheduling and resource limits belong to the execution host's local instructions. The owner uses the private `ShaulLavo/heavy-runner` tool documented in the local `fregat-local` skill; contributor commands and CI run independently of it.
+- Run the narrowest checks that can catch the change's plausible failures.
 - `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`, `query:check`, `unused:check`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
 - Prove changes with the `verify-fregat` skill (`bun run agent:browser look|scenario|trace|renders|caches`); use the evidence directory the command reports. Read the screenshot back and name the directory. Performance claims cite `trace --compare`, render claims `renders` before and after, settlement claims `caches`. Reproduce a bug on its surface before fixing it. A surface with no scenario gets one in `scripts/agent/scenarios/`, selectors in `scripts/agent/selectors.ts`.
 
 ## Deployment
 
-- `bun run build-release` builds a portable release anyone can make. Installing one is an optional local integration that needs explicit authorization: `bun run install-release` installs onto the machine target set in `developer.deployTarget` (see `docs/development.md`) and refuses without it. When authorized, verify server changes before installing them and confirm the served release afterwards.
+- `bun run build-release` builds a portable release anyone can make. Installing one onto the owner's machine is covered under Owner-only below.
 - Desktop windows, browser tabs and remote clients share the machine server. The launcher reuses the recorded service and release; closing or uninstalling a client leaves shared services and terminals running. Packaged service activation and updates follow [Plan 114](plans/114-installed-app.md).
 - The release endpoint under the configured base path (`GET <base>/release`) reports the served release, commit and dirty count, plus `pending`, `phase` and `liveCheck` for a staged update.
 - Editor packages live in `editor/packages/`; the terminal library lives in `ghostty-webgpu/`. Both are root Bun workspaces mirrored to their standalone repositories. Change their source here, follow each folder's `AGENTS.md`, and run `bun run build:workspaces` before checking consumers. CI builds those workspaces from this checkout.
@@ -152,3 +153,12 @@ Read the applicable skills before writing or reviewing code, or running their wo
 ## Content isolation
 
 Sanitized Markdown renders in light DOM with prefixed ids, names and fragment links. Library output that brings its own stylesheets or document ids renders in a shadow root; Mermaid passes source text unchanged and namespaces parsed custom-class identities for light-DOM measurement before displaying its SVG inside the root. Content that can run script renders in a sandboxed iframe with an opaque origin, using `srcdoc` or a blob with `sandbox="allow-scripts"` and no `allow-same-origin`. Images and SVG files render through `<img>`. PDF viewers disable scripting and evaluation. The editor stays in light DOM.
+
+## Owner-only (the maintainer's machine)
+
+Contributors and CI never need this section. It stays in this file because agents read it. Setup lives in [docs/development.md](docs/development.md#owner-only-setup).
+
+- Mesh, deployment, or heavy-job scheduling: read the local `fregat-local` skill when working on that configured integration.
+- On machines with registered Mesh dev routes, `bun run desktop:dev` opens those routes. Mesh is an optional integration.
+- Heavy-job scheduling and resource limits belong to the execution host's local instructions. The owner uses the private `ShaulLavo/heavy-runner` tool documented in the local `fregat-local` skill; contributor commands and CI run independently of it.
+- `bun run install-release` installs onto the machine target set in `developer.deployTarget` and refuses without it. It is an optional local integration that needs explicit authorization. When authorized, verify server changes before installing them and confirm the served release afterwards.

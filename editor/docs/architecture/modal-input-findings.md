@@ -1,6 +1,6 @@
-# Modal input through public extensions (E028 findings)
+# Modal input through public extensions (modal input findings)
 
-Built 2026-09-26 in wave 2, lane E1, as Platform Plan 122 phase 5. The proof is
+The proof is
 [`examples/app/src/modal/`](../../examples/app/src/modal/): `grammar.ts` (a pure state machine) and
 `modalPlugin.ts` (the plugin). It imports only public entry points: `@singapore-editor/core/document`,
 `/editor` and `/extensions`. Turn it on in the example app with `?modal`.
@@ -37,7 +37,7 @@ and the inner object.
 - `j` and `k` move by buffer line, not by display row; wrapped rows and folded ranges are not
   handled (the editor's own navigation commands are, and a later version should drive them).
 - The block caret is `1ch` wide: exact for a monospace face, wrong for wide graphemes and for
-  proportional fonts (E052). Drawing it from grapheme geometry belongs with the caret renderer.
+  proportional fonts (proportional font extents). Drawing it from grapheme geometry belongs with the caret renderer.
 - The grammar is its own state machine inside the command handler. The shared dispatcher matches
   exact chords with a timeout, which cannot hold counts or an operator waiting for its motion.
 - Undo is the editor's `undo` command through `scope.editor`, which is labelled unstable.

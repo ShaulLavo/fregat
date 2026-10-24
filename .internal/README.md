@@ -1,0 +1,3 @@
+# Internal working notes
+
+This folder holds working notes, not user documentation: research, design comparisons, gap matrices, audits, verification receipts, benchmark dumps and delivery records. Most were written by agents during a task and describe the checkout they were written against, so their paths, counts and conclusions can be out of date. Nothing in `README.md` or `docs/` links here. A note leaves when its finding has moved into a decision record, a public page in `docs/`, or a plan, or when nobody cites it any more. Delete it then. Git history keeps every version. Plans are separate: they stay in `plans/` because the agent workflow reads that path, and `plans/README.md` explains how a finished plan leaves.

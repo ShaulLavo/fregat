@@ -62,7 +62,8 @@ without assembling the whole line. The old eager row algorithm lives only in
 ### Invalidation and remaining global work
 
 Ordinary rendering forwards document snapshots into the view. Single edits use the same projection
-transition contract as batches. [E032 batch rendering](../performance/e032-edit-batches.md)
+transition contract as batches. The [edit batches report](../performance/e032-edit-batches.md)
+describes how the view
 delivers every applied edit in one original-to-final snapshot transition. An already
 adopted session target is a no-op; a view that missed the transaction's source revision resets from
 the immutable target rather than applying an edit in the wrong coordinate space.
@@ -81,16 +82,16 @@ Horizontal extent still follows observed rows rather than a whole-document maxim
 Live snapshots retain content handles. `toVisibleSnapshot()` captures mounted paint parts and stays
 bounded to mounted content. A live snapshot has no `toJSON()` or `fullText`: whole-view JSON comes
 only from `serializeEditorViewSnapshot(snapshot)`, which reads the captured revision's full text and
-source line starts on purpose (E033). E034 owns fallback indentation-fold discovery.
+source line starts on purpose ([full-text boundary](../performance/e033-full-text-boundary.md)). Fallback indentation-fold discovery is described in the [snapshot indentation folds report](../performance/e034-snapshot-indentation-folds.md).
 
-Measurements and commands are recorded in [the E031 performance report](../performance/e031-projection.md).
+Measurements and commands are recorded in [the projection performance report](../performance/e031-projection.md).
 
 ## Decision: Proceed With Layered Transforms
 
 FoldMap validated the core contract: a layer can own local state, update that state against a new
 snapshot, and emit output-space invalidations tight enough for the layer above to avoid global
 recomputation. The decision is **go** for the layered abstraction, with the constraint that future
-layers still need their own validation before the approach is considered locked for every transform.
+layers still need their own validation before the approach holds for every transform.
 
 ### Alternatives considered
 
@@ -108,7 +109,7 @@ layers still need their own validation before the approach is considered locked 
 
 ---
 
-## Layer Interface (Proposed)
+## Layer Interface
 
 Five responsibilities:
 
@@ -120,7 +121,7 @@ Five responsibilities:
 
 The key: layer must communicate **what changed in its output space**. Without this, the layer above recomputes from scratch.
 
-### Invalidation Protocol (Proposed)
+### Invalidation Protocol
 
 Typed ranges: `InvalidatedRange<T>` with `start`, `end`, `lineCountDelta`.
 
@@ -175,7 +176,7 @@ second validation layer instead of collapsing immediately to a monolithic mapper
   ends (the `breaks` of a wrapped entry, shared with tabbed lines). Building the 500k-line
   `bench:transforms` fixture costs 123 ms against 69 ms for character wrap; the character path is
   unchanged.
-- A proportional face wraps by measured advances (E052): `wrapAdvance` carries the row width in pixels
+- A proportional face wraps by measured advances (proportional font extents): `wrapAdvance` carries the row width in pixels
   and a per-face glyph table read from a canvas, and both break modes place ends where the running
   advance would pass the width less a 1 px margin. Monospace faces never build the table.
 
@@ -200,7 +201,7 @@ A replacement is a single-line source span painted as substitute text. Empty tex
 non-empty text stands in for it. Per buffer line, `createInlineRow` produces the display text plus a
 contiguous segment list covering the whole line, so column conversion in either direction is total.
 
-**Locked:**
+**Rules:**
 
 - Replacements are intra-line. A span crossing a newline is a fold, not a replacement, and is dropped.
 - Replacement text may not contain a newline, so **the layer never adds or removes rows**. Its own
@@ -317,7 +318,7 @@ spans, by adjacency for links and images.
   paints as the text it stands for. Word wrap (`wordWrapBreak: 'word'`) keeps every replacement on
   one row; both count a replacement by its placeholder text, not the width its rendered node measures.
 - Carrying a syntax-derived map re-resolves every range on each refresh; with many replacements and
-  an edit-triggered provider on one editor that is O(ranges) per keystroke until Phase 4's range set.
+  an edit-triggered provider on one editor that is O(ranges) per keystroke until a range set replaces the per-range work.
 
 ---
 

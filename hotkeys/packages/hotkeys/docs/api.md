@@ -72,7 +72,7 @@ dispatcher options: `keymap`, `platform`, `timeoutMs`, `replay`, `acceptsTextInp
 
 ## react
 
-`@fregat/react-hotkeys` adds `HotkeysProvider`, `useHotkey`, `useHotkeys`, `useHotkeySequence`, `useHotkeySequences`, `useHotkeyRecorder`, `useHotkeySequenceRecorder`, `useHotkeyRegistrations`, `useHeldKeys`, `useHeldKeyCodes`, `useKeyHold`, and `useHotkeyHint`. it needs React 18 or newer
+`@fregat/react-hotkeys` adds `HotkeysProvider`, `useHotkey`, `useHotkeys`, `useHotkeySequence`, `useHotkeySequences`, `useHotkeyRecorder`, `useHotkeySequenceRecorder`, `useHotkeyRegistrations`, `useHeldKeys`, `useHeldKeyCodes`, `useKeyHold`, and `useHotkeyHint`. it declares `react` and `react-dom` 18 or newer as peer dependencies
 
 `useHotkey(keys, callback, options?)` registers for the component's lifetime and re-syncs the callback and options on every render, so the callback never sees stale state. `options` is the registration options above, except `target` can also be a React ref. `enabled: false` keeps the registration listed and stops it firing
 

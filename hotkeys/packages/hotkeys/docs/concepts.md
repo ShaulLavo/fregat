@@ -40,7 +40,7 @@ a binding's `context` is a predicate over that stack, written in Zed's shorthand
 
 when several bindings match a key, the dispatcher picks by deepest matching context, then by source (`user`, then `pack`, then `base`, then `default`), then by table order, with later entries first. the runnable version is in [keymaps](keymaps.md#ranking)
 
-the handler gets the last say. a handler that returns `false` declines: the command goes to the next ancestor, and then the key goes to the next candidate binding. when nothing takes the key, it goes on to the browser's default handling
+a handler that returns `false` declines: the command goes to the next ancestor, and then the key goes to the next candidate binding. when nothing takes the key, it goes on to the browser's default handling
 
 ## chords
 
@@ -62,11 +62,9 @@ the whole pending chord belongs to the focus it started under, so it cannot leak
 
 hotkeys has three entry points. pick the lowest one you need
 
-| you want                                   | use                         | it adds                                                                        |
-| ------------------------------------------ | --------------------------- | ------------------------------------------------------------------------------ |
-| `Mod+S` while a view is open               | `getHotkeyRegistry()`       | `register` and `unregister` by key, with the newest registration running first |
-| the same key doing different jobs by focus | `createBrowserDispatcher()` | focus nodes, contexts, user overrides, and DOM listeners                       |
-| a dispatcher with no DOM                   | `createDispatcher()`        | the same engine fed by your own key events, such as a terminal                 |
+- `getHotkeyRegistry()` for `Mod+S` while a view is open. it adds `register` and `unregister` by key, with the newest registration running first
+- `createBrowserDispatcher()` for the same key doing different jobs by focus. it adds focus nodes, contexts, user overrides, and DOM listeners
+- `createDispatcher()` for a dispatcher with no DOM. it is the same engine fed by your own key events, such as a terminal
 
 the registry sits on a browser dispatcher, so you can start simple and reach the dispatcher later through `registry.dispatcher`
 

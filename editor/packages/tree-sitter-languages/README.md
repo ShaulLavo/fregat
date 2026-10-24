@@ -4,12 +4,6 @@ Tree-sitter grammars and syntax queries for Singapore language plugins.
 
 Part of [Singapore](https://singapore.shaulavo.dev/). A code editor for the browser that keeps every version.
 
-## Runtime requirements
-
-Tree-sitter and native Markdown parsing require Chromium 144, Firefox 145, Safari 26.2, or newer. Parser tests and direct calls require Node.js 26.0.0 or Bun 1.2.22 or newer. These floors follow `WebAssembly.Memory.prototype.toResizableBuffer()` support.
-
-Repository checks use the pinned Bun version and Node 26. Vitest's Node shebang and explicit `node` commands select Node from `PATH`, including when a package script starts with `bun run`.
-
 ## Install
 
 ```sh
@@ -32,6 +26,10 @@ const editor = new Editor(host, {
 })
 editor.setText('const value = 1\n', { languageId: 'typescript' })
 ```
+
+## Requirements
+
+Tree-sitter and native Markdown parsing need Chromium 144, Firefox 145, Safari 26.2, or newer, and Node.js 26.0.0 or Bun 1.2.22 or newer for parser calls outside a browser. The parser uses `WebAssembly.Memory.prototype.toResizableBuffer()`, and those are the first versions that support it.
 
 ## API highlights
 

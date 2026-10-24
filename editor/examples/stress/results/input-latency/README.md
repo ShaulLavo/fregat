@@ -1,6 +1,6 @@
 # Input latency reference
 
-The E002 browser runs use Chromium 148.0.7778.96 on Linux 7.1.9, an Intel i7-14700K,
+The input-latency browser runs use Chromium 148.0.7778.96 on Linux 7.1.9, an Intel i7-14700K,
 28 logical CPUs and 31.1 GiB RAM, with Node 26.7.0. They consume the built Editor package
 and serve the standalone fixture through Playwright routing without a listening socket.
 The fixture seed is 60061. The result files record exact source hashes, options, and raw samples.
@@ -78,7 +78,7 @@ Some small-workload tails increase, as the table shows. Acceptance compares ever
 against the reference-derived limits.
 
 These measurements isolate mounted geometry capacity and chunk reuse. The older `before.json.gz`
-precedes the separate source-range indexing fix and is retained as E002 history. Its 151.8 ms
+precedes the separate source-range indexing fix and is retained as input-latency history. Its 151.8 ms
 multiple-view short-line paste p95 must not be attributed to this optimization.
 
 ## Allocation and profiling evidence

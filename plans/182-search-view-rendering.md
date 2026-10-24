@@ -12,9 +12,9 @@ historical one-editor recommendation as approved work.
   removed, fling the broad tier in 1,176 ms with no long task (today 1,767 ms and 15), and one editor
   does it in 151–155 ms. One editor keeps per-file sideways scroll through a per-block x offset:
   158–177 ms in a prototype. Recommendation: one editor, per-block sideways scroll, and editing on a
-  multibuffer. Third pass: [docs/search-view-many-editors.md](../docs/search-view-many-editors.md).
-  Second pass (design): [docs/search-view-results-in-editor.md](../docs/search-view-results-in-editor.md).
-  First pass: [docs/search-view-rendering-findings.md](../docs/search-view-rendering-findings.md).
+  multibuffer. Third pass: [.internal/search-view-many-editors.md](../.internal/search-view-many-editors.md).
+  Second pass (design): [.internal/search-view-results-in-editor.md](../.internal/search-view-results-in-editor.md).
+  First pass: [.internal/search-view-rendering-findings.md](../.internal/search-view-rendering-findings.md).
   Two owner questions (Q3, Q4) stand before implementation.
 - Phases 1 and 1b done 2026-09-26 (wave 2, lane E1): Editor
   [singapore#40](https://github.com/ShaulLavo/singapore/pull/40). The unfocused caret is drawn in the
@@ -124,7 +124,7 @@ workstreams doc is deleted; its A–H verdicts are in the findings doc, section 
 ## Results in the editor: design
 
 Second pass, 2026-09-26. The design, the measurements and the Zed and VS Code teardown are in
-[docs/search-view-results-in-editor.md](../docs/search-view-results-in-editor.md).
+[.internal/search-view-results-in-editor.md](../.internal/search-view-results-in-editor.md).
 
 - **One Editor over a results document.**
   - The document's rows are the matched source lines, one per line (Q2 = B), in the view's file order.
@@ -187,7 +187,7 @@ Second pass, 2026-09-26. The design, the measurements and the Zed and VS Code te
 ## Many editors or one: third pass
 
 Measured on a production build with pass 1's harness, runtime flags selecting each variant, three
-traces per variant. Tables and method: [docs/search-view-many-editors.md](../docs/search-view-many-editors.md).
+traces per variant. Tables and method: [.internal/search-view-many-editors.md](../.internal/search-view-many-editors.md).
 
 - **Where an editor mount goes** (today, broad fling, 228 mounts, 8.4 ms each):
   - style, layout and paint: 585 ms
@@ -360,7 +360,7 @@ Phases 1, 1b, 2 and 3 stand on their own and can ship any time.
   - Q3 = A: Phases 1, 1b, 2 and 3, then P1 below and the 200-match cap fix; nothing else.
   - Q3 = C: M1 moves before R2.
   - Q3 = D: M1 is replaced by an edit filter and R5 by forwarding (pass 2's design,
-    [results in the editor § 7.8](../docs/search-view-results-in-editor.md)).
+    [results in the editor § 7.8](../.internal/search-view-results-in-editor.md)).
   - Q4 = B drops E5. Q4 = C drops E5 and R2 turns on `wordWrap`.
 
 1. **Done (singapore#40).** **Grammar signature memo** (S, Editor: `packages/tree-sitter/src/treeSitter/workerClient.ts`).

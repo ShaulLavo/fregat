@@ -6,7 +6,7 @@ Part of [Fregat hotkeys](https://github.com/ShaulLavo/fregat/tree/main/hotkeys).
 
 ## Install
 
-Not on npm yet. Build it from source with the [workspace guide](https://github.com/ShaulLavo/fregat/blob/main/docs/development.md#workspace-libraries). Publishing is planned. It needs React 18 or newer and `react-dom`.
+Not on npm yet. Build it from source with the [workspace guide](https://github.com/ShaulLavo/fregat/blob/main/docs/development.md#workspace-libraries). Publishing is planned. It declares `react` and `react-dom` 18 or newer as peer dependencies, so it uses the copies your app already has.
 
 ## Usage
 
@@ -34,7 +34,7 @@ export function SaveButton({ onSave }: { onSave: () => void }) {
 
 ## In the hotkeys family
 
-`@fregat/hotkeys` owns shortcut matching and dispatch. This optional package adds React hooks and re-exports the core API. Use React 18 or newer.
+`@fregat/hotkeys` owns shortcut matching and dispatch. This optional package adds React hooks and re-exports the core API.
 
 [Main README](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/README.md)
 

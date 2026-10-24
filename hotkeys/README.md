@@ -20,10 +20,20 @@ Context predicates and chord dispatch follow Zed's model.
 
 Forked from [TanStack Hotkeys](https://github.com/TanStack/hotkeys) by Tanner Linsley, under the MIT license.
 
+## Register a shortcut
+
+```ts
+import { getHotkeyRegistry } from '@fregat/hotkeys'
+
+// Mod is Command on macOS and Control on other platforms
+const save = getHotkeyRegistry().register('Mod+S', () => console.log('Save requested'))
+save.unregister() // when the view closes
+```
+
 ## One key, two jobs
 
 `Mod+B` can bold text in the editor and toggle a sidebar elsewhere.
-`Mod` means Command on macOS and Control on other platforms.
+A dispatcher picks the binding from what has focus, and the deepest matching context runs first.
 
 ```ts
 import { createBrowserDispatcher } from '@fregat/hotkeys'
@@ -43,9 +53,6 @@ const editor = keys.createNode({
 keys.attachElement(app, document.body)
 keys.attachElement(editor, document.getElementById('editor')!)
 ```
-
-Replace the empty handlers with your app's actions.
-Focus decides which bindings compete, and the deepest matching context wins:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/key-resolution.dark.svg">
@@ -72,21 +79,17 @@ bun install --frozen-lockfile
 bun run --cwd hotkeys build
 ```
 
-Import `@fregat/hotkeys` from a workspace consumer.
-The [development guide](https://github.com/ShaulLavo/fregat/blob/main/docs/development.md#workspace-libraries) explains source builds.
-Start with [concepts](packages/hotkeys/docs/concepts.md) for the model, or [`@fregat/hotkeys`](packages/hotkeys/README.md) for the simplest registration API.
+Import `@fregat/hotkeys` from a workspace consumer. The [development guide](https://github.com/ShaulLavo/fregat/blob/main/docs/development.md#workspace-libraries) explains source builds. Start with [concepts](packages/hotkeys/docs/concepts.md) for the model, or [`@fregat/hotkeys`](packages/hotkeys/README.md) for the simplest registration API.
 
 ## Status
 
-Version 0.0.x. The API can change between releases, and npm publishing is planned.
-Fregat uses this library for its browser and terminal keymaps.
-The [lookup benchmark](packages/hotkeys/docs/performance.md) covers trie lookup, context resolution, and keymap construction on a 255-binding table. Reproduce it with `bun bench/lookup.ts` from `packages/hotkeys`.
-Treat its timings as local observations until a dated, fully specified rerun lands.
+Version 0.0.x. The API can change between releases, and npm publishing is planned. Fregat uses this library for its browser and terminal keymaps.
+The [lookup benchmark](packages/hotkeys/docs/performance.md) times a 255-binding table. Reproduce it with `bun bench/lookup.ts` from `packages/hotkeys`. Treat its timings as local observations.
 
-| Package                                                   | Purpose                                                           |
-| --------------------------------------------------------- | ----------------------------------------------------------------- |
-| [@fregat/hotkeys](packages/hotkeys/README.md)             | Core matching, contexts, chords, adapters, display, and recording |
-| [@fregat/react-hotkeys](packages/react-hotkeys/README.md) | React hooks over the core                                         |
+## Packages
+
+- [@fregat/hotkeys](packages/hotkeys/README.md): matching, contexts, chords, adapters, display, and recording.
+- [@fregat/react-hotkeys](packages/react-hotkeys/README.md): React hooks over the core.
 
 ## Contributing and license
 

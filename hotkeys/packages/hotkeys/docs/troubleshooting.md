@@ -24,7 +24,7 @@ useHotkey('G', goToTop, { ignoreInputs: false })
 
 a dispatcher has no `ignoreInputs`. a bound key runs wherever focus is, text fields included, so a bare-key binding also fires while someone types unless its `context` leaves that field out. give the field's node a context such as `TextInput` and bind with `Workspace && !TextInput`. `acceptsTextInput` is narrower: it makes a printable chord prefix pend with a timeout, and `replay` types the character back if no chord follows
 
-## the wrong binding wins
+## a different binding runs than expected
 
 print what the dispatcher sees:
 
@@ -32,7 +32,7 @@ print what the dispatcher sees:
 console.log(hotkeys.contextStack()) // outermost to focused
 ```
 
-then compare it with the binding's `context` and with the ranking rules in [concepts](concepts.md#ranking). the deepest matching context wins before source or table order. `bindingsForInput` reports what a key sequence would run under a given stack, which is useful in a settings screen or a test
+then compare it with the binding's `context` and with the ranking rules in [concepts](concepts.md#ranking). the deepest matching context is checked before source or table order. `bindingsForInput` reports what a key sequence would run under a given stack, which is useful in a settings screen or a test
 
 ## a chord ends too early
 
@@ -45,14 +45,12 @@ createBrowserDispatcher({
 })
 ```
 
-| outcome                                   | meaning                                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------------- |
-| `completed`                               | a bound chord ran                                                               |
-| `timeout`                                 | a bound prefix waited `timeoutMs` (1 second by default) and ran its own binding |
-| `unmatched`                               | the next key did not continue the chord                                         |
-| `unavailable`                             | `isAvailable` filtered the bindings out                                         |
-| `blur`, `hidden`, `pointer`, `superseded` | the window lost focus, the tab hid, a pointer pressed, or focus moved           |
-| `disabled`, `disposed`                    | the runtime was turned off or torn down                                         |
+- `completed`: a bound chord ran
+- `timeout`: a bound prefix waited `timeoutMs` (1 second by default) and ran its own binding
+- `unmatched`: the next key did not continue the chord
+- `unavailable`: `isAvailable` filtered the bindings out
+- `blur`, `hidden`, `pointer`, `superseded`: the window lost focus, the tab hid, a pointer pressed, or focus moved
+- `disabled`, `disposed`: the runtime was turned off or torn down
 
 ## characters vanish after a chord prefix
 

@@ -1,6 +1,6 @@
 # Disposal of busy syntax workers
 
-Status: Delivered ownership repair; dated proof record. [Plan 099](../../plans/099-document-contributions.md) owns current runtime scope and remaining acceptance gates.
+Dated proof record of the ownership repair for busy syntax workers.
 
 A syntax worker executing synchronous code cannot answer a queued disposal message. Shiki and
 Tree-sitter owners previously awaited that answer before calling `terminate()`, so both the
@@ -25,8 +25,8 @@ Highlighting-service callers waiting on grammar acquisition still settle with `d
 
 ## Reproduction and verification
 
-Before source: main `4edb43b18`. Evidence is retained under
-`/work/tmp/foundations-worker-cleanup/`.
+Before source: main `4edb43b18`. Evidence logs are written to
+`<report-directory>`.
 
 | Check                                           | Before                                                                                           | After                                                         | Evidence                                                          |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -62,8 +62,7 @@ or account is involved.
 
 ## Independent review repair
 
-The review at `https://github.com/ShaulLavo/fregat/pull/213#issuecomment-5917307032`
-found that parse/edit readiness continuations could recreate retained source after synchronous
+Independent review found that parse/edit readiness continuations could recreate retained source after synchronous
 disposal. The two real-owner regressions reproduce this with the existing injected worker
 transport: both fail on the reviewed head with one retained document, while 19 controls pass.
 Both pass after current-handle checks run before descriptor creation. Closed callers resolve

@@ -1,8 +1,8 @@
-# Native Bench Harness — Plan 1
+# Native bench harness
 
-**Status:** done. `swift run -c release EditorBench` prints the baseline table with an empty native column, and the `os_signpost` → `xctrace` → `analyze_trace.py` pipeline is verified end to end on this machine.
+`swift run -c release EditorBench` prints the baseline table with an empty native column, and the `os_signpost` → `xctrace` → `analyze_trace.py` pipeline is verified end to end on one machine.
 
-This is the instrument that gates every later native editor plan. The doctrine it enforces: **no native editor decision is defended with a claim, only with a row in this table**. The native column is empty today and that is the correct output — it fills in as each plan lands the path it owns, and the gate is passed when every row it fills reads `pass`.
+This is the instrument that gates every native editor change. The doctrine it enforces: **no native editor decision is defended with a claim, only with a row in this table**. The native column is empty today and that is the correct output — it fills in as each path lands, and the gate is passed when every row it fills reads `pass`.
 
 The harness lives in `apps/mac/Sources/EditorBench`; the keystroke instrument it defines lives in `apps/mac/Sources/EditorCore/LatencySignpost.swift` because the editor surface is what will emit it.
 
@@ -209,7 +209,7 @@ For a long interactive session, `record_trace.py --stop-file /tmp/stop-trace` ru
 
 **Correcting the plan-of-plans premise: this machine is not ProMotion.** Built-in display, 2880×1800, 60 Hz, confirmed by both `CGDisplayMode.refreshRate` and `NSScreen.maximumFramesPerSecond`. Gate on the 8.33 ms target anyway — designing to the dev machine's 60 Hz bakes in a budget ProMotion halves — but never _claim_ 120 Hz until it is measured on a 120 Hz display. The harness prints that caveat itself so a pasted result carries it.
 
-Budget arithmetic for plan 2: an 8.33 ms frame that must also absorb a keystroke leaves the sub-2 ms input-to-transaction target roughly a quarter of the frame, with the rest for everything that is not the edit.
+Budget arithmetic for the editor core: an 8.33 ms frame that must also absorb a keystroke leaves the sub-2 ms input-to-transaction target roughly a quarter of the frame, with the rest for everything that is not the edit.
 
 ### 6.5 Microbench rules
 
@@ -238,7 +238,7 @@ Measured by `EditorBench`, 9 MiB ASCII corpus, counting line breaks, min of 7 it
 | `memchr` over `utf8` buffer | **1.8 ms** | 1x       | libc SIMD; the floor for byte search       |
 | `EditorCore.Document`       | 131.6 ms   | 73x      | the placeholder, on the Character path     |
 
-The corpus is pure ASCII — there are no graphemes to break. The 46x is paid entirely for the _possibility_ of one. Two consequences for plan 2:
+The corpus is pure ASCII — there are no graphemes to break. The 46x is paid entirely for the _possibility_ of one. Two consequences for the editor core:
 
 - **Every buffer scan goes through `utf8` or `utf16`, and byte search goes through a contiguous buffer.** Not "prefer"; the 9 MiB scan is a real operation (open a file, build line starts) and 82 ms of it is a visible stall.
 - **`utf16` is 5x the cost of a contiguous `utf8` buffer**, which is awkward because UTF-16 offsets are what the ported piece table and CoreText both speak. Resolve it in the line/layout layer: scan bytes, store UTF-16 offsets. Do not let the index type dictate the scan type.
@@ -288,15 +288,15 @@ Each row's `nativeMs` is registered by the plan that owns the path. The verdict 
 | 4 — tree-sitter + LSP | `syntax.edit.*`, `highlight.viewport.*`                                                                |
 | after the gate        | `foldmap.*`, `minimap.update.*` (parity features, not gate features)                                   |
 
-Plan 2's own exit criterion — sub-2 ms keystroke-to-paint on a 10 MiB file — is measured by §6.1's `Keystroke` interval via §6.3's recipe, not by a stopwatch.
+The editor core's exit criterion — sub-2 ms keystroke-to-paint on a 10 MiB file — is measured by §6.1's `Keystroke` interval via §6.3's recipe, not by a stopwatch.
 
-**Plan 2 is unblocked.** The interaction rows now have a re-runnable command, an exact corpus, same-machine results, and calibration. B3 remains a known web optimization task, not a measurement ambiguity.
+The interaction rows have a re-runnable command, an exact corpus, same-machine results, and calibration. B3 remains a known web optimization task, not a measurement ambiguity.
 
 ---
 
 ## 10. Dated result records
 
-B2, B3, and B4 settle plan 6's open question: check in dated JSON for the web benches and `EditorBench`. One record per harness under `bench-results/YYYY-MM-DD/` is enough. The smallest useful schema is:
+Check in dated JSON for the web benches and `EditorBench`. One record per harness under `bench-results/YYYY-MM-DD/` is enough. The smallest useful schema is:
 
 ```json
 {
