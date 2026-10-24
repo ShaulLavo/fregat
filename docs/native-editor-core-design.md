@@ -1,6 +1,6 @@
 # Native editor core design
 
-**Status:** design complete. On 2026-08-28, the visually corrected 10 MiB source-backed CoreText microspike measured 1.298 ms p95 across 200 calibrated clock samples and 1.369 ms p95 across 282 complete `Keystroke` intervals in an attached Logging trace. Both span synthetic key input through `CATransaction` completion and pass the binding sub-2 ms work gate. An exported inserted frame also passed visual QA for orientation, text order, insertion position, style, and selection. The result selects CoreText, one owner-drawn `NSView`, and app-owned synchronous layers. TextKit 2 and Metal are out of the first implementation.
+Measured on 2026-08-28: the visually corrected 10 MiB source-backed CoreText microspike measured 1.298 ms p95 across 200 calibrated clock samples and 1.369 ms p95 across 282 complete `Keystroke` intervals in an attached Logging trace. Both span synthetic key input through `CATransaction` completion and pass the binding sub-2 ms work gate. An exported inserted frame also passed visual QA for orientation, text order, insertion position, style, and selection. The result selects CoreText, one owner-drawn `NSView`, and app-owned synchronous layers. TextKit 2 and Metal are out of the first implementation.
 
 This document turns the binding directives in `native-plan-of-plans.md` and `native-editor-internals-research.md` into an implementation order. The web buffer source was read at `../Editor` commit `b09199679c680255aa07c0c2c70ae77895023ad5`. The CodeEditTextView and Runestone references were read from `~/Desktop/D/references/` on 2026-08-28.
 
@@ -101,7 +101,7 @@ The calibrated release run on the plan-1 machine produced this result:
 | commit-wait p95          |                    0.256 ms |
 | input through draw p95   | 1.057 ms — attribution only |
 
-The calibrated table uses `ContinuousClock` across the same endpoints as plan 1's `Keystroke` interval. Only the analyzed Logging trace is the signpost result. The attached 600-sample run reported 69.09 ms CPU calibration; the 282 complete intervals captured during the 12-second trace measured 0.870 ms p50, **1.369 ms p95**, and 2.051 ms max. All 282 contained exactly one ordered `ApplyEdit`, `Layout`, `Draw`, and `Commit` event.
+The calibrated table uses `ContinuousClock` across the same endpoints as the bench harness's `Keystroke` interval. Only the analyzed Logging trace is the signpost result. The attached 600-sample run reported 69.09 ms CPU calibration; the 282 complete intervals captured during the 12-second trace measured 0.870 ms p50, **1.369 ms p95**, and 2.051 ms max. All 282 contained exactly one ordered `ApplyEdit`, `Layout`, `Draw`, and `Commit` event.
 
 The first honest run used AppKit's managed backing layer and failed at 3.720 ms p95, with 2.932 ms in commit wait. Moving transaction boundaries, changing the display entry point, and adding or removing `CATransaction.flush()` did not fix it. An empty transaction and a visible property change on an app-owned layer both completed below 0.25 ms p95, localizing the cost to managed backing-store paint.
 
@@ -320,7 +320,7 @@ The tree supports O(log lines) lookup by row, UTF-16 offset, tree-sitter byte of
 
 Runestone's property named byte count is not UTF-8. It configures tree-sitter for UTF-16 and stores `utf16.count * 2`. Native APIs distinguish `TreeSitterByteOffset` from `TreeSitterByteLength`, and the parser configuration decides their conversion. The first implementation also uses UTF-16LE, so a delimiter consumes `delimiterUTF16Length * 2` parser bytes. Do not repeat Runestone's subtraction of raw UTF-16 delimiter units from a byte total.
 
-The byte aggregate stays explicit even when it is twice the UTF-16 aggregate. It documents the parser contract and prevents an `InputEdit` from accepting a text offset by accident. If plan 4 selects UTF-8 input after measurement, the tree shape survives but the parser input callback, `TSPoint.column`, `InputEdit` conversion, restart checkpoints, and byte-to-UTF-16 maps must all change together. Treat that as a parser-coordinate migration, not a one-line calculation change.
+The byte aggregate stays explicit even when it is twice the UTF-16 aggregate. It documents the parser contract and prevents an `InputEdit` from accepting a text offset by accident. If the parser work selects UTF-8 input after measurement, the tree shape survives but the parser input callback, `TSPoint.column`, `InputEdit` conversion, restart checkpoints, and byte-to-UTF-16 maps must all change together. Treat that as a parser-coordinate migration, not a one-line calculation change.
 
 ### Define line boundaries once
 
@@ -455,7 +455,7 @@ Selection changes invalidate only the old and new rectangles in the selection la
 
 `EditorUndoManager` subclasses `UndoManager` so native menu validation works, but owns editor groups made of forward mutations, inverse mutations, and before/after selections. The buffer edit operation returns the inverse against its input snapshot; it does not register with AppKit itself. Typing coalescing is policy above the buffer. Composition updates are suppressed until acceptance produces one group, and cancellation produces none.
 
-Plan 4 supplies the parsers and language services, but this core owns their boundary. `HighlightProvider` accepts a `RevisionedSnapshot` and visible-range request, then returns `Sendable` `StyleRun` values tagged with their input revision. Providers run in three phases: an immediate cheap fallback, tree-sitter syntax, then asynchronous LSP semantic tokens. The style store tracks valid, pending, and visible UTF-16 ranges, schedules large work in 4,096-unit chunks, and accepts results only when their source revision and line-content generations still match. Do not import CodeEdit's polling executor.
+The parser and language-service work supplies the parsers and language services, but this core owns their boundary. `HighlightProvider` accepts a `RevisionedSnapshot` and visible-range request, then returns `Sendable` `StyleRun` values tagged with their input revision. Providers run in three phases: an immediate cheap fallback, tree-sitter syntax, then asynchronous LSP semantic tokens. The style store tracks valid, pending, and visible UTF-16 ranges, schedules large work in 4,096-unit chunks, and accepts results only when their source revision and line-content generations still match. Do not import CodeEdit's polling executor.
 
 Every edit derives tree-sitter `InputEdit` positions from the line tree's UTF-16 and parser-byte aggregates without scanning the prefix. After incremental parse, `ts_tree_get_changed_ranges` becomes line-granular style invalidation. The coordinate wrappers make a UTF-16 offset, parser byte offset, and `TSPoint.column` impossible to interchange accidentally.
 

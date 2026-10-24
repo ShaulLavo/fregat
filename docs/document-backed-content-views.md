@@ -173,7 +173,7 @@ reload, `settings-raw-conflict`,
   default 2, where structural analysis and highlighting each count as one entry.
 - First-frame proof runs in headless Chromium with real workers: `prepared-open`, the
   `retention-acceptance-*` files and the `editor-tab-hover-highlights` scenario. Capturing a
-  physical display on hardware was dropped as a gate on 2026-10-09.
+  physical display on hardware is not a gate.
 - The edit chain composes publications into net edits. A composed batch cannot preserve cursor
   affinity inside replaced text, so source-range resolution reports any edit that touches or
   abuts a range as `edited`. The chain keeps 128 publications; older references report
@@ -181,38 +181,7 @@ reload, `settings-raw-conflict`,
 - Immutable comparison sides (snapshot, history and operation) highlight through the
   highlighting service's diff syntax path with immutable readers. Only compare-with-saved
   shares the live document's analysis.
-- Bounded runs on 2026-10-09 did not reproduce these, so their causes stay unknown:
-  - #650, cancellation logged as an error: two native-syntax and two typing scenario runs, no
-    error-level cancellation events.
-  - #794, retained revisit with zero painted token runs: the original composition passed twice,
-    and 32 of 32 in the generic configuration.
-  - #798, reload bootstrap `ECONNRESET`: 60 of 60 reload runs at the unchanged 30 s deadline.
-  - #805, initial syntax readiness stuck at LOADING: 204 of 204 tests across 12 repetitions,
-    every readiness observation enabled and ready.
-  - The October 5 nightly copy-departure timeout at initial open: 20 runs passed (see #1120).
-
-  #622, the ResizeObserver loop in `prepared-open`, was reproduced and fixed in #1105. The
-  nightly `flake-watch` workflow watches for recurrences of all of them.
-
-## Delivery
-
-All pull requests are in ShaulLavo/fregat.
-
-- Foundations: #203 publishes committed revision frames and keeps analysis retained.
-- Analysis ownership: #659 retained range readiness, #660 bounded disposed runtime metadata,
-  #661 release on final runtime disposal, #664 inactive analysis reclamation, #666 consistent
-  shared Shiki paint across splits, #717 shared file preparation and a bounded inactive budget.
-- Content views: #675 immutable syntax loans, #678 compare-with-saved inputs, #681 bounded
-  preview coverage, #691 Git snapshot sources, #738 Git comparison identity and historical
-  provenance, #747 checkpoint comparisons, #750 local history comparisons, #756 comparisons
-  attached through retained sources, #781 WorkspaceEdit operation sources.
-- Proof and integration: #787 retained document contributions, #803 Git diff scroll modes and
-  cold switching, #845 shared Markdown source through pane lifetime and Undo, #852 native
-  preview ownership, #865 source and measured-reference integration.
-- 2026-10-09 finish: #1096 source range contract and the search and composer handoffs; #1100
-  one preparation for hover, click and revisit; #1101 conflict inputs as source references and
-  the "Keep my changes" data-loss fix; #1102 pixel-offset diff view state removed; #1103
-  overlapping edit composition in the edit chain; #1105 ResizeObserver loop (#622); #1110
-  settings conflict scenario framing; #1120 worker acceptance observer race; #1097 analysis
-  acceptance checks and token-store byte accounting; #1118 diff reload place applied once per
-  page load.
+- Several intermittent failures did not reproduce in bounded runs, so their causes are unknown:
+  a cancellation logged as an error, a retained revisit with zero painted token runs, a reload
+  bootstrap `ECONNRESET`, initial syntax readiness stuck at LOADING, and a nightly copy-departure
+  timeout at initial open. The nightly `flake-watch` workflow watches for recurrences.
