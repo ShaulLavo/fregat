@@ -48,6 +48,7 @@ function fixture() {
   const needs: Record<string, { result: string; outputs?: Record<string, string> }> = {
     baseline: { result: 'success' },
     changes,
+    'workspace-builds': { result: 'success' },
     docs: { result: 'skipped' },
     lint: { result: 'success' },
     typecheck: { result: 'success' },
@@ -62,6 +63,7 @@ function fixture() {
   const names = [
     'Successful main baseline',
     'Changes',
+    'Workspace builds',
     'Docs format',
     'Format, lint, census',
     'Typecheck, generated, packages',
@@ -129,10 +131,18 @@ test('terminal-only validation accepts its two verification jobs and rejects mis
   value.changes.outputs.packages = '["ghostty-webgpu"]'
   for (const id of Object.keys(value.needs))
     value.needs[id] = {
-      result: ['baseline', 'changes', 'docs', 'libraries'].includes(id) ? 'success' : 'skipped',
+      result: ['baseline', 'changes', 'workspace-builds', 'docs', 'libraries'].includes(id)
+        ? 'success'
+        : 'skipped',
     }
   value.needs.changes = value.changes
-  const names = ['Successful main baseline', 'Changes', 'Docs format', 'Libraries / Ghostty tests']
+  const names = [
+    'Successful main baseline',
+    'Changes',
+    'Workspace builds',
+    'Docs format',
+    'Libraries / Ghostty tests',
+  ]
   const jobs = value.jobs
     .filter((job) => names.includes(job.name))
     .map((job) => ({ ...job, conclusion: 'success', runner_id: 1 }))
@@ -493,3 +503,22 @@ test.skipIf(!shellAvailable)(
     expect(incomplete.stderr.toString()).toContain('lacks one successful execution')
   },
 )
+
+test.each(['failure', 'cancelled', 'skipped'])('producer %s keeps aggregate CI red', (result) => {
+  const value = fixture()
+  value.needs['workspace-builds'] = { result }
+  expect(value.run().passed).toBe(false)
+})
+
+test('missing producer execution rejects a successful parent and producer-only retry retains other coverage', () => {
+  const value = fixture()
+  expect(value.evaluate(value.jobs.filter((job) => job.name !== 'Workspace builds')).passed).toBe(
+    false,
+  )
+  const producer = value.jobs.find((job) => job.name === 'Workspace builds')
+  expect(producer).toBeDefined()
+  value.identity.attempt = 2
+  value.metadata.run_attempt = 2
+  if (producer) producer.run_attempt = 2
+  expect(value.run()).toEqual({ passed: true, issues: [] })
+})

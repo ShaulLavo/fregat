@@ -1,0 +1,554 @@
+import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  chmodSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { expect, onTestFinished, test } from 'vitest'
+import { readWorkspaceGraph, requiredLibraries } from './affected.mjs'
+import { consume, planBuilds, prepare, produce, verifyImported } from './build-reuse.mjs'
+
+const root = path.resolve(import.meta.dirname, '../..')
+const graph = readWorkspaceGraph(root)
+const hash = (bytes) => createHash('sha256').update(bytes).digest('hex')
+const full = {
+  code: 'true',
+  shared: 'true',
+  tooling: 'true',
+  tree: 'true',
+  web: 'true',
+  server: 'true',
+  tui: 'true',
+  editor: 'true',
+  ghostty: 'true',
+  site: 'true',
+  sites: 'fregat,singapore,demo,ghostty-webgpu',
+  packages: 'all',
+}
+
+function selected(values = {}) {
+  return Object.assign(
+    Object.fromEntries(Object.keys(full).map((key) => [key, 'false'])),
+    {
+      code: 'true',
+      packages: '[]',
+      sites: '',
+    },
+    values,
+  )
+}
+
+function fixture() {
+  const directory = mkdtempSync(path.join(tmpdir(), 'ci-build-reuse-'))
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
+  const write = (file, value) => {
+    mkdirSync(path.dirname(path.join(directory, file)), { recursive: true })
+    writeFileSync(
+      path.join(directory, file),
+      typeof value === 'string' ? value : JSON.stringify(value),
+    )
+  }
+  write('package.json', {
+    private: true,
+    packageManager: JSON.parse(readFileSync(path.join(root, 'package.json'))).packageManager,
+    workspaces: { packages: ['packages/*'] },
+    scripts: { 'build:workspaces': 'turbo run build --filter=@fregat/* --filter=@workspace/ui' },
+  })
+  write('bun.lock', {
+    lockfileVersion: 1,
+    workspaces: {
+      '': { name: 'fixture' },
+      'packages/base': {
+        name: '@fregat/base',
+        dependencies: { '@workspace/utils': 'workspace:*' },
+      },
+      'packages/utils': { name: '@workspace/utils' },
+      'packages/ui': { name: '@workspace/ui', dependencies: { '@fregat/base': 'workspace:*' } },
+    },
+    packages: {
+      '@fregat/base': ['@fregat/base@workspace:packages/base'],
+      '@workspace/utils': ['@workspace/utils@workspace:packages/utils'],
+      '@workspace/ui': ['@workspace/ui@workspace:packages/ui'],
+    },
+  })
+  write('.gitignore', 'node_modules\n.turbo\ntransport\n**/dist\n')
+  write('turbo.json', {
+    globalDependencies: ['builder.mjs'],
+    globalEnv: ['NODE_ENV'],
+    tasks: {
+      build: { dependsOn: ['^build'], outputs: ['dist/**'] },
+      '@workspace/ui#build': {
+        dependsOn: ['^build'],
+        outputs: ['src/lib/generated/cn-tables.ts'],
+        inputs: ['$TURBO_DEFAULT$', '!src/lib/generated/cn-tables.ts'],
+      },
+      test: { dependsOn: ['^build'], outputs: [] },
+    },
+  })
+  write('packages/base/package.json', {
+    name: '@fregat/base',
+    dependencies: { '@workspace/utils': 'workspace:*' },
+    scripts: { build: 'bun ../../builder.mjs', test: 'bun ../../test-task.mjs' },
+    exports: {
+      '.': { types: './dist/index.d.ts', import: './dist/index.js' },
+      './worker/*': './dist/worker/*.js',
+      './types': './dist/types.js',
+    },
+  })
+  write('packages/ui/package.json', {
+    name: '@workspace/ui',
+    dependencies: { '@fregat/base': 'workspace:*' },
+    scripts: { build: 'bun ../../builder.mjs', test: 'bun ../../test-task.mjs' },
+  })
+  write('packages/utils/package.json', { name: '@workspace/utils' })
+  write('packages/utils/index.ts', 'export const sourceOnly = true')
+  write('packages/base/input.txt', 'base source')
+  write('packages/ui/input.txt', 'ui source')
+  write('packages/ui/src/lib/generated/cn-tables.ts', 'export const classes = []\n')
+  write(
+    'builder.mjs',
+    `import {mkdirSync,writeFileSync,appendFileSync} from 'node:fs';
+const ui = process.cwd().endsWith('/ui');
+const file = ui ? 'src/lib/generated/cn-tables.ts' : 'dist/index.js';
+mkdirSync(ui ? 'src/lib/generated' : 'dist/worker', {recursive:true});
+if(!ui) mkdirSync('dist/node_modules/dependency', {recursive:true});
+writeFileSync(file,ui ? 'export const classes = []\\n' : 'export const value = 1\\n');
+if(!ui){ writeFileSync('dist/index.d.ts','export declare const value = 1\\n'); writeFileSync('dist/style.css','body{}'); writeFileSync('dist/types.js',''); writeFileSync('dist/node_modules/dependency/index.js','export const bundled = true'); writeFileSync('dist/worker/parser.js','self.onmessage=()=>{}'); }
+appendFileSync('../../compiles.log',process.cwd()+'\\n');`,
+  )
+  write(
+    'test-task.mjs',
+    "import {appendFileSync} from 'node:fs'; appendFileSync('../../tests.log','test\\n')",
+  )
+  write(
+    'node_modules/turbo/package.json',
+    readFileSync(path.join(root, 'node_modules/turbo/package.json'), 'utf8'),
+  )
+  mkdirSync(path.join(directory, 'node_modules/.bin'), { recursive: true })
+  symlinkSync(
+    path.join(root, 'node_modules/.bin/turbo'),
+    path.join(directory, 'node_modules/.bin/turbo'),
+  )
+  symlinkSync('packages/ui', path.join(directory, 'instructions-link'))
+  const git = (args) =>
+    execFileSync('git', args, {
+      cwd: directory,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim()
+  git(['init', '-q'])
+  git(['add', '.'])
+  git([
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.test',
+    'commit',
+    '-qm',
+    'Fixture',
+  ])
+  const context = {
+    repository: 'fixture/repo',
+    run: '42',
+    attempt: 1,
+    source: git(['rev-parse', 'HEAD']),
+    os: 'Linux',
+    arch: 'X64',
+    image: 'fixture-image',
+  }
+  const request = (targets = 'all', override = {}) =>
+    prepare({
+      root: directory,
+      temporary: path.join(directory, 'transport'),
+      targets,
+      context: { ...context, ...override },
+    })
+  const publication = () => {
+    const prepared = request()
+    const published = produce(prepared)
+    const downloads = path.join(directory, 'transport/downloads')
+    mkdirSync(downloads, { recursive: true })
+    cpSync(published.directory, path.join(downloads, published.name), { recursive: true })
+    return { prepared, published, downloads }
+  }
+  return { directory, context, git, write, request, publication }
+}
+
+function rewriteBundle(bundle, mutate) {
+  const old = path.join(bundle.downloads, bundle.published.name)
+  const manifest = JSON.parse(readFileSync(path.join(old, 'manifest.json')))
+  mutate(manifest, old)
+  const content = JSON.stringify(manifest)
+  writeFileSync(path.join(old, 'manifest.json'), content)
+  const name = bundle.published.name.replace(/[a-f0-9]{64}$/, hash(content))
+  const next = path.join(bundle.downloads, name)
+  if (next !== old) {
+    cpSync(old, next, { recursive: true })
+    rmSync(old, { recursive: true })
+  }
+  return next
+}
+
+function compiles(directory) {
+  const file = path.join(directory, 'compiles.log')
+  return existsSync(file) ? readFileSync(file, 'utf8').trim().split('\n') : []
+}
+
+test('full enabled CI has one owner for each of its 29 setup build tasks', () => {
+  const plan = planBuilds(graph, full)
+  expect(plan).toEqual(requiredLibraries(graph, Array.from(graph.packages.keys())))
+  expect(plan).toHaveLength(29)
+  expect(new Set(plan).size).toBe(29)
+})
+
+test.each([
+  ['web', { web: 'true' }, 23],
+  ['tree Browser prerequisites', { tree: 'true' }, 23],
+  ['tooling', { tooling: 'true' }, 29],
+  ['server', { server: 'true' }, 2],
+  ['TUI', { tui: 'true' }, 12],
+  ['Editor', { editor: 'true' }, 24],
+  ['Ghostty', { ghostty: 'true' }, 4],
+  ['empty union', {}, 0],
+])('%s selection has its exact existing graph closure', (_, flags, size) => {
+  expect(planBuilds(graph, selected(flags))).toHaveLength(size)
+})
+
+test('union covers every enabled family and selected site without duplicate tasks', () => {
+  const plan = planBuilds(
+    graph,
+    selected({ web: 'true', editor: 'true', ghostty: 'true', site: 'true', sites: 'demo' }),
+  )
+  expect(plan).toHaveLength(28)
+  expect(plan).not.toContain('@fregat/react-hotkeys')
+  expect(() => planBuilds(graph, selected({ shared: 'true', packages: '["unknown"]' }))).toThrow()
+  expect(() => planBuilds(graph, selected({ site: 'true', sites: 'unknown' }))).toThrow()
+})
+
+test('empty producer and consumer succeed with no fake artifact or compile', () => {
+  const f = fixture()
+  const request = f.request('[]')
+  expect(produce(request)).toBeNull()
+  expect(() => verifyImported(request)).not.toThrow()
+  expect(consume(request, path.join(f.directory, 'absent'))).toEqual([])
+  expect(compiles(f.directory)).toEqual([])
+})
+
+test('cold producer builds each task once, imports exact outputs and warm producer hits build cache', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  expect(compiles(f.directory)).toHaveLength(2)
+  const manifest = JSON.parse(readFileSync(path.join(bundle.published.directory, 'manifest.json')))
+  expect(manifest.tasks.every((task) => task.taskId.endsWith('#build'))).toBe(true)
+  expect(manifest.files.map((file) => file.path)).toContain(
+    'packages/ui/src/lib/generated/cn-tables.ts',
+  )
+  expect(manifest.files.map((file) => file.path)).toEqual(
+    expect.arrayContaining([
+      'packages/base/dist/index.js',
+      'packages/base/dist/index.d.ts',
+      'packages/base/dist/style.css',
+      'packages/base/dist/types.js',
+      'packages/base/dist/worker/parser.js',
+      'packages/base/dist/node_modules/dependency/index.js',
+    ]),
+  )
+  rmSync(path.join(f.directory, 'packages/base/dist'), { recursive: true })
+  const imported = consume(f.request('["@fregat/base"]', { attempt: 2 }), bundle.downloads)
+  expect(imported).toHaveLength(1)
+  expect(
+    readFileSync(path.join(f.directory, 'packages/base/dist/worker/parser.js'), 'utf8'),
+  ).toContain('onmessage')
+  expect(compiles(f.directory)).toHaveLength(2)
+  const warm = produce(f.request('all', { attempt: 2 }))
+  expect(warm).not.toBeNull()
+  expect(compiles(f.directory)).toHaveLength(2)
+  expect(warm.tasks.every((task) => task.cache.status === 'HIT')).toBe(true)
+})
+
+test('partial warm cache compiles only the missing build task and never saves test entries', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  const task = bundle.published.tasks.find((entry) => entry.package === '@workspace/ui')
+  assert(task)
+  const cache = path.join(f.directory, '.turbo/ci-builds')
+  rmSync(path.join(cache, `${task.hash}.tar.zst`))
+  writeFileSync(path.join(cache, '0000000000000000.tar.zst'), 'unrelated test cache')
+  produce(f.request('all', { attempt: 2 }))
+  expect(compiles(f.directory)).toHaveLength(3)
+  expect(readdirSync(cache)).not.toContain('0000000000000000.tar.zst')
+})
+
+test('consumer only imports its required subset and build-cache entries', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  rmSync(path.join(f.directory, 'packages/base/dist'), { recursive: true })
+  rmSync(path.join(f.directory, '.turbo/cache'), { recursive: true, force: true })
+  f.write('packages/ui/src/lib/generated/cn-tables.ts', 'keep untouched subset sentinel')
+  consume(f.request('["@fregat/base"]'), bundle.downloads)
+  expect(
+    readFileSync(path.join(f.directory, 'packages/ui/src/lib/generated/cn-tables.ts'), 'utf8'),
+  ).toBe('keep untouched subset sentinel')
+  expect(
+    readdirSync(path.join(f.directory, '.turbo/cache')).filter((name) => name.endsWith('.tar.zst')),
+  ).toHaveLength(1)
+})
+
+test('imported build entries satisfy Turbo prerequisites without caching test success', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  consume(f.request('all'), bundle.downloads)
+  const turbo = path.join(f.directory, 'node_modules/.bin/turbo')
+  for (let i = 0; i < 2; i++) {
+    const output = execFileSync(
+      turbo,
+      ['run', 'test', '--cache=local:r', '--filter=@workspace/ui'],
+      { cwd: f.directory, encoding: 'utf8' },
+    )
+    expect(output).toContain('@fregat/base:build: cache hit')
+    expect(output).toContain('@workspace/ui:test: cache miss')
+  }
+  expect(readFileSync(path.join(f.directory, 'tests.log'), 'utf8').trim().split('\n')).toHaveLength(
+    2,
+  )
+  expect(compiles(f.directory)).toHaveLength(2)
+})
+
+test('required consumer fails closed on missing bundle and never compiles', () => {
+  const f = fixture()
+  expect(() => consume(f.request('all'), path.join(f.directory, 'missing'))).toThrow()
+  expect(compiles(f.directory)).toEqual([])
+})
+
+test('failed producer publishes nothing', () => {
+  const f = fixture()
+  f.write('builder.mjs', 'process.exit(23)')
+  const request = f.request('all')
+  expect(() => produce(request)).toThrow()
+  expect(existsSync(path.join(request.directory, 'bundle/manifest.json'))).toBe(false)
+})
+
+test.each([
+  'checkout',
+  'source',
+  'run',
+  'os',
+  'arch',
+  'image',
+  'toolchain',
+  'environment',
+  'inputs',
+])('consumer rejects wrong %s identity before copying outputs', (key) => {
+  const f = fixture()
+  const bundle = f.publication()
+  rewriteBundle(bundle, (manifest) => {
+    manifest.identity[key] = 'wrong'
+  })
+  rmSync(path.join(f.directory, 'packages/base/dist'), { recursive: true })
+  expect(() => consume(f.request(), bundle.downloads)).toThrow()
+  expect(existsSync(path.join(f.directory, 'packages/base/dist'))).toBe(false)
+})
+
+test('digest and file-byte changes reject', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  const folder = path.join(bundle.downloads, bundle.published.name)
+  writeFileSync(path.join(folder, 'files/packages/base/dist/index.js'), 'changed bytes')
+  expect(() => consume(f.request(), bundle.downloads)).toThrow()
+  copyFileSync(
+    path.join(bundle.published.directory, 'files/packages/base/dist/index.js'),
+    path.join(folder, 'files/packages/base/dist/index.js'),
+  )
+  writeFileSync(
+    path.join(folder, 'manifest.json'),
+    readFileSync(path.join(folder, 'manifest.json'), 'utf8') + '\n',
+  )
+  expect(() => consume(f.request(), bundle.downloads)).toThrow()
+})
+
+test.each([
+  '../escape',
+  '/absolute',
+  'C:\\escape',
+  'packages/base/dist/../../input.txt',
+  'packages/base/node_modules/x',
+  'packages/base/dist/.env',
+])('unsafe output path %s rejects before extraction', (file) => {
+  const f = fixture()
+  const bundle = f.publication()
+  rewriteBundle(bundle, (manifest) => {
+    manifest.files[0].path = file
+  })
+  expect(() => consume(f.request(), bundle.downloads)).toThrow()
+})
+
+test.each([
+  'missing declaration',
+  'missing CSS',
+  'missing worker',
+  'dist-only UI',
+  'duplicate path',
+  'source injection',
+  'symlink',
+])('%s bundle fails closed', (variant) => {
+  const f = fixture()
+  const bundle = f.publication()
+  rewriteBundle(bundle, (manifest, directory) => {
+    if (variant === 'duplicate path') {
+      manifest.files.push(manifest.files[0])
+      return
+    }
+    if (variant === 'source injection') {
+      manifest.files[0].path = 'packages/base/input.txt'
+      return
+    }
+    const suffix = {
+      'missing declaration': 'dist/index.d.ts',
+      'missing CSS': 'dist/style.css',
+      'missing worker': 'dist/worker/parser.js',
+      'dist-only UI': 'src/lib/generated/cn-tables.ts',
+      symlink: 'dist/index.js',
+    }[variant]
+    const file = manifest.files.find((entry) => entry.path.endsWith(suffix))
+    assert(file)
+    const target = path.join(directory, 'files', file.path)
+    rmSync(target)
+    if (variant === 'symlink')
+      symlinkSync(path.join(f.directory, 'packages/base/input.txt'), target)
+  })
+  expect(() => consume(f.request(), bundle.downloads)).toThrow()
+})
+
+test('producer validates runtime/type/wildcard export realizations', () => {
+  const f = fixture()
+  const manifest = JSON.parse(readFileSync(path.join(f.directory, 'packages/base/package.json')))
+  manifest.exports['./missing'] = './dist/missing.d.ts'
+  f.write('packages/base/package.json', manifest)
+  expect(() => produce(f.request())).toThrow()
+})
+
+test('partial retry selects unique latest eligible attempt; future or duplicate producer fails', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  const second = produce(f.request('all', { attempt: 2 }))
+  cpSync(second.directory, path.join(bundle.downloads, second.name), { recursive: true })
+  expect(consume(f.request('all', { attempt: 3 }), bundle.downloads)).toHaveLength(2)
+  expect(() => consume(f.request('all', { attempt: 1 }), bundle.downloads)).toThrow()
+  const directory = path.join(bundle.downloads, second.name)
+  cpSync(directory, directory.replace(/[a-f0-9]{64}$/, '0'.repeat(64)), { recursive: true })
+  expect(() => consume(f.request('all', { attempt: 3 }), bundle.downloads)).toThrow()
+})
+
+test('cache identity separates toolchain/environment/shared inputs and primary tree/filter sets', () => {
+  const f = fixture()
+  const initial = f.request()
+  expect(f.request('["@fregat/base"]').cachePrefix).toBe(initial.cachePrefix)
+  expect(f.request('["@fregat/base"]').cacheKey).not.toBe(initial.cacheKey)
+  f.write('packages/base/input.txt', 'changed local source')
+  expect(f.request().cachePrefix).toBe(initial.cachePrefix)
+  const lock = readFileSync(path.join(f.directory, 'bun.lock'), 'utf8')
+  f.write('bun.lock', 'changed parser lock')
+  expect(f.request().cachePrefix).not.toBe(initial.cachePrefix)
+  f.write('bun.lock', lock)
+  f.write('builder.mjs', 'changed root helper')
+  expect(f.request().cachePrefix).not.toBe(initial.cachePrefix)
+  expect(f.request('all', { image: 'other-image' }).cachePrefix).not.toBe(initial.cachePrefix)
+  const beforeTool = f.request()
+  f.write('node_modules/turbo/package.json', { version: '0.0.0' })
+  expect(f.request().cachePrefix).not.toBe(beforeTool.cachePrefix)
+  const beforeEnv = f.request()
+  f.write('packages/base/.env.local', 'NODE_ENV=production')
+  expect(f.request().cachePrefix).not.toBe(beforeEnv.cachePrefix)
+})
+
+test('site prerequisite reuse requires a matching verified import and intact files', () => {
+  const f = fixture()
+  const request = f.request()
+  expect(() => verifyImported(request)).toThrow()
+  const bundle = f.publication()
+  consume(request, bundle.downloads)
+  expect(() => verifyImported(f.request())).not.toThrow()
+  f.write('packages/base/dist/index.d.ts', 'changed')
+  expect(() => verifyImported(f.request())).toThrow()
+  expect(compiles(f.directory)).toHaveLength(2)
+})
+
+test('artifact ZIP mode normalization preserves manifest output modes on import', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  const directory = rewriteBundle(bundle, (manifest, folder) => {
+    const file = manifest.files.find((entry) => entry.path === 'packages/base/dist/index.js')
+    assert(file)
+    file.mode = 0o755
+    chmodSync(path.join(folder, 'files', file.path), 0o644)
+  })
+  expect(directory).toBeTruthy()
+  consume(f.request(), bundle.downloads)
+  expect(lstatSync(path.join(f.directory, 'packages/base/dist/index.js')).mode & 0o777).toBe(0o755)
+})
+
+test('hardlinks, unexpected source files and escaped checkout parents reject', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  const folder = path.join(bundle.downloads, bundle.published.name)
+  const file = path.join(folder, 'files/packages/base/dist/index.js')
+  rmSync(file)
+  linkSync(path.join(f.directory, 'packages/base/dist/index.js'), file)
+  expect(() => consume(f.request(), bundle.downloads)).toThrow()
+  rmSync(file)
+  copyFileSync(path.join(bundle.published.directory, 'files/packages/base/dist/index.js'), file)
+  writeFileSync(path.join(folder, 'source.txt'), 'unexpected source')
+  expect(() => consume(f.request(), bundle.downloads)).toThrow()
+  rmSync(path.join(folder, 'source.txt'))
+  rmSync(path.join(f.directory, 'packages/base/dist'), { recursive: true })
+  const escape = path.join(f.directory, 'transport/escape')
+  mkdirSync(escape)
+  symlinkSync(escape, path.join(f.directory, 'packages/base/dist'))
+  expect(() => consume(f.request(), bundle.downloads)).toThrow()
+  expect(readdirSync(escape)).toEqual([])
+})
+
+test('bundle identities include declared output roots and the full producer union', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  rewriteBundle(bundle, (manifest) => {
+    const ui = manifest.tasks.find((task) => task.taskId === '@workspace/ui#build')
+    assert(ui)
+    ui.roots = ['packages/ui/dist']
+  })
+  expect(() => consume(f.request('["@fregat/base"]'), bundle.downloads)).toThrow()
+})
+
+test('a package source edit invalidates its build and dependency hashes through Turbo', () => {
+  const f = fixture()
+  const bundle = f.publication()
+  f.write('packages/base/input.txt', 'next version')
+  const next = produce(f.request('all', { attempt: 2 }))
+  expect(compiles(f.directory)).toHaveLength(4)
+  expect(next.tasks.every((task) => task.cache.status === 'MISS')).toBe(true)
+  expect(next.tasks.map((task) => task.hash)).not.toEqual(
+    bundle.published.tasks.map((task) => task.hash),
+  )
+})
+
+test('tracked directory symlinks are sealed as source links without following them', () => {
+  const f = fixture()
+  const initial = f.request()
+  rmSync(path.join(f.directory, 'instructions-link'))
+  symlinkSync('packages/base', path.join(f.directory, 'instructions-link'))
+  expect(f.request().identity.inputs).not.toBe(initial.identity.inputs)
+})
