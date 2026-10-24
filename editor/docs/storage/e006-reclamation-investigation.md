@@ -1,13 +1,12 @@
 # Reclamation investigation
 
-Measured 2026-09-22 against Editor `6656eb7113040f7489a15f4c6e2293e511a55edd`.
-The initial working tree was clean. This records the first investigation and its rejected
-tombstone-removal candidate. Its broad stop conclusion was corrected on 2026-09-23:
-the [automatic text reclamation](e006-text-reclamation.md) preserves position metadata,
+Measured 2026-09-22 against Editor `6656eb7113040f7489a15f4c6e2293e511a55edd` with a clean working tree.
+This records the first investigation and its rejected tombstone-removal candidate. Its broad stop
+conclusion no longer holds: the [automatic text reclamation](e006-text-reclamation.md) preserves position metadata,
 passes retained-anchor/snapshot checks and reduces measured heap in Bun and Chromium.
-[Tombstone compaction](e006-tombstone-compaction.md) completed text reclamation on 2026-09-25 with an
-equivalent compact representation, so the lifetime handles proposed below were not needed. The
-rest of this report records the original observations and proposal.
+[Tombstone compaction](e006-tombstone-compaction.md) reaches an equivalent compact representation,
+so the lifetime handles proposed below are not needed. The rest of this report records the
+original observations and proposal.
 
 ## Reproduce
 

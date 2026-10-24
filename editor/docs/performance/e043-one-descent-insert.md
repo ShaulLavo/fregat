@@ -5,11 +5,11 @@ once to see whether the offset splits a surrogate pair, once to find the piece e
 coalescing, and once to split. It now walks once. The split's descent answers the other two
 questions at its landing, and where it can extend the piece ending there it replaces that piece
 on the way back up instead of splitting. Random insertions are 10% to 12% faster; the other
-lanes are flat to slightly better once warm, and the typing lane pays a cold-JIT transient in the
+scenarios are flat to slightly better once warm, and the typing scenario pays a cold-JIT transient in the
 bench's default regime that turns into a gain with more warmups. Raw reports are in
 [`e043-evidence.tar.gz`](e043-evidence.tar.gz).
 
-Inspected baseline: the fixed edit overhead head, `b7fea3c`, on branch `e043-one-descent-insert`.
+Inspected baseline: the fixed edit overhead head, `b7fea3c`.
 
 ## What changed
 
@@ -34,7 +34,7 @@ Inspected baseline: the fixed edit overhead head, `b7fea3c`, on branch `e043-one
   it.
 - The unit after is read first, and the buffer log remembers the tail chunk's last code unit.
   The tail is a fresh concatenation after every keystroke, and `charCodeAt` on it flattens the
-  string; the first version read the unit before first and doubled the typing lane's time. The
+  string; the first version read the unit before first and doubled the typing scenario's time. The
   `unitAt` accessor serves the tail's last unit from the record and everything else from the
   chunk, and `PieceBufferChunkView.fork` carries the record across.
 - On a coalesce the probe returns the extended piece and the split returns the new root as
@@ -47,9 +47,9 @@ Inspected baseline: the fixed edit overhead head, `b7fea3c`, on branch `e043-one
 
 Standard profile, 9 samples, three seeds, the fixed edit overhead head in a worktree and the change in the
 checkout, alternating. The default regime is 2 warmups; the warm column is 6 warmups on one
-seed. Milliseconds per lane, ratio to the control's median.
+seed. Milliseconds per scenario, ratio to the control's median.
 
-| Lane                 | Control | fixed edit overhead head, 2 warmups | one-descent insert, 2 warmups | fixed edit overhead head, 6 warmups | one-descent insert, 6 warmups |
+| Scenario             | Control | fixed edit overhead head, 2 warmups | one-descent insert, 2 warmups | fixed edit overhead head, 6 warmups | one-descent insert, 6 warmups |
 | -------------------- | ------: | ----------------------------------- | ----------------------------- | ----------------------------------- | ----------------------------- |
 | sequential-typing    |    0.60 | 0.64 1.06x                          | 0.70 1.17x +10%               | 0.53 1.50x                          | 0.50 1.41x -6%                |
 | typing-with-lookups  |    0.93 | 0.89 0.95x                          | 0.95 1.02x +7%                | 0.78 1.06x                          | 0.76 1.02x -3%                |
@@ -60,9 +60,9 @@ seed. Milliseconds per lane, ratio to the control's median.
 | persistent-history   |       — | 6.21                                | 6.21 -0%                      | 5.82                                | 5.70 -2%                      |
 
 The warm control is faster too, which is why its ratios move; compare the Singapore columns.
-The typing lane at 2 warmups is a JIT transient: the bench times the third replay in a fresh
+The typing scenario at 2 warmups is a JIT transient: the bench times the third replay in a fresh
 process, `splitByVisibleOffset` is larger now and typing calls it 1,500 times where it called it
-once, and the same lane with 25 samples at 2 warmups reads +9% while 15 samples at 6 warmups
+once, and the same scenario with 25 samples at 2 warmups reads +9% while 15 samples at 6 warmups
 read -5% and the profiler's 24 steady-state replays read -17% (0.30 ms against 0.36). The
 append-only buffer store report recorded the same third-iteration effect on `large-paste-delete`.
 
@@ -95,5 +95,5 @@ the two splits the same way is a smaller version of this change.
   first snap rule. `bun run bench:test`: 73 tests, budgets regenerated for the counters this
   removed (`tryCoalesceInsert`, the insert's `snapEditRange` and `splitsSurrogatePair` calls).
 - Timing and profiles: `bun run bench -- --profile standard --seed <s> [--warmups 6]
-  [--samples 25]` in both trees and `bun run bench:profile -- --modes cpu,counters --repeats 24`,
+[--samples 25]` in both trees and `bun run bench:profile -- --modes cpu,counters --repeats 24`,
   under `timing/` and `cpu/` in the evidence tarball.

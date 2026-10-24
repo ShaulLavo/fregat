@@ -7,7 +7,7 @@ multi-cursor batches 7% to 13%, anchor resolution 17% to 22%. Sequential typing 
 27 ns a keystroke: 0.76x the control in the bench's default regime and 1.15x warmed up. Raw reports are in
 [`e045-evidence.tar.gz`](e045-evidence.tar.gz).
 
-Inspected baseline: the balanced tree head, `97555fa`, on branch `e045-one-pass-edits`.
+Inspected baseline: the balanced tree head, `97555fa`.
 
 ## What changed
 
@@ -44,11 +44,11 @@ Standard profile, 9 samples, three seeds, the balanced tree head in a worktree w
 interleaved per seed. The bench's replacement now goes through `applyBatchToPieceTable` with one
 edit, which is the call the editor makes; both trees were measured with that adapter. Two
 regimes, because the append-only buffer store and one-descent insert reports found the default two warmups still inside the JIT
-transient: milliseconds per lane, median over seeds, ratio to the control of the same regime.
+transient: milliseconds per scenario, median over seeds, ratio to the control of the same regime.
 The control warms up too: an earlier version of this table divided every column by one pooled
 control and showed typing at 0.71x with 8 warmups, where it is 1.15x.
 
-| Lane                          | Control, 2 warmups | balanced tree, 2 warmups | one-pass edits, 2 warmups | Control, 8 warmups | balanced tree, 8 warmups | one-pass edits, 8 warmups |
+| Scenario                      | Control, 2 warmups | balanced tree, 2 warmups | one-pass edits, 2 warmups | Control, 8 warmups | balanced tree, 8 warmups | one-pass edits, 8 warmups |
 | ----------------------------- | -----------------: | ------------------------ | ------------------------- | -----------------: | ------------------------ | ------------------------- |
 | sequential-typing             |               0.61 | 0.42 (0.70x)             | 0.46 (0.76x)              |               0.37 | 0.39 (1.06x)             | 0.42 (1.15x)              |
 | typing-with-lookups           |               0.92 | 0.63 (0.69x)             | 0.67 (0.72x)              |               0.76 | 0.61 (0.80x)             | 0.64 (0.85x)              |
@@ -62,7 +62,7 @@ control and showed typing at 0.71x with 8 warmups, where it is 1.15x.
 
 Structural counters, standard profile, against the balanced tree budgets:
 
-| Lane                 | Tree nodes cloned | Tree nodes touched | Index nodes cloned |
+| Scenario             | Tree nodes cloned | Tree nodes touched | Index nodes cloned |
 | -------------------- | ----------------- | ------------------ | ------------------ |
 | random-replacements  | 32,066 to 16,177  | 36,775 to 24,498   | 32,611 to 32,997   |
 | eight-cursor-batches | 16,563 to 11,793  | 19,606 to 19,610   | 27,947 to 12,428   |
@@ -89,19 +89,19 @@ trace. The reverse index was 31 to 35 as a treap.
 - **Order gaps run out sooner than they should.** On the churn trace the smallest gap between
   neighbouring orders falls from 1,024 to 2e-6 within 100 random edits and reaches the 1e-9 floor
   near edit 1,000, which forces a relabel of every piece. The balanced tree head is on the same
-  trajectory and crosses just after the lane's 1,500 edits end, so the first measurement of this
-  plan showed churn 6% slower until the relabel stopped rebuilding the index. A relabel is still
+  trajectory and crosses just after the scenario's 1,500 edits end, so the first measurement of this
+  brief showed churn 6% slower until the relabel stopped rebuilding the index. A relabel is still
   linear in the piece count. Relabelling only the smallest crowded subtree, as order-maintenance
-  structures do, would bound it; that is a lead, not part of this plan.
+  structures do, would bound it; that is a lead, not part of this work.
 
 ## What remains
 
 - reverse-index cost: per-buffer index structure or deferred maintenance, plus the typing slot above.
 - A replacement still snaps its two ends with two read descents before the edit. The hide
   descent visits both ends anyway and could report a cut pair as a retry, as the insert probe
-  does. It is 7% of the replacement lane.
+  does. It is 7% of the replacement scenario.
 - Local relabelling of orders.
-- `firstLineBreakAtOrAfter` is still 8% to 12% of the random lanes for pieces that do hold line
+- `firstLineBreakAtOrAfter` is still 8% to 12% of the random scenarios for pieces that do hold line
   breaks; bounding the search to the piece's own range needs the index position of its first
   break.
 

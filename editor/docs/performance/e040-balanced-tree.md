@@ -2,24 +2,24 @@
 
 The sequence tree is an AVL tree instead of a treap, and an edit
 no longer splits and merges: an insert and a delete each descend once and rejoin the path on the
-way back. Every random edit lane is 22% to 34% faster than the node summaries head, typing is 17% faster,
-every read lane after churn is 7% to 14% faster, and the tree's height is 12 to 15 levels where
-the treap's was 26 to 33. The plan's own candidate, a balanced tree driven through split and join,
+way back. Every random edit scenario is 22% to 34% faster than the node summaries head, typing is 17% faster,
+every read scenario after churn is 7% to 14% faster, and the tree's height is 12 to 15 levels where
+the treap's was 26 to 33. The brief's own candidate, a balanced tree driven through split and join,
 was measured and rejected: it is slower than the treap. Raw reports are in
 [`e040-evidence.tar.gz`](e040-evidence.tar.gz).
 
-Inspected baseline: the node summaries head, `55c4cea`, on branch `e040-balanced-tree`.
+Inspected baseline: the node summaries head, `55c4cea`.
 
 ## The bake-off
 
-The plan proposed the join-based framework of Blelloch, Ferizovic and Sun with split and merge
+The brief proposed the join-based framework of Blelloch, Ferizovic and Sun with split and merge
 derived from `join`, weight-balanced first and AVL second. Commit `c9ad15d` holds every candidate
 behind environment switches so one build could be measured under each: AVL or weight-balanced
 with alpha 0.29, 0.25 and 0.20, each proven for join, and edits either through split and join or
 in one descent. Standard profile, 9 samples of 2 warmups, three seeds, configurations interleaved
-per seed, milliseconds per lane as the median over seeds with the ratio to the control.
+per seed, milliseconds per scenario as the median over seeds with the ratio to the control.
 
-| Lane                 | Control | Treap        | AVL split    | AVL direct   | WB .29 split | WB .29 direct | WB .25 direct | WB .20 direct |
+| Scenario             | Control | Treap        | AVL split    | AVL direct   | WB .29 split | WB .29 direct | WB .25 direct | WB .20 direct |
 | -------------------- | ------: | ------------ | ------------ | ------------ | ------------ | ------------- | ------------- | ------------- |
 | random-insertions    |    1.11 | 3.05 (2.75x) | 3.40 (3.06x) | 2.39 (2.15x) | 3.61 (3.25x) | 2.44 (2.20x)  | 2.46 (2.22x)  | 2.45 (2.21x)  |
 | random-replacements  |    1.37 | 6.15 (4.49x) | 6.29 (4.59x) | 4.13 (3.01x) | 6.73 (4.91x) | 4.17 (3.05x)  | 4.36 (3.19x)  | 4.62 (3.38x)  |
@@ -30,12 +30,12 @@ per seed, milliseconds per lane as the median over seeds with the ratio to the c
 
 Three findings decided the design.
 
-- **Split and join loses to the treap.** A balanced tree halves the height, and the read lanes
+- **Split and join loses to the treap.** A balanced tree halves the height, and the read scenarios
   show it, but a split unwinds through a `join` at every level and each of those walks back down
   a spine to restore balance. The treap's split needs no repair at all. Height was never the
   cost of an edit; the number of passes over the path was.
 - **One descent wins under either rule.** Tombstones mean the sequence tree only grows, so no
-  edit needs a split or a merge. With them gone every random lane is 22% to 34% faster.
+  edit needs a split or a merge. With them gone every random scenario is 22% to 34% faster.
 - **The balance rule barely matters.** AVL leads weight balance by 1% to 3% at alpha 0.29, and
   looser alphas are slower on replacements and churn. AVL's invariant is also the simpler one to
   validate, so AVL it is.
@@ -75,7 +75,7 @@ be the log's last, and `reads.test.ts` holds the regression test. The editor's
 
 The final code against the node summaries head in a worktree, same method, three seeds.
 
-| Lane                          | Control | node summaries head | balanced tree | Change |
+| Scenario                      | Control | node summaries head | balanced tree | Change |
 | ----------------------------- | ------: | ------------------- | ------------- | -----: |
 | sequential-typing             |    0.61 | 0.52 (0.85x)        | 0.43 (0.70x)  |   -17% |
 | typing-with-lookups           |    0.93 | 0.73 (0.79x)        | 0.63 (0.68x)  |   -14% |
@@ -96,17 +96,17 @@ The final code against the node summaries head in a worktree, same method, three
 | anchor-resolution-after-churn |       — | 0.79                | 0.82          |    +4% |
 
 Anchor resolution is within run variation of the treap; it is bounded by the reverse index, which
-this plan did not touch.
+this work did not touch.
 
 Structural counters, standard profile, from the regenerated budgets against the node summaries budgets:
 
-| Lane                | Nodes touched (`own`) | Nodes cloned     | Nodes created  |
+| Scenario            | Nodes touched (`own`) | Nodes cloned     | Nodes created  |
 | ------------------- | --------------------- | ---------------- | -------------- |
 | random-insertions   | 46,069 to 18,629      | 17,265 to 15,758 | 4,580 to 3,055 |
 | random-replacements | 112,832 to 36,775     | 40,529 to 32,066 | 7,520 to 4,525 |
 | mixed-edit-churn    | 92,506 to 31,010      | 31,838 to 26,445 | 6,960 to 3,993 |
 
-The plan expected clones to fall with height. They fell 9% to 21%, because the transient edits work's epochs had
+The brief expected clones to fall with height. They fell 9% to 21%, because the transient edits work's epochs had
 already stopped an edit cloning a node twice. What fell by 60% to 67% is the nodes an edit
 touches and re-summarizes: 12 per insert against 31. An insert performs 0.43 rotations.
 

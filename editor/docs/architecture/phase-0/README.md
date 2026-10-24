@@ -1,4 +1,4 @@
-# Phase 0 Architecture Health
+# Architecture Health Baseline
 
 This directory is the architecture health baseline.
 It is intentionally descriptive before it is aspirational: the files here record the current knots so
@@ -32,18 +32,18 @@ pushes to `main`, and manual dispatch.
   `format`, and `format:check`.
 - Duplicate LSP module candidates between `@singapore-editor/lsp-plugin` and `@singapore-editor/typescript-lsp`.
 - The current `@singapore-editor/core` public export inventory.
-- Production timer usage that must stay justified until Phase 3 scheduling work replaces it.
+- Production timer usage that must stay justified until scheduling work replaces it.
 
 ## Current Known Issues
 
-- Package cycles: none reported in the Phase 0 baseline.
+- Package cycles: none reported in the baseline.
 - Source cycles: seven components across the overlapping scan scopes remain in `@singapore-editor/core`
   and `@singapore-editor/lsp-plugin`. The scan includes type imports.
 - Duplicate modules: the LSP plugin and TypeScript-LSP packages share four same-name modules.
 - Package scripts: every workspace package provides all six expected scripts.
 - Public API: 15 explicit entry points are inventoried, including the opt-in debug and keymap APIs.
 - Timers: 42 timer, frame, idle, or microtask usages are inventoried, including browser benchmark
-  observers. Some older entries retain their Phase 0 legacy justification; new entries require a
+  observers. Some older entries retain their original legacy justification; new entries require a
   specific scheduler justification in `timer-usage.json`.
 
 The edit batches refresh includes earlier public facade additions for chord keymaps, piece-table inspection,
@@ -69,4 +69,4 @@ selection reveal, scroll viewports, and row decoration projection; these remain 
   missing package scripts.
 - `core-public-api.json` records `@singapore-editor/core` package entry points and exported names.
 - `timer-usage.json` records production timer usage and required justifications.
-- `performance-baseline.md` records the first reproducible performance numbers for Phase 0.
+- `performance-baseline.md` records the first reproducible performance numbers.

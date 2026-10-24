@@ -3,15 +3,15 @@
 The question was how much of the small-edit gap against
 `microsoft/vscode-textbuffer` is persistence itself. The answer is about a tenth: with every path
 copy removed from both trees, a random insertion still costs 4.35x the mutable control and a
-random replacement 6.2x. The plan's decision rule said no-go above 3x, so transient snapshots do
+random replacement 6.2x. The brief's decision rule said no-go above 3x, so transient snapshots do
 not become an editor contract. What does ship from the prototype is the ownership check itself in
 the default mode, where it reuses the nodes one edit has already cloned and removes most of the
 cloning without any retain point outside the library.
 
 The inspected baseline was `b6a265a786b08c61318a3e02b666f17cb7ef50fc`, on top of the append-only buffer store
-commits. The execution plan has been removed; the [append-only buffer store report](e038-append-only-buffer-store.md)
+commits; the [append-only buffer store report](e038-append-only-buffer-store.md)
 records the starting point. Raw timing, counter and CPU reports are in
-[`e041-evidence.tar.gz`](e041-evidence.tar.gz); the branch is `e041-transient-edits`.
+[`e041-evidence.tar.gz`](e041-evidence.tar.gz).
 
 ## What was built
 
@@ -33,8 +33,8 @@ records the starting point. Raw timing, counter and CPU reports are in
   the first. The bench never hits it; the audit below lists where the editor would.
 - The adapter takes a retention: `always` (retain before every primitive edit, the default),
   `transaction` (before every `edit()` and `batch()` call, so a replacement's insert and a batch's
-  later edits reuse the nodes the earlier ones created) and `history` (only where a lane retains
-  explicitly, which the edit lanes never do). `bench`, `bench:profile` and the workers take
+  later edits reuse the nodes the earlier ones created) and `history` (only where a scenario retains
+  explicitly, which the edit scenarios never do). `bench`, `bench:profile` and the workers take
   `--retention`, and every smoke workload validates under all three, including `branch-edits` and
   the retained-text hashes of `persistent-history`.
 - Counters: `tree.own.calls` and `reverseIndex.ownReverseIndexNode.calls` count nodes touched;
@@ -43,13 +43,13 @@ records the starting point. Raw timing, counter and CPU reports are in
 
 ## Measured results
 
-Standard profile, 10,000 lines, 1,500 edits per lane, 9 samples of 2 warmups, three seeds
+Standard profile, 10,000 lines, 1,500 edits per scenario, 9 samples of 2 warmups, three seeds
 (20260916, 7, 12345). Each cell is the median over seeds of the per-run median in milliseconds
-for the whole lane, with the range across seeds, and the ratio to the control's median.
-`main` is unmodified main timed in a worktree on the same seeds; `always` is this branch in its
+for the whole scenario, with the range across seeds, and the ratio to the control's median.
+`main` is unmodified main timed in a worktree on the same seeds; `always` is this build in its
 default mode.
 
-| Lane                 | Control | main                      | always                 | transaction            | history                |
+| Scenario             | Control | main                      | always                 | transaction            | history                |
 | -------------------- | ------: | ------------------------- | ---------------------- | ---------------------- | ---------------------- |
 | sequential-typing    |    0.61 | 0.64 [0.51–0.64] 1.06x    | 0.66 [0.53–0.67] 1.09x | 0.67 [0.54–0.70] 1.10x | 0.64 [0.52–0.65] 1.05x |
 | typing-with-lookups  |    0.94 | 0.89 [0.73–0.89] 0.95x    | 0.91 [0.74–0.91] 0.97x | 0.92 [0.75–0.93] 0.97x | 0.89 [0.73–0.90] 0.95x |
@@ -63,10 +63,10 @@ default mode.
 Per random insertion that is 3.6 µs on main, 3.4 µs in `always`, 3.2 µs in `history` and
 0.73 µs for the control. Removing every clone buys 0.4 µs of a 2.9 µs gap.
 
-Structural counters for the same lanes, one replay each. Tree and reverse-index nodes touched
+Structural counters for the same scenarios, one replay each. Tree and reverse-index nodes touched
 (`own`) do not change with retention; the copied share does.
 
-| Lane                 | Tree touched | Tree copied: main → always → transaction → history | Reverse touched | Reverse copied: main → always → transaction → history |
+| Scenario             | Tree touched | Tree copied: main → always → transaction → history | Reverse touched | Reverse copied: main → always → transaction → history |
 | -------------------- | -----------: | -------------------------------------------------- | --------------: | ----------------------------------------------------- |
 | sequential-typing    |        4,499 | 4,497 → 4,497 → 4,497 → 0                          |           3,003 | 1,500 + 1,500 replaced → 2,999 → 2,999 → 0            |
 | random-insertions    |       47,401 | 47,401 → 17,988 → 17,988 → 0                       |          57,336 | 55,841 → 29,576 → 29,576 → 0                          |
@@ -81,7 +81,7 @@ the merges after a split and the later reverse-index writes of one change list, 
 the first pass already cloned, so 62% of tree copies and 47% to 70% of reverse-index copies
 disappear with no change in what a snapshot promises. `transaction` mode removes the clones
 between a replacement's delete and insert and between a batch's edits, another 1% to 8% of the
-lane time. `history` mode removes the rest and is worth 5% to 13% of lane time. The main-column
+scenario time. `history` mode removes the rest and is worth 5% to 13% of scenario time. The main-column
 reverse-index counts include the replacement writes that were an object spread before and go
 through `own` now; allocations are the same, the counter moved.
 
@@ -97,7 +97,7 @@ index and the rest in its red-black tree, on one third of the samples.
 ## Decision
 
 No-go on transient snapshots as an editor contract. Persistence is not the cost: at zero copies
-the insert lane is still 4.35x the control, and the plan's rule put the line at 3x. The time is
+the insert scenario is still 4.35x the control, and the brief's rule put the line at 3x. The time is
 fixed per-edit work, and the profile names it:
 
 - `allocateOrdersBetween` builds its result with `Array.from` and a closure, twice per insert
@@ -110,10 +110,10 @@ fixed per-edit work, and the profile names it:
 - Priority hashing (`mixWord`, 3.3%) runs per created node, and the reverse index at 12% is
   the reverse-index cost work's subject with the clone half of it already gone.
 
-What ships from the branch is the `always` mode: the epoch check with `autoRetain` on. It keeps
+What ships is the `always` mode: the epoch check with `autoRetain` on. It keeps
 every snapshot persistent exactly as today, needs no retain point anywhere in the editor, and
 measures 6% faster on insertions, 23% on replacements, 8% on batches, 6% on churn and 16% on
-the history lane against main, with the counter budgets lowered to match. `transaction` mode
+the history scenario against main, with the counter budgets lowered to match. `transaction` mode
 would add a few percent on batches and replacements for a per-transaction retain the session
 could place in `applyEdits` and `commitPrepared`, but the audit below shows it is not free, and
 the number does not justify it.
@@ -153,11 +153,11 @@ percent, and it is why the decision does not depend on the audit's outcome.
   later in-place edits, and branches from a retained root.
 - `bun run bench:test`: 73 tests, with every smoke workload validated under all three retentions
   and the counter budgets regenerated at a 2% margin over the lowered counts.
-- Timing: `bun run bench -- --profile standard --seed <s> --retention <mode> --only <lanes>`
+- Timing: `bun run bench -- --profile standard --seed <s> --retention <mode> --only <scenarios>`
   for each mode and seed, main timed from a worktree at `5469b37`; two runs that overlapped with
   other work on the machine were discarded and repeated. Reports and JSON are in the evidence
   tarball under `timing/`.
 - Counters: `bun run bench:profile -- --modes counters --retention <mode>`, under `counters/`.
 - CPU: `bun run bench:profile -- --modes cpu --retention <mode> --repeats 24 --only
-  random-insertions,random-replacements`, under `cpu/`. Raw `.cpuprofile` files are not kept;
+random-insertions,random-replacements`, under `cpu/`. Raw `.cpuprofile` files are not kept;
   the command reproduces them.

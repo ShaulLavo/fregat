@@ -41,7 +41,7 @@ All runs used Node 26 (V8) on this machine, one process per engine, with `--expo
 Corpora:
 
 - **Composer:** a 60-word chat message with three typos.
-- **10k-line markdown:** the first 10,000 lines of Platform `plans/*.md` (989 KB). The prose
+- **10k-line markdown:** the first 10,000 lines of the Platform repository's planning notes, concatenated (989 KB). The prose
   tokenizer skips fenced code, inline code, link targets, URLs, paths, camelCase and acronyms, which
   leaves 78,955 words, 6,274 of them distinct.
 - **Suggestion quality:** Norvig's Birkbeck-derived `spell-testset1` and `spell-testset2`. A pair

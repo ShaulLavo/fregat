@@ -46,7 +46,7 @@ bun scripts/typescript-parity.mjs qualify "$evidence/matrix.json"
 failures, unavailable variants and unrun roles. `qualify` requires clean source, passed tests,
 verified cleanup, supported mandatory outcomes and every advertised variant. It rejects any
 advertised method without a contract case. Core qualification covers these 25 cases only;
-the complete editor qualification has additional gates in the execution plan.
+the complete editor qualification has additional gates beyond these 25 cases.
 
 Capture rejects duplicate runs for a backend. Keep each retry in a separate evidence directory
 and name the selected run explicitly. Missing roles receive unrun records; capture never

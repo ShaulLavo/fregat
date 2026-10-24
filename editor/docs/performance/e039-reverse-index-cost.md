@@ -9,23 +9,23 @@ resolution 40%, 500 anchors resolved after every edit 44%, and typing 14%. A del
 insert that was deleted whole no longer resolves to the document's start or end. Raw reports are
 in [`e039-evidence.tar.gz`](e039-evidence.tar.gz).
 
-Inspected baseline: the one-pass edits head, `fa46d45`, on branch `e039-reverse-index-cost`.
+Inspected baseline: the one-pass edits head, `fa46d45`.
 
 ## The ceiling
 
-The plan's first step was to measure what any design could win. A disposable build returned the
-index untouched from `applyReverseIndexChanges` and from the relabel. Milliseconds per lane, 8
+The brief's first step was to measure what any design could win. A disposable build returned the
+index untouched from `applyReverseIndexChanges` and from the relabel. Milliseconds per scenario, 8
 warmups, 7 samples, median over three seeds:
 
-| Lane                 | one-pass edits head | No index | Share of the lane |
-| -------------------- | ------------------: | -------: | ----------------: |
-| sequential-typing    |                0.43 |     0.36 |               16% |
-| random-insertions    |                1.99 |     1.31 |               34% |
-| random-replacements  |                3.19 |     2.17 |               32% |
-| eight-cursor-batches |                2.30 |     1.67 |               28% |
-| mixed-edit-churn     |                3.15 |     2.15 |               32% |
+| Scenario             | one-pass edits head | No index | Share of the scenario |
+| -------------------- | ------------------: | -------: | --------------------: |
+| sequential-typing    |                0.43 |     0.36 |                   16% |
+| random-insertions    |                1.99 |     1.31 |                   34% |
+| random-replacements  |                3.19 |     2.17 |                   32% |
+| eight-cursor-batches |                2.30 |     1.67 |                   28% |
+| mixed-edit-churn     |                3.15 |     2.15 |                   32% |
 
-Every random lane is above the plan's stop line of a fifth, so the work went ahead.
+Every random scenario is above the brief's stop line of a fifth, so the work went ahead.
 
 ## What changed
 
@@ -67,7 +67,7 @@ later.
 
 ## Measured results
 
-Standard profile, 9 samples, three seeds, milliseconds per lane, median over seeds, ratio to the
+Standard profile, 9 samples, three seeds, milliseconds per scenario, median over seeds, ratio to the
 pinned vscode-textbuffer control, which has no anchors and no persistence. Two regimes, as in the
 one-pass edits report. The 2-warmup columns are the bench itself: the one-pass edits work's are the figures its report
 recorded on this machine the same day, the reverse-index cost work's are this build. The 8-warmup columns are the one-pass edits
@@ -79,7 +79,7 @@ control. The control warms up too, so those ratios flatter both builds: measured
 comparison stand. The textbuffer [README](../../packages/textbuffer/README.md#current-results)
 holds the per-regime ratios for this commit.
 
-| Lane                          | Control | one-pass edits, 2 warmups | reverse-index cost, 2 warmups | one-pass edits, 8 warmups | reverse-index cost, 8 warmups |
+| Scenario                      | Control | one-pass edits, 2 warmups | reverse-index cost, 2 warmups | one-pass edits, 8 warmups | reverse-index cost, 8 warmups |
 | ----------------------------- | ------: | ------------------------- | ----------------------------- | ------------------------- | ----------------------------- |
 | sequential-typing             |    0.61 | 0.46 (0.76x)              | 0.40 (0.66x)                  | 0.43 (0.70x)              | 0.37 (0.60x)                  |
 | typing-with-lookups           |    0.98 | 0.67 (0.73x)              | 0.62 (0.63x)                  | 0.66 (0.68x)              | 0.59 (0.61x)                  |
@@ -95,13 +95,13 @@ holds the per-regime ratios for this commit.
 
 The one-pass edits ratios in the 2-warmup columns are its report's, against that run's control. The
 driver's own 2-warmup run is colder than the bench's, because it does not validate between
-warmups, and there the batch lane is flat, 2.42 to 2.49 ms, while every other lane improves.
+warmups, and there the batch scenario is flat, 2.42 to 2.49 ms, while every other scenario improves.
 The cause was not chased; both runs are in the evidence.
 
 Structural counters, standard profile, first replay. Index copies are vector nodes, private
 tails and cut-buffer tree nodes; before, they were index tree nodes cloned and created.
 
-| Lane                 | Index copies  | Appends | Sequence-tree copies |
+| Scenario             | Index copies  | Appends | Sequence-tree copies |
 | -------------------- | ------------- | ------: | -------------------: |
 | sequential-typing    | 3,002 to 0    |       2 |                1,503 |
 | random-insertions    | 32,949 to 164 |   1,500 |               18,444 |
@@ -110,19 +110,19 @@ tails and cut-buffer tree nodes; before, they were index tree nodes cloned and c
 | mixed-edit-churn     | 32,847 to 192 |   1,676 |               21,821 |
 | branch-edits         | 1,614 to 72   |      65 |                  883 |
 
-The acceptance bar was index copies at or below sequence-tree copies on both random lanes. They
+The acceptance bar was index copies at or below sequence-tree copies on both random scenarios. They
 are under a hundredth of them. An append is one slot write, not a copy. Batches and churn append
 more than they insert because each relabel rebuilds the index by appending.
 
 ## The decision
 
-The plan offered three designs and asked for the choice to be measured.
+The brief offered three designs and asked for the choice to be measured.
 
 - **Option 1, a per-buffer structure inside a persistent map, as planned: measured and
   rejected.** The build kept the vector and the thin entries but indexed the original buffer
   like any other, as a tree of its pieces in slot 0. Random insertions 1.89 ms against 2.00 for
   the one-pass edits head and 1.39 for the retained design; replacements 3.10 against 3.17 and 2.29; churn
-  3.18 against 3.12 and 2.31; anchor resolution 0.45 against 0.52 and 0.31. The plan expected a
+  3.18 against 3.12 and 2.31; anchor resolution 0.45 against 0.52 and 0.31. The brief expected a
   buffer to hold a handful of pieces. That is true of inserts and false of the original buffer,
   which is the one random edits cut: its tree is as deep as the old index was.
 - **Option 2, deferred maintenance: not built.** It changes when the work happens, not how
@@ -131,7 +131,7 @@ The plan offered three designs and asked for the choice to be measured.
   proposed for the entry being typed into is not needed: typing writes no entry at all.
 - **Option 3, derivation from the sequence tree: taken for the original buffer only.** A
   summary can order one buffer's pieces, not every buffer's, and the original is the buffer
-  worth it. The cost the plan feared, a field on every sequence node, came to nothing:
+  worth it. The cost the brief feared, a field on every sequence node, came to nothing:
   `subtreeOriginalLength` replaced a field that was there already. `subtreeMinBuffer` is one new
   field and one comparison per child in `summarize`.
 
@@ -146,11 +146,11 @@ all, and that 5% also pays for the new summary. Replacements 2.29 against 2.16.
   keys, and making the common write an append.
 - **One object shape per structure.** The first build of the vector made its header at four
   sites with two property orders. `finishEdit` deoptimised on every fresh document and the
-  insert lane read 1.68 ms; one constructor function brought it to 1.39.
+  insert scenario read 1.68 ms; one constructor function brought it to 1.39.
 - **A pre-existing deopt remains.** `retainPieceTableSnapshot`, `editingEpoch`,
   `insertIntoPieceTable` and `finishEdit` are each deoptimised once per fresh document with
   "dependent field type changed", on the one-pass edits head too. It costs the first edits of a document.
-  A lead, not part of this plan.
+  A lead, not part of this work.
 - **The harness has a call-site trap.** A worker that runs its warmups in a loop and the
   measured run at a second call site reads 4x slower for typing. The bench's own worker loops
   over one site; the throwaway driver used here had to be fixed to do the same.
@@ -178,10 +178,10 @@ all, and that 5% also pays for the new summary. Replacements 2.29 against 2.16.
 - `packages/editor`: 2,675 of 2,676 tests. The one failure is the BiDi drag-selection timing
   probe, which fails identically on the one-pass edits head and performs no edits.
 - `bun run bench:check`: 73 tests with the counter budgets regenerated, and the new
-  `anchor-density` lane in every harness test. `bun run bench:profile:check`: 8 tests, which run
-  every smoke lane on the clean and the probed build. The lane resolves 500 live anchors after
+  `anchor-density` scenario in every harness test. `bun run bench:profile:check`: 8 tests, which run
+  every smoke scenario on the clean and the probed build. The scenario resolves 500 live anchors after
   each of 300 edits and checks the digest of all 150,000 resolutions against a plain-string
   model.
 - The height harness no longer samples the reverse index, which has no height.
-- Timing: `drive.mjs`, `lane.mjs` and the per-lane JSONL files are in the evidence tarball, with
+- Timing: `drive.mjs`, `lane.mjs` and the per-scenario JSONL files are in the evidence tarball, with
   the no-index and option 1 builds' patches.

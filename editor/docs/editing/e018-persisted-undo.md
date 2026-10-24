@@ -15,9 +15,9 @@ hash equals the stored `contentHash`. That is VS Code's rule; a changed file ope
 Settings `editor.history.persist`, `editor.history.persistDays` and `editor.history.persistBudget`
 bound it. The scenario `editor-undo-reopen` proves it in the app.
 
-Where it differs from the plan, by the owner's choice: IndexedDB only (no server file, no atomic
+Deliberate limits: IndexedDB only (no server file, no atomic
 writer), the content hash stands in for the backing-file digest, and there is no dirty-buffer
-recovery. Open follow-ups, none scheduled: a clear-all command, and recovering unsaved text.
+recovery. Not implemented: a clear-all command, and recovering unsaved text.
 
 Validation: `test/historySerialization.test.ts` restores undo, redo and a second branch over freshly
 loaded text, keeps recording after a restore, and covers each refusal.

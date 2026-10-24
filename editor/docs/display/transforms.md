@@ -318,7 +318,7 @@ spans, by adjacency for links and images.
   paints as the text it stands for. Word wrap (`wordWrapBreak: 'word'`) keeps every replacement on
   one row; both count a replacement by its placeholder text, not the width its rendered node measures.
 - Carrying a syntax-derived map re-resolves every range on each refresh; with many replacements and
-  an edit-triggered provider on one editor that is O(ranges) per keystroke until Phase 4's range set.
+  an edit-triggered provider on one editor that is O(ranges) per keystroke until a range set replaces the per-range work.
 
 ---
 

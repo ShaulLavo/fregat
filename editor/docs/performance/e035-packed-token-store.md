@@ -7,11 +7,11 @@ the minimap, sticky scroll, diff, decode and rich-text copy read it; nothing unp
 On 100,000 lines (500,000 tokens) the token work one keystroke causes on the main thread went from
 155 ms to 0.004 ms, and it no longer grows with the document.
 
-Inspected baseline: `c2447cf` on `main`. Branch `e035-packed-token-store`.
+Inspected baseline: `c2447cf` on `main`.
 
 ## The premise was half the cost
 
-The plan named `unpackEditorTokens` as the last per-edit cost that scales with the document. Step 1
+The brief named `unpackEditorTokens` as the last per-edit cost that scales with the document. Step 1
 measured the whole path a keystroke causes, one stage at a time
 (`keystroke-baseline.ts` in [`e035-evidence.tar.gz`](e035-evidence.tar.gz), Bun 1.3.14, median of 8
 after 4 warmups):
@@ -25,7 +25,7 @@ after 4 warmups):
 | minimap diffs the answer against what it sent        |     74.5 ms |      512 ms |
 | total                                                |      155 ms |    1,046 ms |
 
-Two findings the plan did not have:
+Two findings the brief did not have:
 
 - The projection was already lazy. It cost microseconds because it wrapped the old array in a
   `Proxy` and shifted the suffix on read. A packed store that copied its arrays per edit would have
@@ -58,7 +58,7 @@ Two findings the plan did not have:
   removed the view's unindexed path: `rebuildTokenRenderIndex`, which walked every token into a
   render entry, is gone with its three fields, and the row painter bisects the store. Render style
   and style key are cached per palette style object, which also replaced the per-projection
-  `TokenStyleSource`. This is the second full index the plan's stop condition asked about; it was
+  `TokenStyleSource`. This is the second full index the brief's stop condition asked about; it was
   deleted rather than rebuilt.
 - **Overlapping input.** Both producers emit non-overlapping ascending tokens. A store whose ends
   do not grow with its starts, which only hand-built input can be, is kept as one flat segment with

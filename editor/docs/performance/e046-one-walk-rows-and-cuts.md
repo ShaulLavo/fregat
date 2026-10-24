@@ -5,19 +5,18 @@ line breaks sit in its chunk's index, and a document that never held a surrogate
 looking for one. A single range edit checks its ends for a cut pair on the pass that hides the
 range. `position-to-offset` is 46% to 53% faster than the reverse-index cost head, line reads 46% to 56%,
 `offset-to-position` 40%, replacements 14% to 19% and churn 14% to 18%. The equivalence test written for the folded check found a placement
-bug that is older than this plan: replacement text could land ahead of tombstones that precede its
+bug that is older than this work: replacement text could land ahead of tombstones that precede its
 range, depending on the shape of the tree. Raw reports are in
 [`e046-evidence.tar.gz`](e046-evidence.tar.gz).
 
-Inspected baseline: `7cafb67`, whose textbuffer is the reverse-index cost head `0330aae`, on branch
-`e046-one-walk-rows-and-cuts`.
+Inspected baseline: `7cafb67`, whose textbuffer is the reverse-index cost head `0330aae`.
 
 ## The premises
 
 Step 1 reran the CPU profile of the baseline at 40 replays. Self time, share of in-workload
 samples:
 
-| Lane                         | `firstLineBreakAtOrAfter` | `findOffsetAfterLineBreak` | `splitsSurrogatePair` |
+| Scenario                     | `firstLineBreakAtOrAfter` | `findOffsetAfterLineBreak` | `splitsSurrogatePair` |
 | ---------------------------- | ------------------------: | -------------------------: | --------------------: |
 | position-to-offset           |                       14% |                        39% |                     — |
 | lines-random-after-churn     |                       11% |                        24% |                     — |
@@ -25,7 +24,7 @@ samples:
 | random-replacements          |                       14% |                          — |                   11% |
 | mixed-edit-churn             |                       14% |                          — |                   10% |
 
-The plan's figures reproduce within run variation, so no premise was corrected.
+The brief's figures reproduce within run variation, so no premise was corrected.
 
 ## What changed
 
@@ -84,14 +83,14 @@ after the new text is the first unit replaced.
 
 Standard profile, three seeds, one fresh process per sample, the baseline build and this one
 interleaved by a throwaway driver that validates between warmups as the bench's worker does.
-Milliseconds per lane, median per seed, then median over seeds.
+Milliseconds per scenario, median per seed, then median over seeds.
 
 Each step on its own, 8 warmups, 7 samples. Step 2 is `firstLineBreak`, step 3 `findLineRange`,
-steps 4 and 5 the flag and the folded check. `ascii-replacements` is a new lane whose document
-never holds a surrogate, so its last column is step 4 alone; the two lanes above it are
+steps 4 and 5 the flag and the folded check. `ascii-replacements` is a new scenario whose document
+never holds a surrogate, so its last column is step 4 alone; the two scenarios above it are
 surrogate-rich, so theirs is step 5 alone.
 
-| Lane                         | Baseline | Step 2 | Step 3 | Steps 4 and 5 |
+| Scenario                     | Baseline | Step 2 | Step 3 | Steps 4 and 5 |
 | ---------------------------- | -------: | -----: | -----: | ------------: |
 | position-to-offset           |     0.96 |   0.72 |   0.46 |             — |
 | lines-sequential-after-churn |     1.12 |   1.02 |   0.53 |             — |
@@ -100,11 +99,11 @@ surrogate-rich, so theirs is step 5 alone.
 | mixed-edit-churn             |     2.31 |      — |   2.07 |          1.89 |
 | ascii-replacements           |     2.43 |      — |   2.17 |          1.87 |
 
-Every step moved its lanes beyond run variation, so none was dropped.
+Every step moved its scenarios beyond run variation, so none was dropped.
 
-Every lane, baseline against the final build, 9 samples:
+Every scenario, baseline against the final build, 9 samples:
 
-| Lane                          | 2 warmups    | Change | 8 warmups    | Change |
+| Scenario                      | 2 warmups    | Change | 8 warmups    | Change |
 | ----------------------------- | ------------ | -----: | ------------ | -----: |
 | load-short-lines              | 2.17 to 2.14 |    −2% | 1.65 to 1.66 |     0% |
 | load-long-line                | 1.08 to 1.08 |     0% | 1.08 to 1.08 |     0% |
@@ -128,7 +127,7 @@ Every lane, baseline against the final build, 9 samples:
 
 Inserts and batches gain from `firstLineBreak` alone: every cut counted the left part's breaks
 with two searches of the whole chunk. `offset-to-position` gains for the same reason, which the
-plan did not list. `full-read-after-churn` rerun at 4, 8 and 12 warmups reads −1%, +2% and 0%,
+brief did not list. `full-read-after-churn` rerun at 4, 8 and 12 warmups reads −1%, +2% and 0%,
 which is run variation.
 
 Against the pinned control, `bun run bench`, each regime against its own control, before and
@@ -140,7 +139,7 @@ after: `position-to-offset` 2.64x to 1.45x and 3.29x to 1.56x, sequential line r
 
 ### `anchor-density` has two modes
 
-The lane reads either about 10.0 ms or about 11.2 ms, and which build lands in the slower mode
+The scenario reads either about 10.0 ms or about 11.2 ms, and which build lands in the slower mode
 depends on the warmup count, not on the build. Five seeds, 7 samples, baseline to final:
 
 | Warmups | 20260916     | 7            | 12345        | 42           | 99          |
@@ -151,17 +150,17 @@ depends on the warmup count, not on the build. Five seeds, 7 samples, baseline t
 
 The step builds place the switch at step 2, but the baseline with an unused seventh field on every
 piece reads 10.1 ms at 8 warmups, so it is not the size of a piece. Every live piece has one
-hidden class in both builds. The CPU profile is the same in both: 54% of the lane is
-`findOriginalPiece`, a pointer chase this plan did not touch, and under the profiler the two
+hidden class in both builds. The CPU profile is the same in both: 54% of the scenario is
+`findOriginalPiece`, a pointer chase this work did not touch, and under the profiler the two
 builds read 10.2 and 10.4 ms. The likeliest cause is where the collector leaves the tree after a
-given number of warmups. It is recorded as a property of the lane, not as a cost of this change,
-and the README quotes the lane with that caveat.
+given number of warmups. It is recorded as a property of the scenario, not as a cost of this change,
+and the README quotes the scenario with that caveat.
 
 ### Work counted
 
 Structural counters, standard profile, first replay, before to after:
 
-| Lane                         | Row descents   | Range reads  | `splitsSurrogatePair` |
+| Scenario                     | Row descents   | Range reads  | `splitsSurrogatePair` |
 | ---------------------------- | -------------- | ------------ | --------------------- |
 | position-to-offset           | 6,000 to 3,000 | —            | —                     |
 | lines-random-after-churn     | 6,000 to 3,000 | 3,000 to 412 | —                     |
@@ -170,35 +169,35 @@ Structural counters, standard profile, first replay, before to after:
 | mixed-edit-churn             | —              | —            | 2,872 to 0            |
 | ascii-replacements           | —              | —            | 0                     |
 
-A line read was three descents and is 1.14 on the random lane: one row lookup, and a range read
+A line read was three descents and is 1.14 on the random scenario: one row lookup, and a range read
 for the 14% of rows that span pieces after the churn. `codeUnitAt`, which only the two-piece
-paths of the folded check call, is never entered by any lane. The batch lane still snaps up
-front, about 3,000 calls, as the plan's limits say. `bench/budgets.json` is regenerated with these
+paths of the folded check call, is never entered by any scenario. The batch scenario still snaps up
+front, about 3,000 calls, as the brief's limits say. `bench/budgets.json` is regenerated with these
 counts, `edits.snapEditRange.calls` is gone with its function, `positions.findLineRange.calls` is
-budgeted, and `reads.codeUnitAt.calls` is a structural counter, so a lane that starts to enter it
+budgeted, and `reads.codeUnitAt.calls` is a structural counter, so a scenario that starts to enter it
 fails the gate as unbudgeted.
 
 Self time after, share of in-workload samples at 40 replays: `findLineRange` is 39% of
-`position-to-offset`, 29% and 21% of the line lanes, and it is the whole lookup where
-`findOffsetAfterLineBreak` and `firstLineBreakAtOrAfter` together were 53%, 34% and 28% of lanes
+`position-to-offset`, 29% and 21% of the line scenarios, and it is the whole lookup where
+`findOffsetAfterLineBreak` and `firstLineBreakAtOrAfter` together were 53%, 34% and 28% of scenarios
 twice as long. `countPieceLineBreaksBefore` is 4% of replacements and churn where
 `firstLineBreakAtOrAfter` was 14%.
 
 ### Memory
 
-Retained heap after the churned read lanes, about 3,900 pieces: 1,049 KB to 1,074 KB at 8
+Retained heap after the churned read scenarios, about 3,900 pieces: 1,049 KB to 1,074 KB at 8
 warmups, 1,052 KB to 1,091 KB at 2. That is one 8-byte field per piece on this Node build, which
 has no pointer compression: a piece goes from 72 to 80 bytes, 2% to 4% of the retained tree. The
-plan's fallback, a bounded search from a hint, would keep the row-lookup gain and lose the cuts',
+the brief's fallback, a bounded search from a hint, would keep the row-lookup gain and lose the cuts',
 which is where inserts, batches and `offset-to-position` gained; the field stays.
 
 ### Editor
 
 `bun run bench:virtualization` and `bun run bench:walker` in `packages/editor`, median of 9 runs,
-before and after the adoption. The window lanes open unedited documents, one piece, where a
+before and after the adoption. The window scenarios open unedited documents, one piece, where a
 descent is one node, so the six-to-one reduction shows as a few percent:
 
-| Lane                         | Before (ms) | After (ms) |
+| Scenario                     | Before (ms) | After (ms) |
 | ---------------------------- | ----------: | ---------: |
 | cold-open-first-window, 100k |        3.58 |       3.40 |
 | warm-distant-windows, 100k   |        3.97 |       3.77 |
@@ -208,12 +207,12 @@ descent is one node, so the six-to-one reduction shows as a few percent:
 | wrap-enable, 500k            |       41.10 |      39.86 |
 | walker, 5,000 random seeks   |        1.52 |       1.52 |
 
-The other virtualization lanes and the walker lanes are within ±2%, except the two chunk-wise
+The other virtualization scenarios and the walker scenarios are within ±2%, except the two chunk-wise
 walks at 0.06 to 0.08 ms, too short to read anything into.
 
 ## What remains
 
-- The sequential line lane is 1.39x to 1.64x the control, which caches the last line. The plan
+- The sequential line scenario is 1.39x to 1.64x the control, which caches the last line. The brief
   ruled a cache out at this layer.
 - A row that spans pieces pays a second descent for its text. After the churn that is one row in
   seven. Collecting the text on the walk from the landing to the row's end would remove it.
@@ -221,7 +220,7 @@ walks at 0.06 to 0.08 ms, too short to read anything into.
   of its history. Clearing the flag belongs to
   [text reclamation](../storage/e006-tombstone-compaction.md).
 - `findOriginalPiece` is 54% of `anchor-density` and reads a piece per node on its path; the two
-  modes above say the lane is bound by memory, not by instructions.
+  modes above say the scenario is bound by memory, not by instructions.
 - A multi-edit batch still snaps up front. Folding it would need the sibling rules inside the
   pass.
 
@@ -247,7 +246,7 @@ walks at 0.06 to 0.08 ms, too short to read anything into.
   insert.
 - The rest of the workspace: every package's tests pass except one `typescript-lsp` hover test,
   which fails identically on the baseline.
-- `bun run bench:check`: 75 tests with the regenerated budgets and the new lane in every harness
+- `bun run bench:check`: 75 tests with the regenerated budgets and the new scenario in every harness
   test. `bun run bench:profile:check`: 8 tests. `bun run typecheck`, `bun run lint` and
   `bun run format:check` at the root. `bun run knip` reports the 26 exports it reported before.
 - Timing: `drive.mjs`, `lane.mjs`, the per-step and final JSONL files, the two CPU and counter

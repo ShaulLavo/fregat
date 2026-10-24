@@ -160,19 +160,19 @@ public API and fresh fixtures. The provenance header identifies this distinction
 
 | Case | Package coverage or follow-up                                                                                                                |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | Atomic transaction activation switches sibling effects and preserves remote work. Editor graph traversal follows in the editor lane.         |
+| 1    | Atomic transaction activation switches sibling effects and preserves remote work. Editor graph traversal follows in the editor package.      |
 | 2    | Grouped replacements reverse insertion and deletion together.                                                                                |
 | 3    | Initiating-view multi-cursor selection restoration requires the editor view layer.                                                           |
 | 4    | Same-ID revival and retained positions are covered. Jump history integration requires the editor.                                            |
-| 5    | Pending edit, undo, redo and remote replay capture local history once. Editor graph-node counting follows in the editor lane.                |
+| 5    | Pending edit, undo, redo and remote replay capture local history once. Editor graph-node counting follows in the editor package.             |
 | 6    | Repeated confirmations and command retransmission are deduplicated.                                                                          |
 | 7    | Deletes arriving at already-hidden spans retain independent provenance.                                                                      |
 | 8    | Save/reopen graph and anchor persistence requires editor storage.                                                                            |
 | 9    | Identity-keyed persistence rejection requires the editor persistence format.                                                                 |
-| 10   | Clearing retained undo entries leaves baseline effects active. Graph pruning follows in the editor lane.                                     |
+| 10   | Clearing retained undo entries leaves baseline effects active. Graph pruning follows in the editor package.                                  |
 | 11   | Engine snapshots preserve provenance and command identities. Full host outcome/frontier transfer belongs to the collaboration session layer. |
-| 12   | Rejected commands and blocked dependants recover prior local history. Editor graph recovery follows in the editor lane.                      |
-| 13   | Provenance-only undo is accepted, sequenced and retained in snapshots. Durable storage follows in the persistence lane.                      |
+| 12   | Rejected commands and blocked dependants recover prior local history. Editor graph recovery follows in the editor package.                   |
+| 13   | Provenance-only undo is accepted, sequenced and retained in snapshots. Durable storage follows in the persistence package.                   |
 | 14   | File-tree shared-head undo integration belongs to Fregat's app layer.                                                                        |
 
 ## Concurrent undo verification

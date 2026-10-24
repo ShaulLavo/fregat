@@ -4,12 +4,12 @@ Inserting text into `@singapore-editor/textbuffer` costs the text
 itself: the chunk store is one append-only log per lineage, appended in place on a linear history
 and copied once per branch point, and an insert fills the newest chunk before it opens another, so
 chunk count follows text volume rather than edit count. The structural counters that prove it gate
-`bench:check`, and a branch-heavy lane measures the one copy that remains.
+`bench:check`, and a branch-heavy scenario measures the one copy that remains.
 
 The inspected baseline was `69dfef7425539165ec05a457bd6f0516fb6607fa`, on top of the textbuffer edit allocations commits
-at `16736ad`. The execution plan has been removed; the
+at `16736ad`; the
 [textbuffer edit allocations report](e037-textbuffer-edit-allocations.md) records the starting point and the
-[ablation](#measured-results) below records the ceiling the plan asked for first.
+[ablation](#measured-results) below records the ceiling the brief asked for first.
 
 ## Contracts that remain
 
@@ -18,7 +18,7 @@ at `16736ad`. The execution plan has been removed; the
   spans two chunks, so `(buffer, start)` is still the insertion identity the reverse index and
   anchors are keyed by. This is what keeps the deleted-anchor edge rules, which read same-buffer
   neighbours as the gap edges, meaning the same thing they meant with one chunk per insert. The
-  plan's "keys per chunk grow" premise for reverse-index cost did not happen; its plan is corrected.
+  brief's "keys per chunk grow" premise for reverse-index cost did not happen.
 - The log is `{ chunks, chunkOfBuffer, lineIndexes }`, shared by every snapshot of a lineage and
   internal to `buffers.ts`. A snapshot's `PieceBufferChunkView` holds its extent: chunk count,
   tail length and buffer count. `get` resolves an id below the extent through `chunkOfBuffer` and
@@ -41,13 +41,13 @@ at `16736ad`. The execution plan has been removed; the
   replaces them.
 - The inspector checks the store extent against `nextBufferSequence` and `chunks.size` and that
   no append chunk exceeds `BUFFER_CHUNK_SIZE`, next to its per-chunk line-index checks.
-- `bench/budgets.json` has a `branch-edits` lane: one insert on each of 64 branches from one
+- `bench/budgets.json` has a `branch-edits` scenario: one insert on each of 64 branches from one
   churned root. The first branch continues the root's log; the other 63 fork it.
 
 ## Measured results
 
 Runtime: Node 26.7.0, Linux x64, one machine, baseline and final runs alternated per seed.
-Control: `microsoft/vscode-textbuffer` at `fdca8848`. Standard profile, nine samples per lane,
+Control: `microsoft/vscode-textbuffer` at `fdca8848`. Standard profile, nine samples per scenario,
 medians averaged over seeds `20260916`, `7` and `42`. The baseline is `16736ad` in a worktree.
 
 | Workload                      | Baseline ms | Final ms | Change | Control ms |
@@ -71,24 +71,24 @@ medians averaged over seeds `20260916`, `7` and `42`. The baseline is `16736ad` 
 | anchor-resolution-after-churn |       0.819 |    0.767 |    -6% |          — |
 | branch-edits                  |           — |    0.439 |    new |          — |
 
-Two lanes read slower and both were chased before acceptance:
+Two scenarios read slower and both were chased before acceptance:
 
 - `large-paste-delete` is a warm-up artefact of the harness, not steady-state cost. Per-iteration
   timing in one process shows the baseline at 5.5, 3.9, 3.9 ms and then 4.6 ms for every later
   iteration; the final build goes 5.6, 4.1, 4.7 ms and stays at 4.6 ms. The harness measures the
   third iteration, which for the baseline is a transient before the JIT settles. Steady state is
-  equal within 2%, and with the lane run after `random-insertions` in one process the final build
+  equal within 2%, and with the scenario run after `random-insertions` in one process the final build
   is 20% faster (3.6 ms against 4.5 ms). The CPU profile is 89% `countLineBreaks` on both builds
   with the same sample count.
 - `full-read-after-churn` is a real 5% to 8% steady-state cost, about 40 ns per piece. The 3,900
   pieces of the churned document now cut short slices from one 4.5K-unit chunk that V8 flattened
   in place from a cons string, where before each came from its own small flat chunk. Holding the
   log's arrays directly on the view did not move it, so it is the string representation, not the
-  lookup. Twelve full reads of a 400 KB document pay 0.17 ms for it; the edit lanes above are
+  lookup. Twelve full reads of a 400 KB document pay 0.17 ms for it; the edit scenarios above are
   the trade.
 
 Ablation ceiling from step 1, measured in-process on the textbuffer edit allocations build with the page copies stubbed
-to in-place mutation (linear lanes only): `random-insertions` 22%, `eight-cursor-batches` 20%,
+to in-place mutation (linear scenarios only): `random-insertions` 22%, `eight-cursor-batches` 20%,
 `sequential-typing` 6%, `mixed-edit-churn` 5%, `large-paste-delete` 0%. The final result beats
 the ceiling on churn (-26%) because filling also removes a chunk object, a line index and a map
 entry per insert, which the ablation kept.
@@ -119,7 +119,7 @@ Structural counters, standard profile, baseline budget to final budget (2% over 
 | branch-edits        | PieceBufferChunkView.fork.calls                   |        — |     65 |
 | branch-edits        | PieceBufferChunkView.fork.copiedArraySlots        |        — | 64,775 |
 
-`fork.copiedArraySlots` is absent from every linear lane: the counter is emitted only when a
+`fork.copiedArraySlots` is absent from every linear scenario: the counter is emitted only when a
 fork runs. On `branch-edits` the 63 forks copy about 1,008 slots each, of which two are chunk
 strings and the rest is the id map, one slot per buffer id minted since the document opened.
 
@@ -155,9 +155,9 @@ the linear resolver shares the code, so no test sees it. It is unchanged by appe
 
 - The tail chunk is a cons string while it grows and V8 flattens it on the first read after each
   append, one copy of up to 16K units per read-after-write. Typing already paid this in textbuffer edit allocations; the
-  fill path now pays it for every insert. It is the cost behind the full-read lane above.
+  fill path now pays it for every insert. It is the cost behind the full-read scenario above.
 - A fork copies the id map, one slot per buffer id in the lineage. A paged map would make that
-  logarithmic; the branch lane is the place to see whether it ever matters.
+  logarithmic; the branch scenario is the place to see whether it ever matters.
 - [text reclamation](../storage/e006-tombstone-compaction.md) needs to swap the log for a compacted one. The
   log is internal to `buffers.ts` and every read goes through a view, so a generation swap is a
   new log plus new views, not a second copy path.

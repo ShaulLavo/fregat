@@ -9,7 +9,7 @@ node packages/minimap/bench/browser-runner.mjs --label=after
 The runner builds the current Editor and minimap sources with Vite, launches the installed
 Playwright Chromium, and serves the output through `BrowserContext.route` on the existing
 `http://127.0.0.1:3300` origin. It starts no server and leaves the running preview untouched.
-Builds, JSON results, and PNG frames go to `/work/tmp/minimap-benchmark` by default.
+Builds, JSON results, and PNG frames go to the directory set by `--output-dir`. The default is a fixed `/work/tmp/minimap-benchmark`, so pass `--output-dir` on machines without `/work`.
 
 Options:
 

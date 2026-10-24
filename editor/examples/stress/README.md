@@ -9,7 +9,7 @@ bun run --cwd examples/stress test
 ```
 
 `bench:stress` builds the public package exports first. The runner then builds this standalone
-Vite entry into a temporary directory under `/work/tmp`, launches installed Playwright Chromium,
+Vite entry into a scratch directory (`/work/tmp`, fixed in `run.mjs`), launches installed Playwright Chromium,
 and serves the build through Playwright request routing. It opens no listening socket and starts
 no dev server. It deletes the build and browser profile on success, failure, SIGINT, or SIGTERM.
 No corpus download or fixture generation is part of a timing interval.

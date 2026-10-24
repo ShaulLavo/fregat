@@ -2,11 +2,11 @@
 
 [transient edits](e041-transient-edits.md) measured that persistence is
 about a tenth of the small-edit gap and profiled the rest; this entry takes the three leads that
-profile named, each a few lines, and measures them on the same lanes and seeds. Every edit lane
+profile named, each a few lines, and measures them on the same scenarios and seeds. Every edit scenario
 is about a fifth faster: a random insertion goes from 4.62x the mutable control to 3.63x, a
 random replacement from 6.44x to 5.05x. Raw reports are in [`e042-evidence.tar.gz`](e042-evidence.tar.gz).
 
-Inspected baseline: the transient edits head, `26e805c`, on branch `e042-fixed-edit-overhead`.
+Inspected baseline: the transient edits head, `26e805c`.
 
 ## What changed
 
@@ -30,10 +30,10 @@ and priorities are identical and the counter budgets pass unchanged.
 ## Measured results
 
 Standard profile, three seeds, 9 samples of 2 warmups, the transient edits head timed in a worktree and the
-change in the checkout, alternating per seed. Milliseconds per lane, median over seeds with the
+change in the checkout, alternating per seed. Milliseconds per scenario, median over seeds with the
 range, ratio to the control's median.
 
-| Lane                 | Control | transient edits head   | fixed edit overhead    | Change |
+| Scenario             | Control | transient edits head   | fixed edit overhead    | Change |
 | -------------------- | ------: | ---------------------- | ---------------------- | -----: |
 | sequential-typing    |    0.61 | 0.66 [0.54–0.66] 1.08x | 0.64 [0.52–0.65] 1.05x |    -3% |
 | typing-with-lookups  |    0.94 | 0.91 [0.74–0.91] 0.97x | 0.89 [0.73–0.90] 0.95x |    -2% |
@@ -76,6 +76,6 @@ remaining local tweak: the three walks are about a third of the insert profile b
   counter budgets unchanged. The editor's `pieceTable-orders`, `pieceTable-buffers` and
   `pieceTable-tree` tests pass, and `allocateOrdersBetween` produces the same values as before
   for every case they check.
-- Timing: `bun run bench -- --profile standard --seed <s> --only <lanes>` in both trees, under
+- Timing: `bun run bench -- --profile standard --seed <s> --only <scenarios>` in both trees, under
   `timing/` in the evidence tarball. CPU and counters: `bun run bench:profile -- --modes
-  cpu,counters --repeats 24 --only random-insertions,random-replacements`, under `cpu/`.
+cpu,counters --repeats 24 --only random-insertions,random-replacements`, under `cpu/`.

@@ -7,8 +7,7 @@ redundant reverse-index removal per split, and a whole-chunk prefix compare on e
 while typing. The structural counters that prove it are a CI gate in `bench:check`.
 
 The inspected baseline was `69dfef7425539165ec05a457bd6f0516fb6607fa`. The work landed as one
-commit per step on top of `eabe5a9`, each lowering the budgets it earned. The execution plan has
-been removed; the [attribution report](../../packages/textbuffer/bench/ATTRIBUTION.md) that
+commit per step on top of `eabe5a9`, each lowering the budgets it earned. The [attribution report](../../packages/textbuffer/bench/ATTRIBUTION.md) that
 commissioned it stays as the record of the starting point.
 
 ## Contracts that remain
@@ -35,12 +34,12 @@ commissioned it stays as the record of the starting point.
   over its ceiling, on a budget whose counter no longer exists, and on a structural counter with
   no budget. Regenerate with `node bench/budgets.mjs --write` only after a deliberate change.
 - The `typing-with-lookups` workload converts the caret to a row and column after every keystroke.
-  It is a shared timing lane and a budgeted counter lane; the height replay excludes it.
+  It is a shared timing scenario and a budgeted counter scenario; the height replay excludes it.
 
 ## Measured results
 
 Runtime: Node 26.7.0, Linux x64, one machine, baseline and final runs alternated per seed.
-Control: `microsoft/vscode-textbuffer` at `fdca8848`. Standard profile, nine samples per lane,
+Control: `microsoft/vscode-textbuffer` at `fdca8848`. Standard profile, nine samples per scenario,
 medians averaged over seeds `20260916`, `7` and `42`. Fixture hashes matched across trees.
 
 | Workload                      | Baseline ms | Final ms | Change | Control ms |
@@ -63,9 +62,9 @@ medians averaged over seeds `20260916`, `7` and `42`. Fixture hashes matched acr
 | persistent-history            |      14.179 |    9.846 |   -31% |          — |
 | anchor-resolution-after-churn |       0.987 |    0.823 |   -17% |          — |
 
-No lane is slower than baseline beyond run variation; the load lanes are unchanged within 1%.
+No scenario is slower than baseline beyond run variation; the load scenarios are unchanged within 1%.
 The comparison with the control is unchanged in kind: the mutable red-black tree still wins the
-small-edit lanes by a wide margin, which is what append-only buffer store, reverse-index cost and balanced tree address.
+small-edit scenarios by a wide margin, which is what append-only buffer store, reverse-index cost and balanced tree address.
 
 Sampled JS-heap allocation per replay, `random-insertions` and `sequential-typing`, 12 replays:
 
@@ -108,7 +107,7 @@ Structural counters, standard profile, baseline budget to final budget:
 The one counter that rose is `tree.cloneNode.calls` on `random-replacements` (+10.6%). It is a
 tree-shape effect of the new hash for that seed, not new work: a smoke height sweep over priority
 seeds 0, 1, 7 and 42 kept height over log2(pieces + 1) in the same band (mean 1.95 to 1.98, max
-2.74 to 2.65, mean depth 6.10 to 6.09), and the lane is 24% faster. The hash was kept rather than
+2.74 to 2.65, mean depth 6.10 to 6.09), and the scenario is 24% faster. The hash was kept rather than
 reseeded; picking a seed for one workload's count would be fitting to the fixture.
 
 ## Verification

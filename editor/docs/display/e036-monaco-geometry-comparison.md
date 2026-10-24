@@ -14,7 +14,7 @@ measured-path cache. Replacing the CSS caret blink with a JavaScript interval wa
 The calculated path does not cover real files. On disk, tab-indented codebases have a tab on 69%
 (Go, crush) to 77% (VS Code `.ts`) of lines. Markdown has 8–10% non-ASCII lines before counting
 inline replacements. Of the mounted rows, 71% (go-tabs), 33% (markdown) and 100% (unicode) take
-measured geometry. The plan's 5% gate therefore did not settle candidates 1 and 4; their cost did.
+measured geometry. The brief's 5% gate therefore did not settle candidates 1 and 4; their cost did.
 
 The geometry module reports each row build's path (`view.rowGeometry`: `calculated`, `tab`,
 `non-simple-text`, `inline-mapping`, `proportional-font`) and each sweep
@@ -44,7 +44,7 @@ per font and style.
 
 Proportional fonts still misplace what is estimated from `characterWidth` outside row geometry:
 soft-wrap column counts and the spacers of windowed long rows.
-[proportional font extents](https://github.com/ShaulLavo/fregat/blob/main/plans/e052-proportional-font-extents.md) plans the fix.
+The fix is not implemented.
 
 ## Re-measuring when the face changes
 

@@ -2,11 +2,11 @@
 
 Two fixed costs paid on every node an edit touches are cut:
 the six subtree summaries are computed in one pass over the two children, and the priority hash
-covers only what identifies a node. Every edit lane is 11% to 27% faster than the one-descent insert head.
+covers only what identifies a node. Every edit scenario is 11% to 27% faster than the one-descent insert head.
 Sequential typing is now faster than the mutable control. Raw reports are in
 [`e044-evidence.tar.gz`](e044-evidence.tar.gz).
 
-Inspected baseline: the one-descent insert head, `19670e4`, on branch `e044-node-updates`.
+Inspected baseline: the one-descent insert head, `19670e4`.
 
 ## What changed
 
@@ -26,15 +26,15 @@ Inspected baseline: the one-descent insert head, `19670e4`, on branch `e044-node
   replay on the standard profile, 4,662 samples over four seeds, passes every invariant, and the
   maximum sequence-tree height per workload and seed stays where it was: 26 to 33 levels after
   against 26 to 35 before, on the same piece counts, with the control at 14 for the random
-  lanes. The balanced tree work's premise is unchanged.
+  scenarios. The balanced tree work's premise is unchanged.
 
 ## Measured results
 
 Standard profile, 9 samples of 2 warmups, three seeds, the one-descent insert head in a worktree and the
-change in the checkout, alternating per seed. Milliseconds per lane, median over seeds with the
+change in the checkout, alternating per seed. Milliseconds per scenario, median over seeds with the
 range, ratio to the control's median.
 
-| Lane                 | Control | one-descent insert head | node summaries         | Change |
+| Scenario             | Control | one-descent insert head | node summaries         | Change |
 | -------------------- | ------: | ----------------------- | ---------------------- | -----: |
 | sequential-typing    |    0.60 | 0.70 [0.57–0.70] 1.16x  | 0.51 [0.51–0.51] 0.85x |   -27% |
 | typing-with-lookups  |    0.93 | 0.95 [0.78–0.96] 1.02x  | 0.73 [0.73–0.74] 0.78x |   -23% |
@@ -44,11 +44,11 @@ range, ratio to the control's median.
 | mixed-edit-churn     |    1.21 | 6.15 [6.14–6.25] 5.07x  | 5.16 [5.10–5.60] 4.26x |   -16% |
 | persistent-history   |       — | 6.21 [6.12–6.29]        | 5.23 [5.07–5.76]       |   -16% |
 
-The typing lane's gain is larger than the hashing and summaries explain. Its counters show the
+The typing scenario's gain is larger than the hashing and summaries explain. Its counters show the
 reason: with the left half of a split keeping its parent's priority, the three-piece typing tree
 lands the tail piece at the root instead of one level down, so a keystroke touches one node
 instead of three (`tree.own.calls` 4,499 to 1,500 for 1,500 keystrokes) and the one-descent insert cold-JIT
-transient on the split function no longer shows. Against unmodified main the lane is now 20%
+transient on the split function no longer shows. Against unmodified main the scenario is now 20%
 faster and against the control 15% faster; a random insertion is 2.1 µs against 3.6 µs on main
 and 0.73 µs for the control.
 
