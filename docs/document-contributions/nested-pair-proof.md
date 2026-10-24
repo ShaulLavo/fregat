@@ -9,7 +9,7 @@ snapshot clears those pairs. Undo grouping is unchanged.
 
 ## Reproduction and repair
 
-Evidence root: `/work/tmp/foundations-undo-proof`.
+Evidence root: `<report-directory>`, the directory the proof runs write their logs to.
 
 - `known-good-pairs.log`: the original 41 input-controller controls passed.
 - `red-nested.log`: both added nested typing regressions failed; 41 controls passed.
@@ -61,8 +61,7 @@ in Chromium; it makes no throughput, long-line, or cross-browser performance cla
 
 ## Independent review repair
 
-The review at `https://github.com/ShaulLavo/fregat/pull/214#issuecomment-5917537495`
-found an introduced ownership regression. Typing `(`, inserting `a` through the shared session
+Independent review found an introduced ownership regression. Typing `(`, inserting `a` through the shared session
 outside the controller, then typing `b())` produced `(ab())` instead of `(ab()))`. Ordinary
 typing advanced tracking onto its new snapshot without checking the foreign starting snapshot,
 so the next nested insertion preserved an outer pair whose ownership had been revoked.

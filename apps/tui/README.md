@@ -226,7 +226,7 @@ terminal defaults. `workbench.reduceMotion` slows the shared loaders.
 ## Frames and development
 
 ```sh
-bun run dev:tui --headless-frame /work/tmp/platform-tui.txt --width 100 --height 30
+bun run dev:tui --headless-frame platform-tui.txt --width 100 --height 30
 ```
 
 A failed connection still writes an error frame and exits 1; a live frame exits 0. Interactive

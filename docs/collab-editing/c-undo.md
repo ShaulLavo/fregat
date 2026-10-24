@@ -161,7 +161,7 @@ Evidence: `references/yjs/src/utils/UndoManager.js:35–40,239–244,531–535`.
 
 ## 2. Our current undo
 
-### E017: branching snapshot graph
+### Branching snapshot graph
 
 Singapore currently stores a **tree of document states**. Nodes contain:
 
@@ -191,7 +191,7 @@ The existing `replaceEditorHistoryState` updates only the current node, confirmi
 
 Evidence: `editor/packages/editor/src/history.ts:260–276`.
 
-### E018: persisted undo
+### Persisted undo
 
 The serialized graph stores parent-relative forward/inverse `TextEdit` scripts, selection offsets, branch identity, and metadata. It does not serialize the snapshot objects. Selection anchors are resolved into numeric offsets when serializing.
 
@@ -206,12 +206,12 @@ Evidence:
 
 **Collaboration consequence, inferred:** equal text is insufficient. Two collaborative documents can contain the same string with completely different character/operation IDs. Restoring ID-space history requires the matching document identity and retained identity universe.
 
-### Cursor undo and E020 jump history
+### Cursor undo and jump history
 
 These are separate domains today:
 
 - `CursorHistory` stores numeric selection ranges and pixel scroll positions, with undo/redo stacks capped at 50. Its contract discards the history when text changes.
-- E020 jump history stores neighboring anchors for each endpoint and an anchored viewport. It survives edits, skips destinations whose primary endpoint has lost both neighboring anchors, and can revisit retained deleted destinations after undo.
+- Jump history stores neighboring anchors for each endpoint and an anchored viewport. It survives edits, skips destinations whose primary endpoint has lost both neighboring anchors, and can revisit retained deleted destinations after undo.
 
 Evidence:
 
@@ -219,13 +219,11 @@ Evidence:
 - `editor/docs/editing/jump-history.md:25–37`.
 - `editor/packages/editor/src/editor/jumpHistory.ts:37–99`.
 
-**Design implication:** E020 provides the useful pattern for collaborative selection restoration, but its piece-table anchors must become transport/persistence-stable character-ID anchors. Cursor undo should remain separate; converting it to anchors is a distinct scope decision.
+**Design implication:** Jump history provides the useful pattern for collaborative selection restoration, but its piece-table anchors must become transport/persistence-stable character-ID anchors. Cursor undo should remain separate; converting it to anchors is a distinct scope decision.
 
-### Fregat server journal and Plan 172
+### Fregat server journal and shared undo stack
 
-Plan 172 explicitly preserves the editor’s branching model. It extracts reusable **linear** history for other domains, keeps focus-based command routing, and keeps file operations under server authority.
-
-Evidence: `plans/172-shared-undo-stack.md:19–31,38–68`.
+The shared undo stack design explicitly preserves the editor’s branching model. It extracts reusable **linear** history for other domains, keeps focus-based command routing, and keeps file operations under server authority.
 
 The durable file-operation system has guarded manifests, retention/staging limits, and a head-only reversal contract shared between windows. The source comment explicitly says reversing anything except the head would reorder shared history.
 
@@ -236,8 +234,6 @@ Evidence:
 - `apps/server/src/fs/tests/workspace-edit.test.ts:1550`.
 
 **Conclusion:** reuse its durability, receipt, and recovery lessons, not its head-only undo semantics. Collaborative text undo must be selective by author and operation identity, even when newer remote operations exist.
-
-The requested Plan 136 file is absent from the current `plans/` directory. Current journal code and Plan 172 were used instead; no historical Plan 136 implementation claims are made.
 
 ## 3. Proposed design
 
@@ -320,7 +316,7 @@ Undoing a pending insertion can enqueue its deactivation behind it. Preserve dep
 
 ### 3.4 Preserve branching topology; replace snapshot restoration
 
-Keep E017’s parent/child graph, preferred-child choice, grouping/sealing metadata, and retention UX. Change a node’s meaning from “complete historical document state” to:
+Keep the branching snapshot graph’s parent/child graph, preferred-child choice, grouping/sealing metadata, and retention UX. Change a node’s meaning from “complete historical document state” to:
 
 > “This local author transaction is active along this branch.”
 
@@ -347,7 +343,7 @@ Preserve existing intent/typing-run boundaries, adding:
 - seal a typing run when remote work intersects its edited region;
 - allow unrelated remote edits to leave a run open.
 
-Unlike the upstream linear managers, new work after undo must **retain the old sibling branch** because E017 already promises that behavior. Changing preferred redo is sufficient.
+Unlike the upstream linear managers, new work after undo must **retain the old sibling branch** because the branching snapshot graph already promises that behavior. Changing preferred redo is sufficient.
 
 A semantically accepted effect change with zero visible text change remains meaningful history. Do not automatically copy Yjs/Loro’s “skip until visible change” rule: withdrawing one deletion can matter even while another deletion still hides the character.
 
@@ -414,7 +410,7 @@ Host handoff and durable tombstone retention are not specified by Weidner’s ar
 
 These are proposed semantic outcomes, not tested results.
 
-**Unresolved product choice:** same-ID revival can make an old anchored waypoint or annotation become live again. That is consistent with E020’s current deleted-waypoint behavior, but collaborative annotations and richer content need their own explicit policies.
+**Unresolved product choice:** same-ID revival can make an old anchored waypoint or annotation become live again. That is consistent with jump history’s current deleted-waypoint behavior, but collaborative annotations and richer content need their own explicit policies.
 
 Grounding: `editor/docs/editing/jump-history.md:29–31`.
 
@@ -483,7 +479,7 @@ Attribute/formatting tests are useful later, outside the initial plain-text scop
 
 ### Singapore/Fregat-specific additions
 
-Grounded in E017, E018, and E020 contracts:
+Grounded in the branching snapshot, persisted undo and jump history contracts:
 
 1. Undo B, create C, receive remote R, then switch back to B: R survives both branches.
 2. Grouped replacement reverses insert and delete effects atomically.
@@ -505,7 +501,7 @@ Existing local contract sources:
 - `editor/docs/editing/undo-graph.md:24–44`.
 - `editor/docs/editing/e018-persisted-undo.md:6–23`.
 - `editor/docs/editing/jump-history.md:25–44`.
-- `plans/172-shared-undo-stack.md:59–68,121–135`.
+- .
 
 ## Verification and limitations
 
