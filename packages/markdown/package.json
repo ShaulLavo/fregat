@@ -36,7 +36,7 @@
     "remark-math": "^6.0.0",
     "remark-parse": "^11.0.0",
     "remend": "1.3.1",
-    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#423d5e73481dc5a9710c61a77a38ef7ff0206ce5",
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#25ddda5e327247a24e3a847dfdb425ca488befd4",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.1.0",
     "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#aab7db1518c19f61c1b13ec3f832b881cf5f1385"
