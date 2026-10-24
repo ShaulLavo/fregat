@@ -11,7 +11,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from host_telemetry import kill_group, timestamp
+from host_telemetry import timestamp
 
 RUNTIME_PROBE = """
 console.log(JSON.stringify({executablePath:process.execPath,
@@ -94,7 +94,7 @@ def runtime_probe(executable: str, environment: dict, collector) -> dict:
             raise ValueError("Native runtime observation is incomplete")
         return value
     finally:
-        kill_group(child.pid)
+        child.kill()
         stdout, stderr = child.communicate(timeout=2)
         collector.record(
             "native-runtime",
