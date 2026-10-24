@@ -153,3 +153,13 @@ test('wheel input inside the menu stays open, while the modal backdrop dismisses
   expect(screen.queryByRole('menu')).toBeNull()
   expect(screen.getByRole('listbox')).toHaveFocus()
 })
+
+test('dismissal consumes a cancelable wheel before returning focus', () => {
+  render(<ListMenu />)
+  fireEvent.contextMenu(screen.getByRole('option', { name: 'second' }))
+  const wheel = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 72 })
+  fireEvent(screen.getByRole('listbox'), wheel)
+  expect(wheel.defaultPrevented).toBe(true)
+  expect(screen.queryByRole('menu')).toBeNull()
+  expect(screen.getByRole('listbox')).toHaveFocus()
+})
