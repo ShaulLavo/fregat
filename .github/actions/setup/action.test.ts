@@ -1,9 +1,18 @@
 import { expect, test } from 'vitest'
-import { readdirSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  cpSync,
+  existsSync,
+  readdirSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-function installScript() {
+function setupStep(name: string) {
   const action: unknown = Bun.YAML.parse(
     readFileSync(path.join(import.meta.dirname, 'action.yml'), 'utf8'),
   )
@@ -14,9 +23,13 @@ function installScript() {
     return ''
   const steps: unknown[] = runs.steps
   const install = steps.find(
-    (step) =>
-      step && typeof step === 'object' && 'name' in step && step.name === 'Install dependencies',
+    (step) => step && typeof step === 'object' && 'name' in step && step.name === name,
   )
+  return install
+}
+
+function installScript() {
+  const install = setupStep('Install dependencies')
   if (
     !install ||
     typeof install !== 'object' ||
@@ -247,14 +260,18 @@ async function runBash(script: string, root: string, env: Record<string, string 
 const realSupported = supported && Bun.which('tar') !== null
 if (!realSupported) console.info('Skipping real Bun lifecycle controls. Bash and tar are required.')
 
-async function lifecycleFixture(mode: 'cold' | 'healthy' | 'warm' | 'workspace' | 'persistent') {
+async function lifecycleFixture(
+  mode: 'cold' | 'healthy' | 'warm' | 'workspace' | 'persistent' | 'restored' | 'restored-partial',
+) {
   const warm = mode === 'warm'
   const workspace = mode === 'workspace' || mode === 'persistent'
-  const healthy = mode === 'healthy'
+  const restored = mode === 'restored' || mode === 'restored-partial'
+  const healthy = mode === 'healthy' || restored
   const root = mkdtempSync(path.join(tmpdir(), 'setup-lifecycle-'))
   let failing = false
   let scriptsAtRecovery = ''
   let recoveryCalls = 0
+  let packageRequests = 0
   const archive = path.join(root, 'bad.tgz')
   const goodArchive = path.join(root, 'good.tgz')
   const scriptLog = path.join(root, 'scripts.log')
@@ -268,6 +285,7 @@ async function lifecycleFixture(mode: 'cold' | 'healthy' | 'warm' | 'workspace' 
         failing = mode === 'persistent' && recoveryCalls < 2
         return new Response('recovered')
       }
+      packageRequests++
       if (new URL(request.url).pathname === '/good.tgz') return new Response(Bun.file(goodArchive))
       return failing
         ? new Response('unavailable', { status: 503 })
@@ -339,6 +357,10 @@ async function lifecycleFixture(mode: 'cold' | 'healthy' | 'warm' | 'workspace' 
     expect(readFileSync(scriptLog, 'utf8')).toBe('good\nroot\n')
     writeFileSync(path.join(install, 'bun.lock'), readFileSync(path.join(seed, 'bun.lock')))
     env.BUN_INSTALL_CACHE_DIR = path.join(root, 'install-cache')
+    if (restored)
+      cpSync(path.join(root, 'seed-cache'), env.BUN_INSTALL_CACHE_DIR, { recursive: true })
+    if (mode === 'restored-partial') removeCachedPackage(env.BUN_INSTALL_CACHE_DIR, 'bad')
+    packageRequests = 0
     trackFixture(install)
     // This external Bun adapter translates the fixture URL into the GitHub release diagnostic.
     const adapter = path.join(root, 'bun-adapter.ts')
@@ -415,7 +437,16 @@ process.exit(status)
     if (mode === 'persistent') expect(raw).toMatch(/^\[[0-9]+\.[0-9][0-9](ms|s)\] done$/m)
     expect(scriptsAtRecovery).toBe('')
     expect(readFileSync(scriptLog, 'utf8')).toBe('good\nroot\n')
-    const preparationCounts = { healthy: 1, persistent: 3, cold: 2, workspace: 2, warm: 1 }
+    if (restored) expect(packageRequests).toBe(mode === 'restored' ? 0 : 1)
+    const preparationCounts = {
+      healthy: 1,
+      persistent: 3,
+      cold: 2,
+      workspace: 2,
+      warm: 1,
+      restored: 1,
+      'restored-partial': 1,
+    }
     const preparationCount = preparationCounts[mode]
     expect(recoveryCalls).toBe(preparationCount - 1)
     expect(readFileSync(path.join(root, 'prep-state'), 'utf8')).toBe(
@@ -606,3 +637,89 @@ test.skipIf(!supported)('cached summary in the final normal failure never trigge
   expect(result.calls).toHaveLength(3)
   expect(result.sleeps).toEqual(['2'])
 })
+
+function removeCachedPackage(cache: string, name: string) {
+  const removed: string[] = []
+  for (const entry of readdirSync(cache)) {
+    const directory = path.join(cache, entry)
+    const manifest = path.join(directory, 'package.json')
+    if (!existsSync(manifest)) continue
+    const value: unknown = JSON.parse(readFileSync(manifest, 'utf8'))
+    if (!value || typeof value !== 'object' || !('name' in value) || value.name !== name) continue
+    rmSync(directory, { recursive: true })
+    removed.push(entry)
+  }
+  expect(removed.length).toBeGreaterThan(0)
+}
+
+for (const mode of ['restored', 'restored-partial'] satisfies Array<
+  'restored' | 'restored-partial'
+>) {
+  test.skipIf(!realSupported)(
+    `real Bun ${mode} package cache on a fresh checkout runs lifecycle scripts`,
+    async () => {
+      await lifecycleFixture(mode)
+    },
+  )
+}
+
+test('Bun package caching keeps dependency installation unconditional and precedes workspace builds', () => {
+  expect(setupStep('Restore Bun packages')).toMatchObject({
+    id: 'bun-packages',
+    uses: 'actions/cache/restore@v4',
+    with: {
+      path: '${{ steps.bun-cache.outputs.path }}',
+      key: "bun-packages-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.bun-cache.outputs.version }}-${{ hashFiles('bun.lock', '**/package.json', '**/bunfig.toml', '**/.npmrc', '!**/node_modules/**') }}",
+      'restore-keys':
+        'bun-packages-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.bun-cache.outputs.version }}-',
+    },
+  })
+  expect(setupStep('Install dependencies')).not.toHaveProperty('if')
+  expect(setupStep('Save Bun packages')).toMatchObject({
+    if: "${{ steps.bun-packages.outputs.cache-hit != 'true' }}",
+    uses: 'actions/cache/save@v4',
+    with: {
+      path: '${{ steps.bun-cache.outputs.path }}',
+      key: '${{ steps.bun-packages.outputs.cache-primary-key }}',
+    },
+  })
+  const action = readFileSync(path.join(import.meta.dirname, 'action.yml'), 'utf8')
+  expect(action.indexOf('name: Resolve Bun package cache')).toBeLessThan(
+    action.indexOf('name: Restore Bun packages'),
+  )
+  expect(action.indexOf('name: Restore Bun packages')).toBeLessThan(
+    action.indexOf('name: Install dependencies'),
+  )
+  expect(action.indexOf('name: Install dependencies')).toBeLessThan(
+    action.indexOf('name: Save Bun packages'),
+  )
+  expect(action.indexOf('name: Save Bun packages')).toBeLessThan(
+    action.indexOf('name: Build workspace packages'),
+  )
+})
+
+test.skipIf(!supported)(
+  'Bun package cache resolves the configured directory and installed version',
+  async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'setup-cache-'))
+    try {
+      writeFileSync(path.join(root, 'package.json'), '{}')
+      const cache = path.join(root, 'custom package cache')
+      writeFileSync(
+        path.join(root, 'bunfig.toml'),
+        `[install.cache]\ndir = ${JSON.stringify(cache)}\n`,
+      )
+      const step = setupStep('Resolve Bun package cache')
+      expect(step).toHaveProperty('run')
+      if (!step || typeof step !== 'object' || !('run' in step) || typeof step.run !== 'string')
+        return
+      const output = path.join(root, 'output')
+      const env = { ...process.env, GITHUB_OUTPUT: output, BUN_INSTALL_CACHE_DIR: undefined }
+      const result = await runBash(step.run, root, env)
+      expect(result.status, result.output).toBe(0)
+      expect(readFileSync(output, 'utf8')).toBe(`path=${cache}\nversion=${Bun.version}\n`)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  },
+)

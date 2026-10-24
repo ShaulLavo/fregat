@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -8,6 +8,24 @@ import { readWorkspaceGraph, requiredLibraries, selectAffected } from './affecte
 const root = path.resolve(import.meta.dirname, '../..')
 const graph = readWorkspaceGraph(root)
 const select = (files, full = false) => selectAffected(graph, files, full)
+
+test('a root lockfile change retains every package test and its build prerequisites', () => {
+  const plan = select(['bun.lock'])
+  const all = select([], true)
+  expect(plan.packages).toEqual(all.packages)
+  expect(requiredLibraries(graph, plan.packages)).toEqual(requiredLibraries(graph, all.packages))
+  expect(plan).toMatchObject({
+    exhaustive: false,
+    tooling: true,
+    web: true,
+    server: true,
+    tui: true,
+    editor: true,
+    ghostty: true,
+    hotkeys: true,
+    site: true,
+  })
+})
 
 test('the four documentation files in PR 1207 do not consume application or library runners', () => {
   const plan = select([
@@ -137,7 +155,7 @@ test('PR 1232 selects Editor health when changing its baseline and workflow', ()
       'editor/docs/architecture/phase-0/health-baseline.json',
       'scripts/workspace-verification.test.ts',
     ]),
-  ).toMatchObject({ editor: true, ghostty: false, web: false, server: false })
+  ).toMatchObject({ editor: true, ghostty: true, web: true, server: true })
 })
 
 test.each([
@@ -149,12 +167,9 @@ test.each([
   'editor/scripts/check-full-text-boundary.mjs',
   'editor/scripts/full-text-boundary-allow.json',
   'editor/scripts/command-reference.ts',
-  'editor/scripts/workspace-root.ts',
   'editor/docs/commands.md',
   'editor/package.json',
   'editor/site/package.json',
-  'package.json',
-  '.github/workflows/workspace-libraries.yml',
 ])('%s selects Editor health without unrelated library or application tests', (file) => {
   expect(select([file])).toMatchObject({
     editor: true,
@@ -182,33 +197,64 @@ test('dependencies are built without selecting their tests', () => {
   expect(plan.ghostty).toBe(false)
 })
 
+test.each(['.agents/skills/helper.ts', 'apps/deleted-package/src/index.ts'])(
+  '%s selects root tooling without every application suite',
+  (file) => {
+    expect(select([file])).toMatchObject({
+      packages: [],
+      tooling: true,
+      web: false,
+      server: false,
+      tui: false,
+      ghostty: false,
+      editor: false,
+    })
+  },
+)
+
 test.each([
-  'bun.lock',
+  'package.json',
+  '.github/workflows/workspace-libraries.yml',
   'turbo.json',
+  'bunfig.toml',
+  '.npmrc',
+  '.env.production',
+  'tsconfig.base.json',
+  'vitest.scripts.config.mjs',
+  'vitest.config.ts',
+  '.oxfmtrc.json',
+  '.oxlintrc.json',
+  'patches/example.patch',
+  'editor/tsconfig.json',
+  'editor/scripts/workspace-root.ts',
+  'editor/scripts/build-package.ts',
+  'editor/examples/app/tsconfig.json',
+  'hotkeys/tsconfig.json',
   '.github/workflows/ci.yml',
-  '.agents/skills/helper.ts',
-  'apps/deleted-package/src/index.ts',
-])('%s selects root tooling without every application suite', (file) => {
-  expect(select([file])).toMatchObject({
-    packages: [],
-    tooling: true,
-    web: false,
-    server: false,
-    tui: false,
-    ghostty: false,
-    editor: false,
-  })
+  '.github/actions/setup/action.yml',
+  'scripts/dev-sources.ts',
+])('%s selects all package owners of shared dependency and configuration inputs', (file) => {
+  const plan = select([file])
+  expect(plan.packages).toEqual(select([], true).packages)
+  expect(plan).toMatchObject({ tooling: true, web: true, server: true, exhaustive: false })
 })
 
-test('script changes select the script package and its tooling suite', () => {
-  expect(select(['scripts/dev-sources.ts'])).toMatchObject({
-    packages: ['scripts'],
-    tooling: true,
-    web: false,
-    server: false,
-    tui: false,
-    ghostty: false,
-  })
+test('global selection remains additive for mixed documentation and package changes', () => {
+  const plan = select(['bun.lock', 'apps/server/src/index.ts', 'docs/development.md'])
+  expect(plan.packages).toEqual(select([], true).packages)
+  expect(plan).toMatchObject({ tooling: true, docs: true, exhaustive: false })
+  expect(plan.docs_files).toEqual(['docs/development.md'])
+})
+
+test('a changed library retains its tests and the transitive build prerequisites', () => {
+  const plan = select(['packages/contracts/src/index.ts'])
+  expect(plan.packages).toEqual(['@workspace/contracts'])
+  expect(plan.web).toBe(false)
+  expect(requiredLibraries(graph, plan.packages)).toContain('@fregat/hotkeys')
+})
+
+test('an empty changed selection leaves package and tooling runners idle', () => {
+  expect(select([])).toMatchObject({ packages: [], code: false, tooling: false, exhaustive: false })
 })
 
 test.each([
@@ -271,10 +317,20 @@ const gitAvailable = Bun.which('git') !== null
 if (!gitAvailable) console.info('Skipping affected CI git proof. Git is required.')
 
 test.skipIf(!gitAvailable).each([
-  [[], ''],
-  [['apps/site/index.html'], 'fregat'],
-  [['apps/site/index.html', 'editor/site/index.html'], 'fregat,singapore'],
-])('CLI exports raw sites %s and JSON arrays', (files, sites) => {
+  [[], '', 'changed', []],
+  [['apps/site/index.html'], 'fregat', 'changed', ['site']],
+  [
+    ['apps/site/index.html', 'editor/site/index.html'],
+    'fregat,singapore',
+    'changed',
+    ['singapore-editor-site', 'site'],
+  ],
+  [['bun.lock'], 'fregat,singapore', 'changed', ['singapore-editor-site', 'site']],
+  [['package.json'], 'fregat,singapore', 'changed', ['singapore-editor-site', 'site']],
+  [['turbo.json'], 'fregat,singapore', 'changed', ['singapore-editor-site', 'site']],
+  [['tsconfig.json'], 'fregat,singapore', 'changed', ['singapore-editor-site', 'site']],
+  [[], 'fregat,singapore', 'full', ['singapore-editor-site', 'site']],
+])('CLI exports raw sites for %s in %s mode and JSON arrays', (files, sites, mode, packages) => {
   const directory = mkdtempSync(path.join(tmpdir(), 'ci-affected-output-'))
   const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim()
   try {
@@ -300,18 +356,16 @@ test.skipIf(!gitAvailable).each([
     git('commit', '-qm', 'base')
     const base = git('rev-parse', 'HEAD')
     writeFileSync(path.join(directory, 'docs/Review note.md'), '# Changed\n')
-    for (const file of files) writeFileSync(path.join(directory, file), '<main>Changed</main>\n')
+    for (const file of files) {
+      const target = path.join(directory, file)
+      const content = existsSync(target) ? readFileSync(target, 'utf8') : '<main>Changed</main>'
+      writeFileSync(target, `${content}\n`)
+    }
     git('add', '.')
     git('commit', '-qm', 'changed')
     const output = path.join(directory, 'outputs')
     const result = Bun.spawnSync(
-      [
-        'bun',
-        path.join(root, 'scripts/ci/affected.mjs'),
-        'changed',
-        base,
-        git('rev-parse', 'HEAD'),
-      ],
+      ['bun', path.join(root, 'scripts/ci/affected.mjs'), mode, base, git('rev-parse', 'HEAD')],
       { cwd: directory, env: { ...process.env, GITHUB_OUTPUT: output } },
     )
     expect(result.exitCode, result.stderr.toString()).toBe(0)
@@ -322,12 +376,13 @@ test.skipIf(!gitAvailable).each([
         .split('\n')
         .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]),
     )
+    expect(selection.packages).toEqual(packages)
     expect(exported.sites).toBe(sites)
     expect(JSON.parse(exported.packages)).toEqual(selection.packages)
     expect(JSON.parse(exported.docs_files)).toEqual(['docs/Review note.md'])
-    expect(exported.site).toBe(String(files.length > 0))
+    expect(exported.site).toBe(String(packages.length > 0))
     expect(exported.docs).toBe('true')
-    expect(exported.exhaustive).toBe('false')
+    expect(exported.exhaustive).toBe(String(mode === 'full'))
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
