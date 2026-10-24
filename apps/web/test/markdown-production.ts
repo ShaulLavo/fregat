@@ -60,19 +60,16 @@ function probeSync() {
 }
 
 async function candidateFactory() {
-  const [module, parser, grammar, chatGrammar, resolver, runtime] = await Promise.all([
+  const [module, runtime] = await Promise.all([
     import('@workspace/markdown/utils/tree-sitter-session'),
-    import('web-tree-sitter/web-tree-sitter.wasm?url'),
-    import('tree-sitter-md/tree-sitter-markdown.wasm?url'),
-    import('tree-sitter-md/tree-sitter-markdown-chat.wasm?url'),
-    import('tree-sitter-md/tree-sitter-md.wasm?url'),
-    import('tree-sitter-md'),
+    import('@workspace/markdown/utils/tree-sitter-runtime'),
   ])
+  const { treeSitterMarkdownAssets: assets } = runtime
   await module.initializeTreeSitterMarkdown({
-    parser: { locateFile: () => parser.default },
-    grammar: grammar.default,
-    chatGrammar: chatGrammar.default,
-    resolver: resolver.default,
+    parser: { locateFile: () => assets.parser },
+    grammar: assets.grammar,
+    chatGrammar: assets.chatGrammar,
+    resolver: assets.resolver,
   })
   return {
     factory: module.createTreeSitterMarkdownSession,
