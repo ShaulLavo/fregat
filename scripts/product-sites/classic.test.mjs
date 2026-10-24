@@ -56,7 +56,8 @@ test('both editions keep their footer link to the other edition', async () => {
 test('the mirror includes both site trees without filtering their shared paths', async () => {
   const workflow = await text(new URL('.github/workflows/mirror.yml', root))
   expect(workflow).toContain('folder: packages/ghostty-webgpu')
-  expect(workflow).toContain('split --prefix="$FAMILY_FOLDER" HEAD')
+  expect(workflow).toContain('split --prefix="$1" "$2"')
+  expect(workflow).toContain('split=$(split_family "$FAMILY_FOLDER" "$split_revision")')
   expect(await realpath(new URL('src/content/docs', classic))).toBe(
     fileURLToPath(new URL('src/content/docs', scene)).replace(/\/$/, ''),
   )
