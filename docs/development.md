@@ -72,7 +72,7 @@ The family folders are mirrored to their standalone repositories. Make library c
 
 ## CI turnaround
 
-Normal PR and main CI select only packages whose files changed. A web change runs web tests; a server change runs server tests; a terminal change runs terminal verification. Dependencies are built as prerequisites, while their tests remain with their owning package. Root configuration and script changes select root tooling checks. Plans, root documentation, agent Markdown and changesets select formatting.
+Normal PR and main CI select affected packages. A web change runs web tests; a server change runs server tests; a terminal change runs terminal verification. Dependencies are built as prerequisites, while their tests remain with their owning package. Global dependency, configuration and shared CI/script inputs select every package and root tooling checks. Plans, root documentation, agent Markdown and changesets select formatting.
 
 Each selected package runs its own formatting, lint, types and tests. Terminal verification owns its complete check; Editor browser regressions run when their own package changes. Website builds and mobile smoke checks are limited to the selected sites. Main uses the last successful main run as its comparison point so replaced queued runs remain covered.
 
