@@ -1,7 +1,7 @@
 # TanStack Router evaluation
 
 Evaluated on 2026-09-11 against Platform `99550068` and current official Router documentation.
-Status: Implemented and verified. The [workspace navigation reference](workspace-navigation.md) records current ownership, behavior, and verification. The evaluation below records the original decision before implementation.
+Status: Implemented and verified. The [workspace navigation reference](../docs/workspace-navigation.md) records current ownership, behavior, and verification. The evaluation below records the original decision before implementation.
 
 ## Recommendation
 

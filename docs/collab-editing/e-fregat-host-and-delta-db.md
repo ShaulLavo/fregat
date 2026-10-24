@@ -99,7 +99,7 @@ The available Plan 134 resolution record documents the earlier symlink, watched-
 
 Evidence:
 
-- `docs/external-edit-lsp-findings.md:44-73`
+- `.internal/external-edit-lsp-findings.md:44-73`
 
 ### Plans 099 and 198 establish consumer ownership, not a machine host
 
