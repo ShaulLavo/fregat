@@ -348,25 +348,48 @@ test('consumer only imports its required subset and build-cache entries', () => 
   ).toHaveLength(1)
 })
 
-test('imported build entries satisfy Turbo prerequisites without caching test success', () => {
-  const f = fixture()
-  const bundle = f.publication()
-  consume(f.request('all'), bundle.downloads)
-  const turbo = path.join(f.directory, 'node_modules/.bin/turbo')
-  for (let i = 0; i < 2; i++) {
-    const output = execFileSync(
-      turbo,
-      ['run', 'test', '--cache=local:r', '--filter=@workspace/ui'],
-      { cwd: f.directory, encoding: 'utf8' },
-    )
-    expect(output).toContain('@fregat/base:build: cache hit')
-    expect(output).toContain('@workspace/ui:test: cache miss')
-  }
-  expect(readFileSync(path.join(f.directory, 'tests.log'), 'utf8').trim().split('\n')).toHaveLength(
-    2,
-  )
-  expect(compiles(f.directory)).toHaveLength(2)
-})
+test.each([false, true])(
+  'imported build entries satisfy Turbo prerequisites without caching test success with GitHub formatting %s',
+  (github) => {
+    const f = fixture()
+    const bundle = f.publication()
+    consume(f.request('all'), bundle.downloads)
+    const build = bundle.published.tasks.find((task) => task.taskId === '@fregat/base#build')
+    assert(build)
+    const turbo = path.join(f.directory, 'node_modules/.bin/turbo')
+    const summaries = path.join(f.directory, '.turbo/runs')
+    for (let i = 0; i < 2; i++) {
+      const before = readdirSync(summaries)
+      const output = execFileSync(
+        turbo,
+        ['run', 'test', '--cache=local:r', '--filter=@workspace/ui', '--summarize'],
+        {
+          cwd: f.directory,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CI: github ? 'true' : undefined,
+            GITHUB_ACTIONS: github ? 'true' : undefined,
+          },
+        },
+      )
+      process.stdout.write(output)
+      const created = readdirSync(summaries).filter((file) => !before.includes(file))
+      expect(created).toHaveLength(1)
+      const result = JSON.parse(readFileSync(path.join(summaries, created[0]), 'utf8'))
+      expect(result.execution.exitCode).toBe(0)
+      expect(result.tasks.map((task) => [task.taskId, task.cache.status])).toEqual([
+        ['@fregat/base#build', 'HIT'],
+        ['@workspace/ui#test', 'MISS'],
+      ])
+      expect(result.tasks[0].hash).toBe(build.hash)
+      expect(
+        readFileSync(path.join(f.directory, 'tests.log'), 'utf8').trim().split('\n'),
+      ).toHaveLength(i + 1)
+      expect(compiles(f.directory)).toHaveLength(2)
+    }
+  },
+)
 
 test('required consumer fails closed on missing bundle and never compiles', () => {
   const f = fixture()
