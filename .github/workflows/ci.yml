@@ -409,12 +409,6 @@ jobs:
         with:
           build-packages: '["web"]'
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
-
       # The workspace's own playwright binary, never `bunx playwright` — bunx
       # resolves a fresh copy from npm and downloads the browser revision *that*
       # version wants, leaving the pinned playwright pointing at a build that
@@ -589,12 +583,6 @@ jobs:
         with:
           name: ci-product-sites
           path: ${{ runner.temp }}/product-sites
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-mobile-${{ hashFiles('bun.lock') }}
 
       - name: Install mobile check browsers
         uses: ./.github/actions/install-browsers

@@ -88,6 +88,26 @@ runs:
         git config --global user.email 'ci@example.com'
         git config --global user.name 'CI'
 
+    - name: Resolve Bun package cache
+      id: bun-cache
+      shell: bash
+      run: |
+        set -euo pipefail
+        cache=$(bun pm cache)
+        test -n "$cache"
+        version=$(bun --version)
+        test -n "$version"
+        echo "path=$cache" >> "$GITHUB_OUTPUT"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    - name: Restore Bun packages
+      id: bun-packages
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.bun-cache.outputs.path }}
+        key: bun-packages-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.bun-cache.outputs.version }}-${{ hashFiles('bun.lock', '**/package.json', '**/bunfig.toml', '**/.npmrc', '!**/node_modules/**') }}
+        restore-keys: bun-packages-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.bun-cache.outputs.version }}-
+
     - name: Install dependencies
       shell: bash
       run: |
@@ -140,6 +160,13 @@ runs:
           sleep "$delay"
         done
         bun install --frozen-lockfile
+
+    - name: Save Bun packages
+      if: ${{ steps.bun-packages.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.bun-cache.outputs.path }}
+        key: ${{ steps.bun-packages.outputs.cache-primary-key }}
 
     - name: Build workspace packages
       shell: bash
