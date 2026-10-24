@@ -66,6 +66,7 @@ test('split preview stays on remark while cold production chat preserves pending
   expect(proof.message().querySelector('[data-chat-markdown-raw]')?.textContent).toBe(source)
   expect(proof.message().querySelector('strong')).toBeNull()
   expect(proof.message().querySelector('[role="status"]')).not.toBeNull()
+  await resourceQueryClient.query(chatMarkdownQueryOptions())
   await expect.poll(() => proof.message().querySelector('strong')?.textContent).toBe('production')
 
   const candidate = await import('@workspace/markdown/utils/tree-sitter-session')
