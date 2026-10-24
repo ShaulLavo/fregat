@@ -8,7 +8,7 @@ ownership, commands, modal input, ownership rules, loading, proofs and gates sta
 extension style.
 
 History: RESEARCH DONE 2026-09-26 — Phase 0 comparison, measured controls and the selected
-`createPlugin` shape are below; the evidence is in [Phase 0 research](../docs/composable-plugins/phase-0-research.md).
+`createPlugin` shape are below; the evidence is in [Phase 0 research](../.internal/composable-plugins/phase-0-research.md).
 Both owner questions are decided (below). Phases 1 and 2 done 2026-09-26 in wave 2, lane E1:
 [singapore#50](https://github.com/ShaulLavo/singapore/pull/50) (lifecycle ownership, D7) and
 [singapore#51](https://github.com/ShaulLavo/singapore/pull/51) (per-input dispatch: D1–D4 counters in
@@ -94,7 +94,7 @@ customization easier. Full access does not imply that every internal property is
 ## Research gate: CodeMirror and Monaco before API selection
 
 Done 2026-09-26: versions pinned, implementation cited and the dispatch model measured in all three
-editors ([Phase 0 research](../docs/composable-plugins/phase-0-research.md)). The references were:
+editors ([Phase 0 research](../.internal/composable-plugins/phase-0-research.md)). The references were:
 
 | Reference                                           | What to study and what not to assume                                                                                                                                                 |
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -488,7 +488,7 @@ is not completion of this plan.
 
 ## Research findings (2026-09-26)
 
-Full evidence, citations and method: [Phase 0 research](../docs/composable-plugins/phase-0-research.md).
+Full evidence, citations and method: [Phase 0 research](../.internal/composable-plugins/phase-0-research.md).
 Probes are throwaway, in `/work/tmp/research2/122/` (real Chromium 153, three engines, same ops).
 
 - **The notification itself is not where time goes.** A no-op piece costs about 5 ns in CodeMirror,

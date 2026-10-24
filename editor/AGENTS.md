@@ -1,117 +1,51 @@
 # AGENTS.md
 
-Instructions for AI coding agents working with this codebase.
+Instructions for AI coding agents working in `editor/` (Singapore). The [README](README.md) maps the packages, and [ARCHITECTURE.md](ARCHITECTURE.md) explains the design. Read [docs/development.md](docs/development.md) for setup.
 
-## Roadmap
+## Plans
 
-Fregat's [PLAN.md](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) schedules all work.
-Create and update Editor plans in Fregat's root `plans/`, using the
-[Editor inventory](https://github.com/ShaulLavo/fregat/blob/main/plans/editor-backlog.md)
-and [authoring contract](https://github.com/ShaulLavo/fregat/blob/main/plans/editor-authoring.md).
+Fregat's [PLAN.md](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) schedules all work. Write Editor plans in Fregat's root `plans/`, following the [Editor inventory](https://github.com/ShaulLavo/fregat/blob/main/plans/editor-backlog.md) and [authoring contract](https://github.com/ShaulLavo/fregat/blob/main/plans/editor-authoring.md). Run `bun run plans:check` from the Fregat root after you edit the inventory. Do not add `plans/` or `PLAN.md` inside `editor/`.
 
-## Project Overview
+## The simple API comes first
 
-Browser-based code editor targeting ultra-low latency typing (<1-2ms perceived). Balanced-tree piece table with persistent immutable snapshots, CSS Highlight API rendering, and optional Tree-sitter syntax plugins.
-
-## The Simple API Comes First
-
-Every feature works on an editor that was only given text: `new Editor(element)` and `setText(text)`, or a plugin built from plain options. Documents — an `openDocument` id, a shared `DocumentSession`, a `LanguageServerDocument` — add identity and sharing: persistence, one buffer or one protocol state behind several views. They are supported, and no feature may require one.
+Every feature works on an editor that was only given text: `new Editor(element)` and `setText(text)`, or a plugin built from plain options. Documents (an `openDocument` id, a shared `DocumentSession`, a `LanguageServerDocument`) add identity and sharing: persistence, one buffer or one protocol state behind several views. They are supported, and no feature may require one.
 
 - When a feature needs something a document usually supplies, such as a language server's URI, take it as a plain option on the simple path and let a document fill it in when there is one.
 - A new capability must not add required setup to the one-line use. If it cannot work without a document, the design is wrong, not the caller.
 - Test the simple path. A feature covered only through documents has not proven it works without one.
 
-## Architecture
+## Read before you change
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the high-level system design: main thread vs worker split, core systems, data flow, and remaining open questions.
+- Storage, anchors, or positions: [piece table](docs/storage/piece-table.md), [anchors](docs/positions/anchors.md), and ADRs [001](docs/adr/001-persistent-avl-piece-table.md) and [002](docs/adr/002-anchors-into-immutable-buffers.md). Deleted text stays in the tree as tombstones, because deleted anchors need it.
+- Rows, geometry, or paint: [browser layout and virtualizer](docs/display/browser-virtualization.md) and [ADR 004](docs/adr/004-browser-layout-and-css-highlights.md). Add a [browser quirks](docs/display/browser-quirks.md) entry for every browser workaround you put in the code.
+- Workers: [worker topology](docs/architecture/worker-topology.md) and [ADR 003](docs/adr/003-document-on-main-thread.md). Each worker has one owner object. Do not add package-level worker singletons.
+- Syntax: [tree-sitter](docs/syntax/tree-sitter.md). Selections are anchors, never syntax nodes.
+- Plugin hooks: [extension hooks](docs/architecture/extension-hooks.md).
+- A limit or ceiling: update [known limits](docs/limitations.md) when you change one.
 
-## Design Documents
+## Conventions
 
-### Storage
+- Call the text-slice record a Piece. Other editors say "fragment".
+- Combine arrays with `concat` and use fresh array results directly, following Fregat's array construction rules. Keep copies needed for ownership, iterable or typed-array conversion, tuple typing, or sparse-array behavior. A performance exception needs measurements.
+- Link files inside `editor/` with relative paths. Links above `editor/` are absolute URLs, because the [singapore](https://github.com/ShaulLavo/singapore) mirror holds only this folder.
+- Package READMEs follow the template that `bun run package-pages:check` enforces from the Fregat root. A package that `npm view` does not find says `Not on npm yet.` in its Install section.
 
-- [Piece Table](docs/storage/piece-table.md) — Tree-backed piece table, buffers, snapshots, aggregate maintenance, enrichment roadmap, Phase 1 prerequisites (opaque BufferId, chunked append buffer)
+## Generated files
 
-### Positions
+- `docs/commands.md`: run `bun run commands:reference`.
+- `docs/architecture/phase-0/*.json`: run `bun run health:write` only for an intended architecture change.
+- `site/src/content/docs/docs/reference/api/`: TypeDoc output, gitignored.
 
-- [Types & Conversions](docs/positions/types-and-conversions.md) — Offset, Point, Anchor hierarchy; line-break augmentation; conversion functions
-- [Anchors](docs/positions/anchors.md) — Durable position references, creation, deletion/bias rules, resolution architecture (reverse index + enriched treap), snapshot consistency
+## Build and test
 
-### Editing
+Turborepo with Bun. Run tests through package scripts with `bun run test`. Do not use `bun test`; it bypasses the configured Vitest environments.
 
-- [Selections & Undo](docs/editing/selections-and-undo.md) — Anchor-based selections, multi-cursor, lazy normalization, batch edits, edit/patch representation, snapshot-based undo
+Before you commit, run the narrowest package test, then from `editor/`:
 
-### Display
-
-- [Transforms](docs/display/transforms.md) — Layered transform hypothesis, layer interface, invalidation protocol, FoldMap validation, decoration constraints
-- [Browser Quirks](docs/display/browser-quirks.md) — Browser-specific workarounds: symptom, root cause, fix rationale, repro, upstream bug for each (e.g. WebKit style-containment counter bug behind Safari line numbers rendering "0")
-
-### Syntax
-
-- [Tree-sitter](docs/syntax/tree-sitter.md) — Committed syntax engine for highlighting, folds, structural selection, indentation, injections, and query-driven features
-
-## Codebase
-
-### Packages
-
-| Package                          | Purpose                                                                                          | Key files                                                                                 |
-| -------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| `packages/editor`                | Core editor: document sessions, CSS Highlight API renderer, and Shiki highlighter                | `src/editor.ts`, `src/documentSession.ts`, `src/tokens.ts`, `src/shiki/*`                 |
-| `packages/textbuffer`            | Persistent text storage, snapshots, anchors, and line mapping                                    | `src/index.ts`, `src/pieceTableTypes.ts`, `src/tree.ts`                                   |
-| `packages/tree-sitter`           | Optional Tree-sitter runtime, worker client, language registry, and structural selection helpers | `src/session.ts`, `src/treeSitter/workerClient.ts`, `src/treeSitter/treeSitter.worker.ts` |
-| `packages/tree-sitter-languages` | First-party lazy Tree-sitter language plugins                                                    | `src/index.ts`, `src/queries/*`                                                           |
-| `examples/app`                   | Demo app with file browser                                                                       | `src/app.ts`, `src/main.ts`                                                               |
-
-### What's Implemented
-
-- **Piece table** — Persistent AVL tree with snapshots, insert/delete/read, structural sharing
-- **CSS Highlight API renderer** — Token-based syntax highlighting via `Highlight` objects
-- **Anchors and selections** — Durable anchor resolution, selection sets, and snapshot-aware history helpers
-- **Tree-sitter syntax path** — Optional worker-backed parsing/query support and structural selection integration
-- **Display transforms and virtualization** — FoldMap, row virtualization, long-line chunking, and mounted-range highlight painting
-- **Shiki highlighter** — Optional highlighter/tokenizer module inside `packages/editor`
-- **Example app** — File System Access API browser + editor integration
-
-### Still Evolving
-
-- Worker transaction ownership and scheduling boundaries
-- Decoration system beyond current syntax/selection highlight paths
-- Performance validation for very large files, dense decorations, and rapid editing
-
-### Key Types (in code)
-
-| Type                                                                     | Location                                     |
-| ------------------------------------------------------------------------ | -------------------------------------------- |
-| `Piece`                                                                  | `packages/textbuffer/src/pieceTableTypes.ts` |
-| `PieceBufferId`                                                          | `packages/textbuffer/src/pieceTableTypes.ts` |
-| `PieceTreeNode`                                                          | `packages/textbuffer/src/pieceTableTypes.ts` |
-| `PieceTableSnapshot`                                                     | `packages/textbuffer/src/pieceTableTypes.ts` |
-| `EditorToken`, `EditorTokenStyle`, `TextEdit`                            | `packages/editor/src/tokens.ts`              |
-| `EditorTokenStore` (the document's tokens; object tokens are input only) | `packages/editor/src/syntax/tokenStore.ts`   |
-| `TreeSitterLanguageContribution`, `TreeSitterBackend`                    | `packages/tree-sitter/src/index.ts`          |
-| `TokenPatch`, `IncrementalTokenizer`                                     | `packages/editor/src/shiki/tokenizer.ts`     |
-| `Editor` (class)                                                         | `packages/editor/src/editor.ts`              |
-
-### Terminology
-
-- **Piece** — the fundamental text-slice record. Other editors sometimes call this a "fragment" (e.g., Zed). In this codebase, it's always a Piece.
-
-## Array construction
-
-Follow Fregat's array construction rules: combine arrays with `concat` and use fresh array results directly. Preserve copies needed for ownership, iterable/typed-array conversion, tuple typing, or sparse-array behavior. Performance exceptions require measurements.
-
-## Build & Test
-
-Monorepo managed by Turborepo with Bun.
-
-Run tests through package scripts with `bun run test`. Do not use `bun test`; it bypasses the configured Vitest environments for this repo.
-
-### Formatting
-
-Run `bun run format` (oxfmt via Turborepo). It formats the **entire repo**, so when there is pre-existing format drift it will touch files unrelated to your change. This is expected and fine — **do not revert those incidental reformats**. `bun run format:check` must pass before committing.
-
-### Dead-code checks
-
-`bun run knip` (config in `knip.ts`) finds unused files, exports, and dependencies across the workspace. Each package's entry points are computed from its `exports` map, so a new export needs no config and only genuinely-internal dead code is reported. A few real deps are referenced in ways knip can't see statically (wasm build tooling, the vitest playwright provider) and are listed under `ignoreDependencies` with the reason inline.
+1. `bun run format:check`. `bun run format` formats the whole workspace, so it touches unrelated files when formatting has drifted. Keep those incidental changes.
+2. `bun run typecheck` and `bun run lint`.
+3. `bun run health` for any architecture-sensitive change.
+4. From the Fregat root, `bun run unused:check` runs knip and reports unused files, exports, and dependencies across the monorepo.
 
 <!-- opensrc:start -->
 

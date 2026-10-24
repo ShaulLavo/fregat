@@ -6,7 +6,7 @@
   open: P3 onward is Approved follow-up under the format, review and editing gates below.
 - Priority: wave 2 P0–P2 closed; remaining Approved phases follow format readiness.
 - Planned at: Platform `9c1c45d1`, 2026-09-25. Origin: the UI library survey
-  ([docs/ui-research/extend-ui.md](../docs/ui-research/extend-ui.md)).
+  ([.internal/ui-research/extend-ui.md](../.internal/ui-research/extend-ui.md)).
 
 ## Outcome
 
@@ -135,7 +135,7 @@ loss and preserve the original until the user accepts the result.
 ## Research findings (2026-09-25)
 
 Read from `origin/main` at `9f343825`; no open PR branch changes this plan. The full library
-survey, with method and screenshots, is [docs/documents/library-survey.md](../docs/documents/library-survey.md).
+survey, with method and screenshots, is [.internal/documents/library-survey.md](../.internal/documents/library-survey.md).
 Probes ran under `/work/tmp/research/156/`.
 
 ### Historical implementation audit (2026-09-25)

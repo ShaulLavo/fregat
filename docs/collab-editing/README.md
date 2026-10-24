@@ -1,5 +1,7 @@
 # Collaborative editing research
 
+> Internal research record, not user documentation. Singapore code comments and test notices cite these files by path, so they stay here.
+
 Research for [E066](../../plans/e066-collaborative-text.md),
 [E067](../../plans/e067-webrtc-collaboration-plugin.md) and the
 [Delta DB plan](../../plans/delta-db-implementation-plan.md), done on 2026-10-08 at Fregat

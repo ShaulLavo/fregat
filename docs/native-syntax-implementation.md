@@ -1,5 +1,7 @@
 # Native syntax implementation, 2026-09-20
 
+> Internal delivery record, not user documentation. `scripts/syntax/candidates.json` cites this file by path, so it stays here.
+
 This is an implementation increment of `native-syntax-coverage-plan.md`, not completion of its
 full-catalog research pass. The inventory contains 242 canonical Shiki 4.4.3 IDs: 24 partial native
 mappings, 218 candidates and no external blockers. Plain text and ANSI are accounted for separately.

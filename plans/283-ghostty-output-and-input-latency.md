@@ -229,7 +229,7 @@ in #358 and #360; an empty NVIDIA sample invalidated separate DOM attribution at
 ### Consistent grapheme policy
 
 Status: Approved. Issue #360's exact ZWJ sequences follow the configured Unicode provider and
-grapheme mode. [Matched cell and browser controls](../docs/terminal/zwj-cell-controls-2026-10-03.md)
+grapheme mode. [Matched cell and browser controls](../.internal/terminal/zwj-cell-controls-2026-10-03.md)
 show native mode 2027 off equals xterm Unicode 11, and native mode 2027 on equals xterm
 Unicode 15-graphemes. The benchmark's default xterm Unicode 6 assigns each emoji component one
 cell, and its DOM renderer can shape across those cells. Native raw ABI and packed row ownership

@@ -3,7 +3,7 @@
 Status: **Approved. Nightly architecture execution moves to [Plan 343](343-t3code-nightly-orchestration.md), deferred at the owner's request on 2026-10-10.**
 
 The active source reference is published nightly `v0.0.46-nightly.20261010.2922`, commit
-`bd2346eda2e2c380d1844869c7fd16c279d2190f`. [The reference guide](../docs/t3code-reference.md)
+`bd2346eda2e2c380d1844869c7fd16c279d2190f`. [The reference guide](../.internal/t3code-reference.md)
 and [pin manifest](343-t3code-nightly/reference-pin.json) own source selection. Plan 343 owns
 the orchestration rewrite, its new acceptance matrix, and the transfer of affected follow-ons.
 
@@ -221,7 +221,7 @@ a delivered capability. The 2026-09-23 reconciliation recovered historical evide
 groups. None became fully verified from that review. Historical browser evidence does not
 establish the current checkout's runtime behavior.
 
-Historical `docs/t3code-*` and `docs/chat-t3code-parity.md` are evidence of prior work, not the
+Historical `docs/t3code-*` and `.internal/chat-t3code-parity.md` are evidence of prior work, not the
 acceptance authority for this baseline. Do not revive their stale absence claims or percentages.
 Update their supersession pointers when application implementation updates the stable docs.
 

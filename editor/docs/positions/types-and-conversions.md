@@ -42,21 +42,21 @@ Each display transform layer may introduce its own branded type (structurally id
 
 ### Problem
 
-The treap has no way to convert between offsets and row/column positions without scanning for newlines. Row-based operations are O(n). Unacceptable.
+The sequence tree has no way to convert between offsets and row/column positions without scanning for newlines. Row-based operations are O(n). Unacceptable.
 
 ### Design
 
-Extend treap aggregates to track newline counts. O(log n) conversion.
+Extend the tree's aggregates to track newline counts. O(log n) conversion.
 
 **Normalization (locked):** All input normalized to `\n` at system boundary. Piece table assumes `\n`-only.
 
 **Piece-level:** Each Piece gains `lineBreaks` field (computed at creation by scanning buffer slice).
 
-**Treap-level:** Each node gains `subtreeLineBreaks`, maintained in the same aggregate pattern as `subtreeLength` (see `packages/textbuffer/src/pieceTable.ts`).
+**Tree-level:** Each node gains `subtreeLineBreaks`, maintained in the same aggregate pattern as `subtreeLength` (see `packages/textbuffer/src/pieceTable.ts`).
 
 ### offsetToPoint
 
-Walks treap using `subtreeLineBreaks` to count newlines preceding target. O(log n). Within final piece, linear scan for column.
+Walks the tree using `subtreeLineBreaks` to count newlines preceding target. O(log n). Within final piece, linear scan for column.
 
 ### pointToOffset
 

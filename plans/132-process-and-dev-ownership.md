@@ -44,7 +44,7 @@ pending release and a passed live check for `20260928T173104Z-4a85ec00-main`.
 
 The old instruction to reset those databases at the next deploy is obsolete. Do not reset them
 for this plan. The historical backup/reset procedure remains in
-[the preflight record](../docs/verification/2026-09-25-schema-collapse-preflight.md); this audit
+[the preflight record](../.internal/verification/2026-09-25-schema-collapse-preflight.md); this audit
 does not establish which backups were retained. A future schema bump needs its own concrete
 state-loss review and authorization.
 

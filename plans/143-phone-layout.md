@@ -42,7 +42,7 @@ unimaginable. This plan does not design screens.
   mobile app needs its own delivery plan.
 - `composer-mobile-enter-newline` was rejected in `plans/t3code-chat-parity-gap-analysis.md:423`
   because "there is no mobile target". That reason is stale once this plan picks a target.
-- `docs/product-vision.md` does not mention phones.
+- `.internal/product-vision.md` does not mention phones.
 
 ## What the references do
 

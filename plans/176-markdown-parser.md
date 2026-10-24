@@ -1,6 +1,6 @@
 # Plan 176: One markdown parser
 
-Owner direction, 2026-09-28: [Markdown experiences](../docs/markdown-experiences.md)
+Owner direction, 2026-09-28: [Markdown experiences](../.internal/markdown-experiences.md)
 extends the target to visual and source-revealing authoring, rich composition and
 streaming chat on our parser. Keeping remark for chat and split rendering was
 the scope of the completed integration below. Migrating those consumers remains
@@ -21,14 +21,14 @@ checks, paired benchmarks and the gates required before that cutover.
   CI pin: `7edf180cea1e03a477db4c4626d39c9e985cdb3b`.
 - The original research and Rust measurements below are historical. The
   [current implementation and release gate](#current-implementation-and-release-gate) supersede
-  their packaging, completion and performance claims. The [behaviour research](../docs/markdown-parser/editor-behaviour.md)
+  their packaging, completion and performance claims. The [behaviour research](../.internal/markdown-parser/editor-behaviour.md)
   separates observed editor practices from the proposed integration contract.
 - Replaces [Plan 108](108-markdown-modes.md) D5. Plan 108 Phase 2 and the chat parser decision
   wait on this plan. [Plan 111](111-editor-decorations.md)'s decoration API does not.
 - Planned at: Platform `d42184dc`, Editor `74e76be`, 2026-09-26. Researched at Platform
   `c130dd35a`, Editor `74e76be`. Origin: the investigation into markdown files painting as raw
   source before their live-preview decorations land.
-- Method, tables and pinned versions: [docs/markdown-parser/measurements.md](../docs/markdown-parser/measurements.md).
+- Method, tables and pinned versions: [.internal/markdown-parser/measurements.md](../.internal/markdown-parser/measurements.md).
 
 ## TanStack Markdown reference, 2026-10-09
 
@@ -276,7 +276,7 @@ reference links whose label has no definition, which neither tree-sitter nor lez
 
 Measured 2026-09-26 in [ShaulLavo/tree-sitter-md](https://github.com/ShaulLavo/tree-sitter-md)
 `b962319` (`/work/projects/tree-sitter-md`; findings in its `docs/FINDINGS.md`, method and rows
-in [measurements](../docs/markdown-parser/measurements.md#tree-sitter-md-custom-grammar--rust-resolver)).
+in [measurements](../.internal/markdown-parser/measurements.md#tree-sitter-md-custom-grammar--rust-resolver)).
 It cleared the original spike gates. The resolver measured here is Rust on pulldown-cmark.
 The C rewrite has since landed; current release gates and expanded stress findings are above.
 
@@ -376,7 +376,7 @@ from the completed Phase 0 rewrite).
      edits and bulk workloads against the same-run baseline. Publish 0.1 to npm after these
      gates. Publishing credentials may need the owner; implementation and package checks do not.
 1. **Markdown document in `@singapore-editor/markdown`** (M; Editor `packages/markdown`).
-   Implement the [proposed behaviour contract](../docs/markdown-parser/editor-behaviour.md#proposed-contract-for-platform).
+   Implement the [proposed behaviour contract](../.internal/markdown-parser/editor-behaviour.md#proposed-contract-for-platform).
    One compatible parser belongs to the retained source buffer's analysis, following the
    [document analysis contracts](../docs/document-backed-content-views.md#analysis-and-attachment-contracts); view attachment
    borrows it. Feed committed edits once, preserve undo, and dispose with the analysis owner.

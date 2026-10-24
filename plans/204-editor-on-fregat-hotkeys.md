@@ -16,7 +16,7 @@
 
 ## Delivery evidence
 
-The [command foundation delivery record](../docs/keymap/command-foundation-delivery.md)
+The [command foundation delivery record](../.internal/keymap/command-foundation-delivery.md)
 records the integrated source, independent review, green CI, exact standalone family proof,
 and qualified large-file comparison. Installed release
 `20261004T102110Z-fa40610d-main-c24b3184` passed its live check on 2026-10-04.

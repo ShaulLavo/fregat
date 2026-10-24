@@ -28,8 +28,7 @@ there are no migrations.
   their existing owner. Write admission bypasses both client freshness and the server status TTL,
   rechecks the repository and intended affected paths, and rejects changes requiring another review.
 - **Diff:** historical data binds to exact object identities. Scroll, selections, expanded regions
-  and split ratios restore. A diff keeps no paint snapshot: prefetch on intent covers presses
-  ([Plan 177](../plans/177-prefetch-every-press.md)).
+  and split ratios restore. A diff keeps no paint snapshot: prefetch on intent covers presses.
 - **Search:** completed results preserve full query/options identity, coverage and truncation.
   Compact/full views have separate row anchors. Cached generation zero cannot authorize replacement.
 - **Chat:** the visible session and message window take priority. Plans and checkpoints around that

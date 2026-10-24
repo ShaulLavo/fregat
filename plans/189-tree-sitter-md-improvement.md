@@ -8,7 +8,7 @@
   size, speed). Each pass ships as its own releases of the package.
 - Repository: [ShaulLavo/tree-sitter-md](https://github.com/ShaulLavo/tree-sitter-md) (MIT), npm
   `tree-sitter-md`. Spike findings: `docs/FINDINGS.md` in that repository; Platform measurements in
-  [`docs/markdown-parser/measurements.md`](../docs/markdown-parser/measurements.md).
+  [`.internal/markdown-parser/measurements.md`](../.internal/markdown-parser/measurements.md).
 - Refreshed 2026-09-28 against `tree-sitter-md` `ab81f6c`. The C rewrite and shared-runtime
   extension are complete. The two extension modules total 74,937 gzip bytes, excluding host/JS.
   The spec score remains 672/676. The expanded stress runner reports 120 incremental/fresh
@@ -30,7 +30,7 @@
 Plan 176 Phase 0 owns the four spec failures, frontmatter switch, existing incremental/fresh
 mismatches and nesting safety, CI and first publish. Its Phase 1 owns document integration,
 correct first paint, reference readiness, cold-load warm-up and the measured scheduling decision.
-The [behaviour contract](../docs/markdown-parser/editor-behaviour.md) replaces a fixed prefix-append
+The [behaviour contract](../.internal/markdown-parser/editor-behaviour.md) replaces a fixed prefix-append
 assumption. Chunking is not a separate deferred task here: if needed for responsive integration,
 it must be proved in Phase 1. CodeMirror's scheduling is precedent, not an API the current parser has.
 

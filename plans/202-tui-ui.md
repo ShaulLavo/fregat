@@ -28,7 +28,7 @@ React host integration and published native artifacts. tree-sitter-md owns share
 semantics; Singapore owns its existing browser-editor consumer. Shared application data, drafts,
 commands, settings, palettes, documents and backend clients stay with their existing owners.
 
-[Coordination and reference index](../docs/tui-research/ui-plan-links.md) links the parser/editor
+[Coordination and reference index](../.internal/tui-research/ui-plan-links.md) links the parser/editor
 plans and the immutable source research, 83-capability catalog, visual recipes, measured-from-source
 constants, source ledger and acceptance matrix. Their old fork/package ownership is superseded by
 this plan; their source observations and behavior targets remain useful. A capability is not

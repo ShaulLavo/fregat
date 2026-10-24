@@ -18,7 +18,7 @@ Editor workers share lifecycle, settlement and reusable scheduling while preserv
 | Minimap                | Clipped projections, two canvases, coalesced rendering, colors/layout/render token              | Owned endpoint, render/control event lifecycle, bounded cleanup | New contribution after failure; acknowledge or bounded forced teardown    |
 | Browser TypeScript LSP | Project/service state, JSON-RPC, server-exit contract                                           | Worker-shaped lifecycle endpoint only                           | New owner/connection; preserve exit notification                          |
 
-The [current inventory](../docs/async-runtime/inventory.md) and [architecture](../docs/async-runtime/architecture.md) include broader Platform consumers. The Platform highlighting service shares Tree-sitter/Shiki across editors, diffs, previews and code fences. Its lifetime outlives a view; standalone services still have explicit owners. Add no package worker singleton or per-view duplicate service.
+The [current inventory](../.internal/async-runtime/inventory.md) and [architecture](../.internal/async-runtime/architecture.md) include broader Platform consumers. The Platform highlighting service shares Tree-sitter/Shiki across editors, diffs, previews and code fences. Its lifetime outlives a view; standalone services still have explicit owners. Add no package worker singleton or per-view duplicate service.
 
 ## Ownership and API boundary
 

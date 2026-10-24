@@ -19,7 +19,7 @@ highlighter, so the highlighter is not the cause:
 
 Rows are from `bun run bench:large-file --ext ts --highlighting shiki,tree-sitter` (30 keys,
 80 ms apart); evidence and method are in
-[the 112 results report](../docs/large-file-ceiling/results/resident-20260928.md#final-highlighting-validation).
+[the 112 results report](../.internal/large-file-ceiling/results/resident-20260928.md#final-highlighting-validation).
 
 The 5 MiB typing profiles are nearly identical for both engines. The top main-thread costs are:
 

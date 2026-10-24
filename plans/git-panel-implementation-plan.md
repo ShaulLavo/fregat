@@ -17,7 +17,7 @@ Requested scope: compare the local VS Code checkout with Platform, plan the impr
 Platform checkout: `ca707eebeab6c3bba6d116e30e55f91ef56731d5`.
 VS Code reference: `/work/projects/references/vscode`, commit `73e2745dc724f41e589bc387d18281cff82f144a`.
 
-The earlier `docs/git-feature-comparison.md` includes historical gaps. This plan will distinguish those from features present in the current source.
+The earlier `.internal/git-feature-comparison.md` includes historical gaps. This plan will distinguish those from features present in the current source.
 
 Research and design completed before source changes. Implementation follows the scope and checks below.
 

@@ -86,4 +86,4 @@ Positive controls deliberately block the host, slow the worker, fill a queue, om
 
 ## Reporting
 
-Each delivered unit records the question, exact command/artifacts, control and result, accepted claim, remaining limitation and next triggered action. Evidence goes under docs/async-runtime or the existing domain evidence home; checklists/order remain in these plans. Research pins do not become runtime PASS results. This planning delivery records no new performance figures.
+Each delivered unit records the question, exact command/artifacts, control and result, accepted claim, remaining limitation and next triggered action. Evidence goes under .internal/async-runtime or the existing domain evidence home; checklists/order remain in these plans. Research pins do not become runtime PASS results. This planning delivery records no new performance figures.

@@ -24,14 +24,16 @@ Read the applicable skills before writing or reviewing code, or running their wo
 
 ## Planning ownership
 
-- Root `PLAN.md` schedules all packages and clients. Plans, backlogs, and wishlists live in root `plans/`; package `PLAN.md`, `ROADMAP.md`, instructions, and READMEs link to Fregat's root roadmap.
-- Index plans in `plans/README.md`. Run `bun run plans:check` when editing the Editor inventory.
-- `docs/` holds architecture, research, and delivery evidence. Execution checklists and work ordering belong in the owning root plan and roadmap.
+- Root `PLAN.md` schedules all packages and clients. Plans, backlogs, and wishlists live in root `plans/`. The path stays because this workflow reads it. Package instructions link to the root roadmap; package READMEs and `docs/` do not.
+- Index every top-level plan in `plans/README.md`. Run `bun run plans:check` after editing `plans/` or `PLAN.md`.
+- A finished plan leaves `plans/`: put its lasting decision in `docs/adr/`, fold its behavior into `docs/`, then delete it. Aim for at most two live plans.
+- `docs/` holds public documentation only: guides, architecture, reference, decision records. Research, audits, measurement dumps and delivery receipts go in `.internal/`. `README.md` and `docs/` never link into `plans/` or `.internal/`.
+- Execution checklists and work ordering belong in the owning root plan and roadmap.
 
 ## Reference Clones
 
 - Upstream clones (vscode, t3code, opencode, codex, …) belong in gitignored root `references/`. Check there before cloning. Tests and `scripts/parity` resolve `references/t3code` relatively; CI skips these checks because it does not fetch the clone.
-- Pull outdated clones before use. T3 Code architecture uses the published nightly pinned in `plans/343-t3code-nightly/reference-pin.json`; follow `docs/t3code-reference.md`. Plan 126 comparison records retain their historical pin. Record a reviewed nightly delta before changing the active pin.
+- Pull outdated clones before use. T3 Code architecture uses the published nightly pinned in `plans/343-t3code-nightly/reference-pin.json`; follow `.internal/t3code-reference.md`. Plan 126 comparison records retain their historical pin. Record a reviewed nightly delta before changing the active pin.
 
 ## Code Organization
 
@@ -119,7 +121,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 ## Dev, Gates, Verification
 
 - Bundle size is not gated; deal with it when it's a real problem (owner, 2026-10-09).
-- Follow `README.md` and `docs/development.md` for development setup; Mesh is an optional integration. Browser verification uses an isolated state home. `/dev` is the component gallery; add a tab for anything worth eyeballing.
+- Follow `README.md` and `docs/development.md` for development setup. Run `bun run build:workspaces` before the first `bun run dev` or typecheck: the server imports the mirrored libraries from their built `dist`. Mesh is an optional integration. Browser verification uses an isolated state home. `/dev` is the component gallery; add a tab for anything worth eyeballing.
 - A private dev server takes an explicit free `--port` on a known loopback address, and stops after verification.
 - Run the narrowest checks that can catch the change's plausible failures. Heavy-job scheduling and resource limits belong to the execution host's local instructions. The owner uses the private `ShaulLavo/heavy-runner` tool documented in the local `fregat-local` skill; contributor commands and CI run independently of it.
 - `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`, `query:check`, `unused:check`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
