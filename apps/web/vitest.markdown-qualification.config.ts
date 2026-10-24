@@ -6,10 +6,13 @@ import { createScriptError } from '../../scripts/structured-errors'
 import base from './vitest.browser.config'
 
 const require = createRequire(import.meta.url)
+const markdownRequire = createRequire(
+  require.resolve('@workspace/markdown/utils/tree-sitter-runtime'),
+)
 const parserRoots = ['tree-sitter-md', 'web-tree-sitter'].map(parserPackageRoot)
 
 function parserPackageRoot(name: string): string {
-  let directory = path.dirname(realpathSync(require.resolve(name)))
+  let directory = path.dirname(realpathSync(markdownRequire.resolve(name)))
   while (!existsSync(path.join(directory, 'package.json'))) {
     const parent = path.dirname(directory)
     if (parent === directory)

@@ -1,3 +1,4 @@
+import { treeSitterMarkdownAssets } from '@workspace/markdown/utils/tree-sitter-runtime'
 import { onTestFinished, vi } from 'vitest'
 import { page } from 'vitest/browser'
 
@@ -13,8 +14,10 @@ test('authored text stays selectable through a failed grammar fetch and a succes
   const release = Promise.withResolvers<void>()
   const fetch = globalThis.fetch
   let held = false
+  const chatGrammar = new URL(treeSitterMarkdownAssets.chatGrammar, location.href).href
   const boundary = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-    if (!held && String(input).includes('tree-sitter-markdown-chat.wasm')) {
+    const request = typeof input === 'string' || input instanceof URL ? input : input.url
+    if (!held && new URL(request, location.href).href === chatGrammar) {
       held = true
       entered.resolve()
       await release.promise

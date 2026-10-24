@@ -92,6 +92,77 @@ function candidateReplay() {
   })
 }
 
+describe('Tree-sitter mixed delimiter parity', () => {
+  test.each([
+    [
+      '~_~a_~',
+      {
+        text: '~_a_',
+        elements: [
+          {
+            tag: 'p',
+            text: '~_a_',
+            attributes: { 'data-source-end-line': '1', 'data-source-line': '1' },
+            parents: [],
+          },
+          {
+            tag: 'del',
+            text: 'a_',
+            attributes: { 'data-source-end-line': '1', 'data-source-line': '1' },
+            parents: ['p'],
+          },
+        ],
+      },
+    ],
+    [
+      '*~~a*~~',
+      {
+        text: '~~a~~',
+        elements: [
+          {
+            tag: 'p',
+            text: '~~a~~',
+            attributes: { 'data-source-end-line': '1', 'data-source-line': '1' },
+            parents: [],
+          },
+          {
+            tag: 'em',
+            text: '~~a',
+            attributes: { 'data-source-end-line': '1', 'data-source-line': '1' },
+            parents: ['p'],
+          },
+        ],
+      },
+    ],
+    [
+      '*~~*a~~*',
+      {
+        text: '~~a~~*',
+        elements: [
+          {
+            tag: 'p',
+            text: '~~a~~*',
+            attributes: { 'data-source-end-line': '1', 'data-source-line': '1' },
+            parents: [],
+          },
+          {
+            tag: 'em',
+            text: '~~',
+            attributes: { 'data-source-end-line': '1', 'data-source-line': '1' },
+            parents: ['p'],
+          },
+        ],
+      },
+    ],
+  ] as const)('%s keeps the remark delimiter ownership', (source, expected) => {
+    const remark = observeHast(createRemarkReplay({ extensions: loadedHtml }).update(source, false))
+    const native = observeHast(candidateReplay()(source, false))
+
+    expect(remark).toEqual(expected)
+    expect(native).toEqual(expected)
+  })
+})
+
 describe('Tree-sitter actual product semantics', () => {
   test.each(MARKDOWN_CASES)(
     '$id preserves the completed independently authored expectation',

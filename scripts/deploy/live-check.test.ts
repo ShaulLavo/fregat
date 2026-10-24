@@ -87,6 +87,8 @@ test.each(['/demo/', '/demo', '/', '/demo%3F%23/'])(
     })
     const target = `http://127.0.0.1:${server.port}${route}`
     const base = `${target.replace(/\/$/, '')}/`
+    // Keep the budget positive while making its deadline expire deterministically.
+    const waitMs = Number.MIN_VALUE
     try {
       const process = Bun.spawn(
         [
@@ -94,7 +96,7 @@ test.each(['/demo/', '/demo', '/', '/demo%3F%23/'])(
           script,
           `--target=${target}`,
           '--release=new',
-          '--wait-for-server=1',
+          `--wait-for-server=${waitMs}`,
           `--out=${directory}`,
         ],
         { stdout: 'pipe', stderr: 'pipe' },
@@ -110,7 +112,7 @@ test.each(['/demo/', '/demo', '/', '/demo%3F%23/'])(
       ).toMatchObject({
         target: base,
         status: 'failed',
-        failures: ['server did not report new within 1ms'],
+        failures: [`server did not report new within ${waitMs}ms`],
       })
     } finally {
       await server.stop(true)

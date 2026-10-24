@@ -5,7 +5,7 @@ import {
 } from '@workspace/markdown/utils/session'
 import { onTestFinished } from 'vitest'
 import { commands, page } from 'vitest/browser'
-import grammarUrl from 'tree-sitter-md/tree-sitter-markdown.wasm?url'
+import { treeSitterMarkdownAssets as assets } from '@workspace/markdown/utils/tree-sitter-runtime'
 
 import { MarkdownPreviewPane } from '@/features/workbench/components/markdown-preview-pane'
 import { createMarkdownScrollSync } from '@/features/workbench/state/markdown-scroll-sync'
@@ -41,7 +41,7 @@ test('split preview stays on remark while cold production chat preserves pending
   await expect.poll(() => preview.container.querySelector('strong')?.textContent).toBe('preview')
   expect(resourceQueryClient.getQueryData(chatMarkdownQueryKeys.runtime)).toBeUndefined()
 
-  const grammar = new URL(grammarUrl, location.href)
+  const grammar = new URL(assets.grammar, location.href)
   await commands.delayRequest({ ms: 750, path: `${grammar.pathname}${grammar.search}` })
   const proof = await createMarkdownBrowser({ sessionFactory: null })
   const source = '**production**\n\n-       aligned bullet\n\n[docs](https://example.com)'
