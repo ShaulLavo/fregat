@@ -1,6 +1,6 @@
 import { mockQualificationImages } from './test/factories/qualification-image-command.ts'
 import { rendererLifecycleControl } from './src/state/tests/renderer-lifecycle.command.ts'
-import { browserTestResponses } from '../../packages/singapore/scripts/browser-test-responses.ts'
+import { browserTestResponses } from './test/env/browser-test-responses.ts'
 import fs from 'node:fs'
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'

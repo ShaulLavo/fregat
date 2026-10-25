@@ -1,4 +1,4 @@
-import { browserTestResponses } from '../../packages/singapore/scripts/browser-test-responses.ts'
+import { browserTestResponses } from './test/env/browser-test-responses.ts'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 import react from '@vitejs/plugin-react'

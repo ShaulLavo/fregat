@@ -169,6 +169,29 @@ sourceTest('keeps an external installed cache on package exports', ({ web }) => 
   expect(readDevSources(web)).toEqual([])
 })
 
+sourceTest('ignores installed caches inside the consumer Git tree', ({ web }) => {
+  const cache = path.join(web, '.bun/install/cache')
+  const packages = [
+    ['@singapore-editor/core', 'singapore', { exports: { '.': { import: './dist/index.js' } } }],
+    ['@fregat/hotkeys', 'hotkeys', { exports: { '.': { import: './dist/index.js' } } }],
+    ['ghostty-webgpu', 'ghostty', {}],
+  ] as const
+  for (const [name, directory, manifest] of packages) {
+    const target = path.join(cache, directory)
+    writeFile(target, 'package.json', JSON.stringify(manifest))
+    writeFile(target, 'src/index.ts')
+    if (name === 'ghostty-webgpu') {
+      writeFile(target, 'ghostty-vt.wasm')
+      writeFile(target, 'bridge.wasm')
+    }
+    const link = path.join(web, 'node_modules', name)
+    fs.rmSync(link, { recursive: true, force: true })
+    fs.mkdirSync(path.dirname(link), { recursive: true })
+    fs.symlinkSync(target, link, 'junction')
+  }
+  expect(readDevSources(web)).toEqual([])
+})
+
 sourceTest('maps a local editor alongside installed hotkeys and Ghostty packages', ({ web }) => {
   for (const name of ['@fregat/hotkeys', 'ghostty-webgpu']) {
     fs.unlinkSync(path.join(web, 'node_modules', name))

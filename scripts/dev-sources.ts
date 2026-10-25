@@ -72,18 +72,20 @@ export function writeDevTypeConfig(webRoot: string, packages: readonly DevPackag
   return file
 }
 
-function packageRoot(webRoot: string, name: string): string {
+function packageRoot(webRoot: string, name: string): { root: string; linked: boolean } {
   const candidates = [webRoot, path.resolve(webRoot, '../..')]
   const linked = candidates
     .map((base) => path.join(base, 'node_modules', name))
     .find((candidate) => fs.existsSync(path.join(candidate, 'package.json')))
   if (!linked) throw createScriptError(`Missing ${name}. Run bun install at the repository root.`)
 
-  return fs.realpathSync(linked)
+  return { root: fs.realpathSync(linked), linked: fs.lstatSync(linked).isSymbolicLink() }
 }
 
 function readSourcePackage(webRoot: string, name: string): readonly DevPackage[] {
-  const root = packageRoot(webRoot, name)
+  const packageLink = packageRoot(webRoot, name)
+  if (!packageLink.linked) return []
+  const { root } = packageLink
   const checkout = checkoutRoot(root)
   if (!checkout) return []
   if (name === '@fregat/hotkeys') return [readHotkeysPackage(root, checkout)]
@@ -129,8 +131,8 @@ function readGhosttyPackage(root: string, checkout: string): DevPackage {
 function checkoutRoot(root: string): string | undefined {
   let dir = root
   while (true) {
-    // Installed archives can include source and live inside the consumer's Git tree.
-    if (path.basename(dir) === 'node_modules') return undefined
+    // Installed caches can live inside the consumer's Git tree.
+    if (['.bun', '.cache', 'cache', 'node_modules'].includes(path.basename(dir))) return undefined
     if (fs.existsSync(path.join(dir, '.git'))) return dir
     const parent = path.dirname(dir)
     if (parent === dir) return undefined

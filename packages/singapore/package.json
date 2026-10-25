@@ -9,7 +9,7 @@
       "site"
     ],
     "catalog": {
-      "@fregat/hotkeys": "https://github.com/ShaulLavo/fregat/releases/download/hotkeys-0.0.2-68d8aaf6f631-260650623e7e/fregat-hotkeys-0.0.2-68d8aaf6f631-260650623e7e.tgz",
+      "@fregat/hotkeys": "https://github.com/ShaulLavo/hotkeys/releases/download/hotkeys-3de9d21e2299d2b94ed2d8b012c25bf9358dcfbd/fregat-hotkeys-3de9d21e2299d2b94ed2d8b012c25bf9358dcfbd.tgz",
       "@types/bun": "1.4.2",
       "vite": "8.3.1"
     }
