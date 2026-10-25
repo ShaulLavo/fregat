@@ -1,4 +1,4 @@
-import { cpSync, existsSync, readFileSync, statSync, symlinkSync } from 'node:fs'
+import { cpSync, existsSync, readFileSync, rmSync, statSync, symlinkSync } from 'node:fs'
 import path from 'node:path'
 
 import {
@@ -121,44 +121,49 @@ async function install(options: InstallOptions, control: InstallControl) {
   if (checkout.dirtyFiles.length > 0)
     log('release', `checkout is dirty (${checkout.dirtyFiles.length} files)`)
 
-  const built = options.from ? readBuildConfig(path.resolve(options.from)) : null
-  if (options.from && (!built || built.webBase !== webBase))
-    throw createScriptError('The built release must match this installation base.', {
-      fix: `Run bun run build-release --base=${webBase} --output=<directory>, then install-release --from=<directory>.`,
+  try {
+    const built = options.from ? readBuildConfig(path.resolve(options.from)) : null
+    if (options.from && (!built || built.webBase !== webBase))
+      throw createScriptError('The built release must match this installation base.', {
+        fix: `Run bun run build-release --base=${webBase} --output=<directory>, then install-release --from=<directory>.`,
+      })
+    if (options.from) {
+      cpSync(path.join(path.resolve(options.from), 'web'), release.web, { recursive: true })
+      await stampWebRelease(release.web, release.name)
+    } else await buildWeb(release, webBase)
+
+    if (release.previous) {
+      const carried = carryAssets(path.join(release.previous, 'web'), release.web)
+      log('web', `carried ${carried} hashed assets from ${path.basename(release.previous)}`)
+    }
+    const serverSource =
+      options.from && options.server
+        ? copyBuiltServer(release, path.resolve(options.from))
+        : await provideServer(release, options.server, staged)
+    writeBuildConfig(release, {
+      ...(built ?? checkout),
+      release: release.directory,
+      source: checkoutRoot,
+      webBase,
+      meshUrl,
+      previousRelease: release.previous,
+      server: serverSource,
+      reason: options.reason,
+      builtAt: new Date().toISOString(),
+      liveCheck: options.liveCheck,
     })
-  if (options.from) {
-    cpSync(path.join(path.resolve(options.from), 'web'), release.web, { recursive: true })
-    await stampWebRelease(release.web, release.name)
-  } else await buildWeb(release, webBase)
 
-  if (release.previous) {
-    const carried = carryAssets(path.join(release.previous, 'web'), release.web)
-    log('web', `carried ${carried} hashed assets from ${path.basename(release.previous)}`)
+    log('verify', 'candidate files')
+    await verifyCandidateFiles(release, webBase)
+    log('verify', 'booting the candidate server')
+    await bootCandidate(release, webBase)
+
+    await control.installUnit()
+    assertUnmoved(release, staged)
+  } catch (error) {
+    rmSync(release.directory, { recursive: true, force: true })
+    throw error
   }
-  const serverSource =
-    options.from && options.server
-      ? copyBuiltServer(release, path.resolve(options.from))
-      : await provideServer(release, options.server, staged)
-  writeBuildConfig(release, {
-    ...(built ?? checkout),
-    release: release.directory,
-    source: checkoutRoot,
-    webBase,
-    meshUrl,
-    previousRelease: release.previous,
-    server: serverSource,
-    reason: options.reason,
-    builtAt: new Date().toISOString(),
-    liveCheck: options.liveCheck,
-  })
-
-  log('verify', 'candidate files')
-  await verifyCandidateFiles(release, webBase)
-  log('verify', 'booting the candidate server')
-  await bootCandidate(release, webBase)
-
-  await control.installUnit()
-  assertUnmoved(release, staged)
   if (options.server || staged) {
     await stage(release, options.server ? null : staged, options, control)
     return
