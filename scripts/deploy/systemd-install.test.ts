@@ -104,7 +104,7 @@ test('pre-existing exact-PID staging survives a write failure', () => {
     expect(result.exitCode, result.stderr.toString()).toBe(0)
     const report = JSON.parse(result.stdout.toString().trim().split('\n').at(-1)!)
     expect(report.outcome).toBe('EACCES')
-    expect(report.stagingEntries).toEqual(
+    expect(report.stagingEntries.sort()).toEqual(
       [path.basename(report.preexisting), 'promote.ts.next-unrelated'].sort(),
     )
     expect(readFileSync(report.preexisting, 'utf8')).toBe('pre-existing staging\n')
