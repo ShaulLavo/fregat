@@ -33,25 +33,26 @@ async function geometry(page: Page) {
     ),
   }))
 }
+function observeActivation(node: HTMLElement) {
+  node.addEventListener(
+    'click',
+    () => {
+      const start = performance.now()
+      node.setAttribute('data-activation-scroll-y', String(scrollY))
+      new MutationObserver((_, observer) => {
+        if (!node.hasAttribute('data-example-live')) return
+        node.setAttribute('data-activation-ms', String(performance.now() - start))
+        observer.disconnect()
+      }).observe(node, { attributes: true, attributeFilter: ['data-example-live'] })
+    },
+    { capture: true, once: true },
+  )
+}
 async function activate(example: Locator, touch: boolean) {
   await expect.poll(() => example.getAttribute('data-example-ready'), { timeout: 20000 }).toBe('')
   const button = example.getByRole('button', { name: /Edit/ })
   await button.scrollIntoViewIfNeeded()
-  await example.evaluate((node) => {
-    node.addEventListener(
-      'click',
-      () => {
-        const start = performance.now()
-        node.setAttribute('data-activation-scroll-y', String(scrollY))
-        new MutationObserver((_, observer) => {
-          if (!node.hasAttribute('data-example-live')) return
-          node.setAttribute('data-activation-ms', String(performance.now() - start))
-          observer.disconnect()
-        }).observe(node, { attributes: true, attributeFilter: ['data-example-live'] })
-      },
-      { capture: true, once: true },
-    )
-  })
+  await example.evaluate(observeActivation)
   if (touch) await button.tap()
   else await button.click()
   await example.locator('.example-prepared textarea').waitFor({ state: 'attached' })
