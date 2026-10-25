@@ -21,8 +21,8 @@ export function readDevSources(webRoot: string): readonly DevPackage[] {
   if (editors.length === 0) throw createScriptError('No editor dependencies found in the web app.')
 
   return editors
-    .map((name) => readEditorPackage(webRoot, name))
-    .concat([readHotkeysPackage(webRoot), readGhosttyPackage(webRoot)])
+    .concat(['@fregat/hotkeys', 'ghostty-webgpu'])
+    .flatMap((name) => readSourcePackage(webRoot, name))
 }
 
 export function sourceAliases(packages: readonly DevPackage[]) {
@@ -47,7 +47,6 @@ export function sourcePaths(packages: readonly DevPackage[]): Record<string, str
 
 export function writeDevTypeConfig(webRoot: string, packages: readonly DevPackage[]): string {
   const ghostty = packages.find((pkg) => pkg.name === 'ghostty-webgpu')
-  if (!ghostty) throw createScriptError('Missing Ghostty source package.')
 
   const file = path.join(webRoot, 'node_modules/.tmp/tsconfig.dev.json')
   const config = {
@@ -63,7 +62,9 @@ export function writeDevTypeConfig(webRoot: string, packages: readonly DevPackag
         ...sourcePaths(packages),
       },
     },
-    files: [requiredFile(ghostty.root, 'node_modules/@webgpu/types/dist/index.d.ts')],
+    files: ghostty
+      ? [requiredFile(ghostty.root, 'node_modules/@webgpu/types/dist/index.d.ts')]
+      : [],
   }
   const text = JSON.stringify(config, null, 2) + '\n'
   fs.mkdirSync(path.dirname(file), { recursive: true })
@@ -81,8 +82,16 @@ function packageRoot(webRoot: string, name: string): string {
   return fs.realpathSync(linked)
 }
 
-function readEditorPackage(webRoot: string, name: string): DevPackage {
+function readSourcePackage(webRoot: string, name: string): readonly DevPackage[] {
   const root = packageRoot(webRoot, name)
+  const checkout = checkoutRoot(root)
+  if (!checkout) return []
+  if (name === '@fregat/hotkeys') return [readHotkeysPackage(root, checkout)]
+  if (name === 'ghostty-webgpu') return [readGhosttyPackage(root, checkout)]
+  return [readEditorPackage(root, name, checkout)]
+}
+
+function readEditorPackage(root: string, name: string, checkout: string): DevPackage {
   const manifest = readManifest(path.join(root, 'package.json'))
   const exports = objectField(manifest.exports, `${name} exports`)
   const entries = new Map<string, string>()
@@ -98,36 +107,35 @@ function readEditorPackage(webRoot: string, name: string): DevPackage {
   }
   if (!entries.has(name)) throw createScriptError(`Missing source entry for ${name}.`)
 
-  return { name, root, checkout: checkoutRoot(root), entries }
+  return { name, root, checkout, entries }
 }
 
-function readHotkeysPackage(webRoot: string): DevPackage {
+function readHotkeysPackage(root: string, checkout: string): DevPackage {
   const name = '@fregat/hotkeys'
-  const root = packageRoot(webRoot, name)
   const entries = new Map([[name, requiredFile(root, 'src/index.ts')]])
-  return { name, root, checkout: checkoutRoot(root), entries }
+  return { name, root, checkout, entries }
 }
 
-function readGhosttyPackage(webRoot: string): DevPackage {
+function readGhosttyPackage(root: string, checkout: string): DevPackage {
   const name = 'ghostty-webgpu'
-  const root = packageRoot(webRoot, name)
   const entries = new Map([
     [name, requiredFile(root, 'src/index.ts')],
     [`${name}/ghostty-vt.wasm`, requiredFile(root, 'ghostty-vt.wasm')],
     [`${name}/bridge.wasm`, requiredFile(root, 'bridge.wasm')],
   ])
-  return { name, root, checkout: checkoutRoot(root), entries }
+  return { name, root, checkout, entries }
 }
 
-function checkoutRoot(root: string): string {
+function checkoutRoot(root: string): string | undefined {
   let dir = root
-  while (!fs.existsSync(path.join(dir, '.git'))) {
+  while (true) {
+    // Installed archives can include source and live inside the consumer's Git tree.
+    if (path.basename(dir) === 'node_modules') return undefined
+    if (fs.existsSync(path.join(dir, '.git'))) return dir
     const parent = path.dirname(dir)
-    if (parent === dir) return root
+    if (parent === dir) return undefined
     dir = parent
   }
-
-  return dir
 }
 
 function editorSourcePath(root: string, target: string, id: string): string {

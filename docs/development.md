@@ -80,6 +80,8 @@ Ghostty's `ghostty-vt.wasm` and `bridge.wasm` are compiled artifacts. Run `bun r
 
 The family folders are mirrored to their standalone repositories. Make library changes here and follow `packages/singapore/AGENTS.md` and `packages/ghostty-webgpu/AGENTS.md` for their package rules.
 
+To develop against separately built repositories, follow [Use local package checkouts](local-package-checkouts.md).
+
 ## CI turnaround
 
 Normal PR and main CI select affected packages. A web change runs web tests; a server change runs server tests; a terminal change runs terminal verification. Dependencies are built as prerequisites, while their tests remain with their owning package. Global dependency, configuration and shared CI/script inputs select every package and root tooling checks. Plans, root documentation, agent Markdown and changesets select formatting.
