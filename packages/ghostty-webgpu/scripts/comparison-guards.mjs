@@ -37,11 +37,74 @@ export function cpuSample(before, after, milliseconds) {
   }
 }
 
-async function cpuSnapshot(session, now) {
-  const requested = now()
-  const { processInfo } = await session.send('SystemInfo.getProcessInfo')
-  const completed = now()
-  return { processInfo, requested, completed, sampledAt: (requested + completed) / 2 }
+async function cpuSnapshot(session, now, boundary = {}) {
+  boundary.requested = now()
+  try {
+    const { processInfo } = await session.send('SystemInfo.getProcessInfo')
+    boundary.processInfo = processInfo
+  } finally {
+    boundary.completed = now()
+    boundary.sampledAt = (boundary.requested + boundary.completed) / 2
+  }
+  return boundary
+}
+
+async function captureCpuOperation(operation, now) {
+  const evidence = { started: now() }
+  let failure
+  try {
+    evidence.sample = await operation()
+  } catch (error) {
+    failure = error
+    evidence.sample = error.partialLatency
+    evidence.error = String(error.stack ?? error)
+  }
+  evidence.completed = now()
+  return { evidence, failure }
+}
+
+function cpuTiming(before, after, tickSeconds, workCounters) {
+  const bracket = (value) =>
+    value.requested === undefined
+      ? null
+      : { requested: value.requested, completed: value.completed }
+  const timing = {
+    tickSeconds,
+    milliseconds: after.sampledAt - before.sampledAt,
+    interval: { before: bracket(before), after: bracket(after) },
+    acquisitionUncertaintyMilliseconds:
+      (before.completed - before.requested + after.completed - after.requested) / 2,
+  }
+  if (workCounters) timing.workCounters = workCounters
+  return timing
+}
+
+function retainCpuFailure(error, before, after, operation, tickSeconds, workCounters) {
+  error.cpuFailure ??= {
+    before: before.processInfo ?? null,
+    after: after.processInfo ?? null,
+    ...cpuTiming(before, after, tickSeconds, workCounters),
+    operation: operation?.evidence,
+  }
+  return error
+}
+
+function finishCpuMeasurement(before, after, operation, tickSeconds, workCounters) {
+  const timing = cpuTiming(before, after, tickSeconds, workCounters)
+  const interval = timing.milliseconds
+  let cpu
+  try {
+    assert(Number.isFinite(interval) && interval > 0, 'Positive CPU sampling interval required')
+    cpu = { ...cpuSample(before.processInfo, after.processInfo, interval), ...timing }
+    if (operation.failure) throw operation.failure
+  } catch (error) {
+    throw retainCpuFailure(error, before, after, operation, tickSeconds, workCounters)
+  }
+  return {
+    sample: operation.evidence.sample,
+    milliseconds: operation.evidence.completed - operation.evidence.started,
+    cpu,
+  }
 }
 
 async function measureCpuOnly(
@@ -49,27 +112,16 @@ async function measureCpuOnly(
   operation,
   { now = () => performance.now(), tickSeconds = null } = {},
 ) {
-  const before = await cpuSnapshot(session, now)
-  const started = now()
-  const sample = await operation()
-  const milliseconds = now() - started
-  const after = await cpuSnapshot(session, now)
-  const interval = after.sampledAt - before.sampledAt
-  assert(Number.isFinite(interval) && interval > 0, 'Positive CPU sampling interval required')
-  return {
-    sample,
-    milliseconds,
-    cpu: {
-      ...cpuSample(before.processInfo, after.processInfo, interval),
-      tickSeconds,
-      milliseconds: interval,
-      interval: {
-        before: { requested: before.requested, completed: before.completed },
-        after: { requested: after.requested, completed: after.completed },
-      },
-      acquisitionUncertaintyMilliseconds:
-        (before.completed - before.requested + after.completed - after.requested) / 2,
-    },
+  const before = {}
+  const after = {}
+  let captured
+  try {
+    await cpuSnapshot(session, now, before)
+    captured = await captureCpuOperation(operation, now)
+    await cpuSnapshot(session, now, after)
+    return finishCpuMeasurement(before, after, captured, tickSeconds)
+  } catch (error) {
+    throw retainCpuFailure(error, before, after, captured, tickSeconds)
   }
 }
 
@@ -132,16 +184,17 @@ export async function measureCpu(
       return { raw: null, requested, completed: now(), error: error.message }
     }
   }
+  const before = {}
+  const after = {}
+  let captured
+  let failure
   try {
     const initial = reader.initialProcessInfo ?? (await cpuSnapshot(session, now)).processInfo
     const nativeBefore = await nativeSnapshot(initial)
-    const before = await cpuSnapshot(session, now)
-    const started = now()
-    const sample = await operation()
-    const milliseconds = now() - started
-    const after = await cpuSnapshot(session, now)
+    await cpuSnapshot(session, now, before)
+    captured = await captureCpuOperation(operation, now)
+    await cpuSnapshot(session, now, after)
     const nativeAfter = await nativeSnapshot(after.processInfo)
-    const interval = after.sampledAt - before.sampledAt
     const workCounters = workEvidence(
       reader,
       counterFailure,
@@ -151,37 +204,21 @@ export async function measureCpu(
       nativeAfter,
       { requested: setupRequested, completed: setupCompleted },
     )
-    let validated
-    try {
-      assert(Number.isFinite(interval) && interval > 0, 'Positive CPU sampling interval required')
-      validated = cpuSample(before.processInfo, after.processInfo, interval)
-    } catch (error) {
-      error.cpuFailure = {
-        before: before.processInfo,
-        after: after.processInfo,
-        milliseconds: interval,
-        workCounters,
-      }
-      throw error
-    }
-    return {
-      sample,
-      milliseconds,
-      cpu: {
-        ...validated,
-        tickSeconds,
-        milliseconds: interval,
-        interval: {
-          before: { requested: before.requested, completed: before.completed },
-          after: { requested: after.requested, completed: after.completed },
-        },
-        acquisitionUncertaintyMilliseconds:
-          (before.completed - before.requested + after.completed - after.requested) / 2,
-        workCounters,
-      },
-    }
+    return finishCpuMeasurement(before, after, captured, tickSeconds, workCounters)
+  } catch (error) {
+    failure = retainCpuFailure(error, before, after, captured, tickSeconds)
+    throw failure
   } finally {
+    await closeCounterReader(reader, failure)
+  }
+}
+
+async function closeCounterReader(reader, failure) {
+  try {
     await reader.close?.()
+  } catch (error) {
+    if (!failure) throw error
+    failure.cpuFailure.counterCloseError = String(error.stack ?? error)
   }
 }
 

@@ -23,7 +23,8 @@ function syntheticCdp({ churn = false, stall, recorderFailure } = {}) {
       time += 10
       return { processInfo }
     }
-    if (name === 'Tracing.end') session.emit('Tracing.tracingComplete', { stream: 'trace' })
+    if (name === 'Tracing.end' && stall !== 'tracingComplete')
+      session.emit('Tracing.tracingComplete', { stream: 'trace' })
     if (name === 'IO.read') return { data: trace, eof: true }
     return {}
   }
@@ -42,6 +43,12 @@ function syntheticCdp({ churn = false, stall, recorderFailure } = {}) {
     return sample
   }
   return { session, page, calls, trace, sample, operation, now: () => time }
+}
+
+async function temporaryOutput(t, prefix) {
+  const output = await mkdtemp(join(tmpdir(), prefix))
+  t.after(() => rm(output, { recursive: true }))
+  return output
 }
 
 const counterReader = () => ({
@@ -104,82 +111,87 @@ for (const churn of [false, true]) {
   })
 }
 
-test('a failed traced CPU window saves the finalized trace and completed operation before rejection', async () => {
-  const output = await mkdtemp(join(tmpdir(), 'comparison-failure-'))
+test('a failed traced CPU window saves the finalized trace and completed operation before rejection', async (t) => {
+  const output = await temporaryOutput(t, 'comparison-failure-')
   const cdp = syntheticCdp({ churn: true })
-  try {
-    await assert.rejects(
-      tracePhase({ ...cdp, browserSession: cdp.session, output, label: 'churn', traced: true }),
-      (error) => {
-        assert.match(error.message, /CPU process set changed/)
-        assert.equal(error.phaseFailure.trace, 'churn.trace.json.gz')
-        assert.deepEqual(error.phaseFailure.sample, cdp.sample)
-        assert.deepEqual(error.phaseFailure.cpu.operation.sample, cdp.sample)
-        return true
-      },
-    )
-    assert.equal(gunzipSync(await readFile(join(output, 'churn.trace.json.gz'))).toString(), cdp.trace)
-    assert.deepEqual(cdp.calls.slice(-4), ['record-end', 'Tracing.end', 'IO.read', 'IO.close'])
-    assert.equal(cdp.session.listenerCount('Tracing.tracingComplete'), 0)
-  } finally {
-    await rm(output, { recursive: true })
-  }
+  await assert.rejects(
+    tracePhase({ ...cdp, browserSession: cdp.session, output, label: 'churn', traced: true }),
+    (error) => {
+      assert.match(error.message, /CPU process set changed/)
+      assert.equal(error.phaseFailure.trace, 'churn.trace.json.gz')
+      assert.deepEqual(error.phaseFailure.sample, cdp.sample)
+      assert.deepEqual(error.phaseFailure.cpu.operation.sample, cdp.sample)
+      return true
+    },
+  )
+  assert.equal(
+    gunzipSync(await readFile(join(output, 'churn.trace.json.gz'))).toString(),
+    cdp.trace,
+  )
+  assert.deepEqual(cdp.calls.slice(-4), ['record-end', 'Tracing.end', 'IO.read', 'IO.close'])
+  assert.equal(cdp.session.listenerCount('Tracing.tracingComplete'), 0)
 })
 
-test('a simultaneous phase operation error survives CPU rejection and trace finalization', async () => {
-  const output = await mkdtemp(join(tmpdir(), 'comparison-phase-error-'))
+test('a simultaneous phase operation error survives CPU rejection and trace finalization', async (t) => {
+  const output = await temporaryOutput(t, 'comparison-phase-error-')
   const cdp = syntheticCdp({ churn: true })
-  try {
+  await assert.rejects(
+    tracePhase({
+      ...cdp,
+      browserSession: cdp.session,
+      output,
+      label: 'operation',
+      traced: true,
+      operation: async () => {
+        await cdp.operation()
+        throw Object.assign(new TypeError('Endpoint failed'), { partialLatency: cdp.sample })
+      },
+    }),
+    (error) => {
+      assert.match(error.message, /CPU process set changed/)
+      assert.match(error.phaseFailure.cpu.operation.error, /Endpoint failed/)
+      assert.deepEqual(error.phaseFailure.sample, cdp.sample)
+      return true
+    },
+  )
+  assert.equal(
+    gunzipSync(await readFile(join(output, 'operation.trace.json.gz'))).toString(),
+    cdp.trace,
+  )
+})
+
+for (const recorderFailure of ['record-begin', 'record-end']) {
+  test(`${recorderFailure} failure still saves the finalized trace`, async (t) => {
+    const output = await temporaryOutput(t, 'comparison-recorder-error-')
+    const cdp = syntheticCdp({ recorderFailure })
     await assert.rejects(
       tracePhase({
         ...cdp,
         browserSession: cdp.session,
         output,
-        label: 'operation',
+        label: 'recorder',
         traced: true,
-        operation: async () => {
-          await cdp.operation()
-          throw Object.assign(new TypeError('Endpoint failed'), { partialLatency: cdp.sample })
-        },
       }),
       (error) => {
-        assert.match(error.message, /CPU process set changed/)
-        assert.match(error.phaseFailure.cpu.operation.error, /Endpoint failed/)
-        assert.deepEqual(error.phaseFailure.sample, cdp.sample)
+        assert.match(error.message, /Recorder failed/)
+        assert.equal(error.phaseFailure.trace, 'recorder.trace.json.gz')
         return true
       },
     )
-    assert.equal(gunzipSync(await readFile(join(output, 'operation.trace.json.gz'))).toString(), cdp.trace)
-  } finally {
-    await rm(output, { recursive: true })
-  }
-})
-
-for (const recorderFailure of ['record-begin', 'record-end']) {
-  test(`${recorderFailure} failure still saves the finalized trace`, async () => {
-    const output = await mkdtemp(join(tmpdir(), 'comparison-recorder-error-'))
-    const cdp = syntheticCdp({ recorderFailure })
-    try {
-      await assert.rejects(
-        tracePhase({ ...cdp, browserSession: cdp.session, output, label: 'recorder', traced: true }),
-        (error) => {
-          assert.match(error.message, /Recorder failed/)
-          assert.equal(error.phaseFailure.trace, 'recorder.trace.json.gz')
-          return true
-        },
-      )
-      assert.equal(gunzipSync(await readFile(join(output, 'recorder.trace.json.gz'))).toString(), cdp.trace)
-    } finally {
-      await rm(output, { recursive: true })
-    }
+    assert.equal(
+      gunzipSync(await readFile(join(output, 'recorder.trace.json.gz'))).toString(),
+      cdp.trace,
+    )
   })
 }
 
-for (const stall of ['Tracing.end', 'IO.read', 'IO.close']) {
-  test(`stalled ${stall} finalization is bounded and preserves the original CPU rejection`, { timeout: 1000 }, async () => {
-    const output = await mkdtemp(join(tmpdir(), 'comparison-finalizer-error-'))
-    const cdp = syntheticCdp({ churn: true, stall })
-    try {
+for (const stall of ['Tracing.end', 'tracingComplete', 'IO.read', 'IO.close']) {
+  test(
+    `stalled ${stall} finalization is bounded and preserves the original CPU rejection`,
+    { timeout: 1000 },
+    async (t) => {
+      const output = await temporaryOutput(t, 'comparison-finalizer-error-')
+      const cdp = syntheticCdp({ churn: true, stall })
       await assert.rejects(
         tracePhase({
           ...cdp,
@@ -197,35 +209,41 @@ for (const stall of ['Tracing.end', 'IO.read', 'IO.close']) {
         },
       )
       assert.equal(cdp.session.listenerCount('Tracing.tracingComplete'), 0)
-      assert.deepEqual(await readdir(output), [])
-    } finally {
-      await rm(output, { recursive: true })
-    }
-  })
+      const files = await readdir(output)
+      assert.deepEqual(files, stall === 'IO.close' ? ['stalled.trace.json.gz'] : [])
+      if (stall === 'IO.close')
+        assert.equal(gunzipSync(await readFile(join(output, files[0]))).toString(), cdp.trace)
+    },
+  )
 }
 
-test('a late trace read cannot save a file after finalization expires', async () => {
-  const output = await mkdtemp(join(tmpdir(), 'comparison-late-trace-'))
+test('a late trace read cannot save a file after finalization expires', async (t) => {
+  const output = await temporaryOutput(t, 'comparison-late-trace-')
   const cdp = syntheticCdp({ churn: true })
   const send = cdp.session.send
   let finishRead
   cdp.session.send = async (name) => {
-    if (name === 'IO.read') return new Promise((resolve) => { finishRead = resolve })
+    if (name === 'IO.read')
+      return new Promise((resolve) => {
+        finishRead = resolve
+      })
     return send(name)
   }
-  try {
-    await assert.rejects(
-      tracePhase({ ...cdp, browserSession: cdp.session, output, label: 'late', traced: true,
-        finalizationMilliseconds: 10 }),
-      /CPU process set changed/,
-    )
-    finishRead({ data: cdp.trace, eof: true })
-    await new Promise((resolve) => setImmediate(resolve))
-    assert.equal(cdp.calls.filter((name) => name === 'IO.close').length, 1)
-    assert.deepEqual(await readdir(output), [])
-  } finally {
-    await rm(output, { recursive: true })
-  }
+  await assert.rejects(
+    tracePhase({
+      ...cdp,
+      browserSession: cdp.session,
+      output,
+      label: 'late',
+      traced: true,
+      finalizationMilliseconds: 10,
+    }),
+    /CPU process set changed/,
+  )
+  finishRead({ data: cdp.trace, eof: true })
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(cdp.calls.filter((name) => name === 'IO.close').length, 1)
+  assert.deepEqual(await readdir(output), [])
 })
 
 for (const counters of [false, true]) {
