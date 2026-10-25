@@ -48,7 +48,7 @@
     "vite": "8.3.1"
   },
   "overrides": {
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#aab7db1518c19f61c1b13ec3f832b881cf5f1385"
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#d4c988a02313fef32a307f8f254ab7a1dba18515"
   },
   "engines": {
     "node": ">=26.0.0"
