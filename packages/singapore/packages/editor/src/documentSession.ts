@@ -1372,11 +1372,12 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       return appendTiming(this.createChange('none', []), 'session.clearHistory', start)
     }
     this.applyLocalEdits.history?.seal()
-    this.history = this.createHistory(this.history.current, this.history.selections)
+    this.history = {
+      ...this.createHistory(this.history.current, this.history.selections),
+      graphRevision: this.history.graphRevision + 1,
+    }
     this.typingRun = null
     this.storageMaintenance.request(0, true)
-    // No text moved, so no revision either; a checkout change with no edits tells every
-    // view that undo and redo just went away.
     const change = this.publish({
       createChange: () =>
         appendTiming(this.createChange('checkout', []), 'session.clearHistory', start),
@@ -1398,9 +1399,8 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     })
     if (!restored) return false
 
-    this.history = restored
+    this.history = { ...restored, graphRevision: this.history.graphRevision + 1 }
     this.typingRun = null
-    // No text moved; an empty checkout tells every view that undo and redo arrived.
     this.publish({ createChange: () => this.createChange('checkout', []), origin: 'external' })
     return true
   }
