@@ -55,7 +55,10 @@ export class Host<Snapshot = unknown> {
     if (sender !== envelope.id.actor) throw new CollabFailure('sender-mismatch')
     const key = editKey(envelope.id)
     const outcome = this.outcomes.get(key)
-    if (outcome) return outcome
+    if (outcome) {
+      this.drain()
+      return outcome
+    }
     if (rejection !== undefined) {
       this.deferred.delete(key)
       this.settle(envelope, rejection)
@@ -72,15 +75,24 @@ export class Host<Snapshot = unknown> {
     if (this.draining) return
     this.draining = true
     const errors: unknown[] = []
+    let settlementFailure: { error: unknown } | undefined
     try {
       do {
         this.settleReady()
-        while (this.broadcasts.length) this.deliver(this.broadcasts.shift()!, errors)
-      } while ([...this.deferred.values()].some((envelope) => this.ready(envelope)))
+        this.broadcast(errors)
+      } while (Array.from(this.deferred.values()).some((envelope) => this.ready(envelope)))
+    } catch (error) {
+      settlementFailure = { error }
+      this.broadcast(errors)
     } finally {
       this.draining = false
     }
     rethrowObserverErrors('host.broadcast', errors)
+    if (settlementFailure) throw settlementFailure.error
+  }
+
+  private broadcast(errors: unknown[]): void {
+    while (this.broadcasts.length) this.deliver(this.broadcasts.shift()!, errors)
   }
 
   private deliver(message: HostMessage, errors: unknown[]): void {
@@ -102,8 +114,8 @@ export class Host<Snapshot = unknown> {
       for (const [key, envelope] of this.deferred) {
         const reason = this.rejection(envelope)
         if (reason === null && envelope.deps.some((id) => !this.outcomes.has(editKey(id)))) continue
-        this.deferred.delete(key)
         this.settle(envelope, reason)
+        this.deferred.delete(key)
         progress = true
       }
     }
