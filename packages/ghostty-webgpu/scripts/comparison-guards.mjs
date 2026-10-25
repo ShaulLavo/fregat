@@ -49,18 +49,47 @@ async function cpuSnapshot(session, now, boundary = {}) {
   return boundary
 }
 
+export function failureProperty(error, name) {
+  try {
+    return error?.[name]
+  } catch {
+    return undefined
+  }
+}
+
+export function failureText(error) {
+  try {
+    return String(failureProperty(error, 'stack') ?? error)
+  } catch {
+    return 'Unprintable rejection'
+  }
+}
+
+export function attachFailure(error, name, evidence) {
+  try {
+    Object.defineProperty(error, name, {
+      value: evidence,
+      configurable: true,
+      enumerable: true,
+      writable: true,
+    })
+  } catch {
+    // Rejection identity takes precedence when a value cannot carry diagnostics.
+  }
+}
+
 async function captureCpuOperation(operation, now) {
   const evidence = { started: now() }
-  let failure
+  let outcome = { status: 'fulfilled' }
   try {
     evidence.sample = await operation()
   } catch (error) {
-    failure = error
-    evidence.sample = error.partialLatency
-    evidence.error = String(error.stack ?? error)
+    outcome = { status: 'rejected', error }
+    evidence.sample = failureProperty(error, 'partialLatency')
+    evidence.error = failureText(error)
   }
   evidence.completed = now()
-  return { evidence, failure }
+  return { evidence, outcome }
 }
 
 function cpuTiming(before, after, tickSeconds, workCounters) {
@@ -79,27 +108,28 @@ function cpuTiming(before, after, tickSeconds, workCounters) {
   return timing
 }
 
-function retainCpuFailure(error, before, after, operation, tickSeconds, workCounters) {
-  error.cpuFailure ??= {
+function retainCpuFailure(error, before, after, operation, tickSeconds, workCounters, onFailure) {
+  const evidence = {
     before: before.processInfo ?? null,
     after: after.processInfo ?? null,
     ...cpuTiming(before, after, tickSeconds, workCounters),
     operation: operation?.evidence,
   }
-  return error
+  attachFailure(error, 'cpuFailure', evidence)
+  try {
+    onFailure?.(evidence)
+  } catch {
+    // Diagnostic consumers must preserve the original rejection too.
+  }
+  return evidence
 }
 
 function finishCpuMeasurement(before, after, operation, tickSeconds, workCounters) {
   const timing = cpuTiming(before, after, tickSeconds, workCounters)
   const interval = timing.milliseconds
-  let cpu
-  try {
-    assert(Number.isFinite(interval) && interval > 0, 'Positive CPU sampling interval required')
-    cpu = { ...cpuSample(before.processInfo, after.processInfo, interval), ...timing }
-    if (operation.failure) throw operation.failure
-  } catch (error) {
-    throw retainCpuFailure(error, before, after, operation, tickSeconds, workCounters)
-  }
+  assert(Number.isFinite(interval) && interval > 0, 'Positive CPU sampling interval required')
+  const cpu = { ...cpuSample(before.processInfo, after.processInfo, interval), ...timing }
+  if (operation.outcome.status === 'rejected') throw operation.outcome.error
   return {
     sample: operation.evidence.sample,
     milliseconds: operation.evidence.completed - operation.evidence.started,
@@ -110,7 +140,7 @@ function finishCpuMeasurement(before, after, operation, tickSeconds, workCounter
 async function measureCpuOnly(
   session,
   operation,
-  { now = () => performance.now(), tickSeconds = null } = {},
+  { now = () => performance.now(), tickSeconds = null, onFailure } = {},
 ) {
   const before = {}
   const after = {}
@@ -121,7 +151,8 @@ async function measureCpuOnly(
     await cpuSnapshot(session, now, after)
     return finishCpuMeasurement(before, after, captured, tickSeconds)
   } catch (error) {
-    throw retainCpuFailure(error, before, after, captured, tickSeconds)
+    retainCpuFailure(error, before, after, captured, tickSeconds, undefined, onFailure)
+    throw error
   }
 }
 
@@ -131,12 +162,16 @@ function workEvidence(reader, counterFailure, before, after, nativeBefore, nativ
   workCounters.metadata = reader.metadata
   workCounters.snapshots = { before: nativeBefore?.raw ?? null, after: nativeAfter?.raw ?? null }
   const bracket = (value) =>
-    value ? { requested: value.requested, completed: value.completed } : null
+    value?.requested === undefined
+      ? null
+      : { requested: value.requested, completed: value.completed }
   workCounters.boundary = {
     before: { cdp: bracket(before), native: bracket(nativeBefore) },
     after: { cdp: bracket(after), native: bracket(nativeAfter) },
   }
   if (counterFailure) return workCounters
+  if (!nativeBefore?.raw || !nativeAfter?.raw)
+    return { ...workCounters, reason: 'Native counter sampling interrupted' }
   try {
     const result = {
       ...workCounters,
@@ -163,15 +198,17 @@ export async function measureCpu(
     processCounters = false,
     counterReader,
     counterTimeoutMilliseconds,
+    onFailure,
   } = {},
 ) {
   if (!processCounters && !counterReader)
-    return measureCpuOnly(session, operation, { now, tickSeconds })
+    return measureCpuOnly(session, operation, { now, tickSeconds, onFailure })
   const setupRequested = now()
   const reader =
     counterReader ??
     (await createCounterReader(session, { timeoutMilliseconds: counterTimeoutMilliseconds }))
   const setupCompleted = now()
+  const setup = { requested: setupRequested, completed: setupCompleted }
   let counterFailure = reader.skipped ? reader.reason : null
   async function nativeSnapshot(processes) {
     if (counterFailure) return null
@@ -180,21 +217,17 @@ export async function measureCpu(
       const raw = await reader.snapshot(processes)
       return { raw, requested, completed: now() }
     } catch (error) {
-      counterFailure = error.message
-      return { raw: null, requested, completed: now(), error: error.message }
+      counterFailure = failureText(error)
+      return { raw: null, requested, completed: now(), error: counterFailure }
     }
   }
   const before = {}
   const after = {}
   let captured
   let failure
-  try {
-    const initial = reader.initialProcessInfo ?? (await cpuSnapshot(session, now)).processInfo
-    const nativeBefore = await nativeSnapshot(initial)
-    await cpuSnapshot(session, now, before)
-    captured = await captureCpuOperation(operation, now)
-    await cpuSnapshot(session, now, after)
-    const nativeAfter = await nativeSnapshot(after.processInfo)
+  let nativeBefore
+  let nativeAfter
+  function retain(error) {
     const workCounters = workEvidence(
       reader,
       counterFailure,
@@ -202,23 +235,44 @@ export async function measureCpu(
       after,
       nativeBefore,
       nativeAfter,
-      { requested: setupRequested, completed: setupCompleted },
+      setup,
+    )
+    return retainCpuFailure(error, before, after, captured, tickSeconds, workCounters, onFailure)
+  }
+  try {
+    const initial = reader.initialProcessInfo ?? (await cpuSnapshot(session, now)).processInfo
+    nativeBefore = await nativeSnapshot(initial)
+    await cpuSnapshot(session, now, before)
+    captured = await captureCpuOperation(operation, now)
+    await cpuSnapshot(session, now, after)
+    nativeAfter = await nativeSnapshot(after.processInfo)
+    const workCounters = workEvidence(
+      reader,
+      counterFailure,
+      before,
+      after,
+      nativeBefore,
+      nativeAfter,
+      setup,
     )
     return finishCpuMeasurement(before, after, captured, tickSeconds, workCounters)
   } catch (error) {
-    failure = retainCpuFailure(error, before, after, captured, tickSeconds)
-    throw failure
+    failure = retain(error)
+    throw error
   } finally {
-    await closeCounterReader(reader, failure)
+    await closeCounterReader(reader, failure, retain)
   }
 }
 
-async function closeCounterReader(reader, failure) {
+async function closeCounterReader(reader, failure, retain) {
   try {
     await reader.close?.()
   } catch (error) {
-    if (!failure) throw error
-    failure.cpuFailure.counterCloseError = String(error.stack ?? error)
+    if (!failure) {
+      retain(error)
+      throw error
+    }
+    attachFailure(failure, 'counterCloseError', failureText(error))
   }
 }
 

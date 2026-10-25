@@ -14,8 +14,10 @@ function syntheticCdp({ churn = false, stall, recorderFailure } = {}) {
   const calls = []
   const trace = '{"traceEvents":[{"name":"retained"}]}'
   const session = new EventEmitter()
-  session.send = async (name) => {
+  const requests = []
+  session.send = async (name, parameters) => {
     calls.push(name)
+    requests.push({ name, parameters })
     if (name === stall) return new Promise(() => {})
     if (name === 'SystemInfo.getProcessInfo') {
       const id = churn && operated ? 2 : 1
@@ -42,7 +44,7 @@ function syntheticCdp({ churn = false, stall, recorderFailure } = {}) {
     time += 100
     return sample
   }
-  return { session, page, calls, trace, sample, operation, now: () => time }
+  return { session, page, calls, requests, trace, sample, operation, now: () => time }
 }
 
 async function temporaryOutput(t, prefix) {
@@ -192,6 +194,7 @@ for (const stall of ['Tracing.end', 'tracingComplete', 'IO.read', 'IO.close']) {
     async (t) => {
       const output = await temporaryOutput(t, 'comparison-finalizer-error-')
       const cdp = syntheticCdp({ churn: true, stall })
+      t.after(() => cdp.session.emit('close'))
       await assert.rejects(
         tracePhase({
           ...cdp,
@@ -208,7 +211,11 @@ for (const stall of ['Tracing.end', 'tracingComplete', 'IO.read', 'IO.close']) {
           return true
         },
       )
+      if (stall === 'Tracing.end' || stall === 'tracingComplete')
+        cdp.session.emit('Tracing.tracingComplete', { stream: 'late-stalled-stream' })
+      await new Promise((resolve) => setImmediate(resolve))
       assert.equal(cdp.session.listenerCount('Tracing.tracingComplete'), 0)
+      assert.equal(cdp.session.listenerCount('close'), 0)
       const files = await readdir(output)
       assert.deepEqual(files, stall === 'IO.close' ? ['stalled.trace.json.gz'] : [])
       if (stall === 'IO.close')
@@ -296,12 +303,16 @@ for (const [name, makeFailure] of rejectionCases) {
     test(`CPU preserves ${name} rejection identity ${counters ? 'with counters' : 'by default'}`, async () => {
       const cdp = syntheticCdp()
       const failure = makeFailure()
+      let evidence
       const reader = counterReader()
       reader.close = async () => {
         throw new TypeError('Close failed')
       }
       const observed = await measureCpu(cdp.session, () => Promise.reject(failure), {
         now: cdp.now,
+        onFailure: (cpu) => {
+          evidence = cpu
+        },
         ...(counters ? { counterReader: reader } : {}),
       }).then(
         () => ({ rejected: false }),
@@ -309,6 +320,8 @@ for (const [name, makeFailure] of rejectionCases) {
       )
       assert.equal(observed.rejected, true)
       assert.equal(observed.error, failure)
+      assert.equal(evidence.after.length, 1)
+      assert.equal(typeof evidence.operation.error, 'string')
       assert.equal(cdp.calls.filter((call) => call === 'SystemInfo.getProcessInfo').length, 2)
     })
   }
@@ -477,4 +490,96 @@ test('session close removes cleanup-only completion ownership', { timeout: 1000 
   assert.equal(cdp.session.listenerCount('Tracing.tracingComplete'), 0)
   assert.equal(cdp.session.listenerCount('close'), 0)
   assert.equal(countCalls(cdp, 'IO.read'), 0)
+})
+
+for (const [name, makeFailure] of rejectionCases) {
+  test(`trace cleanup preserves ${name} rejection identity`, async (t) => {
+    const output = await temporaryOutput(t, 'comparison-cleanup-identity-')
+    const cdp = syntheticCdp()
+    const failure = makeFailure()
+    const send = cdp.session.send
+    cdp.session.send = async (name) => {
+      if (name === 'Tracing.end') {
+        cdp.session.emit('Tracing.tracingComplete', { stream: 'failed-end-stream' })
+        throw failure
+      }
+      return send(name)
+    }
+    const observed = await tracePhase({
+      ...cdp,
+      browserSession: cdp.session,
+      output,
+      label: 'identity',
+      traced: true,
+    }).then(
+      () => ({ rejected: false }),
+      (error) => ({ rejected: true, error }),
+    )
+    assert.equal(observed.rejected, true)
+    assert.equal(observed.error, failure)
+    assert.equal(countCalls(cdp, 'IO.close'), 1)
+    assert.equal(cdp.session.listenerCount('Tracing.tracingComplete'), 0)
+  })
+}
+
+test('counter close failure retains both acquired native samples', async () => {
+  const cdp = syntheticCdp()
+  const raw = { requestedNs: '1', completedNs: '2', processes: {} }
+  const failure = new TypeError('Counter close failed')
+  const reader = {
+    metadata: { source: 'perf_event_open' },
+    initialProcessInfo: [{ id: 1, type: 'renderer', cpuTime: 0 }],
+    snapshot: async () => raw,
+    close: async () => {
+      throw failure
+    },
+  }
+  await assert.rejects(
+    measureCpu(cdp.session, cdp.operation, { now: cdp.now, counterReader: reader }),
+    (error) => {
+      assert.equal(error, failure)
+      assert.equal(error.cpuFailure.workCounters.snapshots.before, raw)
+      assert.equal(error.cpuFailure.workCounters.snapshots.after, raw)
+      assert.equal(error.cpuFailure.operation.sample, cdp.sample)
+      return true
+    },
+  )
+})
+
+test('pending late completion cannot claim a later window stream', { timeout: 1000 }, async (t) => {
+  const output = await temporaryOutput(t, 'comparison-trace-ownership-')
+  const cdp = syntheticCdp({ stall: 'tracingComplete' })
+  t.after(() => cdp.session.emit('close'))
+  const options = {
+    ...cdp,
+    browserSession: cdp.session,
+    output,
+    label: 'first',
+    traced: true,
+    finalizationMilliseconds: 10,
+  }
+  await assert.rejects(tracePhase(options), /deadline exceeded/)
+  await assert.rejects(
+    tracePhase({ ...options, label: 'second' }),
+    /Previous browser trace is still finalizing/,
+  )
+  assert.equal(countCalls(cdp, 'Tracing.start'), 1)
+  assert.equal(cdp.session.listenerCount('Tracing.tracingComplete'), 1)
+  cdp.session.emit('Tracing.tracingComplete', { stream: 'first-stream' })
+  const send = cdp.session.send
+  cdp.session.send = async (name, parameters) => {
+    if (name === 'Tracing.end')
+      cdp.session.emit('Tracing.tracingComplete', { stream: 'second-stream' })
+    return send(name, parameters)
+  }
+  const result = await tracePhase({ ...options, label: 'second' })
+  assert.equal(result.trace, 'second.trace.json.gz')
+  assert.deepEqual(
+    cdp.requests
+      .filter(({ name }) => name === 'IO.close')
+      .map(({ parameters }) => parameters.handle),
+    ['first-stream', 'second-stream'],
+  )
+  assert.equal(cdp.session.listenerCount('Tracing.tracingComplete'), 0)
+  assert.equal(cdp.session.listenerCount('close'), 0)
 })
