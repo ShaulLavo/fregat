@@ -19,8 +19,23 @@ const isStandalone = (name) =>
   name.startsWith('ghostty-webgpu')
 const readManifest = (root) => JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 
-function resolvePackage(from, name) {
-  const entry = fs.realpathSync(createRequire(path.join(from, 'package.json')).resolve(name))
+function resolveEntry(from, name, optional) {
+  const require = createRequire(path.join(from, 'package.json'))
+  try {
+    return require.resolve(name)
+  } catch (error) {
+    const installed = require.resolve
+      .paths(name)
+      .some((directory) => fs.existsSync(path.join(directory, name)))
+    if (optional && error.code === 'MODULE_NOT_FOUND' && !installed) return
+    throw error
+  }
+}
+
+function resolvePackage(from, name, optional = false) {
+  const resolved = resolveEntry(from, name, optional)
+  if (!resolved) return
+  const entry = fs.realpathSync(resolved)
   let root = path.dirname(entry)
   while (!fs.existsSync(path.join(root, 'package.json'))) {
     const parent = path.dirname(root)
@@ -45,8 +60,10 @@ function inspectPackage(root, state) {
   if (manifest.name === '@fregat/hotkeys') state.hotkeys.add(root)
   const dependencies = { ...manifest.dependencies, ...manifest.peerDependencies }
   for (const name of Object.keys(dependencies).filter(isStandalone)) {
-    if (manifest.peerDependenciesMeta?.[name]?.optional) continue
-    inspectPackage(resolvePackage(root, name), state)
+    const optional =
+      manifest.peerDependenciesMeta?.[name]?.optional && !manifest.dependencies?.[name]
+    const dependency = resolvePackage(root, name, optional)
+    if (dependency) inspectPackage(dependency, state)
   }
 }
 

@@ -10,7 +10,7 @@ async function addPackage(put, root, directory, name, extra = {}) {
   await writeFile(join(root, directory, 'dist/index.js'), 'export const value = 1\n')
 }
 
-async function graphFixture(workspace, mode = 'release') {
+async function graphFixture(workspace, mode = 'release', optional = false) {
   const { root, put } = workspace
   for (const consumer of [
     'apps/web',
@@ -32,8 +32,10 @@ async function graphFixture(workspace, mode = 'release') {
     '@singapore-editor/highlighting',
     {
       peerDependencies: { '@singapore-editor/core': '1.0.0' },
+      peerDependenciesMeta: { '@singapore-editor/core': { optional } },
     },
   )
+  if (mode === 'missing') return
   const core =
     mode === 'fallback'
       ? 'packages/singapore/packages/editor'
@@ -78,5 +80,38 @@ test('producer-free qualification rejects retained producer folders', async () =
     expect(() => verifyConsumerGraph(workspace.root, { producerFree: true })).toThrow(
       /Producer still present/,
     )
+  })
+})
+
+test.each(['fallback', 'split'])('checks installed optional peers: %s', async (mode) => {
+  await withWorkspace(async (workspace) => {
+    await graphFixture(workspace, mode, true)
+    const failure = mode === 'fallback' ? /Producer fallback/ : /one installed hotkeys runtime/
+    expect(() => verifyConsumerGraph(workspace.root)).toThrow(failure)
+  })
+})
+
+test('allows absent optional standalone peers', async () => {
+  await withWorkspace(async (workspace) => {
+    await graphFixture(workspace, 'missing', true)
+    expect(verifyConsumerGraph(workspace.root)).toMatchObject({ packages: 2, hotkeysRuntimes: 1 })
+  })
+})
+
+test('rejects absent required standalone peers', async () => {
+  await withWorkspace(async (workspace) => {
+    await graphFixture(workspace, 'missing')
+    expect(() => verifyConsumerGraph(workspace.root)).toThrow()
+  })
+})
+
+test('rejects an installed optional peer with a missing entrypoint', async () => {
+  await withWorkspace(async (workspace) => {
+    await graphFixture(workspace, 'release', true)
+    await workspace.put('node_modules/@singapore-editor/core', {
+      name: '@singapore-editor/core',
+      exports: './dist/missing.js',
+    })
+    expect(() => verifyConsumerGraph(workspace.root)).toThrow()
   })
 })
