@@ -28,6 +28,7 @@ const configurations = [
   'apps/web/vitest.browser.config.ts',
   'apps/web/vitest.tree-browser.config.ts',
   'apps/web/retention-acceptance.vitest.config.ts',
+  'apps/web/retention-acceptance-layout.vitest.config.ts',
   'packages/ghostty-webgpu/vitest.browser.config.ts',
   'packages/singapore/packages/editor/vitest.config.ts',
   'packages/singapore/packages/highlighting/vitest.config.ts',
@@ -61,9 +62,30 @@ for (const loader of ['bundle', 'native'] as const) {
   )
 }
 
-test.for(['bundle', 'native'] as const)(
-  'reload config loads through Node with %s and preserves its test commands',
-  (loader) => {
+const retentionConfigurations = [
+  {
+    name: 'reload',
+    file: 'retention-acceptance.vitest.config.ts',
+    globalSetup: ['./test/env/retention-acceptance-file-server.ts'],
+    include: ['src/features/editor/tests/retention-acceptance-reload.browser.tsx'],
+    commands: ['retentionAcceptanceReload', 'retentionAcceptanceReloadFinish'],
+  },
+  {
+    name: 'layout',
+    file: 'retention-acceptance-layout.vitest.config.ts',
+    globalSetup: ['./test/env/retention-acceptance-layout-server.ts'],
+    include: ['src/features/editor/tests/retention-acceptance-layout.proof.tsx'],
+    commands: ['retentionLayoutArchive'],
+  },
+]
+
+const retentionLoaders = retentionConfigurations.flatMap((config) =>
+  ['bundle', 'native'].map((loader) => ({ ...config, loader })),
+)
+
+test.for(retentionLoaders)(
+  '$name config loads through Node with $loader and preserves its test commands',
+  ({ file, globalSetup, include, commands, loader }) => {
     const current = realpathSync(process.execPath)
     const node = process.versions.bun
       ? (process.env.PATH ?? '')
@@ -88,14 +110,14 @@ test.for(['bundle', 'native'] as const)(
           logger.warn = (message) => warnings.push(message);
           const result = await loadConfigFromFile(
             { command: 'serve', mode: 'test' },
-            'retention-acceptance.vitest.config.ts', process.cwd(), 'warn', logger,
+            ${JSON.stringify(file)}, process.cwd(), 'warn', logger,
             ${JSON.stringify(loader)},
           );
           assert.ok(result?.config.test);
-          assert.deepEqual(result.config.test.globalSetup, ['./test/env/retention-acceptance-file-server.ts']);
-          assert.deepEqual(result.config.test.include, ['src/features/editor/tests/retention-acceptance-reload.browser.tsx']);
-          assert.equal(typeof result.config.test.browser.commands.retentionAcceptanceReload, 'function');
-          assert.equal(typeof result.config.test.browser.commands.retentionAcceptanceReloadFinish, 'function');
+          assert.deepEqual(result.config.test.globalSetup, ${JSON.stringify(globalSetup)});
+          assert.deepEqual(result.config.test.include, ${JSON.stringify(include)});
+          for (const command of ${JSON.stringify(commands)})
+            assert.equal(typeof result.config.test.browser.commands[command], 'function', command);
           assert.deepEqual(warnings.filter((message) => message.includes("configLoader: 'native'")), []);
         `,
       ],

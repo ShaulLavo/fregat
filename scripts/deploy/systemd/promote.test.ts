@@ -15,7 +15,7 @@ import { afterEach, beforeEach, expect, test } from 'vitest'
 
 import { approveRestart } from '../../../apps/server/src/update/staged-release'
 
-import { liveCheckCommand, promote, releaseProblem, signalServer } from './promote'
+import { checkReadiness, liveCheckCommand, promote, releaseProblem, signalServer } from './promote'
 
 let root = ''
 let launched: string[][] = []
@@ -266,4 +266,23 @@ test('a promotion leaves no claim behind on any outcome', () => {
   approve()
   expect(promote(root, launch)).toBe('promoted')
   expect(readdirSync(root).filter((name) => name.startsWith('pending.claim-'))).toEqual([])
+})
+
+test('a failed readiness record rename removes its staging file', async () => {
+  const live = release('A', {
+    readiness: {
+      stateHome: path.join(root, 'home'),
+      address: 'http://127.0.0.1:0',
+      webBase: '/',
+      expected: null,
+      timeoutMs: 1,
+    },
+  })
+  link('current', live)
+  mkdirSync(path.join(live, 'live-check.json'))
+
+  await expect(checkReadiness(root, live, null, launch)).rejects.toThrow()
+  expect(current()).toBe(live)
+  expect(readdirSync(path.join(live, 'live-check.json'))).toEqual([])
+  expect(readdirSync(live).filter((name) => name.startsWith('live-check.json.next-'))).toEqual([])
 })

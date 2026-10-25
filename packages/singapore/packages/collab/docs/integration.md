@@ -78,6 +78,26 @@ publication snapshot and perform no diff. Subscriber failures are surfaced after
 all entitled subscribers receive the committed changes in order; the first thrown
 value is preserved.
 
+## Host settlement failures
+
+`Host.submit()` settles ready edits and delivers committed messages synchronously.
+If a supplied engine's `snapshot()` throws, the edit remains queued with no outcome
+or host sequence. Settlement stops for that call, and already committed messages
+reach healthy receivers in sequence order before the error is surfaced. Edits queued
+reentrantly during that delivery wait for the next submission.
+
+A later authenticated submission retries queued work, including when the submitted
+edit already has an accepted or rejected outcome. Existing outcomes keep their
+identity and are delivered once. A persistent snapshot failure makes one attempt
+per drain and returns the original thrown value. Callers control retry timing.
+
+Callback errors retain precedence over a settlement error. The first callback's
+thrown value is preserved, and multiple callback errors produce one count-only
+observer report. With no callback error, the settlement error is thrown unchanged.
+Application failures retain the existing rollback and rejection behavior. Supplied
+engines must leave state unchanged when snapshot creation fails and must support
+restoring a snapshot after application fails.
+
 ## Undo and retained provenance
 
 Placement runs may coalesce across authored edits. A separate persistent span index

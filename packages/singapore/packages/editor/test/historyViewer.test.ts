@@ -212,6 +212,74 @@ describe('history viewer', () => {
     viewer.dispose()
   })
 
+  it('observes history restored into a fresh buffer while already attached', () => {
+    const { buffer: source } = branchedBuffer()
+    const saved = structuredClone(source.serializeHistory()!)
+    const buffer = createEditorTextBuffer(source.materializeFullText())
+    const viewer = createHistoryViewer(buffer)
+    const initialRevision = viewer.getState().graph.revision
+    const textRevision = buffer.getRevision()
+    const seen: number[] = []
+    const unsubscribe = viewer.subscribe(() => seen.push(viewer.getState().graph.nodes.length))
+
+    try {
+      expect(viewer.getState().graph.nodes).toHaveLength(1)
+      expect(buffer.restoreHistory(saved)).toBe(true)
+      expect(viewer.getState().graph.nodes).toHaveLength(4)
+      expect(viewer.getState().graph).toEqual(buffer.getHistoryGraph())
+      expect(viewer.getState().graph.revision).toBeGreaterThan(initialRevision)
+      expect(viewer.getState().focusedId).toBe(buffer.getHistoryGraph().currentId)
+      const restoredRevision = viewer.getState().graph.revision
+      expect(buffer.restoreHistory(saved)).toBe(false)
+      expect(viewer.getState().graph.revision).toBe(restoredRevision)
+      expect(seen).toEqual([4])
+      expect(buffer.getRevision()).toBe(textRevision)
+      expect(buffer.materializeFullText()).toBe('AC')
+    } finally {
+      unsubscribe()
+      viewer.dispose()
+    }
+  })
+
+  it('observes repeated clear and restore cycles through an attached viewer', () => {
+    const { buffer, ids } = branchedBuffer()
+    const saved = structuredClone(buffer.serializeHistory()!)
+    const viewer = createHistoryViewer(buffer)
+    const textRevision = buffer.getRevision()
+
+    try {
+      expect(viewer.getState().graph.nodes).toHaveLength(4)
+      for (let cycle = 0; cycle < 2; cycle += 1) {
+        const previousRevision = viewer.getState().graph.revision
+        viewer.toggleSelection(ids.b)
+        viewer.toggleSelection(ids.c)
+        expect(viewer.getState().comparison).not.toBeNull()
+
+        expect(buffer.clearHistory().kind).toBe('checkout')
+        const clearedRevision = viewer.getState().graph.revision
+        expect(viewer.getState().graph.nodes).toHaveLength(1)
+        expect(viewer.getState().selectedIds).toEqual([])
+        expect(viewer.getState().comparison).toBeNull()
+        expect(buffer.clearHistory().kind).toBe('none')
+        expect(viewer.getState().graph.revision).toBe(clearedRevision)
+
+        expect(buffer.restoreHistory(saved)).toBe(true)
+        expect(viewer.getState().graph.nodes).toHaveLength(4)
+        expect(viewer.getState().graph).toEqual(buffer.getHistoryGraph())
+        expect(clearedRevision).toBeGreaterThan(previousRevision)
+        expect(viewer.getState().graph.revision).toBeGreaterThan(clearedRevision)
+        expect(viewer.getState().focusedId).toBe(ids.c)
+        expect(viewer.getState().lostIds).toEqual([])
+        expect(viewer.focus(ids.b)).toBe(true)
+        expect(viewer.focus(ids.c)).toBe(true)
+        expect(buffer.getRevision()).toBe(textRevision)
+        expect(buffer.materializeFullText()).toBe('AC')
+      }
+    } finally {
+      viewer.dispose()
+    }
+  })
+
   it('stops listening after dispose', () => {
     const { buffer } = branchedBuffer()
     const viewer = createHistoryViewer(buffer)
