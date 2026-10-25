@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -213,3 +214,36 @@ test('catalog consumer ordering preserves resolved build cache fields', () => {
     })
   }
 })
+
+function linkPackageDependencies(relative: string) {
+  const target = path.join(root, relative, 'node_modules')
+  mkdirSync(target, { recursive: true })
+  const source = path.join(repository, relative, 'node_modules')
+  for (const name of readdirSync(source)) {
+    if (name === '@fregat') continue
+    symlinkSync(path.join(source, name), path.join(target, name), 'junction')
+  }
+}
+
+test('a direct ghostty build prepares local hotkeys from absent generated outputs', () => {
+  const ghostty = path.join(root, 'packages/ghostty-webgpu')
+  const hotkeys = path.join(root, 'packages/hotkeys/packages/hotkeys')
+  linkPackageDependencies('packages/ghostty-webgpu')
+  linkPackageDependencies('packages/hotkeys/packages/hotkeys')
+  const scope = path.join(ghostty, 'node_modules/@fregat')
+  mkdirSync(scope, { recursive: true })
+  symlinkSync(hotkeys, path.join(scope, 'hotkeys'), 'junction')
+  expect(existsSync(path.join(hotkeys, 'dist'))).toBe(false)
+  expect(existsSync(path.join(ghostty, 'dist'))).toBe(false)
+
+  const result = Bun.spawnSync(['bun', 'run', '--cwd', ghostty, 'build'], {
+    cwd: root,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  })
+
+  expect(result.exitCode, result.stdout.toString() + result.stderr.toString()).toBe(0)
+  expect(existsSync(path.join(hotkeys, 'dist/index.d.ts'))).toBe(true)
+  expect(existsSync(path.join(ghostty, 'dist/index.js'))).toBe(true)
+  expect(existsSync(path.join(ghostty, 'dist/worker/entry.js'))).toBe(true)
+}, 30_000)
