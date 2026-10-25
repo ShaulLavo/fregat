@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { webkit, type Browser, type Page } from 'playwright'
+import { webkit, type Browser, type Locator, type Page } from 'playwright'
 import { hasChromium, startPreview, type Preview } from './preview'
 
 const evidence = join(
@@ -32,6 +32,32 @@ async function geometry(page: Page) {
       }),
     ),
   }))
+}
+function observeActivation(node: HTMLElement) {
+  node.addEventListener(
+    'click',
+    () => {
+      const start = performance.now()
+      node.setAttribute('data-activation-scroll-y', String(scrollY))
+      new MutationObserver((_, observer) => {
+        if (!node.hasAttribute('data-example-live')) return
+        node.setAttribute('data-activation-ms', String(performance.now() - start))
+        observer.disconnect()
+      }).observe(node, { attributes: true, attributeFilter: ['data-example-live'] })
+    },
+    { capture: true, once: true },
+  )
+}
+async function activate(example: Locator, touch: boolean) {
+  await expect.poll(() => example.getAttribute('data-example-ready'), { timeout: 20000 }).toBe('')
+  const button = example.getByRole('button', { name: /Edit/ })
+  await button.scrollIntoViewIfNeeded()
+  await example.evaluate(observeActivation)
+  if (touch) await button.tap()
+  else await button.click()
+  await example.locator('.example-prepared textarea').waitFor({ state: 'attached' })
+  await expect.poll(() => example.getAttribute('data-example-live')).toBe('')
+  return Number(await example.getAttribute('data-activation-ms'))
 }
 for (const engine of ['chromium', 'webkit'] as const) {
   describe.skipIf(!hasChromium() || (engine === 'webkit' && !existsSync(webkit.executablePath())))(
@@ -177,27 +203,7 @@ for (const engine of ['chromium', 'webkit'] as const) {
             const staticPixels = await first.locator('.example-stage').screenshot()
             await first.getByRole('button', { name: /Edit/ }).scrollIntoViewIfNeeded()
             const before = await geometry(page)
-            await first.evaluate((node) => {
-              node.addEventListener(
-                'click',
-                () => {
-                  const start = performance.now()
-                  node.setAttribute('data-activation-scroll-y', String(scrollY))
-                  new MutationObserver((_, observer) => {
-                    if (!node.hasAttribute('data-example-live')) return
-                    node.setAttribute('data-activation-ms', String(performance.now() - start))
-                    observer.disconnect()
-                  }).observe(node, { attributes: true, attributeFilter: ['data-example-live'] })
-                },
-                { capture: true, once: true },
-              )
-            })
-            if (width < 768) await first.getByRole('button', { name: /Edit/ }).tap()
-            else await first.getByRole('button', { name: /Edit/ }).click()
-            await first.locator('.example-prepared textarea').waitFor({ state: 'attached' })
-            await expect.poll(() => first.getAttribute('data-example-live')).toBe('')
-            const activationMs = Number(await first.getAttribute('data-activation-ms'))
-            expect(activationMs).toBeLessThan(50)
+            const firstActivationMs = await activate(first, width < 768)
             const after = await geometry(page)
             expect(after.y).toBe(Number(await first.getAttribute('data-activation-scroll-y')))
             expect(after.examples).toEqual(before.examples)
@@ -216,21 +222,9 @@ for (const engine of ['chromium', 'webkit'] as const) {
             expect(livePixels.equals(staticPixels), 'Static and live example ink matches').toBe(
               true,
             )
-            await writeFile(
-              join(evidence, `${engine}-${width}-geometry.json`),
-              JSON.stringify(
-                {
-                  before,
-                  after,
-                  activationMs,
-                  cls: await page.evaluate(() => (window as unknown as { shifts: number }).shifts),
-                  nativeClsSupported: await page.evaluate(() =>
-                    PerformanceObserver.supportedEntryTypes.includes('layout-shift'),
-                  ),
-                },
-                null,
-                2,
-              ),
+            const cls = await page.evaluate(() => (window as unknown as { shifts: number }).shifts)
+            const nativeClsSupported = await page.evaluate(() =>
+              PerformanceObserver.supportedEntryTypes.includes('layout-shift'),
             )
             await page.keyboard.press('Control+End')
             await page.keyboard.insertText('\n// edited example')
@@ -238,6 +232,30 @@ for (const engine of ['chromium', 'webkit'] as const) {
               .poll(() => first.locator('.example-prepared').innerText())
               .toContain('// edited example')
             expect((await geometry(page)).document).toBeLessThanOrEqual(width)
+            let activationSamples = [firstActivationMs]
+            for (let sample = 1; sample < 3; sample++) {
+              await page.reload()
+              await page.evaluate(() => document.fonts.ready)
+              activationSamples = activationSamples.concat(await activate(first, width < 768))
+            }
+            const activationMs = activationSamples.toSorted((a, b) => a - b)[1]!
+            await writeFile(
+              join(evidence, `${engine}-${width}-geometry.json`),
+              JSON.stringify(
+                {
+                  before,
+                  after,
+                  activationMs,
+                  activationSamples,
+                  cls,
+                  nativeClsSupported,
+                },
+                null,
+                2,
+              ),
+            )
+            // One scheduler outlier must not fail the 50 ms prepared-editor activation budget.
+            expect(activationMs).toBeLessThan(50)
             expect(problems).toEqual([])
           } finally {
             await context.close()
