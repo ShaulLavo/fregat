@@ -1,5 +1,14 @@
-import { cpSync, existsSync, readFileSync, rmSync, statSync, symlinkSync } from 'node:fs'
+import {
+  cpSync,
+  existsSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+} from 'node:fs'
 import path from 'node:path'
+import { errorMessage } from '../packages/contracts/src/error-fields'
 
 import {
   checkoutRoot,
@@ -121,6 +130,7 @@ async function install(options: InstallOptions, control: InstallControl) {
   if (checkout.dirtyFiles.length > 0)
     log('release', `checkout is dirty (${checkout.dirtyFiles.length} files)`)
 
+  let published = false
   try {
     const built = options.from ? readBuildConfig(path.resolve(options.from)) : null
     if (options.from && (!built || built.webBase !== webBase))
@@ -160,27 +170,52 @@ async function install(options: InstallOptions, control: InstallControl) {
 
     await control.installUnit()
     assertUnmoved(release, staged)
+    if (options.server || staged) {
+      stagePending(release)
+      published = true
+      await notifyStaged(release, options.server ? null : staged, options, control)
+      return
+    }
+
+    swapCurrent(release)
+    published = true
+    await checkInPlace(liveTarget(release.directory, release.previous), options.liveCheck, control)
+    console.log(`\n[install-release] ${release.name} is live at ${meshUrl}`)
   } catch (error) {
-    rmSync(release.directory, { recursive: true, force: true })
+    cleanupUnpublished(release, published)
     throw error
   }
-  if (options.server || staged) {
-    await stage(release, options.server ? null : staged, options, control)
-    return
-  }
-
-  swapCurrent(release)
-  await checkInPlace(liveTarget(release.directory, release.previous), options.liveCheck, control)
-  console.log(`\n[install-release] ${release.name} is live at ${meshUrl}`)
 }
 
-async function stage(
+function cleanupUnpublished(release: Release, published: boolean) {
+  if (published) return
+  try {
+    const directory = realpathSync(release.directory)
+    if (currentRelease() === directory || pendingRelease() === directory) return
+    rmSync(release.directory, { recursive: true, force: true })
+  } catch (error) {
+    const detail = errorMessage(error)
+    console.error(
+      scriptFailureText(
+        createScriptError(
+          `Could not remove unpublished candidate ${release.directory}: ${detail}`,
+          {
+            why: 'Another installation step failed, and removing its candidate also failed.',
+            fix: 'Check the candidate permissions. Remove it only after confirming it is neither current nor pending.',
+            internal: { cleanupError: detail },
+          },
+        ),
+      ),
+    )
+  }
+}
+
+async function notifyStaged(
   release: Release,
   carrier: string | null,
   options: InstallOptions,
   control: InstallControl,
 ) {
-  stagePending(release)
   const outcome = await control.notifyServer(release.name)
   if (outcome === 'staged' && options.restart) {
     await restartStaged(options.restart, options.liveCheck, control)
