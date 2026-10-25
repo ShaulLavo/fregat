@@ -26,14 +26,13 @@ test('every mirror checks out the pinned host keys before configuring SSH', () =
   expect(workflow.jobs.mirror.strategy.matrix.include.map((entry) => entry.folder)).toEqual([
     'packages/singapore',
     'packages/ghostty-webgpu',
-    'packages/hotkeys',
   ])
 })
 
 test('every relocated family keeps its old prefix and the shared relocation boundary', () => {
   expect(
     workflow.jobs.mirror.strategy.matrix.include.map((entry) => entry.previous_folder),
-  ).toEqual(['editor', 'ghostty-webgpu', 'hotkeys'])
+  ).toEqual(['editor', 'ghostty-webgpu'])
   const splitStep = workflow.jobs.mirror.steps.find((step) => step.name === 'Split and push family')
   expect(splitStep.env.FAMILY_RELOCATION_COMMIT).toBe('ddf0527c59168f51e96bc0a96e68e0771cdbaadd')
   expect(splitStep.env.FAMILY_PREVIOUS_FOLDER).toBe('${{ matrix.previous_folder }}')
