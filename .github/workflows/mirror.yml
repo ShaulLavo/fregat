@@ -28,10 +28,6 @@ jobs:
             previous_folder: ghostty-webgpu
             repository: ShaulLavo/ghostty-webgpu
             deploy_key: MIRROR_GHOSTTY_SSH_KEY
-          - folder: packages/hotkeys
-            previous_folder: hotkeys
-            repository: ShaulLavo/hotkeys
-            deploy_key: MIRROR_HOTKEYS_SSH_KEY
     steps:
       - name: Checkout full history
         uses: actions/checkout@v4
