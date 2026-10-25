@@ -388,8 +388,12 @@ function activeRelease(root: string, directory: string, options: ReadinessOption
 
 function writeRecord(file: string, value: unknown) {
   const staging = `${file}.next-${process.pid}`
-  writeFileSync(staging, JSON.stringify(value), { mode: 0o600 })
-  renameSync(staging, file)
+  try {
+    writeFileSync(staging, JSON.stringify(value), { mode: 0o600 })
+    renameSync(staging, file)
+  } finally {
+    rmSync(staging, { force: true })
+  }
 }
 
 function readRecord<T extends v.GenericSchema>(file: string, schema: T): v.InferOutput<T> | null {
