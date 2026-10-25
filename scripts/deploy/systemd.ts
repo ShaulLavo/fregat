@@ -1,4 +1,14 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 
@@ -60,9 +70,20 @@ async function installPromote() {
   if (installed === source) return
 
   mkdirSync(path.dirname(installedPromote), { recursive: true })
-  const staging = `${installedPromote}.next-${process.pid}`
-  writeFileSync(staging, source)
-  renameSync(staging, installedPromote)
+  const staging = `${installedPromote}.next-${process.pid}-${randomUUID()}`
+  let claimed = false
+  try {
+    const stagingFd = openSync(staging, 'wx')
+    claimed = true
+    try {
+      writeFileSync(stagingFd, source)
+    } finally {
+      closeSync(stagingFd)
+    }
+    renameSync(staging, installedPromote)
+  } finally {
+    if (claimed) rmSync(staging, { force: true })
+  }
   log('systemd', `installed ${installedPromote}`)
 }
 

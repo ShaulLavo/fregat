@@ -1545,7 +1545,6 @@ const appendReusableLayer = (
 
   const tree = editReusableTree(layer.tree, inputEdits)
   reusableLayers.push({
-    // Included ranges stay in document code units; only query cursor bounds use UTF-16 bytes.
     layer: { ...layer, tree, ranges: tree.getIncludedRanges() },
     state: 'available',
   })
@@ -2179,14 +2178,10 @@ const queryOptions = (
 
   return {
     ...options,
-    startIndex: treeSitterQueryIndex(range.startIndex),
-    endIndex: treeSitterQueryIndex(range.endIndex),
+    startIndex: range.startIndex,
+    endIndex: range.endIndex,
   }
 }
-
-// web-tree-sitter exposes node indexes as UTF-16 code units, but query cursor
-// byte ranges still use raw UTF-16 bytes.
-const treeSitterQueryIndex = (index: number): number => index * Uint16Array.BYTES_PER_ELEMENT
 
 const collectCaptures = (
   tree: Tree | null,
