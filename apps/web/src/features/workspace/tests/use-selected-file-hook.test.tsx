@@ -1,4 +1,4 @@
-import { chmod, writeFile } from 'node:fs/promises'
+import { mkdir, rename, rmdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { fileSystemKeys } from '@/lib/query-keys'
@@ -47,6 +47,7 @@ test('exposes a failed text refetch while retaining the matching snapshot', asyn
   void client
   const selected = filesystemPath('retained.txt')
   const disk = path.join(server.root, selected)
+  const original = path.join(server.root, 'retained-original.txt')
   await writeFile(disk, 'retained text\n')
   const queryClient = createTestQueryClient()
   const hook = renderHook(() => useSelectedFile(selected), {
@@ -55,7 +56,8 @@ test('exposes a failed text refetch while retaining the matching snapshot', asyn
   try {
     await waitFor(() => expect(hook.result.current.fileState.status).toBe('ready'))
     const retained = hook.result.current.fileState
-    await chmod(disk, 0)
+    await rename(disk, original)
+    await mkdir(disk)
     await act(() =>
       queryClient.invalidateQueries({
         queryKey: fileSystemKeys.fileSnapshot(selected),
@@ -69,7 +71,8 @@ test('exposes a failed text refetch while retaining the matching snapshot', asyn
     )
     expect(hook.result.current.fileState).toEqual(retained)
     expect(hook.result.current).toMatchObject({ readError: expect.any(String) })
-    await chmod(disk, 0o600)
+    await rmdir(disk)
+    await rename(original, disk)
     await act(() =>
       queryClient.invalidateQueries({
         queryKey: fileSystemKeys.fileSnapshot(selected),
@@ -79,7 +82,6 @@ test('exposes a failed text refetch while retaining the matching snapshot', asyn
     await waitFor(() => expect(hook.result.current).toMatchObject({ readError: null }))
     expect(hook.result.current.fileState).toEqual(retained)
   } finally {
-    await chmod(disk, 0o600)
     hook.unmount()
     queryClient.clear()
   }
@@ -89,8 +91,7 @@ test('keeps initial text read failures in the error state', async ({ client, ser
   void client
   const selected = filesystemPath('denied.txt')
   const disk = path.join(server.root, selected)
-  await writeFile(disk, 'unreadable text')
-  await chmod(disk, 0)
+  await mkdir(disk)
   const queryClient = createTestQueryClient()
   const hook = renderHook(() => useSelectedFile(selected), {
     wrapper: queryClientWrapper(queryClient),
@@ -99,7 +100,6 @@ test('keeps initial text read failures in the error state', async ({ client, ser
     await waitFor(() => expect(hook.result.current.fileState.status).toBe('error'))
     expect(hook.result.current).toMatchObject({ readError: null })
   } finally {
-    await chmod(disk, 0o600)
     hook.unmount()
     queryClient.clear()
   }
