@@ -270,13 +270,13 @@ describe('tree-sitter worker internals', () => {
     expect(rangeSpan(ranges)).toEqual({ startIndex: 0, endIndex: 399_999 })
   })
 
-  it('collects range highlights from captures that intersect the visible range', () => {
+  it('queries visible range highlights in UTF-16 code units', () => {
     const highlightedNode = node('identifier', 75, 82)
     const query = {
       matches: () => [],
       captures: (_root: Node, options?: NonNullable<Parameters<Query['captures']>[1]>) => {
-        expect(options?.startIndex).toBe(140)
-        expect(options?.endIndex).toBe(180)
+        expect(options?.startIndex).toBe(70)
+        expect(options?.endIndex).toBe(90)
         return [{ name: 'variable', node: highlightedNode }]
       },
     } as unknown as Query

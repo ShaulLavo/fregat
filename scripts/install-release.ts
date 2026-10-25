@@ -1,5 +1,14 @@
-import { cpSync, existsSync, readFileSync, statSync, symlinkSync } from 'node:fs'
+import {
+  cpSync,
+  existsSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+} from 'node:fs'
 import path from 'node:path'
+import { errorMessage } from '../packages/contracts/src/error-fields'
 
 import {
   checkoutRoot,
@@ -121,61 +130,92 @@ async function install(options: InstallOptions, control: InstallControl) {
   if (checkout.dirtyFiles.length > 0)
     log('release', `checkout is dirty (${checkout.dirtyFiles.length} files)`)
 
-  const built = options.from ? readBuildConfig(path.resolve(options.from)) : null
-  if (options.from && (!built || built.webBase !== webBase))
-    throw createScriptError('The built release must match this installation base.', {
-      fix: `Run bun run build-release --base=${webBase} --output=<directory>, then install-release --from=<directory>.`,
+  let published = false
+  try {
+    const built = options.from ? readBuildConfig(path.resolve(options.from)) : null
+    if (options.from && (!built || built.webBase !== webBase))
+      throw createScriptError('The built release must match this installation base.', {
+        fix: `Run bun run build-release --base=${webBase} --output=<directory>, then install-release --from=<directory>.`,
+      })
+    if (options.from) {
+      cpSync(path.join(path.resolve(options.from), 'web'), release.web, { recursive: true })
+      await stampWebRelease(release.web, release.name)
+    } else await buildWeb(release, webBase)
+
+    if (release.previous) {
+      const carried = carryAssets(path.join(release.previous, 'web'), release.web)
+      log('web', `carried ${carried} hashed assets from ${path.basename(release.previous)}`)
+    }
+    const serverSource =
+      options.from && options.server
+        ? copyBuiltServer(release, path.resolve(options.from))
+        : await provideServer(release, options.server, staged)
+    writeBuildConfig(release, {
+      ...(built ?? checkout),
+      release: release.directory,
+      source: checkoutRoot,
+      webBase,
+      meshUrl,
+      previousRelease: release.previous,
+      server: serverSource,
+      reason: options.reason,
+      builtAt: new Date().toISOString(),
+      liveCheck: options.liveCheck,
     })
-  if (options.from) {
-    cpSync(path.join(path.resolve(options.from), 'web'), release.web, { recursive: true })
-    await stampWebRelease(release.web, release.name)
-  } else await buildWeb(release, webBase)
 
-  if (release.previous) {
-    const carried = carryAssets(path.join(release.previous, 'web'), release.web)
-    log('web', `carried ${carried} hashed assets from ${path.basename(release.previous)}`)
+    log('verify', 'candidate files')
+    await verifyCandidateFiles(release, webBase)
+    log('verify', 'booting the candidate server')
+    await bootCandidate(release, webBase)
+
+    await control.installUnit()
+    assertUnmoved(release, staged)
+    if (options.server || staged) {
+      stagePending(release)
+      published = true
+      await notifyStaged(release, options.server ? null : staged, options, control)
+      return
+    }
+
+    swapCurrent(release)
+    published = true
+    await checkInPlace(liveTarget(release.directory, release.previous), options.liveCheck, control)
+    console.log(`\n[install-release] ${release.name} is live at ${meshUrl}`)
+  } catch (error) {
+    cleanupUnpublished(release, published)
+    throw error
   }
-  const serverSource =
-    options.from && options.server
-      ? copyBuiltServer(release, path.resolve(options.from))
-      : await provideServer(release, options.server, staged)
-  writeBuildConfig(release, {
-    ...(built ?? checkout),
-    release: release.directory,
-    source: checkoutRoot,
-    webBase,
-    meshUrl,
-    previousRelease: release.previous,
-    server: serverSource,
-    reason: options.reason,
-    builtAt: new Date().toISOString(),
-    liveCheck: options.liveCheck,
-  })
-
-  log('verify', 'candidate files')
-  await verifyCandidateFiles(release, webBase)
-  log('verify', 'booting the candidate server')
-  await bootCandidate(release, webBase)
-
-  await control.installUnit()
-  assertUnmoved(release, staged)
-  if (options.server || staged) {
-    await stage(release, options.server ? null : staged, options, control)
-    return
-  }
-
-  swapCurrent(release)
-  await checkInPlace(liveTarget(release.directory, release.previous), options.liveCheck, control)
-  console.log(`\n[install-release] ${release.name} is live at ${meshUrl}`)
 }
 
-async function stage(
+function cleanupUnpublished(release: Release, published: boolean) {
+  if (published) return
+  try {
+    const directory = realpathSync(release.directory)
+    if (currentRelease() === directory || pendingRelease() === directory) return
+    rmSync(release.directory, { recursive: true, force: true })
+  } catch (error) {
+    const detail = errorMessage(error)
+    console.error(
+      scriptFailureText(
+        createScriptError(
+          `Could not remove unpublished candidate ${release.directory}: ${detail}`,
+          {
+            why: 'Another installation step failed, and removing its candidate also failed.',
+            fix: 'Check the candidate permissions. Remove it only after confirming it is neither current nor pending.',
+            internal: { cleanupError: detail },
+          },
+        ),
+      ),
+    )
+  }
+}
+
+async function notifyStaged(
   release: Release,
   carrier: string | null,
   options: InstallOptions,
   control: InstallControl,
 ) {
-  stagePending(release)
   const outcome = await control.notifyServer(release.name)
   if (outcome === 'staged' && options.restart) {
     await restartStaged(options.restart, options.liveCheck, control)
