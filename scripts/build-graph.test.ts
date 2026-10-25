@@ -238,6 +238,7 @@ test('a direct ghostty build prepares local hotkeys from absent generated output
 
   const result = Bun.spawnSync(['bun', 'run', '--cwd', ghostty, 'build'], {
     cwd: root,
+    env: { ...process.env, TURBO_HASH: undefined },
     stdout: 'pipe',
     stderr: 'pipe',
   })
@@ -247,3 +248,19 @@ test('a direct ghostty build prepares local hotkeys from absent generated output
   expect(existsSync(path.join(ghostty, 'dist/index.js'))).toBe(true)
   expect(existsSync(path.join(ghostty, 'dist/worker/entry.js'))).toBe(true)
 }, 30_000)
+
+test('dependency preparation is a no-op outside the monorepo', () => {
+  const standalone = path.join(root, 'standalone-ghostty')
+  const script = 'scripts/build-dependencies.ts'
+  mkdirSync(path.join(standalone, 'scripts'), { recursive: true })
+  cpSync(path.join(repository, 'packages/ghostty-webgpu', script), path.join(standalone, script))
+  const result = Bun.spawnSync(['bun', script], {
+    cwd: standalone,
+    env: { ...process.env, TURBO_HASH: undefined },
+    stdout: 'pipe',
+    stderr: 'pipe',
+  })
+  expect(result.exitCode, result.stderr.toString()).toBe(0)
+  expect(result.stdout.toString()).toBe('')
+  expect(result.stderr.toString()).toBe('')
+})
