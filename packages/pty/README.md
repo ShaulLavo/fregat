@@ -6,27 +6,11 @@ It wraps Bun's native terminal support and waits for every last byte before repo
 
 ## Usage
 
-One function. `onData` is set at spawn, so no startup output is missed.
+One function. `onData` is set at spawn, so no startup output is missed. Install it, then spawn a byte-first PTY in one line:
 
 ```ts
 import { spawnPty } from '@workspace/pty'
-
-const decoder = new TextDecoder()
-await using pty = spawnPty({
-  command: ['/bin/sh', '-i'],
-  cwd: process.cwd(),
-  env: { ...process.env, TERM: 'xterm-256color' },
-  cols: 100,
-  rows: 30,
-  onData(bytes) {
-    process.stdout.write(decoder.decode(bytes, { stream: true }))
-  },
-})
-
-pty.resize(120, 40)
-pty.write('printf "hello\\n"\nexit\n')
-const { exitCode, signal } = await pty.exited
-process.stdout.write(decoder.decode())
+const pty = spawnPty({ command: ['/bin/sh', '-i'], onData: bytes => process.stdout.write(bytes) })
 ```
 
 `pty.kill()` sends `SIGHUP` and escalates to `SIGKILL` after 250 ms. `await using` (or `pty[Symbol.asyncDispose]()`) kills and waits for cleanup. `pty.pid` is the direct child.
