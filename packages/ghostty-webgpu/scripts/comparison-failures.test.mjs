@@ -203,3 +203,53 @@ for (const stall of ['Tracing.end', 'IO.read', 'IO.close']) {
     }
   })
 }
+
+test('a late trace read cannot save a file after finalization expires', async () => {
+  const output = await mkdtemp(join(tmpdir(), 'comparison-late-trace-'))
+  const cdp = syntheticCdp({ churn: true })
+  const send = cdp.session.send
+  let finishRead
+  cdp.session.send = async (name) => {
+    if (name === 'IO.read') return new Promise((resolve) => { finishRead = resolve })
+    return send(name)
+  }
+  try {
+    await assert.rejects(
+      tracePhase({ ...cdp, browserSession: cdp.session, output, label: 'late', traced: true,
+        finalizationMilliseconds: 10 }),
+      /CPU process set changed/,
+    )
+    finishRead({ data: cdp.trace, eof: true })
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.equal(cdp.calls.filter((name) => name === 'IO.close').length, 1)
+    assert.deepEqual(await readdir(output), [])
+  } finally {
+    await rm(output, { recursive: true })
+  }
+})
+
+for (const counters of [false, true]) {
+  test(`a failed after snapshot retains completed work ${counters ? 'with counters' : 'by default'}`, async () => {
+    const cdp = syntheticCdp()
+    const send = cdp.session.send
+    let snapshots = 0
+    cdp.session.send = async (name) => {
+      if (name === 'SystemInfo.getProcessInfo' && ++snapshots === 2) assert.fail('Snapshot failed')
+      return send(name)
+    }
+    await assert.rejects(
+      measureCpu(cdp.session, cdp.operation, {
+        now: cdp.now,
+        ...(counters ? { counterReader: counterReader() } : {}),
+      }),
+      (error) => {
+        assert.match(error.message, /Snapshot failed/)
+        assert.deepEqual(error.cpuFailure.before, [{ id: 1, type: 'renderer', cpuTime: 0 }])
+        assert.equal(error.cpuFailure.after, null)
+        assert.deepEqual(error.cpuFailure.operation.sample, cdp.sample)
+        assert.deepEqual(error.cpuFailure.interval.after, { requested: 110, completed: 110 })
+        return true
+      },
+    )
+  })
+}
