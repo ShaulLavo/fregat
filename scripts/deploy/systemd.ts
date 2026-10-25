@@ -61,8 +61,12 @@ async function installPromote() {
 
   mkdirSync(path.dirname(installedPromote), { recursive: true })
   const staging = `${installedPromote}.next-${process.pid}`
-  writeFileSync(staging, source)
-  renameSync(staging, installedPromote)
+  try {
+    writeFileSync(staging, source)
+    renameSync(staging, installedPromote)
+  } finally {
+    rmSync(staging, { force: true })
+  }
   log('systemd', `installed ${installedPromote}`)
 }
 
