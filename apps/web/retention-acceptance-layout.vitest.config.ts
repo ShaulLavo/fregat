@@ -3,7 +3,7 @@ import type { BrowserCommandContext } from 'vitest/node'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import base from './vitest.browser.config'
+import base from './vitest.browser.config.ts'
 
 export default defineConfig({
   ...base,
