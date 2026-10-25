@@ -1,5 +1,21 @@
 # ghostty-webgpu
 
+## 0.3.25
+
+### Patch Changes
+
+- [#1299](https://github.com/ShaulLavo/fregat/pull/1299) [`2f1b2df`](https://github.com/ShaulLavo/fregat/commit/2f1b2dfc9a5f915f0199225948711e0541cfc78b) - Added support for `font.lineHeight` values down to 0.5. Shorter lines centre glyphs vertically and clip them to their cell spans in WebGPU, WebGL2, Canvas2D and DOM renderers.
+
+- [#1291](https://github.com/ShaulLavo/fregat/pull/1291) [`39d463d`](https://github.com/ShaulLavo/fregat/commit/39d463d4ca56370e24461663ea80f18cfc9df654) - Fixed `subscribeCustomOsc` payload corruption when its capture predicate writes to the same terminal. Each observation preserves the original OSC payload through reentrant terminal writes.
+
+- [#1306](https://github.com/ShaulLavo/fregat/pull/1306) [`891a9e9`](https://github.com/ShaulLavo/fregat/commit/891a9e94361f3046b061e5a02d73c8204e3c6405) - Improved: unfocused terminals no longer reposition their input and composition elements on every cursor move.
+
+- [#1267](https://github.com/ShaulLavo/fregat/pull/1267) [`c36bb76`](https://github.com/ShaulLavo/fregat/commit/c36bb76eff2a4bdba82cd53a9128d3d56c66bd62) - Changed `accessibility` to coalesce the displayed row list, cursor position and recent-output announcements on a 100 ms refresh delay, with immediate refreshes on enable, focus and history navigation and suspended updates in hidden documents. Intervals containing a resize or font reflow update readable text silently, including output received in that interval; the next output-only interval resumes announcements. Public `onText` subscribers continue receiving every submitted text frame.
+
+- [#1286](https://github.com/ShaulLavo/fregat/pull/1286) [`17f9403`](https://github.com/ShaulLavo/fregat/commit/17f9403050cca39aee18b8845a58da3de7756f23) - Added the `presentation` terminal option. `'immediate'` draws the first write of each display frame right away, prefers WebGL2, and asks for a desynchronized (low-latency) canvas; `diagnostics.desynchronized` reports the context's `desynchronized` attribute.
+
+- [#1288](https://github.com/ShaulLavo/fregat/pull/1288) [`96f0800`](https://github.com/ShaulLavo/fregat/commit/96f080016aea1b84b06be28167de1507f33e1b3f) - Added the `outputTiming` terminal event. For each burst of written output it reports the last typed input before it, the first and last write, when a frame drew the output and when the browser's page update carried it, all as `performance.now()` times. Bursts end after `outputTiming.quietMs` (default 100) without output, input counts within `outputTiming.inputWindowMs` (default 2000), and timing is recorded only while a listener is attached. `TerminalDataEvent` gains `origin`: `'input'` for typed, pasted, mouse and `sendInput` data, `'reply'` for the terminal's own answers and focus reports.
+
 ## 0.3.24
 
 ### Patch Changes

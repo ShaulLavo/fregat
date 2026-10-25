@@ -1,5 +1,13 @@
 # @singapore-editor/collab
 
+## 0.0.5
+
+### Patch Changes
+
+- [#1344](https://github.com/ShaulLavo/fregat/pull/1344) [`3349ee2`](https://github.com/ShaulLavo/fregat/commit/3349ee270c92b63f24980ff6c95548051b6bb918) - Fixed `Host.submit()` to preserve queued edits and deliver committed messages when a supplied engine's `snapshot()` throws. Later submissions, including retries of accepted edits, retry queued work without duplicate delivery. Callback failures retain their first thrown value and take precedence over settlement errors.
+- Updated dependencies []:
+  - @singapore-editor/textbuffer@0.2.10
+
 ## 0.0.4
 
 ### Patch Changes

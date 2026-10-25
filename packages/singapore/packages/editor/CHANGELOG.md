@@ -1,5 +1,35 @@
 # @singapore-editor/core
 
+## 0.2.10
+
+### Patch Changes
+
+- [#1276](https://github.com/ShaulLavo/fregat/pull/1276) [`c8964ca`](https://github.com/ShaulLavo/fregat/commit/c8964ca9f13ea527acb6f049fbf3b4d24bec256b) - Changed touch selection to use editor-owned word, line and document selections with double, triple and quadruple taps, long-press dragging and edge scrolling. Added input gesture events and selection commands for optional plugins. Added `createTouchSelectionPlugin` in `@singapore-editor/plugin-ui` with Cut, Copy, Paste, Select all, available Undo/Redo actions, custom items and optional supported haptic feedback.
+
+- [#1347](https://github.com/ShaulLavo/fregat/pull/1347) [`51aedd3`](https://github.com/ShaulLavo/fregat/commit/51aedd398127b056ac92293d66fbdeb132f450f2) - Fixed `createHistoryViewer()` refreshing its graph when `restoreHistory()` loads saved history into an attached buffer, including after `clearHistory()`.
+
+- [#1318](https://github.com/ShaulLavo/fregat/pull/1318) [`8ff1b65`](https://github.com/ShaulLavo/fregat/commit/8ff1b654b4b7096dbe9499919df06e045f0a4123) - Breaking: `createFileEditAnimationPlugin` now morphs every text change except keyboard text input, including small commands such as indenting and toggling comments; remove the `minEditChars` option from calling code. Added `typing` to `EditorContributionChange`, true when a change is typed text, Enter, Backspace or Delete at a caret, or IME composition.
+
+  Fixed lines that swap places in a morph: each line now slides whole to its new spot, where shared words and punctuation used to fade out and back in.
+
+  Fixed Markdown preview briefly showing raw source after every edit: replacements from a provider that needs syntax now carry through an edit until the next parse, following lines the edit only moved. `createFileEditAnimationPlugin` now animates documents with inline replacements: rows it can draw morph as before, and rendered rows slide or fade in as whole rows.
+
+- [#1326](https://github.com/ShaulLavo/fregat/pull/1326) [`19617a4`](https://github.com/ShaulLavo/fregat/commit/19617a4a0513a16eb50e41475b23e327cb2e5323) - Changed the Markdown parser dependency to version 0.1.32, using the same grammar and runtime across the editor packages.
+
+- [#1298](https://github.com/ShaulLavo/fregat/pull/1298) [`5b50c80`](https://github.com/ShaulLavo/fregat/commit/5b50c80dc40b6173023ea94a83c3215094304779) - Fixed `Editor.clearDocument()`, `Editor.clear()`, and `Editor.detachSession()` retaining the previous document through touch selection state. These operations now cancel pending touch gestures.
+
+- [#1272](https://github.com/ShaulLavo/fregat/pull/1272) [`044eafe`](https://github.com/ShaulLavo/fregat/commit/044eafef8f31f2cb5435a07988785793194a283c) - Fixed text entry over selections made directly in the editor's accessible textarea, including selections moved by assistive technology. IME commits now replace the range selected when composition started, including commits delivered through `beforeinput`.
+
+- [#1273](https://github.com/ShaulLavo/fregat/pull/1273) [`57cbbbf`](https://github.com/ShaulLavo/fregat/commit/57cbbbf1b0a37df9e6cdc5a2e97e3732975d1cbe) - Fixed the editor caret following the active end of a touch selection as native selection handles move, including backward selections and dragging onto another row. Native handle updates keep the browser highlight and batch caret painting once per frame.
+
+- [#1271](https://github.com/ShaulLavo/fregat/pull/1271) [`b981120`](https://github.com/ShaulLavo/fregat/commit/b9811202176722702d40fef6e8e1b781a2e5a816) - Breaking: `EditorPressParticipant` now receives `MouseEvent | TouchEvent` so plugins can claim taps and holds before selection changes. Update typed participants to accept both event types and read touch coordinates from `event.touches[0]`. Fixed touch control ownership, blank-area caret placement, repeated word-selection notifications, and backward native selections after edits.
+
+  Fixed touch press handling on diff separators and modified-touch definition links.
+
+- [#1269](https://github.com/ShaulLavo/fregat/pull/1269) [`bb88ac6`](https://github.com/ShaulLavo/fregat/commit/bb88ac6c1dc8fd3ad7e938d707ca1990f92d6899) - Fixed touch text selection: double-tapping and holding select words, dragging extends the selection, and tapping places the caret. Native text selection changes now update the editor's selection so copying uses the text selected on screen.
+- Updated dependencies []:
+  - @singapore-editor/textbuffer@0.2.10
+
 ## 0.2.9
 
 ### Patch Changes

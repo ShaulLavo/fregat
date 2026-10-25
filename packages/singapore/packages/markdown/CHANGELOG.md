@@ -1,5 +1,20 @@
 # @singapore-editor/markdown
 
+## 0.2.10
+
+### Patch Changes
+
+- [#1326](https://github.com/ShaulLavo/fregat/pull/1326) [`19617a4`](https://github.com/ShaulLavo/fregat/commit/19617a4a0513a16eb50e41475b23e327cb2e5323) - Changed the Markdown parser dependency to version 0.1.32, using the same grammar and runtime across the editor packages.
+
+- [#1297](https://github.com/ShaulLavo/fregat/pull/1297) [`e0be280`](https://github.com/ShaulLavo/fregat/commit/e0be2804215974a90850b881f42e9fb702d098d7) - Breaking: Tree-sitter and Markdown parsing require Node.js 26.0.0 or newer, Bun 1.2.22 or newer, Chromium 144 or newer, Firefox 145 or newer, or Safari 26.2 or newer.
+
+  Improved memory growth so retained `heap()` views stay attached and track the new heap length.
+
+  Fixed Markdown extension access above 2 GiB and semantic decoding from resizable memory by updating `tree-sitter-md` to 0.1.6.
+
+- Updated dependencies [[`c8964ca`](https://github.com/ShaulLavo/fregat/commit/c8964ca9f13ea527acb6f049fbf3b4d24bec256b), [`51aedd3`](https://github.com/ShaulLavo/fregat/commit/51aedd398127b056ac92293d66fbdeb132f450f2), [`8ff1b65`](https://github.com/ShaulLavo/fregat/commit/8ff1b654b4b7096dbe9499919df06e045f0a4123), [`19617a4`](https://github.com/ShaulLavo/fregat/commit/19617a4a0513a16eb50e41475b23e327cb2e5323), [`5b50c80`](https://github.com/ShaulLavo/fregat/commit/5b50c80dc40b6173023ea94a83c3215094304779), [`044eafe`](https://github.com/ShaulLavo/fregat/commit/044eafef8f31f2cb5435a07988785793194a283c), [`57cbbbf`](https://github.com/ShaulLavo/fregat/commit/57cbbbf1b0a37df9e6cdc5a2e97e3732975d1cbe), [`b981120`](https://github.com/ShaulLavo/fregat/commit/b9811202176722702d40fef6e8e1b781a2e5a816), [`bb88ac6`](https://github.com/ShaulLavo/fregat/commit/bb88ac6c1dc8fd3ad7e938d707ca1990f92d6899)]:
+  - @singapore-editor/core@0.2.10
+
 ## 0.2.9
 
 ### Patch Changes
