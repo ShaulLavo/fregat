@@ -42,12 +42,9 @@ function packageRoot(entry, name) {
 }
 
 function packageFiles(root) {
-  const files = []
-  for (const entry of readdirSync(root, { withFileTypes: true })) {
-    if (entry.name === 'node_modules') continue
+  return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.name === 'node_modules') return []
     const file = join(root, entry.name)
-    if (entry.isDirectory()) files.push(...packageFiles(file))
-    else files.push(file)
-  }
-  return files
+    return entry.isDirectory() ? packageFiles(file) : [file]
+  })
 }

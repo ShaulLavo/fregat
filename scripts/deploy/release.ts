@@ -31,7 +31,6 @@ export type Checkout = {
   commit: string
   branch: string
   dirtyFiles: string[]
-  editorCommit: string | null
 }
 
 export type BuildConfig = Checkout & {
@@ -72,7 +71,6 @@ export async function readCheckout(root = checkoutRoot): Promise<Checkout> {
     commit,
     branch,
     dirtyFiles: status.code === 0 ? porcelainPaths(status.stdout) : [],
-    editorCommit: null,
   }
 }
 

@@ -85,7 +85,7 @@ test.each([
     expect(checkout.branch).toBe(expected)
     expect(checkout.commit).toBe(git('rev-parse', 'HEAD'))
     expect(checkout.dirtyFiles).toEqual([])
-    expect(checkout.editorCommit).toBeNull()
+    expect(checkout).not.toHaveProperty('editorCommit')
   } finally {
     rmSync(root, { force: true, recursive: true })
   }
