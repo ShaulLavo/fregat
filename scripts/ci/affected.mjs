@@ -4,19 +4,6 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 
 const generatedDocs = ['docs/settings-reference.md', 'docs/native-syntax-coverage.*']
-const editorHealthInputs = [
-  'packages/singapore/docs/architecture/**/*.json',
-  'packages/singapore/docs/commands.md',
-  'packages/singapore/scripts/architecture-health.mjs',
-  'packages/singapore/scripts/check-full-text-boundary.mjs',
-  'packages/singapore/scripts/full-text-boundary-allow.json',
-  'packages/singapore/scripts/command-reference.ts',
-  'packages/singapore/scripts/workspace-root.ts',
-  'packages/singapore/package.json',
-  'packages/singapore/site/package.json',
-  'package.json',
-  '.github/workflows/workspace-libraries.yml',
-]
 
 function readJson(file) {
   return JSON.parse(readFileSync(file, 'utf8'))
@@ -169,25 +156,11 @@ export function selectAffected(graph, files, full = false) {
   const packages = Array.from(full ? graph.packages.keys() : owned.seeds).sort()
   const selected = new Set(packages)
   const tooling = full || owned.tooling || selected.has('scripts')
-  const familyChanged = (family) =>
-    packages.some((name) => graph.packages.get(name).directory.startsWith(`${family}/packages/`))
-  const sites = []
-  if (selected.has('site')) sites.push('fregat')
-  if (selected.has('singapore-editor-site')) sites.push('singapore')
-  if (selected.has('@singapore-editor/example-app')) sites.push('demo')
-  if (selected.has('ghostty-webgpu-site') || selected.has('ghostty-webgpu-classic-site'))
-    sites.push('ghostty-webgpu')
+  const sites = selected.has('site') ? 'fregat' : ''
   return {
     exhaustive: full,
     code: tooling || packages.length > 0,
-    shared:
-      tooling ||
-      packages.some(
-        (name) =>
-          !['ghostty-webgpu', 'ghostty-webgpu-line-editor', 'ghostty-webgpu-shaders'].includes(
-            name,
-          ),
-      ),
+    shared: tooling || packages.length > 0,
     tooling,
     packages,
     web: selected.has('web'),
@@ -196,18 +169,7 @@ export function selectAffected(graph, files, full = false) {
     tree: selected.has('@workspace/tree'),
     desktop: selected.has('desktop'),
     site: sites.length > 0,
-    sites: sites.join(','),
-    editor:
-      files.some((file) => matches(file, editorHealthInputs)) ||
-      familyChanged('packages/singapore') ||
-      packages.some((name) =>
-        graph.packages.get(name).directory.startsWith('packages/singapore/examples/'),
-      ),
-    ghostty:
-      selected.has('ghostty-webgpu') ||
-      selected.has('ghostty-webgpu-line-editor') ||
-      selected.has('ghostty-webgpu-shaders'),
-    hotkeys: familyChanged('packages/hotkeys'),
+    sites,
     docs: files.some(rootDocument),
     docs_files: files.filter(
       (file) => rootDocument(file) && existsSync(path.join(graph.root, file)),

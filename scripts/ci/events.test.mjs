@@ -113,19 +113,3 @@ test.skipIf(!gitAvailable).each(['success', 'none'])(
     })
   },
 )
-
-test('expensive collaboration and textbuffer runs are scheduled or manual', () => {
-  for (const file of [
-    'editor-collab.yml',
-    'editor-collaboration.yml',
-    'editor-textbuffer-bench.yml',
-  ]) {
-    const workflow = Bun.YAML.parse(
-      readFileSync(path.join(root, '.github/workflows', file), 'utf8'),
-    )
-    expect(workflow.on).not.toHaveProperty('pull_request')
-    expect(workflow.on).not.toHaveProperty('push')
-    expect(workflow.on).toHaveProperty('schedule')
-    expect(workflow.on).toHaveProperty('workflow_dispatch')
-  }
-})

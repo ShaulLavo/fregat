@@ -1,5 +1,4 @@
 import { expect, test } from 'vitest'
-import { JSON5 } from 'bun'
 import { copyFile, mkdir, readdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, relative } from 'node:path'
@@ -69,59 +68,31 @@ test('test:scripts picks up future nested ts and mjs suites without collecting o
   })
 })
 
-async function prepare({ root, put }) {
+async function prepare({ put }) {
   await put('.', {
     name: 'fixture',
     private: true,
     packageManager: 'bun@1.4.4',
     workspaces: {
-      packages: [
-        'apps/*',
-        'packages/hotkeys/packages/*',
-        'packages/singapore/site',
-        'packages/ghostty-webgpu/site',
-        'packages/ghostty-webgpu/site-classic',
-      ],
+      packages: ['apps/*', 'packages/*'],
       catalog,
     },
   })
-  const format = JSON.stringify({ semi: false, singleQuote: true })
-  await writeFile(`${root}/.oxfmtrc.json`, format)
-  for (const family of ['packages/singapore', 'packages/ghostty-webgpu', 'packages/hotkeys']) {
-    await mkdir(`${root}/${family}`, { recursive: true })
-    await writeFile(`${root}/${family}/.oxfmtrc.json`, format)
-  }
 }
 
 function run(root, ...args) {
   return spawnSync('bun', [script].concat(args), { cwd: root, encoding: 'utf8' })
 }
 
-test('checks workspace tools, standalone catalogs and the Astro compiler API', async () => {
+test('checks Fregat workspace tools and the Astro compiler API', async () => {
   await withWorkspace(async (fixture) => {
     await prepare(fixture)
     await fixture.put('apps/site', {
       name: 'site',
       devDependencies: { typescript: catalog['typescript-api'] },
     })
-    await fixture.put('packages/singapore/site', {
-      name: 'singapore-editor-site',
-      devDependencies: { typescript: catalog['typescript-api'] },
-    })
-    await fixture.put('packages/ghostty-webgpu/site', {
-      name: 'ghostty-webgpu-site',
-      devDependencies: { typescript: catalog['typescript-api'] },
-    })
-    await fixture.put('packages/ghostty-webgpu/site-classic', {
-      name: 'ghostty-webgpu-classic-site',
-      devDependencies: { typescript: catalog['typescript-api'] },
-    })
-    await fixture.put('packages/hotkeys', {
-      name: 'hotkeys-workspace',
-      workspaces: { packages: ['packages/*'], catalog: { vitest: '5.0.2' } },
-    })
-    await fixture.put('packages/hotkeys/packages/core', {
-      name: 'core',
+    await fixture.put('packages/contracts', {
+      name: '@workspace/contracts',
       devDependencies: { typescript: '7.0.2', vitest: 'catalog:' },
     })
     const result = run(fixture.root)
@@ -129,11 +100,11 @@ test('checks workspace tools, standalone catalogs and the Astro compiler API', a
   })
 })
 
-test('rejects and synchronizes tool versions, Bun pins and standalone catalog drift', async () => {
+test('rejects and synchronizes tool versions, Bun pins and workspace catalog drift', async () => {
   await withWorkspace(async (fixture) => {
     await prepare(fixture)
-    await fixture.put('packages/singapore', {
-      name: 'editor-workspace',
+    await fixture.put('packages/contracts', {
+      name: 'contracts',
       packageManager: 'bun@1.3.14',
       devDependencies: { typescript: '~6.0.3' },
       workspaces: { packages: ['packages/*'], catalog: { vitest: '4.0.0' } },
@@ -145,138 +116,73 @@ test('rejects and synchronizes tool versions, Bun pins and standalone catalog dr
     expect(failed.stderr).toContain('catalog vitest must be 5.0.2')
     expect(run(fixture.root, '--write').status).toBe(0)
     expect(run(fixture.root).status).toBe(0)
-    const manifest = await fixture.read('packages/singapore')
+    const manifest = await fixture.read('packages/contracts')
     expect(manifest.devDependencies.typescript).toBe('7.0.2')
     expect(manifest.packageManager).toBe('bun@1.4.4')
     expect(manifest.workspaces.catalog.vitest).toBe('5.0.2')
   })
 })
 
-test('rejects formatter drift while allowing family-specific generated-file exclusions', async () => {
-  await withWorkspace(async (fixture) => {
-    await prepare(fixture)
-    await writeFile(
-      `${fixture.root}/packages/ghostty-webgpu/.oxfmtrc.json`,
-      JSON.stringify({ semi: true, singleQuote: true, ignorePatterns: ['native/**'] }),
-    )
-    const result = run(fixture.root)
-    expect(result.status).not.toBe(0)
-    expect(result.stderr).toContain('semi must match the root formatter')
-  })
-})
-
-test('root and standalone terminal install Node types ahead of ancestor packages', async () => {
+test('root installs Node types ahead of ancestor packages', async () => {
   const checkout = fileURLToPath(new URL('../', import.meta.url))
   const require = createRequire(join(checkout, 'package.json'))
   const compiler = join(dirname(require.resolve('typescript/package.json')), 'bin/tsc')
 
-  for (const workspace of ['.', 'packages/ghostty-webgpu']) {
-    const manifestPath = join(checkout, workspace, 'package.json')
-    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-    expect(manifest.devDependencies['@types/node']).toBe('26.6.3')
-    const localRequire = createRequire(manifestPath)
-    const nodeTypes = dirname(localRequire.resolve('@types/node/package.json'))
+  const manifestPath = join(checkout, 'package.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  expect(manifest.devDependencies['@types/node']).toBe('26.6.3')
+  const localRequire = createRequire(manifestPath)
+  const nodeTypes = dirname(localRequire.resolve('@types/node/package.json'))
 
-    await withWorkspace(async ({ root }) => {
-      const ancestor = join(root, 'node_modules/@types/node')
-      const project = join(root, 'repo')
-      await mkdir(ancestor, { recursive: true })
-      await mkdir(project)
-      await writeFile(join(ancestor, 'index.d.ts'), 'declare const ancestorTypes: unique symbol')
-      await writeFile(
-        join(project, 'tsconfig.json'),
-        JSON.stringify({
-          compilerOptions: {
-            target: 'ES2023',
-            module: 'ESNext',
-            moduleResolution: 'bundler',
-            types: ['node'],
-            skipLibCheck: true,
-            noEmit: true,
-          },
-          files: ['index.ts'],
-        }),
-      )
-      await writeFile(
-        join(project, 'index.ts'),
-        "const bytes: Uint8Array = Buffer.from('checkout')",
-      )
-      const args = [compiler, '-p', join(project, 'tsconfig.json'), '--traceResolution']
-      const before = spawnSync('node', args, { cwd: project, encoding: 'utf8' })
-      expect(before.status).not.toBe(0)
-      expect(before.stdout).toContain(join(ancestor, 'index.d.ts'))
-      expect(before.stdout).toContain("Cannot find name 'Buffer'")
+  await withWorkspace(async ({ root }) => {
+    const ancestor = join(root, 'node_modules/@types/node')
+    const project = join(root, 'repo')
+    await mkdir(ancestor, { recursive: true })
+    await mkdir(project)
+    await writeFile(join(ancestor, 'index.d.ts'), 'declare const ancestorTypes: unique symbol')
+    await writeFile(
+      join(project, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          target: 'ES2023',
+          module: 'ESNext',
+          moduleResolution: 'bundler',
+          types: ['node'],
+          skipLibCheck: true,
+          noEmit: true,
+        },
+        files: ['index.ts'],
+      }),
+    )
+    await writeFile(join(project, 'index.ts'), "const bytes: Uint8Array = Buffer.from('checkout')")
+    const args = [compiler, '-p', join(project, 'tsconfig.json'), '--traceResolution']
+    const before = spawnSync('node', args, { cwd: project, encoding: 'utf8' })
+    expect(before.status).not.toBe(0)
+    expect(before.stdout).toContain(join(ancestor, 'index.d.ts'))
+    expect(before.stdout).toContain("Cannot find name 'Buffer'")
 
-      const typesRoot = join(project, 'node_modules/@types')
-      await mkdir(typesRoot, { recursive: true })
-      await symlink(nodeTypes, join(typesRoot, 'node'), 'junction')
-      const after = spawnSync('node', args, { cwd: project, encoding: 'utf8' })
-      expect(after.status, after.stdout + after.stderr).toBe(0)
-      expect(after.stdout).toContain(join(nodeTypes, 'index.d.ts'))
-      expect(after.stdout).not.toContain(join(ancestor, 'index.d.ts'))
-    })
-  }
-})
-
-test('terminal workspace version agrees with the root lockfile', async () => {
-  const manifest = JSON.parse(
-    await readFile(new URL('../packages/ghostty-webgpu/package.json', import.meta.url), 'utf8'),
-  )
-  const lockfile = JSON5.parse(await readFile(new URL('../bun.lock', import.meta.url), 'utf8'))
-  expect(lockfile.workspaces['packages/ghostty-webgpu'].version).toBe(manifest.version)
-})
-
-test('terminal native input closure agrees with its package dependencies', () => {
-  const terminal = fileURLToPath(new URL('../packages/ghostty-webgpu/', import.meta.url))
-  const verifier = fileURLToPath(
-    new URL(
-      '../packages/ghostty-webgpu/scripts/verify-config-resolver-artifacts.ts',
-      import.meta.url,
-    ),
-  )
-  const result = spawnSync('bun', [verifier, '--state', 'either'], {
-    cwd: terminal,
-    encoding: 'utf8',
+    const typesRoot = join(project, 'node_modules/@types')
+    await mkdir(typesRoot, { recursive: true })
+    await symlink(nodeTypes, join(typesRoot, 'node'), 'junction')
+    const after = spawnSync('node', args, { cwd: project, encoding: 'utf8' })
+    expect(after.status, after.stdout + after.stderr).toBe(0)
+    expect(after.stdout).toContain(join(nodeTypes, 'index.d.ts'))
+    expect(after.stdout).not.toContain(join(ancestor, 'index.d.ts'))
   })
-  expect(result.status, result.stdout + result.stderr).toBe(0)
-  expect(['bootstrap', 'assembled']).toContain(result.stdout.trim())
 })
 
-test.each(
-  ['packages/singapore', 'packages/ghostty-webgpu', 'packages/hotkeys'].flatMap((family) =>
-    [
-      { key: 'vitest@5.0.2', patch: 'patches/vitest@5.0.2.patch' },
-      { key: '@vitest/mocker@5.0.2', patch: 'patches/@vitest%2Fmocker@5.0.2.patch' },
-    ].map((tool) => ({ family, ...tool })),
-  ),
-)(
-  'keeps the shared $key patch inside the $family standalone export',
-  async ({ family, key, patch }) => {
-    await withWorkspace(async (fixture) => {
-      await prepare(fixture)
-      const source = 'shared test-tool patch\n'
-      const root = await fixture.read('.')
-      await fixture.put('.', { ...root, patchedDependencies: { [key]: patch } })
-      await mkdir(join(fixture.root, 'patches'))
-      await writeFile(join(fixture.root, patch), source)
-      for (const name of ['packages/singapore', 'packages/ghostty-webgpu', 'packages/hotkeys']) {
-        await fixture.put(name, { name, patchedDependencies: { [key]: patch } })
-        await mkdir(join(fixture.root, name, 'patches'))
-        await writeFile(join(fixture.root, name, patch), source)
-      }
-      await fixture.put(family, { name: family })
-      const missing = run(fixture.root)
-      expect(missing.status).not.toBe(0)
-      expect(missing.stderr).toContain(`${family}/package.json: patch ${key}`)
-      expect(run(fixture.root, '--write').status).toBe(0)
-      expect((await fixture.read(family)).patchedDependencies[key]).toBe(patch)
-      await writeFile(join(fixture.root, family, patch), 'stale patch\n')
-      const stale = run(fixture.root)
-      expect(stale.status).not.toBe(0)
-      expect(stale.stderr).toContain(`${family}/${patch} must match the root patch`)
-      expect(run(fixture.root, '--write').status).toBe(0)
-      expect(await readFile(join(fixture.root, family, patch), 'utf8')).toBe(source)
-      expect(run(fixture.root).status).toBe(0)
+test('ignores undeclared standalone checkouts', async () => {
+  await withWorkspace(async (fixture) => {
+    await prepare(fixture)
+    await fixture.put('packages/singapore', {
+      name: 'standalone-editor',
+      devDependencies: { typescript: '1.0.0' },
     })
-  },
-)
+    const manifest = await fixture.read('.')
+    manifest.workspaces.packages = ['apps/*']
+    await fixture.put('.', manifest)
+    const result = run(fixture.root)
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('1 package manifests')
+  })
+})

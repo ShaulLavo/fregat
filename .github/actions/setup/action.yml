@@ -1,9 +1,9 @@
 name: Setup
-description: Installs the toolchain and workspace dependencies, then builds Editor and ghostty packages.
+description: Installs the toolchain and workspace dependencies, then builds Fregat workspace prerequisites.
 
 inputs:
   build-packages:
-    description: JSON consumer workspace names, all workspaces, or the editor family.
+    description: JSON consumer workspace names or all workspaces.
     default: all
 
 runs:

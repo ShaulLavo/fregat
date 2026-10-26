@@ -5,7 +5,7 @@ import { createServer } from 'node:http'
 import { extname, join, resolve, sep } from 'node:path'
 import { chromium, webkit } from 'playwright'
 
-// A row is one built page, browser, viewport and interaction state. The same crawl runs locally
+// A row is one built page, browser and viewport. The same crawl runs locally
 // against build output or against a published sitemap; evidence is optional in CI.
 const args = process.argv.slice(2)
 const option = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback)
@@ -210,8 +210,6 @@ async function checkPage(page, engine, url) {
     assert(response?.ok(), `${url}: HTTP ${response?.status()}`)
     if (readySelector) await page.locator(readySelector).waitFor({ timeout: 45000 })
     for (const width of widths) await record(page, engine, url, width, 'page')
-    await checkSearch(page, engine, url)
-    await checkInspector(page, engine, url)
   } catch (error) {
     failed++
     console.log(`FAIL ${engine} ${url}: ${error.message}`)
@@ -221,29 +219,6 @@ async function checkPage(page, engine, url) {
         `${JSON.stringify({ url, engine, error: error.message })}\n`,
       )
   }
-}
-
-async function checkSearch(page, engine, url) {
-  // Pagefind's dialog has a separate layout on each documentation page.
-  const search = page.locator('site-search button, button.search-open')
-  if (!(await search.count())) return
-  await search.first().click()
-  await page.locator('dialog[open]').waitFor()
-  for (const width of widths) await record(page, engine, url, width, 'search')
-  await page.keyboard.press('Escape')
-}
-
-async function checkInspector(page, engine, url) {
-  const trigger = page.locator('#toolbar').getByRole('button', {
-    name: 'Inspect piece tree',
-    exact: true,
-  })
-  if (!(await trigger.count())) return
-  await trigger.click()
-  const dialog = page.getByRole('dialog', { name: 'Piece tree inspector' })
-  await dialog.waitFor()
-  for (const width of widths) await record(page, engine, url, width, 'inspector')
-  await dialog.getByRole('button', { name: 'Close inspector', exact: true }).click()
 }
 
 async function checkWorker(browser, engine, nextUrl) {

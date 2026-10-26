@@ -5,10 +5,6 @@ const [operation, source] = process.argv.slice(2)
 const graph = readWorkspaceGraph(process.cwd())
 function targetNames() {
   if (source === 'all') return Array.from(graph.packages.keys())
-  if (source === 'editor')
-    return Array.from(graph.packages.values())
-      .filter((pkg) => pkg.directory.startsWith('packages/singapore/'))
-      .map((pkg) => pkg.name)
   return JSON.parse(source)
 }
 const names = targetNames()
@@ -31,36 +27,10 @@ if (operation === 'build') {
       ['bun', 'x', 'turbo', 'run', 'build'].concat(libraries.map((name) => `--filter=${name}`)),
     )
 } else {
-  assert(['checks', 'tests', 'editor-tests'].includes(operation), 'Unknown CI package operation')
+  assert(['checks', 'tests'].includes(operation), 'Unknown CI package operation')
   for (const name of names) {
     const pkg = graph.packages.get(name)
-    if (
-      operation === 'checks' &&
-      ['ghostty-webgpu', 'ghostty-webgpu-line-editor', 'ghostty-webgpu-shaders'].includes(name)
-    )
-      continue
-    const dedicatedTest =
-      [
-        'web',
-        'server',
-        'tui',
-        'ghostty-webgpu',
-        'ghostty-webgpu-line-editor',
-        'ghostty-webgpu-shaders',
-        'singapore-editor-site',
-        'scripts',
-      ].includes(name) ||
-      pkg.directory.startsWith('packages/singapore/packages/') ||
-      pkg.directory.startsWith('packages/singapore/examples/')
-    if (operation === 'tests' && dedicatedTest) continue
-    if (
-      operation === 'editor-tests' &&
-      !(
-        pkg.directory.startsWith('packages/singapore/packages/') ||
-        pkg.directory.startsWith('packages/singapore/examples/')
-      )
-    )
-      continue
+    if (operation === 'tests' && ['web', 'server', 'tui', 'scripts'].includes(name)) continue
     const tasks = operation === 'checks' ? ['format:check', 'lint', 'typecheck'] : ['test']
     for (const task of tasks) {
       if (!pkg.scripts[task]) continue

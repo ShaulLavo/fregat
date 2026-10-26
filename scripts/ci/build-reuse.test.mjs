@@ -19,11 +19,13 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, onTestFinished, test } from 'vitest'
-import { readWorkspaceGraph, requiredLibraries } from './affected.mjs'
+import { requiredLibraries } from './affected.mjs'
 import { consume, planBuilds, prepare, produce, verifyImported } from './build-reuse.mjs'
 
+import { consumerGraph } from './fixtures/consumer-workspace.mjs'
+
 const root = path.resolve(import.meta.dirname, '../..')
-const graph = readWorkspaceGraph(root)
+const graph = consumerGraph(root)
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex')
 const full = {
   code: 'true',
@@ -33,10 +35,8 @@ const full = {
   web: 'true',
   server: 'true',
   tui: 'true',
-  editor: 'true',
-  ghostty: 'true',
   site: 'true',
-  sites: 'fregat,singapore,demo,ghostty-webgpu',
+  sites: 'fregat',
   packages: 'all',
 }
 
@@ -215,33 +215,31 @@ function compiles(directory) {
   return existsSync(file) ? readFileSync(file, 'utf8').trim().split('\n') : []
 }
 
-test('full enabled CI has one owner for each of its 29 setup build tasks', () => {
+test('full enabled CI has one owner for each Fregat setup build task', () => {
   const plan = planBuilds(graph, full)
   expect(plan).toEqual(requiredLibraries(graph, Array.from(graph.packages.keys())))
-  expect(plan).toHaveLength(29)
-  expect(new Set(plan).size).toBe(29)
+  expect(plan).toEqual(['@workspace/ui'])
+  expect(new Set(plan).size).toBe(1)
 })
 
 test.each([
-  ['web', { web: 'true' }, 23],
-  ['tree Browser prerequisites', { tree: 'true' }, 23],
-  ['tooling', { tooling: 'true' }, 29],
-  ['server', { server: 'true' }, 2],
-  ['TUI', { tui: 'true' }, 12],
-  ['Editor', { editor: 'true' }, 24],
-  ['Ghostty', { ghostty: 'true' }, 4],
+  ['web', { web: 'true' }, 1],
+  ['tree Browser prerequisites', { tree: 'true' }, 1],
+  ['tooling', { tooling: 'true' }, 1],
+  ['server', { server: 'true' }, 0],
+  ['TUI', { tui: 'true' }, 0],
+  ['Fregat site', { site: 'true', sites: 'fregat' }, 0],
   ['empty union', {}, 0],
 ])('%s selection has its exact existing graph closure', (_, flags, size) => {
   expect(planBuilds(graph, selected(flags))).toHaveLength(size)
 })
 
-test('union covers every enabled family and selected site without duplicate tasks', () => {
+test('union covers every enabled consumer and the Fregat site without duplicate tasks', () => {
   const plan = planBuilds(
     graph,
-    selected({ web: 'true', editor: 'true', ghostty: 'true', site: 'true', sites: 'demo' }),
+    selected({ web: 'true', server: 'true', site: 'true', sites: 'fregat' }),
   )
-  expect(plan).toHaveLength(28)
-  expect(plan).not.toContain('@fregat/react-hotkeys')
+  expect(plan).toEqual(['@workspace/ui'])
   expect(() => planBuilds(graph, selected({ shared: 'true', packages: '["unknown"]' }))).toThrow()
   expect(() => planBuilds(graph, selected({ site: 'true', sites: 'unknown' }))).toThrow()
 })

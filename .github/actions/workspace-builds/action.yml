@@ -8,7 +8,7 @@ inputs:
     description: Changes job outputs for the producer union.
     default: ''
   targets:
-    description: Consumer package selection, all, editor, or sites selection.
+    description: Consumer package selection, all, or sites selection.
     default: '[]'
 outputs:
   ready:

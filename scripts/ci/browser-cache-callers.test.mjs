@@ -5,7 +5,7 @@ import { YAML } from 'bun'
 const root = new URL('../../', import.meta.url)
 const browserAction = './.github/actions/install-browsers'
 const flake = YAML.parse(await readFile(new URL('.github/workflows/flake-watch.yml', root), 'utf8'))
-const docs = YAML.parse(await readFile(new URL('.github/workflows/ghostty-docs.yml', root), 'utf8'))
+const ci = YAML.parse(await readFile(new URL('.github/workflows/ci.yml', root), 'utf8'))
 
 function browserSteps(job) {
   return job.steps.filter((step) => step.uses === browserAction)
@@ -37,30 +37,22 @@ test('flake browser suites share the action cache and keep their Chromium instal
   ])
 })
 
-test('both docs sites install Chromium and WebKit with their own workspace executable', () => {
-  expect(docs.jobs.docs.strategy.matrix.site).toEqual(['site', 'site-classic'])
-  expect(browserSteps(docs.jobs.docs)).toEqual([
+test('Fregat site checks install every engine through the scripts workspace', () => {
+  expect(browserSteps(ci.jobs.site)).toEqual([
     {
-      name: 'Install Chromium and WebKit',
+      name: 'Install Fregat site browsers',
       uses: browserAction,
       with: {
-        playwright: 'packages/ghostty-webgpu/${{ matrix.site }}/node_modules/.bin/playwright',
-        browsers: 'chromium webkit',
+        playwright: 'scripts/node_modules/.bin/playwright',
+        browsers: 'chromium firefox webkit',
       },
     },
   ])
-  const names = docs.jobs.docs.steps.map((step) => step.name)
-  expect(names.indexOf('Install Chromium and WebKit')).toBeGreaterThan(
-    names.indexOf('Check samples, generate reference and validate links'),
-  )
-  expect(names.indexOf('Install Chromium and WebKit')).toBeLessThan(
-    names.indexOf('Start docs preview'),
-  )
 })
 
 test.each([
   ['flake watch', flake.jobs.repeat],
-  ['ghostty docs', docs.jobs.docs],
+  ['Fregat site', ci.jobs.site],
 ])('%s leaves browser payload and APT cache ownership to the shared action', (_, job) => {
   const caches = job.steps.filter((step) => step.uses?.startsWith('actions/cache'))
   expect(

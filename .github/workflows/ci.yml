@@ -66,9 +66,6 @@ jobs:
       tui: ${{ steps.plan.outputs.tui }}
       desktop: ${{ steps.plan.outputs.desktop }}
       site: ${{ steps.plan.outputs.site }}
-      editor: ${{ steps.plan.outputs.editor }}
-      ghostty: ${{ steps.plan.outputs.ghostty }}
-      hotkeys: ${{ steps.plan.outputs.hotkeys }}
       web_shards: >-
         ${{ github.event_name == 'workflow_dispatch' && inputs.web_shards == '2' && '["1/2","2/2"]' || '["1/4","2/4","3/4","4/4"]' }}
       mobile_shards: >-
@@ -156,17 +153,14 @@ jobs:
       - name: Check shared tooling
         run: bun run workspace:check
 
-      - name: Check package pages
-        run: bun run package-pages:check
-
       # `format:check`, never `format` — a CI job that rewrites files and then
       # passes is a job that reports on a tree nobody reviewed.
       - name: Format
-        run: bun run format:check:root && bun run --cwd packages/singapore format:check:root && bun run --cwd packages/hotkeys format:check
+        run: bun run format:check:root
 
       # Package formatting and linting run with the affected package checks.
       - name: Lint
-        run: bun run plans:check && bun run --cwd packages/singapore lint:root && bun run dupes:functions && bun run dupes
+        run: bun run plans:check && bun run dupes:functions && bun run dupes
 
       - name: Query API
         run: bun run query:check
@@ -243,7 +237,7 @@ jobs:
       - name: Archive script test builds
         if: ${{ needs.changes.outputs.tooling == 'true' }}
         run: |
-          find editor/packages packages hotkeys ghostty-webgpu -name node_modules -prune -o -type d -name dist -prune -print0 |
+          find packages -name node_modules -prune -o -type d -name dist -prune -print0 |
             tar --null -T - -czf "$RUNNER_TEMP/script-test-builds.tar.gz"
 
       - name: Share script test builds
@@ -278,10 +272,6 @@ jobs:
       - name: Check script types
         if: ${{ needs.changes.outputs.tooling == 'true' }}
         run: bun run --cwd scripts typecheck
-
-      - name: Check Hotkeys documentation
-        if: ${{ needs.changes.outputs.hotkeys == 'true' }}
-        run: bun run --cwd packages/hotkeys docs:check
 
       - name: Check generated artifacts
         if: ${{ needs.changes.outputs.tooling == 'true' }}
@@ -573,35 +563,22 @@ jobs:
           operation: consume
           targets: sites:${{ needs.changes.outputs.sites }}
 
-      - name: Install Singapore browser test dependencies
-        if: ${{ contains(needs.changes.outputs.sites, 'singapore') || contains(needs.changes.outputs.sites, 'fregat') || needs.changes.outputs.tooling == 'true' }}
+      - name: Install Fregat site browsers
         uses: ./.github/actions/install-browsers
         with:
-          playwright: packages/singapore/site/node_modules/.bin/playwright
+          playwright: scripts/node_modules/.bin/playwright
           browsers: chromium firefox webkit
       - name: Build production sites
         env:
           CI_SITES: ${{ needs.changes.outputs.sites }}
         run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites" "$CI_SITES" --reuse-workspace-builds
-      - name: Build classic Ghostty site for Pages
-        if: ${{ contains(needs.changes.outputs.sites, 'ghostty-webgpu') }}
-        run: bun run --cwd packages/ghostty-webgpu/site-classic build --base /ghostty-webgpu/
       - name: Check deployment config and cache headers
         run: python3 -m unittest discover -s scripts/product-sites -p 'test_*.py'
-      - name: Check Ghostty font assets
-        if: ${{ contains(needs.changes.outputs.sites, 'ghostty-webgpu') }}
-        run: bun scripts/product-sites/test-font-assets.mjs "$RUNNER_TEMP/product-sites/ghostty-webgpu"
-      - name: Test Singapore documentation checks
-        if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
-        run: bun run --cwd packages/singapore/site test
       - name: Test landing page playback
         run: bun run test:scripts scripts/site-player.test.ts
       - name: Test mobile overflow detection
         if: ${{ needs.changes.outputs.tooling == 'true' }}
         run: bun scripts/product-sites/test-mobile.mjs
-      - name: Test Singapore docs browsing and examples at the root base
-        if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
-        run: bun run --cwd packages/singapore/site test:browser
       - name: Check landing page focus, contrast and motion controls
         if: ${{ contains(needs.changes.outputs.sites, 'fregat') }}
         run: bun run --cwd apps/site verify:a11y
@@ -658,23 +635,12 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}
           EXHAUSTIVE: ${{ needs.changes.outputs.exhaustive }}
-          CI_SITES: ${{ needs.changes.outputs.sites }}
         run: |
-          for site in fregat singapore ghostty-webgpu; do
-            directory="$RUNNER_TEMP/product-sites/$site"
-            if [[ ! -d "$directory" ]]; then continue; fi
-            paths=('/')
-            if [[ "$site" == singapore ]]; then
-              paths=()
-              if [[ ",$CI_SITES," == *",singapore,"* ]]; then paths+=('/' '/docs/start-here/introduction/' '/docs/start-here/playground/'); fi
-              if [[ ",$CI_SITES," == *",demo,"* ]]; then paths+=('/demo/'); fi
-            fi
-            selection=(--paths "$(IFS=,; echo "${paths[*]}")")
-            if [[ "$EXHAUSTIVE" == 'true' ]]; then
-              selection=(--shards 2 --shard "${SHARD##*-}")
-            fi
-            bun scripts/product-sites/verify-mobile.mjs --directory "$directory" --evidence "$RUNNER_TEMP/mobile-layout/$site" --engines "${SHARD%-*}" "${selection[@]}"
-          done
+          selection=(--paths /)
+          if [[ "$EXHAUSTIVE" == 'true' ]]; then
+            selection=(--shards 2 --shard "${SHARD##*-}")
+          fi
+          bun scripts/product-sites/verify-mobile.mjs --directory "$RUNNER_TEMP/product-sites/fregat" --evidence "$RUNNER_TEMP/mobile-layout/fregat" --engines "${SHARD%-*}" "${selection[@]}"
 
       - name: Upload mobile layout evidence
         if: always()
@@ -684,23 +650,6 @@ jobs:
           path: ${{ runner.temp }}/mobile-layout
           if-no-files-found: ignore
           retention-days: 7
-
-  libraries:
-    name: Libraries
-    needs: [changes, workspace-builds]
-    if: ${{ needs.changes.outputs.editor == 'true' || needs.changes.outputs.ghostty == 'true' || needs.changes.outputs.hotkeys == 'true' }}
-    permissions:
-      contents: read
-    uses: ./.github/workflows/workspace-libraries.yml
-    with:
-      reuse_builds: ${{ needs.changes.outputs.code == 'true' }}
-      packages: ${{ needs.changes.outputs.packages }}
-      exhaustive: ${{ needs.changes.outputs.exhaustive == 'true' }}
-      editor: ${{ needs.changes.outputs.editor == 'true' }}
-      ghostty: ${{ needs.changes.outputs.ghostty == 'true' }}
-      standalone_editor: ${{ needs.changes.outputs.exhaustive == 'true' }}
-      standalone_ghostty: ${{ needs.changes.outputs.exhaustive == 'true' }}
-      standalone_hotkeys: ${{ needs.changes.outputs.exhaustive == 'true' }}
 
   # The one status to read: red when any job failed or was cancelled; a job skipped because the
   # change cannot affect it counts as passed.
@@ -721,7 +670,6 @@ jobs:
         browser,
         site,
         mobile-layout,
-        libraries,
       ]
     if: ${{ always() }}
     runs-on: ubuntu-latest

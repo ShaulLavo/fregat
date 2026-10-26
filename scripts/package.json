@@ -8,7 +8,7 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "typecheck": "tsc --noEmit",
-    "product-sites:deploy": "wrangler deploy --config product-sites/wrangler.fregat.jsonc && wrangler deploy --config product-sites/wrangler.singapore.jsonc && wrangler deploy --config product-sites/wrangler.ghostty.jsonc"
+    "product-sites:deploy": "wrangler deploy --config product-sites/wrangler.fregat.jsonc"
   },
   "dependencies": {
     "@workspace/utils": "workspace:*"
