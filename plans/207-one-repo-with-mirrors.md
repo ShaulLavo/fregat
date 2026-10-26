@@ -2,9 +2,18 @@
 
 ## Status and authorization
 
-- Status: SOURCE MIGRATION DELIVERED 2026-09-30. Command foundation standalone
-  qualification completed 2026-10-04. Overall delivery remains ongoing while npm
-  account setup, initial publication and trusted publishing remain deferred.
+- Status: SOURCE MIGRATION DELIVERED 2026-09-30. Standalone development and releases have since
+  resumed in the Singapore, ghostty-webgpu, and hotkeys repositories.
+- Develop those libraries in their own repositories. Fregat consumes their immutable release
+  archives. Use [local package checkouts](../docs/local-package-checkouts.md) for coordinated
+  changes.
+- Fregat [#1356](https://github.com/ShaulLavo/fregat/pull/1356) tracks removal of
+  `packages/singapore`, `packages/ghostty-webgpu`, and `packages/hotkeys` after the final release
+  and site gates. `packages/pty` stays in Fregat.
+
+The authorization, decisions, and receipts below record the original migration and the publication
+deferrals in effect at that time.
+
 - The owner authorized final fixes and merging PR #199 on 2026-09-30. Mirror pushes must
   fast-forward without force; integration edits may change the split commit ids.
 - Owner decision: all code we write for Fregat lives in the Fregat monorepo. Flagship packages

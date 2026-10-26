@@ -9,10 +9,8 @@ receipts remain in Git history.
 
 - **One library, no keymaps inside.** `@fregat/hotkeys` is our fork of TanStack Hotkeys: its API
   shape and pure key functions, with our trie, editor-grade chords and Zed's context resolution.
-  It lives in Fregat's `packages/hotkeys/`, mirrored to its own public repo
-  ([ADR 001](../adr/001-one-repository-with-mirrors.md)). Local consumers use the workspace;
-  standalone consumers qualify a pinned dependency artifact while npm remains deferred.
-  The core is DOM-free; adapters turn browser and terminal input into its key events.
+  It lives in [ShaulLavo/hotkeys](https://github.com/ShaulLavo/hotkeys). Fregat consumes a pinned
+  release archive. The core is DOM-free; adapters turn browser and terminal input into its key events.
 - **Every product is standalone on the library** and ships its own defaults. The Editor follows
   CodeMirror: a minimal built-in base, packs exported as data (VS Code, Markdown, …) and the
   user's object on top. ghostty-webgpu ships a small baseline. Hosts import, modify and pass back

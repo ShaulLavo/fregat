@@ -4,10 +4,10 @@ Fregat is a server plus several clients on one machine. The server owns your fil
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/architecture.dark.svg">
-  <img alt="Three clients (a desktop window, the web app and a terminal client) call one machine server. The server holds the orchestration engine, the files, Git and language server routes, and a separate terminal host. It talks to a SQLite state home, to Claude Code and Codex, to your files and to your shells. The web and terminal clients embed the editor, terminal and keymap libraries, which are mirrored to their own repositories." src="assets/architecture.light.svg">
+  <img alt="Three clients (a desktop window, the web app and a terminal client) call one machine server. The server holds the orchestration engine, the files, Git and language server routes, and a separate terminal host. It talks to a SQLite state home, to Claude Code and Codex, to your files and to your shells. The web and terminal clients embed the editor, terminal and keymap libraries from their standalone repositories." src="assets/architecture.light.svg">
 </picture>
 
-Every client talks to the same server, and the libraries below it are shared. The dashed arrow marks the one copy the repository makes for outsiders.
+Every client talks to the same server, and the clients share those libraries.
 
 ## One server per machine
 
@@ -43,9 +43,9 @@ Read the loop from the right: the adapter turns agent output into runtime events
 
 Shells run in a separate terminal host process, not in the server. When the server restarts, the next server adopts the host's leases and replays each shell's output from its saved byte offset. The behavior is verified on Linux. On macOS the host runs as a detached process and the restart check is still open. [Terminal host](terminal-host.md) has the protocol and limits.
 
-## Libraries and mirrors
+## Standalone libraries
 
-Three folders in this repository are products of their own: `packages/singapore/` (Singapore, the editor), `packages/ghostty-webgpu/` (Ghostty's terminal in the browser) and `packages/hotkeys/` (the keymap library). The web app embeds all three. The terminal client uses the editor's core and the keymap library. On every push to `main`, CI copies each folder to a read-only repository. [ADR 001](adr/001-one-repository-with-mirrors.md) explains the choice.
+Singapore, ghostty-webgpu, and hotkeys are developed in their own repositories. Fregat consumes their immutable release archives. The web app embeds all three, and the terminal client uses the editor's core and the keymap library. For coordinated source changes, use [local package checkouts](local-package-checkouts.md).
 
 ## Platform support
 

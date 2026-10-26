@@ -29,17 +29,17 @@ All are private workspace packages (`@workspace/*`). None is published.
 | `packages/push`          | A thin wrapper over `web-push` for VAPID keys and request details.                              |
 | `packages/utils`         | Small shared helpers.                                                                           |
 
-## Mirrored libraries
+## Standalone libraries
 
-Each folder is copied to a read-only repository on every push to `main`. Edit it here, never in the mirror. [ADR 001](adr/001-one-repository-with-mirrors.md) records why.
+Singapore, ghostty-webgpu, and hotkeys live in their own repositories. Fregat consumes their pinned release archives. Make changes in those repositories. For coordinated local development, use [local package checkouts](local-package-checkouts.md).
 
-| Folder                     | Mirror                                                                  | What it is                                       |
-| -------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------ |
-| `packages/singapore/`      | [ShaulLavo/singapore](https://github.com/ShaulLavo/singapore)           | Singapore, a code editor for the browser.        |
-| `packages/ghostty-webgpu/` | [ShaulLavo/ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu) | Ghostty's terminal, in the browser.              |
-| `packages/hotkeys/`        | [ShaulLavo/hotkeys](https://github.com/ShaulLavo/hotkeys)               | Keyboard shortcuts for editors and complex apps. |
+| Repository                                                              | What it is                                       |
+| ----------------------------------------------------------------------- | ------------------------------------------------ |
+| [ShaulLavo/singapore](https://github.com/ShaulLavo/singapore)           | Singapore, a code editor for the browser.        |
+| [ShaulLavo/ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu) | Ghostty's terminal, in the browser.              |
+| [ShaulLavo/hotkeys](https://github.com/ShaulLavo/hotkeys)               | Keyboard shortcuts for editors and complex apps. |
 
-Each folder has its own `AGENTS.md` and its own docs.
+Each repository has its own `AGENTS.md` and docs.
 
 ## Everything else
 
@@ -47,7 +47,7 @@ Each folder has its own `AGENTS.md` and its own docs.
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/`                           | This documentation.                                                                                                               |
 | `scripts/`                        | The dev launcher, CI selectors, generators, census checks, release build, and `scripts/agent` (the browser verification harness). |
-| `.github/workflows/`              | CI (`ci.yml`), the mirror job (`mirror.yml`), package releases (`release.yml`) and library checks.                                |
+| `.github/workflows/`              | CI and release automation.                                                                                                        |
 | `.agents/skills/`                 | Agent skills. `.claude/skills/` links to them.                                                                                    |
 | `patches/`                        | Patches applied to pinned dependencies by Bun.                                                                                    |
 | `test/parity/`                    | Fixtures for the T3 Code parity checks.                                                                                           |
@@ -55,4 +55,4 @@ Each folder has its own `AGENTS.md` and its own docs.
 
 ## Build order
 
-`bun install --frozen-lockfile` links every workspace. The server and several packages import the mirrored libraries through their built `dist` output, so run `bun run build:workspaces` before `bun run dev` or a typecheck. Turbo runs that build and the per-package tasks.
+`bun install --frozen-lockfile` links every workspace. Some Fregat workspaces import built `dist` output, so run `bun run build:workspaces` before `bun run dev` or a typecheck. Turbo runs that build and the per-package tasks.
