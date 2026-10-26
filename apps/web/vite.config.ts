@@ -120,7 +120,12 @@ export default defineConfig(({ command, isPreview }) => {
         '@singapore-editor/plugin-ui > remark-stringify',
         '@singapore-editor/spellcheck > cspell-trie-lib',
         '@singapore-editor/tree-sitter > web-tree-sitter',
-      ],
+      ].concat(
+        // Linked syntax providers can use installed core; its operation bindings must stay shared.
+        packages.some((pkg) => pkg.name === '@singapore-editor/core')
+          ? []
+          : ['@singapore-editor/core/internal/document-worker'],
+      ),
     },
     plugins: [
       htmlBootstrapPlugin(

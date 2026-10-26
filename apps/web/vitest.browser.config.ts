@@ -66,6 +66,8 @@ export default defineConfig({
       'ghostty-webgpu',
     ],
     include: [
+      // Excluded syntax providers must share core's operation bindings with the editor.
+      '@singapore-editor/core/internal/document-worker',
       '@phosphor-icons/react',
       '@workspace/ui > @base-ui/react/accordion',
       '@workspace/ui > @base-ui/react/drawer',

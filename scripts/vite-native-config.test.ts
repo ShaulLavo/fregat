@@ -43,6 +43,28 @@ for (const loader of ['bundle', 'native'] as const) {
   )
 }
 
+test.for(['apps/web/vite.config.ts', 'apps/web/vitest.browser.config.ts'])(
+  '%s keeps installed worker core in the editor optimizer graph',
+  async (relative) => {
+    const file = path.join(repository, relative)
+    const result = await loadConfigFromFile(
+      { command: 'serve', mode: 'test' },
+      file,
+      path.dirname(file),
+    )
+    const dependencies = result?.config.optimizeDeps
+    const workerCore = '@singapore-editor/core/internal/document-worker'
+    const coreIsSource = dependencies?.exclude?.includes('@singapore-editor/core')
+    if (coreIsSource) {
+      expect(dependencies?.include).not.toContain(workerCore)
+      return
+    }
+    expect(dependencies?.include).toContain(workerCore)
+    if (relative === 'apps/web/vitest.browser.config.ts')
+      expect(dependencies?.exclude).toContain('@singapore-editor/tree-sitter')
+  },
+)
+
 const retentionConfigurations = [
   {
     name: 'reload',
