@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os'
 import { createServer } from 'node:net'
 import path from 'node:path'
 import { expect, test } from 'vitest'
+import type { Browser } from 'playwright'
 import {
   browserAvailable,
   browserTempRoot,
@@ -116,21 +117,26 @@ test.skipIf(process.platform === 'win32')(
   },
 )
 
-test.skipIf(
-  process.platform !== 'linux' ||
-    headedUnavailable ||
-    (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY),
-)(
-  'headed Chromium starts with a disk-backed private profile and isolated caller contexts',
-  async () => {
-    const before = new Set(await readdir(browserTempRoot).catch(() => []))
-    const browser = await launchBrowser('chromium', true)
-    let directory = ''
-    let ipc = ''
+async function profileDirectory(browser: Browser): Promise<string> {
+  const page = await browser.newPage()
+  try {
+    await page.goto('chrome://version')
+    const profile = await page.locator('#profile_path').innerText()
+    return path.dirname(path.dirname(profile))
+  } finally {
+    await page.close()
+  }
+}
+
+async function verifyPersistentContexts(headed: boolean) {
+  const peer = await launchBrowser('chromium', false)
+  let directory = ''
+  let ipc = ''
+  try {
+    const browser = await launchBrowser('chromium', headed, !headed)
     try {
-      const created = (await readdir(browserTempRoot)).filter((entry) => !before.has(entry))
-      expect(created).toHaveLength(1)
-      directory = path.join(browserTempRoot, created[0]!)
+      directory = await profileDirectory(browser)
+      expect(path.dirname(directory)).toBe(browserTempRoot)
       const socket = await readlink(path.join(directory, 'profile', 'SingletonSocket'))
       expect(Buffer.byteLength(socket)).toBeLessThan(104)
       ipc = path.dirname(path.dirname(path.dirname(socket)))
@@ -151,6 +157,24 @@ test.skipIf(
     }
     await expect.poll(() => existsSync(directory)).toBe(false)
     await expect.poll(() => existsSync(ipc)).toBe(false)
-  },
+    expect(peer.isConnected()).toBe(true)
+  } finally {
+    await peer.close()
+  }
+}
+
+test.skipIf(process.platform !== 'linux' || headedUnavailable)(
+  'persistent Chromium owns its profile while a peer browser is running',
+  () => verifyPersistentContexts(false),
+  60_000,
+)
+
+test.skipIf(
+  process.platform !== 'linux' ||
+    headedUnavailable ||
+    (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY),
+)(
+  'headed Chromium starts with a disk-backed private profile and isolated caller contexts',
+  () => verifyPersistentContexts(true),
   60_000,
 )
