@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 
 import { expect, test } from 'vitest'
+import { readWorkflow } from '../workflow-fixtures'
 
 // @ts-expect-error The census is a plain ES module and the scripts workspace has no `allowJs`.
 import { causeOf, censusSource, evaluate } from './react-compiler-census.mjs'
@@ -109,22 +110,17 @@ test('is wired into the repository: a script entry, the verify chain and CI', ()
   expect(workflow).toContain('run: bun run compiler:census')
 })
 
-/**
- * A gate nobody runs is a gate that goes red unnoticed, which is how `dupes` sat broken on main.
- * Every whole-tree gate has to reach all three: the commit hook, `verify`, and CI.
- */
 test('every whole-tree gate runs in the commit hook, in verify and in CI', () => {
   const root = new URL('../../', import.meta.url)
   const manifest = JSON.parse(readFileSync(new URL('package.json', root), 'utf8')) as {
     scripts: Record<string, string>
   }
   const hook = readFileSync(new URL('lefthook.yml', root), 'utf8')
-  const workflow = readFileSync(new URL('.github/workflows/ci.yml', root), 'utf8')
+  const ciSteps = readWorkflow('ci.yml').jobs.lint!.steps
 
   const gates = manifest.scripts.gates.split('&&').map((part) => part.trim())
   expect(gates).toEqual([
     'bun run workspace:check',
-    'bun run package-pages:check',
     'bun run plans:check',
     'bun run dupes:functions',
     'bun run dupes',
@@ -138,11 +134,14 @@ test('every whole-tree gate runs in the commit hook, in verify and in CI', () =>
     'bun run unused:check',
   ])
   expect(hook).toContain('bun run gates')
-  expect(workflow).toContain('run: bun run package-pages:check')
   for (const gate of gates) {
     const name = gate.replace('bun run ', '')
     expect(manifest.scripts[name]).toBeDefined()
     expect(`${manifest.scripts.verify} ${manifest.scripts.lint}`).toContain(gate)
-    expect(workflow).toContain('run: bun run')
+    const ciStep = ciSteps.find((step) =>
+      (step.run ?? '').split('&&').some((command) => command.trim() === gate),
+    )
+    expect(ciStep, `${gate} must run in CI`).toBeDefined()
+    expect(ciStep?.['continue-on-error'], gate).not.toBe(true)
   }
 })

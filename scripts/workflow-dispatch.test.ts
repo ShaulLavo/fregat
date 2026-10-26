@@ -3,7 +3,7 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 import { readWorkflow } from './workflow-fixtures'
 
-test('every explicitly dispatched workflow accepts workflow_dispatch', () => {
+test('CI and every explicitly dispatched workflow accept workflow_dispatch', () => {
   const directory = path.resolve(import.meta.dirname, '../.github/workflows')
   const sources = readdirSync(directory).filter((file) => file.endsWith('.yml'))
   const targets = sources.flatMap((file) => {
@@ -17,22 +17,37 @@ test('every explicitly dispatched workflow accepts workflow_dispatch', () => {
       ),
     )
   })
-  expect(targets).toContain('ci.yml')
-  for (const target of targets)
+  for (const target of ['ci.yml'].concat(targets))
     expect(readWorkflow(target).on, target).toHaveProperty('workflow_dispatch')
 })
 
-test('the parser updater dispatches the full CI verdict after publishing', () => {
-  const workflow = readWorkflow('editor-tree-sitter-x.yml')
-  const commands = workflow.jobs.publish!.steps.map((step) => step.run ?? '').join('\n')
-  expect(commands).toContain('gh workflow run ci.yml --ref "$branch"')
-  expect(readWorkflow('ci.yml').jobs.verdict!.needs).toContain('libraries')
+test('manual CI keeps consumer builds and tests in the blocking verdict', () => {
+  const workflow = readWorkflow('ci.yml')
+  const plan = workflow.jobs.changes!.steps.find((step) => step.id === 'plan')
+  expect(plan?.run).toContain('MODE=full')
+  expect(workflow.jobs.verdict!.if).toBe('${{ always() }}')
+  expect(workflow.jobs.verdict!.needs).toEqual(
+    expect.arrayContaining([
+      'changes',
+      'lint',
+      'workspace-builds',
+      'typecheck',
+      'test-web',
+      'test-server',
+      'test-tui',
+      'browser',
+    ]),
+  )
+  expect(workflow.jobs.typecheck!.steps).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ run: expect.stringContaining('bun run test:scripts') }),
+    ]),
+  )
 })
 
-test('parser updates have no automatic merge workflow', () => {
-  expect(
-    existsSync(
-      path.resolve(import.meta.dirname, '../.github/workflows/editor-parser-pin-merge.yml'),
-    ),
-  ).toBe(false)
-})
+test.each(['editor-tree-sitter-x.yml', 'editor-parser-pin-merge.yml'])(
+  'standalone parser publishing has no consumer workflow %s',
+  (file) => {
+    expect(existsSync(path.resolve(import.meta.dirname, '../.github/workflows', file))).toBe(false)
+  },
+)

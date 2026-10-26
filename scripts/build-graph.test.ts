@@ -15,7 +15,7 @@ const buildGraphSchema = v.object({
 })
 const manifestSchema = v.object({ scripts: v.record(v.string(), v.string()) })
 
-function buildTasks(args: string[]) {
+function buildTasks(args: readonly string[]) {
   const result = Bun.spawnSync(['bun', 'x', 'turbo', 'run', 'build', ...args, '--dry=json'], {
     cwd: repository,
     stdout: 'pipe',
@@ -45,7 +45,18 @@ test('consumer preparation builds UI without rebuilding installed releases', () 
     JSON.parse(readFileSync(path.join(repository, 'package.json'), 'utf8')),
   )
   expect(root.scripts['build:workspaces']).toBe('turbo run build --filter=@workspace/ui')
-  expect(buildTasks(['--filter=@workspace/ui']).map((task) => task.taskId)).toEqual([
-    '@workspace/ui#build',
+  const tasks = buildTasks(['--filter=@workspace/ui'])
+  tasks.sort((left, right) => left.taskId.localeCompare(right.taskId))
+  expect(tasks).toEqual([
+    {
+      taskId: '@workspace/ui#build',
+      directory: 'packages/ui',
+      dependencies: ['@workspace/utils#build'],
+    },
+    {
+      taskId: '@workspace/utils#build',
+      directory: 'packages/utils',
+      dependencies: [],
+    },
   ])
 })
