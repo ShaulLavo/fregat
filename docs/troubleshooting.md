@@ -4,14 +4,15 @@ Fixes for the failures a new checkout hits most often. Each entry quotes the mes
 
 ## `Cannot find module '@fregat/hotkeys'` when starting the dev server
 
-The server and several packages import the workspace libraries (`packages/hotkeys/`, `packages/singapore/packages/*`, `packages/ghostty-webgpu/`) from their built `dist` output. A fresh install has none. Build them once, then start again:
+Hotkeys, Singapore, and Ghostty come from pinned release packages. Install the dependencies, build Fregat's UI and utility packages, then start the app:
 
 ```sh
+bun install --frozen-lockfile
 bun run build:workspaces
 bun run dev
 ```
 
-Rebuild after you change a library's source, or after you pull changes to `packages/singapore/`, `packages/ghostty-webgpu/` or `packages/hotkeys/`.
+Rebuild after changing Fregat's UI or utility sources. To develop a standalone package alongside Fregat, follow [Local package checkouts](local-package-checkouts.md).
 
 ## `Port 5173 is in use` or `Port 3001 is in use`
 
