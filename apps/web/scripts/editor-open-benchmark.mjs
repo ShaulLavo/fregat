@@ -1,13 +1,5 @@
 import { createHash } from 'node:crypto'
-import {
-  copyFileSync,
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-} from 'node:fs'
+import { copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { relative, resolve, sep } from 'node:path'
 
 import {
@@ -22,6 +14,7 @@ import {
   workspaceCacheEntries,
 } from './bench-workspace.mjs'
 import { createBenchmarkError } from './structured-errors.mjs'
+import { installedDependencyFingerprint } from './installed-packages.mjs'
 import { workspaceSliceStorageKey } from '../src/features/workspace/utils/cache-keys.ts'
 import { environmentStorageKey } from '../src/lib/environments/state/scoped-storage.ts'
 import { workspaceCacheStorageKey } from '../src/lib/workspace-cache-keys.ts'
@@ -30,7 +23,6 @@ const defaultAppUrl = 'http://localhost:5173/'
 const defaultServerUrl = process.env.VITE_SERVER_URL ?? 'http://localhost:3001'
 const defaultFilePath = 'apps/web/src/features/editor/components/editor.tsx'
 const platformRoot = resolve(import.meta.dirname, '../../..')
-const defaultEditorRoot = resolve(platformRoot, 'packages/singapore')
 const defaultRootPath = platformRoot
 const defaultCalibrationFile = resolve(
   import.meta.dirname,
@@ -45,6 +37,7 @@ const platformImplementationEntries = [
   'apps/web/public',
   'apps/web/scripts/bench-workspace.mjs',
   'apps/web/scripts/editor-open-benchmark.mjs',
+  'apps/web/scripts/installed-packages.mjs',
   'apps/web/src',
   'apps/web/vite.config.ts',
   'bun.lock',
@@ -103,7 +96,6 @@ function parseOptions(args) {
     browsers: browserList(process.env.EDITOR_OPEN_BENCH_BROWSERS ?? 'chromium'),
     calibrationFile: process.env.EDITOR_OPEN_BENCH_CALIBRATION_FILE ?? defaultCalibrationFile,
     calibrate: false,
-    editorRoot: process.env.EDITOR_OPEN_BENCH_EDITOR_ROOT ?? null,
     filePath: process.env.EDITOR_OPEN_BENCH_FILE ?? defaultFilePath,
     gate: false,
     pageTimeoutMs: numberOption(process.env.EDITOR_OPEN_BENCH_PAGE_TIMEOUT_MS, 30_000),
@@ -116,7 +108,6 @@ function parseOptions(args) {
   }
 
   for (const arg of args) applyOption(parsed, arg)
-  if (!parsed.editorRoot) parsed.editorRoot = defaultEditorRoot
   if (parsed.browsers.length === 0) parsed.browsers = ['chromium']
   if (parsed.gate && parsed.warmupsPerMode < 5) {
     throw createBenchmarkError('editor-open gate requires at least five warmups per mode')
@@ -146,7 +137,6 @@ function applyOption(parsed, arg) {
   if (name === '--app-url') parsed.appUrl = value ?? parsed.appUrl
   if (name === '--browsers') parsed.browsers = browserList(value)
   if (name === '--calibration-file') parsed.calibrationFile = value ?? parsed.calibrationFile
-  if (name === '--editor-root') parsed.editorRoot = value ?? parsed.editorRoot
   if (name === '--file') parsed.filePath = value ?? parsed.filePath
   if (name === '--page-timeout-ms') parsed.pageTimeoutMs = numberOption(value, parsed.pageTimeoutMs)
   if (name === '--samples') parsed.samplesPerMode = numberOption(value, parsed.samplesPerMode)
@@ -164,10 +154,7 @@ function createBenchmarkIdentity(config) {
     fixturePath: relative(config.workspaceRoot, source).split(sep).join('/'),
     fixtureSha256: createHash('sha256').update(readFileSync(source)).digest('hex'),
     modes,
-    editorImplementationSha256: implementationFingerprint(
-      config.editorRoot,
-      editorImplementationEntries(config.editorRoot),
-    ),
+    editorImplementationSha256: installedDependencyFingerprint('@singapore-editor/').sha256,
     platformImplementationSha256: implementationFingerprint(
       platformRoot,
       platformImplementationEntries,
@@ -188,26 +175,6 @@ function implementationFingerprint(root, entries) {
     hash.update('\0')
   }
   return hash.digest('hex')
-}
-
-function editorImplementationEntries(root) {
-  const entries = ['package.json']
-  if (existsSync(resolve(root, 'bun.lock'))) entries.push('bun.lock')
-  const packageDirectories = readdirSync(resolve(root, 'packages'), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort()
-  for (const packageDirectory of packageDirectories) {
-    entries.push(...editorPackageImplementationEntries(root, packageDirectory))
-  }
-  return entries
-}
-
-function editorPackageImplementationEntries(root, packageDirectory) {
-  const packageRoot = `packages/${packageDirectory}`
-  return [`${packageRoot}/package.json`, `${packageRoot}/src`, `${packageRoot}/dist`].filter(
-    (entry) => existsSync(resolve(root, entry)),
-  )
 }
 
 function implementationManifest(root, entries) {

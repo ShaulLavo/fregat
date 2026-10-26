@@ -6,6 +6,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { parseArgs } from 'node:util'
 import { selectors, waitForApp, runPaletteCommand } from '../../../scripts/agent/selectors.ts'
 import { createBenchmarkError } from './structured-errors.mjs'
+import { installedPackageFingerprint } from './installed-packages.mjs'
 
 // NOT-PORTABLE: Defaults to /work/tmp and live app/server ports 5173 and 3001.
 const { values } = parseArgs({
@@ -291,7 +292,7 @@ try {
     api,
     viewport,
     platform: await fingerprint(platformRoot),
-    ghostty: await fingerprint(resolve(platformRoot, 'packages/ghostty-webgpu')),
+    ghostty: installedPackageFingerprint('ghostty-webgpu'),
     recipeHash: createHash('sha256')
       .update(await readFile(new URL(import.meta.url)))
       .digest('hex'),

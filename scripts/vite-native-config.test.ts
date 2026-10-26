@@ -1,25 +1,14 @@
-import { existsSync, realpathSync } from 'node:fs'
+import { realpathSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import path from 'node:path'
-import { chromium } from 'playwright'
 import { expect, test } from 'vitest'
 
 const repository = path.resolve(import.meta.dirname, '..')
-const require = createRequire(path.join(repository, 'packages/singapore/package.json'))
+const require = createRequire(path.join(repository, 'apps/web/package.json'))
 const { createLogger, loadConfigFromFile } = await import(require.resolve('vite'))
-
-const ghosttyNeedsSwiftShader =
-  process.platform === 'linux' &&
-  process.env.GHOSTTY_BROWSER_HARDWARE !== '1' &&
-  (process.env.GHOSTTY_BROWSER_ENGINE ?? 'chromium') === 'chromium'
-const swiftShaderDriver = path.join(
-  path.dirname(chromium.executablePath()),
-  'vk_swiftshader_icd.json',
-)
-const missingSwiftShader = ghosttyNeedsSwiftShader && !existsSync(swiftShaderDriver)
 
 const configurations = [
   'apps/web/vite.config.ts',
@@ -29,20 +18,12 @@ const configurations = [
   'apps/web/vitest.tree-browser.config.ts',
   'apps/web/retention-acceptance.vitest.config.ts',
   'apps/web/retention-acceptance-layout.vitest.config.ts',
-  'packages/ghostty-webgpu/vitest.browser.config.ts',
-  'packages/singapore/packages/editor/vitest.config.ts',
-  'packages/singapore/packages/highlighting/vitest.config.ts',
-  'packages/singapore/packages/typescript-lsp/vitest.config.ts',
 ]
 
 for (const loader of ['bundle', 'native'] as const) {
   test.for(configurations)(
     '%s loads with ' + loader + ' without native compatibility warnings',
-    async (relative, { skip }) => {
-      if (relative === 'packages/ghostty-webgpu/vitest.browser.config.ts' && missingSwiftShader)
-        skip(
-          'Ghostty Chromium config loading requires the installed Playwright SwiftShader Vulkan driver',
-        )
+    async (relative) => {
       const configFile = path.join(repository, relative)
       const warnings: string[] = []
       const logger = createLogger()

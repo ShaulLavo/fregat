@@ -4,10 +4,8 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { test } from 'vitest'
 
-const editor = createRequire(
-  new URL('../packages/singapore/packages/editor/package.json', import.meta.url),
-)
-const providerUrl = pathToFileURL(editor.resolve('@vitest/browser-playwright')).href
+const web = createRequire(new URL('../apps/web/package.json', import.meta.url))
+const providerUrl = pathToFileURL(web.resolve('@vitest/browser-playwright')).href
 
 test('Playwright providers share and release SIGTERM trace cleanup', () => {
   // Deliver a real signal in a child so Vitest's own termination handler stays untouched.

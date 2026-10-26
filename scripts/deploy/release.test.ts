@@ -85,6 +85,7 @@ test.each([
     expect(checkout.branch).toBe(expected)
     expect(checkout.commit).toBe(git('rev-parse', 'HEAD'))
     expect(checkout.dirtyFiles).toEqual([])
+    expect(checkout.editorCommit).toBeNull()
   } finally {
     rmSync(root, { force: true, recursive: true })
   }
@@ -274,14 +275,10 @@ function createWebBuildFixture(directory: string, stale: boolean, failedBuild = 
     failedBuild
       ? 'process.exit(17)'
       : `import { mkdirSync, writeFileSync } from 'node:fs'
-mkdirSync('packages/singapore/packages/editor/dist', { recursive: true })
-writeFileSync('packages/singapore/packages/editor/dist/index.d.ts', 'export type EditorTextBufferChange = { revisionAfter: number }')`,
+mkdirSync('packages/ui/dist', { recursive: true })
+writeFileSync('packages/ui/dist/index.d.ts', 'export type BuildStamp = { revisionAfter: number }')`,
   )
-  if (stale)
-    write(
-      'packages/singapore/packages/editor/dist/index.d.ts',
-      'export type EditorTextBufferChange = {}',
-    )
+  if (stale) write('packages/ui/dist/index.d.ts', 'export type BuildStamp = {}')
   write(
     'apps/web/tsconfig.json',
     JSON.stringify({
@@ -291,8 +288,8 @@ writeFileSync('packages/singapore/packages/editor/dist/index.d.ts', 'export type
   )
   write(
     'apps/web/main.ts',
-    `import type { EditorTextBufferChange } from '../../packages/singapore/packages/editor/dist/index'
-const change: EditorTextBufferChange = { revisionAfter: 1 }
+    `import type { BuildStamp } from '../../packages/ui/dist/index'
+const change: BuildStamp = { revisionAfter: 1 }
 export const revision = change.revisionAfter`,
   )
   write('apps/web/index.html', '<head></head><script type="module" src="/main.ts"></script>')
