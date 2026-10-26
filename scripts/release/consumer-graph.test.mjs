@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { mkdir, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { withWorkspace } from './fixture.mjs'
 import { verifyConsumerGraph } from './consumer-graph.mjs'
@@ -48,6 +48,18 @@ async function graphFixture(workspace, mode = 'release', optional = false) {
   if (mode === 'split')
     await addPackage(put, root, `${core}/node_modules/@fregat/hotkeys`, '@fregat/hotkeys')
 }
+
+test('generated checks enforce the producer-free installed consumer graph', async () => {
+  const manifest = JSON.parse(
+    await readFile(join(import.meta.dirname, '../../package.json'), 'utf8'),
+  )
+  expect(manifest.scripts['standalone:consumer:check']).toBe(
+    'bun scripts/release/consumer-graph.mjs --producer-free',
+  )
+  expect(manifest.scripts['generated:check'].split(' && ')).toContain(
+    'bun run standalone:consumer:check',
+  )
+})
 
 test('verifies installed entries, peer dependencies and one shared hotkeys runtime', async () => {
   await withWorkspace(async (workspace) => {
