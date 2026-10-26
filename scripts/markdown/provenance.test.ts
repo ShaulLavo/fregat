@@ -30,9 +30,9 @@ const fixtureFiles = [
   'apps/web/vitest.markdown-qualification.config.ts',
   'apps/web/vitest.browser.config.ts',
   'apps/web/vite.config.ts',
-  'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
-  'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-  'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
+  'apps/web/node_modules/@singapore-editor/tree-sitter/dist/index.js',
+  'apps/web/node_modules/@singapore-editor/tree-sitter/dist/treeSitter/workerClient.js',
+  'apps/web/node_modules/@singapore-editor/tree-sitter/package.json',
   'package.json',
   'bun.lock',
 ]
@@ -48,16 +48,19 @@ test('candidate source identity includes the production probe and its shared pro
         file,
       ).toBe(true)
     for (const file of [
-      'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
-      'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-      'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
+      'apps/web/node_modules/@singapore-editor/tree-sitter/dist/index.js',
+      'apps/web/node_modules/@singapore-editor/tree-sitter/dist/treeSitter/workerClient.js',
+      'apps/web/node_modules/@singapore-editor/tree-sitter/package.json',
       'apps/web/test/providers.tsx',
       'apps/web/src/features/chat/providers/control.tsx',
       'apps/web/src/features/chat/state/control.ts',
       'apps/web/test/factories/markdown-production-assets.ts',
     ]) {
       const current = await qualificationProvenance(root)
-      await writeFile(path.join(root, file), 'changed provider\n')
+      const content = file.endsWith('package.json')
+        ? '{"name":"@singapore-editor/tree-sitter","exports":{".":"./dist/index.js"},"changed":true}\n'
+        : 'changed provider\n'
+      await writeFile(path.join(root, file), content)
       const after = await qualificationProvenance(root)
       expect(after.revision).toBe(before.revision)
       expect(after.sourceClosureSha256).not.toBe(current.sourceClosureSha256)
@@ -72,6 +75,15 @@ async function writeFixture(root: string) {
     await mkdir(path.dirname(path.join(root, file)), { recursive: true })
     await writeFile(path.join(root, file), `${file}\n`)
   }
+  await writeFile(path.join(root, 'apps/web/package.json'), '{}')
+  await writeFile(
+    path.join(root, 'apps/web/node_modules/@singapore-editor/tree-sitter/package.json'),
+    JSON.stringify({
+      name: '@singapore-editor/tree-sitter',
+      type: 'module',
+      exports: { '.': './dist/index.js' },
+    }),
+  )
   await execute('git', ['init', '--quiet'], { cwd: root })
   await execute('git', ['add', '.'], { cwd: root })
   const hooks = path.join(root, '.hooks')

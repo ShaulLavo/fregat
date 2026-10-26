@@ -4,9 +4,9 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { CORE_CASES } from '../packages/singapore/packages/typescript-lsp/test/parity/cases/core'
-import { capabilityAdvertised } from '../packages/singapore/packages/typescript-lsp/test/parity/contract'
-import { paritySourceIdentity } from '../packages/singapore/packages/typescript-lsp/test/parity/source'
+import { CORE_CASES } from '../apps/server/test/fixtures/typescript-parity/cases/core'
+import { capabilityAdvertised } from '../apps/server/test/fixtures/typescript-parity/contract'
+import { paritySourceIdentity } from '../apps/server/test/fixtures/typescript-parity/source'
 import {
   REQUIRED_PARITY_BACKENDS,
   parityCommand,
@@ -234,8 +234,8 @@ describe('source-bound TypeScript parity capture', () => {
   it('fingerprints a deleted tracked source file as dirty source', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'typescript-parity-source-'))
     directories.push(directory)
-    const path = join(directory, 'packages/singapore/packages/typescript-lsp/src/fixture.ts')
-    await mkdir(join(directory, 'packages/singapore/packages/typescript-lsp/src'), {
+    const path = join(directory, 'apps/server/test/fixtures/typescript-parity/fixture.ts')
+    await mkdir(join(directory, 'apps/server/test/fixtures/typescript-parity'), {
       recursive: true,
     })
     await writeFile(path, 'export const fixture = 1\n')

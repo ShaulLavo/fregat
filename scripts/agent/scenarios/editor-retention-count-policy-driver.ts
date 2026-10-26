@@ -10,7 +10,8 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { createReadStream, existsSync } from 'node:fs'
+import { createReadStream } from 'node:fs'
+import { createRequire } from 'node:module'
 import { createInterface } from 'node:readline'
 import { createServer } from 'node:net'
 import { resolve, join } from 'node:path'
@@ -21,6 +22,13 @@ import {
   RETENTION_COUNT_PROTOCOL,
   retentionFixtureText,
 } from '../../../apps/web/test/factories/retention-count-policy-protocol'
+
+const installedPackages = [
+  '@singapore-editor/core',
+  '@singapore-editor/textbuffer',
+  '@singapore-editor/tree-sitter',
+  '@singapore-editor/tree-sitter-languages',
+]
 
 const args = process.argv.slice(2)
 const evidence = await evidenceDirectory(args)
@@ -150,25 +158,11 @@ async function run() {
     join(repo, 'apps/web/src/lib/file-open-intent/state/service.ts'),
     join(repo, 'apps/web/src/features/editor/state/inactive-analysis-retention.ts'),
     join(repo, 'apps/web/src/features/editor/state/inactive-analysis-policy.ts'),
-    join(repo, 'packages/singapore/packages/editor/src/editor/documentAnalysis.ts'),
-    join(repo, 'packages/singapore/packages/editor/src/editor/Editor.ts'),
-    join(repo, 'packages/singapore/packages/editor/src/editor/preparedDocument.ts'),
-    join(repo, 'packages/singapore/packages/editor/src/editor/syntaxController.ts'),
-    join(repo, 'packages/singapore/packages/editor/src/plugins.ts'),
-    join(repo, 'packages/singapore/packages/editor/src/syntax/highlighter.ts'),
-    join(repo, 'packages/singapore/packages/editor/src/syntax/providerTheme.ts'),
-    join(repo, 'packages/singapore/packages/tree-sitter/src/treeSitter/workerClient.ts'),
-    join(repo, 'packages/singapore/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts'),
-    join(repo, 'packages/singapore/packages/tree-sitter/src/treeSitter/types.ts'),
-    join(repo, 'packages/singapore/packages/editor/src/shiki/workerClient.ts'),
-    join(repo, 'packages/singapore/packages/editor/src/shiki/shiki.worker.ts'),
-    join(repo, 'packages/singapore/packages/editor/src/shiki/workerTypes.ts'),
-    join(repo, 'packages/singapore/packages/editor/src/syntax/tokenStore.ts'),
-  ]
-  const sourceFiles = []
+  ].concat(await installedPackageFiles(repo))
+  const sourceFiles: { file: string; sha256: string }[] = []
   for (const file of provenanceFiles) {
-    const text = await readFile(file, 'utf8')
-    sourceFiles.push({ file, sha256: hash(text), text })
+    const bytes = await readFile(file)
+    sourceFiles.push({ file, sha256: hash(bytes) })
   }
   const oracleControls = { knownGood: inactiveBound(2, 2), growthNegative: inactiveBound(3, 2) }
   if (!oracleControls.knownGood.passes || oracleControls.growthNegative.passes)
@@ -217,7 +211,6 @@ async function run() {
   await assertFree(port)
   await assertFree(filePort)
   const configPath = join(output, 'retention.vitest.config.mts')
-  const packageAliases = await editorSourceAliases()
   const dependencyRoot = await realpath(join(repo, 'node_modules/.bun'))
   await writeFile(
     configPath,
@@ -232,10 +225,6 @@ export default {
     '@singapore-editor/core > @shikijs/engine-oniguruma/wasm-inlined', 'shiki/core',
     '@singapore-editor/tree-sitter > tree-sitter-md', '@singapore-editor/tree-sitter > web-tree-sitter']) },
   server: { ...base.server, fs: { ...base.server.fs, allow: base.server.fs.allow.concat([${JSON.stringify(dependencyRoot)}]) } },
-  resolve: { ...base.resolve, alias: Object.entries(${JSON.stringify(packageAliases)}).map(([find, replacement]) => ({ find: new RegExp('^' + find + '$'), replacement })).concat([
-    { find: /^@singapore-editor\\/textbuffer\\/internal\\/(.+)$/, replacement: ${JSON.stringify(join(repo, 'packages/singapore/packages/textbuffer/src/$1.ts'))} }],
-    Object.entries(base.resolve.alias).map(([find, replacement]) => ({ find, replacement })),
-  ) },
   test: {
     ...base.test,
     provide: { ...base.test.provide, retentionRun: run },
@@ -345,7 +334,7 @@ export default {
   )
   return exitCode === 0 && outcome === 'headless-count-controls-complete' ? 0 : 1
 
-  function hash(text: string) {
+  function hash(text: string | Uint8Array) {
     return createHash('sha256').update(text).digest('hex')
   }
   async function git(args: readonly string[]) {
@@ -397,49 +386,30 @@ export default {
     if (!Number.isInteger(sample.cycle) || sample.cycle < 1 || sample.cycle > cycles) return null
     return `${sample.fixture}:${sample.cycle}`
   }
+}
 
-  async function editorSourceAliases() {
-    const aliases: Record<string, string> = {}
-    const root = join(repo, 'packages/singapore/packages')
-    for (const directory of await readdir(root)) {
-      const file = join(root, directory, 'package.json')
-      if (!existsSync(file)) continue
-      const manifest: unknown = JSON.parse(await readFile(file, 'utf8'))
-      addPackageAliases(aliases, join(root, directory), manifest)
-    }
-    return aliases
-  }
+async function installedPackageFiles(repo: string): Promise<string[]> {
+  const webRequire = createRequire(join(repo, 'apps/web/package.json'))
+  const files = await Promise.all(
+    installedPackages.map(async (name) => {
+      webRequire.resolve(name)
+      const root = join(repo, 'apps/web/node_modules', name)
+      return (await artifactFiles(join(root, 'dist'))).concat(join(root, 'package.json'))
+    }),
+  )
+  return files.flat().sort()
+}
 
-  function addPackageAliases(aliases: Record<string, string>, root: string, manifest: unknown) {
-    if (
-      typeof manifest !== 'object' ||
-      manifest === null ||
-      !('name' in manifest) ||
-      !('exports' in manifest)
-    )
-      return
-    if (
-      typeof manifest.name !== 'string' ||
-      typeof manifest.exports !== 'object' ||
-      manifest.exports === null
-    )
-      return
-    for (const [key, value] of Object.entries(manifest.exports)) {
-      const target = exportTarget(value)
-      if (!target?.startsWith('./dist/')) continue
-      const source = join(root, target.replace('./dist/', './src/').replace(/\.js$/, '.ts'))
-      if (!existsSync(source)) continue
-      aliases[key === '.' ? manifest.name : manifest.name + key.slice(1)] = source
-    }
-  }
-
-  function exportTarget(value: unknown): string | null {
-    if (typeof value === 'string') return value
-    if (typeof value !== 'object' || value === null) return null
-    if ('import' in value && typeof value.import === 'string') return value.import
-    if ('default' in value && typeof value.default === 'string') return value.default
-    return null
-  }
+async function artifactFiles(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true })
+  const parts = await Promise.all(
+    entries.map(async (entry) => {
+      const file = join(directory, entry.name)
+      if (entry.isDirectory()) return artifactFiles(file)
+      return [file]
+    }),
+  )
+  return parts.flat()
 }
 
 async function evidenceDirectory(argv: readonly string[]) {
