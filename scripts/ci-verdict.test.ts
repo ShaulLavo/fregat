@@ -21,9 +21,6 @@ function fixture() {
     server: 'true',
     tui: 'true',
     site: 'true',
-    editor: 'true',
-    ghostty: 'true',
-    hotkeys: 'true',
     docs: 'false',
     web_shards: '["1/4","2/4","3/4","4/4"]',
     mobile_shards: '["chromium-0","chromium-1","webkit-0","webkit-1"]',
@@ -59,7 +56,6 @@ function fixture() {
     browser: { result: 'success' },
     site: { result: 'success' },
     'mobile-layout': { result: 'success' },
-    libraries: { result: 'success' },
   }
   const names = [
     'Successful main baseline',
@@ -82,9 +78,6 @@ function fixture() {
     'Mobile layout (chromium-1)',
     'Mobile layout (webkit-0)',
     'Mobile layout (webkit-1)',
-    'Libraries / Editor tests',
-    'Libraries / Ghostty tests',
-    'Libraries / Standalone packages',
   ]
   const jobs = names.map((name) => ({
     name,
@@ -114,26 +107,15 @@ test('actual required graph accepts completed successful jobs and its docs skip'
   expect(fixture().run()).toEqual({ passed: true, issues: [] })
 })
 
-test('terminal-only validation accepts its two verification jobs and rejects missing coverage', () => {
+test('server-only validation requires both server shards and workspace builds', () => {
   const value = fixture()
-  for (const key of [
-    'shared',
-    'tooling',
-    'tree',
-    'web',
-    'server',
-    'tui',
-    'site',
-    'editor',
-    'hotkeys',
-    'exhaustive',
-  ])
+  for (const key of ['shared', 'tooling', 'tree', 'web', 'tui', 'site', 'exhaustive'])
     value.changes.outputs[key] = 'false'
   value.changes.outputs.docs = 'true'
-  value.changes.outputs.packages = '["ghostty-webgpu"]'
+  value.changes.outputs.packages = '["server"]'
   for (const id of Object.keys(value.needs))
     value.needs[id] = {
-      result: ['baseline', 'changes', 'workspace-builds', 'docs', 'libraries'].includes(id)
+      result: ['baseline', 'changes', 'workspace-builds', 'docs', 'test-server'].includes(id)
         ? 'success'
         : 'skipped',
     }
@@ -143,15 +125,15 @@ test('terminal-only validation accepts its two verification jobs and rejects mis
     'Changes',
     'Workspace builds',
     'Docs format',
-    'Libraries / Ghostty tests',
+    'Test (server 1/2)',
+    'Test (server 2/2)',
   ]
   const jobs = value.jobs
     .filter((job) => names.includes(job.name))
     .map((job) => ({ ...job, conclusion: 'success', runner_id: 1 }))
   expect(value.evaluate(jobs)).toEqual({ passed: true, issues: [] })
-  expect(
-    value.evaluate(jobs.filter((job) => job.name !== 'Libraries / Ghostty tests')).passed,
-  ).toBe(false)
+  for (const name of ['Workspace builds', 'Test (server 1/2)', 'Test (server 2/2)'])
+    expect(value.evaluate(jobs.filter((job) => job.name !== name)).passed).toBe(false)
 })
 
 test('scheduled full validation uses the same strict verdict', () => {
@@ -162,8 +144,6 @@ test('scheduled full validation uses the same strict verdict', () => {
 test('ordinary site changes require both smoke engines and no exhaustive mobile shards', () => {
   const value = fixture()
   value.changes.outputs.exhaustive = 'false'
-  const standalone = value.jobs.find((job) => job.name === 'Libraries / Standalone packages')
-  if (standalone) standalone.conclusion = 'skipped'
   value.changes.outputs.mobile_shards = '["chromium-0","webkit-0"]'
   const jobs = value.jobs.filter(
     (job) => !['Mobile layout (chromium-1)', 'Mobile layout (webkit-1)'].includes(job.name),
@@ -185,9 +165,6 @@ test('actual cancelled packet rejects synthetic successful parent needs', () => 
     'Test (web 3/4)',
     'Test (web 4/4)',
     'Browser tests',
-    'Libraries / Editor tests',
-    'Libraries / Ghostty tests',
-    'Libraries / Standalone packages',
   ])
   for (const job of value.jobs) if (cancelled.has(job.name)) job.conclusion = 'cancelled'
   const verdict = value.run()
@@ -213,7 +190,9 @@ test('missing required needs rejects before trusting successful API jobs', () =>
 
 test.each([
   'Test (web 3/4)',
-  'Libraries / Ghostty tests',
+  'Typecheck, generated, packages',
+  'Test (server 1/2)',
+  'Test (server 2/2)',
   'Browser tests',
   'Mobile layout (chromium-0)',
   'Mobile layout (chromium-1)',
@@ -227,13 +206,20 @@ test.each([
   expect(verdict.issues).toContain(`Required job ${name} lacks one successful execution`)
 })
 
-test('disabled reusable children may skip while selected family succeeds', () => {
+test('disabled consumer browser checks may skip while server coverage succeeds', () => {
   const value = fixture()
-  value.changes.outputs.ghostty = 'false'
-  value.changes.outputs.hotkeys = 'false'
-  const ghostty = value.jobs.find((job) => job.name === 'Libraries / Ghostty tests')
-  expect(ghostty).toBeDefined()
-  if (ghostty) ghostty.conclusion = 'skipped'
+  for (const key of ['web', 'tree', 'tooling']) value.changes.outputs[key] = 'false'
+  for (const id of ['browser', 'test-web', 'test-promotion-evidence', 'lint'])
+    value.needs[id] = { result: 'skipped' }
+  for (const job of value.jobs) {
+    if (
+      job.name === 'Browser tests' ||
+      job.name.startsWith('Test (web ') ||
+      job.name === 'Script tests (promotion evidence)' ||
+      job.name === 'Format, lint, census'
+    )
+      job.conclusion = 'skipped'
+  }
   expect(value.run()).toEqual({ passed: true, issues: [] })
 })
 
@@ -257,10 +243,10 @@ test('plan-only selection runs formatting and permits skipped or absent disabled
   expect(value.evaluate(jobs).passed).toBe(false)
 })
 
-test('missing reusable package selection rejects', () => {
+test('missing declared web shard selection rejects', () => {
   const value = fixture()
-  delete value.changes.outputs.packages
-  expect(value.run()).toEqual({ passed: false, issues: ['Reusable output input is missing'] })
+  delete value.changes.outputs.web_shards
+  expect(value.run()).toEqual({ passed: false, issues: ['Matrix output is missing'] })
 })
 
 test('non-site code selection permits a skipped mobile layout job', () => {
@@ -329,7 +315,7 @@ test('CLI reads needs metadata without evaluating output text', () => {
   try {
     const workflows = path.join(directory, '.github/workflows')
     mkdirSync(workflows, { recursive: true })
-    for (const file of ['ci.yml', 'workspace-libraries.yml'])
+    for (const file of ['ci.yml'])
       writeFileSync(
         path.join(workflows, file),
         readFileSync(path.join(root, '.github/workflows', file)),
@@ -462,7 +448,7 @@ test.skipIf(!shellAvailable)(
     mkdirSync(path.join(candidate, '.github/workflows'), { recursive: true })
     mkdirSync(path.join(candidate, 'scripts'), { recursive: true })
     mkdirSync(path.join(trusted, 'scripts'), { recursive: true })
-    for (const file of ['ci.yml', 'workspace-libraries.yml'])
+    for (const file of ['ci.yml'])
       writeFileSync(
         path.join(candidate, '.github/workflows', file),
         readFileSync(path.join(root, '.github/workflows', file)),
