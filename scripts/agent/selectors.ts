@@ -1,5 +1,5 @@
 import type { Locator, Page } from 'playwright'
-import { createRequire } from 'node:module'
+import { detectPlatform } from '@fregat/hotkeys'
 import type {
   Editor,
   EditorTextBuffer,
@@ -7,10 +7,6 @@ import type {
   TextSnapshot,
 } from '@singapore-editor/core'
 import { createScriptError } from '../structured-errors'
-
-const webRequire = createRequire(new URL('../../apps/web/package.json', import.meta.url))
-const hotkeys: typeof import('@fregat/hotkeys') = webRequire('@fregat/hotkeys')
-const { detectPlatform } = hotkeys
 
 export const siteReplicaSelectors = {
   stage: (page: Page, id: string) => page.locator(`[data-replica][id="${id}"]`),

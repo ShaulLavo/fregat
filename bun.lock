@@ -430,6 +430,8 @@
       "name": "scripts",
       "version": "0.0.56",
       "dependencies": {
+        "@fregat/hotkeys": "catalog:",
+        "@singapore-editor/core": "catalog:",
         "@workspace/utils": "workspace:*",
       },
       "devDependencies": {

@@ -11,6 +11,8 @@
     "product-sites:deploy": "wrangler deploy --config product-sites/wrangler.fregat.jsonc"
   },
   "dependencies": {
+    "@fregat/hotkeys": "catalog:",
+    "@singapore-editor/core": "catalog:",
     "@workspace/utils": "workspace:*"
   },
   "devDependencies": {
