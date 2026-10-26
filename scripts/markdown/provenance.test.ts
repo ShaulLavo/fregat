@@ -70,14 +70,42 @@ test('candidate source identity includes the production probe and its shared pro
   }
 })
 
-async function writeFixture(root: string) {
-  for (const file of fixtureFiles) {
+test.each(['isolated', 'hoisted'] as const)(
+  'resolves the real %s package root past a nested decoy manifest',
+  async (layout) => {
+    const root = await mkdtemp(path.join(tmpdir(), `markdown-provenance-${layout}-`))
+    try {
+      await writeFixture(root, layout)
+      const directory = installedDirectory(layout)
+      await writeFile(path.join(root, directory, 'dist/package.json'), '{"name":"decoy"}\n')
+      const before = await qualificationProvenance(root)
+      for (const file of ['dist/index.js', 'dist/treeSitter/workerClient.js', 'package.json'])
+        expect(before.sources.some((entry) => entry.file === `${directory}/${file}`)).toBe(true)
+      await writeFile(path.join(root, directory, 'dist/index.js'), 'changed installed artifact\n')
+      const after = await qualificationProvenance(root)
+      expect(after.sourceClosureSha256).not.toBe(before.sourceClosureSha256)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  },
+)
+
+function installedDirectory(layout: 'isolated' | 'hoisted'): string {
+  const base = layout === 'isolated' ? 'apps/web/node_modules' : 'node_modules'
+  return `${base}/@singapore-editor/tree-sitter`
+}
+
+async function writeFixture(root: string, layout: 'isolated' | 'hoisted' = 'isolated') {
+  const files = fixtureFiles.map((file) =>
+    file.replace(installedDirectory('isolated'), installedDirectory(layout)),
+  )
+  for (const file of files) {
     await mkdir(path.dirname(path.join(root, file)), { recursive: true })
     await writeFile(path.join(root, file), `${file}\n`)
   }
   await writeFile(path.join(root, 'apps/web/package.json'), '{}')
   await writeFile(
-    path.join(root, 'apps/web/node_modules/@singapore-editor/tree-sitter/package.json'),
+    path.join(root, installedDirectory(layout), 'package.json'),
     JSON.stringify({
       name: '@singapore-editor/tree-sitter',
       type: 'module',

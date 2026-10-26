@@ -25,22 +25,11 @@ installation and all 25 `build:workspaces` tasks pass. This refresh adds invento
 adds no approval record; it creates no production contribution runtime. Earlier source/payload
 measurements below retain their original identity and date.
 
-### Rerunnable source inventory
+### Historical source inventory
 
-From the repository root, run:
-
-```sh
-bun run documents:inventory --check
-bun run documents:inventory --write
-```
-
-The script resolves the checkout from its own location, lists Git-tracked sources and reads each
-file once with Node. It covers all Editor packages, Editor examples, Platform apps and shared
-packages. It excludes dependencies, built artifacts,
-tests, browser-test files and benchmark directories. Example benchmark source remains included.
-It writes [consumer-inventory.tsv](consumer-inventory.tsv), including source text, line, owner,
-migration family and an explanatory note. Standard output without a flag supports comparison
-without writing. `--check` detects drift in the complete generated file.
+The retired `documents:inventory` command produced the research scan described here. Its generated
+`consumer-inventory.tsv` was removed with the producer tooling. The measurement content below
+retains its original scope.
 
 The preparation scan records 597 classified matches: 26 publication points, 26 subscriptions/view
 notifications, 106 factories/borrows/declarations, 65 worker/protocol messages, 252 source reads,
@@ -360,7 +349,7 @@ non-built-in theme.
 - **Main-thread reads at open differ per consumer.** Shiki materializes the whole text once per
   view (`materializeFullText`, 624,000 units). Minimap reads the whole document line by line:
   32,045 reads and 592,799 units for one view on the medium file without materializing it, the
-  pattern [projection performance notes](../../packages/singapore/docs/performance/e031-projection.md) warns a full-read counter
+  pattern [projection performance notes](https://github.com/ShaulLavo/singapore/blob/main/docs/performance/e031-projection.md) warns a full-read counter
   hides. Tree-sitter shows 43 reads because it builds chunks from the piece table's buffers
   (`treeSitter/source.ts:172`), below the `TextSnapshot` counter; its cost appears only in the
   message column. Typing costs the view about 900 reads and 16,000 units per 20 keystrokes in

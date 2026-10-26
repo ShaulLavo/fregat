@@ -14,8 +14,8 @@ notifications and 15 publication points. Its owner column distinguishes mutation
 presentation, domain adapter and host policy. API declarations and example probes are included;
 these counts describe source matches, not active worker or subscription counts. The
 [October 4 inventory refresh](baseline-and-inventory.md#runtime-preparation-2026-10-04) records
-the current generated [scan](consumer-inventory.tsv), twelve production raw subscriptions and
-the complete same-unit provider caller cutover.
+the historical generated scan, twelve production raw subscriptions and the complete same-unit
+provider caller cutover.
 
 The nine production raw buffer subscriptions are:
 

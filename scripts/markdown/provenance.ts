@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { hash } from 'node:crypto'
-import { readFile, readdir } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { readFile, readdir, realpath } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -84,11 +85,29 @@ async function sourceFiles(root: string): Promise<string[]> {
 
 async function installedPackageFiles(root: string, name: string): Promise<string[]> {
   const webRequire = createRequire(path.join(root, 'apps/web/package.json'))
-  webRequire.resolve(name)
-  const directory = path.join(root, 'apps/web/node_modules', name)
+  const entry = await realpath(webRequire.resolve(name))
+  const directory = await installedPackageRoot(entry, name)
   const files = await artifactFiles(root, path.join(directory, 'dist'))
   files.push(path.relative(root, path.join(directory, 'package.json')))
   return files
+}
+
+async function installedPackageRoot(entry: string, name: string): Promise<string> {
+  let directory = path.dirname(entry)
+  while (true) {
+    const manifest = path.join(directory, 'package.json')
+    if ((await readPackageName(manifest)) === name) return directory
+    const parent = path.dirname(directory)
+    if (parent === directory) throw new TypeError(`No package manifest found for ${name}`)
+    directory = parent
+  }
+}
+
+async function readPackageName(file: string): Promise<string | null> {
+  if (!existsSync(file)) return null
+  const manifest: unknown = JSON.parse(await readFile(file, 'utf8'))
+  if (typeof manifest !== 'object' || manifest === null || !('name' in manifest)) return null
+  return typeof manifest.name === 'string' ? manifest.name : null
 }
 
 async function artifactFiles(root: string, directory: string): Promise<string[]> {

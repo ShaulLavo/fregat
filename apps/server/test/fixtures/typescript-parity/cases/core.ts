@@ -360,11 +360,7 @@ export const CORE_CASES: readonly ParityCase[] = [
     methods: ['textDocument/semanticTokens/range'],
     capability: { kind: 'all', paths: ['semanticTokensProvider.range'] },
     expectation: 'Range semantic tokens contain valid token tuples',
-    run: (s) =>
-      s.client.request('textDocument/semanticTokens/range', {
-        textDocument: { uri: s.uri(CORE_PROJECT.mainPath) },
-        range: { start: { line: 2, character: 0 }, end: { line: 4, character: 0 } },
-      }),
+    run: semanticTokensRange,
     useful: hasSemanticTokens,
   },
   {
@@ -404,10 +400,7 @@ export const CORE_CASES: readonly ParityCase[] = [
         ? s.client.request('textDocument/semanticTokens/full', {
             textDocument: { uri: s.uri(CORE_PROJECT.mainPath) },
           })
-        : s.client.request('textDocument/semanticTokens/range', {
-            textDocument: { uri: s.uri(CORE_PROJECT.mainPath) },
-            range: { start: { line: 2, character: 0 }, end: { line: 4, character: 0 } },
-          }),
+        : semanticTokensRange(s),
     useful: hasSemanticTokens,
   },
   {
@@ -445,6 +438,13 @@ export const CORE_CASES: readonly ParityCase[] = [
     useful: usefulRefactor,
   },
 ]
+
+function semanticTokensRange(session: ParitySession): Promise<unknown> {
+  return session.client.request('textDocument/semanticTokens/range', {
+    textDocument: { uri: session.uri(CORE_PROJECT.mainPath) },
+    range: { start: { line: 2, character: 0 }, end: { line: 4, character: 0 } },
+  })
+}
 
 function completionAtEdit(session: ParitySession): Promise<unknown> {
   const text = CORE_PROJECT.editedMainText

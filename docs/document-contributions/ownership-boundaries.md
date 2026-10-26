@@ -40,13 +40,9 @@ history can retire, and returning to a retired range performs a fresh query befo
 ## Executable checks
 
 `bun run documents:check` parses production source with `oxc-parser`. It checks package source and
-dist imports, private worker-reader imports, raw runtime factories, legacy source bindings, edit
-cursor accesses, and direct buffer subscriptions, including simple buffer aliases. Explicit backend
-adapters and synchronous view observers are listed in the checker with their ownership reasons.
-The checker runs in the normal gates, verification command and CI.
+dist imports, private worker-reader imports, edit cursor accesses, and direct buffer subscriptions,
+including simple buffer aliases. Synchronous view observers are listed in the checker with their
+ownership reasons. The checker runs in the normal gates, verification command and CI.
 
-The AST check enforces these known boundaries. Independent code review establishes ownership for
-new domain state and updates the explicit adapters when a backend requires one.
-
-`bun run documents:inventory` regenerates the discovery inventory. Its source matches support the
-ownership review; the AST check supplies the enforcement.
+The AST check enforces these consumer boundaries. Independent code review establishes ownership for
+new domain state.
