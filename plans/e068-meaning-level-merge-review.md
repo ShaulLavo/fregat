@@ -1,6 +1,6 @@
 # E068: Review edits that merged cleanly but may not make sense together
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: Approved
 - Kind: Implementation

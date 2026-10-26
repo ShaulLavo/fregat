@@ -1,6 +1,6 @@
 # E066: Collaborative text with one ordering host
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: In progress
 - Kind: Implementation
@@ -189,8 +189,8 @@ Types' and Fugue's test suites. The research settles the rest:
     document measurements, not browser frame or isolated-machine headline claims.
   - Reproduce the counted bounds and existing ordering assertions with
     `COLLABORATION_LONG_RUN=1 bun run --cwd packages/singapore/packages/collab test
-test/offline-order.test.ts test/order-independence.test.ts test/replay-work.test.ts
-test/document-replay.test.ts --maxWorkers=1`. Both engines passed all 44 tests in
+    test/offline-order.test.ts test/order-independence.test.ts test/replay-work.test.ts
+    test/document-replay.test.ts --maxWorkers=1`. Both engines passed all 44 tests in
     171.84 s. The counted 2,000/2,000 case bounds envelope applies by three times the
     branch length and one restore; the production batch bounds them by twice the branch
     length and two exact publications. Typing at 0, 1, 10 and 100 pending edits retains

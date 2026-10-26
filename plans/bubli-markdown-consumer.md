@@ -1,6 +1,6 @@
 # Shared Markdown semantics for Editor and Fregat TUI
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 Status: Approved cross-repository integration work package, requested by the owner on 2026-09-28. Documentation only; no editor, dependency, worker or build changes are made in this PR. This is part of Fregat Plan 202, coordinated with existing Plans 176/189/099/197/198, not a second independent Editor roadmap or a replacement for the numbered backlog.
 

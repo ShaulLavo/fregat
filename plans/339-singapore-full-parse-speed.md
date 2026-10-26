@@ -20,18 +20,18 @@ Use the simple editor API and the normal TypeScript plugin. Preserve token style
 
 ## Current code
 
-- [`syntaxController.ts`](../packages/singapore/packages/editor/src/editor/syntaxController.ts) currently requests `syntaxMode: range`. It first gets a full parse acknowledgment, then asks for visible tokens. That is a different workload from full-document highlighting, even though the root tree is already complete.
-- [`session.ts`](../packages/singapore/packages/tree-sitter/src/session.ts) already supports `syntaxMode: full` and requests `resultMode: full`. The benchmark selects this existing path through a build-only source transform and disables subsequent range queries. Shipping editor source stays unchanged.
-- [`treeSitter.worker.ts`](../packages/singapore/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts) parses the root, discovers injection layers, then flattens every layer. Whole-tree highlight collection currently uses `Query.matches`; range collection uses `Query.captures`. The paths have different output shapes and normalization work.
+- [`syntaxController.ts`](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/editor/syntaxController.ts) currently requests `syntaxMode: range`. It first gets a full parse acknowledgment, then asks for visible tokens. That is a different workload from full-document highlighting, even though the root tree is already complete.
+- [`session.ts`](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/session.ts) already supports `syntaxMode: full` and requests `resultMode: full`. The benchmark selects this existing path through a build-only source transform and disables subsequent range queries. Shipping editor source stays unchanged.
+- [`treeSitter.worker.ts`](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts) parses the root, discovers injection layers, then flattens every layer. Whole-tree highlight collection currently uses `Query.matches`; range collection uses `Query.captures`. The paths have different output shapes and normalization work.
 - The worker already measures root parse, injection discovery, structural walk, highlight query plus predicates, capture sorting, overlap resolution and packing. Parse/query totals contain these phases. Input uses a worker-owned piece-table replica and UTF-16 callback reads.
-- Packed tokens already travel as transferable arrays. [`EditorTokenStore.fromPacked`](../packages/singapore/packages/editor/src/syntax/tokenStore.ts) validates style IDs and adopts sorted arrays in one segment. It sorts when the packed result does not assert sorted order. Do not plan a second object-token store or assume an expensive store rebuild without the measured clock.
+- Packed tokens already travel as transferable arrays. [`EditorTokenStore.fromPacked`](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/syntax/tokenStore.ts) validates style IDs and adopts sorted arrays in one segment. It sorts when the packed result does not assert sorted order. Do not plan a second object-token store or assume an expensive store rebuild without the measured clock.
 - tree-sitter-x's source build already specifies `-O3`, LTO and optional `wasm-opt -O3`. Inspect the exact packaged artifact and grammar build before claiming a missing optimization flag. SIMD is a hypothesis about specific hot loops, not a blanket speed switch for a branch-heavy parser.
 
 ## Measured baseline
 
 Measured 2026-10-08 at 2026-10-08T17:03:21.176Z on an Intel i7-14700K, 28 logical CPUs, 31.1 GiB RAM, Linux 7.2.8-arch1-2, headless Chromium 153.0.8010.12, Node 26.7.0 and Bun 1.4.2. Source commit `77fef3fa0cfa76be7d1a914fa5bd87629b1259c5` plus the benchmark-only transforms in this PR. Condition `noisy`, three rotated repetitions per editor, viewport 1280×720, device scale 1, local HTTP. The native build and other wave work could overlap; neither series is a quiet qualification.
 
-Committed [browser samples](../packages/singapore/docs/performance/singapore-full-parse-2026-10-08/experiment.json.gz), [phase summary](../packages/singapore/docs/performance/singapore-full-parse-2026-10-08/summary.json) and [native samples](../packages/singapore/docs/performance/singapore-full-parse-2026-10-08/native.json) retain the method and provenance. Compressed traces sit beside the browser samples. The author retains the historical screenshots and scheduling output outside the repository.
+Committed [browser samples](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-full-parse-2026-10-08/experiment.json.gz), [phase summary](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-full-parse-2026-10-08/summary.json) and [native samples](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-full-parse-2026-10-08/native.json) retain the method and provenance. Compressed traces sit beside the browser samples. The author retains the historical screenshots and scheduling output outside the repository.
 
 | Singapore observation                | Median of three, ms | Interpretation                                                                                            |
 | ------------------------------------ | ------------------: | --------------------------------------------------------------------------------------------------------- |
@@ -68,7 +68,7 @@ Worker times use their own monotonic clock. Boundary delays use `performance.tim
 
 ### Reconcile the earlier highlighted-open result
 
-The earlier [open-time summary](../packages/singapore/docs/performance/singapore-open-2026-10-08/after/open-summary.json) and [raw samples](../packages/singapore/docs/performance/singapore-open-2026-10-08/after/experiment.json.gz) recorded a 1,464.0 ms median for first visible highlighting of the same 10 MiB fixture. That noisy run was measured on the same machine and Chromium build at 2026-10-08T11:07:44.129Z, from source commit `308f5e514573c6cee874ad63201bbb17151b5c36`.
+The earlier [open-time summary](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-open-2026-10-08/after/open-summary.json) and [raw samples](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-open-2026-10-08/after/experiment.json.gz) recorded a 1,464.0 ms median for first visible highlighting of the same 10 MiB fixture. That noisy run was measured on the same machine and Chromium build at 2026-10-08T11:07:44.129Z, from source commit `308f5e514573c6cee874ad63201bbb17151b5c36`.
 
 Its `parseOnly` request parsed the complete root and discovered injections. Its subsequent `queryRange` request walked, highlighted, normalized and packed only the requested visible scope, 0..23,359 code units, returning 2,672 tokens. The benchmark's highlighted-open clock ended after visible syntax settled and a frame opportunity passed. It did not wait for whole-file token production, delivery or store settlement.
 
@@ -150,7 +150,7 @@ Exit with a checked full-document baseline and the ranked bottleneck. Leave view
 Qualification work in progress, 2026-10-08:
 
 - The benchmark checks canonical token, palette and structural hashes, root/injection bounds, query limits and final tokens. Five quiet cold-context and five warmed-runtime repetitions passed with fresh measured documents and identical canonical output across both conditions. The deterministic TypeScript and HTML controls passed at 1 MiB and 10 MiB, including complete dense injections. The Markdown control remains rejected.
-- The packaged runtime WASM is byte-identical to an `-O3`/LTO/`wasm-opt -O3` rebuild of tree-sitter-x source `fc034c3ad42a6a5669202fa40303bfb2cd8829fc` with wasi-sdk 34.0 and Binaryen 132. [Build provenance](../packages/singapore/docs/performance/singapore-full-parse-2026-10-08/runtime-wasm-provenance.json) records the flags, exports and grammar input hashes. The grammar WASM has not had a byte-identical rebuild.
+- The packaged runtime WASM is byte-identical to an `-O3`/LTO/`wasm-opt -O3` rebuild of tree-sitter-x source `fc034c3ad42a6a5669202fa40303bfb2cd8829fc` with wasi-sdk 34.0 and Binaryen 132. [Build provenance](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-full-parse-2026-10-08/runtime-wasm-provenance.json) records the flags, exports and grammar input hashes. The grammar WASM has not had a byte-identical rebuild.
 - PR #1021 and the complete-injection repair #1062 are integrated. The earlier five cold and five warm runs remain preliminary evidence. The frozen M0 below uses the integrated main and expanded retention and lifecycle controls. Phase 0 remains partial because Markdown proof is absent.
 
 ### Phase 1: Remove the largest single-worker cost
@@ -230,7 +230,7 @@ qualification records their reruns and the Markdown failure separately.
 
 ### Frozen TypeScript M0 and next experiment, 2026-10-09
 
-[Qualification evidence](../packages/singapore/docs/performance/singapore-full-parse-2026-10-08/qualified-m0/qualification.json)
+[Qualification evidence](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-full-parse-2026-10-08/qualified-m0/qualification.json)
 contains all samples, canonical output, phase budgets, build hashes and sanitized
 whole-job memory receipts. Compressed experiments and browser traces sit beside
 it. These instrumented, headless runs establish a full-document baseline. They
@@ -308,7 +308,7 @@ has been accepted yet.
 
 ### Memory review corrections, 2026-10-09
 
-[Corrected memory evidence](../packages/singapore/docs/performance/singapore-full-parse-2026-10-08/memory-correction/qualification.json)
+[Corrected memory evidence](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-full-parse-2026-10-08/memory-correction/qualification.json)
 replaces the historical memory observations while preserving the frozen timing
 baseline and M1 thresholds. The probe now parses Linux RSS/high-water fields
 with tab or space separation, retains only the latest unproved reply, counts
@@ -343,7 +343,7 @@ No shipping parser/editor source or open timing markers changed.
 
 ### First retained structural candidate, 2026-10-09
 
-[Cursor-read evidence](../packages/singapore/docs/performance/singapore-full-parse-2026-10-08/cursor-reads/comparison.json)
+[Cursor-read evidence](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-full-parse-2026-10-08/cursor-reads/comparison.json)
 retains the normal timed experiments, both overhead-heavy native counter
 profiles, all control traces and the bounded replication intent. The shipping
 change reads a cursor's type and missing state once, and reads source offsets
@@ -417,7 +417,7 @@ candidate at `9d78f3e84f683325d57ebcb4b3b1b1b86518f407`. Every original attempt
 completed. No failed sample was replaced, no acceptance rerun was made, and no
 threshold was widened. The complete declaration, twenty timing traces, thirty-two
 control traces, counter diagnostics and fifty-two matched scheduler receipts are
-in [the preserved evidence](../packages/singapore/docs/performance/singapore-full-parse-2026-10-08/predicate-reads/comparison.json).
+in [the preserved evidence](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-full-parse-2026-10-08/predicate-reads/comparison.json).
 
 The following are original instrumented experiment medians, in milliseconds.
 They describe headless frame opportunities, not physical presentation or CPU

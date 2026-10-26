@@ -1,6 +1,6 @@
 # E064: One highlight pipeline for tokens and range highlights
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: Approved
 - Kind: Design

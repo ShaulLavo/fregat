@@ -41,11 +41,11 @@ an arbitrary server is not advertised as a fully qualified TypeScript engine.
 
 ## Current code
 
-- [Worker session](../packages/singapore/packages/typescript-lsp/src/worker/session.ts) handles 21 feature
+- [Worker session](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/typescript-lsp/src/worker/session.ts) handles 21 feature
   requests, including completion/code-action resolution, prepare-rename, workspace symbols,
-  on-type formatting and pull diagnostics. [ProjectHost](../packages/singapore/packages/typescript-lsp/src/worker/projectHost.ts)
+  on-type formatting and pull diagnostics. [ProjectHost](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/typescript-lsp/src/worker/projectHost.ts)
   maintains versions and unsaved overlays over supplied workspace files.
-- [Worker parity test](../packages/singapore/packages/typescript-lsp/test/parity.test.ts) constructs only
+- [Worker parity test](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/typescript-lsp/test/parity.test.ts) constructs only
   `InProcessTypeScriptWorker`; its useful-answer rows are valuable, but it does not compare
   real server backends. Its completeness check covers top-level capability keys. Existing
   browser coverage concentrates on document symbols and synchronization.
@@ -56,18 +56,18 @@ an arbitrary server is not advertised as a fully qualified TypeScript engine.
 - [Real server tests](../apps/server/src/lsp/tests/typescript-server.test.ts) use real TS6/TS7
   processes with a recording socket. They cover project changes and selected hover,
   definition, completion and token results, rather than the full worker method matrix.
-- [LspClient](../packages/singapore/packages/lsp/src/client.ts) already has generic requests, request handles
-  and notifications. [ServerSet](../packages/singapore/packages/lsp-plugin/src/serverSet.ts) routes a
+- [LspClient](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/lsp/src/client.ts) already has generic requests, request handles
+  and notifications. [ServerSet](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/lsp-plugin/src/serverSet.ts) routes a
   narrower feature set. The proxy generally forwards client requests; transport reachability
   and editor feature coverage are separate facts.
-- [Code-action application](../packages/singapore/packages/lsp-plugin/src/codeActions.ts) explicitly
+- [Code-action application](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/lsp-plugin/src/codeActions.ts) explicitly
   rejects commands before and after resolution; completion application omits item commands.
   The [proxy](../apps/server/src/lsp/proxy-session.ts) deliberately rejects unowned server
   requests, including `workspace/applyEdit`. Extend the transaction contract before enabling it.
-- [Workspace preload](../packages/singapore/packages/typescript-lsp/src/workspace.ts) broadcasts custom
+- [Workspace preload](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/typescript-lsp/src/workspace.ts) broadcasts custom
   file notifications to connected clients. Standard external servers need their own provisioning
   contract. The worker currently selects one tsconfig; config glob and multi-project behavior
-  need fixtures before changing [project ownership](../packages/singapore/packages/typescript-lsp/src/worker/project.ts).
+  need fixtures before changing [project ownership](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/typescript-lsp/src/worker/project.ts).
 
 The old E054 completion record remains historical evidence. This plan adds a stronger acceptance
 contract. Older Plan 088 references to the removed in-process server must be reconciled against
@@ -227,7 +227,7 @@ literal-action negotiation. Code-action resolution is unavailable. Preserve thes
 upstream/adapter evidence while completing the action owner; do not lower the useful-edit gate.
 
 Commands, source/artifact rules and browser results belong in
-[the baseline guide](../packages/singapore/docs/architecture/typescript-parity-baseline.md). These core
+[the baseline guide](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/typescript-parity-baseline.md). These core
 checks do not complete feature, project or editor qualification. Rust integration still waits
 for the current TypeScript qualification gate.
 

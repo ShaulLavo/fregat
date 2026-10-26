@@ -1,13 +1,13 @@
 # E014: Search immutable snapshots across workers and stream results
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: Approved
 - Kind: Implementation
 - Owner: Cross-repo
 - Priority: P2
 - Effort: L
-- Dependencies: [E001](../packages/singapore/examples/stress/README.md), [E008](../packages/singapore/docs/performance/e008-in-buffer-search.md)
+- Dependencies: [E001](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/examples/stress/README.md), [E008](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e008-in-buffer-search.md)
 - Inspected baseline: `9abb944f3a2b8d6516953fdec75e8df5e1a94811`, 2026-09-05.
 
 ## Outcome
@@ -19,11 +19,11 @@ The first implementation works without SharedArrayBuffer.
 
 ## Current code
 
-- [Editor find](../packages/singapore/packages/find/src/search.ts) supplies synchronous query semantics and
-  [FindController](../packages/singapore/packages/find/src/findController.ts) supplies scoped find and replacement behavior.
-- [Document edit chains](../packages/singapore/packages/editor/src/editor/editChain.ts) already compose changes
+- [Editor find](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/find/src/search.ts) supplies synchronous query semantics and
+  [FindController](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/find/src/findController.ts) supplies scoped find and replacement behavior.
+- [Document edit chains](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/editor/editChain.ts) already compose changes
   from an earlier sync point, with explicit gaps and segment changes.
-- [Tree-sitter source transport](../packages/singapore/packages/tree-sitter/src/treeSitter/source.ts) offers
+- [Tree-sitter source transport](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/treeSitter/source.ts) offers
   an existing example of worker chunk mirrors. Its format is private to that package.
 - [Platform search providers](../apps/web/src/features/search/utils/providers.ts)
   already combine disk and open-buffer search, preserve dirty-buffer precedence, and stream events.

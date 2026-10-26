@@ -23,8 +23,8 @@ A caller that keeps the `Uint8Array` returned by `heap()` sees the enlarged heap
 - `UTF8ToString()` passes a heap subarray to `TextDecoder.decode()`. `stringToUTF8()` passes one to `TextEncoder.encodeInto()`. These exact operations need a runtime matrix check.
 - `src/text_buffer.ts` rebuilds bounded `Uint16Array` views around its current C allocation. Its `reserve()` can move that allocation through `_realloc()`. Stable backing memory does not make the old address valid.
 - `src/extension.ts` exports `heap()` and `loadExtension()`. Here, extensions share one ordinary Wasm memory. This is distinct from `SharedArrayBuffer` or Wasm threads.
-- [Fregat's memory test](../packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts) deliberately forces growth. It asserted replacement of the buffer and detachment of the old view. Adoption replaces those expectations with stable length-tracking views.
-- Fregat pins the generated runtime commit in its root manifest, overrides, Editor manifests, release fixture, and `bun.lock`. [`update-tree-sitter-x.ts`](../packages/singapore/scripts/update-tree-sitter-x.ts) updates these but also advances tree-sitter-md to remote HEAD.
+- [Fregat's memory test](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/test/wasm-memory.test.ts) deliberately forces growth. It asserted replacement of the buffer and detachment of the old view. Adoption replaces those expectations with stable length-tracking views.
+- Fregat pins the generated runtime commit in its root manifest, overrides, Editor manifests, release fixture, and `bun.lock`. [`update-tree-sitter-x.ts`](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/scripts/update-tree-sitter-x.ts) updates these but also advances tree-sitter-md to remote HEAD.
 - The consumed Markdown revision is `e2ae3f735f614b3b618b5de71fc41644a180b9e7`, package 0.1.3. Its peer range is `web-tree-sitter ^0.28.1`. Inspected Markdown `origin/main` is `aca967752732f8eefcbb6ccba94d70f3ec96e65e`, package 0.1.4. Neither revision owns a separate parser heap.
 
 ## Scope and design

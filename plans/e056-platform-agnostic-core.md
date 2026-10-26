@@ -1,13 +1,13 @@
 # E056: Extract a platform-agnostic core and prove a Strict DOM host
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: Approved
 - Kind: Implementation
 - Owner: Cross-repo
 - Priority: P3
 - Effort: XL
-- Dependencies: [E001](../packages/singapore/examples/stress/README.md), [E002](../packages/singapore/docs/performance/input-latency.md)
+- Dependencies: [E001](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/examples/stress/README.md), [E002](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/input-latency.md)
 - Inspected baseline: `45e22a495902c577243334586bc391f04201a827`, 2026-09-20.
 
 Requested on 2026-09-20. Approved work, parked by the owner on 2026-09-25.
@@ -15,8 +15,8 @@ Implementation has not started. Plan 207 must establish the canonical source lay
 package relocation or producer/consumer cutover. Baseline research may proceed while parked. Fregat was inspected at
 `43d3ac1762d4eb01f4521554967e666336858e33`; React Strict DOM at
 `abd34bbf22bb468ffdc0baaf606f172c3a583487`. Reconcile actual HEADs and full dirty diffs before work.
-The [research and detailed delivery units](../packages/singapore/docs/architecture/e056-platform-agnostic-core.md)
-and [57-source evidence ledger](../packages/singapore/docs/architecture/e056-platform-agnostic-core-sources.json)
+The [research and detailed delivery units](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/e056-platform-agnostic-core.md)
+and [57-source evidence ledger](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/e056-platform-agnostic-core-sources.json)
 are supporting design evidence, not passing implementation results.
 
 ## Outcome
@@ -30,16 +30,16 @@ a readonly viewer, a WebView, a typecheck or cached selection getters.
 
 ## Current code
 
-[Document sessions](../packages/singapore/packages/editor/src/documentSession.ts) already own buffers, view sessions,
+[Document sessions](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/documentSession.ts) already own buffers, view sessions,
 history graphs, logical revisions, leases and reversible prepared transactions. Preserve them.
-[Editor](../packages/singapore/packages/editor/src/editor/Editor.ts) constructs the DOM view while coordinating
-shared behavior. [InputSelectionController](../packages/singapore/packages/editor/src/editor/inputSelectionController.ts)
+[Editor](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/editor/Editor.ts) constructs the DOM view while coordinating
+shared behavior. [InputSelectionController](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/editor/inputSelectionController.ts)
 mixes native browser events and hidden input with autoclose, snippets and linked-edit policy.
-[Viewport calculations](../packages/singapore/packages/editor/src/virtualization/fixedRowVirtualizer.ts) mix numeric
-window planning with DOM attachment; [geometry](../packages/singapore/packages/editor/src/virtualization/virtualizedTextViewGeometry.ts)
-uses mounted text and DOM Range. [Plugins](../packages/singapore/packages/editor/src/plugins.ts) expose host elements
-and snapshot serializers; the [React adapter](../packages/singapore/packages/react/src/index.tsx) has concrete DOM
-mounting, deferred disposal and generation-guarded presentation. The [worker reference](../packages/singapore/docs/architecture/worker-topology.md)
+[Viewport calculations](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/virtualization/fixedRowVirtualizer.ts) mix numeric
+window planning with DOM attachment; [geometry](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/virtualization/virtualizedTextViewGeometry.ts)
+uses mounted text and DOM Range. [Plugins](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/plugins.ts) expose host elements
+and snapshot serializers; the [React adapter](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/react/src/index.tsx) has concrete DOM
+mounting, deferred disposal and generation-guarded presentation. The [worker reference](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/worker-topology.md)
 confirms current document authority remains local/main-thread, not an authoritative document worker.
 The research records exact Fregat consumers and RSD source/API mismatches. It is a targeted audit,
 not a complete transitive import census, a fresh benchmark or native runtime certification.

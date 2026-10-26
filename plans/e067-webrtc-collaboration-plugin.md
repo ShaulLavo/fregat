@@ -1,6 +1,6 @@
 # E067: Peer-to-peer collaboration plugin over WebRTC
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: In progress
 - Kind: Implementation
@@ -26,7 +26,7 @@ sides' work survives the rejoin.
   that declare `inputs` only receive those update kinds (`packages/editor/src/plugins.ts`).
 - Remote selections and carets can use owner-scoped highlights, tracked decorations, per-view DOM
   contributions and range geometry (`plugins.ts`, `editor/decorationStore.ts`,
-  [E050](../packages/singapore/docs/architecture/e050-host-obligations.md)).
+  [E050](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/e050-host-obligations.md)).
 - Missing core contracts (exact transaction stream with origin, atomic reconcile, character-ID
   conversion, collaborative undo) belong to E066 step 6.
 - y-webrtc is coupled to a Y.Doc; its signaling server is a small topic broker; its code default

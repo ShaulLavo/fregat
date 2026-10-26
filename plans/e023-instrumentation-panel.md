@@ -1,13 +1,13 @@
 # E023: Inspect editor timing and retained memory
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: Approved
 - Kind: Implementation
 - Owner: Editor
 - Priority: P2
 - Effort: M
-- Dependencies: [E001](../packages/singapore/examples/stress/README.md)
+- Dependencies: [E001](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/examples/stress/README.md)
 - Inspected baseline: `9abb944f3a2b8d6516953fdec75e8df5e1a94811`
 
 Decided 2026-09-25: owner — parked. Not scheduled until the owner revisits it.
@@ -20,15 +20,15 @@ capture. Keep diagnostics cheap when disabled and bounded when someone leaves th
 
 ## Current code
 
-- [Performance diagnostics](../packages/singapore/packages/editor/src/editor/performanceDiagnostics.ts) already
+- [Performance diagnostics](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/editor/performanceDiagnostics.ts) already
   supply an opt-in global sink and lazy detail construction. This is a seed, not a per-editor panel API.
-- [Logging](../packages/singapore/packages/editor/src/logging/index.ts) and
-  [its evlog adapter](../packages/singapore/packages/editor/src/logging/evlog.ts) provide existing event boundaries.
-- [The debug export](../packages/singapore/packages/editor/src/debug.ts) exposes piece-table inspection and has
+- [Logging](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/logging/index.ts) and
+  [its evlog adapter](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/logging/evlog.ts) provide existing event boundaries.
+- [The debug export](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/debug.ts) exposes piece-table inspection and has
   a deprecated containment comment. It does not define a registry of switchable debug flags.
-- [Tree-sitter results](../packages/singapore/packages/tree-sitter/src/treeSitter/types.ts) already include timings;
-  [the worker client](../packages/singapore/packages/tree-sitter/src/treeSitter/workerClient.ts) owns worker requests.
-- [E001](../packages/singapore/examples/stress/README.md) supplies repeatable scenarios and measurement definitions.
+- [Tree-sitter results](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/treeSitter/types.ts) already include timings;
+  [the worker client](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/treeSitter/workerClient.ts) owns worker requests.
+- [E001](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/examples/stress/README.md) supplies repeatable scenarios and measurement definitions.
 
 Inventory real emitters and available counters before promising panels. JavaScript does not expose
 an exact per-subsystem allocator ledger or arbitrary click-to-allocation source mapping by default.

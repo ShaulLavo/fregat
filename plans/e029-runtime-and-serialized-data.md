@@ -1,6 +1,6 @@
 # E029: Document runtime and serialized data boundaries
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: Approved
 - Kind: Design
@@ -22,23 +22,23 @@ source descriptor may also depend on chunks the receiving worker already holds.
 
 ## Current code
 
-[Piece-table types](../packages/singapore/packages/textbuffer/src/pieceTableTypes.ts) describe a persistent
+[Piece-table types](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/textbuffer/src/pieceTableTypes.ts) describe a persistent
 tree, reverse index, chunk store, anchors, and lazy buffer line indexes. These structures carry
 ownership and identity rules beyond a flat record of visible document text.
 
-[DocumentTextSnapshot](../packages/singapore/packages/editor/src/documentTextSnapshot.ts) exposes read methods
+[DocumentTextSnapshot](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/documentTextSnapshot.ts) exposes read methods
 and may retain a materialized string. Its readonly shape does not make the object serializable.
-[DocumentEditChain](../packages/singapore/packages/editor/src/editor/editChain.ts) uses branded runtime objects
+[DocumentEditChain](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/editor/editChain.ts) uses branded runtime objects
 for synchronization segments and logical revision scopes.
 
-[Tree-sitter source conversion](../packages/singapore/packages/tree-sitter/src/treeSitter/source.ts) builds source
+[Tree-sitter source conversion](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/treeSitter/source.ts) builds source
 descriptors and resolves them into a document-scoped chunk cache. It supports string chunks
 and shared UTF-16 buffers. Descriptors can omit previously sent chunks through `sentChunkLengths`.
-[Worker message types](../packages/singapore/packages/tree-sitter/src/treeSitter/types.ts) carry protocol data
+[Worker message types](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/treeSitter/types.ts) carry protocol data
 that is distinct from parser trees and worker-local input caches.
 
-[LSP position conversion](../packages/singapore/packages/lsp/src/positions.ts) turns snapshot edits into protocol
-content changes. [Line-ending handling](../packages/singapore/packages/textbuffer/src/lineEndings.ts)
+[LSP position conversion](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/lsp/src/positions.ts) turns snapshot edits into protocol
+content changes. [Line-ending handling](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/textbuffer/src/lineEndings.ts)
 records normalized text and round-trip facts that hosts need when saving.
 
 The TODO's hot and cold vocabulary is useful shorthand. Its claim that every worker payload
@@ -46,7 +46,7 @@ is a self-contained serialized representation needs these qualifications before 
 
 ## Scope
 
-Write a concise section in [ARCHITECTURE.md](../packages/singapore/ARCHITECTURE.md) and a linked, proposed
+Write a concise section in [ARCHITECTURE.md](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/ARCHITECTURE.md) and a linked, proposed
 `docs/architecture/data-representations.md` inventory. Update vocabulary in touched design
 documents only where it clarifies a real boundary. This plan makes no runtime representation change.
 
@@ -73,7 +73,7 @@ Document three actual flows: host text into a normalized piece table and back to
 snapshot changes into Tree-sitter source synchronization, and Editor edits into LSP changes.
 Show where version and generation checks apply and which caches must exist at the receiver.
 
-[E018](../packages/singapore/docs/editing/e018-persisted-undo.md) shipped on 2026-09-20: `serializeHistory` and
+[E018](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/editing/e018-persisted-undo.md) shipped on 2026-09-20: `serializeHistory` and
 `restoreHistory` store each node's edit script against its parent, and Platform restores it when the
 content hash matches. Document that format as an existing consumer of this vocabulary.
 Explain why serializing runtime tree pointers, sync segment objects, or parser handles does
@@ -99,8 +99,8 @@ not preserve their meaning across restart.
 This is documentation work. Check links, export paths, type definitions, and the actual
 encoder and decoder pairs. Do not run the repository's test suite to validate prose.
 
-Use [Tree-sitter source tests](../packages/singapore/packages/tree-sitter/test/source-chunks.test.ts) and
-[LSP positions tests](../packages/singapore/packages/lsp/test/positions.test.ts) as existing evidence for transfer
+Use [Tree-sitter source tests](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/test/source-chunks.test.ts) and
+[LSP positions tests](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/lsp/test/positions.test.ts) as existing evidence for transfer
 and coordinate claims. Inspect their assertions before stating the behavior they establish.
 
 For each conversion diagram, identify one source entry and one consumer entry. A descriptor

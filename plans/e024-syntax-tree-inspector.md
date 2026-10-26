@@ -1,6 +1,6 @@
 # E024: Inspect the live syntax tree
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: Approved
 - Kind: Implementation
@@ -20,15 +20,15 @@ requests and renders only the nodes needed to navigate it.
 
 ## Current code
 
-- [The Tree-sitter worker](../packages/singapore/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts) owns live
+- [The Tree-sitter worker](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts) owns live
   trees and injection layers. Browser UI cannot safely receive a WASM node object from that worker.
-- [The backend](../packages/singapore/packages/tree-sitter/src/treeSitter/workerClient.ts) exposes parsing, range
+- [The backend](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/treeSitter/workerClient.ts) exposes parsing, range
   queries, and structural selection; inspection requests would be a new, explicitly scoped contract.
-- [Worker messages](../packages/singapore/packages/tree-sitter/src/treeSitter/types.ts) already identify document,
+- [Worker messages](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/treeSitter/types.ts) already identify document,
   runtime session, and snapshot version. Reuse those stale-result and disposal boundaries.
-- [Structural selection](../packages/singapore/packages/tree-sitter/src/structuralSelection.ts) demonstrates
+- [Structural selection](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/structuralSelection.ts) demonstrates
   selection requests tied to a snapshot. It does not expose a lazy tree browser.
-- [The example app](../packages/singapore/examples/app/src/app.ts) is the initial host for the reusable inspector.
+- [The example app](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/examples/app/src/app.ts) is the initial host for the reusable inspector.
 
 The original TODO calls this mostly UI, but bounded worker inspection and revision-safe node
 identity are prerequisites. Verify available parser traversal and index units at implementation time.
@@ -75,8 +75,8 @@ two-way selection path against echo loops and reject results after panel or edit
 
 ## Verification
 
-Extend the targeted [worker tests](../packages/singapore/packages/tree-sitter/test/treeSitter-worker.test.ts) and
-the real [browser worker suite](../packages/singapore/packages/tree-sitter/test/treeSitter-workerClient.browser.test.ts)
+Extend the targeted [worker tests](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/test/treeSitter-worker.test.ts) and
+the real [browser worker suite](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/test/treeSitter-workerClient.browser.test.ts)
 through their package scripts. Verify pagination limits, stale revisions, two editor sessions,
 missing/error nodes, deep ancestry, injected languages, and close-before-response cancellation.
 

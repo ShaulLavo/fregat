@@ -1,13 +1,13 @@
 # E025: Design and prove reloadable user plugins
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: Approved
 - Kind: Research
 - Owner: Cross-repo
 - Priority: P2
 - Effort: L
-- Dependencies: [E026](e026-command-metadata.md), [E027](e027-extension-hooks.md), [E028](../packages/singapore/docs/architecture/modal-input-findings.md)
+- Dependencies: [E026](e026-command-metadata.md), [E027](e027-extension-hooks.md), [E028](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/modal-input-findings.md)
 - Inspected baseline: Editor `9abb944f3a2b8d6516953fdec75e8df5e1a94811`, Platform `c8e05123d8f89f74bdca0e73cd43bb060c6f4e67`.
 
 ## Outcome
@@ -22,18 +22,18 @@ listeners, or decorations behind. A failed reload leaves an explicit recoverable
 
 ## Current code
 
-[EditorPlugin and its host](../packages/singapore/packages/editor/src/plugins.ts) already provide install,
+[EditorPlugin and its host](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/plugins.ts) already provide install,
 activate, update, deactivate, and dispose lifecycles. Command, edit, capability, view, and
 decoration contributions already exist. This is a loader and contract problem, not a new
 plugin system from nothing.
 
-[Editor.setPlugins](../packages/singapore/packages/editor/src/editor/Editor.ts) changes the active plugin set.
-[Lifecycle tests](../packages/singapore/packages/editor/src/editor/pluginLifecycle.test.ts) exercise identity,
-disposal, and logging. [The public extension entry](../packages/singapore/packages/editor/src/public/extensions.ts)
+[Editor.setPlugins](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/editor/Editor.ts) changes the active plugin set.
+[Lifecycle tests](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/editor/pluginLifecycle.test.ts) exercise identity,
+disposal, and logging. [The public extension entry](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/public/extensions.ts)
 already exports the extension contracts, while the host implementation remains separate.
 
-[The shared keymap entry](../packages/singapore/packages/editor/src/public/keymap.ts) already supports chords.
-[Find](../packages/singapore/packages/find/src/plugin.ts) and [LSP](../packages/singapore/packages/lsp-plugin/src/plugin.ts) provide
+[The shared keymap entry](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/public/keymap.ts) already supports chords.
+[Find](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/find/src/plugin.ts) and [LSP](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/lsp-plugin/src/plugin.ts) provide
 real contribution examples. Neither supplies user-file discovery or a reload coordinator.
 
 The Fred description in [TODO.md](editor-wishlist.md) is inspiration recorded by the project, not

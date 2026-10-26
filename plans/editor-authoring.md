@@ -7,7 +7,7 @@ remains the execution scheduler. The Editor backlog index recommends an order wi
 
 ## Write a plan another engineer can execute
 
-Read [Editor instructions](../packages/singapore/AGENTS.md), the relevant [wishlist](editor-wishlist.md)
+Read [Editor instructions](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/AGENTS.md), the relevant [wishlist](editor-wishlist.md)
 section, and the actual source before writing.
 The initial inspection baseline is Editor `9abb944f3a2b8d6516953fdec75e8df5e1a94811`.
 Later plans record their actual inspected commit in a per-entry `baseline` in `editor-backlog.json`;
