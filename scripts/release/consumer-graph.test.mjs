@@ -19,6 +19,7 @@ async function graphFixture(workspace, mode = 'release', optional = false) {
     'packages/client-core',
     'packages/contracts',
     'packages/markdown',
+    'scripts',
   ]) {
     await put(consumer, {
       dependencies: { '@singapore-editor/highlighting': '1.0.0', '@fregat/hotkeys': '1.0.0' },
@@ -125,5 +126,18 @@ test('rejects an installed optional peer with a missing entrypoint', async () =>
       exports: './dist/missing.js',
     })
     expect(() => verifyConsumerGraph(workspace.root)).toThrow()
+  })
+})
+
+test('rejects a scripts-only second hotkeys runtime', async () => {
+  await withWorkspace(async (workspace) => {
+    await graphFixture(workspace)
+    await addPackage(
+      workspace.put,
+      workspace.root,
+      'scripts/node_modules/@fregat/hotkeys',
+      '@fregat/hotkeys',
+    )
+    expect(() => verifyConsumerGraph(workspace.root)).toThrow(/one installed hotkeys runtime/)
   })
 })

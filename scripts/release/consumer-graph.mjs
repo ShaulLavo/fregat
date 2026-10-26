@@ -11,6 +11,7 @@ const consumers = [
   'packages/client-core',
   'packages/contracts',
   'packages/markdown',
+  'scripts',
 ]
 const producers = ['packages/singapore', 'packages/ghostty-webgpu', 'packages/hotkeys']
 const isStandalone = (name) =>
