@@ -10,11 +10,12 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { createReadStream, existsSync } from 'node:fs'
+import { createReadStream } from 'node:fs'
 import { createRequire } from 'node:module'
 import { createInterface } from 'node:readline'
 import { createServer } from 'node:net'
-import { resolve, join, dirname } from 'node:path'
+import { resolve, join } from 'node:path'
+import { installedPackageRoot } from '../../installed-package-root'
 import { fileURLToPath } from 'node:url'
 import {
   inactiveBound,
@@ -398,24 +399,6 @@ async function installedPackageFiles(repo: string): Promise<string[]> {
     }),
   )
   return files.flat().sort()
-}
-
-async function installedPackageRoot(entry: string, name: string): Promise<string> {
-  let directory = dirname(entry)
-  while (true) {
-    const manifest = join(directory, 'package.json')
-    if ((await readPackageName(manifest)) === name) return directory
-    const parent = dirname(directory)
-    if (parent === directory) throw new TypeError(`No package manifest found for ${name}`)
-    directory = parent
-  }
-}
-
-async function readPackageName(file: string): Promise<string | null> {
-  if (!existsSync(file)) return null
-  const manifest: unknown = JSON.parse(await readFile(file, 'utf8'))
-  if (typeof manifest !== 'object' || manifest === null || !('name' in manifest)) return null
-  return typeof manifest.name === 'string' ? manifest.name : null
 }
 
 async function artifactFiles(directory: string): Promise<string[]> {
