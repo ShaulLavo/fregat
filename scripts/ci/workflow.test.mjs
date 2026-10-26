@@ -467,6 +467,5 @@ test('retired standalone producer jobs leave every Fregat consumer gate blocking
   expect(mobile.run).toContain('--directory "$RUNNER_TEMP/product-sites/fregat"')
   expect(mobile.run).toContain('--shards 2 --shard')
   expect(mobile.run).not.toContain('continue')
-  const changesets = JSON.parse(await readFile(new URL('.changeset/config.json', root), 'utf8'))
-  expect(changesets.fixed).toEqual([])
+  await expect(stat(new URL('.changeset/', root))).rejects.toMatchObject({ code: 'ENOENT' })
 })

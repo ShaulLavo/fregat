@@ -14,9 +14,6 @@
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/*.browser.tsx",
-    "**/*.generated.ts",
-    "packages/singapore/**",
-    "packages/ghostty-webgpu/**",
-    "packages/hotkeys/**"
+    "**/*.generated.ts"
   ]
 }

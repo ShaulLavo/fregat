@@ -8,10 +8,7 @@
       "specifier": "./scripts/lint/web-boundaries.mjs"
     }
   ],
-  "ignorePatterns": [
-    "apps/desktop/build/**",
-    "packages/singapore/packages/textbuffer/bench/vscode-textbuffer/**"
-  ],
+  "ignorePatterns": ["apps/desktop/build/**"],
   "rules": {
     "no-alert": "error",
     "react/rules-of-hooks": "error",

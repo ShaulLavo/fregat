@@ -46,15 +46,6 @@ test('the four documentation files in PR 1207 do not consume application or libr
   expect(plan.docs_files).toContain('.agents/skills/react-development/SKILL.md')
 })
 
-test('a changeset by itself does not select application or library tests', () => {
-  expect(select(['.changeset/patch.md'])).toMatchObject({
-    packages: [],
-    shared: false,
-    docs: true,
-    web: false,
-  })
-})
-
 test.each([
   ['apps/web/src/features/chat/components/message.tsx', 'web'],
   ['apps/server/src/provider/service.ts', 'server'],

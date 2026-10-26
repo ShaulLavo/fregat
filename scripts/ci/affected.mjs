@@ -119,7 +119,6 @@ function rootDocument(file) {
     file.startsWith('plans/') ||
     file.startsWith('docs/') ||
     (file.startsWith('.agents/') && file.endsWith('.md')) ||
-    (file.startsWith('.changeset/') && file.endsWith('.md')) ||
     (!file.includes('/') && file.endsWith('.md'))
   )
 }
