@@ -1,6 +1,6 @@
 # E026: Declare Editor command metadata once
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: In progress
 - Kind: Implementation
@@ -10,7 +10,7 @@ Source paths in this document are relative to [`editor/`](../packages/singapore/
 - Dependencies: None
 - Inspected baseline: Editor `9abb944f3a2b8d6516953fdec75e8df5e1a94811`, Platform `c8e05123d8f89f74bdca0e73cd43bb060c6f4e67`.
 
-Decided 2026-09-25: owner — unparked. Rebase the plan on the [E050 host contracts](../packages/singapore/docs/architecture/e050-host-obligations.md) first, then execute. Platform `ed96e9f16` hand-copied command metadata again, the duplication this plan removes.
+Decided 2026-09-25: owner — unparked. Rebase the plan on the [E050 host contracts](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/e050-host-obligations.md) first, then execute. Platform `ed96e9f16` hand-copied command metadata again, the duplication this plan removes.
 
 Progress 2026-09-26 (wave 2, lane E1, with Platform Plan 122 phase 4): steps 1–4 and 6 are done.
 `EDITOR_COMMANDS` (`packages/editor/src/editor/commandCatalog.ts`) declares every built-in's id, title,
@@ -33,14 +33,14 @@ and instantiated for the correct editor view.
 
 ## Current code
 
-[commands.ts](../packages/singapore/packages/editor/src/editor/commands.ts) re-exports `EditorCommandId`, derived from
+[commands.ts](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/editor/commands.ts) re-exports `EditorCommandId`, derived from
 the catalog. Its `EditorCommandContext` carries an optional keyboard event; typed arguments remain
 part of the host command contract work.
-[EditorCommandRouter](../packages/singapore/packages/editor/src/editor/commandRouter.ts) dispatches built-ins
+[EditorCommandRouter](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/editor/commandRouter.ts) dispatches built-ins
 and accepts registered handlers. Plugin registration currently uses that same finite ID type.
 
-[Keymap presets](../packages/singapore/packages/editor/src/keymap/presets.ts) already own default and VS Code
-bindings and named pack data. The catalog classifies mutating commands. [The public keymap entry](../packages/singapore/packages/editor/src/public/keymap.ts)
+[Keymap presets](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/keymap/presets.ts) already own default and VS Code
+bindings and named pack data. The catalog classifies mutating commands. [The public keymap entry](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/public/keymap.ts)
 exports named pack data and metadata. Plans [204](204-editor-on-fregat-hotkeys.md) and
 [206](206-platform-one-keymap.md) assign the runtime to `@fregat/hotkeys`; the old runtime,
 layer helpers, and their exports are removed in that cutover.

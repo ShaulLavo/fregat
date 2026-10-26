@@ -1436,9 +1436,9 @@ async function writeSyntheticTree(root: string) {
   ]
   for (const directory of directories) await mkdir(path.join(root, directory), { recursive: true })
   const files = [
-    'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
-    'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-    'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
+    'apps/web/node_modules/@singapore-editor/tree-sitter/dist/index.js',
+    'apps/web/node_modules/@singapore-editor/tree-sitter/dist/treeSitter/workerClient.js',
+    'apps/web/node_modules/@singapore-editor/tree-sitter/package.json',
     'apps/web/test/providers.tsx',
     'apps/web/test/factories/markdown-browser.tsx',
     'apps/web/test/factories/markdown-observation.ts',
@@ -1461,6 +1461,15 @@ async function writeSyntheticTree(root: string) {
   await writeFile(path.join(root, 'bun.lock'), 'lockfile')
   await writeFile(path.join(root, 'package.json'), '{}')
   await writeFile(path.join(root, 'packages/markdown/package.json'), '{}')
+  await writeFile(path.join(root, 'apps/web/package.json'), '{}')
+  await writeFile(
+    path.join(root, 'apps/web/node_modules/@singapore-editor/tree-sitter/package.json'),
+    JSON.stringify({
+      name: '@singapore-editor/tree-sitter',
+      type: 'module',
+      exports: { '.': './dist/index.js' },
+    }),
+  )
   await writeFile(
     path.join(root, 'scripts/markdown/workloads.ts'),
     await readFile(new URL('./workloads.ts', import.meta.url)),
@@ -1835,9 +1844,9 @@ test('uses an actual clean disposable candidate and completed synthetic100 ledge
   expect(fixture.captured.sources).toEqual(
     expect.arrayContaining(
       [
-        'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
-        'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-        'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
+        'apps/web/node_modules/@singapore-editor/tree-sitter/dist/index.js',
+        'apps/web/node_modules/@singapore-editor/tree-sitter/dist/treeSitter/workerClient.js',
+        'apps/web/node_modules/@singapore-editor/tree-sitter/package.json',
       ].map((file) => expect.objectContaining({ file })),
     ),
   )

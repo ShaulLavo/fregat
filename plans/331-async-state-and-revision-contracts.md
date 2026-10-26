@@ -16,7 +16,7 @@ Editor documents keep the main-thread buffer as sole text authority. Document pu
 
 Plan 287 chooses worker authority for native terminal state. Its host reads one copied submitted-frame summary for synchronous geometry/IME/hit-testing. The terminal domain defines native/layout/frame identity and processed port sequences. Native authoritative reads remain async.
 
-The completed [SAB text deletion](../packages/singapore/docs/performance/sab-transport-2026-09-12.md) remains accepted. Keep strings/chunks and incremental changes, packed result transfers and the separate atomic cancellation flag. New shared-memory representations need a separately identified consumer, correctness proof and measured benefit; they are outside the initial package.
+The completed [SAB text deletion](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/sab-transport-2026-09-12.md) remains accepted. Keep strings/chunks and incremental changes, packed result transfers and the separate atomic cancellation flag. New shared-memory representations need a separately identified consumer, correctness proof and measured benefit; they are outside the initial package.
 
 ## Chosen contract
 

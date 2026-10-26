@@ -11,6 +11,7 @@ import { runCaseScope } from './case-scope'
 import { defaultOutput } from './output'
 import { captureRevision, recordedBuildSource } from './provenance'
 import { buildBenchmarkWeb } from './build'
+import { installedDependencyFingerprint } from '../../apps/web/scripts/installed-packages.mjs'
 
 const { values } = parseArgs({
   options: {
@@ -83,7 +84,7 @@ if (!values['web-root'])
         schemaVersion: 2,
         buildSourceState:
           beforeBuild.platform.fingerprint === revisions.platform.fingerprint &&
-          beforeBuild.editor.fingerprint === revisions.editor.fingerprint
+          beforeBuild.editor.sha256 === revisions.editor.sha256
             ? 'stable'
             : 'changed-during-build',
         beforeBuild,
@@ -179,10 +180,7 @@ function positiveInteger(raw: string, name: string) {
 async function sourceRevisions(phase: string) {
   return {
     platform: await captureRevision(checkoutRoot, path.join(output, `platform-${phase}.patch`)),
-    editor: await captureRevision(
-      path.resolve(checkoutRoot, 'packages/singapore'),
-      path.join(output, `editor-${phase}.patch`),
-    ),
+    editor: installedDependencyFingerprint('@singapore-editor/'),
   }
 }
 

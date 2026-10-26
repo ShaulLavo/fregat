@@ -25,7 +25,7 @@ ownership in [csv-table.tsx](../apps/web/src/features/workbench/components/csv-t
 Reuse their document identity, parsing and presentation; [327](327-virtualization-and-two-axis-tables.md)
 owns required two-axis table geometry.
 
-The source snapshot/anchor APIs already exist in `packages/singapore/packages/editor/src/documentSession.ts` after Plan 207, verified in [the current Editor source](../packages/singapore/packages/editor/src/documentSession.ts).
+The source snapshot/anchor APIs already exist in `packages/singapore/packages/editor/src/documentSession.ts` after Plan 207, verified in [the current Editor source](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/documentSession.ts).
 
 ## Design
 

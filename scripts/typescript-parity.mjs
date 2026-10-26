@@ -6,9 +6,9 @@ import * as v from 'valibot'
 import {
   capabilityAdvertised,
   uncoveredCapabilityPaths,
-} from '../packages/singapore/packages/typescript-lsp/test/parity/contract.ts'
-import { paritySourceIdentity } from '../packages/singapore/packages/typescript-lsp/test/parity/source.ts'
-import { CORE_CASES } from '../packages/singapore/packages/typescript-lsp/test/parity/cases/core.ts'
+} from '../apps/server/test/fixtures/typescript-parity/contract.ts'
+import { paritySourceIdentity } from '../apps/server/test/fixtures/typescript-parity/source.ts'
+import { CORE_CASES } from '../apps/server/test/fixtures/typescript-parity/cases/core.ts'
 
 export const REQUIRED_PARITY_BACKENDS = [
   { id: 'worker-in-process', engine: 'worker' },

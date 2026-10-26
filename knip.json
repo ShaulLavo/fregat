@@ -1,14 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
-    "packages/singapore/bench/compare": {
-      "entry": ["page.js", "singapore.js", "monaco.js", "codemirror.js"],
-      "ignoreBinaries": ["cc"],
-      "ignoreDependencies": ["ACTOR", "FIXTURE"]
-    },
-    "packages/hotkeys/packages/hotkeys": {
-      "entry": ["bench/lookup.ts"]
-    },
     "apps/desktop": {
       "entry": [
         "src/launcher/index.ts",
@@ -76,7 +68,6 @@
         "ci/affected.mjs",
         "ci/packages.mjs",
         "check-editor-backlog.mjs",
-        "check-package-pages.mjs",
         "agent/browser.ts",
         "agent/scenarios/editor-retention-count-policy-driver.ts",
         "agent/desktop-display.ts",
@@ -109,7 +100,6 @@
         "install-server.ts",
         "import-proxy-usage-key.ts",
         "prod.ts",
-        "product-sites/test-font-assets.mjs",
         "product-sites/test-mobile.mjs",
         "product-sites/verify-mobile.mjs",
         "tui.ts",
@@ -134,7 +124,6 @@
       "ignoreBinaries": ["ssh-keygen", "systemd-run", "taskset"]
     },
     ".": {
-      "entry": ["packages/hotkeys/scripts/check-samples.mjs"],
       "ignoreDependencies": ["typescript-api"],
       "vitest": {
         "config": ["vitest.scripts.config.mjs", "vitest.t3code.config.mjs"]
@@ -155,237 +144,6 @@
     },
     "packages/pty": {
       "entry": ["test/nvim-smoke.ts", "test/fixtures/child.ts"]
-    },
-    "packages/singapore/packages/file-animation": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
-    },
-    "packages/singapore/packages/diff": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
-    },
-    "packages/singapore/packages/editor": {
-      "entry": [
-        "src/debug.ts",
-        "src/document/workerReader.ts",
-        "src/editor.ts",
-        "src/index.ts",
-        "src/logging/evlog.ts",
-        "src/logging/index.ts",
-        "src/paint.ts",
-        "src/public/document.ts",
-        "src/public/extensions.ts",
-        "src/public/keymap.ts",
-        "src/public/rendering.ts",
-        "src/public/secondaryViews.ts",
-        "src/public/syntax.ts",
-        "src/public/testing.ts",
-        "src/shiki/index.ts",
-        "src/**/*.worker.ts",
-        "bench/**/*.ts",
-        "test/types/**/*.ts",
-        "test/reading-order.proof.mjs",
-        "vitest.snapshot.config.ts"
-      ],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
-      "ignoreDependencies": ["@playwright/test"]
-    },
-    "packages/singapore/packages/find": {
-      "entry": ["src/index.ts", "bench/**/*.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
-      "ignoreDependencies": ["@playwright/test"]
-    },
-    "packages/singapore/packages/gutters": {
-      "entry": ["src/foldGutter.ts", "src/index.ts", "src/lineGutter.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
-    },
-    "packages/singapore/packages/highlighting": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
-      "ignoreDependencies": ["@playwright/test"]
-    },
-    "packages/singapore/packages/lsp": {
-      "entry": ["src/index.ts", "src/positions.ts", "src/types.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
-    },
-    "packages/singapore/packages/lsp-plugin": {
-      "entry": [
-        "src/completion.ts",
-        "src/completionController.ts",
-        "src/definitionLinkController.ts",
-        "src/definitionNavigation.ts",
-        "src/diagnostics.ts",
-        "src/diagnosticsPresenter.ts",
-        "src/documentSync.ts",
-        "src/documentSyncController.ts",
-        "src/hoverParticipant.ts",
-        "src/index.ts",
-        "src/paths.ts",
-        "src/plugin.styles.ts",
-        "src/pluginTypes.ts",
-        "src/websocket.ts",
-        "src/workspaceEdit.ts"
-      ],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
-    },
-    "packages/singapore/packages/markdown": {
-      "entry": ["src/index.ts", "test/reading-order.fixture.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
-    },
-    "packages/singapore/packages/minimap": {
-      "entry": ["src/index.ts", "src/**/*.worker.ts", "bench/**/*.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"]
-    },
-    "packages/singapore/packages/paged": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
-    },
-    "packages/singapore/packages/panes": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
-    },
-    "packages/singapore/packages/plugin-ui": {
-      "entry": [
-        "src/anchoredSurface.ts",
-        "src/hoverController.ts",
-        "src/hoverParticipant.ts",
-        "src/hoverPlugin.ts",
-        "src/hoverRegistry.ts",
-        "src/hoverToken.ts",
-        "src/index.ts",
-        "src/markdownTooltip.ts",
-        "src/offsetRange.ts",
-        "src/styles.ts",
-        "src/tooltip.ts"
-      ],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
-    },
-    "packages/singapore/packages/react": {
-      "entry": ["src/index.tsx"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
-      "ignoreDependencies": ["@playwright/test"]
-    },
-    "packages/singapore/packages/scope-lines": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
-      "ignoreDependencies": ["@playwright/test"]
-    },
-    "packages/singapore/packages/solid": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
-    },
-    "packages/singapore/packages/spellcheck": {
-      "entry": ["src/index.ts", "src/**/*.worker.ts", "bench/**/*.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"]
-    },
-    "packages/singapore/packages/textbuffer": {
-      "entry": [
-        "src/*.ts",
-        "src/debug.ts",
-        "src/diagnostics.ts",
-        "src/index.ts",
-        "bench/{identity,profile-worker}.mjs"
-      ],
-      "project": ["src/**/*.{ts,tsx}", "bench/*.mjs"]
-    },
-    "packages/singapore/packages/tree-sitter": {
-      "entry": ["src/index.ts", "src/**/*.worker.ts", "bench/**/*.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
-      "ignoreDependencies": ["@playwright/test"]
-    },
-    "packages/singapore/packages/tree-sitter-languages": {
-      "entry": ["src/index.ts", "src/metadata.ts"],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
-      "ignoreDependencies": ["tree-sitter-cli"]
-    },
-    "packages/singapore/packages/typescript-lsp": {
-      "entry": [
-        "src/index.ts",
-        "src/server.ts",
-        "src/tsDiagnostics.ts",
-        "src/**/*.worker.ts",
-        "bench/**/*.ts"
-      ],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"]
-    },
-    "packages/singapore": {
-      "entry": ["scripts/*.{ts,mjs}", "knip.ts"],
-      "project": ["scripts/**/*.{ts,mjs}"]
-    },
-    "packages/singapore/examples/stress": {
-      "entry": [
-        "*.html",
-        "*.mjs",
-        "test/*.mjs",
-        "src/{boundary,consumers,copies,dispatch,firstPaint,geometry}.ts",
-        "src/paged/proof.ts"
-      ],
-      "project": ["src/**/*.ts", "*.mjs"],
-      "ignoreBinaries": ["taskset"],
-      "ignoreDependencies": ["@singapore-editor/gutters"]
-    },
-    "packages/singapore/examples/app": {
-      "entry": ["src/collaboration.ts", "index.html", "src/jumpHistoryDemo.ts"],
-      "project": ["src/**/*.{ts,tsx}"]
-    },
-    "packages/ghostty-webgpu": {
-      "ignoreBinaries": ["zig"],
-      "entry": ["src/index.ts", "src/worker/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],
-      "project": ["src/**/*.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"]
-    },
-    "packages/ghostty-webgpu/packages/line-editor": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["ghostty-webgpu"]
-    },
-    "packages/ghostty-webgpu/demo": {
-      "entry": ["src/client.ts"],
-      "project": ["src/**/*.ts"]
-    },
-    "packages/ghostty-webgpu/site": {
-      "entry": [
-        "src/landing.ts",
-        "src/pages/**/*.{astro,ts}",
-        "src/examples/**/*.ts",
-        "scripts/*.ts",
-        "worker/index.ts"
-      ],
-      "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts", "worker/**/*.ts"]
-    },
-    "packages/ghostty-webgpu/site-classic": {
-      "entry": ["src/main.ts", "src/docs-theme.ts", "src/pages/**/*.{astro,ts}", "scripts/*.ts"],
-      "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts"]
-    },
-    "packages/singapore/packages/collaboration": {
-      "entry": [
-        "src/index.ts",
-        "src/transports.ts",
-        "src/merge-review.ts",
-        "bench/**/*.ts",
-        "server/signaling.ts",
-        "examples/signaling-server.ts",
-        "test/peer.html",
-        "test/broker-process.ts"
-      ],
-      "project": [
-        "src/**/*.ts",
-        "server/**/*.ts",
-        "examples/**/*.ts",
-        "test/**/*.ts",
-        "bench/**/*.ts"
-      ]
-    },
-    "packages/singapore/site": {
-      "entry": ["scripts/capture-page.ts", "src/examples/*.ts"],
-      "ignoreDependencies": ["@singapore-editor/*", "satteri", "react", "@types/react", "solid-js"]
-    },
-    "packages/ghostty-webgpu/packages/shaders": {
-      "entry": ["src/index.ts", "src/tests/**/*.ts", "scripts/*.mjs"],
-      "project": ["src/**/*.ts", "scripts/*.mjs"]
     }
-  },
-  "ignore": ["packages/singapore/**/*.d.css.ts"],
-  "ignoreIssues": {
-    "packages/ghostty-webgpu/src/core/abi.ts": ["types", "enumMembers"]
   }
 }

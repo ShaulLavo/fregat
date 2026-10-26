@@ -26,19 +26,10 @@ const digest = (bytes) => createHash('sha256').update(bytes).digest('hex')
 const git = (root, ...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
 const cacheDirectory = '.turbo/ci-builds'
 const receiptFile = '.turbo/workspace-builds-receipt.json'
-const sitePackages = {
-  fregat: 'site',
-  singapore: 'singapore-editor-site',
-  demo: '@singapore-editor/example-app',
-  'ghostty-webgpu': 'ghostty-webgpu-site',
-}
+const sitePackages = { fregat: 'site' }
 
 function targets(graph, source) {
   if (source === 'all') return Array.from(graph.packages.keys())
-  if (source === 'editor')
-    return Array.from(graph.packages.values())
-      .filter((pkg) => pkg.directory.startsWith('packages/singapore/'))
-      .map((pkg) => pkg.name)
   if (!source.startsWith('sites:')) return JSON.parse(source)
   const sites = source.slice(6).split(',').filter(Boolean)
   assert(
@@ -56,9 +47,6 @@ export function planBuilds(graph, changes) {
   if (enabled('web') || enabled('tree') || enabled('tooling')) names = names.concat(['web'])
   if (enabled('server')) names = names.concat(['server'])
   if (enabled('tui')) names = names.concat(['tui'])
-  if (enabled('editor')) names = names.concat(targets(graph, 'editor'))
-  if (enabled('ghostty'))
-    names = names.concat(['ghostty-webgpu', 'ghostty-webgpu-line-editor', 'ghostty-webgpu-shaders'])
   if (enabled('site')) names = names.concat(targets(graph, `sites:${changes.sites}`))
   return requiredLibraries(graph, names)
 }

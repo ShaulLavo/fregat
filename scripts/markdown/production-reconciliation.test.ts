@@ -585,19 +585,20 @@ function nativeInput(
       sha256: hash('full closure source'),
     },
     {
-      file: 'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
-      sha256: hash('editor markdown loader'),
+      file: 'apps/web/node_modules/@singapore-editor/tree-sitter/dist/index.js',
+      sha256: hash('editor package entry'),
     },
     {
-      file: 'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-      sha256: hash('editor browser memory test'),
+      file: 'apps/web/node_modules/@singapore-editor/tree-sitter/dist/treeSitter/workerClient.js',
+      sha256: hash('editor worker client'),
     },
     {
-      file: 'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
-      sha256: hash('editor memory test'),
+      file: 'apps/web/node_modules/@singapore-editor/tree-sitter/package.json',
+      sha256: hash('editor package manifest'),
     },
     { file: 'scripts/markdown/paired-native.ts', sha256: hash('native source') },
   ]
+  sources.sort((left, right) => left.file.localeCompare(right.file))
   const sourceFiles = [{ path: 'scripts/markdown/paired-native.ts', sha256: hash('native source') }]
   const base = freeze()
   const frozen = {
@@ -657,16 +658,16 @@ function nativeInput(
         bytes: Buffer.from('full closure source'),
       },
       {
-        path: 'snapshot/packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
-        bytes: Buffer.from('editor markdown loader'),
+        path: 'snapshot/apps/web/node_modules/@singapore-editor/tree-sitter/dist/index.js',
+        bytes: Buffer.from('editor package entry'),
       },
       {
-        path: 'snapshot/packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-        bytes: Buffer.from('editor browser memory test'),
+        path: 'snapshot/apps/web/node_modules/@singapore-editor/tree-sitter/dist/treeSitter/workerClient.js',
+        bytes: Buffer.from('editor worker client'),
       },
       {
-        path: 'snapshot/packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
-        bytes: Buffer.from('editor memory test'),
+        path: 'snapshot/apps/web/node_modules/@singapore-editor/tree-sitter/package.json',
+        bytes: Buffer.from('editor package manifest'),
       },
       { path: 'snapshot/scripts/markdown/paired-native.ts', bytes: Buffer.from('native source') },
       { path: 'bun.lock', bytes: Buffer.from('lock') },

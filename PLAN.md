@@ -1,6 +1,6 @@
 # Execution roadmap
 
-Updated 2026-10-15. This file owns cross-project ordering. Each [plan](plans/README.md)
+Updated 2026-10-26. This file owns cross-project ordering. Each [plan](plans/README.md)
 owns its scope, decisions, status and acceptance checks. [AGENTS.md](AGENTS.md) owns execution
 rules; [docs](docs/README.md) holds architecture, research and delivery evidence.
 
@@ -82,7 +82,7 @@ This pass updates planning; product implementation starts through each plan's ex
 | Wave                | Bounded scope and finish line                                                                                                                                                                                                                        | Entry conditions                                                                                                                                                                            |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Preparation         | Reconcile launch handoffs, delivered contracts, terminal input ownership and shared-file owners. Preserve deferred work and owner-only checks separately.                                                                                            | Current documentation pass; qualify required runtime/package proofs when the implementation wave starts.                                                                                    |
-| Command foundation  | 204 + 205 → 206 merged in PR #603; caller migration, old API removal and exact standalone qualification are complete. Installed release and live verification passed.                                                                                | Exact standalone family gate qualified under 207; npm stays deferred. Finite main-host input coexists with public 286/287 contracts; their whole programs remain independent.               |
+| Command foundation  | 204 + 205 → 206 merged in PR #603; caller migration, old API removal and exact standalone qualification are complete. Installed release and live verification passed.                                                                                | Exact standalone family gate qualified under 207. Finite main-host input coexists with public 286/287 contracts; their whole programs remain independent.                                   |
 | Document foundation | 099 runtime merged in PR #787, installed and read-only live-verified. 198 analysis ownership and 200 content views are delivered; their contracts and accepted limits are in [document-backed content views](docs/document-backed-content-views.md). | 099 units 2–7 have accepted scoped performance, source/lifetime and host proof. Owner-instance web delivery is complete. Historical unit 0 stays partial.                                   |
 | Feature batches     | Deliver coherent interaction/editor, navigation/save/search, excerpt/review, Git, terminal, chat and Markdown/document slices in their declared dependency order.                                                                                    | Use 206 commands and the exact content contracts each slice needs. Pane/layout changes require the relevant 209 decisions and authorized delivered hosts; preserve TUI/parser/device gates. |
 | Broad migrations    | Localize consumers under 208's catalog/error contract, then separately authorized 209 workspace units.                                                                                                                                               | Catalog and design preparation may run earlier. Complete-client translation and the whole workspace redesign are not prerequisites for every feature batch.                                 |
@@ -207,12 +207,12 @@ scopes into one package rewrite, lift a gate or approve gated units. Sizes are i
 | Desktop app              | [114](plans/114-installed-app.md) Gates 1–4 delivered 2026-10-03                                                                                      | Closeout done after approved owner acceptance                                                                           | Installed Chromium app and native system-webview host replace the old shell. Preserve mesh-owned servers and terminals; 132's transferred Mac vibrancy gate is accepted.                                                                                                 |
 | T3 nightly orchestration | [343](plans/343-t3code-nightly-orchestration.md), with historical scope and receipts in [126](plans/126-t3code-alignment.md)                          | Approved, deferred on 2026-10-10. Schedule one structural rewrite when resumed; reference research may proceed earlier. | Published nightly `bd2346eda` is the architecture baseline. Preserve September provenance, account/device/pairing/state-loss gates, and delivered local capabilities.                                                                                                    |
 | Rich documents           | [156](plans/156-documents-in-the-editor.md) P0–P2 delivered 2026-10-02 (#269/#280/#286); P3+ Approved follow-up                                       | Wave 2 scope delivered; schedule follow-ups by format readiness                                                         | Uses existing file identity and 179's isolation policy. P3–P6 follow; P7 DOCX editing stays parked on Markdown and fidelity decisions.                                                                                                                                   |
-| Keymap cutover           | [204](plans/204-editor-on-fregat-hotkeys.md) + [205](plans/205-ghostty-on-fregat-hotkeys.md) → [206](plans/206-platform-one-keymap.md); E026 metadata | Merged in PR #603; installed and live-verified                                                                          | Caller migration, old API removal, shadow reporting and exact standalone qualification are merged; installed release and live verification passed. npm stays deferred. Zed/Vim 220–280 remain separate follow-ups.                                                       |
+| Keymap cutover           | [204](plans/204-editor-on-fregat-hotkeys.md) + [205](plans/205-ghostty-on-fregat-hotkeys.md) → [206](plans/206-platform-one-keymap.md); E026 metadata | Merged in PR #603; installed and live-verified                                                                          | Caller migration, old API removal, shadow reporting and exact standalone qualification are merged; installed release and live verification passed. Zed/Vim 220–280 remain separate follow-ups.                                                                           |
 | Document runtime         | [099](plans/099-document-contributions.md) units 2–7, 198 analysis ownership and 200 content views                                                    | Delivered 2026-10-09                                                                                                    | 099 units 2–7 delivered in PR #787 with accepted scoped proof and installed web/live verification. 198/200 are retired into [document-backed content views](docs/document-backed-content-views.md). 122 follows 099; 182 and 171 own their search and composer handoffs. |
 | TUI                      | [202](plans/202-tui-ui.md) on upstream OpenTUI                                                                                                        | Local controls any time                                                                                                 | Production Markdown cutover waits for the tree-sitter-md M1–M4 producer and Editor semantic S0–S4 consumer gates. Controls use 206's dispatcher. No toolkit package, maintained fork or native release pipeline.                                                         |
 | Localization             | [208](plans/208-all-text-in-json.md)                                                                                                                  | Broad migration, by unit                                                                                                | Catalog and typed generation, then structured-error transport, bounded caller migrations, locale/plural/RTL acceptance. 207 no longer blocks the catalog contract; command/settings metadata coordinates with 206.                                                       |
 | Unified workspace        | [209](plans/209-unified-workspace.md)                                                                                                                 | Design review any time                                                                                                  | Resolve D1–D6 before affected units. Production implementation needs a separate owner decision. Uses 206 commands, [content view](docs/document-backed-content-views.md) ownership and 208 catalogs.                                                                     |
-| Async runtime            | [328](plans/328-async-runtime-master.md) master + [329](plans/329-async-lifecycle-and-transport.md)–[334](plans/334-async-runtime-verification.md)    | Research/planning delivered; implementation deferred at owner request                                                   | Start qualification before package adoption when execution begins. Preserve 099/282 and terminal 287/286/283 gates, exact standalone publication under 207, current domain authority and independent actors.                                                             |
+| Async runtime            | [328](plans/328-async-runtime-master.md) master + [329](plans/329-async-lifecycle-and-transport.md)–[334](plans/334-async-runtime-verification.md)    | Research/planning delivered; implementation deferred at owner request                                                   | Start qualification before package adoption when execution begins. Preserve 099/282 and terminal 287/286/283 gates, pinned standalone releases, current domain authority and independent actors.                                                                         |
 
 Work that can start without waiting for another program: nightly reference and provider contract research under 343,
 202's local controls and 209's design review. Bounded product lanes continue beside them: Markdown authoring
@@ -243,16 +243,15 @@ servers retain their actual capability limits. Its order within this program is:
 The existing worker's method tests and server tests are controls; they do not yet prove this
 complete cross-backend contract. Runtime implementation follows the owning plans' acceptance gates.
 
-## Package cutover delivered
+## Package ownership
 
 This is separate from the foundations wave and from the product programs above.
-[207](plans/207-one-repo-with-mirrors.md) delivered source migration on 2026-09-30.
-The scoped cutover hold has ended. Develop Editor in `packages/singapore/packages/`, Ghostty in
-`packages/ghostty-webgpu/`, and hotkeys in `packages/hotkeys/`; their standalone repositories are mirrors.
-npm authentication, initial publication and trusted-publisher setup remain deferred.
-Local development uses the neighboring workspaces. Before 204/205 mirror a consumer of
-hotkeys, qualify the exact standalone dependency source under 207; npm remains deferred.
-Old checkouts remain untouched references.
+[207](plans/207-one-repo-with-mirrors.md) records the source migration delivered on 2026-09-30.
+Develop Singapore, ghostty-webgpu, and hotkeys in their own repositories. Fregat consumes their
+immutable release archives. For coordinated local changes, follow
+[Use local package checkouts](docs/local-package-checkouts.md). Fregat
+[#1356](https://github.com/ShaulLavo/fregat/pull/1356) will remove the three producer folders after
+the final release and site gates. `packages/pty` stays in Fregat.
 
 ## Wave 2 closeout and dependency order
 
@@ -337,7 +336,7 @@ shared React/TypeScript logic. The wave-2 queue above is unchanged.
   [document-backed content views](docs/document-backed-content-views.md). Only exact consumed
   contracts are prerequisites, not unrelated whole plans.
 - Plans 203/206 own keymap infrastructure. Plan 202's controls integrate with that dispatcher;
-  they do not introduce a second one. Editor source is canonical in `packages/singapore/packages/` after 207.
+  they do not introduce a second one. Editor source lives in the standalone Singapore repository.
 - The [coordination and research index](.internal/tui-research/ui-plan-links.md) links the retained
   catalog, source evidence, companion plans and implementation handoffs. These are plans, not
   delivered package changes; the existing fork overrides remain until the verified cutover.
@@ -354,17 +353,17 @@ shared React/TypeScript logic. The wave-2 queue above is unchanged.
 standalone package and processing/presentation evidence. Installed release and live verification passed.
 206's TUI delivery is command infrastructure; Plan 202 retains its own redesign.
 
-[207: one repo with mirrors](plans/207-one-repo-with-mirrors.md) delivered the source move
-and Git mirroring. The command foundation's exact standalone hotkeys installation gate is
-now qualified for all three families. Local core metadata is 0.0.3; the independently hosted
-consumer artifact is immutable 0.0.2. npm account setup and publication remain deferred.
+[207: one repo with mirrors](plans/207-one-repo-with-mirrors.md) records the source move
+and Git mirroring. The command foundation's exact standalone hotkeys installation gate was
+qualified for all three families with local core metadata 0.0.3 and immutable hosted consumer
+artifact 0.0.2. Standalone repositories now own development and releases.
 
 ## Localization
 
 [208: all app text in JSON](plans/208-all-text-in-json.md) is Approved. Break execution
 into catalog/package ownership and typed generation, structured-error transport,
-bounded caller extraction/migration, then locale/plural/RTL acceptance. Prove standalone
-family catalog installation after 207 and coordinate command/settings metadata with 206.
+bounded caller extraction/migration, then locale/plural/RTL acceptance. Prove installation
+from the affected standalone releases and coordinate command/settings metadata with 206.
 New UI work uses the catalog contract once available. Keep native adapter proofs separate
 from JavaScript generation. The approved full scope remains; this is its delivery order.
 

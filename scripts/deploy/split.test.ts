@@ -10,8 +10,6 @@ test('portable release and installation have separate commands', () => {
   expect(scripts['build-release']).toBe('bun scripts/build-release.ts')
   expect(scripts['install-release']).toBe('bun scripts/install-release.ts')
   expect(scripts).not.toHaveProperty('deploy')
-  expect(scripts.release).toContain('scripts/release/prepare.mjs')
-  expect(scripts['version-packages']).toBe('changeset version && bun install --lockfile-only')
   expect(scripts).not.toHaveProperty('release:packages')
 })
 
@@ -23,10 +21,6 @@ test.each([
   [
     '.internal/verification/2026-09-19-editor-splits.md',
     "bun run deploy --slug=editor-splits --reason='Add editor split views'",
-  ],
-  [
-    'plans/207-one-repo-with-mirrors.md',
-    '[x] Deploy PR #199 with `bun run deploy --server --restart`',
   ],
 ])('historical execution receipt %s preserves its executed command', (file, command) => {
   expect(readFileSync(path.join(root, file), 'utf8')).toContain(command)

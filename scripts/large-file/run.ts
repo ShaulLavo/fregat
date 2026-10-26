@@ -1,5 +1,4 @@
 import { strictEqual } from 'node:assert/strict'
-import { detectPlatform } from '../../packages/hotkeys/packages/hotkeys/src/platform'
 import { copyFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium, type CDPSession, type Page } from 'playwright'
@@ -42,8 +41,8 @@ async function typeBurst(page: Page, keys: number) {
     .first()
     .click({ position: { x: 180, y: 12 } })
   await selectors.editorInput(page).first().focus()
-  const platform = await page.evaluate(detectPlatform)
-  await page.keyboard.press(platform === 'mac' ? 'Meta+ArrowUp' : 'Control+Home')
+  const mac = await page.evaluate(() => /mac/i.test(navigator.platform + navigator.userAgent))
+  await page.keyboard.press(mac ? 'Meta+ArrowUp' : 'Control+Home')
   await page.evaluate((name) => {
     performance.clearMeasures(name)
     let index = 0

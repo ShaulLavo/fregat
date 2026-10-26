@@ -1,13 +1,13 @@
 # E015: Design bounded loading for massive files
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: Approved
 - Kind: Research
 - Owner: Cross-repo
 - Priority: P3
 - Effort: XL
-- Dependencies: [E001](../packages/singapore/examples/stress/README.md), [E007](../packages/singapore/docs/performance/e007-consumer-copies.md)
+- Dependencies: [E001](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/examples/stress/README.md), [E007](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e007-consumer-copies.md)
 - Inspected baseline: `9abb944f3a2b8d6516953fdec75e8df5e1a94811`
 
 Decided 2026-09-25: owner — this plan and Platform [Plan 112](112-large-file-ceiling.md) run as one lane, 112 first. 112's benchmark sets the ceiling this plan's scope and exit are written against.
@@ -20,15 +20,15 @@ read-only proof before promising general editing, saving, or language features f
 
 ## Current code
 
-- [Editor document creation](../packages/singapore/packages/editor/src/editor/editorDocument.ts) accepts a complete
+- [Editor document creation](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/editor/editorDocument.ts) accepts a complete
   string for both session and static documents. Static mode is not a paged source abstraction.
-- [Document sessions](../packages/singapore/packages/editor/src/documentSession.ts) and
-  [piece-table snapshots](../packages/singapore/packages/textbuffer/src/snapshot.ts) assume known document text.
+- [Document sessions](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/documentSession.ts) and
+  [piece-table snapshots](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/textbuffer/src/snapshot.ts) assume known document text.
 - [Platform reads](../apps/server/src/fs/read.ts) enforce a byte limit, read the file,
   decode UTF-8, and compute a content version from the resulting text.
 - [Host text-snapshot helpers](../apps/web/src/features/editor/utils/text-snapshot.ts)
   demonstrate the existing chunk-reading API; chunks here are resident text, not file ranges.
-- [Tree-sitter sources](../packages/singapore/packages/tree-sitter/src/treeSitter/source.ts) avoid some flat copies,
+- [Tree-sitter sources](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/treeSitter/source.ts) avoid some flat copies,
   but still describe resident document content. E007 first measures and removes avoidable copies.
 
 The old 48 MB incident is motivation, not a current maximum. Reproduce limits on current versions

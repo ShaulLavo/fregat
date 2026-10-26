@@ -101,7 +101,7 @@ Expected gains below are hypotheses. Measure each independently, keep it only wh
 
 [PR #1021](https://github.com/ShaulLavo/fregat/pull/1021) supplies a relevant viewport-first experiment, not a ready-made Markdown shortcut. At this plan's writing it is open. Its provisional trees are root-only, exclude injected content, and keep Markdown/MDX on the complete-context path. Check its final merged contract before reusing anything. The small guide startup here differs from its 1–200 MiB TypeScript opens.
 
-The [browser comparison](../packages/singapore/docs/performance/browser-compare-2026-10-08.md) and [comparison harness](../packages/singapore/bench/compare/README.md) provide calibration and regressions. Their open clocks begin after module loading and use different prerequisite parsing work per editor. This site's clock includes navigation, code loading, preview and swap. Report both; do not infer a docs takeover target or a universal Monaco/CodeMirror ranking from that comparison.
+The [browser comparison](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/browser-compare-2026-10-08.md) and [comparison harness](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/bench/compare/README.md) provide calibration and regressions. Their open clocks begin after module loading and use different prerequisite parsing work per editor. This site's clock includes navigation, code loading, preview and swap. Report both; do not infer a docs takeover target or a universal Monaco/CodeMirror ranking from that comparison.
 
 ## Phases
 
@@ -169,7 +169,7 @@ Exit: only the smaller proven approach ships. If neither is correct and cheaper 
 
 - [ ] Run the fixed cold/warm matrix with at least 20 repetitions per accepted cell, CPU and network settings above, separate trace runs and resource accounting. Report each page independently.
 - [ ] Run the prototype verification behaviours on the built site: JavaScript-off, failed grammar/worker, forced phone takeover, tab links/back, scroll restoration, find, selection/copy and immediate typing. Inspect screenshots at the top and a scrolled fence.
-- [ ] Run the [comparison harness](../packages/singapore/bench/compare/README.md) smoke for any changed shared editor path. Preserve its controls and explicit feature differences. For Fregat consumer changes use `verify-fregat`, a matching scenario and `trace --compare`; collect render counts only if React consumers changed.
+- [ ] Run the [comparison harness](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/bench/compare/README.md) smoke for any changed shared editor path. Preserve its controls and explicit feature differences. For Fregat consumer changes use `verify-fregat`, a matching scenario and `trace --compare`; collect render counts only if React consumers changed.
 - [ ] Check real phone behaviour when a device is available and accessibility reading order/headings with the Plan 336 owner. Publish public numbers only with committed method, machine, versions, date and a reproducible script.
 - [ ] Run `bun run plans:check`, update this plan's phase receipts and link the final evidence from Plan 336.
 

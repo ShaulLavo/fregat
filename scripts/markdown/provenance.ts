@@ -1,8 +1,10 @@
 import { execFile } from 'node:child_process'
 import { hash } from 'node:crypto'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile, readdir, realpath } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { installedPackageRoot } from '../installed-package-root'
 import { MARKDOWN_CASES } from '../../packages/markdown/test/fixtures/cases'
 import { REMARK_BASELINE_PROFILE } from '../../packages/markdown/test/qualification'
 import reference from '../../packages/markdown/test/reference/manifest.json'
@@ -59,9 +61,9 @@ async function sourceFiles(root: string): Promise<string[]> {
     'apps/web/src/features/chat/tests',
     'scripts/markdown',
   ]
-  const files = (
-    await Promise.all(directories.map((directory) => codeFiles(root, directory)))
-  ).flat()
+  const files = (await Promise.all(directories.map((directory) => codeFiles(root, directory))))
+    .flat()
+    .concat(await installedPackageFiles(root, '@singapore-editor/tree-sitter'))
   files.push(
     'apps/web/test/providers.tsx',
     'apps/web/test/factories/markdown-browser.tsx',
@@ -76,12 +78,30 @@ async function sourceFiles(root: string): Promise<string[]> {
     'apps/web/vitest.markdown-qualification.config.ts',
     'apps/web/vite.config.ts',
     'apps/web/vitest.browser.config.ts',
-    'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
-    'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-    'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
     'package.json',
   )
   return files.sort()
+}
+
+async function installedPackageFiles(root: string, name: string): Promise<string[]> {
+  const webRequire = createRequire(path.join(root, 'apps/web/package.json'))
+  const entry = await realpath(webRequire.resolve(name))
+  const directory = await installedPackageRoot(entry, name)
+  const files = await artifactFiles(root, path.join(directory, 'dist'))
+  files.push(path.relative(root, path.join(directory, 'package.json')))
+  return files
+}
+
+async function artifactFiles(root: string, directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true })
+  const parts = await Promise.all(
+    entries.map(async (entry) => {
+      const file = path.join(directory, entry.name)
+      if (entry.isDirectory()) return artifactFiles(root, file)
+      return [path.relative(root, file)]
+    }),
+  )
+  return parts.flat()
 }
 
 async function codeFiles(root: string, directory: string): Promise<string[]> {

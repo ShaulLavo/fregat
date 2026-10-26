@@ -12,11 +12,20 @@ test('the landing page offers the source build and no downloads or native apps',
   expect(page).toContain('Linux and macOS')
 })
 
-test('the README names the shipped desktop client and phone setup', () => {
+test('the README links to public desktop and phone setup documentation', () => {
   const readme = source('README.md')
-  expect(readme).not.toContain('native mac')
-  expect(readme).toMatch(/https proxy/i)
-  expect(readme).toContain('pairing')
+  expect(readme).toContain('[Overview and requirements](docs/project-overview.md)')
+  expect(readme).toContain('[Development and checks](docs/development.md)')
+  const overview = source('docs/project-overview.md')
+  expect(overview).not.toContain('native mac')
+  expect(overview).toContain('desktop window')
+  expect(overview).toMatch(/https proxy/i)
+  expect(overview).toContain('device pairing')
+  expect(overview).toContain('[Remote access](remote-access.md)')
+  const remoteAccess = source('docs/remote-access.md')
+  expect(remoteAccess).toContain('HTTPS reverse proxy')
+  expect(remoteAccess).toContain('bun run pair --address=http://127.0.0.1:3012')
+  expect(remoteAccess).toContain('Open the link on the phone')
 })
 
 test.each([

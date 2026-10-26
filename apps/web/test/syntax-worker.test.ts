@@ -1,9 +1,9 @@
 import { expect, test } from './fixtures'
 import { installSyntaxWorker } from './factories/syntax-worker'
 import type {
-  TreeSitterWorkerRequestPayload,
-  TreeSitterWorkerResponse,
-} from '../../../packages/singapore/packages/tree-sitter/src/treeSitter/types'
+  TreeSitterFixturePayload,
+  TreeSitterFixtureResponse,
+} from './factories/syntax-worker-protocol'
 
 const identity = {
   documentId: 'review',
@@ -13,7 +13,7 @@ const identity = {
 }
 const point = { segment: 'review', revision: 0, textVersion: 0 }
 const source = { identity, point, readId: 'review-read' }
-const parse: TreeSitterWorkerRequestPayload = {
+const parse: TreeSitterFixturePayload = {
   type: 'parse',
   generation: 1,
   documentId: 'review',
@@ -27,8 +27,8 @@ function harness() {
   installSyntaxWorker((text) => [{ start: 0, end: text.length, style: { color: 'red' } }])
   const worker = new Worker(new URL('treeSitter.worker.ts', 'http://localhost'))
   let id = 0
-  const send = (payload: TreeSitterWorkerRequestPayload) =>
-    new Promise<TreeSitterWorkerResponse>((resolve) => {
+  const send = (payload: TreeSitterFixturePayload) =>
+    new Promise<TreeSitterFixtureResponse>((resolve) => {
       worker.onmessage = (event) => resolve(event.data)
       worker.postMessage({ id: ++id, payload })
     })

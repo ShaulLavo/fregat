@@ -3,7 +3,7 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { test } from 'vitest'
 
-const workspace = createRequire(new URL('../packages/ghostty-webgpu/package.json', import.meta.url))
+const workspace = createRequire(new URL('../apps/web/package.json', import.meta.url))
 const provider = createRequire(workspace.resolve('@vitest/browser-playwright'))
 const browser = createRequire(provider.resolve('@vitest/browser'))
 const { interceptorPlugin } = await import(

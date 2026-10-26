@@ -21,13 +21,7 @@ function runFixture(operation, names, failure = '') {
       path.join(root, 'task.mjs'),
       'import {appendFileSync} from "node:fs"; const task=process.argv.slice(2).join(" "); appendFileSync(process.env.RECEIPT,task+"\\n"); process.exit(task===process.env.FAIL_TASK?23:0)',
     )
-    for (const name of [
-      'alpha',
-      'beta',
-      'ghostty-webgpu',
-      'ghostty-webgpu-line-editor',
-      'ghostty-webgpu-shaders',
-    ]) {
+    for (const name of ['alpha', 'beta', 'web', 'server', 'tui', 'scripts']) {
       const directory = path.join(root, 'packages', name)
       mkdirSync(directory, { recursive: true })
       const scripts = Object.fromEntries(
@@ -39,7 +33,7 @@ function runFixture(operation, names, failure = '') {
       writeFileSync(
         path.join(directory, 'package.json'),
         JSON.stringify({
-          name: name.startsWith('ghostty-') ? name : `@workspace/${name}`,
+          name: ['alpha', 'beta'].includes(name) ? `@workspace/${name}` : name,
           scripts,
         }),
       )
@@ -82,21 +76,19 @@ test('empty package selection executes no commands', () => {
   expect(runFixture('checks', [])).toMatchObject({ status: 0, calls: [] })
 })
 
-test('family verification owns Ghostty checks without a duplicate package execution', () => {
-  expect(
-    runFixture('checks', [
-      'ghostty-webgpu',
-      'ghostty-webgpu-line-editor',
-      'ghostty-webgpu-shaders',
-      '@workspace/alpha',
-    ]),
-  ).toMatchObject({ status: 0, calls: ['alpha format:check', 'alpha lint', 'alpha typecheck'] })
+test('dedicated application and script suites execute only in their own jobs', () => {
+  expect(runFixture('tests', ['web', 'server', 'tui', 'scripts', '@workspace/beta'])).toMatchObject(
+    {
+      status: 0,
+      calls: ['beta test'],
+    },
+  )
 })
 
-test('family verification owns shader tests without duplicate package execution', () => {
-  expect(runFixture('tests', ['ghostty-webgpu-shaders', '@workspace/beta'])).toMatchObject({
+test('scripts retain format and lint while their dedicated step owns typechecking', () => {
+  expect(runFixture('checks', ['scripts'])).toMatchObject({
     status: 0,
-    calls: ['beta test'],
+    calls: ['scripts format:check', 'scripts lint'],
   })
 })
 

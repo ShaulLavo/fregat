@@ -4,11 +4,10 @@ import {
   type DocumentWorkerRead,
 } from '@singapore-editor/core/internal/document-worker'
 import { packEditorTokens, type EditorToken } from '@singapore-editor/core/syntax'
-import type { TreeSitterWorkerRequest } from '../../../../packages/singapore/packages/tree-sitter/src/treeSitter/types'
-import type { ShikiWorkerRequest } from '../../../../packages/singapore/packages/editor/src/shiki/workerTypes'
 import { disposeHighlightingService } from '@/lib/highlighting/state/service'
+import type { SyntaxWorkerRequest } from './syntax-worker-protocol'
 
-type Request = TreeSitterWorkerRequest | ShikiWorkerRequest
+type Request = SyntaxWorkerRequest
 
 type SyntaxWorkerOptions = {
   readonly workers: Set<SyntaxWorker>

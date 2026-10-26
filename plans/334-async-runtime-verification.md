@@ -8,7 +8,7 @@ Dependencies: contract sketches in [329](329-async-lifecycle-and-transport.md)â€
 
 Resolve each architecture/dependency choice with the smallest test or paired workload that could change it. Record actual source/artifact/runtime identity, prove correctness and cleanup first, then accept boundedness/code reduction or measured performance benefits without misleading proxies.
 
-The prior [SAB transport evidence](../packages/singapore/docs/performance/sab-transport-2026-09-12.md) remains the decision for editor text. This program does not schedule its removed paths again. New shared-memory, pool, SharedWorker or Coaction implementations are conditional on a concrete consumer and a decision they can resolve.
+The prior [SAB transport evidence](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/sab-transport-2026-09-12.md) remains the decision for editor text. This program does not schedule its removed paths again. New shared-memory, pool, SharedWorker or Coaction implementations are conditional on a concrete consumer and a decision they can resolve.
 
 ## Evidence identity and execution environment
 

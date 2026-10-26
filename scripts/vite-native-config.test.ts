@@ -1,25 +1,14 @@
-import { existsSync, realpathSync } from 'node:fs'
+import { realpathSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import path from 'node:path'
-import { chromium } from 'playwright'
 import { expect, test } from 'vitest'
 
 const repository = path.resolve(import.meta.dirname, '..')
-const require = createRequire(path.join(repository, 'packages/singapore/package.json'))
+const require = createRequire(path.join(repository, 'apps/web/package.json'))
 const { createLogger, loadConfigFromFile } = await import(require.resolve('vite'))
-
-const ghosttyNeedsSwiftShader =
-  process.platform === 'linux' &&
-  process.env.GHOSTTY_BROWSER_HARDWARE !== '1' &&
-  (process.env.GHOSTTY_BROWSER_ENGINE ?? 'chromium') === 'chromium'
-const swiftShaderDriver = path.join(
-  path.dirname(chromium.executablePath()),
-  'vk_swiftshader_icd.json',
-)
-const missingSwiftShader = ghosttyNeedsSwiftShader && !existsSync(swiftShaderDriver)
 
 const configurations = [
   'apps/web/vite.config.ts',
@@ -29,20 +18,12 @@ const configurations = [
   'apps/web/vitest.tree-browser.config.ts',
   'apps/web/retention-acceptance.vitest.config.ts',
   'apps/web/retention-acceptance-layout.vitest.config.ts',
-  'packages/ghostty-webgpu/vitest.browser.config.ts',
-  'packages/singapore/packages/editor/vitest.config.ts',
-  'packages/singapore/packages/highlighting/vitest.config.ts',
-  'packages/singapore/packages/typescript-lsp/vitest.config.ts',
 ]
 
 for (const loader of ['bundle', 'native'] as const) {
   test.for(configurations)(
     '%s loads with ' + loader + ' without native compatibility warnings',
-    async (relative, { skip }) => {
-      if (relative === 'packages/ghostty-webgpu/vitest.browser.config.ts' && missingSwiftShader)
-        skip(
-          'Ghostty Chromium config loading requires the installed Playwright SwiftShader Vulkan driver',
-        )
+    async (relative) => {
       const configFile = path.join(repository, relative)
       const warnings: string[] = []
       const logger = createLogger()
@@ -61,6 +42,28 @@ for (const loader of ['bundle', 'native'] as const) {
     },
   )
 }
+
+test.for(['apps/web/vite.config.ts', 'apps/web/vitest.browser.config.ts'])(
+  '%s keeps installed worker core in the editor optimizer graph',
+  async (relative) => {
+    const file = path.join(repository, relative)
+    const result = await loadConfigFromFile(
+      { command: 'serve', mode: 'test' },
+      file,
+      path.dirname(file),
+    )
+    const dependencies = result?.config.optimizeDeps
+    const workerCore = '@singapore-editor/core/internal/document-worker'
+    const coreIsSource = dependencies?.exclude?.includes('@singapore-editor/core')
+    if (coreIsSource) {
+      expect(dependencies?.include).not.toContain(workerCore)
+      return
+    }
+    expect(dependencies?.include).toContain(workerCore)
+    if (relative === 'apps/web/vitest.browser.config.ts')
+      expect(dependencies?.exclude).toContain('@singapore-editor/tree-sitter')
+  },
+)
 
 const retentionConfigurations = [
   {

@@ -1,11 +1,12 @@
 import { expect, test } from 'vitest'
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { YAML } from 'bun'
-import { readWorkspaceGraph, selectAffected } from './affected.mjs'
+import { selectAffected } from './affected.mjs'
+import { consumerGraph } from './fixtures/consumer-workspace.mjs'
 
 const root = new URL('../../', import.meta.url)
 const workflow = YAML.parse(await readFile(new URL('.github/workflows/ci.yml', root), 'utf8'))
@@ -294,10 +295,8 @@ test('script test partition discovers every file once and reuses built outputs',
     const source = join(directory, 'source')
     const destination = join(directory, 'destination')
     await mkdir(destination)
-    for (const base of ['editor/packages', 'packages', 'hotkeys', 'ghostty-webgpu']) {
-      await mkdir(join(source, base), { recursive: true })
-    }
-    for (const file of ['editor/packages/parser/dist/parser.wasm', 'hotkeys/core/dist/index.js']) {
+    await mkdir(join(source, 'packages'), { recursive: true })
+    for (const file of ['packages/example/dist/index.js']) {
       await mkdir(dirname(join(source, file)), { recursive: true })
       await writeFile(join(source, file), 'built output')
     }
@@ -314,10 +313,7 @@ test('script test partition discovers every file once and reuses built outputs',
       })
       expect(result.status, result.stdout + result.stderr).toBe(0)
     }
-    expect(
-      await readFile(join(destination, 'editor/packages/parser/dist/parser.wasm'), 'utf8'),
-    ).toBe('built output')
-    expect(await readFile(join(destination, 'hotkeys/core/dist/index.js'), 'utf8')).toBe(
+    expect(await readFile(join(destination, 'packages/example/dist/index.js'), 'utf8')).toBe(
       'built output',
     )
   } finally {
@@ -337,20 +333,11 @@ test('setup builds have a single early producer and required fail-closed imports
     producer.steps.filter((step) => step.uses === './.github/actions/workspace-builds'),
   ).toHaveLength(1)
   expect(workflow.jobs.verdict.needs).toContain('workspace-builds')
-  for (const name of [
-    'typecheck',
-    'test-web',
-    'test-server',
-    'test-tui',
-    'browser',
-    'site',
-    'libraries',
-  ]) {
+  for (const name of ['typecheck', 'test-web', 'test-server', 'test-tui', 'browser', 'site']) {
     const job = workflow.jobs[name]
     expect(job.needs).toEqual(['changes', 'workspace-builds'])
     expect(job.needs).not.toContain('typecheck')
     expect(job.if).not.toContain('always()')
-    if (name === 'libraries') continue
     expect(
       job.steps.find((step) => step.uses === './.github/actions/setup').with['build-packages'],
     ).toBe('[]')
@@ -364,32 +351,6 @@ test('setup builds have a single early producer and required fail-closed imports
   expect(workflow.jobs.lint.needs).toBe('changes')
   expect(workflow.jobs.docs.needs).toBe('changes')
   expect(workflow.jobs['mobile-layout'].needs).toEqual(['changes', 'site'])
-})
-
-test('reusable library workflows keep direct defaults and import only for the CI opt-in', async () => {
-  const libraries = YAML.parse(
-    await readFile(new URL('.github/workflows/workspace-libraries.yml', root), 'utf8'),
-  )
-  expect(libraries.on.workflow_call.inputs.reuse_builds).toEqual({
-    type: 'boolean',
-    default: false,
-  })
-  expect(workflow.jobs.libraries.with.reuse_builds).toBe(
-    "${{ needs.changes.outputs.code == 'true' }}",
-  )
-  for (const name of ['editor', 'ghostty']) {
-    const job = libraries.jobs[name]
-    const setup = job.steps.find((step) => step.uses === './.github/actions/setup')
-    expect(setup.with['build-packages']).toContain("inputs.reuse_builds && '[]'")
-    const imported = job.steps.find((step) => step.uses === './.github/actions/workspace-builds')
-    expect(imported.if).toBe('${{ inputs.reuse_builds }}')
-    expect(imported.with.operation).toBe('consume')
-  }
-  expect(
-    libraries.jobs.standalone.steps.some(
-      (step) => step.uses === './.github/actions/workspace-builds',
-    ),
-  ).toBe(false)
 })
 
 test('transport is same-run and immutable, with only local build tasks persisted', async () => {
@@ -429,7 +390,7 @@ test('transport is same-run and immutable, with only local build tasks persisted
   )
 })
 
-const graph = readWorkspaceGraph(fileURLToPath(root))
+const graph = consumerGraph(fileURLToPath(root))
 const browserScriptInputs = [
   'scripts/agent/browser-launch.test.ts',
   'scripts/agent/browser-launch.ts',
@@ -457,3 +418,54 @@ test.each(browserScriptInputs)(
     expect(workflow.jobs.verdict.needs).toContain('browser')
   },
 )
+
+test('retired standalone producer jobs leave every Fregat consumer gate blocking', async () => {
+  const files = await readdir(new URL('.github/workflows/', root))
+  expect(
+    files.filter((file) =>
+      /^(editor-|ghostty-|mirror\.|workspace-libraries\.|release\.)/.test(file),
+    ),
+  ).toEqual([])
+  await expect(stat(new URL('.github/actions/standalone/action.yml', root))).rejects.toMatchObject({
+    code: 'ENOENT',
+  })
+  expect(workflow.jobs).not.toHaveProperty('libraries')
+  expect(workflow.jobs.changes.outputs).not.toHaveProperty('editor')
+  expect(workflow.jobs.changes.outputs).not.toHaveProperty('ghostty')
+  expect(workflow.jobs.changes.outputs).not.toHaveProperty('hotkeys')
+  expect(workflow.jobs.verdict.needs).toEqual([
+    'baseline',
+    'changes',
+    'workspace-builds',
+    'docs',
+    'lint',
+    'typecheck',
+    'test-promotion-evidence',
+    'test-web',
+    'test-server',
+    'test-tui',
+    'browser',
+    'site',
+    'mobile-layout',
+  ])
+  const site = workflow.jobs.site.steps.map((step) => step.run ?? '').join('\n')
+  for (const command of [
+    'scripts/product-sites/build.sh',
+    "python3 -m unittest discover -s scripts/product-sites -p 'test_*.py'",
+    'bun run test:scripts scripts/site-player.test.ts',
+    'bun scripts/product-sites/test-mobile.mjs',
+    'bun run --cwd apps/site verify:a11y',
+    'bun run --cwd apps/site verify:scroll --engine webkit',
+    'bun run --cwd apps/site verify:scroll --engine chromium',
+    'bun run --cwd apps/site verify:scroll --engine firefox',
+    'bun run --cwd apps/site verify:scroll --engine firefox --generic-font monospace',
+  ])
+    expect(site).toContain(command)
+  const mobile = workflow.jobs['mobile-layout'].steps.find(
+    (step) => step.name === 'Check production pages on mobile',
+  )
+  expect(mobile.run).toContain('--directory "$RUNNER_TEMP/product-sites/fregat"')
+  expect(mobile.run).toContain('--shards 2 --shard')
+  expect(mobile.run).not.toContain('continue')
+  await expect(stat(new URL('.changeset/', root))).rejects.toMatchObject({ code: 'ENOENT' })
+})

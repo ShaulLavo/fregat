@@ -2,8 +2,7 @@
 
 ## Report a vulnerability privately
 
-Use [GitHub's private vulnerability reporting](https://github.com/ShaulLavo/fregat/security/advisories/new) for Fregat, Singapore, ghostty-webgpu, and hotkeys.
-The standalone package repositories are read-only mirrors. Their security reports belong here too.
+Use [GitHub's private vulnerability reporting](https://github.com/ShaulLavo/fregat/security/advisories/new) for Fregat. Report vulnerabilities in [Singapore](https://github.com/ShaulLavo/singapore/security/advisories/new), [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu/security/advisories/new), and [hotkeys](https://github.com/ShaulLavo/hotkeys/security/advisories/new) through the affected repository's private advisory page.
 
 Include the affected product, version or commit, reproduction steps, impact, and any proposed fix.
 Use a minimal example with synthetic data. Remove credentials and personal data from logs and attachments.
@@ -11,8 +10,8 @@ Keep exploit details in the private report while we investigate and prepare a fi
 
 ## Supported code
 
-Security fixes target the current `main` branch. Older releases have no separate security-maintenance commitment.
-The current npm releases of Singapore and ghostty-webgpu lag behind this repository. Check the affected source commit when reporting a problem.
+Security fixes target the current `main` branch in the affected repository. Older releases have no separate security-maintenance commitment.
+Check the affected release or source commit when reporting a problem.
 
 ## Deployment and trust
 
@@ -27,4 +26,4 @@ Know these defaults before you expose a server:
 - A browser on the machine itself needs no pairing. Any other browser pairs first. A reverse proxy must preserve the public `Host` header, or always add a forwarding header such as `X-Forwarded-For`. A proxy that rewrites every request to a loopback host and strips every forwarding header makes remote traffic look local. See [reverse proxy device trust](docs/development.md#reverse-proxy-device-trust).
 
 The browser terminal's clipboard behavior and shell connection are part of its integration policy.
-Review the [terminal integration guide](packages/ghostty-webgpu/docs/integration.md) when embedding it in another app.
+Review the [terminal integration guide](https://github.com/ShaulLavo/ghostty-webgpu/blob/main/docs/integration.md) when embedding it in another app.

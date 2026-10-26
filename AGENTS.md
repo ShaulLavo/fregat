@@ -95,7 +95,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 - Bad: "Expose the default row overscan so benchmark tooling can bound retained rows against the editor's viewport policy."
 - Good: "Added `scrollbackByteLimit` to limit terminal scrollback by allocated page bytes, including the active screen. `0` clears history and disables further scrollback."
 - Bad: "Document scrollback as native page-granular retention and expose its byte budget through core, session, and appearance APIs."
-- Follow [Releasing packages](docs/releasing.md) for package selection, version PRs, and local checks.
+- Follow the standalone package repository's release instructions for public package changes. Follow [Adopting package releases](docs/releasing.md) when updating Fregat's pins.
 
 ## Logs And Errors
 
@@ -120,7 +120,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 ## Dev, Gates, Verification
 
 - Bundle size is not gated; deal with it when it's a real problem (owner, 2026-10-09).
-- Follow `README.md` and `docs/development.md` for development setup. Run `bun run build:workspaces` before the first `bun run dev` or typecheck: the server imports the mirrored libraries from their built `dist`. Browser verification uses an isolated state home. `/dev` is the component gallery; add a tab for anything worth eyeballing.
+- Follow `README.md` and `docs/development.md` for development setup. Run `bun run build:workspaces` before the first `bun run dev` or typecheck: this builds the local UI package while editor, terminal, and hotkeys imports use installed release exports. Browser verification uses an isolated state home. `/dev` is the component gallery; add a tab for anything worth eyeballing.
 - A private dev server takes an explicit free `--port` on a known loopback address, and stops after verification.
 - Run the narrowest checks that can catch the change's plausible failures.
 - `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`, `query:check`, `unused:check`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
@@ -131,7 +131,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 - `bun run build-release` builds a portable release anyone can make. Installing one onto the owner's machine is covered under Owner-only below.
 - Desktop windows, browser tabs and remote clients share the machine server. The launcher reuses the recorded service and release; closing or uninstalling a client leaves shared services and terminals running. Packaged service activation and updates follow [Plan 114](plans/114-installed-app.md).
 - The release endpoint under the configured base path (`GET <base>/release`) reports the served release, commit and dirty count, plus `pending`, `phase` and `liveCheck` for a staged update.
-- Editor packages live in `packages/singapore/packages/`; the terminal library lives in `packages/ghostty-webgpu/`. Both are root Bun workspaces mirrored to their standalone repositories. Change their source here, follow each folder's `AGENTS.md`, and run `bun run build:workspaces` before checking consumers. CI builds those workspaces from this checkout.
+- Editor, terminal, and hotkeys development belongs to the standalone `ShaulLavo/singapore`, `ShaulLavo/ghostty-webgpu`, and `ShaulLavo/hotkeys` repositories. Fregat consumes inspected GitHub Release tarballs pinned in the root catalog and lockfile. See `docs/releasing.md` for release adoption and `docs/development.md` for deliberate local-checkout development. `packages/pty` remains a Fregat workspace.
 - A source-checkout release's `server/node_modules` can link to the checkout's installed packages, so rollback does not undo a `bun install`.
 
 ## Testing

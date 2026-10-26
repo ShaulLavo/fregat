@@ -5,7 +5,7 @@
 - Owner: Editor
 - Priority: P1
 - Effort: M
-- Dependencies: [E001](../packages/singapore/examples/stress/README.md)
+- Dependencies: [E001](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/examples/stress/README.md)
 - Inspected baseline: `7d06ab6f52370b3f8bc116bd0491ffe47c1c2107` (Fregat main, 2026-10-02)
 
 ## Outcome
@@ -23,12 +23,12 @@ record frozen-product costs: injection discovery took 920–1,025 ms after a 24-
 burst versus 106–118 ms for root parsing; reset parses took 621–743 ms versus 30–40 ms.
 These are coalesced edit/parse observations, not individual-keystroke timings.
 
-- [The current worker](../packages/singapore/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts)
+- [The current worker](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts)
   measures `injectionDiscovery` in `appendInjectionLayers` and executes injection matches in
   `findInjections`. Unlike the frozen products, current `editDocument` already combines changed
   and edited ranges, expands enclosing ranges and carries unaffected layers. Measure those
   effective bounds first; full discovery still exists when no range restriction is supplied.
-- [Document analysis](../packages/singapore/packages/editor/src/editor/documentAnalysis.ts):
+- [Document analysis](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/packages/editor/src/editor/documentAnalysis.ts):
   `AnalysisEntry.query` still chains requests onto `this.tail`; `StructuralEntry.range` dedupes
   identical revision/range keys, while distinct keys enter that chain.
 - [Fregat's document service](../apps/web/src/features/editor/state/workspace-document-service.ts)

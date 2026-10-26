@@ -20,7 +20,6 @@
     "*.patch",
     "references/**",
     "apps/server/src/provider/adapters/codex-protocol/upstream/**",
-    "packages/singapore/packages/textbuffer/bench/vscode-textbuffer/**",
     "apps/site/src/replicas/*.html",
     "packages/markdown/test/reference/chat.json"
   ]

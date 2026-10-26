@@ -15,6 +15,7 @@ export default defineConfig({
         test: {
           name: 'dom',
           environment: 'happy-dom',
+          server: { deps: { inline: [/@singapore-editor\//] } },
           include: ['src/**/*.test.tsx'],
         },
       },

@@ -6,7 +6,7 @@
   "plans": [
     {
       "id": "E001",
-      "reference": "../packages/singapore/examples/stress/README.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/examples/stress/README.md",
       "title": "Repeatable stress fixtures and browser benchmarks",
       "status": "Completed",
       "owner": "Editor",
@@ -18,7 +18,7 @@
     },
     {
       "id": "E002",
-      "reference": "../packages/singapore/docs/performance/input-latency.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/input-latency.md",
       "title": "Enforce the input-to-paint budget",
       "status": "Completed",
       "owner": "Editor",
@@ -30,7 +30,7 @@
     },
     {
       "id": "E003",
-      "reference": "../packages/singapore/docs/performance/first-paint.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/first-paint.md",
       "title": "Keep optional startup work off first paint",
       "status": "Completed",
       "owner": "Editor",
@@ -42,7 +42,7 @@
     },
     {
       "id": "E004",
-      "reference": "../packages/singapore/examples/stress/results/hidden-rendering.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/examples/stress/results/hidden-rendering.md",
       "title": "Suspend rendering in zero-height views",
       "status": "Completed",
       "owner": "Editor",
@@ -54,7 +54,7 @@
     },
     {
       "id": "E005",
-      "reference": "../packages/singapore/docs/storage/piece-tree-inspection.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/storage/piece-tree-inspection.md",
       "title": "Inspect piece trees and verify their invariants",
       "status": "Completed",
       "owner": "Editor",
@@ -66,7 +66,7 @@
     },
     {
       "id": "E006",
-      "reference": "../packages/singapore/docs/storage/e006-tombstone-compaction.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/storage/e006-tombstone-compaction.md",
       "title": "Reclaim deleted text without breaking retained document states",
       "status": "Completed",
       "owner": "Editor",
@@ -87,7 +87,7 @@
       "effort": "L",
       "dependsOn": ["E001"],
       "topics": ["Reduce editor memory footprint"],
-      "reference": "../packages/singapore/docs/performance/e007-consumer-copies.md"
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e007-consumer-copies.md"
     },
     {
       "id": "E008",
@@ -99,7 +99,7 @@
       "effort": "L",
       "dependsOn": ["E001"],
       "topics": ["Faster in-buffer find (single-threaded)"],
-      "reference": "../packages/singapore/docs/performance/e008-in-buffer-search.md"
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e008-in-buffer-search.md"
     },
     {
       "id": "E009",
@@ -115,7 +115,7 @@
     },
     {
       "id": "E010",
-      "reference": "../packages/singapore/docs/performance/sab-transport-2026-09-12.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/sab-transport-2026-09-12.md",
       "title": "Prove a shared allocator and concurrent hash map",
       "status": "Completed",
       "owner": "Editor",
@@ -139,7 +139,7 @@
     },
     {
       "id": "E012",
-      "reference": "../packages/singapore/docs/performance/sab-transport-2026-09-12.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/sab-transport-2026-09-12.md",
       "title": "Reuse shared storage only after every reader releases it",
       "status": "Completed",
       "owner": "Editor",
@@ -151,7 +151,7 @@
     },
     {
       "id": "E013",
-      "reference": "../packages/singapore/docs/performance/sab-transport-2026-09-12.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/sab-transport-2026-09-12.md",
       "title": "Let eligible workers read shared immutable document snapshots",
       "status": "Completed",
       "owner": "Cross-repo",
@@ -199,7 +199,7 @@
     },
     {
       "id": "E017",
-      "reference": "../packages/singapore/docs/editing/undo-graph.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/editing/undo-graph.md",
       "title": "Preserve alternate undo branches",
       "status": "Completed",
       "owner": "Editor",
@@ -212,7 +212,7 @@
     },
     {
       "id": "E018",
-      "reference": "../packages/singapore/docs/editing/e018-persisted-undo.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/editing/e018-persisted-undo.md",
       "title": "Persist and restore undo history safely",
       "status": "Completed",
       "owner": "Cross-repo",
@@ -224,7 +224,7 @@
     },
     {
       "id": "E019",
-      "reference": "../packages/singapore/docs/editing/undo-graph-viewer.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/editing/undo-graph-viewer.md",
       "title": "Browse and compare undo branches",
       "status": "Completed",
       "owner": "Editor",
@@ -245,7 +245,7 @@
       "effort": "M",
       "dependsOn": [],
       "topics": ["Cursor position navigation history (alt+left / alt+right)"],
-      "reference": "../packages/singapore/docs/editing/jump-history.md"
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/editing/jump-history.md"
     },
     {
       "id": "E021",
@@ -321,7 +321,7 @@
     },
     {
       "id": "E028",
-      "reference": "../packages/singapore/docs/architecture/modal-input-findings.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/modal-input-findings.md",
       "title": "Prove modal editing through public extensions",
       "status": "Completed",
       "owner": "Editor",
@@ -357,7 +357,7 @@
     },
     {
       "id": "E031",
-      "reference": "../packages/singapore/docs/performance/e031-projection.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e031-projection.md",
       "title": "Replace eager display rows with an indexed projection",
       "status": "Completed",
       "owner": "Editor",
@@ -374,7 +374,7 @@
     },
     {
       "id": "E032",
-      "reference": "../packages/singapore/docs/performance/e032-edit-batches.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e032-edit-batches.md",
       "title": "Render edit batches without flattening the document",
       "status": "Completed",
       "owner": "Editor",
@@ -387,7 +387,7 @@
     },
     {
       "id": "E033",
-      "reference": "../packages/singapore/docs/performance/e033-full-text-boundary.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e033-full-text-boundary.md",
       "title": "Make full-document text reads an explicit boundary",
       "status": "Completed",
       "owner": "Editor",
@@ -403,7 +403,7 @@
     },
     {
       "id": "E034",
-      "reference": "../packages/singapore/docs/performance/e034-snapshot-indentation-folds.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e034-snapshot-indentation-folds.md",
       "title": "Maintain indentation folds from document snapshots",
       "status": "Completed",
       "owner": "Editor",
@@ -420,7 +420,7 @@
     },
     {
       "id": "E035",
-      "reference": "../packages/singapore/docs/performance/e035-packed-token-store.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e035-packed-token-store.md",
       "title": "Make packed tokens the canonical token store",
       "status": "Completed",
       "owner": "Editor",
@@ -436,7 +436,7 @@
     },
     {
       "id": "E036",
-      "reference": "../packages/singapore/docs/display/e036-monaco-geometry-comparison.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/display/e036-monaco-geometry-comparison.md",
       "title": "Measure Monaco's view mechanisms against the calculated geometry path",
       "status": "Completed",
       "owner": "Editor",
@@ -452,7 +452,7 @@
     },
     {
       "id": "E037",
-      "reference": "../packages/singapore/docs/performance/e037-textbuffer-edit-allocations.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e037-textbuffer-edit-allocations.md",
       "title": "Remove avoidable per-edit allocations from the textbuffer",
       "status": "Completed",
       "owner": "Editor",
@@ -465,7 +465,7 @@
     },
     {
       "id": "E038",
-      "reference": "../packages/singapore/docs/performance/e038-append-only-buffer-store.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e038-append-only-buffer-store.md",
       "title": "Append inserted text without copying the buffer store",
       "status": "Completed",
       "owner": "Editor",
@@ -478,7 +478,7 @@
     },
     {
       "id": "E039",
-      "reference": "../packages/singapore/docs/performance/e039-reverse-index-cost.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e039-reverse-index-cost.md",
       "title": "Make reverse-index maintenance cheaper than the edit it follows",
       "status": "Completed",
       "owner": "Editor",
@@ -491,7 +491,7 @@
     },
     {
       "id": "E040",
-      "reference": "../packages/singapore/docs/performance/e040-balanced-tree.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e040-balanced-tree.md",
       "title": "Balance the sequence tree and edit it in one descent",
       "status": "Completed",
       "owner": "Editor",
@@ -504,7 +504,7 @@
     },
     {
       "id": "E041",
-      "reference": "../packages/singapore/docs/performance/e041-transient-edits.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e041-transient-edits.md",
       "title": "Measure whether in-place edits between retained snapshots close the small-edit gap",
       "status": "Completed",
       "owner": "Editor",
@@ -517,7 +517,7 @@
     },
     {
       "id": "E042",
-      "reference": "../packages/singapore/docs/performance/e042-fixed-edit-overhead.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e042-fixed-edit-overhead.md",
       "title": "Cut the fixed per-edit overhead the zero-copy profile named",
       "status": "Completed",
       "owner": "Editor",
@@ -530,7 +530,7 @@
     },
     {
       "id": "E043",
-      "reference": "../packages/singapore/docs/performance/e043-one-descent-insert.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e043-one-descent-insert.md",
       "title": "Answer the snap and coalesce questions inside the insert split so an insert descends once",
       "status": "Completed",
       "owner": "Editor",
@@ -543,7 +543,7 @@
     },
     {
       "id": "E044",
-      "reference": "../packages/singapore/docs/performance/e044-node-summaries.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e044-node-summaries.md",
       "title": "Summarize a node in one pass and hash only what identifies it",
       "status": "Completed",
       "owner": "Editor",
@@ -556,7 +556,7 @@
     },
     {
       "id": "E045",
-      "reference": "../packages/singapore/docs/performance/e045-one-pass-edits.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e045-one-pass-edits.md",
       "title": "Apply an edit call in one pass: one epoch, a fused replacement and one index write",
       "status": "Completed",
       "owner": "Editor",
@@ -569,7 +569,7 @@
     },
     {
       "id": "E046",
-      "reference": "../packages/singapore/docs/performance/e046-one-walk-rows-and-cuts.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e046-one-walk-rows-and-cuts.md",
       "title": "Find a row in one walk, check surrogates inside the edit, and search line breaks within the piece",
       "status": "Completed",
       "owner": "Editor",
@@ -582,7 +582,7 @@
     },
     {
       "id": "E047",
-      "reference": "../packages/singapore/docs/display/e047-point-queries.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/display/e047-point-queries.md",
       "title": "One answer to \"what is under this point\"",
       "status": "Completed",
       "owner": "Cross-repo",
@@ -595,7 +595,7 @@
     },
     {
       "id": "E048",
-      "reference": "../packages/singapore/docs/display/e048-minimap-document-space.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/display/e048-minimap-document-space.md",
       "title": "The minimap maps display rows to document lines, not the other way round",
       "status": "Completed",
       "owner": "Editor",
@@ -608,7 +608,7 @@
     },
     {
       "id": "E049",
-      "reference": "../packages/singapore/docs/architecture/e049-no-silent-misses.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/e049-no-silent-misses.md",
       "title": "A miss is an error, not a default",
       "status": "Completed",
       "owner": "Editor",
@@ -630,11 +630,11 @@
       "dependsOn": ["E047"],
       "topics": ["Workaround audit: ask the owner, do not model it"],
       "baseline": "aeba6783b978193de9d2ba0fd5874f357df68edc",
-      "reference": "../packages/singapore/docs/architecture/e050-host-obligations.md"
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/e050-host-obligations.md"
     },
     {
       "id": "E051",
-      "reference": "../packages/singapore/docs/display/e051-fast-path-equivalence.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/display/e051-fast-path-equivalence.md",
       "title": "Every fast path is pinned to the slow path it stands in for",
       "status": "Completed",
       "owner": "Editor",
@@ -672,11 +672,11 @@
       "dependsOn": [],
       "topics": ["Unnecessary code: fade in each token's own colour"],
       "baseline": "206bc32eca5fd02a2d4573952312367c96500192",
-      "reference": "../packages/singapore/docs/display/diagnostic-overlays.md"
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/display/diagnostic-overlays.md"
     },
     {
       "id": "E054",
-      "reference": "../packages/singapore/docs/architecture/e054-worker-language-server-parity.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/e054-worker-language-server-parity.md",
       "title": "The TypeScript worker answers everything the server path answers",
       "status": "Completed",
       "owner": "Editor",
@@ -689,7 +689,7 @@
     },
     {
       "id": "E055",
-      "reference": "../packages/singapore/docs/performance/e055-edit-commands-read-lines.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/e055-edit-commands-read-lines.md",
       "title": "Edit commands read the lines they touch",
       "status": "Completed",
       "owner": "Editor",
@@ -715,7 +715,7 @@
     },
     {
       "id": "E057",
-      "reference": "../packages/singapore/docs/performance/sab-transport-2026-09-12.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/sab-transport-2026-09-12.md",
       "title": "Delete the SAB text transport",
       "status": "Completed",
       "owner": "Editor",
@@ -741,7 +741,7 @@
     },
     {
       "id": "E062",
-      "reference": "../packages/singapore/docs/editing/e062-spellcheck-hardening.md",
+      "reference": "https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/editing/e062-spellcheck-hardening.md",
       "title": "Spellcheck hardening: bounded tokenization, settled worker failures, cheaper underline masks",
       "status": "Completed",
       "owner": "Cross-repo",

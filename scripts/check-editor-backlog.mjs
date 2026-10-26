@@ -77,12 +77,21 @@ function checkReference(plan) {
   const kind = plan.status.toLowerCase()
   check(!Object.hasOwn(plan, 'file'), `${plan.id}: ${kind} entry must not have an executable file`)
   const reference = plan.reference
-  const valid =
+  const relative =
     typeof reference === 'string' &&
     !/^(?:[a-z]+:|\/)/i.test(reference) &&
     reference.endsWith('.md')
-  check(valid, `${plan.id}: ${kind} entry requires a relative Markdown reference`)
-  if (!valid) return
+  const standalone =
+    typeof reference === 'string' &&
+    /^https:\/\/github\.com\/ShaulLavo\/(?:singapore|ghostty-webgpu|hotkeys)\/(?:blob|tree)\/[a-f0-9]{40}(?:\/[^#]*)?(?:#.*)?$/i.test(
+      reference,
+    )
+  const valid = relative || standalone
+  check(
+    valid,
+    `${plan.id}: ${kind} entry requires a relative Markdown reference or a stable standalone URL`,
+  )
+  if (!valid || standalone) return
 
   const path = resolve(directory, reference)
   if (plan.status === 'Completed')

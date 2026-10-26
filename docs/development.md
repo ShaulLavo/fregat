@@ -46,7 +46,7 @@ Use Git 2.31 or newer. Run `bun run hooks:install` in each checkout that should 
 
 Relative selection follows a moved checkout. The installer preserves existing custom `core.hooksPath` settings and stops before writes when one applies. A custom hook manager can invoke `bun run hooks:pre-commit` explicitly. The first opt-in enables `extensions.worktreeConfig`. An ordinary common `core.bare=false` value moves into the main worktree's config. Bare repositories, `core.worktree` overrides, and unrelated dormant worktree configuration require separate Git setup. Existing common hooks remain in place.
 
-## Workspace libraries and native hosts
+## Library dependencies and native hosts
 
 The Linux desktop host is written in Zig and links WebKitGTK, so it requires Zig 0.17.x, `pkg-config`, and WebKitGTK 4.1 development headers.
 The macOS host is written in Swift with AppKit and WebKit, so it requires Swift 6 and the macOS SDK from the Xcode command-line tools.
@@ -60,9 +60,9 @@ and writes protocol receipts to the evidence directory.
 
 <a id="workspace-libraries"></a>
 
-Editor packages live in `packages/singapore/packages/`, and the terminal library lives in `packages/ghostty-webgpu/`. Bun installs their workspace links from the root `bun.lock`. Run `bun install --frozen-lockfile` at the root, then `bun run build:workspaces` to prepare the exports used by production builds and typechecking.
+Fregat consumes Singapore, ghostty-webgpu, and hotkeys through immutable release archives pinned in the root `package.json` catalog and `bun.lock`. Run `bun install --frozen-lockfile` at the root, then `bun run build:workspaces` to prepare Fregat's workspace exports for production builds and typechecking. Run `bun run standalone:consumer:check` after changing these dependencies to verify built release resolution and one shared hotkeys runtime.
 
-Desktop launcher bundle tests load these workspace exports too. Build the libraries before running the launcher checks from a fresh checkout:
+Desktop launcher bundle tests load the built exports too. Build the workspace exports before running the launcher checks from a fresh checkout:
 
 ```bash
 bun run build:workspaces
@@ -70,25 +70,23 @@ cd apps/desktop
 bun --bun vitest run src/launcher/tests/build-native.test.ts src/launcher/tests/bundle.test.ts src/launcher/tests/check-app.test.ts
 ```
 
-`dev` and `dev:web` serve both libraries from their TypeScript source through Vite aliases. Turbo coordinates tasks; Vite owns browser updates through its normal module graph and watcher. Fregat UI and the Editor React adapter use Fast Refresh. The adapter replaces its retained controller when its implementation changes. Editor core changes reload the page. Terminal panel and saved-viewport components are excluded from Fast Refresh because their cached modules retain WASM owners; their changes use Vite's native page reload. Generated `dist` files and unloaded package sources leave the page running. The custom source reload plugin is deleted.
+With [local package checkouts](local-package-checkouts.md), `dev` and `dev:web` serve linked library source through Vite aliases. Turbo coordinates tasks; Vite owns browser updates through its normal module graph and watcher. Fregat UI and the Editor React adapter use Fast Refresh. The adapter replaces its retained controller when its implementation changes. Editor core changes reload the page. Terminal panel and saved-viewport components are excluded from Fast Refresh because their cached modules retain WASM owners; their changes use Vite's native page reload. Generated `dist` files and unloaded package sources leave the page running. The custom source reload plugin is deleted.
 
 `bun run --cwd apps/web typecheck` checks the browser and Node configurations plus the source map Vite uses. `typecheck:dev`, the development watcher and production builds use the same checker. Source-package unused checks remain with their producer packages.
 
 Browser verification gives terminal IDs a per-run namespace in session storage before navigation. New tabs, restored tabs, chat terminals and terminal actions use those actual IDs. The harness observes and kills its own terminals through the normal API. It uses the browser's native `WebSocket`.
 
-Ghostty's `ghostty-vt.wasm` and `bridge.wasm` are compiled artifacts. Run `bun run build:wasm` in `packages/ghostty-webgpu/` after changing their native inputs. To rebuild only the bridge, run `bun run build:bridge --source /absolute/path/to/ghostty` from that directory, with a clean official Ghostty checkout at `GHOSTTY_SOURCE_REVISION` in `packages/ghostty-webgpu/src/core/version.ts` (currently `c8554f28e0efe2f5595f32020371c34b25ec628f`). Both commands verify the source revision and clean tree before compiling. Production builds read `dist`; run `bun run build:workspaces` after source changes. Restart dev after changing a package's export map.
+Ghostty release archives include `ghostty-vt.wasm` and `bridge.wasm`. When changing their native inputs, build the artifacts in the ghostty-webgpu checkout by following that repository's instructions. Rebuild the producer before checking Fregat.
 
-The family folders are mirrored to their standalone repositories. Make library changes here and follow `packages/singapore/AGENTS.md` and `packages/ghostty-webgpu/AGENTS.md` for their package rules.
+Develop Singapore, ghostty-webgpu, and hotkeys in their own repositories. Update Fregat's release pins to consume a new release. For coordinated local development, follow [Use local package checkouts](local-package-checkouts.md).
 
 ## CI turnaround
 
-Normal PR and main CI select affected packages. A web change runs web tests; a server change runs server tests; a terminal change runs terminal verification. Dependencies are built as prerequisites, while their tests remain with their owning package. Global dependency, configuration and shared CI/script inputs select every package and root tooling checks. Plans, root documentation, agent Markdown and changesets select formatting.
+Normal PR and main CI select affected packages. A web change runs web tests; a server change runs server tests. Dependencies are built as prerequisites, while their tests remain with their owning package. Global dependency, configuration and shared CI/script inputs select every package and root tooling checks. Plans, root documentation, and agent Markdown select formatting.
 
-Each selected package runs its own formatting, lint, types and tests. Terminal verification owns its complete check; Editor browser regressions run when their own package changes. Website builds and mobile smoke checks are limited to the selected sites. Main uses the last successful main run as its comparison point so replaced queued runs remain covered.
+Each selected package runs its own formatting, lint, types and tests. Website builds and mobile smoke checks are limited to the selected sites. Main uses the last successful main run as its comparison point so replaced queued runs remain covered.
 
-Scheduled and manual runs select every package, shared structural checks, standalone packaging, full mobile crawls and benchmark/endurance probes. The selector controls run with `bun --bun vitest run --config vitest.scripts.config.mjs scripts/ci/affected.test.mjs scripts/ci/packages.test.mjs scripts/ci/events.test.mjs`.
-
-Standalone families share one runner. Each uses a fresh `git archive` export and independent install outside the checkout. Editor also installs a second export with hoisted dependencies and checks tree-sitter runtime identity.
+Scheduled and manual runs select every package, shared structural checks, standalone consumer checks, full mobile crawls and benchmark/endurance probes. The selector controls run with `bun --bun vitest run --config vitest.scripts.config.mjs scripts/ci/affected.test.mjs scripts/ci/packages.test.mjs scripts/ci/events.test.mjs`.
 
 The CI verdict summary separates each completed job's queue and execution seconds. It also reports run creation to verdict runner start, including the initial Changes queue. On reruns, that total starts at the original run creation. The diagnostic step can fail without changing the verdict.
 
@@ -126,7 +124,7 @@ bun install --frozen-lockfile
 bun run build-release --output=./fregat-release --base=/fregat/
 ```
 
-Package publishing is separate: `bun run release` is the Package releases workflow's Changesets publishing step.
+Fregat does not publish the standalone packages. Singapore, ghostty-webgpu, and hotkeys own their package releases and document their release instructions in their repositories.
 
 ## Pairing another device
 

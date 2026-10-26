@@ -1,12 +1,12 @@
 import type { Locator, Page } from 'playwright'
-import type { Editor } from '../../packages/singapore/packages/editor/dist/editor'
+import { detectPlatform } from '@fregat/hotkeys'
 import type {
+  Editor,
   EditorTextBuffer,
   DocumentTextSnapshot,
   TextSnapshot,
-} from '../../packages/singapore/packages/editor/dist/public/document'
+} from '@singapore-editor/core'
 import { createScriptError } from '../structured-errors'
-import { detectPlatform } from '../../packages/hotkeys/packages/hotkeys/src/platform'
 
 export const siteReplicaSelectors = {
   stage: (page: Page, id: string) => page.locator(`[data-replica][id="${id}"]`),

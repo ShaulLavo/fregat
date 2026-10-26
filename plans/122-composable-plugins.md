@@ -24,7 +24,7 @@ segment for contributed commands (palette, keybinding table, recorder) to phase 
 attaches a `createPlugin` plugin. Phase 5 done the same day ([#56](https://github.com/ShaulLavo/singapore/pull/56)): key
 participant, text gate, cursor style and per-caret `applyEdits` on the scope; the E028 modal proof
 passes on both input routes with IME, readonly and two views; verdict go
-([findings](../packages/singapore/docs/architecture/modal-input-findings.md)).
+([findings](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/modal-input-findings.md)).
 Requested: 2026-09-16. Owners: Fregat and Singapore.
 
 This is a cross-repository plan, not an implementation or a settled API signature.

@@ -31,7 +31,6 @@ export type Checkout = {
   commit: string
   branch: string
   dirtyFiles: string[]
-  editorCommit: string | null
 }
 
 export type BuildConfig = Checkout & {
@@ -68,14 +67,10 @@ export async function readCheckout(root = checkoutRoot): Promise<Checkout> {
   }
 
   const status = await run(['git', 'status', '--porcelain', '-z'], { cwd: root })
-  const editor = path.join(root, 'packages/singapore')
   return {
     commit,
     branch,
     dirtyFiles: status.code === 0 ? porcelainPaths(status.stdout) : [],
-    editorCommit: existsSync(editor)
-      ? (await output(['git', 'rev-parse', 'HEAD'], editor)) || null
-      : null,
   }
 }
 

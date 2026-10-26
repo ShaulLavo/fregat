@@ -1,7 +1,8 @@
 # Monorepo migration completion
 
-Status: Source migration delivered on 2026-09-30, authorized by the owner. npm authentication,
-initial publication and trusted-publisher setup remain deferred.
+Status: Historical receipt for the source migration delivered on 2026-09-30. The deferred npm
+status below describes that checkpoint. See [Plan 207](207-one-repo-with-mirrors.md) for current
+standalone ownership and releases.
 
 ## Completion checks
 

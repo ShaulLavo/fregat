@@ -1,6 +1,6 @@
 # Architecture Recovery Plan
 
-Source paths in this document are relative to [`editor/`](../packages/singapore/) unless qualified.
+Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 Status: superseded as an execution source on 2026-08-22
 
@@ -636,7 +636,7 @@ Purpose: stop clone-and-modify language server architecture.
 Purpose: make workers resources with explicit ownership instead of global side effects.
 
 Current worker owner cache limits and restart behavior are documented in
-[Worker Topology](../packages/singapore/docs/architecture/worker-topology.md).
+[Worker Topology](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/architecture/worker-topology.md).
 
 ### Work
 

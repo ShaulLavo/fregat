@@ -30,9 +30,9 @@ const fixtureFiles = [
   'apps/web/vitest.markdown-qualification.config.ts',
   'apps/web/vitest.browser.config.ts',
   'apps/web/vite.config.ts',
-  'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
-  'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-  'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
+  'apps/web/node_modules/@singapore-editor/tree-sitter/dist/index.js',
+  'apps/web/node_modules/@singapore-editor/tree-sitter/dist/treeSitter/workerClient.js',
+  'apps/web/node_modules/@singapore-editor/tree-sitter/package.json',
   'package.json',
   'bun.lock',
 ]
@@ -48,16 +48,19 @@ test('candidate source identity includes the production probe and its shared pro
         file,
       ).toBe(true)
     for (const file of [
-      'packages/singapore/packages/tree-sitter/src/treeSitter/markdown.ts',
-      'packages/singapore/packages/tree-sitter/test/wasm-memory.browser.test.ts',
-      'packages/singapore/packages/tree-sitter/test/wasm-memory.test.ts',
+      'apps/web/node_modules/@singapore-editor/tree-sitter/dist/index.js',
+      'apps/web/node_modules/@singapore-editor/tree-sitter/dist/treeSitter/workerClient.js',
+      'apps/web/node_modules/@singapore-editor/tree-sitter/package.json',
       'apps/web/test/providers.tsx',
       'apps/web/src/features/chat/providers/control.tsx',
       'apps/web/src/features/chat/state/control.ts',
       'apps/web/test/factories/markdown-production-assets.ts',
     ]) {
       const current = await qualificationProvenance(root)
-      await writeFile(path.join(root, file), 'changed provider\n')
+      const content = file.endsWith('package.json')
+        ? '{"name":"@singapore-editor/tree-sitter","exports":{".":"./dist/index.js"},"changed":true}\n'
+        : 'changed provider\n'
+      await writeFile(path.join(root, file), content)
       const after = await qualificationProvenance(root)
       expect(after.revision).toBe(before.revision)
       expect(after.sourceClosureSha256).not.toBe(current.sourceClosureSha256)
@@ -67,11 +70,48 @@ test('candidate source identity includes the production probe and its shared pro
   }
 })
 
-async function writeFixture(root: string) {
-  for (const file of fixtureFiles) {
+test.each(['isolated', 'hoisted'] as const)(
+  'resolves the real %s package root past a nested decoy manifest',
+  async (layout) => {
+    const root = await mkdtemp(path.join(tmpdir(), `markdown-provenance-${layout}-`))
+    try {
+      await writeFixture(root, layout)
+      const directory = installedDirectory(layout)
+      await writeFile(path.join(root, directory, 'dist/package.json'), '{"name":"decoy"}\n')
+      const before = await qualificationProvenance(root)
+      for (const file of ['dist/index.js', 'dist/treeSitter/workerClient.js', 'package.json'])
+        expect(before.sources.some((entry) => entry.file === `${directory}/${file}`)).toBe(true)
+      await writeFile(path.join(root, directory, 'dist/index.js'), 'changed installed artifact\n')
+      const after = await qualificationProvenance(root)
+      expect(after.sourceClosureSha256).not.toBe(before.sourceClosureSha256)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  },
+)
+
+function installedDirectory(layout: 'isolated' | 'hoisted'): string {
+  const base = layout === 'isolated' ? 'apps/web/node_modules' : 'node_modules'
+  return `${base}/@singapore-editor/tree-sitter`
+}
+
+async function writeFixture(root: string, layout: 'isolated' | 'hoisted' = 'isolated') {
+  const files = fixtureFiles.map((file) =>
+    file.replace(installedDirectory('isolated'), installedDirectory(layout)),
+  )
+  for (const file of files) {
     await mkdir(path.dirname(path.join(root, file)), { recursive: true })
     await writeFile(path.join(root, file), `${file}\n`)
   }
+  await writeFile(path.join(root, 'apps/web/package.json'), '{}')
+  await writeFile(
+    path.join(root, installedDirectory(layout), 'package.json'),
+    JSON.stringify({
+      name: '@singapore-editor/tree-sitter',
+      type: 'module',
+      exports: { '.': './dist/index.js' },
+    }),
+  )
   await execute('git', ['init', '--quiet'], { cwd: root })
   await execute('git', ['add', '.'], { cwd: root })
   const hooks = path.join(root, '.hooks')

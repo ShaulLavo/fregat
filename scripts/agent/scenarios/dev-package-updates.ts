@@ -1,17 +1,19 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import { utimes } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { checkoutRoot } from '../paths'
 import { openFileByName, selectors, waitForApp } from '../selectors'
 import type { Scenario } from './index'
 
 const inspection = new WeakMap<object, unknown>()
+const webRequire = createRequire(path.join(checkoutRoot, 'apps/web/package.json'))
 
 export const devPackageUpdates: Scenario = {
   name: 'dev-package-updates',
   requiresIsolatedServer: true,
   description:
-    'Invalidate loaded package source and verify native Vite reloads restore the editor and terminal.',
+    'Verify consumer reloads restore the editor and terminal while installed package artifacts stay inert.',
   inspect: async (page) => inspection.get(page) ?? null,
   async run(page, { file, step }) {
     const events: { file: string; before: number; after: number }[] = []
@@ -61,14 +63,12 @@ export const devPackageUpdates: Scenario = {
     strictEqual(startupReloads, 0, 'Cold dependency loading must avoid optimizer page reloads')
     await step('mounted-editor-and-terminal')
     for (const relative of [
-      'packages/singapore/packages/react/src/index.tsx',
-      'packages/singapore/packages/editor/src/editor.ts',
-      'packages/ghostty-webgpu/src/core/runtime.ts',
-      'packages/ghostty-webgpu/src/dom/terminal.ts',
+      'apps/web/src/features/editor/utils/render-document.ts',
+      'apps/web/src/features/terminal/components/panel.tsx',
     ]) {
       const before = await page.evaluate(() => performance.timeOrigin)
       const oldSurface = await (
-        relative.startsWith('packages/ghostty-webgpu/')
+        relative.startsWith('apps/web/src/features/terminal/')
           ? selectors.terminalSurface(page).first().locator('canvas').first()
           : selectors.editorSurface(page).first()
       ).elementHandle()
@@ -90,27 +90,25 @@ export const devPackageUpdates: Scenario = {
       events.push({ file: relative, before, after })
       await step(`updated-${events.length}`)
     }
-    const before = await page.evaluate(() => performance.timeOrigin)
-    const now = new Date()
-    await utimes(
-      path.join(checkoutRoot, 'packages/singapore/packages/react/dist/index.js'),
-      now,
-      now,
-    )
-    await page.waitForTimeout(1500)
-    strictEqual(
-      await page.evaluate(() => performance.timeOrigin),
-      before,
-      'Generated output must leave the page running',
-    )
+    for (const specifier of ['@singapore-editor/react', 'ghostty-webgpu']) {
+      const before = await page.evaluate(() => performance.timeOrigin)
+      const now = new Date()
+      await utimes(webRequire.resolve(specifier), now, now)
+      await page.waitForTimeout(1500)
+      strictEqual(
+        await page.evaluate(() => performance.timeOrigin),
+        before,
+        `Installed ${specifier} artifacts must leave the page running`,
+      )
+    }
     inspection.set(page, {
       events,
       hmr,
       startupReloads,
       connections: connections.length,
-      generatedReload: false,
+      installedArtifactReload: false,
     })
-    await step('generated-output-ignored')
+    await step('installed-artifacts-ignored')
   },
 }
 

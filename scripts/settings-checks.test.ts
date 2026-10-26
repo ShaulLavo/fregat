@@ -21,8 +21,6 @@ async function freshSettingsCheckout(root: string): Promise<void> {
     'packages/contracts/package.json',
     'packages/contracts/tsconfig.json',
     'packages/contracts/vitest.config.ts',
-    'packages/hotkeys/packages/hotkeys/src',
-    'packages/hotkeys/packages/hotkeys/package.json',
     'docs/settings-reference.md',
   ]) {
     const destination = path.join(root, relative)
@@ -30,20 +28,9 @@ async function freshSettingsCheckout(root: string): Promise<void> {
     await cp(path.join(repository, relative), destination, { recursive: true })
   }
 
-  for (const workspace of [
-    '',
-    'scripts',
-    'packages/contracts',
-    'packages/hotkeys/packages/hotkeys',
-  ]) {
+  for (const workspace of ['', 'scripts', 'packages/contracts']) {
     await linkDependencies(root, workspace)
   }
-  await mkdir(path.join(root, 'node_modules/@fregat'), { recursive: true })
-  await symlink(
-    path.join(root, 'packages/hotkeys/packages/hotkeys'),
-    path.join(root, 'node_modules/@fregat/hotkeys'),
-    'dir',
-  )
 }
 
 async function linkDependencies(root: string, workspace: string): Promise<void> {
@@ -53,17 +40,16 @@ async function linkDependencies(root: string, workspace: string): Promise<void> 
   const destination = path.join(root, workspace, 'node_modules')
   await mkdir(destination, { recursive: true })
   for (const dependency of await readdir(source)) {
-    if (dependency === '@fregat') continue
     await symlink(path.join(source, dependency), path.join(destination, dependency), 'dir')
   }
 }
 
-test('settings hook checks run without hotkeys build output', async () => {
+test('settings hook checks consume installed hotkeys without producer source', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'fregat-settings-checks-'))
   try {
     await freshSettingsCheckout(root)
-    const buildOutput = path.join(root, 'packages/hotkeys/packages/hotkeys/dist')
-    expect(existsSync(buildOutput)).toBe(false)
+    const producerSource = path.join(root, 'packages/hotkeys')
+    expect(existsSync(producerSource)).toBe(false)
 
     for (const args of [
       ['run', 'settings:schema', '--target', path.join(root, 'generated-schema.json')],
@@ -84,24 +70,18 @@ test('settings hook checks run without hotkeys build output', async () => {
       expect(result.status, result.stdout + result.stderr).toBe(0)
     }
 
-    expect(existsSync(buildOutput)).toBe(false)
+    expect(existsSync(producerSource)).toBe(false)
   } finally {
     await rm(root, { recursive: true, force: true })
   }
 }, 60_000)
 
-test('production contracts bundles resolve the built hotkeys export', async () => {
+test('production contracts bundles resolve the installed hotkeys export', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'fregat-settings-consumer-'))
   try {
     await freshSettingsCheckout(root)
-    for (const args of [
-      [
-        'build',
-        'packages/hotkeys/packages/hotkeys/src/index.ts',
-        '--outdir=packages/hotkeys/packages/hotkeys/dist',
-        '--target=browser',
-        '--packages=external',
-      ],
+    const result = spawnSync(
+      'bun',
       [
         'build',
         'packages/contracts/src/settings.ts',
@@ -109,19 +89,16 @@ test('production contracts bundles resolve the built hotkeys export', async () =
         '--outfile=consumer.js',
         '--metafile=consumer.json',
       ],
-    ]) {
-      const result = spawnSync('bun', args, { cwd: root, encoding: 'utf8' })
-      expect(result.status, result.stdout + result.stderr).toBe(0)
-    }
+      { cwd: root, encoding: 'utf8' },
+    )
+    expect(result.status, result.stdout + result.stderr).toBe(0)
 
     const metadata = JSON.parse(await readFile(path.join(root, 'consumer.json'), 'utf8'))
-    const hotkeysInputs = Object.keys(metadata.inputs).filter((input) =>
-      input.replaceAll('\\', '/').includes('packages/hotkeys/packages/hotkeys/'),
-    )
+    const inputs = Object.keys(metadata.inputs).map((input) => input.replaceAll('\\', '/'))
+    const hotkeysInputs = inputs.filter((input) => input.includes('@fregat/hotkeys/'))
     expect(hotkeysInputs).toHaveLength(1)
-    expect(hotkeysInputs[0]?.replaceAll('\\', '/')).toMatch(
-      /hotkeys\/packages\/hotkeys\/dist\/index\.js$/,
-    )
+    expect(hotkeysInputs[0]).toMatch(/@fregat\/hotkeys\/dist\/index\.js$/)
+    expect(inputs.filter((input) => input.includes('packages/hotkeys/'))).toEqual([])
   } finally {
     await rm(root, { recursive: true, force: true })
   }

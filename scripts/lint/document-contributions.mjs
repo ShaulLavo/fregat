@@ -5,55 +5,11 @@ import { fileURLToPath } from 'node:url'
 import { parseSync } from 'oxc-parser'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
-const core = 'packages/singapore/packages/editor/src/'
-const adapters = new Set([
-  'packages/singapore/packages/tree-sitter/src/index.ts',
-  'packages/singapore/packages/tree-sitter/src/session.ts',
-  'packages/singapore/packages/tree-sitter/src/mergeReview.ts',
-  'packages/singapore/packages/tree-sitter/src/treeSitter/source.ts',
-  'packages/singapore/packages/tree-sitter/src/treeSitter/types.ts',
-  'packages/singapore/packages/tree-sitter/src/treeSitter/workerClient.ts',
-  'packages/singapore/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts',
-  'packages/singapore/packages/minimap/src/documentSource.ts',
-  'packages/singapore/packages/minimap/src/sourceIdentity.ts',
-  'packages/singapore/packages/minimap/src/sourceProtocol.ts',
-  'packages/singapore/packages/minimap/src/types.ts',
-  'packages/singapore/packages/minimap/src/workerClient.ts',
-  'packages/singapore/packages/lsp-plugin/src/retainedSource.ts',
-])
-const rawRuntimeNames = new Set([
-  'TreeSitterWorkerClient',
-  'TreeSitterSyntaxSession',
-  'ShikiWorkerHighlighterSession',
-  'createShikiDocumentOperation',
-  'setEditorSyntaxSessionFactory',
-  'setEditorHighlighterSessionFactory',
-])
-const runtimeFactories = new Set([
-  'packages/singapore/packages/tree-sitter/src/index.ts',
-  'packages/singapore/packages/tree-sitter/src/session.ts',
-  'packages/singapore/packages/tree-sitter/src/mergeReview.ts',
-  'packages/singapore/packages/tree-sitter/src/treeSitter/workerClient.ts',
-  `${core}shiki/plugin.ts`,
-  `${core}shiki/workerClient.ts`,
-])
-const legacySourceBindings = new Set([
-  'structuralDispatchPoint',
-  'highlightDispatchPoint',
-  'workerDocumentState',
-  'sourceDocumentEpochs',
-  'sentSourceChunkLengths',
-  'composeSkippedChanges',
-])
-const cursorOwners = new Map([
-  [`${core}documentSession.ts`, 'canonical mutation owner'],
-  [`${core}editor/Editor.ts`, 'canonical view reader adapters'],
-  [`${core}editor/documentDelivery.ts`, 'canonical endpoint admission'],
-  ['packages/singapore/packages/lsp-plugin/src/documentSnapshot.ts', 'canonical reader adapter'],
-  ['packages/singapore/packages/find/src/plugin.ts', 'offscreen match offset projection'],
-  [`${core}mergeConflictPlugin.ts`, 'conflict result projection'],
-  [`${core}semanticTokenLayer.ts`, 'delayed semantic result projection'],
-])
+const externalPackageRoots = [
+  'packages/singapore/',
+  'packages/ghostty-webgpu/',
+  'packages/hotkeys/',
+]
 const viewObservers = new Map([
   [
     'apps/web/src/features/editor/hooks/use-document-feature-tier.ts',
@@ -114,25 +70,12 @@ function importFindings(node, filename) {
   const specifier = staticName(node.source)
   if (typeof specifier !== 'string') return []
   const target = sourceTarget(filename, specifier)
-  const singapore =
-    target.startsWith('@singapore-editor/') || target.startsWith('packages/singapore/packages/')
-  if (!singapore) return []
+  if (!target.startsWith('@singapore-editor/')) return []
   const findings = []
   if (/^@singapore-editor\/[^/]+\/(?:src|dist)(?:\/|$)/.test(target))
     findings.push('Use an exported package entry point')
-  if (!filename.startsWith('packages/singapore/packages/editor/') && target.startsWith(core))
-    findings.push('External consumers use the published document reader')
-  if (
-    target === '@singapore-editor/core/internal/document-worker' &&
-    !filename.startsWith(core) &&
-    !adapters.has(filename)
-  )
-    findings.push('Document worker internals belong to an explicit backend adapter')
-  if (runtimeFactories.has(filename)) return findings
-  for (const binding of node.specifiers ?? []) {
-    const name = staticName(binding.imported ?? binding.local)
-    if (rawRuntimeNames.has(name)) findings.push(`Route ${name} through a document operation`)
-  }
+  if (target === '@singapore-editor/core/internal/document-worker')
+    findings.push('Document worker internals belong to the editor package')
   return findings
 }
 
@@ -145,27 +88,15 @@ export function documentContributionFindings(source, filename) {
   const report = (node, message) =>
     findings.push({ line: source.slice(0, node.start).split('\n').length, message })
   for (const node of syntaxNodes(parsed.program)) {
-    if (legacySourceBindings.has(staticName(node.key ?? node.id)))
-      report(node, 'Use canonical delivery for source progress and edit composition')
-    if (
-      node.type === 'NewExpression' &&
-      rawRuntimeNames.has(staticName(node.callee)) &&
-      !runtimeFactories.has(filename)
-    )
-      report(node, 'Create backend work through a document operation')
     for (const message of importFindings(node, filename)) report(node, message)
-    for (const binding of cursorBindings(node, filename))
+    for (const binding of cursorBindings(node))
       report(binding, 'Generic document progress belongs to canonical delivery')
-    for (const binding of runtimeBindings(node, filename))
-      report(binding, 'Create backend work through a document operation')
     for (const binding of subscriptionBindings(node, buffers, filename))
       report(binding, 'Retain document source through its contribution owner')
     if (node.type !== 'MemberExpression') continue
     const name = staticName(node.property)
-    if (name === 'changesSinceDocumentSyncPoint' && !cursorOwners.has(filename))
+    if (name === 'changesSinceDocumentSyncPoint')
       report(node, 'Generic document progress belongs to canonical delivery')
-    if (rawRuntimeNames.has(name) && !runtimeFactories.has(filename))
-      report(node, `Route ${name} through a document operation`)
     const receiver = node.object
     const buffer = isBuffer(receiver, buffers)
     if (name === 'subscribe' && buffer && !permitsBufferObserver(filename))
@@ -231,13 +162,8 @@ function addBufferAlias(node, aliases, factories) {
   }
 }
 
-function runtimeBindings(node, filename) {
-  if (node.type !== 'ObjectPattern' || runtimeFactories.has(filename)) return []
-  return node.properties.filter((binding) => rawRuntimeNames.has(staticName(binding.key)))
-}
-
 function permitsBufferObserver(filename) {
-  return filename.startsWith('packages/singapore/packages/editor/') || viewObservers.has(filename)
+  return viewObservers.has(filename)
 }
 
 function subscriptionBindings(node, buffers, filename) {
@@ -251,45 +177,24 @@ function subscriptionBindings(node, buffers, filename) {
   return node.id.properties.filter((binding) => staticName(binding.key) === 'subscribe')
 }
 
-function cursorBindings(node, filename) {
-  if (node.type !== 'ObjectPattern' || cursorOwners.has(filename)) return []
+function cursorBindings(node) {
+  if (node.type !== 'ObjectPattern') return []
   return node.properties.filter(
     (binding) => staticName(binding.key) === 'changesSinceDocumentSyncPoint',
   )
 }
 
 function productionSource(filename) {
-  if (!inDocumentScope(filename)) return false
+  if (externalPackageRoots.some((directory) => filename.startsWith(directory))) return false
   if (!/\.(?:[cm]?[jt]s|[jt]sx)$/.test(filename)) return false
   if (/\.(?:test|browser)\./.test(filename)) return false
   return !/(?:^|\/)(?:node_modules|dist|generated|test|tests|e2e|results)\//.test(filename)
 }
 
-function inDocumentScope(file) {
-  if (file.startsWith('packages/singapore/'))
-    return ['packages/singapore/packages/', 'packages/singapore/examples/'].some((directory) =>
-      file.startsWith(directory),
-    )
-  return !['packages/ghostty-webgpu/', 'packages/hotkeys/'].some((directory) =>
-    file.startsWith(directory),
-  )
-}
-
 function check() {
   const files = execFileSync(
     'git',
-    [
-      'ls-files',
-      '--cached',
-      '--others',
-      '--exclude-standard',
-      '-z',
-      '--',
-      'packages/singapore/packages',
-      'packages/singapore/examples',
-      'apps',
-      'packages',
-    ],
+    ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'apps', 'packages'],
     { cwd: root, encoding: 'utf8' },
   ).split('\0')
   const findings = []

@@ -408,9 +408,9 @@ unvisited while in-range diagnostics remain identical. This narrow correction do
 full-document bootstrap or the 200 MiB cancellation.
 
 Evidence is retained in
-[the raw matrix](../packages/singapore/docs/performance/singapore-open-2026-10-08/baseline/experiment.json.gz),
-[the 10 MiB open trace](../packages/singapore/docs/performance/singapore-open-2026-10-08/baseline/singapore-10-0-open.trace.json.gz)
-and [the failed 200 MiB open trace](../packages/singapore/docs/performance/singapore-open-2026-10-08/baseline/singapore-200-0-open.trace.json.gz).
+[the raw matrix](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-open-2026-10-08/baseline/experiment.json.gz),
+[the 10 MiB open trace](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-open-2026-10-08/baseline/singapore-10-0-open.trace.json.gz)
+and [the failed 200 MiB open trace](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-open-2026-10-08/baseline/singapore-200-0-open.trace.json.gz).
 The three settled 10 MiB editor screenshots were read back. All display highlighted initial rows.
 
 ### Bounded correction and repeated experiment
@@ -452,9 +452,9 @@ The larger dependency remains. All three after Singapore 200 MiB attempts still 
 parse result; no visible query follows. All competitor attempts complete. Keep the viewport-first
 bootstrap below as Approved work, with cancellation accounting and correctness controls.
 
-[The after matrix](../packages/singapore/docs/performance/singapore-open-2026-10-08/after/experiment.json.gz),
-[the diagnostic comparison](../packages/singapore/docs/performance/singapore-open-2026-10-08/after/comparison.json)
-and [the after 10 MiB trace](../packages/singapore/docs/performance/singapore-open-2026-10-08/after/singapore-10-0-open.trace.json.gz)
+[The after matrix](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-open-2026-10-08/after/experiment.json.gz),
+[the diagnostic comparison](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-open-2026-10-08/after/comparison.json)
+and [the after 10 MiB trace](https://github.com/ShaulLavo/singapore/blob/d44f7ffa2112417fcc919e1ee4ac5e801f054432/docs/performance/singapore-open-2026-10-08/after/singapore-10-0-open.trace.json.gz)
 retain the proof. Reproduce the phase comparison with:
 
 ```sh
