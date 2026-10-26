@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import type { Editor } from '@singapore-editor/core/editor'
-import { decodePaintSnapshot } from '../../../../packages/singapore/packages/editor/src/editor/paintSnapshot'
+import { decodePaintSnapshot } from '@singapore-editor/core/paint'
 import { editorPreparedDocumentTags } from '@/features/editor/utils/prepared-document'
 import {
   editorSyntaxColors,
@@ -36,7 +36,9 @@ export function retentionIdentityCaptureFrame(
 ) {
   if (!capture) return { kind: 'absent' } as const
   const paint = decodePaintSnapshot(capture.paint)
-  if (!paint || !paint.rows.length) return { kind: 'unsupported', paint: capture.paint } as const
+  if (!paint || paint.format !== 5 || !paint.rows.length) {
+    return { kind: 'unsupported', paint: capture.paint } as const
+  }
   const height = paint.rows[0]?.height ?? 0
   const lines = source.split('\n')
   const starts: number[] = []
