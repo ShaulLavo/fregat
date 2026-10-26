@@ -1,7 +1,8 @@
 # Contributing to Fregat
 
-Fregat develops the app, Singapore, ghostty-webgpu, and hotkeys in this repository.
-The standalone package repositories are read-only mirrors. Send changes here.
+Fregat owns the app and `packages/pty` in this repository.
+Develop Singapore, ghostty-webgpu, and hotkeys in their standalone repositories.
+Fregat consumes immutable releases from those repositories.
 
 ## Choose where to start
 
@@ -20,7 +21,7 @@ git clone https://github.com/ShaulLavo/fregat.git && cd fregat && bun install --
 ```
 
 The [README](README.md#requirements) says which Bun, Node.js and Git versions you need and why. Read [docs/development.md](docs/development.md) for source builds, checks, version floors and platform prerequisites, and the [monorepo map](docs/monorepo.md) for where code lives. If a command fails, see [troubleshooting](docs/troubleshooting.md).
-Read [AGENTS.md](AGENTS.md) for repository conventions. Make editor and terminal changes in the [Singapore](https://github.com/ShaulLavo/singapore) and [Ghostty](https://github.com/ShaulLavo/ghostty-webgpu) repositories, following their contributor instructions.
+Read [AGENTS.md](AGENTS.md) for repository conventions. Make editor changes in [Singapore](https://github.com/ShaulLavo/singapore), terminal changes in [Ghostty](https://github.com/ShaulLavo/ghostty-webgpu), and keyboard shortcut changes in [hotkeys](https://github.com/ShaulLavo/hotkeys). Follow each repository's contributor instructions.
 
 ## Make and verify a change
 
@@ -33,12 +34,12 @@ Read [AGENTS.md](AGENTS.md) for repository conventions. Make editor and terminal
 Tests must run from a fresh checkout. Use temporary fixtures and mock external providers.
 Keep credentials, private paths, and personal data out of fixtures, screenshots, logs, and reports.
 
-Docs-only changes need no changeset. Package code changes follow the repository's patch-release policy and Changesets workflow.
+Docs-only changes need no release entry. Changes to Fregat packages follow the repository's patch-release policy. Changes to standalone packages follow the release instructions in their repositories.
 
 ## Write documentation
 
 Put pages for users and contributors in `docs/`, and package pages next to the package. Plans, audits, research and measurement dumps do not belong in `docs/`. `plans/` and `.internal/` hold working material, and neither is linked from the README or `docs/`.
-Before you push a docs change, run `bunx oxfmt --check <files>` on the files you touched and `bun run plans:check` when you touch `plans/` or `PLAN.md`. `bun run package-pages:check` covers the published package READMEs. `bun --bun vitest run --config vitest.scripts.config.mjs scripts/public-copy.test.ts` checks the root README.
+Before you push a docs change, run `bunx oxfmt --check <files>` on the files you touched and `bun run plans:check` when you touch `plans/` or `PLAN.md`. `bun --bun vitest run --config vitest.scripts.config.mjs scripts/public-copy.test.ts` checks the root README.
 
 ## AI contributions
 

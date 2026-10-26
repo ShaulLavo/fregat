@@ -32,7 +32,7 @@ Develop Fregat alongside Singapore, ghostty-webgpu, or hotkeys in separate Git c
 
 2. Change every selected direct dependency in Fregat to its local `link:` path. Inspect `apps/web`, `apps/tui`, `apps/server`, `packages/client-core`, `packages/contracts`, and `packages/markdown`. Keep `catalog:` callers when changing their root catalog entry. For example, the temporary root catalog value for hotkeys is `"@fregat/hotkeys": "link:/absolute/path/to/hotkeys/packages/hotkeys"`. Leave unrelated workspace dependencies in place.
 
-3. Link all consumed Singapore packages to the same checkout when working on Singapore. Their internal `workspace:` dependencies need the producer's independent install. Leave Fregat's current family workspace globs in place while the folders remain here. Explicit `link:` dependencies select the external checkout even when an in-tree package has the same name.
+3. Link all consumed Singapore packages to the same checkout when working on Singapore. Their internal `workspace:` dependencies need the producer's independent install. Fregat keeps standalone repositories separate from its workspace globs. Explicit `link:` dependencies select the external checkout and its source aliases.
 
 4. When changing hotkeys, also point Singapore's hotkeys catalog and Ghostty's hotkeys dependency at that same local core directory. Reinstall and rebuild those producers. A root override alone does not establish a shared hotkeys copy across explicit tarball dependencies.
 
@@ -62,7 +62,7 @@ for (const name of ["@singapore-editor/core", "ghostty-webgpu"]) {
 
 Run `bun run --cwd apps/web typecheck`, then `bun run dev:web`. Exercise the editor, app shortcuts, and terminal keyboard input. Check the other app consumers affected by your change. If you consume `@singapore-editor/panes`, check its hotkeys resolution from its own package directory too. Matching declaration types alone cannot prove that shortcut registries share one runtime instance.
 
-The source mapper follows installed dependency links. A package inside a Git checkout, before any `node_modules` ancestor, selects source aliases, watched checkout roots, and development type paths. Both ordinary clones and Git worktrees qualify. Current in-tree workspace links keep this behavior. Installed release packages use their exported JavaScript and declarations, even when an archive includes source. They need no producer source tree or development dependencies.
+The source mapper follows installed dependency links. A package inside a Git checkout, before any `node_modules` ancestor, selects source aliases, watched checkout roots, and development type paths. Both ordinary clones and Git worktrees qualify. Explicit links to standalone clones or worktrees select this behavior. Fregat-owned workspace links retain normal workspace behavior. Installed release packages use their exported JavaScript and declarations, even when an archive includes source. They need no producer source tree or development dependencies.
 
 Vite serves linked source during development. Builds and server consumers still use the producer's built exports. Rebuild the producer after changes that affect those consumers or generated assets. Restart development after relinking a package or changing its export map. Vite handles loaded source updates through its normal module graph.
 

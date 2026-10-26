@@ -82,7 +82,7 @@ Develop Singapore, ghostty-webgpu, and hotkeys in their own repositories. Update
 
 ## CI turnaround
 
-Normal PR and main CI select affected packages. A web change runs web tests; a server change runs server tests. Dependencies are built as prerequisites, while their tests remain with their owning package. Global dependency, configuration and shared CI/script inputs select every package and root tooling checks. Plans, root documentation, agent Markdown and changesets select formatting.
+Normal PR and main CI select affected packages. A web change runs web tests; a server change runs server tests. Dependencies are built as prerequisites, while their tests remain with their owning package. Global dependency, configuration and shared CI/script inputs select every package and root tooling checks. Plans, root documentation, and agent Markdown select formatting.
 
 Each selected package runs its own formatting, lint, types and tests. Website builds and mobile smoke checks are limited to the selected sites. Main uses the last successful main run as its comparison point so replaced queued runs remain covered.
 
@@ -124,7 +124,7 @@ bun install --frozen-lockfile
 bun run build-release --output=./fregat-release --base=/fregat/
 ```
 
-Package publishing is separate: `bun run release` is the Package releases workflow's Changesets publishing step.
+Fregat does not publish the standalone packages. Singapore, ghostty-webgpu, and hotkeys own their package releases and document their release instructions in their repositories.
 
 ## Pairing another device
 
