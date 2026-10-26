@@ -34,6 +34,7 @@ test('committed multi-file rename reconciles every path', async ({ client, serve
   const queries = application.getSnapshot().queryClient
   const unopenedPath = filesystemPath('repo/b.ts')
   const unopenedQuery = fileSnapshotQueryOptions(unopenedPath)
+  await queries.cancelQueries({ queryKey: unopenedQuery.queryKey, exact: true })
   queries.removeQueries({ queryKey: unopenedQuery.queryKey, exact: true })
   expect(
     harness.documents.getState().getLiveEditorDocument(fileDocumentKey(unopenedPath)),
@@ -79,6 +80,7 @@ test.for([false, true])(
     }
     const documents = harness.documents.getState()
     expect(Boolean(documents.getLiveEditorDocument(fileDocumentKey(deleted)))).toBe(opened)
+    await queries.cancelQueries({ queryKey: query.queryKey, exact: true })
     queries.removeQueries({ queryKey: query.queryKey, exact: true })
     await unlink(path.join(server.root, deleted))
     await expect(queries.query({ ...query, retry: false })).rejects.toBeDefined()
