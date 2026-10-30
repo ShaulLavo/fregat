@@ -8,6 +8,20 @@ changed_paths() {
   done < <(git apply --numstat -z "$1")
 }
 
+check_record_type() {
+  local path=$1
+  local before_mode after_mode
+  if [[ ! -f "$path" || -L "$path" ]]; then
+    echo "::error::Dependency records must remain regular files: $path" >&2
+    return 1
+  fi
+  read -r before_mode after_mode _ < <(git -c core.filemode=true diff --raw --no-renames HEAD -- "$path")
+  if [[ "$before_mode" != ":$after_mode" ]]; then
+    echo "::error::Dependency updater changed a record mode: $path" >&2
+    return 1
+  fi
+}
+
 while IFS= read -r -d '' path; do
   case "$path" in
     package.json|bun.lock) ;;
@@ -17,4 +31,5 @@ while IFS= read -r -d '' path; do
     echo "::error::Dependency updater may only update existing pin records: $path" >&2
     exit 1
   fi
+  if [[ $# == 0 ]]; then check_record_type "$path"; fi
 done < <(changed_paths "$@")

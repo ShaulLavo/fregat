@@ -11,9 +11,12 @@ cd "$scratch/consumer"
 git config user.name test
 git config user.email test@example.com
 git config core.hooksPath /dev/null
+git config core.filemode true
 mkdir -p .github/scripts
 cp "$script_root/publish-update.sh" "$script_root/check-update-paths.sh" "$script_root/check-manifests.sh" .github/scripts/
 printf '{"dependencies":{"waffle":"https://github.com/ShaulLavo/waffle/releases/download/waffle-v0.0.1/waffle-0.0.1.tgz"}}\n' > package.json
+cp package.json manifest-fixture.json
+printf '{}\n' > bun.lock
 git add .
 git commit -qm base
 base=$(git rev-parse HEAD)
@@ -58,6 +61,59 @@ test "$third" != "$first"
 test "$(grep -c '^pr create ' "$scratch/gh-calls")" = 1
 test "$(grep -c '^pr edit ' "$scratch/gh-calls")" = 2
 test "$(grep -c '^workflow run ' "$scratch/gh-calls")" = 2
+
+rejection_failures=0
+expect_record_rejection() {
+  local label=$1 diagnostic=$2
+  local before calls
+  before=$(git rev-parse HEAD)
+  calls=$(wc -l < "$scratch/gh-calls")
+  if bash .github/scripts/publish-update.sh > "$scratch/rejected-record.log" 2>&1; then
+    echo "FAIL: $label was published" >&2
+    rejection_failures=$((rejection_failures + 1))
+    return
+  fi
+  grep -q "$diagnostic" "$scratch/rejected-record.log"
+  git diff --cached --quiet
+  test "$(git rev-parse HEAD)" = "$before"
+  test "$(git --git-dir="$scratch/remote.git" rev-parse refs/heads/automation/test)" = "$third"
+  test "$(wc -l < "$scratch/gh-calls")" = "$calls"
+  git restore -- package.json bun.lock
+  echo "Rejected $label before publication."
+}
+
+# Every case starts from the trusted base and exercises the full publisher.
+git switch -q --detach "$base"
+rm bun.lock
+git diff --binary > "$scratch/artifact/update.patch"
+git restore -- bun.lock
+expect_record_rejection 'lockfile deletion' 'must remain regular files'
+
+git switch -q --detach "$base"
+rm package.json
+ln -s manifest-fixture.json package.json
+git diff --binary > "$scratch/artifact/update.patch"
+git restore -- package.json
+expect_record_rejection 'manifest symlink' 'must remain regular files'
+
+git switch -q --detach "$base"
+rm bun.lock
+ln -s manifest-fixture.json bun.lock
+git diff --binary > "$scratch/artifact/update.patch"
+git restore -- bun.lock
+expect_record_rejection 'lockfile symlink' 'must remain regular files'
+
+git switch -q --detach "$base"
+chmod +x package.json
+git diff --binary > "$scratch/artifact/update.patch"
+git restore -- package.json
+expect_record_rejection 'record mode change' 'changed a record mode'
+
+git switch -q --detach "$base"
+if [[ "$rejection_failures" != 0 ]]; then
+  echo "$rejection_failures record-boundary regressions failed." >&2
+  exit 1
+fi
 git switch -q --detach "$base"
 printf '{"scripts":{"postinstall":"unrelated"}}\n' > package.json
 git diff > "$scratch/artifact/update.patch"
@@ -80,4 +136,4 @@ git diff > "$scratch/artifact/update.patch"
 git restore -- .github/scripts/publish-update.sh
 if bash .github/scripts/publish-update.sh; then echo 'Forbidden patch was accepted' >&2; exit 1; fi
 test "$(git --git-dir="$scratch/remote.git" rev-parse refs/heads/automation/test)" = "$third"
-echo 'Publisher fixtures passed: initial PR, unchanged head, same PR on update, forbidden path rejection.'
+echo 'Publisher fixtures passed: PR reuse, CI dispatch, pin-only edits, and regular record preservation.'
