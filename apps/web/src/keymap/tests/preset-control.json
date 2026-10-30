@@ -42,16 +42,16 @@
       "platform": "linux",
       "preset": "vscode",
       "shellKeys": false,
-      "count": 302,
-      "bindings": "a3aec3bec044fb44acf56d2814906b195b8907c28321536bde0cb36119bde144",
+      "count": 305,
+      "bindings": "dbf91bd0faf42c6f1b64b62c991a81544dba655d2e485308a777d15c02a7e79c",
       "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     {
       "platform": "linux",
       "preset": "vscode",
       "shellKeys": true,
-      "count": 349,
-      "bindings": "671354657d8a967315dc3978e10f21d198a6105f4982ef66b4aec62b9dc913d2",
+      "count": 352,
+      "bindings": "4d9edffc9e933cbb0aac980efeeda9c000f3abebd3f3de08a15ea2b77b05c962",
       "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     {
@@ -90,16 +90,16 @@
       "platform": "mac",
       "preset": "vscode",
       "shellKeys": false,
-      "count": 308,
-      "bindings": "b1b8f977ed47df79038f3b530166fbe4313c911fd0a79e39c965fa1e9899cdcd",
+      "count": 316,
+      "bindings": "707757b4d8cfc2d75f9bac50aa8138ad5a88b4386b472496ecb465f172d35ec1",
       "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     {
       "platform": "mac",
       "preset": "vscode",
       "shellKeys": true,
-      "count": 355,
-      "bindings": "c0651794f8a9ed06c6b8939331ab32b37eae08e3b37f8cb02115dae4e85d98f3",
+      "count": 363,
+      "bindings": "940542775eb04881d8996ddba32a7c7ef5243cee1fd43180474b41993172326e",
       "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     {
@@ -138,16 +138,16 @@
       "platform": "windows",
       "preset": "vscode",
       "shellKeys": false,
-      "count": 300,
-      "bindings": "60ad364873ae10a92121fb7638a10778425f5574bc2ca1ecae0e0b367f101883",
+      "count": 303,
+      "bindings": "6473c6b75ac9336e7cdd8a3ecf2166f71c9fdfe0166269369fd7427503c02ca3",
       "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     {
       "platform": "windows",
       "preset": "vscode",
       "shellKeys": true,
-      "count": 347,
-      "bindings": "88434255ad405bf6235f6d85260625851194db106a61fbddd9de915813d686a8",
+      "count": 350,
+      "bindings": "8a69d033660560ce6e797dd3399e05ea2981a164c78e3c3376cdee8ebce85b8c",
       "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     }
   ]

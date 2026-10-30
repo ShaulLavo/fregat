@@ -1,9 +1,5 @@
-import {
-  GhosttyRuntime,
-  Terminal,
-  attachTerminalHotkeys,
-  type GhosttyWebGpuRenderer,
-} from 'ghostty-webgpu'
+import { GhosttyRuntime, Terminal, type GhosttyWebGpuRenderer } from 'ghostty-webgpu'
+import { attachTerminalHotkeys } from 'ghostty-webgpu/hotkeys'
 import { detectPlatform } from '@fregat/hotkeys'
 import { flushSync } from 'react-dom'
 
@@ -25,7 +21,7 @@ export async function createTerminalKeymap(bindings: readonly PlatformKeyBinding
   await terminal.open(host)
   const output: string[] = []
   const decoder = new TextDecoder()
-  const subscription = terminal.onData((bytes) => output.push(decoder.decode(bytes)))
+  const subscription = terminal.onData(({ bytes }) => output.push(decoder.decode(bytes)))
   const focus = new FocusService()
   const registration = focus.register({
     area: 'terminal',

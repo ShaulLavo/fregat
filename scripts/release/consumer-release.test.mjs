@@ -19,7 +19,7 @@ const families = [
     name: 'Ghostty',
     packages: /^ghostty-webgpu(?:-|$)/,
     asset:
-      /^https:\/\/github\.com\/ShaulLavo\/ghostty-webgpu\/releases\/download\/v\d+\.\d+\.\d+-[0-9a-f]{8,40}\/[\w.-]+\.tgz$/,
+      /^https:\/\/github\.com\/ShaulLavo\/ghostty-webgpu\/releases\/download\/v\d+\.\d+\.\d+-[0-9a-f]{7,40}\/[\w.-]+\.tgz$/,
   },
 ]
 

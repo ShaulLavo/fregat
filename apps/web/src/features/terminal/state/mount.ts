@@ -110,7 +110,7 @@ export function mountTerminal({
     }
 
     terminal = nextTerminal
-    dataDisposable = terminal.onData((data) => {
+    dataDisposable = terminal.onData(({ bytes: data }) => {
       if (data.byteLength === 0 || !inputReady) return
       sendTerminalClientMessage(socket, { data, type: 'input' })
     })
@@ -335,6 +335,8 @@ function handleTerminalServerMessage({
 function createTerminal(runtime: GhosttyRuntime, scrollback: number, lowLatency: boolean) {
   return Terminal.create({
     appearance: {
+      // The panel paints the backdrop (theme color or wallpaper) behind the transparent grid.
+      backgroundOpacity: 0,
       // Constructed unfocused; the real values arrive at handover, before paint.
       cursor: { blink: false, style: UNFOCUSED_TERMINAL_CURSOR_STYLE },
       font: {
@@ -350,6 +352,8 @@ function createTerminal(runtime: GhosttyRuntime, scrollback: number, lowLatency:
     accessibility: readSettingsMirror()['terminal.integrated.screenReader'] ? {} : undefined,
     links: { activateUri: openTerminalUri },
     presentation: lowLatency ? 'immediate' : 'frame',
+    // The replay gate marks input ready on the first painted frame; a paused hidden terminal never would.
+    renderWhenOffscreen: true,
     runtime: { kind: 'borrowed', runtime },
   })
 }
