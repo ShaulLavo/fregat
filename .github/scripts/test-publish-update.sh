@@ -64,6 +64,15 @@ git diff > "$scratch/artifact/update.patch"
 git restore -- package.json
 if bash .github/scripts/publish-update.sh; then echo 'Manifest code change was accepted' >&2; exit 1; fi
 git restore -- package.json
+# An allowed manifest filename must still exist on the trusted base.
+git switch -q --detach "$base"
+mkdir -p packages/new-workspace
+printf '{"name":"new-workspace"}\n' > packages/new-workspace/package.json
+git add --intent-to-add packages/new-workspace/package.json
+git diff > "$scratch/artifact/update.patch"
+git reset -q -- packages/new-workspace/package.json
+rm packages/new-workspace/package.json
+if bash .github/scripts/publish-update.sh; then echo 'New manifest was accepted' >&2; exit 1; fi
 # A patch outside the pin allowlist must stop before publication.
 git switch -q --detach "$base"
 printf 'forbidden\n' > .github/scripts/publish-update.sh
