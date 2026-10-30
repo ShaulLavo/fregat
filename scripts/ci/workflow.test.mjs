@@ -219,13 +219,19 @@ test.each([
 )
 
 test('script test partition discovers every file once and reuses built outputs', async () => {
-  const original = workflow.jobs.typecheck
+  const original = workflow.jobs['test-scripts']
   const isolated = workflow.jobs['test-promotion-evidence']
   expect(isolated).toBeDefined()
-  expect(isolated.needs).toEqual(['changes', 'typecheck'])
-  expect(isolated.if).toBe("${{ needs.changes.outputs.tooling == 'true' }}")
-  expect(isolated['timeout-minutes']).toBe(20)
-  expect(original['timeout-minutes']).toBe(20)
+  // Promotion evidence starts beside the other suites instead of after typechecking.
+  for (const job of [original, isolated]) {
+    expect(job.needs).toEqual(['changes', 'workspace-builds'])
+    expect(job.if).toBe("${{ needs.changes.outputs.tooling == 'true' }}")
+    expect(job['timeout-minutes']).toBe(20)
+    const imported = job.steps.find((step) => step.uses === './.github/actions/workspace-builds')
+    expect(imported.id).toBe('builds')
+    expect(imported.with).toEqual({ operation: 'consume', targets: 'all' })
+  }
+  expect(workflow.jobs.verdict.needs).toContain('test-scripts')
   expect(workflow.jobs.verdict.needs).toContain('test-promotion-evidence')
   expect(workflow.jobs.verdict.if).toBe('${{ always() }}')
   const commands = [original, isolated].map(
@@ -281,43 +287,19 @@ test('script test partition discovers every file once and reuses built outputs',
   const partition = general.concat(promotion, browser).sort()
   expect(partition).toEqual(all)
   expect(new Set(partition).size).toBe(all.length)
-  expect(original.steps.find((step) => step.name === 'Package tests').run).toBe(
+  const packages = workflow.jobs['test-packages']
+  expect(packages.steps.find((step) => step.name === 'Package tests').run).toBe(
     'bun scripts/ci/packages.mjs tests "$CI_PACKAGES"',
   )
+  expect(workflow.jobs.verdict.needs).toContain('test-packages')
   expect(isolated.steps.find((step) => step.name === 'Setup').with['build-packages']).toBe('[]')
-  const upload = original.steps.find((step) => step.uses === 'actions/upload-artifact@v4')
-  const download = isolated.steps.find((step) => step.uses === 'actions/download-artifact@v4')
-  expect(upload.with.name).toBe(download.with.name)
-  expect(upload.with['if-no-files-found']).toBe('error')
-  expect(upload.if).toBe(isolated.if)
-  const directory = await mkdtemp(join(tmpdir(), 'ci-build-transfer-'))
-  try {
-    const source = join(directory, 'source')
-    const destination = join(directory, 'destination')
-    await mkdir(destination)
-    await mkdir(join(source, 'packages'), { recursive: true })
-    for (const file of ['packages/example/dist/index.js']) {
-      await mkdir(dirname(join(source, file)), { recursive: true })
-      await writeFile(join(source, file), 'built output')
-    }
-    const archive = original.steps.find((step) => step.name === 'Archive script test builds')
-    const restore = isolated.steps.find((step) => step.name === 'Restore script test builds')
-    for (const [cwd, step] of [
-      [source, archive],
-      [destination, restore],
-    ]) {
-      const result = spawnSync('bash', ['-euo', 'pipefail', '-c', step.run], {
-        cwd,
-        env: { ...process.env, RUNNER_TEMP: directory },
-        encoding: 'utf8',
-      })
-      expect(result.status, result.stdout + result.stderr).toBe(0)
-    }
-    expect(await readFile(join(destination, 'packages/example/dist/index.js'), 'utf8')).toBe(
-      'built output',
-    )
-  } finally {
-    await rm(directory, { recursive: true, force: true })
+  for (const job of Object.values(workflow.jobs)) {
+    expect(
+      job.steps?.some(
+        (step) =>
+          step.uses === 'actions/download-artifact@v4' && step.with?.name === 'script-test-builds',
+      ),
+    ).not.toBe(true)
   }
 })
 
@@ -333,7 +315,17 @@ test('setup builds have a single early producer and required fail-closed imports
     producer.steps.filter((step) => step.uses === './.github/actions/workspace-builds'),
   ).toHaveLength(1)
   expect(workflow.jobs.verdict.needs).toContain('workspace-builds')
-  for (const name of ['typecheck', 'test-web', 'test-server', 'test-tui', 'browser', 'site']) {
+  for (const name of [
+    'typecheck',
+    'test-scripts',
+    'test-packages',
+    'test-promotion-evidence',
+    'test-web',
+    'test-server',
+    'test-tui',
+    'browser',
+    'site',
+  ]) {
     const job = workflow.jobs[name]
     expect(job.needs).toEqual(['changes', 'workspace-builds'])
     expect(job.needs).not.toContain('typecheck')
@@ -440,6 +432,8 @@ test('retired standalone producer jobs leave every Fregat consumer gate blocking
     'docs',
     'lint',
     'typecheck',
+    'test-scripts',
+    'test-packages',
     'test-promotion-evidence',
     'test-web',
     'test-server',
