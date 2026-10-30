@@ -32,13 +32,15 @@ test('manual CI keeps consumer builds and tests in the blocking verdict', () => 
       'lint',
       'workspace-builds',
       'typecheck',
+      'test-scripts',
+      'test-packages',
       'test-web',
       'test-server',
       'test-tui',
       'browser',
     ]),
   )
-  expect(workflow.jobs.typecheck!.steps).toEqual(
+  expect(workflow.jobs['test-scripts']!.steps).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ run: expect.stringContaining('bun run test:scripts') }),
     ]),

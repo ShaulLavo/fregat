@@ -209,7 +209,7 @@ jobs:
           operation: produce
           selection: ${{ toJSON(needs.changes.outputs) }}
 
-  # Package tests share this runner with typechecking and generated checks.
+  # Checks, script tests, package tests and promotion evidence run on separate runners.
   typecheck:
     name: Typecheck, generated, packages
     needs: [changes, workspace-builds]
@@ -233,22 +233,6 @@ jobs:
         with:
           operation: consume
           targets: ${{ needs.changes.outputs.tooling == 'true' && 'all' || needs.changes.outputs.packages }}
-
-      - name: Archive script test builds
-        if: ${{ needs.changes.outputs.tooling == 'true' }}
-        run: |
-          find packages -name node_modules -prune -o -type d -name dist -prune -print0 |
-            tar --null -T - -czf "$RUNNER_TEMP/script-test-builds.tar.gz"
-
-      - name: Share script test builds
-        if: ${{ needs.changes.outputs.tooling == 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: script-test-builds
-          compression-level: 0
-          path: ${{ runner.temp }}/script-test-builds.tar.gz
-          if-no-files-found: error
-          retention-days: 1
 
       - name: Validate dev task graph
         if: ${{ needs.changes.outputs.web == 'true' }}
@@ -289,21 +273,9 @@ jobs:
         if: ${{ needs.changes.outputs.web == 'true' }}
         run: bun run --cwd apps/web bench:file-tree-prepared-input:gate
 
-      # Script tests inspect the whole repository; package source readers are declared in Turbo.
-      - name: Script tests
-        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tooling == 'true' }}
-        run: bun run test:scripts --exclude scripts/markdown/promotion-evidence.test.ts --exclude scripts/agent/browser-launch.test.ts --exclude scripts/browser-gc.test.ts
-
-      - name: Package tests
-        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' }}
-        env:
-          CI_PACKAGES: ${{ needs.changes.outputs.packages }}
-        run: bun scripts/ci/packages.mjs tests "$CI_PACKAGES"
-
-  # The complete synthetic promotion controls need their own runner and full job budget.
-  test-promotion-evidence:
-    name: Script tests (promotion evidence)
-    needs: [changes, typecheck]
+  test-scripts:
+    name: Script tests
+    needs: [changes, workspace-builds]
     if: ${{ needs.changes.outputs.tooling == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -318,16 +290,75 @@ jobs:
         with:
           build-packages: '[]'
 
-      - name: Download script test builds
-        uses: actions/download-artifact@v4
+      - name: Import workspace builds
+        id: builds
+        uses: ./.github/actions/workspace-builds
         with:
-          name: script-test-builds
-          path: ${{ runner.temp }}
+          operation: consume
+          targets: all
 
-      - name: Restore script test builds
-        run: tar -xzf "$RUNNER_TEMP/script-test-builds.tar.gz"
+      # Script tests inspect the whole repository; package source readers are declared in Turbo.
+      - name: Script tests
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tooling == 'true' }}
+        run: bun run test:scripts --exclude scripts/markdown/promotion-evidence.test.ts --exclude scripts/agent/browser-launch.test.ts --exclude scripts/browser-gc.test.ts
+
+  test-packages:
+    name: Package tests
+    needs: [changes, workspace-builds]
+    if: ${{ needs.changes.outputs.shared == 'true' || needs.changes.outputs.tooling == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          build-packages: '[]'
+
+      - name: Import workspace builds
+        id: builds
+        uses: ./.github/actions/workspace-builds
+        with:
+          operation: consume
+          targets: ${{ needs.changes.outputs.tooling == 'true' && 'all' || needs.changes.outputs.packages }}
+
+      - name: Package tests
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' }}
+        env:
+          CI_PACKAGES: ${{ needs.changes.outputs.packages }}
+        run: bun scripts/ci/packages.mjs tests "$CI_PACKAGES"
+
+  # The complete synthetic promotion controls need their own runner and full job budget.
+  test-promotion-evidence:
+    name: Script tests (promotion evidence)
+    needs: [changes, workspace-builds]
+    if: ${{ needs.changes.outputs.tooling == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          build-packages: '[]'
+
+      - name: Import workspace builds
+        id: builds
+        uses: ./.github/actions/workspace-builds
+        with:
+          operation: consume
+          targets: all
 
       - name: Script tests
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' }}
         run: bun run test:scripts scripts/markdown/promotion-evidence.test.ts
 
   # Web is most of the time, so it is sharded by file, balanced by recorded durations
@@ -663,6 +694,8 @@ jobs:
         docs,
         lint,
         typecheck,
+        test-scripts,
+        test-packages,
         test-promotion-evidence,
         test-web,
         test-server,
