@@ -2,7 +2,7 @@ import { useCommand } from '@/keymap/hooks/use-command'
 import { fileExtension } from '@/lib/path-formatters'
 import type { EditorTheme } from '@singapore-editor/core/rendering'
 import type { EditorPlugin } from '@singapore-editor/core/extensions'
-import { EditorHost, useEditor } from '@singapore-editor/react'
+import { useEditor } from '@singapore-editor/react'
 import {
   memo,
   useEffect,
@@ -127,6 +127,7 @@ export const SearchResultFileEditor = memo(
       textMetrics: SEARCH_RESULT_FILE_EDITOR_TEXT_METRICS,
       theme: editorTheme,
     })
+    const { ref: editorRef } = controller
     const { ref: focusTargetRef } = useEditorFocusTarget({
       controller,
       writable: false,
@@ -247,9 +248,9 @@ export const SearchResultFileEditor = memo(
               />
             )}
             <div className='min-w-0' ref={editorHostRef}>
-              <EditorHost
+              <div
                 className='app-editor-host search-result-file-editor-host'
-                controller={controller}
+                ref={editorRef}
                 style={editorStyle}
               />
             </div>

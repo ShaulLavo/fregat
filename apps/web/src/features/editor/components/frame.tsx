@@ -1,10 +1,9 @@
-import { EditorHost } from '@singapore-editor/react'
+import type { ReactEditorController } from '@singapore-editor/react'
 import {
   memo,
   useEffect,
   useEffectEvent,
   useState,
-  type ComponentProps,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
@@ -17,7 +16,7 @@ import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 type EditorFrameProps = {
   active: boolean
   preparing?: boolean
-  controller: ComponentProps<typeof EditorHost>['controller']
+  controller: ReactEditorController
   targetRef?: Ref<HTMLDivElement>
   children?: ReactNode
   onRequestCloseOverlay?: (restoreOrigin: boolean) => void
@@ -35,6 +34,7 @@ export const EditorFrame = memo(
     onRequestCloseOverlay,
     textMenuRequest = null,
   }: EditorFrameProps) => {
+    const { ref: editorRef } = controller
     const contextMenu = useContextMenu()
     const [menuOffset, setMenuOffset] = useState<number | null>(null)
 
@@ -84,9 +84,9 @@ export const EditorFrame = memo(
         onKeyDown={handleKeyDown}
       >
         <div className='contents' onPointerDownCapture={handleHostPointerDown}>
-          <EditorHost
+          <div
             className={preparing ? 'app-editor-host invisible' : 'app-editor-host'}
-            controller={controller}
+            ref={editorRef}
           />
         </div>
         {children}

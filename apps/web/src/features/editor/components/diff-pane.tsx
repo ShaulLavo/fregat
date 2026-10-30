@@ -10,7 +10,7 @@ import {
   type DiffRegionStore,
   type DiffSyntaxBackend,
 } from '@singapore-editor/diff'
-import { EditorHost, useEditor } from '@singapore-editor/react'
+import { useEditor } from '@singapore-editor/react'
 import type { Editor } from '@singapore-editor/core/editor'
 import { useEffectEvent, useLayoutEffect, useMemo, useState } from 'react'
 
@@ -152,6 +152,7 @@ export function DiffPane({
     // `'none'`, which short-circuits before `domSelection.addRange` and leaves copy depending
     // entirely on the hidden textarea; copying a diff selection is the point here.
   })
+  const { ref: editorRef } = controller
   useLayoutEffect(() => () => persistence?.detach(), [persistence])
   const focusTarget = useEditorFocusTarget({
     controller,
@@ -259,9 +260,9 @@ export function DiffPane({
       ref={file ? focusTarget.ref : undefined}
       onFocusCapture={onFocus ? () => onFocus(side) : undefined}
     >
-      <EditorHost
+      <div
         className='app-editor-host flex h-full min-h-0 w-full min-w-0 flex-1 overflow-hidden'
-        controller={controller}
+        ref={editorRef}
       />
     </div>
   )

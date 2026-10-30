@@ -1,4 +1,4 @@
-import { EditorHost, useEditor } from '@singapore-editor/react'
+import { useEditor } from '@singapore-editor/react'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
 import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
@@ -25,6 +25,7 @@ test('holds queued editor focus until its visible host is ready', async () => {
 
 function PreparedEditor({ ready }: { readonly ready: boolean }) {
   const controller = useEditor({ document: { text: '# Preparing', documentId: id.key } })
+  const { ref: editorRef } = controller
   const { ref: targetRef } = useEditorFocusTarget({
     controller,
     enabled: ready,
@@ -33,7 +34,7 @@ function PreparedEditor({ ready }: { readonly ready: boolean }) {
   })
   return (
     <div ref={targetRef}>
-      <EditorHost controller={controller} />
+      <div ref={editorRef} />
     </div>
   )
 }
