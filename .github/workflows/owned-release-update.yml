@@ -1,0 +1,77 @@
+name: Update owned release pins
+
+on:
+  schedule:
+    - cron: '47 */3 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: owned-dependency-update
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26.12.1
+      - name: Generate version pins and lockfiles
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/test-publish-update.sh
+          bash .github/scripts/update-owned-release-tarballs.sh
+          bash .github/scripts/check-update-paths.sh
+          mkdir "$RUNNER_TEMP/dependency-update"
+          git diff --binary > "$RUNNER_TEMP/dependency-update/update.patch"
+          if git diff --quiet; then echo 'Dependency pins are current.'; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dependency-update
+          path: ${{ runner.temp }}/dependency-update
+          retention-days: 1
+
+  publish:
+    needs: generate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: dependency-update
+          path: ${{ runner.temp }}/dependency-update
+      - name: Refresh the standing update PR and dispatch CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: automation/owned-release-updates
+          TITLE: Update owned release pins
+          UPDATE_ARTIFACT: ${{ runner.temp }}/dependency-update
+        run: |
+          if [[ ! -s "$UPDATE_ARTIFACT/update.patch" ]]; then
+            echo 'Dependency pins are current.'
+            exit 0
+          fi
+          bash .github/scripts/publish-update.sh
