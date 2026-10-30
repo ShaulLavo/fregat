@@ -49,6 +49,8 @@ function fixture() {
     docs: { result: 'skipped' },
     lint: { result: 'success' },
     typecheck: { result: 'success' },
+    'test-scripts': { result: 'success' },
+    'test-packages': { result: 'success' },
     'test-promotion-evidence': { result: 'success' },
     'test-web': { result: 'success' },
     'test-server': { result: 'success' },
@@ -64,6 +66,8 @@ function fixture() {
     'Docs format',
     'Format, lint, census',
     'Typecheck, generated, packages',
+    'Script tests',
+    'Package tests',
     'Script tests (promotion evidence)',
     'Test (web 1/4)',
     'Test (web 2/4)',
@@ -209,12 +213,13 @@ test.each([
 test('disabled consumer browser checks may skip while server coverage succeeds', () => {
   const value = fixture()
   for (const key of ['web', 'tree', 'tooling']) value.changes.outputs[key] = 'false'
-  for (const id of ['browser', 'test-web', 'test-promotion-evidence', 'lint'])
+  for (const id of ['browser', 'test-web', 'test-scripts', 'test-promotion-evidence', 'lint'])
     value.needs[id] = { result: 'skipped' }
   for (const job of value.jobs) {
     if (
       job.name === 'Browser tests' ||
       job.name.startsWith('Test (web ') ||
+      job.name === 'Script tests' ||
       job.name === 'Script tests (promotion evidence)' ||
       job.name === 'Format, lint, census'
     )
