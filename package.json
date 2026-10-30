@@ -52,7 +52,7 @@
       "@singapore-editor/textbuffer": "https://github.com/ShaulLavo/singapore/releases/download/singapore-d44f7ffa2112417fcc919e1ee4ac5e801f054432/singapore-editor-textbuffer-0.2.9.tgz",
       "@singapore-editor/tree-sitter": "https://github.com/ShaulLavo/singapore/releases/download/singapore-d44f7ffa2112417fcc919e1ee4ac5e801f054432/singapore-editor-tree-sitter-0.2.9.tgz",
       "@singapore-editor/tree-sitter-languages": "https://github.com/ShaulLavo/singapore/releases/download/singapore-d44f7ffa2112417fcc919e1ee4ac5e801f054432/singapore-editor-tree-sitter-languages-0.2.10.tgz",
-      "ghostty-webgpu": "https://github.com/ShaulLavo/ghostty-webgpu/releases/download/v0.3.24-b54f15f2/ghostty-webgpu.tgz"
+      "ghostty-webgpu": "https://github.com/ShaulLavo/ghostty-webgpu/releases/download/v0.3.30-a322323/ghostty-webgpu.tgz"
     }
   },
   "scripts": {

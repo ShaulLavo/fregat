@@ -1,4 +1,4 @@
-import { terminalDefaultPack, terminalShellKeysPack } from 'ghostty-webgpu'
+import { ghosttyKeymap, terminalShellKeysPack } from 'ghostty-webgpu/hotkeys'
 import { applicationBindings } from '@/keymap/presets/application'
 import {
   baseEditorKeymap,
@@ -62,7 +62,7 @@ export function defaultPlatformKeyBindings(
     const editor = vscodePacks.flatMap((pack) =>
       pack[platform].map((entry) => presetBinding(entry, platform)),
     )
-    const terminal = terminalDefaultPack[platform].map((entry) => presetBinding(entry, platform))
+    const terminal = ghosttyKeymap[platform].map((entry) => presetBinding(entry, platform))
     return app.concat(appWidgets, widgets, editor, terminal, readOnly, shell)
   }
   const current = presetRuntimeRows.filter(
