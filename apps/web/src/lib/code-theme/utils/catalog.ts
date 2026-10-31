@@ -31,6 +31,7 @@ const BUILTIN_EDITOR_THEMES = [
     label: 'Native Dark',
     type: 'dark',
     editorTheme: {
+      type: 'dark',
       backgroundColor: '#1e1e1e',
       foregroundColor: '#d4d4d4',
       gutterBackgroundColor: '#1e1e1e',
@@ -63,6 +64,7 @@ const BUILTIN_EDITOR_THEMES = [
     label: 'Native Light',
     type: 'light',
     editorTheme: {
+      type: 'light',
       backgroundColor: '#ffffff',
       foregroundColor: '#24292e',
       gutterBackgroundColor: '#ffffff',
