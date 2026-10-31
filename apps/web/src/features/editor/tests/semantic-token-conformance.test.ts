@@ -1,19 +1,10 @@
 import { spawn } from 'node:child_process'
-import {
-  accessSync,
-  constants,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
+import { accessSync, constants, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe } from 'vitest'
-import { spawnTypeScript } from 'server/testing'
+import { spawnRustAnalyzer, spawnTypeScript } from 'server/testing'
 import { test as it, expect } from '../../../../test/fixtures'
-import { createClientInvariantError } from '@/lib/structured-errors'
 import { SEMANTIC_TOKEN_LEGENDS } from '../../../../test/factories/semantic-token-legends'
 
 import { createSemanticTokenStyles } from '@singapore-editor/core/syntax'
@@ -44,7 +35,8 @@ type ServerCase = {
 
 const CASES: readonly ServerCase[] = [
   {
-    resolve: () => installedServer(rustAnalyzerBinary()),
+    // The app's own resolver, which skips a rustup proxy that has no server behind it.
+    resolve: () => spawnRustAnalyzer,
     expected: { delta: true, full: true, range: true },
     files: {
       'Cargo.toml': '[package]\nname = "probe"\nversion = "0.1.0"\nedition = "2021"\n',
@@ -100,6 +92,7 @@ describe('semantic token conformance', () => {
       if (!launch) return skip(`${testCase.serverId} is not installed on this machine`)
 
       const provider = await negotiate(launch, testCase)
+      if (provider === NOT_STARTED) return skip(`no runnable ${testCase.serverId} on this machine`)
       expect(provider, `${testCase.serverId} advertised no semanticTokensProvider`).toBeTruthy()
 
       const full = (provider as { full?: unknown }).full
@@ -150,11 +143,9 @@ describe('semantic token conformance', () => {
  */
 describe('semantic tokens end to end', () => {
   it('decodes a live rust-analyzer answer into spans this theme can paint', async ({ skip }) => {
-    const binary = rustAnalyzerBinary()
-    if (!binary) return skip('no rust-analyzer on this machine')
-
     const source = 'pub const MAX: usize = 10;\npub fn value(n: usize) -> usize { n + MAX }\n'
-    const session = await tokenSession(binary, source)
+    const session = await tokenSession(source)
+    if (session === NOT_STARTED) return skip('no runnable rust-analyzer on this machine')
     // NOT-PORTABLE: Installed optional LSP servers can time out and skip token assertions.
     if (!session) return skip('rust-analyzer did not answer a token request in time')
 
@@ -204,6 +195,9 @@ function installedServer(
   return async (root) => ({ process: spawn(binary, args, { cwd: root, stdio: 'pipe' }) })
 }
 
+/** The launcher found no server that runs, such as a rustup proxy with no component. */
+const NOT_STARTED = Symbol('not started')
+
 async function negotiate(launch: typeof spawnTypeScript, testCase: ServerCase): Promise<unknown> {
   const root = mkdtempSync(path.join(tmpdir(), `platform-lsp-conformance-${testCase.serverId}-`))
   roots.push(root)
@@ -214,7 +208,7 @@ async function negotiate(launch: typeof spawnTypeScript, testCase: ServerCase): 
   }
 
   const handle = await launch(root)
-  if (!handle) throw createClientInvariantError(`${testCase.serverId} did not start`)
+  if (!handle) return NOT_STARTED
   const child = handle.process
   const messages: Record<string, unknown>[] = []
   readLspMessages(child.stdout, (message) => messages.push(message))
@@ -307,38 +301,6 @@ function onPath(command: string): string | null {
   return null
 }
 
-/**
- * The real server inside the toolchain, never `~/.cargo/bin/rust-analyzer`.
- *
- * That one is a rustup proxy which exits with `'rust-analyzer' is not installed
- * for the toolchain` unless the component happens to be installed for the active
- * toolchain — so a PATH lookup alone would make this test skip on a machine that
- * has rust-analyzer, or hang on one that does not.
- */
-function rustAnalyzerBinary(): string | null {
-  const toolchains = path.join(homedir(), '.rustup', 'toolchains')
-  const entries = safeReaddir(toolchains)
-  for (const entry of entries.sort()) {
-    const candidate = path.join(toolchains, entry, 'bin', 'rust-analyzer')
-    if (isExecutable(candidate)) return candidate
-  }
-
-  const onPathBinary = onPath('rust-analyzer')
-  if (onPathBinary && path.dirname(onPathBinary) === path.join(homedir(), '.cargo', 'bin')) {
-    return null
-  }
-
-  return onPathBinary
-}
-
-function safeReaddir(directory: string): string[] {
-  try {
-    return readdirSync(directory)
-  } catch {
-    return []
-  }
-}
-
 function isExecutable(candidate: string): boolean {
   try {
     accessSync(candidate, constants.X_OK)
@@ -353,9 +315,12 @@ function isExecutable(candidate: string): boolean {
  * didOpen, then `semanticTokens/full`.
  */
 async function tokenSession(
-  binary: string,
   source: string,
-): Promise<{ data: number[]; legend: { tokenTypes: string[]; tokenModifiers: string[] } } | null> {
+): Promise<
+  | { data: number[]; legend: { tokenTypes: string[]; tokenModifiers: string[] } }
+  | typeof NOT_STARTED
+  | null
+> {
   const root = mkdtempSync(path.join(tmpdir(), 'platform-lsp-tokens-'))
   roots.push(root)
   mkdirSync(path.join(root, 'src'), { recursive: true })
@@ -366,7 +331,9 @@ async function tokenSession(
   const file = path.join(root, 'src', 'lib.rs')
   writeFileSync(file, source)
 
-  const child = spawn(binary, [], { cwd: root, stdio: 'pipe' })
+  const handle = await spawnRustAnalyzer(root)
+  if (!handle) return NOT_STARTED
+  const child = handle.process
   const messages: Record<string, unknown>[] = []
   readLspMessages(child.stdout, (message) => messages.push(message))
   child.stderr.resume()

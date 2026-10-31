@@ -358,7 +358,10 @@ async function rustupRustAnalyzer(root: string) {
 }
 
 async function installedToolchainRustAnalyzer(root: string) {
-  const toolchains = path.join(homedir(), '.rustup', 'toolchains')
+  const toolchains = path.join(
+    process.env.RUSTUP_HOME ?? path.join(homedir(), '.rustup'),
+    'toolchains',
+  )
   const entries = await readdir(toolchains).catch(() => [])
   // Sorted so a machine with several toolchains resolves the same binary on
   // every spawn; an arbitrary readdir order would make a pooled backend's

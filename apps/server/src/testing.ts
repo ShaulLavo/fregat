@@ -47,6 +47,7 @@ export type {
 export { LspSessionPool } from './lsp/proxy-session'
 export { resolveLspServer } from './lsp/registry'
 export { spawnTypeScript } from './lsp/typescript/runtime'
+export { spawnRustAnalyzer } from './lsp/installers'
 export type { LspProxyClientSession } from './lsp/proxy-session'
 export type { TerminalPtyFactory } from './terminal/service'
 export { createTestTerminalHost } from './terminal-host/testing'
