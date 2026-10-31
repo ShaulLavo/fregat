@@ -1,5 +1,4 @@
 import '@workspace/ui/globals.css'
-import '@singapore-editor/core/style.css'
 import { createEditorFindPlugin } from '@singapore-editor/find'
 import { createKeymapEditor } from '../../../test/factories/keymap-editor'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'

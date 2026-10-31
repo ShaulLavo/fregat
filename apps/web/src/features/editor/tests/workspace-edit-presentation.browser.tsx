@@ -5,7 +5,6 @@ import { WorkspaceEditServiceContext } from '@/features/editor/providers/workspa
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { editorQueryKeys } from '@/features/editor/utils/query-keys'
 import '@workspace/ui/globals.css'
-import '@singapore-editor/core/style.css'
 import { expect, test } from 'vitest'
 import { getClient } from '@/lib/client'
 import { operationDiffAttachment } from '@/lib/diff-attachment'

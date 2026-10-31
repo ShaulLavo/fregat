@@ -1,6 +1,4 @@
 import '@workspace/ui/globals.css'
-import '@singapore-editor/core/style.css'
-import '@singapore-editor/gutters/style.css'
 import { useLayoutEffect, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'

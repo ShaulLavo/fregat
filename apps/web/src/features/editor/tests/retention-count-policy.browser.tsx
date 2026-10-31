@@ -2,7 +2,6 @@ import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { Editor, createEditorStructuralOperation } from '@singapore-editor/core/editor'
 import { afterAll, afterEach, expect, inject, test } from 'vitest'
 import { commands } from 'vitest/browser'
-import '@singapore-editor/core/style.css'
 import { pieceTableSnapshotsHaveSameText } from '@singapore-editor/textbuffer'
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
 import {

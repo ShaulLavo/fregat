@@ -1,6 +1,4 @@
 import '@workspace/ui/globals.css'
-import '@singapore-editor/core/style.css'
-import '@singapore-editor/gutters/style.css'
 import { useLayoutEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createMemoryHistory } from '@tanstack/react-router'

@@ -1,5 +1,4 @@
 import '@workspace/ui/globals.css'
-import '@singapore-editor/core/style.css'
 import type { EditorTextAnchor } from '@singapore-editor/core/extensions'
 import type {
   LanguageServerDiagnosticMarkerClaim,

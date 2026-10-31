@@ -8,7 +8,6 @@ import {
 import { createHighlightingPlugin } from '@singapore-editor/highlighting'
 import { highlightingService } from '@/lib/highlighting/state/service'
 import { TRANSITION_STEPS } from '@/features/dev/utils/transition-samples'
-import '@singapore-editor/core/style.css'
 
 export type TransitionsMotion = {
   readonly durationMs: number

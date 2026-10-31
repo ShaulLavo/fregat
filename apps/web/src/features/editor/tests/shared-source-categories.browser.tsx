@@ -1,6 +1,5 @@
 import { act, waitFor } from '@testing-library/react'
 import { pieceTableSnapshotsHaveSameText } from '@singapore-editor/textbuffer'
-import '@singapore-editor/core/style.css'
 import {
   attachmentUploadTicketSchema,
   chatAttachmentSchema,

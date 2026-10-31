@@ -4,8 +4,6 @@ import { filesystemPath, fileDocumentKey, tabId } from '@/lib/documents/utils/id
 import { testTabContent } from '../../../../test/factories/document-targets'
 import type { TabContent } from '@/lib/documents/utils/types'
 import '@workspace/ui/globals.css'
-import '@singapore-editor/core/style.css'
-import '@singapore-editor/gutters/style.css'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useLayoutEffect } from 'react'
