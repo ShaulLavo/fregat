@@ -136,6 +136,7 @@ export function DiffPane({
   const gutterInset = useEditorGutterInset()
   const controller = useEditor({
     ...createDiffEditorOptions(),
+    scrollPastEnd: true,
     keymapContext: { mode: 'diff', extension: file ? fileExtension(file.path) : '' },
     suspiciousCharacters: unicodeHighlights.options,
     ...typography,

@@ -328,6 +328,8 @@ export function Editor({
   const gutterInset = useEditorGutterInset()
   const rowPositioning = editorPerformanceLayoutVariant() === 'absolute-rows' ? 'top' : 'transform'
   const controller = useEditor({
+    // A code editor lets the last line scroll to the top; Singapore leaves that off by default.
+    scrollPastEnd: true,
     cursorLineHighlight: {
       gutterNumber: true,
       gutterBackground: ['fold-gutter'],
