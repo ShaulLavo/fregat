@@ -132,7 +132,7 @@ function BrowserHarness() {
   const diagnosticPeek = useDiagnosticPeek({ active: true, filePath: FILE_PATH })
   const plugins = useMemo(() => [diagnosticPeek.plugin], [diagnosticPeek.plugin])
   const controller = useEditor({
-    document: { documentId: FILE_PATH, languageId: 'typescript', text: DOCUMENT_TEXT },
+    document: { documentId: FILE_PATH, languageId: 'typescript', defaultText: DOCUMENT_TEXT },
     plugins,
   })
   const focusTarget = useFocusTarget<HTMLDivElement>({

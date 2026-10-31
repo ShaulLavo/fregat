@@ -321,7 +321,6 @@ export function Editor({
         ...preparedTags,
         languageId: documentLanguageId,
         preparedDocument: liveDocument.preparedDocument,
-        text: '',
         view: liveDocument.view,
       }
     : null

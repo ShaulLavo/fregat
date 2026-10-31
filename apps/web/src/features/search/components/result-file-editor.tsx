@@ -34,7 +34,6 @@ import {
   preventReadonlyInput,
   readonlyEditingKey,
   searchResultFileDocumentId,
-  searchResultFileDocumentRevision,
   searchResultFileDocumentWindow,
   searchResultFileEditorStyle,
   searchResultFileLineIdAtClientY,
@@ -94,9 +93,7 @@ export const SearchResultFileEditor = memo(
       documentId: searchResultFileDocumentId(file),
       documentMode: 'static' as const,
       languageId: visibleDocument.languageId,
-      revision: searchResultFileDocumentRevision(visibleDocument, lineWindow),
       text: visibleDocument.text,
-      textSyncMode: 'open' as const,
     }
     const rangeDecorations = parked
       ? []

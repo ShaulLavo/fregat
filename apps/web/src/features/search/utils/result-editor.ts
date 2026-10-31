@@ -320,13 +320,6 @@ export function searchResultFileDocumentId(file: SearchResultFileBlock) {
   return `${SEARCH_RESULT_FILE_DOCUMENT_ID_PREFIX}${file.path}`
 }
 
-export function searchResultFileDocumentRevision(
-  document: SearchResultFileDocument,
-  window: SearchResultFileEditorLineWindow,
-) {
-  return `${window.start}:${window.end}:${document.text}`
-}
-
 export function searchResultLineOpenLabel(line: SearchResultFileDocumentLine) {
   const match = line.sourceMatch
   if (typeof match.column !== 'number') return `Open result at line ${line.sourceLine}`

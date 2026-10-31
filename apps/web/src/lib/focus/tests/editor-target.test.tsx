@@ -24,7 +24,7 @@ test('holds queued editor focus until its visible host is ready', async () => {
 })
 
 function PreparedEditor({ ready }: { readonly ready: boolean }) {
-  const controller = useEditor({ document: { text: '# Preparing', documentId: id.key } })
+  const controller = useEditor({ document: { defaultText: '# Preparing', documentId: id.key } })
   const { ref: editorRef } = controller
   const { ref: targetRef } = useEditorFocusTarget({
     controller,
