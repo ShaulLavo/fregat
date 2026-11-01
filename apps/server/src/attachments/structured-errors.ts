@@ -13,6 +13,12 @@ export const attachmentErrors = defineErrorCatalog('attachments', {
     why: 'Each attached file holds at most 50 MB.',
     fix: 'Choose a smaller file, or mention its path in the message so the agent reads it there.',
   },
+  MACHINE_FILE_WRITE_STALLED: {
+    status: 500,
+    message: 'That file could not be attached',
+    why: 'Writing the attachment stopped before the current chunk was complete.',
+    fix: 'Try attaching the file again.',
+  },
   MACHINE_FILE_CHANGED: {
     status: 409,
     message: 'That file changed while it was being attached',

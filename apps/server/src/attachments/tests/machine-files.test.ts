@@ -9,6 +9,7 @@ import {
   rm,
   truncate,
   writeFile,
+  type FileHandle,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -116,6 +117,132 @@ test('refuses empty, oversized, missing and folder paths without staging anythin
   )
   expect(leftovers).toEqual([])
 })
+
+async function copyFixture(bytes: Uint8Array) {
+  const root = await mkdtemp(join(tmpdir(), 'platform-machine-copy-'))
+  roots.push(root)
+  const sourcePath = join(root, 'source.bin')
+  const copyPath = join(root, 'copy.part')
+  await writeFile(sourcePath, bytes)
+  const source = await open(sourcePath, 'r')
+  handles.push(() => source.close())
+  const writer = await open(copyPath, 'wx')
+  handles.push(() => writer.close())
+  return { source, writer, copyPath }
+}
+
+function patternedBytes(length: number) {
+  const bytes = Buffer.alloc(length)
+  for (let index = 0; index < length; index++)
+    bytes[index] = (index * 17 + Math.floor(index / 251) + Math.floor(index / 65_536) * 31) % 256
+  return bytes
+}
+
+function boundedWriter(writer: FileHandle, maxBytes: number) {
+  const writes: Array<{ offset: number; length: number; bytesWritten: number; bytes: Buffer }> = []
+  return {
+    writes,
+    async write(buffer: Buffer, offset: number, length: number) {
+      const { bytesWritten } = await writer.write(buffer, offset, Math.min(length, maxBytes))
+      writes.push({
+        offset,
+        length,
+        bytesWritten,
+        bytes: Buffer.from(buffer.subarray(offset, offset + bytesWritten)),
+      })
+      return { bytesWritten }
+    },
+  }
+}
+
+test('copies exact bytes through an ordinary file writer', async () => {
+  const bytes = patternedBytes(97)
+  const { source, writer, copyPath } = await copyFixture(bytes)
+
+  await copyExactly(source, writer, bytes.byteLength)
+
+  expect(await readFile(copyPath)).toEqual(bytes)
+})
+
+test.each([40_097, 2 * 65_536 + 173])(
+  'finishes short writes for a %i-byte source',
+  async (length) => {
+    const bytes = patternedBytes(length)
+    const { source, writer, copyPath } = await copyFixture(bytes)
+    const output = boundedWriter(writer, 10_007)
+
+    await expect(copyExactly(source, output, bytes.byteLength)).resolves.toBeUndefined()
+
+    const actual = await readFile(copyPath)
+    expect(actual.byteLength).toBe(bytes.byteLength)
+    expect(actual).toEqual(bytes)
+    let written = 0
+    for (const write of output.writes) {
+      expect(write.offset).toBe(written % 65_536)
+      expect(write.length).toBe(Math.min(65_536 - write.offset, bytes.byteLength - written))
+      expect(write.bytesWritten).toBe(Math.min(write.length, 10_007))
+      expect(write.bytes).toEqual(bytes.subarray(written, written + write.bytesWritten))
+      written += write.bytesWritten
+    }
+    expect(written).toBe(bytes.byteLength)
+  },
+)
+
+test('refuses a zero-progress write after a prefix', { timeout: 1_000 }, async () => {
+  const bytes = patternedBytes(2 * 65_536 + 173)
+  const { source, writer, copyPath } = await copyFixture(bytes)
+  let calls = 0
+  const output = {
+    async write(buffer: Buffer, offset: number, length: number) {
+      calls += 1
+      expect(calls).toBeLessThanOrEqual(2)
+      return writer.write(buffer, offset, calls === 1 ? Math.min(length, 7) : 0)
+    },
+  }
+
+  await expect(copyExactly(source, output, bytes.byteLength)).rejects.toMatchObject({
+    code: 'attachments.MACHINE_FILE_WRITE_STALLED',
+    status: 500,
+    internal: { chunkBytes: 65_536, writtenBytes: 7 },
+  })
+
+  expect(calls).toBe(2)
+  expect(await readFile(copyPath)).toEqual(bytes.subarray(0, 7))
+})
+
+test(
+  'propagates a writer failure after a prefix without retrying',
+  { timeout: 1_000 },
+  async () => {
+    const bytes = patternedBytes(2 * 65_536 + 173)
+    const { source, writer, copyPath } = await copyFixture(bytes)
+    let calls = 0
+    let writeError: unknown
+    const output = {
+      async write(buffer: Buffer, offset: number, length: number) {
+        calls += 1
+        if (calls === 1) {
+          const result = await writer.write(buffer, offset, Math.min(length, 7))
+          await writer.close()
+          return result
+        }
+        return writer.write(buffer, offset, length).catch((error: unknown) => {
+          writeError = error
+          throw error
+        })
+      },
+    }
+
+    const failure = await copyExactly(source, output, bytes.byteLength).catch(
+      (error: unknown) => error,
+    )
+
+    expect(failure).toMatchObject({ code: 'EBADF' })
+    expect(failure).toBe(writeError)
+    expect(calls).toBe(2)
+    expect(await readFile(copyPath)).toEqual(bytes.subarray(0, 7))
+  },
+)
 
 test('a file that grows after its size was checked is refused, reading one byte past it', async () => {
   const { root } = await setup()
