@@ -265,10 +265,7 @@ describe('streamed git process limits', () => {
     const outcome = await collectWithWatchdog([leaderFile, childFile], () =>
       collectStream(
         streamProcess({
-          args: aliasArgs(
-            'overflow',
-            '"$FIXTURE_RUNTIME" -e "setInterval(() => {}, 1000)" "$CHILD_FILE" & echo $! > "$CHILD_FILE"; echo $$ > "$LEADER_FILE"; printf "12345\\n"; wait',
-          ),
+          args: aliasArgs('overflow', activeProducerScript('12345')),
           cwd: root,
           env: fixtureEnv(leaderFile, childFile),
           maxOutputBytes: 4,
@@ -336,7 +333,11 @@ describe('streamed git process limits', () => {
       if (outcome.kind !== 'settled') return
       expect(outcome.elapsed).toBeLessThan(1_000)
       expect(outcome.events).toEqual([
-        { kind: 'exit', exitCode: expect.any(Number), limit: { kind: 'timeout', timeoutMs: 100 } },
+        {
+          kind: 'exit',
+          exitCode: leaderExits ? 0 : expect.any(Number),
+          limit: { kind: 'timeout', timeoutMs: 100 },
+        },
       ])
       await expect.poll(() => fixturePidsAlive([leaderFile, childFile])).toBe(false)
     },
@@ -371,10 +372,7 @@ describe('streamed git process limits', () => {
     const childFile = path.join(root, 'early child file')
     const outcome = await collectWithWatchdog([leaderFile, childFile], async () => {
       const stream = streamProcess({
-        args: aliasArgs(
-          'early',
-          '"$FIXTURE_RUNTIME" -e "setInterval(() => {}, 1000)" "$CHILD_FILE" & echo $! > "$CHILD_FILE"; echo $$ > "$LEADER_FILE"; printf "ready\\n"; wait',
-        ),
+        args: aliasArgs('early', activeProducerScript('ready')),
         cwd: root,
         env: fixtureEnv(leaderFile, childFile),
         timeoutMs: 5_000,
@@ -390,17 +388,31 @@ describe('streamed git process limits', () => {
     await expect.poll(() => fixturePidsAlive([leaderFile, childFile])).toBe(false)
   })
 
-  it('propagates a pipe reader failure after cleaning the process', async () => {
+  it('propagates a pipe reader failure and cleans the other pending reader', async () => {
     const root = await fixtureRepo()
+    const leaderFile = path.join(root, 'reader leader file')
+    const childFile = path.join(root, 'reader child file')
     const failure = Symbol('fixture reader failure')
-    const read = vi
-      .spyOn(ReadableStreamDefaultReader.prototype, 'read')
-      .mockRejectedValueOnce(failure)
-
+    const originalRead = ReadableStreamDefaultReader.prototype.read
+    const read = vi.spyOn(ReadableStreamDefaultReader.prototype, 'read')
+    read.mockImplementationOnce(async function (this: ReadableStreamDefaultReader<Uint8Array>) {
+      await originalRead.call(this)
+      throw failure
+    })
     try {
-      await expect(
-        collectStream(streamProcess({ args: ['rev-parse', 'HEAD'], cwd: root })),
-      ).rejects.toBe(failure)
+      const outcome = await collectWithWatchdog([leaderFile, childFile], () =>
+        collectStream(
+          streamProcess({
+            args: aliasArgs('reader-failure', activeProducerScript('ready')),
+            cwd: root,
+            env: fixtureEnv(leaderFile, childFile),
+            timeoutMs: 5_000,
+          }),
+        ),
+      )
+      expect(outcome).toMatchObject({ kind: 'rejected', error: failure })
+      expect(read).toHaveBeenCalledTimes(2)
+      await expect.poll(() => fixturePidsAlive([leaderFile, childFile])).toBe(false)
     } finally {
       read.mockRestore()
     }
@@ -421,28 +433,36 @@ describe('streamed git process limits', () => {
     }
   })
 
-  it('releases the repository lane after a streamed limit', async () => {
-    const root = await fixtureRepo()
-    const leaderFile = path.join(root, 'lane leader file')
-    const childFile = path.join(root, 'lane child file')
-    const stream = withGitRepositoryLaneStream(root, () =>
-      streamProcess({
-        args: aliasArgs(
-          'overflow',
-          '"$FIXTURE_RUNTIME" -e "setInterval(() => {}, 1000)" "$CHILD_FILE" & echo $! > "$CHILD_FILE"; echo $$ > "$LEADER_FILE"; printf "12345\\n"; wait',
-        ),
-        cwd: root,
-        env: fixtureEnv(leaderFile, childFile),
-        maxOutputBytes: 4,
-        timeoutMs: 5_000,
-      }),
-    )
-    const outcome = await collectWithWatchdog([leaderFile, childFile], () => collectStream(stream))
+  it.for(['output-limit', 'timeout'] as const)(
+    'releases the repository lane after $0',
+    async (limit) => {
+      const root = await fixtureRepo()
+      const leaderFile = path.join(root, 'lane leader file')
+      const childFile = path.join(root, 'lane child file')
+      const stream = withGitRepositoryLaneStream(root, () =>
+        streamProcess({
+          args: aliasArgs(
+            'lane',
+            limit === 'timeout'
+              ? inheritedPipeScript('stdout', false)
+              : activeProducerScript('12345'),
+          ),
+          cwd: root,
+          env: fixtureEnv(leaderFile, childFile),
+          maxOutputBytes: 4,
+          timeoutMs: limit === 'timeout' ? 100 : 5_000,
+        }),
+      )
+      const outcome = await collectWithWatchdog([leaderFile, childFile], () =>
+        collectStream(stream),
+      )
 
-    expect(outcome.kind).toBe('settled')
-    if (outcome.kind !== 'settled') return
-    await expect(withGitRepositoryLane(root, async () => 'released')).resolves.toBe('released')
-  })
+      expect(outcome.kind).toBe('settled')
+      if (outcome.kind !== 'settled') return
+      expect(outcome.events.at(-1)).toMatchObject({ kind: 'exit', limit: { kind: limit } })
+      await expect(withGitRepositoryLane(root, async () => 'released')).resolves.toBe('released')
+    },
+  )
 })
 
 describe('git service output limit', () => {
@@ -509,6 +529,10 @@ function fixtureEnv(leaderFile: string, childFile: string) {
     FIXTURE_RUNTIME: process.execPath,
     GIT_FILE: `${leaderFile}.git`,
   }
+}
+
+function activeProducerScript(line: '12345' | 'ready') {
+  return `"$FIXTURE_RUNTIME" -e "setInterval(() => {}, 1000)" "$CHILD_FILE" & echo $! > "$CHILD_FILE"; echo $$ > "$LEADER_FILE"; printf "${line}\\n"; wait`
 }
 
 function inheritedPipeScript(stream: 'stdout' | 'stderr', leaderExits: boolean) {
@@ -622,6 +646,7 @@ async function isAlive(pid: number) {
   } catch {
     return false
   }
+  if (process.platform !== 'linux') return true
   const stat = await readFile(`/proc/${pid}/stat`, 'utf8').catch(() => '')
   return stat.split(' ')[2] !== 'Z'
 }
