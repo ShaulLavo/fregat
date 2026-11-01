@@ -276,6 +276,12 @@ type GitProcessLine = {
   readonly text: string
 }
 
+type StreamBudget = {
+  readonly maxBytes: number
+  observedBytes: number
+  limit?: GitProcessLimit
+}
+
 export type GitProcessEvent =
   | { readonly kind: 'line'; readonly line: GitProcessLine }
   | {
@@ -301,43 +307,42 @@ export async function* streamProcess(input: GitProcessInput): AsyncGenerator<Git
     stderr: 'pipe',
     stdin: input.input === undefined ? 'ignore' : 'pipe',
     stdout: 'pipe',
+    detached: true,
   })
-  let timedOut = false
-  const timer = setTimeout(() => {
-    timedOut = true
-    killIfRunning(child)
-  }, timeoutMs)
+  const control = createReadControl()
+  const budget: StreamBudget = { maxBytes, observedBytes: 0 }
+  const stop = (limit?: GitProcessLimit) => {
+    if (limit && !budget.limit) budget.limit = limit
+    control.abort()
+    killGroup(child)
+  }
+  const timer = setTimeout(() => stop({ kind: 'timeout', timeoutMs }), timeoutMs)
 
   try {
     if (input.input !== undefined) await writeProcessInput(child.stdin, input.input)
 
-    const budget = { remaining: maxBytes }
     // Interleaved rather than sequential: hooks write progress to stderr while
     // git writes its summary to stdout, and draining one pipe at a time lets
     // the other fill and block the process we are trying to watch.
-    yield* mergeProcessLines([
-      readProcessLines(child.stdout, 'stdout', budget),
-      readProcessLines(child.stderr, 'stderr', budget),
-    ])
+    yield* mergeProcessLines(
+      [
+        readProcessLines(child.stdout, 'stdout', budget, control, stop),
+        readProcessLines(child.stderr, 'stderr', budget, control, stop),
+      ],
+      stop,
+    )
 
     const exitCode = await child.exited
-    if (timedOut) {
-      yield { exitCode, kind: 'exit', limit: { kind: 'timeout', timeoutMs } }
-      return
-    }
-    if (budget.remaining <= 0) {
-      yield {
-        exitCode,
-        kind: 'exit',
-        limit: { kind: 'output-limit', maxBytes, observedBytes: maxBytes, stream: 'stdout' },
-      }
+    if (budget.limit) {
+      yield { exitCode, kind: 'exit', limit: budget.limit }
       return
     }
 
     yield { exitCode, kind: 'exit' }
   } finally {
     clearTimeout(timer)
-    killIfRunning(child)
+    stop()
+    await child.exited
   }
 }
 
@@ -348,50 +353,83 @@ export async function* streamProcess(input: GitProcessInput): AsyncGenerator<Git
 async function* readProcessLines(
   stream: ReadableStream<Uint8Array> | undefined,
   name: 'stderr' | 'stdout',
-  budget: { remaining: number },
+  budget: StreamBudget,
+  control: ReadControl,
+  onLimit: (limit: GitProcessLimit) => void,
 ): AsyncGenerator<GitProcessLine> {
   if (!stream) return
 
+  const reader = stream.getReader()
+  try {
+    yield* decodeProcessLines(reader, name, budget, control, onLimit)
+  } finally {
+    await reader.cancel().catch(() => undefined)
+    reader.releaseLock()
+  }
+}
+
+async function* decodeProcessLines(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  name: 'stderr' | 'stdout',
+  budget: StreamBudget,
+  control: ReadControl,
+  onLimit: (limit: GitProcessLimit) => void,
+): AsyncGenerator<GitProcessLine> {
   const decoder = new TextDecoder()
   let buffered = ''
 
-  for await (const chunk of stream) {
-    if (budget.remaining <= 0) return
+  while (true) {
+    const chunk = await Promise.race([reader.read(), control.aborted])
+    if (chunk === ABORTED || budget.limit) return
+    if (chunk.done) break
 
-    budget.remaining -= chunk.byteLength
-    buffered += decoder.decode(chunk, { stream: true })
-    const lines = buffered.split('\n')
-    // The tail is whatever follows the last newline — a partial line the next
-    // chunk finishes, or the final line if the process ends here.
-    buffered = lines.pop() ?? ''
-
-    for (const text of lines) {
-      yield { stream: name, text }
+    const observedBytes = budget.observedBytes + chunk.value.byteLength
+    if (observedBytes > budget.maxBytes) {
+      onLimit({ kind: 'output-limit', maxBytes: budget.maxBytes, observedBytes, stream: name })
+      return
     }
+    budget.observedBytes = observedBytes
+    buffered += decoder.decode(chunk.value, { stream: true })
+    const lines = buffered.split('\n')
+    buffered = lines.pop() ?? ''
+    for (const text of lines) yield { stream: name, text }
   }
+  buffered += decoder.decode()
   if (buffered.length > 0) yield { stream: name, text: buffered }
 }
 
 /** Yields from every generator as it produces, rather than one after another. */
-async function* mergeProcessLines(sources: AsyncGenerator<GitProcessLine>[]) {
-  const pending = new Map(
-    sources.map((source, index) => [index, source.next().then((result) => ({ index, result }))]),
-  )
+async function* mergeProcessLines(sources: AsyncGenerator<GitProcessLine>[], onClose: () => void) {
+  const pending = new Map(sources.map((source, index) => [index, nextProcessLine(source, index)]))
+  let completed = false
 
+  try {
+    yield* mergePendingLines(sources, pending)
+    completed = true
+  } finally {
+    if (!completed) onClose()
+    await Promise.allSettled(sources.map((source) => source.return(undefined)))
+    await Promise.allSettled(pending.values())
+  }
+}
+
+async function* mergePendingLines(
+  sources: AsyncGenerator<GitProcessLine>[],
+  pending: Map<number, ReturnType<typeof nextProcessLine>>,
+) {
   while (pending.size > 0) {
     const { index, result } = await Promise.race(pending.values())
     if (result.done) {
       pending.delete(index)
       continue
     }
-
     yield { kind: 'line' as const, line: result.value }
-    const source = sources[index]!
-    pending.set(
-      index,
-      source.next().then((next) => ({ index, result: next })),
-    )
+    pending.set(index, nextProcessLine(sources[index]!, index))
   }
+}
+
+function nextProcessLine(source: AsyncGenerator<GitProcessLine>, index: number) {
+  return source.next().then((result) => ({ index, result }))
 }
 
 function formatTimeout(timeoutMs: number) {
