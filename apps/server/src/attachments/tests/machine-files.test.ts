@@ -188,6 +188,62 @@ test.each([40_097, 2 * 65_536 + 173])(
   },
 )
 
+test('refuses a zero-progress write after a prefix', { timeout: 1_000 }, async () => {
+  const bytes = patternedBytes(2 * 65_536 + 173)
+  const { source, writer, copyPath } = await copyFixture(bytes)
+  let calls = 0
+  const output = {
+    async write(buffer: Buffer, offset: number, length: number) {
+      calls += 1
+      expect(calls).toBeLessThanOrEqual(2)
+      return writer.write(buffer, offset, calls === 1 ? Math.min(length, 7) : 0)
+    },
+  }
+
+  await expect(copyExactly(source, output, bytes.byteLength)).rejects.toMatchObject({
+    code: 'attachments.MACHINE_FILE_WRITE_STALLED',
+    status: 500,
+    internal: { chunkBytes: 65_536, writtenBytes: 7 },
+  })
+
+  expect(calls).toBe(2)
+  expect(await readFile(copyPath)).toEqual(bytes.subarray(0, 7))
+})
+
+test(
+  'propagates a writer failure after a prefix without retrying',
+  { timeout: 1_000 },
+  async () => {
+    const bytes = patternedBytes(2 * 65_536 + 173)
+    const { source, writer, copyPath } = await copyFixture(bytes)
+    let calls = 0
+    let writeError: unknown
+    const output = {
+      async write(buffer: Buffer, offset: number, length: number) {
+        calls += 1
+        if (calls === 1) {
+          const result = await writer.write(buffer, offset, Math.min(length, 7))
+          await writer.close()
+          return result
+        }
+        return writer.write(buffer, offset, length).catch((error: unknown) => {
+          writeError = error
+          throw error
+        })
+      },
+    }
+
+    const failure = await copyExactly(source, output, bytes.byteLength).catch(
+      (error: unknown) => error,
+    )
+
+    expect(failure).toMatchObject({ code: 'EBADF' })
+    expect(failure).toBe(writeError)
+    expect(calls).toBe(2)
+    expect(await readFile(copyPath)).toEqual(bytes.subarray(0, 7))
+  },
+)
+
 test('a file that grows after its size was checked is refused, reading one byte past it', async () => {
   const { root } = await setup()
   const sourcePath = join(root, 'project', 'growing.log')

@@ -139,14 +139,14 @@ async function copyInto(
   }
 }
 
-/**
- * Copies the file the handle holds, reading at most one byte past `expectedBytes`, so a file
- * that grew after its size was checked is refused before more than that is read.
- */
 type BufferWriter = {
   write(buffer: Buffer, offset: number, length: number): Promise<{ bytesWritten: number }>
 }
 
+/**
+ * Copies the file the handle holds, reading at most one byte past `expectedBytes`, so a file
+ * that grew after its size was checked is refused before more than that is read.
+ */
 export async function copyExactly(source: FileHandle, writer: BufferWriter, expectedBytes: number) {
   const buffer = Buffer.allocUnsafe(COPY_CHUNK_BYTES)
   let copied = 0
@@ -156,10 +156,22 @@ export async function copyExactly(source: FileHandle, writer: BufferWriter, expe
     if (bytesRead === 0) break
     copied += bytesRead
     if (copied > expectedBytes) break
-    await writer.write(buffer, 0, bytesRead)
+    await writeChunk(writer, buffer, bytesRead)
   }
   if (copied !== expectedBytes)
     throw attachmentErrors.MACHINE_FILE_CHANGED({
       internal: { expectedBytes, copiedBytes: copied },
     })
+}
+
+async function writeChunk(writer: BufferWriter, buffer: Buffer, length: number) {
+  let offset = 0
+  while (offset < length) {
+    const { bytesWritten } = await writer.write(buffer, offset, length - offset)
+    if (bytesWritten === 0)
+      throw attachmentErrors.MACHINE_FILE_WRITE_STALLED({
+        internal: { chunkBytes: length, writtenBytes: offset },
+      })
+    offset += bytesWritten
+  }
 }
