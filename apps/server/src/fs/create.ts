@@ -9,11 +9,15 @@ export async function createFile(
   body: Pick<CreateFileBody, 'content'>,
   maxBytes: number,
 ) {
+  const content = body.content ?? ''
   if (target.kind === 'content') {
-    return writeTextFile(target, { content: body.content ?? '' }, maxBytes)
+    return writeTextFile(target, { content }, maxBytes)
   }
+  const size = Buffer.byteLength(content)
+  if (size > maxBytes)
+    throw new FsError('FILE_TOO_LARGE', undefined, undefined, { internal: { size, maxBytes } })
   try {
-    await writeFile(target.absolutePath, body.content ?? '', {
+    await writeFile(target.absolutePath, content, {
       encoding: 'utf8',
       flag: 'wx',
     })
