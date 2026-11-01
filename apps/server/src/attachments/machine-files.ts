@@ -143,7 +143,11 @@ async function copyInto(
  * Copies the file the handle holds, reading at most one byte past `expectedBytes`, so a file
  * that grew after its size was checked is refused before more than that is read.
  */
-export async function copyExactly(source: FileHandle, writer: FileHandle, expectedBytes: number) {
+type BufferWriter = {
+  write(buffer: Buffer, offset: number, length: number): Promise<{ bytesWritten: number }>
+}
+
+export async function copyExactly(source: FileHandle, writer: BufferWriter, expectedBytes: number) {
   const buffer = Buffer.allocUnsafe(COPY_CHUNK_BYTES)
   let copied = 0
   for (;;) {
