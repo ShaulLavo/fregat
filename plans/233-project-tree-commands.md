@@ -64,6 +64,21 @@ path/link actions through an Editor host adapter. Preserve marked selection, ren
 contexts and open payloads. Declare native file-manager capability; browser hosts retain path
 copy while unavailable reveal declines. Reuse shared menus, tooltips and truncation titles.
 
+Before implementing paste, decide whether to retain legacy overwrite safely or retire it.
+[mutation-target.ts](../apps/server/src/fs/mutation-target.ts) removes an existing permitted
+destination before the fallible transfer in [rename.ts](../apps/server/src/fs/rename.ts) or
+[copy.ts](../apps/server/src/fs/copy.ts).
+[workspace-edit.ts](../apps/server/src/fs/workspace-edit.ts) excludes competing Fregat mutations,
+but it does not restore destination bytes after an I/O failure. The
+[web wrappers](../apps/web/src/lib/file-server.ts) omit overwrite, and the
+[TUI tree actions](../apps/tui/src/tree/state/tree.ts) send false. This source finding does not
+establish an ordinary tree-action incident.
+
+Any retained overwrite path must preserve destination bytes after failed file, directory, and
+cross-device transfers. Keep failure recovery under the existing filesystem journal owner and
+test it before implementation resumes. This correction records a future design obligation.
+It does not authorize a new rollback owner or resume deferred Plan 233 implementation.
+
 Keep command IDs, titles, typed arguments and enablement in the command table under
 `packages/client-core/src/commands/`; handlers belong to the owning feature and its focus node.
 Plan 206 owns bindings as preset data under `apps/web/src/keymap/presets/`, including Linux/macOS
@@ -74,7 +89,7 @@ local shortcut listeners or inline command chords.
 ## Steps
 
 - [ ] Add failing tree parity cases for clipboard, filtered navigation, half-page selection and preview/permanent opens.
-- [ ] Implement clipboard and collision policy through existing tree intents and the filesystem journal; cover rollback and dirty-document path updates.
+- [ ] Implement clipboard and collision policy through existing tree intents and the filesystem journal. Decide whether the legacy overwrite path is retained safely or retired. Preserve destination bytes after failed file, directory, and cross-device transfers, and cover those failures under the existing journal owner with dirty-document path updates.
 - [ ] Wire remaining tree and Editor host actions, recoverable trash and marked-file comparison; enable exact preset payloads.
 - [ ] Add `zed-project-tree-commands` using disposable filesystem fixtures and a fixture native reveal adapter.
 - [ ] Run the acceptance checks, record screenshot evidence, then commit, push and deploy the implementation.
@@ -82,7 +97,9 @@ local shortcut listeners or inline command chords.
 ## Acceptance
 
 Run the focused tree keyboard suite and file-operation tests for copy/cut, ancestor-mark
-reduction, collisions, failed paste, dirty moved documents and trash recovery.
+reduction, collisions, failed paste, failed file/directory/cross-device overwrite transfers,
+dirty moved documents and trash recovery. Keep the failed-transfer cases under the existing
+journal owner and assert that the destination bytes remain intact.
 `zed-project-tree-commands` uses marked files, context-menu opening, preview/permanent and split
 opens, filtered navigation, every viewport action, compare, clipboard and recovery. Owner data
 must stay outside fixtures; native reveal tests use an injected host adapter.

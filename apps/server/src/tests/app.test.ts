@@ -2,7 +2,17 @@ import serverPackage from '../../package.json' with { type: 'json' }
 import { textWriteRequest } from '../../test/file-transport'
 import { readTextResponse } from '../../test/file-transport'
 import { randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, lstat, readFile, rm, symlink, truncate, writeFile } from 'node:fs/promises'
+import {
+  mkdir,
+  mkdtemp,
+  lstat,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  truncate,
+  writeFile,
+} from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
 import { healthDescriptorSchema, ORCHESTRATION_WS_PROTOCOL_VERSION } from '@workspace/contracts'
 import * as v from 'valibot'
@@ -346,6 +356,99 @@ describe('fs rpc filesystem limits', () => {
     expect(refused.status).toBe(413)
     expect(await errorCode(refused)).toBe('FILE_TOO_LARGE')
     expect(await readFile(path.join(root, 'bom.txt'))).toEqual(Buffer.from(content))
+  })
+
+  it.each([
+    { body: { path: 'omitted.txt' }, bytes: Buffer.from(''), status: 200 },
+    { body: { path: 'empty.txt', content: '' }, bytes: Buffer.from(''), status: 200 },
+    { body: { path: 'ascii.txt', content: 'abcde' }, bytes: Buffer.from('abcde'), status: 200 },
+    {
+      body: { path: 'false.txt', overwrite: false },
+      bytes: Buffer.from(''),
+      status: 200,
+    },
+    {
+      body: { path: 'exact.txt', content: 'éabc' },
+      bytes: Buffer.from('éabc'),
+      status: 200,
+    },
+    {
+      body: { path: 'false-exact.txt', content: 'éabc', overwrite: false },
+      bytes: Buffer.from('éabc'),
+      status: 200,
+    },
+    { body: { path: 'over.txt', content: 'éabcd' }, bytes: Buffer.from('éabcd'), status: 413 },
+    {
+      body: { path: 'false-over.txt', content: 'éabcd', overwrite: false },
+      bytes: Buffer.from('éabcd'),
+      status: 413,
+    },
+  ])('enforces the byte cap for exclusive creates: %#', async ({ body, bytes, status }) => {
+    const root = await fixtureRoot()
+    const app = testApp(root, { maxTextFileBytes: 5 })
+    const response = await app.handle(
+      new Request('http://local/fs/create-file', {
+        body: JSON.stringify(body),
+        headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
+        method: 'POST',
+      }),
+    )
+
+    expect(response.status).toBe(status)
+    const target = path.join(root, body.path)
+    if (status === 413) {
+      expect(await errorCode(response)).toBe('FILE_TOO_LARGE')
+      await expect(lstat(target)).rejects.toMatchObject({ code: 'ENOENT' })
+      expect(await readdir(root)).toEqual([])
+      return
+    }
+
+    expect(await readFile(target)).toEqual(bytes)
+  })
+
+  it.each([
+    { path: 'overwrite-exact.txt', content: 'éabc', bytes: Buffer.from('éabc'), status: 200 },
+    { path: 'overwrite-over.txt', content: 'éabcd', bytes: Buffer.from('base'), status: 413 },
+  ])(
+    'keeps overwrite byte-cap protection: %#',
+    async ({ path: targetPath, content, bytes, status }) => {
+      const root = await fixtureRoot()
+      const target = path.join(root, targetPath)
+      await writeFile(target, 'base')
+      const app = testApp(root, { maxTextFileBytes: 5 })
+      const response = await app.handle(
+        new Request('http://local/fs/create-file', {
+          body: JSON.stringify({ content, overwrite: true, path: targetPath }),
+          headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
+          method: 'POST',
+        }),
+      )
+
+      expect(response.status).toBe(status)
+      if (status === 413) {
+        expect(await errorCode(response)).toBe('FILE_TOO_LARGE')
+      }
+      expect(await readFile(target)).toEqual(bytes)
+      expect(await readdir(root)).toEqual([targetPath])
+    },
+  )
+
+  it('preserves existing bytes when an exclusive create collides', async () => {
+    const root = await fixtureRoot()
+    const target = path.join(root, 'occupied.txt')
+    await writeFile(target, 'before')
+    const app = testApp(root, { maxTextFileBytes: 5 })
+    const response = await app.handle(
+      new Request('http://local/fs/create-file', {
+        body: JSON.stringify({ content: 'after', path: 'occupied.txt' }),
+        headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
+        method: 'POST',
+      }),
+    )
+
+    expect(response.status).toBe(409)
+    expect(await errorCode(response)).toBe('ALREADY_EXISTS')
+    expect(await readFile(target)).toEqual(Buffer.from('before'))
   })
 
   it('refuses to overwrite a file whose bytes do not round-trip as UTF-8', async () => {
