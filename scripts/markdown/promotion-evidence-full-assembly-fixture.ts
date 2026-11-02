@@ -33,6 +33,49 @@ import type { PromotionEvidence } from './promotion'
 import type { qualificationProvenance } from './provenance'
 
 type Source = Awaited<ReturnType<typeof qualificationProvenance>>
+export type PromotionPhaseDiagnostics = {
+  phases: { phase: string; wallMs: number }[]
+  childProcesses: number
+  bytesCopied: number
+  gitOperations: number
+  cleanupMs?: number
+}
+
+export function recordFixtureChildProcess(
+  diagnostics: PromotionPhaseDiagnostics | undefined,
+): void {
+  if (!diagnostics) return
+  diagnostics.childProcesses++
+}
+
+export async function measureFixturePhase<T>(
+  diagnostics: PromotionPhaseDiagnostics | undefined,
+  phase: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  if (!diagnostics) return run()
+  const started = performance.now()
+  try {
+    return await run()
+  } finally {
+    diagnostics.phases.push({ phase, wallMs: Math.round(performance.now() - started) })
+  }
+}
+
+export function measureFixturePhaseSync<T>(
+  diagnostics: PromotionPhaseDiagnostics | undefined,
+  phase: string,
+  run: () => T,
+): T {
+  if (!diagnostics) return run()
+  const started = performance.now()
+  try {
+    return run()
+  } finally {
+    diagnostics.phases.push({ phase, wallMs: Math.round(performance.now() - started) })
+  }
+}
+
 type Resources = {
   rawTrials: readonly {
     workload: string
@@ -555,8 +598,9 @@ export async function writeFullSyntheticTiming(options: {
   identity: PromotionEvidence['identity']
   provenance: Source
   resources: Resources
+  diagnostics?: PromotionPhaseDiagnostics
 }) {
-  const { directory, identity, provenance, sourceRoot, resources } = options
+  const { directory, identity, provenance, sourceRoot, resources, diagnostics } = options
   const frozenProvenance = {
     revision: provenance.revision,
     trackedDiffSha256: provenance.trackedDiffSha256,
@@ -572,18 +616,27 @@ export async function writeFullSyntheticTiming(options: {
     ['fixture.woff2', 'fixture font bytes'],
   ])
     await writeFile(path.join(directory, 'assets', name), bytes)
-  await writeFile(
-    path.join(directory, 'files/bun.lock'),
-    await readFile(path.join(sourceRoot, 'bun.lock')),
-  )
-  await writeFile(
-    path.join(directory, 'files/promotion-budget.json'),
-    await readFile(new URL('./promotion-budget.json', import.meta.url)),
-  )
+  const copiedFiles = [
+    {
+      source: path.join(sourceRoot, 'bun.lock'),
+      destination: path.join(directory, 'files/bun.lock'),
+    },
+    {
+      source: new URL('./promotion-budget.json', import.meta.url),
+      destination: path.join(directory, 'files/promotion-budget.json'),
+    },
+  ]
+  for (const file of copiedFiles) {
+    const bytes = await readFile(file.source)
+    if (diagnostics) diagnostics.bytesCopied += bytes.byteLength
+    await writeFile(file.destination, bytes)
+  }
   for (const row of provenance.sources) {
     const file = path.join(directory, 'source', row.file)
     await mkdir(path.dirname(file), { recursive: true })
-    await writeFile(file, await readFile(path.join(sourceRoot, row.file)))
+    const bytes = await readFile(path.join(sourceRoot, row.file))
+    if (diagnostics) diagnostics.bytesCopied += bytes.byteLength
+    await writeFile(file, bytes)
   }
   await save(directory, 'freeze.json', { identity, provenance: frozenProvenance, fontFingerprint })
   await writeNative(directory, identity, provenance)
@@ -643,7 +696,10 @@ export async function recordStatistics(
   return statistics
 }
 
-export async function fullAssemblySummary(manifestPath: string) {
+export async function fullAssemblySummary(
+  manifestPath: string,
+  diagnostics?: PromotionPhaseDiagnostics,
+) {
   const directory = path.dirname(manifestPath)
   const evidencePath = path.join(directory, 'assembled-evidence.json')
   const reportPath = path.join(directory, 'assembled-report.json')
@@ -668,6 +724,7 @@ export async function fullAssemblySummary(manifestPath: string) {
     ],
     { encoding: 'utf8', timeout: 360_000, maxBuffer: 2 * 1024 * 1024 },
   )
+  recordFixtureChildProcess(diagnostics)
   const { parsePromotionEvidenceAssemblyManifest } = await import('./promotion-evidence')
   const {
     verifyPromotionArtifacts,
