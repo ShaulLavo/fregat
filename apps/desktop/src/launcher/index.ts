@@ -26,6 +26,8 @@ import { readInstallManifest } from './install-receipt'
 import { appBundle } from './bundle'
 import { readSettings } from './settings'
 
+// Plan 351 native-source selection evidence.
+
 const bundle = appBundle()
 const root = bundle ? null : path.resolve(import.meta.dirname, '../../../..')
 if (root) applyEnvFileOverrides(path.join(root, '.env'), Bun.env)
