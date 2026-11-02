@@ -28,6 +28,10 @@ import {
 } from './promotion'
 import {
   fullAssemblySummary,
+  measureFixturePhase,
+  measureFixturePhaseSync,
+  recordFixtureChildProcess,
+  type PromotionPhaseDiagnostics,
   syntheticNativeResources,
   writeFullSyntheticTiming,
   syntheticProductionTemplate,
@@ -69,7 +73,11 @@ import {
 } from './promotion-evidence'
 
 const temporary = new Set<string>()
+let activeDiagnostics: PromotionPhaseDiagnostics | undefined
 const sha = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex')
+function createDiagnostics(): PromotionPhaseDiagnostics {
+  return { phases: [], childProcesses: 0, bytesCopied: 0, gitOperations: 0 }
+}
 const identity = (budgetSha256: string) => ({
   candidateCommit: 'a'.repeat(40),
   grammarSha256: sha('grammar'),
@@ -119,10 +127,15 @@ const interactions = FROZEN_SCENARIOS.interactions ?? []
 const safety = FROZEN_SCENARIOS.safety ?? []
 const frames = FROZEN_SCENARIOS['frame-probes'] ?? []
 afterEach(async () => {
+  const started = performance.now()
   await Promise.all(
     Array.from(temporary, (directory) => rm(directory, { recursive: true, force: true })),
   )
   temporary.clear()
+  if (!activeDiagnostics) return
+  activeDiagnostics.cleanupMs = Math.round(performance.now() - started)
+  console.log('PROMOTION_PHASE_TIMING', JSON.stringify(activeDiagnostics))
+  activeDiagnostics = undefined
 })
 
 async function fixture(existingDirectory?: string) {
@@ -1416,7 +1429,14 @@ test('positively reconciles eight producer-shaped development and visual gates',
   expect(result.validation.verdict).toBe('NOT VERIFIED')
 })
 
-function fixtureCommand(directory: string, command: string, args: readonly string[]) {
+function fixtureCommand(
+  directory: string,
+  command: string,
+  args: readonly string[],
+  diagnostics?: PromotionPhaseDiagnostics,
+) {
+  recordFixtureChildProcess(diagnostics)
+  if (command === 'git' && diagnostics) diagnostics.gitOperations += 1
   const result = spawnSync(command, args, { cwd: directory, encoding: 'utf8', timeout: 30_000 })
   expect(result.error).toBeUndefined()
   expect(result.status, result.stderr).toBe(0)
@@ -1704,17 +1724,22 @@ async function syntheticCustody(
   )
 }
 
-function syntheticProvenance(root: string) {
+function syntheticProvenance(root: string, diagnostics?: PromotionPhaseDiagnostics) {
   const module = fileURLToPath(new URL('./provenance.ts', import.meta.url))
   return JSON.parse(
-    fixtureCommand(root, 'bun', [
-      '--eval',
-      `import {qualificationProvenance} from ${JSON.stringify(module)}; process.stdout.write(JSON.stringify(await qualificationProvenance(${JSON.stringify(root)})))`,
-    ]),
+    fixtureCommand(
+      root,
+      'bun',
+      [
+        '--eval',
+        `import {qualificationProvenance} from ${JSON.stringify(module)}; process.stdout.write(JSON.stringify(await qualificationProvenance(${JSON.stringify(root)})))`,
+      ],
+      diagnostics,
+    ),
   )
 }
 
-async function trustedSyntheticFixture() {
+async function trustedSyntheticFixture(diagnostics?: PromotionPhaseDiagnostics) {
   const root = await mkdtemp(path.join(tmpdir(), 'promotion-trusted-'))
   temporary.add(root)
   await writeSyntheticTree(root)
@@ -1738,21 +1763,28 @@ async function trustedSyntheticFixture() {
   }
   const manifestBytes = JSON.stringify(manifest)
   await writeFile(path.join(root, 'packages/markdown/test/evaluation/manifest.json'), manifestBytes)
-  fixtureCommand(root, 'git', ['init', '--quiet'])
-  fixtureCommand(root, 'git', ['add', '.'])
-  fixtureCommand(root, 'git', [
-    '-c',
-    'user.name=Synthetic fixture',
-    '-c',
-    'user.email=fixture@example.test',
-    '-c',
-    'core.hooksPath=/dev/null',
-    'commit',
-    '--quiet',
-    '-m',
-    'Synthetic source fixture',
-  ])
-  const captured = syntheticProvenance(root)
+  fixtureCommand(root, 'git', ['init', '--quiet'], diagnostics)
+  fixtureCommand(root, 'git', ['add', '.'], diagnostics)
+  fixtureCommand(
+    root,
+    'git',
+    [
+      '-c',
+      'user.name=Synthetic fixture',
+      '-c',
+      'user.email=fixture@example.test',
+      '-c',
+      'core.hooksPath=/dev/null',
+      'commit',
+      '--quiet',
+      '-m',
+      'Synthetic source fixture',
+    ],
+    diagnostics,
+  )
+  const captured = measureFixturePhaseSync(diagnostics, 'syntheticProvenance:initial', () =>
+    syntheticProvenance(root, diagnostics),
+  )
   const candidate: CandidateIdentity = {
     candidateCommit: captured.revision,
     candidateSourceSha256: captured.sourceClosureSha256,
@@ -1769,23 +1801,32 @@ async function trustedSyntheticFixture() {
     },
   }
   await syntheticCustody(root, manifest, candidate)
-  fixtureCommand(root, 'git', ['add', '.'])
-  fixtureCommand(root, 'git', [
-    '-c',
-    'user.name=Synthetic fixture',
-    '-c',
-    'user.email=fixture@example.test',
-    '-c',
-    'core.hooksPath=/dev/null',
-    'commit',
-    '--quiet',
-    '-m',
-    'Synthetic custody registration',
-  ])
-  const registered = syntheticProvenance(root)
+  fixtureCommand(root, 'git', ['add', '.'], diagnostics)
+  fixtureCommand(
+    root,
+    'git',
+    [
+      '-c',
+      'user.name=Synthetic fixture',
+      '-c',
+      'user.email=fixture@example.test',
+      '-c',
+      'core.hooksPath=/dev/null',
+      'commit',
+      '--quiet',
+      '-m',
+      'Synthetic custody registration',
+    ],
+    diagnostics,
+  )
+  const registered = measureFixturePhaseSync(diagnostics, 'syntheticProvenance:registered', () =>
+    syntheticProvenance(root, diagnostics),
+  )
   candidate.candidateCommit = registered.revision
   candidate.candidateSourceSha256 = registered.sourceClosureSha256
-  const evaluation = await syntheticTrustedEvaluation(root, sha(manifestBytes), batch, candidate)
+  const evaluation = await measureFixturePhase(diagnostics, 'syntheticTrustedEvaluation', () =>
+    syntheticTrustedEvaluation(root, sha(manifestBytes), batch, candidate),
+  )
   const options = {
     root,
     evaluationReceipt: evaluation.reportPath,
@@ -1908,14 +1949,21 @@ test('clears prior assembly outputs when current input cannot produce timing evi
 }, 60_000)
 
 test('verifies all fourteen gates from complete synthetic producer files and rejects changed or missing bytes', async () => {
-  const trusted = await trustedSyntheticFixture()
-  const fixture = await producerQualificationFixture(false, trusted)
+  const diagnostics = createDiagnostics()
+  activeDiagnostics = diagnostics
+  const trusted = await measureFixturePhase(diagnostics, 'fixture-construction:trusted', () =>
+    trustedSyntheticFixture(diagnostics),
+  )
+  const fixture = await measureFixturePhase(diagnostics, 'fixture-construction:qualification', () =>
+    producerQualificationFixture(false, trusted),
+  )
   const timing = await writeFullSyntheticTiming({
     directory: fixture.root,
     sourceRoot: trusted.root,
     identity: trusted.context.identity,
     provenance: trusted.captured,
     resources: resourceEvidence(),
+    diagnostics,
   })
   await syntheticNativeResources(fixture.root, trusted.captured)
   const manifest = await parsePromotionEvidenceAssemblyManifest({
@@ -1933,19 +1981,41 @@ test('verifies all fourteen gates from complete synthetic producer files and rej
   const manifestPath = path.join(fixture.root, 'assembly-input.json')
   await writeFile(manifestPath, JSON.stringify(manifest))
   try {
-    await fullAssemblyPositive(fixture.root, manifestPath, manifest)
+    await measureFixturePhase(diagnostics, 'positive-assembly', () =>
+      fullAssemblyPositive(fixture.root, manifestPath, manifest, diagnostics),
+    )
   } finally {
-    await fullAssemblyControls(fixture.root, manifestPath)
+    await fullAssemblyControls(fixture.root, manifestPath, diagnostics)
   }
+  expect(diagnostics.phases.map((entry) => entry.phase)).toEqual([
+    'syntheticProvenance:initial',
+    'syntheticProvenance:registered',
+    'syntheticTrustedEvaluation',
+    'fixture-construction:trusted',
+    'fixture-construction:qualification',
+    'fullAssemblySummary:positive',
+    'positive-assembly',
+    'control:tamper-grammar',
+    'control:missing-native-capture',
+    'control:tamper-late-hash',
+    'control:tamper-last-warmup',
+    'control:tamper-resource',
+    'control:tamper-last-input',
+  ])
+  expect(diagnostics.childProcesses).toBeGreaterThan(0)
+  expect(diagnostics.bytesCopied).toBeGreaterThan(0)
+  expect(diagnostics.gitOperations).toBeGreaterThan(0)
 }, 1_200_000)
 
 async function fullAssemblyPositive(
   root: string,
   manifestPath: string,
   manifest: PromotionEvidenceAssemblyManifest,
+  diagnostics?: PromotionPhaseDiagnostics,
 ) {
-  const result = await fullAssemblySummary(manifestPath)
-  console.log('SYNTHETIC_FULL14', JSON.stringify(result))
+  const result = await measureFixturePhase(diagnostics, 'fullAssemblySummary:positive', () =>
+    fullAssemblySummary(manifestPath, diagnostics),
+  )
   expect.soft(result).toMatchObject({
     verdict: 'VERIFIED',
     finalArtifactVerdict: 'VERIFIED',
@@ -2000,20 +2070,20 @@ async function fullAssemblyPositive(
     .toBe(225)
   expect.soft(production.trialsArtifact.recordCount).toBe(3956)
   expect.soft(manifest.expectedWorkloads).toEqual(productionTimingManifest().workloads)
-  console.log(
-    'SYNTHETIC_STATISTICS',
-    await readFile(path.join(root, 'raw-production-trials.jsonl.statistics.json'), 'utf8'),
-    await readFile(path.join(root, 'raw-native-pairs.jsonl.statistics.json'), 'utf8'),
-  )
 }
 
-async function fullAssemblyControls(root: string, manifestPath: string) {
+async function fullAssemblyControls(
+  root: string,
+  manifestPath: string,
+  diagnostics?: PromotionPhaseDiagnostics,
+) {
   const grammar = path.join(root, 'assets/tree-sitter-markdown.wasm')
   const original = await readFile(grammar)
   try {
     await writeFile(grammar, 'changed grammar bytes')
-    const tampered = await fullAssemblySummary(manifestPath)
-    console.log('SYNTHETIC_TAMPERED', JSON.stringify(tampered))
+    const tampered = await measureFixturePhase(diagnostics, 'control:tamper-grammar', () =>
+      fullAssemblySummary(manifestPath, diagnostics),
+    )
     expect.soft(tampered).toMatchObject({
       verdict: 'NOT VERIFIED',
       exit: 1,
@@ -2037,8 +2107,9 @@ async function fullAssemblyControls(root: string, manifestPath: string) {
   const source = await readFile(capture)
   try {
     await rm(capture)
-    const missing = await fullAssemblySummary(manifestPath)
-    console.log('SYNTHETIC_MISSING', JSON.stringify(missing))
+    const missing = await measureFixturePhase(diagnostics, 'control:missing-native-capture', () =>
+      fullAssemblySummary(manifestPath, diagnostics),
+    )
     expect.soft(missing).toMatchObject({
       verdict: 'NOT VERIFIED',
       exit: 1,
@@ -2054,20 +2125,25 @@ async function fullAssemblyControls(root: string, manifestPath: string) {
   } finally {
     await writeFile(capture, source)
   }
-  await fullRawControls(root, manifestPath)
-  await fullSemanticControl(root, manifestPath, 'resource')
-  await fullSemanticControl(root, manifestPath, 'last-input')
+  await fullRawControls(root, manifestPath, diagnostics)
+  await fullSemanticControl(root, manifestPath, 'resource', diagnostics)
+  await fullSemanticControl(root, manifestPath, 'last-input', diagnostics)
 }
 
-async function fullRawControls(root: string, manifestPath: string) {
+async function fullRawControls(
+  root: string,
+  manifestPath: string,
+  diagnostics?: PromotionPhaseDiagnostics,
+) {
   const file = await open(path.join(root, 'raw-production-trials.jsonl'), 'r+')
   const stats = JSON.parse(
     await readFile(path.join(root, 'raw-production-trials.jsonl.statistics.json'), 'utf8'),
   )
   try {
     await file.write(Buffer.from(' \n'), 0, 2, stats.byteLength - 1)
-    const late = await fullAssemblySummary(manifestPath)
-    console.log('SYNTHETIC_LATE_HASH', JSON.stringify(late))
+    const late = await measureFixturePhase(diagnostics, 'control:tamper-late-hash', () =>
+      fullAssemblySummary(manifestPath, diagnostics),
+    )
     expect.soft(late).toMatchObject({
       verdict: 'NOT VERIFIED',
       exit: 1,
@@ -2090,8 +2166,9 @@ async function fullRawControls(root: string, manifestPath: string) {
     const marker = record.indexOf('"userAgent":"synthetic"') + '"userAgent":"syntheti'.length
     expect(marker).toBeGreaterThan('"userAgent":"syntheti'.length)
     await file.write(Buffer.from('X'), 0, 1, stats.lastWarmup.offset + marker)
-    const warmup = await fullAssemblySummary(manifestPath)
-    console.log('SYNTHETIC_LAST_WARMUP_HASH', JSON.stringify(warmup))
+    const warmup = await measureFixturePhase(diagnostics, 'control:tamper-last-warmup', () =>
+      fullAssemblySummary(manifestPath, diagnostics),
+    )
     expect.soft(warmup).toMatchObject({
       verdict: 'NOT VERIFIED',
       exit: 1,
@@ -2115,6 +2192,7 @@ async function fullSemanticControl(
   root: string,
   manifestPath: string,
   kind: 'resource' | 'last-input',
+  diagnostics?: PromotionPhaseDiagnostics,
 ) {
   const stats = JSON.parse(
     await readFile(path.join(root, 'raw-production-trials.jsonl.statistics.json'), 'utf8'),
@@ -2150,8 +2228,9 @@ async function fullSemanticControl(
       quietPath,
       JSON.stringify({ ...JSON.parse(quietBytes), reportSha256: sha(encoded) }),
     )
-    const result = await fullAssemblySummary(manifestPath)
-    console.log(`SYNTHETIC_REHASHED_${kind}`, JSON.stringify(result))
+    const result = await measureFixturePhase(diagnostics, `control:tamper-${kind}`, () =>
+      fullAssemblySummary(manifestPath, diagnostics),
+    )
     expect.soft(result).toMatchObject({
       verdict: 'NOT VERIFIED',
       exit: 1,
