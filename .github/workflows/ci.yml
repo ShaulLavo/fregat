@@ -65,6 +65,7 @@ jobs:
       server: ${{ steps.plan.outputs.server }}
       tui: ${{ steps.plan.outputs.tui }}
       desktop: ${{ steps.plan.outputs.desktop }}
+      desktop_native: ${{ steps.plan.outputs.desktop_native }}
       site: ${{ steps.plan.outputs.site }}
       web_shards: >-
         ${{ github.event_name == 'workflow_dispatch' && inputs.web_shards == '2' && '["1/2","2/2"]' || '["1/4","2/4","3/4","4/4"]' }}
@@ -241,11 +242,11 @@ jobs:
         run: bun run dev:web -- --dry-run=json > /dev/null
 
       - name: Install Linux webview build dependencies
-        if: ${{ needs.changes.outputs.desktop == 'true' }}
+        if: ${{ needs.changes.outputs.desktop_native == 'true' }}
         uses: ./.github/actions/linux-webview-deps
 
       - name: Build Linux webview host
-        if: ${{ needs.changes.outputs.desktop == 'true' }}
+        if: ${{ needs.changes.outputs.desktop_native == 'true' }}
         run: bun run --cwd apps/desktop build:native
 
       - name: Package checks

@@ -315,6 +315,9 @@ test('setup builds have a single early producer and required fail-closed imports
     producer.steps.filter((step) => step.uses === './.github/actions/workspace-builds'),
   ).toHaveLength(1)
   expect(workflow.jobs.verdict.needs).toContain('workspace-builds')
+  expect(workflow.jobs.changes.outputs.desktop_native).toBe(
+    '${{ steps.plan.outputs.desktop_native }}',
+  )
   for (const name of [
     'typecheck',
     'test-scripts',

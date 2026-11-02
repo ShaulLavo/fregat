@@ -204,6 +204,9 @@ test('CI invokes the verified action before the original native build', () => {
   const install = steps[index]
   const build = steps[index + 1]
   expect(isRecord(install) && install.uses).toBe('./.github/actions/linux-webview-deps')
+  expect(isRecord(install) && install.if).toBe(
+    "${{ needs.changes.outputs.desktop_native == 'true' }}",
+  )
   expect(isRecord(build) && build.run).toBe('bun run --cwd apps/desktop build:native')
   const action: unknown = Bun.YAML.parse(
     readFileSync(path.join(import.meta.dirname, 'action.yml'), 'utf8'),

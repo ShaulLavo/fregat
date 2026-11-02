@@ -19,12 +19,88 @@ test('a root lockfile change retains every package test and its build prerequisi
   expect(plan).toMatchObject({
     exhaustive: false,
     tooling: true,
+    desktop_native: false,
     web: true,
     server: true,
     tui: true,
     site: true,
   })
 })
+
+test.each([
+  [
+    '.github/workflows/ci.yml',
+    [
+      '@workspace/client-core',
+      '@workspace/contracts',
+      '@workspace/markdown',
+      '@workspace/observability',
+      '@workspace/pty',
+      '@workspace/push',
+      '@workspace/tree',
+      '@workspace/ui',
+      '@workspace/utils',
+      'desktop',
+      'scripts',
+      'server',
+      'site',
+      'tui',
+      'web',
+    ],
+    false,
+  ],
+  [
+    'scripts/ci/affected.mjs',
+    [
+      '@workspace/client-core',
+      '@workspace/contracts',
+      '@workspace/markdown',
+      '@workspace/observability',
+      '@workspace/pty',
+      '@workspace/push',
+      '@workspace/tree',
+      '@workspace/ui',
+      '@workspace/utils',
+      'desktop',
+      'scripts',
+      'server',
+      'site',
+      'tui',
+      'web',
+    ],
+    false,
+  ],
+  [
+    '.github/actions/linux-webview-deps/action.yml',
+    [
+      '@workspace/client-core',
+      '@workspace/contracts',
+      '@workspace/markdown',
+      '@workspace/observability',
+      '@workspace/pty',
+      '@workspace/push',
+      '@workspace/tree',
+      '@workspace/ui',
+      '@workspace/utils',
+      'desktop',
+      'scripts',
+      'server',
+      'site',
+      'tui',
+      'web',
+    ],
+    true,
+  ],
+  ['apps/desktop/src/launcher/index.ts', ['desktop'], true],
+  ['apps/web/src/main.tsx', ['web'], false],
+])(
+  '%s keeps package selection and native selection independent',
+  (file, packages, desktopNative) => {
+    const plan = select([file])
+    expect(plan.packages).toEqual(packages)
+    expect(plan.desktop_native).toBe(desktopNative)
+  },
+)
 
 test('the four documentation files in PR 1207 do not consume application or library runners', () => {
   const plan = select([
@@ -135,6 +211,7 @@ test('scheduled and manual validation retain every package', () => {
   expect(select([], true).packages).toHaveLength(graph.packages.size)
   expect(select([], true)).toMatchObject({
     tooling: true,
+    desktop_native: true,
     web: true,
     server: true,
     tui: true,

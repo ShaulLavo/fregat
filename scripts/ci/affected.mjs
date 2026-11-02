@@ -4,6 +4,13 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 
 const generatedDocs = ['docs/settings-reference.md', 'docs/native-syntax-coverage.*']
+const desktopNativeInputs = [
+  '.github/actions/linux-webview-deps/**',
+  'apps/desktop/native/**',
+  'apps/desktop/package.json',
+  'apps/desktop/scripts/**',
+  'apps/desktop/src/**',
+]
 
 function readJson(file) {
   return JSON.parse(readFileSync(file, 'utf8'))
@@ -133,6 +140,7 @@ function changedOwners(graph, files) {
   const globalChanged = files.some((file) => matches(file, graph.globalInputs))
   const seeds = new Set(globalChanged ? graph.packages.keys() : [])
   let tooling = globalChanged
+  const desktopNative = files.some((file) => matches(file, desktopNativeInputs))
   for (const file of files) {
     if (matches(file, generatedDocs)) {
       tooling = true
@@ -147,7 +155,7 @@ function changedOwners(graph, files) {
     if (file.startsWith('apps/mac/')) continue
     tooling = true
   }
-  return { seeds, tooling }
+  return { desktopNative, seeds, tooling }
 }
 
 export function selectAffected(graph, files, full = false) {
@@ -155,6 +163,7 @@ export function selectAffected(graph, files, full = false) {
   const packages = Array.from(full ? graph.packages.keys() : owned.seeds).sort()
   const selected = new Set(packages)
   const tooling = full || owned.tooling || selected.has('scripts')
+  const desktopNative = full || owned.desktopNative
   const sites = selected.has('site') ? 'fregat' : ''
   return {
     exhaustive: full,
@@ -167,6 +176,7 @@ export function selectAffected(graph, files, full = false) {
     tui: selected.has('tui'),
     tree: selected.has('@workspace/tree'),
     desktop: selected.has('desktop'),
+    desktop_native: desktopNative,
     site: sites.length > 0,
     sites,
     docs: files.some(rootDocument),
