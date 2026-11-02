@@ -16,7 +16,7 @@
         "oxfmt": "catalog:",
         "oxlint": "catalog:",
         "pngjs": "7.0.0",
-        "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#7e84c579018564b64c023a60008f2a45157a6ef1",
+        "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#f02e277a34375f326572b4ade2602f44ac769005",
         "turbo": "catalog:",
         "typescript": "catalog:",
         "typescript-api": "catalog:",
@@ -464,7 +464,7 @@
     "@fregat/hotkeys": "catalog:",
     "@opentui/core": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-core-0.5.12-bubli.2.tgz",
     "@opentui/react": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-react-0.5.12-bubli.2.tgz",
-    "@singapore-editor/collab": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-collab-0.0.4.tgz",
+    "@singapore-editor/collab": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-collab-0.0.4.tgz",
     "@singapore-editor/collaboration": "catalog:",
     "@singapore-editor/core": "catalog:",
     "@singapore-editor/diff": "catalog:",
@@ -477,16 +477,16 @@
     "@singapore-editor/markdown": "catalog:",
     "@singapore-editor/minimap": "catalog:",
     "@singapore-editor/paged": "catalog:",
-    "@singapore-editor/panes": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-panes-0.2.9.tgz",
+    "@singapore-editor/panes": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-panes-0.2.9.tgz",
     "@singapore-editor/plugin-ui": "catalog:",
     "@singapore-editor/react": "catalog:",
     "@singapore-editor/scope-lines": "catalog:",
-    "@singapore-editor/solid": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-solid-0.2.9.tgz",
+    "@singapore-editor/solid": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-solid-0.2.10.tgz",
     "@singapore-editor/spellcheck": "catalog:",
     "@singapore-editor/textbuffer": "catalog:",
     "@singapore-editor/tree-sitter": "catalog:",
     "@singapore-editor/tree-sitter-languages": "catalog:",
-    "@singapore-editor/typescript-lsp": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-typescript-lsp-0.2.9.tgz",
+    "@singapore-editor/typescript-lsp": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-typescript-lsp-0.2.10.tgz",
     "ghostty-webgpu": "catalog:",
     "lodash-es": "4.18.1",
     "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#d4c988a02313fef32a307f8f254ab7a1dba18515",
@@ -495,29 +495,29 @@
     "@fregat/hotkeys": "https://github.com/ShaulLavo/hotkeys/releases/download/hotkeys-3de9d21e2299d2b94ed2d8b012c25bf9358dcfbd/fregat-hotkeys-3de9d21e2299d2b94ed2d8b012c25bf9358dcfbd.tgz",
     "@opentui/core": "0.5.12",
     "@opentui/react": "0.5.12",
-    "@singapore-editor/collaboration": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-collaboration-0.0.4.tgz",
-    "@singapore-editor/core": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-core-0.2.9.tgz",
-    "@singapore-editor/diff": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-diff-0.2.9.tgz",
-    "@singapore-editor/file-animation": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-file-animation-0.2.9.tgz",
-    "@singapore-editor/find": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-find-0.2.9.tgz",
-    "@singapore-editor/gutters": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-gutters-0.2.9.tgz",
-    "@singapore-editor/highlighting": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-highlighting-0.2.10.tgz",
-    "@singapore-editor/lsp": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-lsp-0.2.9.tgz",
-    "@singapore-editor/lsp-plugin": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-lsp-plugin-0.2.9.tgz",
-    "@singapore-editor/markdown": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-markdown-0.2.9.tgz",
-    "@singapore-editor/minimap": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-minimap-0.2.9.tgz",
-    "@singapore-editor/paged": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-paged-0.2.9.tgz",
-    "@singapore-editor/plugin-ui": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-plugin-ui-0.2.9.tgz",
-    "@singapore-editor/react": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-react-0.2.9.tgz",
-    "@singapore-editor/scope-lines": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-scope-lines-0.2.9.tgz",
-    "@singapore-editor/spellcheck": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-spellcheck-0.2.9.tgz",
-    "@singapore-editor/textbuffer": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-textbuffer-0.2.9.tgz",
-    "@singapore-editor/tree-sitter": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-tree-sitter-0.2.9.tgz",
-    "@singapore-editor/tree-sitter-languages": "https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-tree-sitter-languages-0.2.10.tgz",
+    "@singapore-editor/collaboration": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-collaboration-0.0.5.tgz",
+    "@singapore-editor/core": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-core-0.2.10.tgz",
+    "@singapore-editor/diff": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-diff-0.2.10.tgz",
+    "@singapore-editor/file-animation": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-file-animation-0.2.10.tgz",
+    "@singapore-editor/find": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-find-0.2.10.tgz",
+    "@singapore-editor/gutters": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-gutters-0.2.10.tgz",
+    "@singapore-editor/highlighting": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-highlighting-0.2.11.tgz",
+    "@singapore-editor/lsp": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-lsp-0.2.9.tgz",
+    "@singapore-editor/lsp-plugin": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-lsp-plugin-0.2.10.tgz",
+    "@singapore-editor/markdown": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-markdown-0.2.10.tgz",
+    "@singapore-editor/minimap": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-minimap-0.2.10.tgz",
+    "@singapore-editor/paged": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-paged-0.2.10.tgz",
+    "@singapore-editor/plugin-ui": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-plugin-ui-0.2.10.tgz",
+    "@singapore-editor/react": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-react-0.2.10.tgz",
+    "@singapore-editor/scope-lines": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-scope-lines-0.2.10.tgz",
+    "@singapore-editor/spellcheck": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-spellcheck-0.2.10.tgz",
+    "@singapore-editor/textbuffer": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-textbuffer-0.2.9.tgz",
+    "@singapore-editor/tree-sitter": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-tree-sitter-0.2.10.tgz",
+    "@singapore-editor/tree-sitter-languages": "https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-tree-sitter-languages-0.2.11.tgz",
     "@types/bun": "1.4.2",
     "@vitest/browser-playwright": "5.0.2",
     "evlog": "2.29.0",
-    "ghostty-webgpu": "https://github.com/ShaulLavo/ghostty-webgpu/releases/download/v0.3.30-a322323/ghostty-webgpu.tgz",
+    "ghostty-webgpu": "https://github.com/ShaulLavo/ghostty-webgpu/releases/download/v0.3.31-87127c8/ghostty-webgpu.tgz",
     "knip": "6.38.0",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
@@ -1297,45 +1297,45 @@
 
     "@sindresorhus/is": ["@sindresorhus/is@7.2.0", "", {}, "sha512-P1Cz1dWaFfR4IR+U13mqqiGsLFf1KbayybWwdd2vfctdV6hDpUkgCY0nKOLLTMSoRd/jJNjtbqzf13K8DCCXQw=="],
 
-    "@singapore-editor/collab": ["@singapore-editor/collab@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-collab-0.0.4.tgz", { "dependencies": { "@singapore-editor/textbuffer": "0.2.9" } }, "sha512-mUOdH1MFWup5gXWWHcOwTGSGcbtqaTsDVSL/BCXuA22HislbZe3pNL8q6KrPd2LZGBX9dFeBgkUya3xbPErN/Q=="],
+    "@singapore-editor/collab": ["@singapore-editor/collab@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-collab-0.0.4.tgz", { "dependencies": { "@singapore-editor/textbuffer": "0.2.9" } }, "sha512-mUOdH1MFWup5gXWWHcOwTGSGcbtqaTsDVSL/BCXuA22HislbZe3pNL8q6KrPd2LZGBX9dFeBgkUya3xbPErN/Q=="],
 
-    "@singapore-editor/collaboration": ["@singapore-editor/collaboration@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-collaboration-0.0.4.tgz", { "dependencies": { "@noble/hashes": "2.4.0", "@singapore-editor/collab": "0.0.4", "@singapore-editor/core": "0.2.9", "@singapore-editor/plugin-ui": "0.2.9", "@singapore-editor/textbuffer": "0.2.9" } }, "sha512-R5OR+w5ybYk9x2OmRW6c6rYU4THfy4qMzou1AsW1bn6OEkr4Y4Rd8WXInZZMQPISFF9ZVKypS0z95M7wW/B7zA=="],
+    "@singapore-editor/collaboration": ["@singapore-editor/collaboration@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-collaboration-0.0.5.tgz", { "dependencies": { "@noble/hashes": "2.4.0", "@singapore-editor/collab": "0.0.4", "@singapore-editor/core": "0.2.10", "@singapore-editor/plugin-ui": "0.2.10", "@singapore-editor/textbuffer": "0.2.9" } }, "sha512-73tf4R6pSrGpCrMbpHn469J578STX5J/gdCfrJRYqkU61Zqdyp4Xhm8vVZYmkFiU93pds7VrxQ2WjCS4Z31dOw=="],
 
-    "@singapore-editor/core": ["@singapore-editor/core@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-core-0.2.9.tgz", { "dependencies": { "@fregat/hotkeys": "https://github.com/ShaulLavo/hotkeys/releases/download/hotkeys-3de9d21e2299d2b94ed2d8b012c25bf9358dcfbd/fregat-hotkeys-3de9d21e2299d2b94ed2d8b012c25bf9358dcfbd.tgz", "@shikijs/engine-oniguruma": "4.4.3", "@singapore-editor/textbuffer": "0.2.9", "diff": "^9.0.0", "evlog": "^2.29.0", "shiki": "^4.4.3" } }, "sha512-Is4RT3sZpAZp5IegxGNpvv+uQrFJCRyXjjAb1Y6Z2kKEEwifXxvaH4ggJsblqqvyrr2vO2WiYfi53hXSHPChUQ=="],
+    "@singapore-editor/core": ["@singapore-editor/core@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-core-0.2.10.tgz", { "dependencies": { "@fregat/hotkeys": "https://github.com/ShaulLavo/hotkeys/releases/download/hotkeys-3de9d21e2299d2b94ed2d8b012c25bf9358dcfbd/fregat-hotkeys-3de9d21e2299d2b94ed2d8b012c25bf9358dcfbd.tgz", "@shikijs/engine-oniguruma": "4.4.3", "@singapore-editor/textbuffer": "0.2.9", "diff": "^9.0.0", "evlog": "^2.29.0", "shiki": "^4.4.3" } }, "sha512-a/jXEN2Yfr2qQOO4TZox8oco7vR9HcUmyURH/terZIuEFewGQ9TpK1mXo14cLPAKNRegSh3WfDUEv0tg39Y0hQ=="],
 
-    "@singapore-editor/diff": ["@singapore-editor/diff@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-diff-0.2.9.tgz", { "dependencies": { "@singapore-editor/core": "0.2.9", "diff": "^9.0.0" } }, "sha512-gzvQNIFSAoZRjptz5XtuKSulUccgMVzeWdQiEzEyJZSE3LUsmst2SJnnnQEKoCZwqN94XAR6J/Zbbzg0K92MDw=="],
+    "@singapore-editor/diff": ["@singapore-editor/diff@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-diff-0.2.10.tgz", { "dependencies": { "@singapore-editor/core": "0.2.10", "diff": "^9.0.0" } }, "sha512-f9af0ymEJc2lTBAFxbmQ/EBkboul3FI5Bc38i3ies/FhiJGYqj+3pPUTCncJBA1DXhIoLNOCFY06xjLi/OOpBw=="],
 
-    "@singapore-editor/file-animation": ["@singapore-editor/file-animation@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-file-animation-0.2.9.tgz", { "dependencies": { "@singapore-editor/core": "0.2.9" } }, "sha512-FGfNqPTkDvRrh036NfSw1avUBQKEyV6hWvcFA0B5K0e1XwtTBmOU9NVC7cLXWQeGn2+qlWJp1V/yZUdNlhTsGA=="],
+    "@singapore-editor/file-animation": ["@singapore-editor/file-animation@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-file-animation-0.2.10.tgz", { "dependencies": { "@singapore-editor/core": "0.2.10" } }, "sha512-yvXkdV7mVJd9a7DPieff+Me9I8YomyOqL5vM/96LEwgKTPBIljPZfX6fzwdfpcqvbO3KR/7VRMAT8bATbIv8rA=="],
 
-    "@singapore-editor/find": ["@singapore-editor/find@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-find-0.2.9.tgz", { "peerDependencies": { "@singapore-editor/core": "0.2.9" } }, "sha512-nXsZ1VjluJI9dayN7+xnJwg8lBNsOlhM2B/RNcPAFhHgm65S1Gbwdi/wdsGk2W0tWZ0dZV1ifi9GT64HzICW7Q=="],
+    "@singapore-editor/find": ["@singapore-editor/find@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-find-0.2.10.tgz", { "peerDependencies": { "@singapore-editor/core": "0.2.10" } }, "sha512-HotT6akOc/D6ypT6tU3hrCt8U1+PshwM5ERcKD8xov9GOIdnytEUAs12WFzoV5zjOaS1rriupUguhPefGEhf/Q=="],
 
-    "@singapore-editor/gutters": ["@singapore-editor/gutters@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-gutters-0.2.9.tgz", { "dependencies": { "@singapore-editor/core": "0.2.9" } }, "sha512-/toSg+cVXSMwwYmCdEHoCow6czrbrR8m+9aiZwvONulxDMJcsc5Z0vXC7xMPvVdDL2ZXUTZNmDD73dmrLvWLug=="],
+    "@singapore-editor/gutters": ["@singapore-editor/gutters@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-gutters-0.2.10.tgz", { "dependencies": { "@singapore-editor/core": "0.2.10" } }, "sha512-zT5uuNOV+O/6CM6AsU2zwcVtpSn8LpxAhZ8BchNfPd72eOr8Sv12ik6K15EDWn1+9Xtgfbb4ijTln7D2WW4kgA=="],
 
-    "@singapore-editor/highlighting": ["@singapore-editor/highlighting@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-highlighting-0.2.10.tgz", { "dependencies": { "@singapore-editor/diff": "0.2.9", "@singapore-editor/tree-sitter": "0.2.9", "@singapore-editor/tree-sitter-languages": "0.2.10", "shiki": "^4.4.3" }, "peerDependencies": { "@singapore-editor/core": "0.2.9" } }, "sha512-30Y+CcyURs+eyZleNqKpl7ak8PXoMr5Gk3hVGD39h74qZ7Hjqny2CHQAIa28SedYPk5qgZZ6zFea7gw0edmaSg=="],
+    "@singapore-editor/highlighting": ["@singapore-editor/highlighting@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-highlighting-0.2.11.tgz", { "dependencies": { "@singapore-editor/diff": "0.2.10", "@singapore-editor/tree-sitter": "0.2.10", "@singapore-editor/tree-sitter-languages": "0.2.11", "shiki": "^4.4.3" }, "peerDependencies": { "@singapore-editor/core": "0.2.10" } }, "sha512-oooYTk180z/n1xJ64rR8cuMcaTpEi4WDNrwOyFIg29MsV0Mkn1Gbm90kQ9HvYzVOEG58lvnR0IMn5V9r1h8vhA=="],
 
-    "@singapore-editor/lsp": ["@singapore-editor/lsp@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-lsp-0.2.9.tgz", { "dependencies": { "vscode-languageserver-protocol": "^3.18.4" } }, "sha512-oc9jjGBKN4D9Cg94s1aSJkFsAyd80w4CtFwcJY2zbKv9F4t6RSJbDSfDImSVkx+2ehaty0EtslmGYJVBBBBX9Q=="],
+    "@singapore-editor/lsp": ["@singapore-editor/lsp@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-lsp-0.2.9.tgz", { "dependencies": { "vscode-languageserver-protocol": "^3.18.4" } }, "sha512-oc9jjGBKN4D9Cg94s1aSJkFsAyd80w4CtFwcJY2zbKv9F4t6RSJbDSfDImSVkx+2ehaty0EtslmGYJVBBBBX9Q=="],
 
-    "@singapore-editor/lsp-plugin": ["@singapore-editor/lsp-plugin@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-lsp-plugin-0.2.9.tgz", { "dependencies": { "@singapore-editor/lsp": "0.2.9", "@singapore-editor/plugin-ui": "0.2.9", "vscode-languageserver-protocol": "^3.18.4" }, "peerDependencies": { "@singapore-editor/core": "0.2.9" } }, "sha512-pGsi4kXNlN4oV5uAl1D8Rg4Lq+AdLxAiDqHsnhlw8J0u81npPBMBQAMCnuYn65qSVVVanH1WvXpwBCCutb8IOg=="],
+    "@singapore-editor/lsp-plugin": ["@singapore-editor/lsp-plugin@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-lsp-plugin-0.2.10.tgz", { "dependencies": { "@singapore-editor/lsp": "0.2.9", "@singapore-editor/plugin-ui": "0.2.10", "vscode-languageserver-protocol": "^3.18.4" }, "peerDependencies": { "@singapore-editor/core": "0.2.10" } }, "sha512-ujvJ46WlPQ9CkfeD6ZMPfI8X05h9V+OtGW72b8vvFwd01SIByAH0HcG/sTVPgbroC+yWI1oQXpDI+vxp8fZkGQ=="],
 
-    "@singapore-editor/markdown": ["@singapore-editor/markdown@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-markdown-0.2.9.tgz", { "dependencies": { "@singapore-editor/core": "0.2.9", "micromark-util-decode-string": "2.0.1", "micromark-util-normalize-identifier": "2.0.1", "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#f02e277a34375f326572b4ade2602f44ac769005" } }, "sha512-8XmwI3CPEcn2x9T7Na1sWmcgcH3NEmo1Yk2RCflMfwNbdjUMortLdZX8Cw5mHiwWbySbIJJuJcxGZ4Ka+xZGiA=="],
+    "@singapore-editor/markdown": ["@singapore-editor/markdown@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-markdown-0.2.10.tgz", { "dependencies": { "@singapore-editor/core": "0.2.10", "micromark-util-decode-string": "2.0.1", "micromark-util-normalize-identifier": "2.0.1", "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#f02e277a34375f326572b4ade2602f44ac769005" } }, "sha512-xycti1Ou5k5A6lKp/pT00PRFwAU7iM8GMulWXIgNp8x4hZ9AEuerL3Gv77xOXK36/F534p2iMPrDzvIadcSi8w=="],
 
-    "@singapore-editor/minimap": ["@singapore-editor/minimap@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-minimap-0.2.9.tgz", { "dependencies": { "@singapore-editor/core": "0.2.9" } }, "sha512-tnPm95NQMCqZRe9QwT8dpEw8vi3ekECQo50eMlVqrJIvdUFtZqcjkwNUz7c0ZSCighb7NGRbyz9Dy3EpfnQjxw=="],
+    "@singapore-editor/minimap": ["@singapore-editor/minimap@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-minimap-0.2.10.tgz", { "dependencies": { "@singapore-editor/core": "0.2.10" } }, "sha512-46QKRRvGbJYD9JR5MoXS/uxyEpy7TyUt5Ky8HYWyxHRWmCtOkyCi9EGTrsZ+n65MypPpMkczG4Wtw5RgRNdwQQ=="],
 
-    "@singapore-editor/paged": ["@singapore-editor/paged@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-paged-0.2.9.tgz", { "dependencies": { "@singapore-editor/core": "0.2.9" } }, "sha512-VYSvAam0yvXEdYZSax/AVD1ly1mOs8gRg/RgPadBxz9QYkkMyb7Lv8xRvtM6pbFLJpG/BDatFdGgwN6db7rPqQ=="],
+    "@singapore-editor/paged": ["@singapore-editor/paged@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-paged-0.2.10.tgz", { "dependencies": { "@singapore-editor/core": "0.2.10" } }, "sha512-C1u9bnD2JgLNdDJ7TDwrDBP9UzQA4JFcGeokdNIrRunLkOhe7yPC6iPVcw1J0zRxx+mpt2WBBI+iRM9oTyzJAw=="],
 
-    "@singapore-editor/plugin-ui": ["@singapore-editor/plugin-ui@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-plugin-ui-0.2.9.tgz", { "dependencies": { "remark-gfm": "^4.0.1", "remark-parse": "^11.0.0", "remark-stringify": "^11.0.0", "unified": "^11.0.5" }, "peerDependencies": { "@singapore-editor/core": "0.2.9" } }, "sha512-17R5IsL4Ud4l4T8wcdI2QOotiO6Fl5XXVp2muRO3YjxfkW0se/dl0dQjPEmmUncwLQBhCG4YshUo3ZF69vLspQ=="],
+    "@singapore-editor/plugin-ui": ["@singapore-editor/plugin-ui@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-plugin-ui-0.2.10.tgz", { "dependencies": { "remark-gfm": "^4.0.1", "remark-parse": "^11.0.0", "remark-stringify": "^11.0.0", "unified": "^11.0.5" }, "peerDependencies": { "@singapore-editor/core": "0.2.10" } }, "sha512-TQOhtBFEgF9Z6Hfpk23IvEKMmCPsRbtlXb02G8aVsbiXR+8szfUohvuSRPHRlIv1NYMbpn99NIbh1zyWXU8xBA=="],
 
-    "@singapore-editor/react": ["@singapore-editor/react@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-react-0.2.9.tgz", { "dependencies": { "@singapore-editor/core": "0.2.9" }, "peerDependencies": { "@singapore-editor/core": "0.2.9", "react": ">=19.0.0", "react-dom": ">=19.0.0" } }, "sha512-PH5YK3NbnmplyYHnM5RSyX2oJnz8n9u5Z2jA4XcYzHj20MsRO4Usif7aLQMvi79E7lUTlXaDKKvAQ5QRJcGIww=="],
+    "@singapore-editor/react": ["@singapore-editor/react@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-react-0.2.10.tgz", { "dependencies": { "@singapore-editor/core": "0.2.10" }, "peerDependencies": { "@singapore-editor/core": "0.2.10", "react": ">=19.0.0", "react-dom": ">=19.0.0" } }, "sha512-eGg5OINSZLiFFkkd8bRTzRLFPwjPqCxzI7y7SS1ZXPlL4UANx0t5G/RRHHBveBHxYg0fU5QYYZehZVAJCwgraQ=="],
 
-    "@singapore-editor/scope-lines": ["@singapore-editor/scope-lines@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-scope-lines-0.2.9.tgz", { "dependencies": { "@singapore-editor/core": "0.2.9" } }, "sha512-CqY9EGxLilGN53JLcl2xyKlolSqWnRLqPAL2kFNpYttxY6UudgVGVQfjW6qSeXPetcnPkxaiC20nXiVJYQs+Vg=="],
+    "@singapore-editor/scope-lines": ["@singapore-editor/scope-lines@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-scope-lines-0.2.10.tgz", { "dependencies": { "@singapore-editor/core": "0.2.10" } }, "sha512-Ep1OOBtfy3Pu3EEKBI0kP8abzmL2qEEi1WTs6GyppzQ2PZ6y6QsIDuyf7yzbMbiCfwaVN47LAepNiqvL5VGdlw=="],
 
-    "@singapore-editor/spellcheck": ["@singapore-editor/spellcheck@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-spellcheck-0.2.9.tgz", { "dependencies": { "cspell-trie-lib": "10.3.4" }, "peerDependencies": { "@singapore-editor/core": "0.2.9" } }, "sha512-OChr232DJ3yC5vbohdt7u+JFYRhhm/fH8Nw1JZ0DGXCcLPOVHC+E77IntbVcs8BdtAtC36zK/6DBCBmyl2mNGw=="],
+    "@singapore-editor/spellcheck": ["@singapore-editor/spellcheck@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-spellcheck-0.2.10.tgz", { "dependencies": { "cspell-trie-lib": "10.3.4" }, "peerDependencies": { "@singapore-editor/core": "0.2.10" } }, "sha512-fCwBEF0zj/Lqd/lp+p8TGZUZNuULMSEUcgyTkIyRj4/6dfrnyKCSVCOraxWEGXtHF+tuBOYyMTMINOTWIpcyxg=="],
 
-    "@singapore-editor/textbuffer": ["@singapore-editor/textbuffer@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-textbuffer-0.2.9.tgz", {}, "sha512-Z6kp46tKmtjGrizpQbzL2/Ifhd+nkEssNc2VYgib6bJ9gmsVnd+TEDmPon64mN+/Y1x0eO7SBqnYJqedLL3FAQ=="],
+    "@singapore-editor/textbuffer": ["@singapore-editor/textbuffer@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-textbuffer-0.2.9.tgz", {}, "sha512-Z6kp46tKmtjGrizpQbzL2/Ifhd+nkEssNc2VYgib6bJ9gmsVnd+TEDmPon64mN+/Y1x0eO7SBqnYJqedLL3FAQ=="],
 
-    "@singapore-editor/tree-sitter": ["@singapore-editor/tree-sitter@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-tree-sitter-0.2.9.tgz", { "dependencies": { "@singapore-editor/core": "0.2.9", "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#f02e277a34375f326572b4ade2602f44ac769005", "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#d4c988a02313fef32a307f8f254ab7a1dba18515" }, "peerDependencies": { "@singapore-editor/core": "0.2.9" } }, "sha512-NjHWhhL1EfQshbzN0D/JOFDUXVqFhxevRP08QsjC6XqnaGg8XMSb2Dosq6ENpacwUsdtvm8spr69Rx2LpY1G0Q=="],
+    "@singapore-editor/tree-sitter": ["@singapore-editor/tree-sitter@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-tree-sitter-0.2.10.tgz", { "dependencies": { "@singapore-editor/core": "0.2.10", "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#f02e277a34375f326572b4ade2602f44ac769005", "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#d4c988a02313fef32a307f8f254ab7a1dba18515" }, "peerDependencies": { "@singapore-editor/core": "0.2.10" } }, "sha512-KJBR1rbTtsHS1wa//FH5Slc7d0JF2aQ/38oupY0FRRd7zVho5CEJAdjzs75LAD3kNc3HcGPBLfvjLsj0dboHDg=="],
 
-    "@singapore-editor/tree-sitter-languages": ["@singapore-editor/tree-sitter-languages@https://github.com/ShaulLavo/singapore/releases/download/singapore-8e9434d94552fae13bc7e00021485552739819e1/singapore-editor-tree-sitter-languages-0.2.10.tgz", { "dependencies": { "@singapore-editor/tree-sitter": "0.2.9", "@tree-sitter-grammars/tree-sitter-lua": "0.4.1", "@tree-sitter-grammars/tree-sitter-toml": "0.7.0", "@tree-sitter-grammars/tree-sitter-yaml": "0.7.1", "tree-sitter-bash": "0.25.1", "tree-sitter-c": "0.24.1", "tree-sitter-c-sharp": "0.23.5", "tree-sitter-cpp": "0.23.4", "tree-sitter-css": "0.25.0", "tree-sitter-go": "0.25.0", "tree-sitter-html": "0.23.2", "tree-sitter-java": "0.23.5", "tree-sitter-javascript": "0.25.0", "tree-sitter-jsdoc": "0.25.0", "tree-sitter-json": "0.24.8", "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#f02e277a34375f326572b4ade2602f44ac769005", "tree-sitter-php": "0.24.2", "tree-sitter-python": "0.25.0", "tree-sitter-regex": "0.25.0", "tree-sitter-rust": "0.24.0", "tree-sitter-svelte": "0.11.0", "tree-sitter-typescript": "0.23.2" }, "peerDependencies": { "@singapore-editor/core": "0.2.9", "@singapore-editor/tree-sitter": "0.2.9" } }, "sha512-JFAoHzCW6GC6olOQcHMNswpIAccVW/+ajzWCA8I2LRfjsY/zeOXcV6FkB3ncOB2Zirk4hMFFgmPJmoYRzZddNw=="],
+    "@singapore-editor/tree-sitter-languages": ["@singapore-editor/tree-sitter-languages@https://github.com/ShaulLavo/singapore/releases/download/singapore-58bde928296e4f37ffa52330cd8b843b3c13ff04/singapore-editor-tree-sitter-languages-0.2.11.tgz", { "dependencies": { "@singapore-editor/tree-sitter": "0.2.10", "@tree-sitter-grammars/tree-sitter-lua": "0.4.1", "@tree-sitter-grammars/tree-sitter-toml": "0.7.0", "@tree-sitter-grammars/tree-sitter-yaml": "0.7.1", "tree-sitter-bash": "0.25.1", "tree-sitter-c": "0.24.1", "tree-sitter-c-sharp": "0.23.5", "tree-sitter-cpp": "0.23.4", "tree-sitter-css": "0.25.0", "tree-sitter-go": "0.25.0", "tree-sitter-html": "0.23.2", "tree-sitter-java": "0.23.5", "tree-sitter-javascript": "0.25.0", "tree-sitter-jsdoc": "0.25.0", "tree-sitter-json": "0.24.8", "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#f02e277a34375f326572b4ade2602f44ac769005", "tree-sitter-php": "0.24.2", "tree-sitter-python": "0.25.0", "tree-sitter-regex": "0.25.0", "tree-sitter-rust": "0.24.0", "tree-sitter-svelte": "0.11.0", "tree-sitter-typescript": "0.23.2" }, "peerDependencies": { "@singapore-editor/core": "0.2.10", "@singapore-editor/tree-sitter": "0.2.10" } }, "sha512-iTGq51pmQZvV2mvms2iDjJ9wBBVHCwLXcEpghYn/2cj2HT9DobgugGBDCyovPJZXdRjDi3h+CvMeHXmG08WfbA=="],
 
     "@speed-highlight/core": ["@speed-highlight/core@1.2.24", "", {}, "sha512-qeW2e1l78afw8VhRPfPQ1Gjj+KU5XFQ/OFV5ti6eTa9bruO7mJyZtA4vw0ofqmA3tKCkROE9xLk3VZoeRc98nw=="],
 
@@ -2061,7 +2061,7 @@
 
     "get-tsconfig": ["get-tsconfig@4.14.3", "", { "dependencies": { "resolve-pkg-maps": "^1.0.0" } }, "sha512-++QEw4DIY7WGoukz+/+A/8dGYPT9l9yIadnmSgZ8Rjr3YVSVDipQSO9CdnJo9ePqFqUUqh+wk9uIaoiAwsiPkA=="],
 
-    "ghostty-webgpu": ["ghostty-webgpu@https://github.com/ShaulLavo/ghostty-webgpu/releases/download/v0.3.30-a322323/ghostty-webgpu.tgz", { "dependencies": { "@webgpu/types": "0.1.74" }, "peerDependencies": { "@fregat/hotkeys": "^0.0.3" }, "optionalPeers": ["@fregat/hotkeys"] }, "sha512-QMDrVRhpF9Mcy+bJkhXnjzZWAh9dle5o7jPzZa4jUAXNqbdwEKV00szMxXJtbxR50lK9e6akj5eux5N0H16DZg=="],
+    "ghostty-webgpu": ["ghostty-webgpu@https://github.com/ShaulLavo/ghostty-webgpu/releases/download/v0.3.31-87127c8/ghostty-webgpu.tgz", { "dependencies": { "@webgpu/types": "0.1.74" }, "peerDependencies": { "@fregat/hotkeys": "^0.0.3" }, "optionalPeers": ["@fregat/hotkeys"] }, "sha512-u/ZeFzngbplzAZQeti5p46Ghf3kjxooNLVShw+hdGP76a28PInYA0V1Eb+c2pkpWit35HIn13nwCoDKeSMydZg=="],
 
     "github-slugger": ["github-slugger@2.0.0", "", {}, "sha512-IaOQ9puYtjrkq7Y0Ygl9KDZnrf/aiUJYUpVf89y8kyaxbRG7Y1SrX/jaumrv81vc61+kiMempujsM3Yw7w5qcw=="],
 
@@ -2821,7 +2821,7 @@
 
     "tree-sitter-json": ["tree-sitter-json@0.24.8", "", { "dependencies": { "node-addon-api": "^8.2.2", "node-gyp-build": "^4.8.2" }, "peerDependencies": { "tree-sitter": "^0.21.1" }, "optionalPeers": ["tree-sitter"], "hasInstallScript": true }, "sha512-Tc9ZZYwHyWZ3Tt1VEw7Pa2scu1YO7/d2BCBbKTx5hXwig3UfdQjsOPkPyLpDJOn/m1UBEWYAtSdGAwCSyagBqQ=="],
 
-    "tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#7e84c57", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-7e84c57", "sha512-UDGSId96PYKCS9FiMZFW11ZOtJIKw7lLKd+iVSAWajPcPvYxflrQ84Izi7//eKXWRL1XDK9fBbRNoXTQIPSfxw=="],
+    "tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#f02e277", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-f02e277", "sha512-fophWIbaYMEXKW8huRGEX+2zNErybko5sHSn8AoNuBwEk66pD4X5weU9OQM10osk/4iG9eAegEYQMZ+BSfLFhg=="],
 
     "tree-sitter-php": ["tree-sitter-php@0.24.2", "", { "dependencies": { "node-addon-api": "^8.2.2", "node-gyp-build": "^4.8.2" }, "peerDependencies": { "tree-sitter": "^0.22.4" }, "optionalPeers": ["tree-sitter"], "hasInstallScript": true }, "sha512-zwgAePc/HozNaWOOfwRAA+3p8yhuehRw8Fb7vn5qd2XjiIc93uJPryDTMYTSjBRjVIUg/KY6pM3rRzs8dSwKfw=="],
 
@@ -3067,12 +3067,6 @@
 
     "@singapore-editor/highlighting/shiki": ["shiki@4.5.0", "", { "dependencies": { "@shikijs/core": "4.5.0", "@shikijs/engine-javascript": "4.5.0", "@shikijs/engine-oniguruma": "4.5.0", "@shikijs/langs": "4.5.0", "@shikijs/themes": "4.5.0", "@shikijs/types": "4.5.0", "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.5" } }, "sha512-OcRW72ngQvc+MSVWBRIovC/BTW589iUE/Vxav7VeM4RcY9MUjqB+IR6ILG1k9nuW6LiG/nct9uma4/MBtnZbmQ=="],
 
-    "@singapore-editor/markdown/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#f02e277", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-f02e277", "sha512-fophWIbaYMEXKW8huRGEX+2zNErybko5sHSn8AoNuBwEk66pD4X5weU9OQM10osk/4iG9eAegEYQMZ+BSfLFhg=="],
-
-    "@singapore-editor/tree-sitter/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#f02e277", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-f02e277", "sha512-fophWIbaYMEXKW8huRGEX+2zNErybko5sHSn8AoNuBwEk66pD4X5weU9OQM10osk/4iG9eAegEYQMZ+BSfLFhg=="],
-
-    "@singapore-editor/tree-sitter-languages/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#f02e277", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-f02e277", "sha512-fophWIbaYMEXKW8huRGEX+2zNErybko5sHSn8AoNuBwEk66pD4X5weU9OQM10osk/4iG9eAegEYQMZ+BSfLFhg=="],
-
     "@tailwindcss/node/lightningcss": ["lightningcss@1.32.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.32.0", "lightningcss-darwin-arm64": "1.32.0", "lightningcss-darwin-x64": "1.32.0", "lightningcss-freebsd-x64": "1.32.0", "lightningcss-linux-arm-gnueabihf": "1.32.0", "lightningcss-linux-arm64-gnu": "1.32.0", "lightningcss-linux-arm64-musl": "1.32.0", "lightningcss-linux-x64-gnu": "1.32.0", "lightningcss-linux-x64-musl": "1.32.0", "lightningcss-win32-arm64-msvc": "1.32.0", "lightningcss-win32-x64-msvc": "1.32.0" } }, "sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ=="],
 
     "@tailwindcss/node/magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
@@ -3102,8 +3096,6 @@
     "@volar/language-server/vscode-languageserver": ["vscode-languageserver@9.0.1", "", { "dependencies": { "vscode-languageserver-protocol": "3.17.5" }, "bin": { "installServerIntoExtension": "bin/installServerIntoExtension" } }, "sha512-woByF3PDpkHFUreUa7Hos7+pUWdeWMXRd26+ZX2A8cFx6v/JPTtd4/uN0/jB6XQHYaOlHbio03NTHCqrgG5n7g=="],
 
     "@vscode/emmet-helper/jsonc-parser": ["jsonc-parser@2.3.1", "", {}, "sha512-H8jvkz1O50L3dMZCsLqiuB2tA7muqbSg1AtGEkN0leAqGjsUzDJir3Zwr02BhqdcITPg3ei3mZ+HjMocAknhhg=="],
-
-    "@workspace/markdown/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#f02e277", { "peerDependencies": { "web-tree-sitter": "^0.28.1" } }, "ShaulLavo-tree-sitter-md-f02e277", "sha512-fophWIbaYMEXKW8huRGEX+2zNErybko5sHSn8AoNuBwEk66pD4X5weU9OQM10osk/4iG9eAegEYQMZ+BSfLFhg=="],
 
     "ajv-formats/ajv": ["ajv@8.20.0", "", { "dependencies": { "fast-deep-equal": "^3.1.3", "fast-uri": "^3.0.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2" } }, "sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA=="],
 
