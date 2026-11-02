@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process'
 
 const generatedDocs = ['docs/settings-reference.md', 'docs/native-syntax-coverage.*']
 const desktopNativeInputs = [
-  '.github/actions/linux-webview-deps/**',
+  '.github/actions/linux-webview-deps/action.yml',
   'apps/desktop/native/**',
   'apps/desktop/package.json',
   'apps/desktop/scripts/**',

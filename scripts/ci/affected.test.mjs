@@ -102,6 +102,10 @@ test.each([
   },
 )
 
+test('dependency action tests do not select the native build', () => {
+  expect(select(['.github/actions/linux-webview-deps/action.test.ts']).desktop_native).toBe(false)
+})
+
 test('the four documentation files in PR 1207 do not consume application or library runners', () => {
   const plan = select([
     '.agents/skills/react-development/SKILL.md',
