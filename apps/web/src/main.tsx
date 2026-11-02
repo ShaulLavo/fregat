@@ -168,9 +168,10 @@ async function start() {
       .then(() => undefined)
       .catch(() => undefined),
   ]
+  const deferredWarmViews: Array<() => Promise<unknown>> = []
   watchShellKind()
   if (kind === 'workbench' && restoredWorkspace?.selectedTabContent?.kind === 'settings')
-    warmViews.push(
+    deferredWarmViews.push(() =>
       resourceQueryClient
         .query(settingsPageQueryOptions)
         .then(() => undefined)
@@ -230,6 +231,8 @@ async function start() {
       </LoggingErrorBoundary>
     </StrictMode>,
   )
+
+  void Promise.all(deferredWarmViews.map((warmView) => warmView()))
 
   sampleStartupFrameCadence()
 
