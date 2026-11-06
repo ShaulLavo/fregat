@@ -1,7 +1,7 @@
 import { MARKDOWN_CASES } from '../../packages/markdown/test/fixtures/cases'
 import { createHash, hash } from 'node:crypto'
-import { createReadStream } from 'node:fs'
-import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises'
+import { constants, createReadStream } from 'node:fs'
+import { copyFile, mkdir, open, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { ProductionTrial } from './production-analysis'
 import type { productionBrowserControls } from './production-controls'
@@ -299,6 +299,27 @@ export async function writeSyntheticProductionArm(
   })
   return { ...row, ...captured }
 }
+
+export async function copySyntheticProductionArm(
+  directory: string,
+  row: ProductionTemplate,
+  original: ProductionTrial,
+): Promise<ProductionTrial> {
+  const file = `oracles/${row.workload}-${row.pair}-${row.engine}.jsonl`
+  await copyFile(
+    path.join(directory, original.correctness.artifact.path),
+    path.join(directory, file),
+    constants.COPYFILE_FICLONE | constants.COPYFILE_EXCL,
+  )
+  return {
+    ...row,
+    correctness: {
+      ...original.correctness,
+      artifact: { ...original.correctness.artifact, path: file },
+    },
+    freshCompleted: original.freshCompleted,
+  }
+}
 export function syntheticNativeTrial(
   workload: NativePairWorkload,
   trial: number,
@@ -356,6 +377,7 @@ async function writeNative(
   directory: string,
   identity: PromotionEvidence['identity'],
   source: Source,
+  diagnostics?: PromotionPhaseDiagnostics,
 ) {
   const sourceFiles = source.sources
     .filter((row) => row.file === 'scripts/markdown/workloads.ts')
@@ -395,7 +417,9 @@ async function writeNative(
     missing: [],
     resources: { created: [], cleanup: [], retained: ['Sealed raw pairs and scalar summaries'] },
   })
-  await recordStatistics(directory, observed.pairsArtifact)
+  await measureFixturePhase(diagnostics, 'fixture-statistics:native', () =>
+    recordStatistics(directory, observed.pairsArtifact),
+  )
   const reportSha256 = await fileHash(file)
   await save(
     directory,
@@ -447,6 +471,7 @@ async function writeProduction(
   identity: PromotionEvidence['identity'],
   source: Source,
   resources: Resources,
+  diagnostics?: PromotionPhaseDiagnostics,
 ) {
   const provenance = {
     revision: source.revision,
@@ -505,6 +530,7 @@ async function writeProduction(
   const workloads = productionBrowserWorkloads()
   let current: ProductionWorkload | undefined
   let template: ProductionTemplate
+  let oracle: ProductionTrial | undefined
   const failures: string[] = []
   const statisticsRows: Pick<ProductionTrial, 'pair' | 'family'>[] = []
   const observed = await writeProductionTrials({
@@ -520,19 +546,26 @@ async function writeProduction(
         if (current !== workload) {
           current = workload
           template = syntheticProductionTemplate(workload, 0, 'remark')
+          oracle = undefined
         }
-        const captured = await writeSyntheticProductionArm(directory, {
+        const row = {
           ...template,
           pair,
           order,
           engine,
-        })
+        }
+        const captured = oracle
+          ? await copySyntheticProductionArm(directory, row, oracle)
+          : await writeSyntheticProductionArm(directory, row)
+        oracle ??= captured
         statisticsRows.push({ pair: captured.pair, family: captured.family })
         return resourceTrial(captured, resources)
       },
     }),
   })
-  await recordStatistics(directory, observed.trialsArtifact, statisticsRows)
+  await measureFixturePhase(diagnostics, 'fixture-statistics:production', () =>
+    recordStatistics(directory, observed.trialsArtifact, statisticsRows),
+  )
   const report = {
     schemaVersion: 2,
     build: 'production',
@@ -639,8 +672,12 @@ export async function writeFullSyntheticTiming(options: {
     await writeFile(file, bytes)
   }
   await save(directory, 'freeze.json', { identity, provenance: frozenProvenance, fontFingerprint })
-  await writeNative(directory, identity, provenance)
-  await writeProduction(directory, identity, provenance, resources)
+  await measureFixturePhase(diagnostics, 'fixture-generation:native', () =>
+    writeNative(directory, identity, provenance, diagnostics),
+  )
+  await measureFixturePhase(diagnostics, 'fixture-generation:production', () =>
+    writeProduction(directory, identity, provenance, resources, diagnostics),
+  )
   return { fontFingerprint }
 }
 
@@ -711,18 +748,20 @@ export async function fullAssemblySummary(
       path.join(directory, 'assembled-production-timing-reconciliation.json'),
     ].map((file) => rm(file, { force: true })),
   )
-  const cli = spawnSync(
-    'bun',
-    [
-      fileURLToPath(new URL('./promotion-evidence.ts', import.meta.url)),
-      '--manifest',
-      manifestPath,
-      '--out',
-      evidencePath,
-      '--report',
-      reportPath,
-    ],
-    { encoding: 'utf8', timeout: 360_000, maxBuffer: 2 * 1024 * 1024 },
+  const cli = measureFixturePhaseSync(diagnostics, 'assembly:cli', () =>
+    spawnSync(
+      'bun',
+      [
+        fileURLToPath(new URL('./promotion-evidence.ts', import.meta.url)),
+        '--manifest',
+        manifestPath,
+        '--out',
+        evidencePath,
+        '--report',
+        reportPath,
+      ],
+      { encoding: 'utf8', timeout: 360_000, maxBuffer: 2 * 1024 * 1024 },
+    ),
   )
   recordFixtureChildProcess(diagnostics)
   const { parsePromotionEvidenceAssemblyManifest } = await import('./promotion-evidence')
@@ -739,7 +778,9 @@ export async function fullAssemblySummary(
   const report: PromotionEvidenceAssemblyResult['report'] = JSON.parse(
     await readFile(reportPath, 'utf8'),
   )
-  const verified = await verifyPromotionArtifacts(evidence, directory)
+  const verified = await measureFixturePhase(diagnostics, 'assembly:verify-artifacts', () =>
+    verifyPromotionArtifacts(evidence, directory),
+  )
   const context = manifest.trustedContext
     ? await createTrustedPromotionContext({
         ...manifest.trustedContext,
@@ -780,7 +821,9 @@ export async function fullAssemblySummary(
     })),
     timing,
     artifacts: report.artifacts.length,
-    files: await Promise.all(files.map((file) => hashFile({ root: directory, file }))),
+    files: await measureFixturePhase(diagnostics, 'assembly:hash-outputs', () =>
+      Promise.all(files.map((file) => hashFile({ root: directory, file }))),
+    ),
   }
 }
 
