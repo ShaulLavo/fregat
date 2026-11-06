@@ -706,13 +706,18 @@ jobs:
         site,
         mobile-layout,
       ]
-    if: ${{ (github.event_name != 'pull_request' || !github.event.pull_request.draft) && (always()) }}
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       actions: read
       contents: read
     steps:
+      - name: Require a ready PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft
+        run: |
+          echo '::error::Mark this PR ready for review to run the required checks.'
+          exit 1
       # Execute only trusted main code; candidate workflows are parsed as data.
       - name: Checkout trusted verifier
         uses: actions/checkout@v4
