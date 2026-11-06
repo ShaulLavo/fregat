@@ -10,8 +10,8 @@ type StreamedLine = {
 }
 
 type LineByteState = {
-  maxLineBytes: number
-  pending: Buffer
+  pending: Buffer[]
+  byteLength: number
 }
 
 const LINE_FEED = 0x0a
@@ -37,18 +37,21 @@ export async function* readLines(stream: NodeJS.ReadableStream | null): AsyncGen
 
 export async function* streamLines(
   stream: Readable,
-  maxLineBytes: number,
+  maxContentBytes: number,
 ): AsyncGenerator<StreamedLine> {
-  const state: LineByteState = {
-    maxLineBytes,
-    pending: Buffer.alloc(0),
-  }
+  const state: LineByteState = { pending: [], byteLength: 0 }
+  let bytesRead = 0
 
   for await (const chunk of stream) {
-    yield* streamChunkLines(state, toBuffer(chunk))
+    const bytes = toBuffer(chunk)
+    const remainingBytes = maxContentBytes - bytesRead
+    yield* streamChunkLines(state, bytes.subarray(0, remainingBytes))
+    bytesRead += bytes.length
+    // A file can grow after stat. A budget boundary is not a physical line ending.
+    if (bytesRead > maxContentBytes) return
   }
 
-  if (state.pending.length > 0) yield streamedLine(state.pending, 0)
+  if (state.byteLength > 0) yield consumeLine(state, Buffer.alloc(0), false)
 }
 
 export function collectDecodedStreamTail(
@@ -84,65 +87,27 @@ function* streamChunkLines(state: LineByteState, chunk: Buffer): Generator<Strea
     const lfIndex = remaining.indexOf(LINE_FEED)
 
     if (lfIndex === -1) {
-      const consumed = consumeChunkWithoutLineFeed(state, remaining)
-      if (consumed.line) yield consumed.line
-      remaining = consumed.remaining
-      continue
+      appendPending(state, remaining)
+      return
     }
 
-    yield consumeChunkThroughLineFeed(state, remaining, lfIndex)
+    yield consumeLine(state, remaining.subarray(0, lfIndex), true)
     remaining = remaining.subarray(lfIndex + 1)
   }
 }
 
-function consumeChunkWithoutLineFeed(
-  state: LineByteState,
-  chunk: Buffer,
-): { line: StreamedLine | null; remaining: Buffer } {
-  const room = state.maxLineBytes - state.pending.length
+function consumeLine(state: LineByteState, chunk: Buffer, terminated: boolean): StreamedLine {
+  appendPending(state, chunk)
+  const bytes =
+    state.pending.length <= 1
+      ? (state.pending[0] ?? Buffer.alloc(0))
+      : Buffer.concat(state.pending, state.byteLength)
+  const hasCr = terminated && bytes[bytes.length - 1] === CARRIAGE_RETURN
+  state.pending = []
+  state.byteLength = 0
 
-  if (chunk.length <= room) {
-    state.pending = appendPending(state.pending, chunk)
-    return { line: null, remaining: Buffer.alloc(0) }
-  }
-
-  if (room > 0) {
-    state.pending = appendPending(state.pending, chunk.subarray(0, room))
-  }
-
-  const line = streamedLine(state.pending, 0)
-  state.pending = Buffer.alloc(0)
-
-  return {
-    line,
-    remaining: chunk.subarray(Math.max(room, 0)),
-  }
-}
-
-function consumeChunkThroughLineFeed(state: LineByteState, chunk: Buffer, lfIndex: number) {
-  const hasPendingCr =
-    lfIndex === 0 &&
-    state.pending.length > 0 &&
-    state.pending[state.pending.length - 1] === CARRIAGE_RETURN
-  const hasChunkCr = lfIndex > 0 && chunk[lfIndex - 1] === CARRIAGE_RETURN
-  const lineBytes = lineBytesBeforeFeed(state.pending, chunk, lfIndex, hasChunkCr, hasPendingCr)
-
-  state.pending = Buffer.alloc(0)
-
-  return streamedLine(lineBytes, hasChunkCr || hasPendingCr ? 2 : 1)
-}
-
-function lineBytesBeforeFeed(
-  pending: Buffer,
-  chunk: Buffer,
-  lfIndex: number,
-  hasChunkCr: boolean,
-  hasPendingCr: boolean,
-) {
-  if (hasChunkCr) return appendPending(pending, chunk.subarray(0, lfIndex - 1))
-  if (hasPendingCr) return pending.subarray(0, pending.length - 1)
-
-  return appendPending(pending, chunk.subarray(0, lfIndex))
+  const terminatorLength = terminated ? 1 + Number(hasCr) : 0
+  return streamedLine(hasCr ? bytes.subarray(0, -1) : bytes, terminatorLength)
 }
 
 function streamedLine(bytes: Buffer, terminatorLength: number): StreamedLine {
@@ -153,11 +118,11 @@ function streamedLine(bytes: Buffer, terminatorLength: number): StreamedLine {
   }
 }
 
-function appendPending(pending: Buffer, chunk: Buffer) {
-  if (pending.length === 0) return chunk
-  if (chunk.length === 0) return pending
+function appendPending(state: LineByteState, chunk: Buffer) {
+  if (chunk.length === 0) return
 
-  return Buffer.concat([pending, chunk])
+  state.pending.push(chunk)
+  state.byteLength += chunk.length
 }
 
 function appendTail(tail: string, text: string, maxLength: number) {

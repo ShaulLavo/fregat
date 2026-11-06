@@ -142,20 +142,20 @@ async function* fileContentMatches(
 ): AsyncGenerator<FindMatch> {
   const stream = createReadStream(absolutePath, {
     highWaterMark: SEARCH_LINE_BUFFER_BYTES,
+    signal,
   })
-  let bytesRead = 0
   let lineIndex = 0
 
   try {
-    for await (const line of streamLines(stream, SEARCH_LINE_BUFFER_BYTES)) {
-      bytesRead += line.byteLength + line.terminatorLength
-      if (bytesRead > context.options.maxContentBytes) break
+    for await (const line of streamLines(stream, context.options.maxContentBytes)) {
       if (signal?.aborted) break
 
       yield* contentLineMatches(relativePath, entry, line.text, lineIndex, context.matcher)
       lineIndex += 1
     }
   } catch (error) {
+    if (signal?.aborted) return
+
     reportSearchContentError(relativePath, error)
   } finally {
     stream.destroy()
