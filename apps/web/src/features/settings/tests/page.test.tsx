@@ -52,6 +52,7 @@ test(
   'renders a row per user-visible setting and writes a toggle through',
   async ({ client }) => {
     expect(client).toBeDefined()
+    selectSettingsSearch('chat.planModeEnabled')
     renderWithProviders(<SettingsPage />)
 
     const planMode = await planModeSwitch()
@@ -73,6 +74,7 @@ test(
   'offers a reset once a value differs from its default',
   async ({ client }) => {
     expect(client).toBeDefined()
+    selectSettingsSearch('chat.planModeEnabled')
     renderWithProviders(<SettingsPage />)
 
     await userEvent.click(await planModeSwitch())
@@ -96,30 +98,10 @@ test(
 )
 
 test(
-  'mounts every row after the first screen, down to the shortcut list',
-  async ({ client }) => {
-    expect(client).toBeDefined()
-    const { container } = renderWithProviders(<SettingsPage />)
-
-    await waitFor(
-      () =>
-        expect(container.querySelector('[data-setting-row="keybindings.overrides"]')).not.toBe(
-          null,
-        ),
-      { timeout: SLOW_RENDER_TIMEOUT_MS },
-    )
-    const summary = await screen.findByText(/^\d+ settings$/)
-    expect(container.querySelectorAll('[data-setting-row]')).toHaveLength(
-      Number.parseInt(summary.textContent ?? '', 10),
-    )
-  },
-  SLOW_RENDER_TIMEOUT_MS,
-)
-
-test(
   'a second press on a row’s actions closes its menu',
   async ({ client }) => {
     expect(client).toBeDefined()
+    selectSettingsSearch('chat.planModeEnabled')
     renderWithProviders(<SettingsPage />)
     const actions = await screen.findByRole('button', { name: 'Actions for chat.planModeEnabled' })
 
@@ -373,12 +355,20 @@ test('a collection edited back to empty leaves no key behind to look modified', 
 test(
   'every registered widget renders its control or declared JSON fallback',
   async ({ client }) => {
+    expect(client).toBeDefined()
     const snapshot = await fetchSettings(undefined, client)
     const { container } = renderWithProviders(<SettingsPage />)
     const summary = await screen.findByText(/^\d+ settings$/)
 
     // Rows mount in separate passes; the first screen cannot prove dispatch
     // coverage for settings farther down the page.
+    await waitFor(
+      () =>
+        expect(container.querySelector('[data-setting-row="keybindings.overrides"]')).not.toBe(
+          null,
+        ),
+      { timeout: SLOW_RENDER_TIMEOUT_MS },
+    )
     await waitFor(
       () =>
         expect(container.querySelectorAll('[data-setting-row]')).toHaveLength(
