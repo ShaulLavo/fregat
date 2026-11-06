@@ -639,8 +639,12 @@ export async function writeFullSyntheticTiming(options: {
     await writeFile(file, bytes)
   }
   await save(directory, 'freeze.json', { identity, provenance: frozenProvenance, fontFingerprint })
-  await writeNative(directory, identity, provenance)
-  await writeProduction(directory, identity, provenance, resources)
+  await measureFixturePhase(diagnostics, 'fixture-generation:native', () =>
+    writeNative(directory, identity, provenance),
+  )
+  await measureFixturePhase(diagnostics, 'fixture-generation:production', () =>
+    writeProduction(directory, identity, provenance, resources),
+  )
   return { fontFingerprint }
 }
 
@@ -711,18 +715,20 @@ export async function fullAssemblySummary(
       path.join(directory, 'assembled-production-timing-reconciliation.json'),
     ].map((file) => rm(file, { force: true })),
   )
-  const cli = spawnSync(
-    'bun',
-    [
-      fileURLToPath(new URL('./promotion-evidence.ts', import.meta.url)),
-      '--manifest',
-      manifestPath,
-      '--out',
-      evidencePath,
-      '--report',
-      reportPath,
-    ],
-    { encoding: 'utf8', timeout: 360_000, maxBuffer: 2 * 1024 * 1024 },
+  const cli = measureFixturePhaseSync(diagnostics, 'assembly:cli', () =>
+    spawnSync(
+      'bun',
+      [
+        fileURLToPath(new URL('./promotion-evidence.ts', import.meta.url)),
+        '--manifest',
+        manifestPath,
+        '--out',
+        evidencePath,
+        '--report',
+        reportPath,
+      ],
+      { encoding: 'utf8', timeout: 360_000, maxBuffer: 2 * 1024 * 1024 },
+    ),
   )
   recordFixtureChildProcess(diagnostics)
   const { parsePromotionEvidenceAssemblyManifest } = await import('./promotion-evidence')
@@ -739,7 +745,9 @@ export async function fullAssemblySummary(
   const report: PromotionEvidenceAssemblyResult['report'] = JSON.parse(
     await readFile(reportPath, 'utf8'),
   )
-  const verified = await verifyPromotionArtifacts(evidence, directory)
+  const verified = await measureFixturePhase(diagnostics, 'assembly:verify-artifacts', () =>
+    verifyPromotionArtifacts(evidence, directory),
+  )
   const context = manifest.trustedContext
     ? await createTrustedPromotionContext({
         ...manifest.trustedContext,
@@ -780,7 +788,9 @@ export async function fullAssemblySummary(
     })),
     timing,
     artifacts: report.artifacts.length,
-    files: await Promise.all(files.map((file) => hashFile({ root: directory, file }))),
+    files: await measureFixturePhase(diagnostics, 'assembly:hash-outputs', () =>
+      Promise.all(files.map((file) => hashFile({ root: directory, file }))),
+    ),
   }
 }
 

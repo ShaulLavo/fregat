@@ -1987,7 +1987,13 @@ test('verifies all fourteen gates from complete synthetic producer files and rej
   } finally {
     await fullAssemblyControls(fixture.root, manifestPath, diagnostics)
   }
-  expect(diagnostics.phases.map((entry) => entry.phase)).toEqual([
+  expect(
+    diagnostics.phases
+      .map((entry) => entry.phase)
+      .filter(
+        (phase) => !phase.startsWith('assembly:') && !phase.startsWith('fixture-generation:'),
+      ),
+  ).toEqual([
     'syntheticProvenance:initial',
     'syntheticProvenance:registered',
     'syntheticTrustedEvaluation',
