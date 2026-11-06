@@ -105,12 +105,33 @@ test.skipIf(!reportSupported)(
   },
 )
 
-test('CI shares each ref group and cancels only older PR runs', () => {
+test('CI cancels older PR runs and isolates every non-PR run', () => {
   const source = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
   expect(Bun.YAML.parse(source)).toHaveProperty('concurrency', {
-    group: 'ci-${{ github.workflow }}-${{ github.ref }}',
-    'cancel-in-progress': "${{ startsWith(github.ref, 'refs/pull/') }}",
+    group: '${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}',
+    'cancel-in-progress': "${{ github.event_name == 'pull_request' }}",
   })
+})
+
+test('drafts defer selection so trusted verdict parsing keeps the existing job conditions', () => {
+  const ci = readWorkflow('ci.yml')
+  const plan = ci.jobs.changes!.steps.find((step) => step.id === 'plan')!
+  const github = { event_name: 'pull_request', event: { pull_request: { draft: true } } }
+  expect(expression(plan.if!, { github })).toBe(false)
+  github.event.pull_request.draft = false
+  expect(expression(plan.if!, { github })).toBe(true)
+  expect(ci.jobs.baseline!.if).toBeUndefined()
+  expect(ci.jobs.changes!.if).toBeUndefined()
+  const outputs = Object.fromEntries(Object.keys(ci.jobs.changes!.outputs!).map((key) => [key, '']))
+  for (const [id, job] of Object.entries(ci.jobs)) {
+    if (['baseline', 'changes', 'verdict'].includes(id)) continue
+    expect(expression(job.if!, { needs: { changes: { outputs } } }), id).toBe(false)
+  }
+  github.event.pull_request.draft = true
+  const admission = ci.jobs.verdict!.steps[0]!
+  expect(expression(admission.if!, { github })).toBe(true)
+  expect(admission.run).toContain('exit 1')
+  expect(ci.jobs.verdict!.if).toBe('${{ always() }}')
 })
 
 test('CI shares one production site build with every mobile shard', () => {

@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - main
@@ -15,11 +16,10 @@ on:
         default: '4'
         options: ['2', '4']
 
-# Each ref keeps one running and one pending run; newer pushes replace older pending runs.
-# PRs also cancel their running run; main lets its running run finish.
+# PR updates replace earlier PR work. Every other event keeps its own run.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -84,6 +84,7 @@ jobs:
         with:
           bun-version-file: package.json
       - name: Select affected packages
+        if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
         id: plan
         env:
           BEFORE_SHA: ${{ github.event.before }}
@@ -712,6 +713,11 @@ jobs:
       actions: read
       contents: read
     steps:
+      - name: Require a ready PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft
+        run: |
+          echo '::error::Mark this PR ready for review to run the required checks.'
+          exit 1
       # Execute only trusted main code; candidate workflows are parsed as data.
       - name: Checkout trusted verifier
         uses: actions/checkout@v4
@@ -751,7 +757,7 @@ jobs:
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: bun trusted/scripts/ci-verdict.ts candidate/.github/workflows/ci.yml "$RUNNER_TEMP/ci-jobs.json" "$RUNNER_TEMP/ci-run.json"
       - name: Report queue and execution times
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
         continue-on-error: true
         env:
           RUN_ID: ${{ github.run_id }}
