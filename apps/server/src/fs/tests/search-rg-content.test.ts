@@ -119,6 +119,27 @@ describe.skipIf(!rgExecutable)('ripgrep content events (requires rg)', () => {
     expectCompleteRgSearch(events, 2, 1)
   })
 
+  it('keeps zero-offset and supplementary Unicode ranges in byte-backed lines', async () => {
+    const root = await fixtureRoot()
+    await writeFile(
+      path.join(root, 'unicode.txt'),
+      Buffer.concat([Buffer.from('needle é '), Buffer.from([0xff]), Buffer.from(' 😀 needle\n')]),
+    )
+
+    const events = await search(root)
+    expect(contentMatches(events)).toEqual([
+      expect.objectContaining({ column: 1, endColumn: 7, preview: 'needle é � 😀 needle' }),
+      expect.objectContaining({ column: 15, endColumn: 21, preview: 'needle é � 😀 needle' }),
+    ])
+    expectCompleteRgSearch(events, 2, 1)
+
+    const emojiEvents = await search(root, '😀')
+    expect(contentMatches(emojiEvents)).toEqual([
+      expect.objectContaining({ column: 12, endColumn: 14, preview: 'needle é � 😀 needle' }),
+    ])
+    expectCompleteRgSearch(emojiEvents, 1, 1)
+  })
+
   it('anchors bounded previews around byte-backed matches on long lines', async () => {
     const root = await fixtureRoot()
     await writeFile(
@@ -174,7 +195,7 @@ function rgMatchEvent(root: string, filename: string) {
     .find((event) => event !== null)
 }
 
-function search(root: string) {
+function search(root: string, query = 'needle') {
   const provider = new DiskWorkspaceSearchProvider(createWorkspacePaths(root))
   return Array.fromAsync(
     provider.search({
@@ -183,7 +204,7 @@ function search(root: string) {
       limit: 20,
       maxContentBytes: 1_000_000,
       path: '',
-      query: 'needle',
+      query,
     }),
   )
 }

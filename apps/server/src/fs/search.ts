@@ -1178,11 +1178,16 @@ async function contentMatchesFromRgEvent(
   if (!entryStats) return []
   if (!isFileEntry(entryStats)) return []
 
-  const line = event.data.lines.text
   if (event.data.submatches.length === 0) return []
 
+  const rawLine =
+    'text' in event.data.lines
+      ? event.data.lines.text
+      : Buffer.from(event.data.lines.bytes, 'base64')
+  const line = typeof rawLine === 'string' ? rawLine : rawLine.toString('utf8')
+
   return event.data.submatches.map((match) => {
-    const range = utf8ByteRangeToStringRange(line, match.start, match.end)
+    const range = utf8ByteRangeToStringRange(rawLine, match.start, match.end)
 
     return contentMatch({
       columnIndex: range.start,
@@ -1195,15 +1200,17 @@ async function contentMatchesFromRgEvent(
   })
 }
 
-function utf8ByteRangeToStringRange(text: string, startByte: number, endByte: number) {
+function utf8ByteRangeToStringRange(text: string | Buffer, startByte: number, endByte: number) {
   const start = utf8ByteOffsetToStringIndex(text, startByte)
   const end = utf8ByteOffsetToStringIndex(text, endByte)
 
   return { end: Math.max(start, end), start }
 }
 
-function utf8ByteOffsetToStringIndex(text: string, byteOffset: number) {
+function utf8ByteOffsetToStringIndex(text: string | Buffer, byteOffset: number) {
   if (byteOffset <= 0) return 0
+  // Replacement characters re-encode to different byte lengths, so retain rg's original bytes.
+  if (typeof text !== 'string') return text.toString('utf8', 0, byteOffset).length
 
   let byteIndex = 0
   let stringIndex = 0
