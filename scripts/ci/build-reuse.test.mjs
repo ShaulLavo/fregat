@@ -493,7 +493,7 @@ test.each(['24.04', '26.04'])(
     rmSync(path.join(f.directory, 'packages/base/dist'), { recursive: true })
     expect(consume(consumer, bundle.downloads)).toHaveLength(2)
     rewriteBundle(bundle, (manifest) => {
-      manifest.identity.platform.system[releaseKey] = '26.04'
+      manifest.identity.platform.system[releaseKey] = `${version}-incompatible`
     })
     rmSync(path.join(f.directory, 'packages/base/dist'), { recursive: true })
     expect(() => consume(consumer, bundle.downloads)).toThrow('Build identity mismatch')
