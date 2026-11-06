@@ -131,7 +131,7 @@ test('drafts defer selection so trusted verdict parsing keeps the existing job c
   const admission = ci.jobs.verdict!.steps[0]!
   expect(expression(admission.if!, { github })).toBe(true)
   expect(admission.run).toContain('exit 1')
-  expect(ci.jobs.verdict!.if).toBe('always()')
+  expect(ci.jobs.verdict!.if).toBe('${{ always() }}')
 })
 
 test('CI shares one production site build with every mobile shard', () => {
