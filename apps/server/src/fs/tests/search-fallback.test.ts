@@ -1,7 +1,9 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe } from 'vitest'
+
+import { test, expect } from '../../../../web/test/fixtures'
 
 import { createWorkspacePaths } from '../path'
 import { createFindContext } from '../search'
@@ -24,7 +26,7 @@ afterEach(async () => {
 })
 
 describe('workspace search fallback', () => {
-  it('yields the first match before it has walked the whole tree', async () => {
+  test('yields the first match before it has walked the whole tree', async () => {
     const context = await createFindContext(
       createWorkspacePaths(await wideFixtureRoot()),
       nameSearchOptions(),
@@ -39,7 +41,7 @@ describe('workspace search fallback', () => {
     expect(statCallCount).toBeLessThan(20)
   })
 
-  it('stops walking when the signal aborts mid-walk', async () => {
+  test('stops walking when the signal aborts mid-walk', async () => {
     const context = await createFindContext(
       createWorkspacePaths(await wideFixtureRoot()),
       nameSearchOptions(),
@@ -56,7 +58,7 @@ describe('workspace search fallback', () => {
     expect(context.measurement.snapshot().statCallCount).toBeLessThan(TOTAL_FILES / 2)
   })
 
-  it('walks the whole tree and returns every match when nothing cancels', async () => {
+  test('walks the whole tree and returns every match when nothing cancels', async () => {
     const context = await createFindContext(
       createWorkspacePaths(await wideFixtureRoot()),
       nameSearchOptions(),
@@ -68,7 +70,7 @@ describe('workspace search fallback', () => {
     expect(context.measurement.snapshot().statCallCount).toBeGreaterThan(TOTAL_FILES)
   })
 
-  it('returns name and content matches in directory-walk order', async () => {
+  test('returns name and content matches in directory-walk order', async () => {
     const root = await fixtureRoot()
     await mkdir(path.join(root, 'sub'), { recursive: true })
     await writeFile(path.join(root, 'alpha-needle.txt'), 'first line\n')
@@ -92,7 +94,33 @@ describe('workspace search fallback', () => {
     ])
   })
 
-  it('keeps yielding past options.limit and leaves truncation to the consumer', async () => {
+  test.each(['\n', '\r\n'])(
+    'searches complete long physical lines with %j endings',
+    async (ending) => {
+      const root = await fixtureRoot()
+      const prefix = ' '.repeat(65_534)
+      const gap = ' '.repeat(65_536)
+      await writeFile(path.join(root, 'long.txt'), `${prefix}needle${gap}needle${ending}needle`)
+      const context = await createFindContext(createWorkspacePaths(root), {
+        includeContent: true,
+        includeNames: false,
+        limit: 100,
+        maxContentBytes: 1_000_000,
+        path: '',
+        query: 'needle',
+      })
+
+      const matches = await collect(searchWithFallback(context))
+
+      expect(matches.map(({ line, column, endColumn }) => ({ line, column, endColumn }))).toEqual([
+        { line: 1, column: 65_535, endColumn: 65_541 },
+        { line: 1, column: 131_077, endColumn: 131_083 },
+        { line: 2, column: 1, endColumn: 7 },
+      ])
+    },
+  )
+
+  test('keeps yielding past options.limit and leaves truncation to the consumer', async () => {
     const context = await createFindContext(createWorkspacePaths(await wideFixtureRoot()), {
       ...nameSearchOptions(),
       limit: 5,
