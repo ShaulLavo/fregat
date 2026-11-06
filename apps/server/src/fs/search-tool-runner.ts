@@ -55,6 +55,8 @@ export async function* runToolLines(
   toleratedFailureCodes: readonly number[] = [],
   options: SearchToolRunOptions = {},
 ): AsyncGenerator<string> {
+  if (signal?.aborted) return
+
   const startedAt = performance.now()
   const child = spawn(command, args, {
     cwd: options.cwd,
