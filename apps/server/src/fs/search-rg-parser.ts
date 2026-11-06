@@ -34,9 +34,7 @@ export type RgMatchEvent = {
     path: {
       text: string
     }
-    lines: {
-      text: string
-    }
+    lines: { text: string } | { bytes: string }
     line_number: number
     submatches: Array<{
       end: number
