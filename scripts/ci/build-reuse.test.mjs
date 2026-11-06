@@ -207,6 +207,7 @@ function rewriteBundle(bundle, mutate) {
     cpSync(old, next, { recursive: true })
     rmSync(old, { recursive: true })
   }
+  bundle.published.name = name
   return next
 }
 
@@ -458,7 +459,6 @@ test.each([
   ['OS', ['platform', 'os'], process.platform === 'win32' ? 'linux' : 'win32'],
   ['architecture', ['platform', 'arch'], process.arch === 'arm64' ? 'x64' : 'arm64'],
   ['distribution', ['platform', 'system', 'distribution'], 'different-linux'],
-  ['OS release', ['platform', 'system', 'version'], '26.04'],
   ['libc', ['platform', 'system', 'libc'], 'different-libc'],
   ['Bun', ['toolchain', 'bun'], '1.4.2'],
   ['Bun revision', ['toolchain', 'bunRevision'], '0'.repeat(40)],
@@ -478,6 +478,28 @@ test.each([
   ).toThrow()
   expect(existsSync(path.join(f.directory, 'packages/base/dist'))).toBe(false)
 })
+
+test.each(['24.04', '26.04'])(
+  'image patch tolerance still rejects incompatible OS release from %s',
+  (version) => {
+    const f = fixture()
+    const bundle = f.publication()
+    const consumer = f.request('all', { image: 'ubuntu24/20261012.334.1' })
+    const releaseKey = process.platform === 'linux' ? 'version' : 'release'
+    consumer.identity.platform.system[releaseKey] = version
+    rewriteBundle(bundle, (manifest) => {
+      manifest.identity.platform.system[releaseKey] = version
+    })
+    rmSync(path.join(f.directory, 'packages/base/dist'), { recursive: true })
+    expect(consume(consumer, bundle.downloads)).toHaveLength(2)
+    rewriteBundle(bundle, (manifest) => {
+      manifest.identity.platform.system[releaseKey] = `${version}-incompatible`
+    })
+    rmSync(path.join(f.directory, 'packages/base/dist'), { recursive: true })
+    expect(() => consume(consumer, bundle.downloads)).toThrow('Build identity mismatch')
+    expect(existsSync(path.join(f.directory, 'packages/base/dist'))).toBe(false)
+  },
+)
 
 test.each([
   [['provenance']],
