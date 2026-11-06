@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto'
+import { constants } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import {
   link,
+  copyFile,
   mkdtemp,
   mkdir,
   open,
@@ -28,6 +30,7 @@ import {
 } from './promotion'
 import {
   fullAssemblySummary,
+  copySyntheticProductionArm,
   measureFixturePhase,
   measureFixturePhaseSync,
   recordFixtureChildProcess,
@@ -1991,7 +1994,10 @@ test('verifies all fourteen gates from complete synthetic producer files and rej
     diagnostics.phases
       .map((entry) => entry.phase)
       .filter(
-        (phase) => !phase.startsWith('assembly:') && !phase.startsWith('fixture-generation:'),
+        (phase) =>
+          !phase.startsWith('assembly:') &&
+          !phase.startsWith('fixture-generation:') &&
+          !phase.startsWith('fixture-statistics:'),
       ),
   ).toEqual([
     'syntheticProvenance:initial',
@@ -2083,6 +2089,55 @@ async function fullAssemblyControls(
   manifestPath: string,
   diagnostics?: PromotionPhaseDiagnostics,
 ) {
+  await withMutableFixtureFiles(
+    root,
+    ['assets/tree-sitter-markdown.wasm', 'native-source-capture.json'],
+    () => fullFileControls(root, manifestPath, diagnostics),
+  )
+  await withMutableFixtureFiles(root, ['raw-production-trials.jsonl'], () =>
+    fullRawControls(root, manifestPath, diagnostics),
+  )
+  const semanticFiles = [
+    'raw-production-trials.jsonl',
+    'production-browser.json',
+    'production-quiet.json',
+  ]
+  await withMutableFixtureFiles(root, semanticFiles, () =>
+    fullSemanticControl(root, manifestPath, 'resource', diagnostics),
+  )
+  await withMutableFixtureFiles(root, semanticFiles, () =>
+    fullSemanticControl(root, manifestPath, 'last-input', diagnostics),
+  )
+}
+
+async function withMutableFixtureFiles(
+  root: string,
+  files: readonly string[],
+  run: () => Promise<void>,
+) {
+  const pristine = await mkdtemp(path.join(tmpdir(), 'promotion-fault-'))
+  temporary.add(pristine)
+  const originals = new Map<string, string>()
+  try {
+    for (const file of files) {
+      const target = path.join(root, file)
+      const original = path.join(pristine, String(originals.size))
+      await copyFile(target, original, constants.COPYFILE_FICLONE | constants.COPYFILE_EXCL)
+      originals.set(target, original)
+    }
+    await run()
+  } finally {
+    for (const [target, original] of originals) await rename(original, target)
+    await rm(pristine, { recursive: true, force: true })
+    temporary.delete(pristine)
+  }
+}
+
+async function fullFileControls(
+  root: string,
+  manifestPath: string,
+  diagnostics?: PromotionPhaseDiagnostics,
+) {
   const grammar = path.join(root, 'assets/tree-sitter-markdown.wasm')
   const original = await readFile(grammar)
   try {
@@ -2131,9 +2186,6 @@ async function fullAssemblyControls(
   } finally {
     await writeFile(capture, source)
   }
-  await fullRawControls(root, manifestPath, diagnostics)
-  await fullSemanticControl(root, manifestPath, 'resource', diagnostics)
-  await fullSemanticControl(root, manifestPath, 'last-input', diagnostics)
 }
 
 async function fullRawControls(
@@ -2278,6 +2330,32 @@ async function fullSemanticControl(
     await writeFile(quietPath, quietBytes)
   }
 }
+
+test('copies immutable synthetic oracles into independently mutable arm files', async () => {
+  const control = await fixture()
+  const workload = productionBrowserWorkloads().find(
+    (entry) => entry.family === 'streaming-replay' && entry.sourceBytes <= 256,
+  )!
+  const template = syntheticProductionTemplate(workload, 0, 'remark')
+  const original = await writeSyntheticProductionArm(control.directory, template)
+  const row = { ...template, pair: -1, engine: 'tree-sitter' as const }
+  const copied = await copySyntheticProductionArm(control.directory, row, original)
+  const referenceRoot = path.join(control.directory, 'reference')
+  const reference = await writeSyntheticProductionArm(referenceRoot, row)
+  expect(copied).toEqual(reference)
+  const originalFile = path.join(control.directory, original.correctness.artifact.path)
+  const copiedFile = path.join(control.directory, copied.correctness.artifact.path)
+  const referenceBytes = await readFile(
+    path.join(referenceRoot, reference.correctness.artifact.path),
+  )
+  expect(await readFile(copiedFile)).toEqual(referenceBytes)
+  expect(copiedFile).not.toBe(originalFile)
+  await writeFile(copiedFile, 'changed independent arm')
+  expect(await readFile(originalFile)).toEqual(referenceBytes)
+  await expect(copySyntheticProductionArm(control.directory, row, original)).rejects.toMatchObject({
+    code: 'EEXIST',
+  })
+})
 
 test('streams unique oracle files for synthetic measured and warmup arms', async () => {
   const control = await fixture()
