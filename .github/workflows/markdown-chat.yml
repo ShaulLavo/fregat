@@ -2,6 +2,7 @@ name: Chat Markdown checks
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'packages/markdown/**'
       - 'apps/web/src/features/chat/**'
@@ -44,11 +45,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: markdown-chat-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   candidate-check:
+    if: ${{ (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
     name: Candidate correctness and chat boundary
     runs-on: ubuntu-latest
     timeout-minutes: 20
