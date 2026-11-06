@@ -1,4 +1,7 @@
-import { checkpointFilesFromDiffs } from '../../orchestration/checkpoint-files'
+import {
+  checkpointFilesFromDiffs,
+  checkpointFilesFromUnifiedDiff,
+} from '../../orchestration/checkpoint-files'
 import { readTextResponse } from '../../../test/file-transport'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -7,6 +10,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { closeTestApps, createTestApp } from '../../../test/server'
 import { createWorkspacePaths } from '../../fs/path'
 import { relativeInsideRoot } from '../path-utils'
+import { parseDiff } from '../diff'
+import { parseRawDiff } from '../raw-diff'
 import { GitService } from '../service'
 import { testSettingsOptions } from '../../settings/testing'
 import { runGit } from '../../testing/git'
@@ -411,6 +416,107 @@ describe('git rpc patches and file content', () => {
     })
   })
 })
+
+describe.skipIf(!Bun.which('git') || process.platform === 'win32')(
+  'git rename paths (requires Git and POSIX filenames)',
+  () => {
+    const cases = [
+      { name: 'plain', oldPath: 'old.txt', newPath: 'new.txt', quotePath: true },
+      { name: 'spaces', oldPath: 'old name.txt', newPath: 'new name.txt', quotePath: true },
+      {
+        name: 'quoted Unicode',
+        oldPath: 'old café.txt',
+        newPath: 'new 日本語.txt',
+        quotePath: true,
+      },
+      {
+        name: 'literal Unicode',
+        oldPath: 'old café.txt',
+        newPath: 'new 日本語.txt',
+        quotePath: false,
+      },
+      { name: 'tabs', oldPath: 'old\tname.txt', newPath: 'new\tname.txt', quotePath: true },
+      { name: 'newlines', oldPath: 'old\nname.txt', newPath: 'new\nname.txt', quotePath: true },
+      { name: 'backslashes', oldPath: 'old\\name.txt', newPath: 'new\\name.txt', quotePath: true },
+      { name: 'quotes', oldPath: '"old".txt', newPath: '"new".txt', quotePath: true },
+    ]
+
+    it.each(cases)(
+      'keeps exact paths for a pure rename with $name',
+      async ({ oldPath, newPath, quotePath }) => {
+        const root = await fixtureRepo()
+        await runGit(root, ['config', 'core.quotePath', String(quotePath)])
+        await runGit(root, ['mv', 'tracked.txt', oldPath])
+        await runGit(root, ['commit', '-m', 'rename baseline'])
+        await runGit(root, ['mv', oldPath, newPath])
+        const patch = (
+          await runGit(root, [
+            'diff',
+            '--cached',
+            '--find-renames',
+            '--src-prefix=a/',
+            '--dst-prefix=b/',
+          ])
+        ).stdout
+        expect(patch).toContain('similarity index 100%')
+        expect(patch).not.toContain('\n--- ')
+        expect(parseDiff(patch, 'nested repo', true)).toMatchObject([
+          {
+            path: `nested repo/${newPath}`,
+            oldPath: `nested repo/${oldPath}`,
+            staged: true,
+            patch,
+            hunks: [],
+          },
+        ])
+        expect(checkpointFilesFromUnifiedDiff(patch)).toEqual([
+          { path: newPath, kind: 'renamed', additions: 0, deletions: 0 },
+        ])
+        const raw = (await runGit(root, ['diff', '--cached', '--find-renames', '--raw', '-z']))
+          .stdout
+        expect(parseRawDiff(raw, '', true)).toMatchObject([
+          { path: newPath, oldPath, staged: true, hunks: [] },
+        ])
+        const service = new GitService(createWorkspacePaths(root))
+        expect(await service.diff('', true)).toMatchObject([
+          { path: newPath, oldPath, staged: true, hunks: [] },
+        ])
+      },
+    )
+
+    it('keeps decoded paths and changed lines for a quoted rename with edits', async () => {
+      const root = await fixtureRepo()
+      const oldPath = 'old café.txt'
+      const newPath = 'new 日本語.txt'
+      const original = 'unchanged\n'.repeat(20) + 'before\n'
+      const changed = 'unchanged\n'.repeat(20) + 'after\n'
+      await runGit(root, ['config', 'core.quotePath', 'true'])
+      await runGit(root, ['mv', 'tracked.txt', oldPath])
+      await writeFile(path.join(root, oldPath), original)
+      await runGit(root, ['commit', '-am', 'rename baseline'])
+      await runGit(root, ['mv', oldPath, newPath])
+      await writeFile(path.join(root, newPath), changed)
+      await runGit(root, ['add', '--all'])
+      const patch = (
+        await runGit(root, [
+          'diff',
+          '--cached',
+          '--find-renames',
+          '--src-prefix=a/',
+          '--dst-prefix=b/',
+        ])
+      ).stdout
+      expect(patch).toContain('\n--- ')
+      expect(checkpointFilesFromUnifiedDiff(patch)).toEqual([
+        { path: newPath, kind: 'renamed', additions: 1, deletions: 1 },
+      ])
+      const service = new GitService(createWorkspacePaths(root))
+      expect(await service.diff(newPath, true)).toMatchObject([
+        { path: newPath, oldPath, oldText: original, newText: changed },
+      ])
+    })
+  },
+)
 
 describe('git diff size budget', () => {
   it('admits 11 MiB replacements through worktree, staged, ref, blob and untracked routes', async () => {
