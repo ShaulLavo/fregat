@@ -757,7 +757,7 @@ jobs:
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: bun trusted/scripts/ci-verdict.ts candidate/.github/workflows/ci.yml "$RUNNER_TEMP/ci-jobs.json" "$RUNNER_TEMP/ci-run.json"
       - name: Report queue and execution times
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
         continue-on-error: true
         env:
           RUN_ID: ${{ github.run_id }}
