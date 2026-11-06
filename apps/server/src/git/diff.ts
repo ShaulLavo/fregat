@@ -33,8 +33,10 @@ export function parseDiff(output: string, rootPath: string, staged: boolean) {
 }
 
 function applyDiffMetadata(current: MutableGitFileDiff, rootPath: string, line: string) {
-  if (line.startsWith('rename from ')) current.oldPath = joinPath(rootPath, line.slice(12))
-  if (line.startsWith('rename to ')) current.path = joinPath(rootPath, line.slice(10))
+  if (line.startsWith('rename from '))
+    current.oldPath = joinPath(rootPath, unquoteGitPath(line.slice(12)))
+  if (line.startsWith('rename to '))
+    current.path = joinPath(rootPath, unquoteGitPath(line.slice(10)))
   if (line === '--- /dev/null') current.oldFileMissing = true
   if (line.startsWith('--- ')) current.oldPath = diffPath(rootPath, line, 'a/')
   if (line === '+++ /dev/null') current.newFileMissing = true
