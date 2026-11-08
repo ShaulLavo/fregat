@@ -712,6 +712,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      statuses: write
     steps:
       - name: Require a ready PR
         if: github.event_name == 'pull_request' && github.event.pull_request.draft
@@ -749,6 +750,7 @@ jobs:
         with:
           bun-version-file: trusted/package.json
       - name: Verdict
+        id: verdict
         env:
           CI_NEEDS_JSON: ${{ toJSON(needs) }}
           CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -773,3 +775,18 @@ jobs:
           created=$(jq -r '.created_at' "$RUNNER_TEMP/ci-run.json")
           started=$(jq -r '.[].jobs[] | select(.name == "CI") | .started_at' "$RUNNER_TEMP/ci-jobs.json")
           echo "Run created to verdict runner started: $(( $(date -d "$started" +%s) - $(date -d "$created" +%s) )) seconds" >> "$GITHUB_STEP_SUMMARY"
+      # Dispatch job checks do not satisfy PR requirements. Commit statuses do.
+      - name: Report the real CI verdict on the tested commit
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/automation/owned-release-updates' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD: ${{ github.sha }}
+          RESULT: ${{ steps.verdict.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          state=failure
+          if [[ "$RESULT" == success ]]; then state=success; fi
+          gh api --method POST "repos/$GH_REPO/statuses/$HEAD" \
+            -f context=CI -f state="$state" -f target_url="$RUN_URL" \
+            -f description="Dispatched CI: $RESULT"
