@@ -155,7 +155,7 @@
     "typescript-api": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#9d890651e02910210694f77bbdbe4761eab7e2b9"
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#5d92154277adfe8c1d1e00c36bc6a2b1befbe8d3"
   },
   "overrides": {
     "@fregat/hotkeys": "catalog:",
@@ -186,7 +186,7 @@
     "@singapore-editor/typescript-lsp": "https://github.com/ShaulLavo/singapore/releases/download/singapore-f0402824ffedcbd5087844adde151e0592aab04e/singapore-editor-typescript-lsp-0.2.10.tgz",
     "ghostty-webgpu": "catalog:",
     "lodash-es": "4.18.1",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#9d890651e02910210694f77bbdbe4761eab7e2b9"
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#5d92154277adfe8c1d1e00c36bc6a2b1befbe8d3"
   },
   "engines": {
     "node": ">=26.0.0"
