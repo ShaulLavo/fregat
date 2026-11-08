@@ -30,16 +30,20 @@ cat > "$body" <<MARKDOWN
 ## Quick summary
 This PR updates our package pins and their generated lock and source records to the newest upstream versions.
 
-The scheduled dependency workflow refreshes this same branch when more versions arrive. CI is dispatched explicitly because PRs created with the built-in token do not start PR workflows.
+The scheduled dependency workflow refreshes this same branch when more versions arrive. CI runs explicitly on this branch, and its real result is reported as the required commit status. Auto-merge waits for that result.
 MARKDOWN
 pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base main --state open --json number --jq '.[0].number // empty')
 if [[ -n "$pr" ]]; then
   gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$body"
 else
-  gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base main --title "$TITLE" --body-file "$body"
+  pr=$(gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base main --title "$TITLE" --body-file "$body")
 fi
 run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch "$BRANCH" --commit "$head" \
   --event workflow_dispatch --limit 1 --json status,conclusion --jq '.[0] // empty')
 if [[ -z "$run" ]] || jq -e '.status == "completed" and .conclusion != "success"' <<< "$run" >/dev/null; then
+  gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$head" \
+    -f context=CI -f state=pending -f description="Waiting for dispatched CI"
   gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
 fi
+
+gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --auto --squash --match-head-commit "$head"

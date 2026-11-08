@@ -30,16 +30,26 @@ cat > "$scratch/bin/gh" <<'MOCK'
 set -euo pipefail
 printf '%s\n' "$*" >> "$TEST_ROOT/gh-calls"
 case "$1 $2" in
+  'api --method')
+    head=$(git --git-dir="$TEST_ROOT/remote.git" rev-parse refs/heads/automation/test)
+    [[ $* == "api --method POST repos/ShaulLavo/fixture/statuses/$head -f context=CI -f state=pending -f description=Waiting for dispatched CI" ]]
+    [[ ${FAIL_STATUS:-0} == 0 ]] ;;
+  'pr merge')
+    head=$(git --git-dir="$TEST_ROOT/remote.git" rev-parse refs/heads/automation/test)
+    [[ $* == "pr merge 123 --repo ShaulLavo/fixture --auto --squash --match-head-commit $head" ]] ;;
   'api repos/'*) git --git-dir="$TEST_ROOT/remote.git" rev-parse refs/heads/automation/test ;;
   'pr list') if [[ -f "$TEST_ROOT/pr" ]]; then echo 123; fi ;;
-  'pr create') touch "$TEST_ROOT/pr" ;;
+  'pr create') touch "$TEST_ROOT/pr"; echo 123 ;;
   'pr edit') test -f "$TEST_ROOT/pr" ;;
   'run list')
     current=$(git --git-dir="$TEST_ROOT/remote.git" rev-parse refs/heads/automation/test)
     if [[ -f "$TEST_ROOT/ci-head" ]] && [[ "$current" == "$(cat "$TEST_ROOT/ci-head")" ]]; then
       echo '{"status":"completed","conclusion":"success"}'
     fi ;;
-  'workflow run') git --git-dir="$TEST_ROOT/remote.git" rev-parse refs/heads/automation/test > "$TEST_ROOT/ci-head" ;;
+  'workflow run')
+    [[ $* == 'workflow run ci.yml --repo ShaulLavo/fixture --ref automation/test' ]]
+    [[ ${FAIL_DISPATCH:-0} == 0 ]] || exit 1
+    git --git-dir="$TEST_ROOT/remote.git" rev-parse refs/heads/automation/test > "$TEST_ROOT/ci-head" ;;
   *) echo "Unexpected gh call: $*" >&2; exit 1 ;;
 esac
 MOCK
@@ -61,6 +71,21 @@ test "$third" != "$first"
 test "$(grep -c '^pr create ' "$scratch/gh-calls")" = 1
 test "$(grep -c '^pr edit ' "$scratch/gh-calls")" = 2
 test "$(grep -c '^workflow run ' "$scratch/gh-calls")" = 2
+test "$(grep -c '^pr merge 123 ' "$scratch/gh-calls")" = 3
+test "$(grep -c '^api --method POST ' "$scratch/gh-calls")" = 2
+
+# A failed handoff must not reach auto-merge, even when the branch already exists.
+rm "$scratch/ci-head"
+for failure in FAIL_STATUS FAIL_DISPATCH; do
+  git switch -q --detach "$base"
+  merges=$(grep -c '^pr merge ' "$scratch/gh-calls")
+  if env "$failure=1" bash .github/scripts/publish-update.sh; then
+    echo "$failure was ignored" >&2; exit 1
+  fi
+  test "$(grep -c '^pr merge ' "$scratch/gh-calls")" = "$merges"
+  test "$(git --git-dir="$scratch/remote.git" rev-parse refs/heads/automation/test)" = "$third"
+  git restore --staged --worktree -- package.json
+done
 
 rejection_failures=0
 expect_record_rejection() {
