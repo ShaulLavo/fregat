@@ -25,7 +25,6 @@ export const pagedFileQueryKeys = {
     ['workbench', 'paged-file', instance, path, generation] as const,
   resource: (instance: string, path: string, generation: number) =>
     [...pagedFileQueryKeys.instance(instance, path, generation), 'resource'] as const,
-  index: (id: string) => ['workbench', 'paged-index', id] as const,
   pages: (id: string) => ['workbench', 'paged-page', id] as const,
-  page: (id: string, line: number) => ['workbench', 'paged-page', id, line] as const,
+  page: (id: string, sequence: number) => [...pagedFileQueryKeys.pages(id), sequence] as const,
 }

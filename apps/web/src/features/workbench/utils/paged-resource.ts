@@ -4,6 +4,8 @@ import {
   PagedDocument,
   PagedSourceInvalidatedError,
   PAGED_PROOF_OPTIONS,
+  type PagedCursor,
+  type RangeSource,
 } from '@singapore-editor/paged'
 import { errorStringField } from '@workspace/contracts'
 import {
@@ -51,16 +53,18 @@ export type PagedResource = {
   view: ReturnType<PagedDocument['createView']>
 }
 
-function pagedSource(source: PagedResource['source']) {
+function pagedSource(source: PagedResource['source']): RangeSource {
   return {
-    ...source,
+    id: source.id,
+    revision: source.revision,
+    byteLength: source.byteLength,
     async readBytes(start: number, end: number, signal: AbortSignal) {
       try {
         const chunk = await source.readBytes(start, end, signal)
         if (start === 0 && detectTextEncoding(chunk.bytes).seemsBinary) {
           throw createBinaryFileError(source.byteLength)
         }
-        return chunk
+        return { ...chunk, eof: end === source.byteLength }
       } catch (error) {
         const code = errorStringField(error, 'code')
         if (
@@ -90,7 +94,6 @@ function releaseWhenRemoved(client: QueryClient, queryKey: QueryKey, resource: P
     unsubscribe()
     resource.view.dispose()
     resource.document.dispose()
-    client.removeQueries({ queryKey: pagedFileQueryKeys.index(resource.source.id) })
     client.removeQueries({ queryKey: pagedFileQueryKeys.pages(resource.source.id) })
     void runMutation(
       client,
@@ -107,9 +110,34 @@ function releaseWhenRemoved(client: QueryClient, queryKey: QueryKey, resource: P
   })
 }
 
-export async function readPagedWindow(owned: PagedResource, line: number, signal: AbortSignal) {
-  signal.throwIfAborted()
-  const window = await owned.view.readLines(line, PAGED_PROOF_OPTIONS.maxWindowRows, signal)
-  signal.throwIfAborted()
-  return { ...window, firstLine: line, byteLength: owned.source.byteLength }
+export type PagedNavigation =
+  | { kind: 'next' | 'previous'; cursor: PagedCursor }
+  | { kind: 'byte'; offset: number }
+
+export async function readPagedWindow(
+  owned: PagedResource,
+  navigation: PagedNavigation | undefined,
+  signal: AbortSignal,
+) {
+  const rows = PAGED_PROOF_OPTIONS.maxWindowRows
+  const window = await readWindow(owned.view, navigation, rows, signal)
+  return { ...window, byteLength: owned.source.byteLength }
+}
+
+function readWindow(
+  view: PagedResource['view'],
+  navigation: PagedNavigation | undefined,
+  rows: number,
+  signal: AbortSignal,
+) {
+  switch (navigation?.kind) {
+    case 'next':
+      return view.next(navigation.cursor, rows, signal)
+    case 'previous':
+      return view.previous(navigation.cursor, rows, signal)
+    case 'byte':
+      return view.seekByte(navigation.offset, rows, signal)
+    default:
+      return view.first(rows, signal)
+  }
 }

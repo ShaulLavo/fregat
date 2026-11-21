@@ -1,34 +1,45 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { keepPreviousData, skipToken, useQuery } from '@tanstack/react-query'
-import { readPagedWindow } from '@/features/workbench/utils/paged-resource'
-import { pagedResourceOptions } from '@/features/workbench/utils/paged-resource'
+import {
+  pagedResourceOptions,
+  readPagedWindow,
+  type PagedNavigation,
+} from '@/features/workbench/utils/paged-resource'
 import { pagedFileQueryKeys } from '@/features/workbench/utils/query-keys'
 
-export function usePagedFile(path: string, line: number, generation: number) {
+type PageRequest = {
+  readonly sourceId: string
+  readonly sequence: number
+  readonly navigation: PagedNavigation
+}
+
+export function usePagedFile(path: string, generation: number) {
   const instance = useId()
+  const [request, setRequest] = useState<PageRequest>()
   const resource = useQuery(pagedResourceOptions(instance, path, generation))
   const owned = resource.data
-  const index = useQuery({
-    queryKey: pagedFileQueryKeys.index(owned?.source.id ?? instance),
-    queryFn: owned
-      ? async () => {
-          await owned.document.initialize()
-          return owned.document.stats
-        }
-      : skipToken,
-    gcTime: 0,
-    staleTime: Infinity,
-    retry: false,
-    structuralSharing: false,
-  })
+  const current = request?.sourceId === owned?.source.id ? request : undefined
   const page = useQuery({
-    queryKey: pagedFileQueryKeys.page(owned?.source.id ?? instance, line),
-    queryFn: owned ? ({ signal }) => readPagedWindow(owned, line, signal) : skipToken,
+    queryKey: pagedFileQueryKeys.page(owned?.source.id ?? instance, current?.sequence ?? 0),
+    queryFn: owned
+      ? ({ signal }) => readPagedWindow(owned, current?.navigation, signal)
+      : skipToken,
     gcTime: 0,
     staleTime: Infinity,
     retry: false,
     structuralSharing: false,
     placeholderData: keepPreviousData,
   })
-  return { resource, index, page }
+
+  function navigate(navigation: PagedNavigation) {
+    if (!owned) return
+    const sourceId = owned.source.id
+    setRequest((previous) => ({
+      sourceId,
+      sequence: (previous?.sequence ?? 0) + 1,
+      navigation,
+    }))
+  }
+
+  return { resource, page, navigate }
 }
