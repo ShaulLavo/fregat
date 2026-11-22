@@ -214,13 +214,7 @@ export const terminalHistory: Scenario = {
       )
       // Restart keeps this socket and canvas, so the old canvas stays live until the new shell's
       // replay has painted; the generation changes when the terminal accepts input again.
-      await selectors
-        .terminalSurface(page)
-        .first()
-        .locator(
-          `[data-terminal-input-generation]:not([data-terminal-input-generation="${generation}"])`,
-        )
-        .waitFor({ timeout: HANG_CAP_MS })
+      await selectors.terminalInputGeneration(page, generation).waitFor({ timeout: HANG_CAP_MS })
       await typeShellCommand(
         page,
         'printf "\\nRESTART_AFTER_%s\\n" "${PLAN126_RESTART_TOKEN-unset}"',
@@ -286,8 +280,7 @@ async function postOwnedTerminal(page: Page, url: URL, action: 'clear' | 'kill')
 }
 
 async function inputGeneration(page: Page) {
-  const host = selectors.terminalSurface(page).first().locator('[data-terminal-input-generation]')
-  return host.getAttribute('data-terminal-input-generation')
+  return selectors.terminalInputGeneration(page).getAttribute('data-terminal-input-generation')
 }
 
 /** The terminal drops keystrokes until its replay has painted, which is when its canvas goes live. */

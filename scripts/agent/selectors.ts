@@ -1439,6 +1439,16 @@ export const selectors = {
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
   terminalLiveCanvas: (page: Page) =>
     selectors.terminalSurface(page).first().locator(':not([inert]) > .ghostty-webgpu > canvas'),
+  /** The host counts each time the terminal starts accepting input; `after` matches a later count. */
+  terminalInputGeneration: (page: Page, after?: string | null) =>
+    selectors
+      .terminalSurface(page)
+      .first()
+      .locator(
+        after === undefined || after === null
+          ? '[data-terminal-input-generation]'
+          : `[data-terminal-input-generation]:not([data-terminal-input-generation="${after}"])`,
+      ),
   terminalDomRows: (page: Page) =>
     selectors.terminalSurface(page).first().locator('.ghostty-webgpu-frame [data-row]'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',
