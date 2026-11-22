@@ -17,6 +17,7 @@ type ObservedTerminal = {
   clears: number
   ready: boolean
   readyCount: number
+  replayCount: number
   socketUrl: string
 }
 const inspection = new WeakMap<Page, unknown>()
@@ -36,6 +37,7 @@ async function isolate(page: Page, prefix: string, owners: Map<string, URL>) {
       clears: 0,
       ready: false,
       readyCount: 0,
+      replayCount: 0,
       socketUrl: socket.url(),
     }
     connections.push(connection)
@@ -49,6 +51,7 @@ async function isolate(page: Page, prefix: string, owners: Map<string, URL>) {
         connection.ready = true
         connection.readyCount++
       }
+      if (message.type === 'replay-complete') connection.replayCount++
       if (message.type === 'cleared') {
         connection.clears++
         connection.output = ''
@@ -58,8 +61,11 @@ async function isolate(page: Page, prefix: string, owners: Map<string, URL>) {
   return connections
 }
 
+// A hang cap, not a speed limit: a loaded machine slows the shell and the API restart a lot.
+const HANG_CAP_MS = 120_000
+
 async function until(page: Page, condition: () => boolean, label: string) {
-  for (let attempt = 0; attempt < 200; attempt++) {
+  for (let attempt = 0; attempt < HANG_CAP_MS / 50; attempt++) {
     if (condition()) return
     await page.waitForTimeout(50)
   }
@@ -138,7 +144,7 @@ export const terminalHistory: Scenario = {
       await stageRelease(server)
       await selectors.serverUpdateApply(page).waitFor()
       await selectors.serverUpdateApply(page).click()
-      await selectors.serverUpdate(page).waitFor({ state: 'detached', timeout: 20_000 })
+      await selectors.serverUpdate(page).waitFor({ state: 'detached', timeout: HANG_CAP_MS })
       await until(
         page,
         () =>
@@ -196,14 +202,20 @@ export const terminalHistory: Scenario = {
       )
       const readyCount = first.at(-1)!.readyCount
       const otherReadyCount = other.at(-1)!.readyCount
+      const replayCount = first.at(-1)!.replayCount
       await selectors
         .terminalSurface(page)
         .first()
         .click({ button: 'right', position: { x: 100, y: 60 } })
       await selectors.restartTerminalShell(page).click()
+      // Restart keeps this socket and canvas, so the old canvas stays live until the replay of the
+      // new shell has been announced; typing earlier would go to the previous shell's gate.
       await until(
         page,
-        () => first.at(-1)!.readyCount > readyCount && other.at(-1)!.readyCount > otherReadyCount,
+        () =>
+          first.at(-1)!.readyCount > readyCount &&
+          other.at(-1)!.readyCount > otherReadyCount &&
+          first.at(-1)!.replayCount > replayCount,
         'Both viewers must attach to the replacement process',
       )
       await typeShellCommand(
@@ -223,41 +235,54 @@ export const terminalHistory: Scenario = {
       failed = true
       throw error
     } finally {
-      await secondWindow?.close()
-      await page.goto('about:blank')
-      // A failed run reports its own error; cleanup may not hide it when the server is already down.
-      const results = await cleanOwnedTerminals(page, owners).catch((error: unknown) => {
-        if (!failed) throw error
-        return []
-      })
-      cleanupComplete = results.every(
-        (result) => result.clearStatus === 200 && result.killStatus === 200,
+      const results = Array.from(owners.values(), (url) => ({
+        worktreeId: url.searchParams.get('worktreeId'),
+        terminalId: url.searchParams.get('terminalId'),
+        clearStatus: null as number | null,
+        killStatus: null as number | null,
+      }))
+      // Every action runs even when another fails, so one dead request cannot skip the other kills.
+      const cleanup = await cleanupAll(
+        [
+          async () => void (await secondWindow?.close()),
+          async () => void (await page.goto('about:blank')),
+        ].concat(
+          Array.from(owners.values(), (url, index) => async () => {
+            results[index]!.clearStatus = await postOwnedTerminal(page, url, 'clear')
+          }),
+          Array.from(owners.values(), (url, index) => async () => {
+            results[index]!.killStatus = await postOwnedTerminal(page, url, 'kill')
+          }),
+        ),
+      ).then(
+        () => null,
+        (error: unknown) => error,
       )
+      cleanupComplete =
+        cleanup === null &&
+        results.every((result) => result.clearStatus === 200 && result.killStatus === 200)
       inspection.set(page, { prefix, marker, cleanupComplete, owners: results })
+      // A failed run reports its own error; the isolated server's teardown stops the terminal host.
       if (!failed) ok(cleanupComplete, 'All owned terminal histories and processes must be cleaned')
     }
   },
 }
 
-async function cleanOwnedTerminals(page: Page, owners: Map<string, URL>) {
-  const results = []
-  for (const url of owners.values()) {
-    const base = `${url.protocol === 'wss:' ? 'https:' : 'http:'}//${url.host}${url.pathname}`
-    const data = {
+async function postOwnedTerminal(page: Page, url: URL, action: 'clear' | 'kill') {
+  const base = `${url.protocol === 'wss:' ? 'https:' : 'http:'}//${url.host}${url.pathname}`
+  const response = await page.request.post(`${base}/${action}`, {
+    headers: { Origin: new URL(base).origin },
+    data: {
       worktreeId: url.searchParams.get('worktreeId'),
       terminalId: url.searchParams.get('terminalId'),
-    }
-    const headers = { Origin: new URL(base).origin }
-    const clear = await page.request.post(`${base}/clear`, { headers, data })
-    const killed = await page.request.post(`${base}/kill`, { headers, data })
-    results.push({ ...data, clearStatus: clear.status(), killStatus: killed.status() })
-  }
-  return results
+    },
+  })
+  return response.status()
 }
 
 /** The terminal drops keystrokes until its replay has painted, which is when its canvas goes live. */
 async function typeShellCommand(page: Page, command: string) {
-  await selectors.terminalLiveCanvas(page).waitFor()
+  await selectors.terminalLiveCanvas(page).waitFor({ timeout: HANG_CAP_MS })
   await selectors
     .terminalSurface(page)
     .first()
