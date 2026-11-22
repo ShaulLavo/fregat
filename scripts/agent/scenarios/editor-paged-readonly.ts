@@ -9,21 +9,20 @@ import { chords, selectors, openFileByName } from '../selectors'
 export const editorPagedReadonly: Scenario = {
   name: 'editor-paged-readonly',
   description:
-    'Open a sparse 300 MiB file read-only, navigate global lines, copy one section, and release the read session.',
+    'Open a sparse 300 MiB file read-only, browse bounded sections, jump by byte, and close the read session.',
   async run(page, { step }) {
     const originalUrl = page.url()
     const fixture = await mkdtemp(scratchPath('fregat-paged-'))
     const target = path.join(fixture, 'large.txt')
-    const released: string[] = []
+    const lines = Array.from({ length: 4096 }, (_, index) => `Paged fixture line ${index + 1}\n`)
+    const requestedStarts: number[] = []
     page.on('request', (request) => {
-      if (request.method() === 'DELETE' && request.url().includes('/fs/read-session/'))
-        released.push(request.url())
+      const url = new URL(request.url())
+      if (request.method() === 'GET' && url.pathname.includes('/fs/read-session/'))
+        requestedStarts.push(Number(url.searchParams.get('start')))
     })
     try {
-      await writeFile(
-        target,
-        Array.from({ length: 4096 }, (_, index) => `Paged fixture line ${index + 1}\n`).join(''),
-      )
+      await writeFile(target, lines.join(''))
       await writeFile(path.join(fixture, 'other.txt'), 'another file')
       await truncate(target, 300 * 1024 * 1024)
       await openFixtureWorkspace(page, fixture)
@@ -32,32 +31,47 @@ export const editorPagedReadonly: Scenario = {
       await selectors.commandOption(page, 'large.txt').click()
       await selectors.openReadOnly(page).waitFor({ timeout: 15_000 })
       await step('oversized-file-offers-read-only')
+      const readsBeforeOpen = requestedStarts.length
       await selectors.openReadOnly(page).click()
       await selectors
         .pagedContents(page)
         .getByText('Paged fixture line 1', { exact: true })
         .waitFor({ timeout: 15_000 })
       await step('first-page')
+      strictEqual(requestedStarts.length - readsBeforeOpen, 1, 'Opening reads one viewer range')
       await selectors.pagedNext(page).click()
       await selectors
         .pagedContents(page)
         .getByText('Paged fixture line 129', { exact: true })
         .waitFor()
-      await selectors.pagedLine(page).fill('3000')
+      await selectors.pagedPrevious(page).click()
+      await selectors
+        .pagedContents(page)
+        .getByText('Paged fixture line 1', { exact: true })
+        .waitFor()
+      const readsBeforeJump = requestedStarts.length
+      await selectors.pagedByte(page).fill(String(Buffer.byteLength(lines.slice(0, 2999).join(''))))
       await selectors.pagedGo(page).click()
       await selectors
         .pagedContents(page)
         .getByText('Paged fixture line 3000', { exact: true })
         .waitFor()
+      const jumpReads = requestedStarts.slice(readsBeforeJump)
+      ok(jumpReads.length > 0 && jumpReads.every((start) => start > 0), 'The jump skips the prefix')
+      const readsBeforeCopy = requestedStarts.length
       await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
       await selectors.pagedCopy(page).click()
+      await page.getByText('Copied displayed text', { exact: true }).waitFor()
       const copied = await page.evaluate(() => navigator.clipboard.readText())
-      strictEqual(copied.split('\n').length, 128)
-      ok(copied.startsWith('Paged fixture line 3000\n'))
-      await step('global-line-jump-and-bounded-copy')
-      await openFileByName(page, 'other.txt')
-      await page.waitForTimeout(500)
-      ok(released.length > 0, 'Leaving the viewer closes its server read session')
+      strictEqual(copied, lines.slice(2999, 2999 + 128).join(''))
+      strictEqual(requestedStarts.length, readsBeforeCopy, 'Copy reads only the mounted window')
+      await step('byte-jump-and-bounded-copy')
+      await Promise.all([
+        page.waitForRequest(
+          (request) => request.method() === 'DELETE' && request.url().includes('/fs/read-session/'),
+        ),
+        openFileByName(page, 'other.txt'),
+      ])
     } finally {
       await page.goto(originalUrl)
       await releaseFixture(fixture)

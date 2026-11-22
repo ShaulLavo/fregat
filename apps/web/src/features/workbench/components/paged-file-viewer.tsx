@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { PAGED_PROOF_OPTIONS } from '@singapore-editor/paged'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
@@ -15,33 +14,38 @@ import { pagedErrorMessage } from '@/features/workbench/utils/paged-error-messag
 import { PagedFileRows } from '@/features/workbench/components/paged-file-rows'
 
 export function PagedFileViewer({ path }: { path: string }) {
-  const [line, setLine] = useState(0)
-  const [draftLine, setDraftLine] = useState('1')
+  const [draftByte, setDraftByte] = useState('0')
   const [generation, setGeneration] = useState(0)
-  const { resource, index, page } = usePagedFile(path, line, generation)
+  const { resource, page, navigate } = usePagedFile(path, generation)
   const copy = useMutation({
     ...copyTextMutationOptions(),
     gcTime: 0,
     onSuccess: () => toast.success('Copied displayed text'),
   })
-  const shown = page.data
-  const error = page.error ?? resource.error ?? index.error
-  const busy = resource.isPending || page.isFetching
-  const requested = Number(draftLine)
-  const validLine =
+  const shown = page.data?.kind === 'window' ? page.data : undefined
+  const error = page.error ?? resource.error
+  const busy = resource.isFetching || page.isFetching
+  const requested = Number(draftByte)
+  const byteLength = resource.data?.source.byteLength
+  const validByte =
+    draftByte.trim() !== '' &&
     Number.isSafeInteger(requested) &&
-    requested > 0 &&
-    (!index.data || requested <= index.data.lines)
-  const lastRow = shown?.rows.at(-1)
-  const nextLine = lastRow ? lastRow.line + 1 : 0
-
-  function navigate(next: number) {
-    setLine(next)
-    setDraftLine(String(next + 1))
-  }
+    requested >= 0 &&
+    byteLength !== undefined &&
+    requested <= byteLength
+  const previous = shown?.previous
+  const next = shown?.next
+  const first = shown?.fragments[0]
+  const last = shown?.fragments.at(-1)
+  const location =
+    first?.line !== undefined && last?.line !== undefined
+      ? ` · Lines ${first.line + 1}–${last.line + 1}`
+      : first
+        ? ` · Byte ${first.start.byteOffset}`
+        : ''
 
   function reopen() {
-    navigate(0)
+    setDraftByte('0')
     setGeneration((value) => value + 1)
   }
 
@@ -52,9 +56,7 @@ export function PagedFileViewer({ path }: { path: string }) {
       detail={
         <span className='text-2xs font-mono tabular-nums'>
           UTF-8
-          {shown
-            ? ` · ${formatSize(shown.byteLength)} · Lines ${shown.firstLine + 1}–${lastRow ? lastRow.line + 1 : shown.firstLine + 1}`
-            : ''}
+          {shown ? ` · ${formatSize(shown.byteLength)}${location}` : ''}
         </span>
       }
       actions={
@@ -67,7 +69,7 @@ export function PagedFileViewer({ path }: { path: string }) {
             onClick={() =>
               shown &&
               copy.mutate({
-                text: shown.rows.map((row) => row.text).join('\n'),
+                text: shown.fragments.map(({ text, lineBreak }) => text + lineBreak).join(''),
                 label: 'displayed text',
               })
             }
@@ -81,59 +83,47 @@ export function PagedFileViewer({ path }: { path: string }) {
           <Button
             size='sm'
             variant='ghost'
-            disabled={!shown || shown.firstLine === 0 || busy || Boolean(error)}
-            onClick={() =>
-              navigate(Math.max(0, (shown?.firstLine ?? 0) - PAGED_PROOF_OPTIONS.maxWindowRows))
-            }
+            disabled={!previous || busy || Boolean(error)}
+            onClick={() => previous && navigate({ kind: 'previous', cursor: previous })}
           >
-            Previous lines
+            Previous section
           </Button>
           <Button
             size='sm'
             variant='ghost'
-            disabled={
-              !lastRow ||
-              busy ||
-              Boolean(error) ||
-              (index.data !== undefined && nextLine >= index.data.lines)
-            }
-            onClick={() => navigate(nextLine)}
+            disabled={!next || busy || Boolean(error)}
+            onClick={() => next && navigate({ kind: 'next', cursor: next })}
           >
-            Next lines
+            Next section
           </Button>
           <form
             className='flex items-center gap-(--density-control-gap)'
             onSubmit={(event) => {
               event.preventDefault()
-              if (validLine) navigate(requested - 1)
+              if (validByte) navigate({ kind: 'byte', offset: requested })
             }}
           >
             <Input
-              aria-label='Line number'
+              aria-label='Byte offset'
               className='w-24 font-mono tabular-nums'
               type='number'
-              min={1}
-              value={draftLine}
-              onChange={(event) => setDraftLine(event.target.value)}
+              min={0}
+              max={byteLength}
+              value={draftByte}
+              onChange={(event) => setDraftByte(event.target.value)}
             />
             <Button
               size='sm'
               variant='secondary'
               type='submit'
-              disabled={!validLine || busy || Boolean(error)}
+              disabled={!validByte || busy || Boolean(error)}
             >
-              Go to line
+              Go to byte
             </Button>
           </form>
-          {index.isFetching ? (
-            <span className='text-muted-foreground text-2xs ml-auto flex items-center gap-(--density-control-gap)'>
-              <Spinner size='xs' label='Indexing file lines' />
-              Indexing lines…
-            </span>
-          ) : null}
         </PaneBar>
       }
-      state={{ pending: !shown && !error, error: Boolean(error) }}
+      state={{ pending: !page.data && !error, error: Boolean(error) }}
       errorState={
         <EmptyState
           title='Unable to read this section'
@@ -148,16 +138,20 @@ export function PagedFileViewer({ path }: { path: string }) {
       }
       bodyClassName='scroll-gutter'
     >
-      {shown?.truncated ? (
+      {shown?.stop === 'text' || shown?.stop === 'budget' ? (
         <p
           role='status'
           className='bg-info/10 text-foreground p-(--density-section-padding) text-xs'
         >
-          This section is too long to show in full. Its last line is cut off, and Copy displayed
-          text copies only what you see.
+          This section reached the read limit. Use the section controls to continue.
         </p>
       ) : null}
-      {shown ? <PagedFileRows rows={shown.rows} /> : null}
+      {page.data?.kind === 'unavailable' ? (
+        <p role='status' className='text-muted-foreground p-(--density-section-padding) text-xs'>
+          No text is available at this byte offset.
+        </p>
+      ) : null}
+      {shown ? <PagedFileRows fragments={shown.fragments} /> : null}
     </ToolPane>
   )
 }
