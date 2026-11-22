@@ -97,6 +97,9 @@ export function TerminalPanel({
   const [menuTarget, setMenuTarget] = useState<TerminalMenuTarget | null>(null)
   const [connectedIdentity, setConnectedIdentity] = useState<string | null>(null)
   const [paintedIdentity, setPaintedIdentity] = useState<string | null>(null)
+  // Counts the times the terminal started accepting input, so a restart of the shell on the same
+  // socket and canvas is observable even when the canvas never looks disconnected.
+  const [inputGeneration, setInputGeneration] = useState(0)
   const [disconnectedPaint, setDisconnectedPaint] = useState<{
     key: string
     paint: string | null
@@ -181,6 +184,7 @@ export function TerminalPanel({
     setConnectedIdentity(connected ? identity : null)
     if (connected) {
       setPaintedIdentity(identity)
+      setInputGeneration((generation) => generation + 1)
       return
     }
     setDisconnectedPaint({
@@ -359,6 +363,7 @@ export function TerminalPanel({
           savedPaint && !hasLivePaint && 'invisible',
         )}
         inert={!socketConnected}
+        data-terminal-input-generation={inputGeneration}
         ref={hostRef}
       />
       {savedPaint && !hasLivePaint && active ? (

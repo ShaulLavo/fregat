@@ -185,10 +185,9 @@ export const terminalHistory: Scenario = {
       await showTerminal(page)
       await until(
         page,
-        () => reattachedTerminal(first, count) !== undefined,
-        'Reconnect after clear must become ready',
+        () => reattachedTerminal(first, count)?.replayCount === 1,
+        'Reconnect after clear must finish its replay',
       )
-      await page.waitForTimeout(300)
       strictEqual(first.at(-1)?.output.includes(marker), false)
       await step('reconnect-keeps-history-cleared')
       await typeShellCommand(
@@ -202,22 +201,26 @@ export const terminalHistory: Scenario = {
       )
       const readyCount = first.at(-1)!.readyCount
       const otherReadyCount = other.at(-1)!.readyCount
-      const replayCount = first.at(-1)!.replayCount
+      const generation = await inputGeneration(page)
       await selectors
         .terminalSurface(page)
         .first()
         .click({ button: 'right', position: { x: 100, y: 60 } })
       await selectors.restartTerminalShell(page).click()
-      // Restart keeps this socket and canvas, so the old canvas stays live until the replay of the
-      // new shell has been announced; typing earlier would go to the previous shell's gate.
       await until(
         page,
-        () =>
-          first.at(-1)!.readyCount > readyCount &&
-          other.at(-1)!.readyCount > otherReadyCount &&
-          first.at(-1)!.replayCount > replayCount,
+        () => first.at(-1)!.readyCount > readyCount && other.at(-1)!.readyCount > otherReadyCount,
         'Both viewers must attach to the replacement process',
       )
+      // Restart keeps this socket and canvas, so the old canvas stays live until the new shell's
+      // replay has painted; the generation changes when the terminal accepts input again.
+      await selectors
+        .terminalSurface(page)
+        .first()
+        .locator(
+          `[data-terminal-input-generation]:not([data-terminal-input-generation="${generation}"])`,
+        )
+        .waitFor({ timeout: HANG_CAP_MS })
       await typeShellCommand(
         page,
         'printf "\\nRESTART_AFTER_%s\\n" "${PLAN126_RESTART_TOKEN-unset}"',
@@ -235,37 +238,39 @@ export const terminalHistory: Scenario = {
       failed = true
       throw error
     } finally {
-      const results = Array.from(owners.values(), (url) => ({
-        worktreeId: url.searchParams.get('worktreeId'),
-        terminalId: url.searchParams.get('terminalId'),
-        clearStatus: null as number | null,
-        killStatus: null as number | null,
-      }))
-      // Every action runs even when another fails, so one dead request cannot skip the other kills.
-      const cleanup = await cleanupAll(
-        [
-          async () => void (await secondWindow?.close()),
-          async () => void (await page.goto('about:blank')),
-        ].concat(
-          Array.from(owners.values(), (url, index) => async () => {
-            results[index]!.clearStatus = await postOwnedTerminal(page, url, 'clear')
-          }),
-          Array.from(owners.values(), (url, index) => async () => {
-            results[index]!.killStatus = await postOwnedTerminal(page, url, 'kill')
-          }),
-        ),
-      ).then(
-        () => null,
-        (error: unknown) => error,
-      )
-      cleanupComplete =
-        cleanup === null &&
-        results.every((result) => result.clearStatus === 200 && result.killStatus === 200)
-      inspection.set(page, { prefix, marker, cleanupComplete, owners: results })
+      // Every action runs even when another fails, so one dead request cannot skip the other kills,
+      // and each outcome is named in the inspection.
+      const outcomes: CleanupOutcome[] = []
+      await attempt(outcomes, 'close second window', async () => void (await secondWindow?.close()))
+      await attempt(outcomes, 'blank page', async () => void (await page.goto('about:blank')))
+      for (const url of owners.values()) await cleanOwnedTerminal(outcomes, page, url)
+      cleanupComplete = outcomes.every((outcome) => outcome.error === null)
+      inspection.set(page, { prefix, marker, cleanupComplete, outcomes })
       // A failed run reports its own error; the isolated server's teardown stops the terminal host.
       if (!failed) ok(cleanupComplete, 'All owned terminal histories and processes must be cleaned')
     }
   },
+}
+
+type CleanupOutcome = { action: string; error: string | null }
+
+async function attempt(outcomes: CleanupOutcome[], action: string, run: () => Promise<void>) {
+  try {
+    await run()
+    outcomes.push({ action, error: null })
+  } catch (error) {
+    outcomes.push({ action, error: error instanceof Error ? error.message : String(error) })
+  }
+}
+
+async function cleanOwnedTerminal(outcomes: CleanupOutcome[], page: Page, url: URL) {
+  for (const action of ['clear', 'kill'] as const) {
+    const name = `${action} ${url.searchParams.get('terminalId')}`
+    await attempt(outcomes, name, async () => {
+      const status = await postOwnedTerminal(page, url, action)
+      ok(status === 200, `Owned terminal ${action} answered ${status}`)
+    })
+  }
 }
 
 async function postOwnedTerminal(page: Page, url: URL, action: 'clear' | 'kill') {
@@ -278,6 +283,11 @@ async function postOwnedTerminal(page: Page, url: URL, action: 'clear' | 'kill')
     },
   })
   return response.status()
+}
+
+async function inputGeneration(page: Page) {
+  const host = selectors.terminalSurface(page).first().locator('[data-terminal-input-generation]')
+  return host.getAttribute('data-terminal-input-generation')
 }
 
 /** The terminal drops keystrokes until its replay has painted, which is when its canvas goes live. */
