@@ -88,16 +88,13 @@ export const terminalHistory: Scenario = {
     const first = await isolate(page, prefix, owners)
     let secondWindow: Awaited<ReturnType<typeof openWiredContextPage>> | undefined
     let cleanupComplete = false
+    let failed = false
+    let other: ObservedTerminal[] = []
     try {
       await page.reload()
       await showTerminal(page)
       await until(page, () => first.at(-1)?.ready === true, 'Owned terminal must become ready')
-      await selectors
-        .terminalSurface(page)
-        .first()
-        .click({ position: { x: 100, y: 60 } })
-      await page.keyboard.type(`printf '\\nTERMINAL_%s\\n' '${suffix}'`)
-      await page.keyboard.press('Enter')
+      await typeShellCommand(page, `printf '\\nTERMINAL_%s\\n' '${suffix}'`)
       await until(
         page,
         () => first.at(-1)?.output.includes(marker) === true,
@@ -106,7 +103,7 @@ export const terminalHistory: Scenario = {
       await step('owned-terminal-output')
       secondWindow = await openWiredContextPage(page)
       const second = secondWindow.page
-      const other = await isolate(second, prefix, owners)
+      other = await isolate(second, prefix, owners)
       await second.goto(page.url())
       await showTerminal(second)
       await until(
@@ -127,14 +124,10 @@ export const terminalHistory: Scenario = {
         'A fresh ready connection must replay the marker before input',
       )
       await step('history-replayed-with-second-viewer')
-      await selectors
-        .terminalSurface(page)
-        .first()
-        .click({ position: { x: 100, y: 60 } })
-      await page.keyboard.type(
+      await typeShellCommand(
+        page,
         'PLAN126_API_TOKEN=survives; printf "\\nAPI_BEFORE_%s\\n" "$PLAN126_API_TOKEN"',
       )
-      await page.keyboard.press('Enter')
       await until(
         page,
         () => first.at(-1)?.output.includes('API_BEFORE_survives') === true,
@@ -153,16 +146,15 @@ export const terminalHistory: Scenario = {
           reattachedTerminal(other, secondCount) !== undefined,
         'Both viewers reconnect after API restart',
       )
-      ok(
-        first.at(-1)?.output.includes(marker) && other.at(-1)?.output.includes(marker),
+      // The server sends `ready` before the saved output, so replay is checked by waiting for it.
+      await until(
+        page,
+        () =>
+          first.at(-1)?.output.includes(marker) === true &&
+          other.at(-1)?.output.includes(marker) === true,
         'Both viewers replay the pre-restart history',
       )
-      await selectors
-        .terminalSurface(page)
-        .first()
-        .click({ position: { x: 100, y: 60 } })
-      await page.keyboard.type('printf "\\nAPI_AFTER_%s\\n" "$PLAN126_API_TOKEN"')
-      await page.keyboard.press('Enter')
+      await typeShellCommand(page, 'printf "\\nAPI_AFTER_%s\\n" "$PLAN126_API_TOKEN"')
       await until(
         page,
         () =>
@@ -193,14 +185,10 @@ export const terminalHistory: Scenario = {
       await page.waitForTimeout(300)
       strictEqual(first.at(-1)?.output.includes(marker), false)
       await step('reconnect-keeps-history-cleared')
-      await selectors
-        .terminalSurface(page)
-        .first()
-        .click({ position: { x: 100, y: 60 } })
-      await page.keyboard.type(
+      await typeShellCommand(
+        page,
         'PLAN126_RESTART_TOKEN=old; printf "\\nRESTART_BEFORE_%s\\n" "$PLAN126_RESTART_TOKEN"',
       )
-      await page.keyboard.press('Enter')
       await until(
         page,
         () => first.at(-1)?.output.includes('RESTART_BEFORE_old') === true,
@@ -218,12 +206,10 @@ export const terminalHistory: Scenario = {
         () => first.at(-1)!.readyCount > readyCount && other.at(-1)!.readyCount > otherReadyCount,
         'Both viewers must attach to the replacement process',
       )
-      await selectors
-        .terminalSurface(page)
-        .first()
-        .click({ position: { x: 100, y: 60 } })
-      await page.keyboard.type('printf "\\nRESTART_AFTER_%s\\n" "${PLAN126_RESTART_TOKEN-unset}"')
-      await page.keyboard.press('Enter')
+      await typeShellCommand(
+        page,
+        'printf "\\nRESTART_AFTER_%s\\n" "${PLAN126_RESTART_TOKEN-unset}"',
+      )
       await until(
         page,
         () =>
@@ -233,31 +219,45 @@ export const terminalHistory: Scenario = {
       )
       strictEqual(first.at(-1)?.output.includes('RESTART_BEFORE_old'), false)
       await step('restart-replaces-process-and-preserves-viewers')
+    } catch (error) {
+      failed = true
+      throw error
     } finally {
       await secondWindow?.close()
       await page.goto('about:blank')
-      const results = []
-      for (const url of owners.values()) {
-        const base = `${url.protocol === 'wss:' ? 'https:' : 'http:'}//${url.host}${url.pathname}`
-        const data = {
-          worktreeId: url.searchParams.get('worktreeId'),
-          terminalId: url.searchParams.get('terminalId'),
-        }
-        const headers = { Origin: new URL(base).origin }
-        const clear = await page.request.post(`${base}/clear`, { headers, data })
-        const killed = await page.request.post(`${base}/kill`, { headers, data })
-        results.push({ ...data, clearStatus: clear.status(), killStatus: killed.status() })
-      }
+      // A failed run reports its own error; cleanup may not hide it when the server is already down.
+      const results = await cleanOwnedTerminals(page, owners).catch((error: unknown) => {
+        if (!failed) throw error
+        return []
+      })
       cleanupComplete = results.every(
         (result) => result.clearStatus === 200 && result.killStatus === 200,
       )
       inspection.set(page, { prefix, marker, cleanupComplete, owners: results })
-      ok(cleanupComplete, 'All owned terminal histories and processes must be cleaned')
+      if (!failed) ok(cleanupComplete, 'All owned terminal histories and processes must be cleaned')
     }
   },
 }
 
+async function cleanOwnedTerminals(page: Page, owners: Map<string, URL>) {
+  const results = []
+  for (const url of owners.values()) {
+    const base = `${url.protocol === 'wss:' ? 'https:' : 'http:'}//${url.host}${url.pathname}`
+    const data = {
+      worktreeId: url.searchParams.get('worktreeId'),
+      terminalId: url.searchParams.get('terminalId'),
+    }
+    const headers = { Origin: new URL(base).origin }
+    const clear = await page.request.post(`${base}/clear`, { headers, data })
+    const killed = await page.request.post(`${base}/kill`, { headers, data })
+    results.push({ ...data, clearStatus: clear.status(), killStatus: killed.status() })
+  }
+  return results
+}
+
+/** The terminal drops keystrokes until its replay has painted, which is when its canvas goes live. */
 async function typeShellCommand(page: Page, command: string) {
+  await selectors.terminalLiveCanvas(page).waitFor()
   await selectors
     .terminalSurface(page)
     .first()
