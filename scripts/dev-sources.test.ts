@@ -43,7 +43,7 @@ const sourceTest = test.extend<{ web: string }>({
     }
     for (const [name, relative] of [
       ['@singapore-editor/core', 'checkouts/singapore/packages/core'],
-      ['@fregat/hotkeys', 'checkouts/hotkeys/packages/hotkeys'],
+      ['@shaulavo/hotkeys', 'checkouts/hotkeys/packages/hotkeys'],
       ['ghostty-webgpu', 'checkouts/ghostty-webgpu'],
     ]) {
       writeFile(root, `${relative.split('/packages/')[0]}/.git`, 'gitdir: ../../repository\n')
@@ -72,7 +72,7 @@ sourceTest(
       path.join(web, 'checkouts/hotkeys'),
       path.join(web, 'checkouts/ghostty-webgpu'),
     ])
-    expect(paths['@fregat/hotkeys']).toEqual([
+    expect(paths['@shaulavo/hotkeys']).toEqual([
       path.join(web, 'checkouts/hotkeys/packages/hotkeys/src/index.ts'),
     ])
     expect(paths['@singapore-editor/core/document']).toEqual([
@@ -128,14 +128,14 @@ sourceTest.for(['isolated', 'hoisted'])(
     const local = readDevSources(web)
     expect(local.map((pkg) => pkg.name)).toEqual([
       '@singapore-editor/core',
-      '@fregat/hotkeys',
+      '@shaulavo/hotkeys',
       'ghostty-webgpu',
     ])
-    expect(sourcePaths(local)['@fregat/hotkeys']).toEqual([
+    expect(sourcePaths(local)['@shaulavo/hotkeys']).toEqual([
       path.join(web, 'checkouts/hotkeys/packages/hotkeys/src/index.ts'),
     ])
     writeDevTypeConfig(web, local)
-    for (const name of ['@singapore-editor/core', '@fregat/hotkeys', 'ghostty-webgpu']) {
+    for (const name of ['@singapore-editor/core', '@shaulavo/hotkeys', 'ghostty-webgpu']) {
       const link = path.join(modules, name)
       fs.unlinkSync(link)
       writeFile(
@@ -173,7 +173,7 @@ sourceTest('ignores installed caches inside the consumer Git tree', ({ web }) =>
   const cache = path.join(web, '.bun/install/cache')
   const packages = [
     ['@singapore-editor/core', 'singapore', { exports: { '.': { import: './dist/index.js' } } }],
-    ['@fregat/hotkeys', 'hotkeys', { exports: { '.': { import: './dist/index.js' } } }],
+    ['@shaulavo/hotkeys', 'hotkeys', { exports: { '.': { import: './dist/index.js' } } }],
     ['ghostty-webgpu', 'ghostty', {}],
   ] as const
   for (const [name, directory, manifest] of packages) {
@@ -193,7 +193,7 @@ sourceTest('ignores installed caches inside the consumer Git tree', ({ web }) =>
 })
 
 sourceTest('maps a local editor alongside installed hotkeys and Ghostty packages', ({ web }) => {
-  for (const name of ['@fregat/hotkeys', 'ghostty-webgpu']) {
+  for (const name of ['@shaulavo/hotkeys', 'ghostty-webgpu']) {
     fs.unlinkSync(path.join(web, 'node_modules', name))
     writeFile(web, `node_modules/${name}/package.json`, '{}')
   }

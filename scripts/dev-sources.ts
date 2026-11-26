@@ -21,7 +21,7 @@ export function readDevSources(webRoot: string): readonly DevPackage[] {
   if (editors.length === 0) throw createScriptError('No editor dependencies found in the web app.')
 
   return editors
-    .concat(['@fregat/hotkeys', 'ghostty-webgpu'])
+    .concat(['@shaulavo/hotkeys', 'ghostty-webgpu'])
     .flatMap((name) => readSourcePackage(webRoot, name))
 }
 
@@ -88,7 +88,7 @@ function readSourcePackage(webRoot: string, name: string): readonly DevPackage[]
   const { root } = packageLink
   const checkout = checkoutRoot(root)
   if (!checkout) return []
-  if (name === '@fregat/hotkeys') return [readHotkeysPackage(root, checkout)]
+  if (name === '@shaulavo/hotkeys') return [readHotkeysPackage(root, checkout)]
   if (name === 'ghostty-webgpu') return [readGhosttyPackage(root, checkout)]
   return [readEditorPackage(root, name, checkout)]
 }
@@ -113,7 +113,7 @@ function readEditorPackage(root: string, name: string, checkout: string): DevPac
 }
 
 function readHotkeysPackage(root: string, checkout: string): DevPackage {
-  const name = '@fregat/hotkeys'
+  const name = '@shaulavo/hotkeys'
   const entries = new Map([[name, requiredFile(root, 'src/index.ts')]])
   return { name, root, checkout, entries }
 }

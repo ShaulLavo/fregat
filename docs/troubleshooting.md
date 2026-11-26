@@ -2,7 +2,7 @@
 
 Fixes for the failures a new checkout hits most often. Each entry quotes the message you see. If yours is not here, read the server's structured logs first with `bun run logs --since 5m`. The command reads `logs/` in your checkout, or the directory in `OBSERVABILITY_DIR`.
 
-## `Cannot find module '@fregat/hotkeys'` when starting the dev server
+## `Cannot find module '@shaulavo/hotkeys'` when starting the dev server
 
 Hotkeys, Singapore, and Ghostty come from pinned release packages. Install the dependencies, build Fregat's UI and utility packages, then start the app:
 

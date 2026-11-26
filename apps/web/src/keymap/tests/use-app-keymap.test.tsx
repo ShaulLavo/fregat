@@ -1,4 +1,4 @@
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 import { act, renderHook } from '@testing-library/react'
 import { vi } from 'vitest'
 import { expect, test } from '../../../test/fixtures'

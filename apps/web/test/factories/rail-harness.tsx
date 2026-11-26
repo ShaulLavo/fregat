@@ -1,4 +1,4 @@
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 import type { KeybindingPreset } from '@workspace/client-core/commands/metadata'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { Toaster } from '@workspace/ui/components/sonner'

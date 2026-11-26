@@ -5,7 +5,7 @@ import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import { commands } from 'vitest/browser'
 import { binding } from '../../../test/factories/key-binding'
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 import {
   useEffect,
   useState,

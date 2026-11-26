@@ -1,5 +1,5 @@
 import '@workspace/ui/globals.css'
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 import { flushSync } from 'react-dom'
 import { commands } from 'vitest/browser'
 import { expect, test } from 'vitest'

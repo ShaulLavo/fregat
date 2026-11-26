@@ -1,4 +1,4 @@
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 /** @jsxImportSource react */
 // Plan 178 parity: keyboard, pointer selection and accessibility of today's tree, driven by real
 // input. The keyboard-and-selection sub-plan replaces this machinery; these pin what it must keep.

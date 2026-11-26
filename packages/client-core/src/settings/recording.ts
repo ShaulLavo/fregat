@@ -1,4 +1,4 @@
-import { detectPlatform, isModifierKey, normalizeKeyName } from '@fregat/hotkeys'
+import { detectPlatform, isModifierKey, normalizeKeyName } from '@shaulavo/hotkeys'
 
 type RecordingKeyEvent = {
   readonly key: string

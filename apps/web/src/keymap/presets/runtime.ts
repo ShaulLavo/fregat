@@ -1,4 +1,4 @@
-import type { Binding } from '@fregat/hotkeys'
+import type { Binding } from '@shaulavo/hotkeys'
 
 export type RuntimeRow = readonly [
   index: number,

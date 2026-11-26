@@ -30,10 +30,10 @@ test('workspace builds contain only Fregat consumers', () => {
   expect(tasks.length).toBeGreaterThan(0)
   for (const task of tasks) {
     expect(task.directory).not.toMatch(/^packages\/(singapore|ghostty-webgpu|hotkeys)(\/|$)/)
-    expect(task.taskId).not.toMatch(/^(@singapore-editor\/|@fregat\/|ghostty-webgpu)/)
+    expect(task.taskId).not.toMatch(/^(@singapore-editor\/|@shaulavo\/|@fregat\/|ghostty-webgpu)/)
     expect(task.dependencies).not.toEqual(
       expect.arrayContaining([
-        expect.stringMatching(/^(@singapore-editor\/|@fregat\/|ghostty-webgpu)/),
+        expect.stringMatching(/^(@singapore-editor\/|@shaulavo\/|@fregat\/|ghostty-webgpu)/),
       ]),
     )
   }

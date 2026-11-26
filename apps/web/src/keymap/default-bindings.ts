@@ -16,7 +16,7 @@ import {
   vscodeInlineSuggestPack,
   type EditorKeymapPack,
 } from '@singapore-editor/core/keymap'
-import { detectPlatform, type KeymapEntry } from '@fregat/hotkeys'
+import { detectPlatform, type KeymapEntry } from '@shaulavo/hotkeys'
 import { chordKeys, parsedChord, type PlatformName } from '@workspace/client-core/commands/chord'
 import type { KeybindingPreset } from '@workspace/client-core/commands/metadata'
 

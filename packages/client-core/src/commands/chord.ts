@@ -5,10 +5,10 @@ import {
   validateHotkey,
   type ParsedHotkey,
   type RawHotkey,
-} from '@fregat/hotkeys'
+} from '@shaulavo/hotkeys'
 import { MAX_KEYBINDING_CHORD_STROKES } from '@workspace/contracts'
 
-import type { KeyChord } from '@fregat/hotkeys'
+import type { KeyChord } from '@shaulavo/hotkeys'
 
 export type PlatformName = ReturnType<typeof detectPlatform>
 

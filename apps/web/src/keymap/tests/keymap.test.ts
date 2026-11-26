@@ -1,4 +1,4 @@
-import { bindingsForInput, compileKeymap, createKeyInput, parseKeyContext } from '@fregat/hotkeys'
+import { bindingsForInput, compileKeymap, createKeyInput, parseKeyContext } from '@shaulavo/hotkeys'
 import { expect, test } from '../../../test/fixtures'
 import { binding } from '../../../test/factories/key-binding'
 import { keyBindingResolution, resolvedPlatformKeyBindings } from '@/keymap/active-bindings'

@@ -1,6 +1,6 @@
 # web
 
-The Fregat browser app: workbench, editor shell, file tree, Git views, chat and terminal panels. It is a Vite and React app that talks to [`apps/server`](../server/) over typed routes. The Singapore editor, the ghostty-webgpu terminal and `@fregat/hotkeys` come from this repository's workspace.
+The Fregat browser app: workbench, editor shell, file tree, Git views, chat and terminal panels. It is a Vite and React app that talks to [`apps/server`](../server/) over typed routes. The Singapore editor, the ghostty-webgpu terminal and `@shaulavo/hotkeys` come from this repository's workspace.
 
 From the repository root, after `bun install --frozen-lockfile` and `bun run build:workspaces`:
 

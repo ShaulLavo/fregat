@@ -1,6 +1,6 @@
 # Adopt package releases
 
-Fregat consumes Singapore, Ghostty, and hotkeys from immutable GitHub Release tarballs.
+Fregat consumes Singapore, Ghostty, and hotkeys from exact pinned npm package versions.
 Each standalone repository owns its source, package versions, release notes, sites, and package qualification.
 
 ## Publish a package change
@@ -12,14 +12,14 @@ Each standalone repository owns its source, package versions, release notes, sit
 2. Follow that repository's contribution and release instructions.
 3. Merge the reviewed change after its checks pass.
 4. Cut a patch release using the repository's release workflow.
-5. Inspect the package identities, manifest, checksums, and packed-consumer qualification before publishing the draft.
+5. Inspect the published package versions and packed-consumer qualification before adopting them.
 
 Keep versions unchanged in feature PRs. Cut a new release to fix a published artifact.
-Preserve existing assets so pinned consumers can reproduce earlier builds.
+Preserve existing releases so pinned consumers can reproduce earlier builds.
 
 ## Update Fregat's pins
 
-1. Update the root `package.json` catalog URLs to the inspected release assets.
+1. Update the root `package.json` catalog versions to the inspected published versions.
 2. Update matching root overrides for transitive packages that have no direct catalog entry.
 3. Run `bun install` to refresh `bun.lock`.
 4. Run `bun install --frozen-lockfile` and `bun run standalone:consumer:check -- --producer-free`.

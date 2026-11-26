@@ -3,7 +3,7 @@ import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 import { act, fireEvent, screen } from '@testing-library/react'
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 
 import { ChatInputSubmitPlugin } from '@/features/chat/components/chat-input-submit-plugin'
 import { expect, test } from '../../../../../test/fixtures'

@@ -1,5 +1,5 @@
 import type { nodeCommands } from '@/keymap/node-commands'
-import type { BindingSource, KeyChord, KeymapEntry } from '@fregat/hotkeys'
+import type { BindingSource, KeyChord, KeymapEntry } from '@shaulavo/hotkeys'
 import type { environmentCommands } from '@/keymap/environment-commands'
 
 // `import type` on purpose: it is erased, so the command table can keep reading
