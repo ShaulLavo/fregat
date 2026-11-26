@@ -5,7 +5,7 @@ import {
   detectPlatform,
   parseRegisterableHotkey,
   predicateDepth,
-} from '@fregat/hotkeys'
+} from '@shaulavo/hotkeys'
 import type { KeybindingOverrides } from '@workspace/contracts'
 import { isBindableChord, type PlatformName } from '@workspace/client-core/commands/chord'
 import { presetBinding } from '@/keymap/default-bindings'

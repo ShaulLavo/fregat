@@ -106,7 +106,7 @@ export default defineConfig(({ command, isPreview }) => {
       // Prebundle their dependencies so opening a lazy screen keeps the optimizer graph.
       include: [
         'evlog/client',
-        '@fregat/hotkeys > @tanstack/store',
+        '@shaulavo/hotkeys > @tanstack/store',
         '@singapore-editor/markdown > micromark-util-decode-string',
         '@singapore-editor/markdown > micromark-util-normalize-identifier',
         '@singapore-editor/markdown > tree-sitter-md',
@@ -163,7 +163,7 @@ export default defineConfig(({ command, isPreview }) => {
         sourceAliases(packages),
       ),
       // Linked checkouts share the app's React, hotkey manager and evlog globals.
-      dedupe: ['react', 'react-dom', 'evlog', '@tanstack/hotkeys'],
+      dedupe: ['react', 'react-dom', 'evlog', '@shaulavo/hotkeys'],
     },
     server: {
       fs: {

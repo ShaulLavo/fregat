@@ -1,4 +1,4 @@
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 import { useState } from 'react'
 import { Button } from '@workspace/ui/components/button'
 

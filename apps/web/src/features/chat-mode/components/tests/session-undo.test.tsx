@@ -1,7 +1,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 import type { FocusArea, FocusTargetId } from '@workspace/client-core/commands/focus'
 import {
   createSessionActiveReorderCommand,

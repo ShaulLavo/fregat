@@ -1,4 +1,4 @@
-import { parseHotkey } from '@fregat/hotkeys'
+import { parseHotkey } from '@shaulavo/hotkeys'
 
 import { expect, test } from '../../../test/fixtures'
 import {

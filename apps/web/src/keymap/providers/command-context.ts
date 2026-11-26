@@ -10,7 +10,7 @@ import type {
 } from '@/keymap/define-command'
 import type { CommandBus, CommandInvocation } from '@/keymap/state/command-bus'
 import type { PlatformCommandId, PlatformKeyBinding } from '@/keymap/types'
-import type { PendingChordLabel } from '@fregat/hotkeys'
+import type { PendingChordLabel } from '@shaulavo/hotkeys'
 import type { WindowKeymap } from '@/keymap/state/window-keymap'
 import type { FocusTargetToken } from '@/lib/focus/state/service'
 

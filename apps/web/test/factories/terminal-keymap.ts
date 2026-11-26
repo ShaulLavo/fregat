@@ -1,6 +1,6 @@
 import { GhosttyRuntime, Terminal, type GhosttyWebGpuRenderer } from 'ghostty-webgpu'
 import { attachTerminalHotkeys } from 'ghostty-webgpu/hotkeys'
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 import { flushSync } from 'react-dom'
 
 import { useCommand } from '@/keymap/hooks/use-command'

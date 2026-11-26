@@ -1,4 +1,4 @@
-import { createBrowserDispatcher, detectPlatform } from '@fregat/hotkeys'
+import { createBrowserDispatcher, detectPlatform } from '@shaulavo/hotkeys'
 import { expect, test } from '../../../test/fixtures'
 import { createKeymapNodeRegistry } from '@/keymap/state/node-registry'
 

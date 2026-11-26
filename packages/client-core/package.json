@@ -141,7 +141,7 @@
   },
   "dependencies": {
     "@elysia/eden": "^1.4.10",
-    "@fregat/hotkeys": "catalog:",
+    "@shaulavo/hotkeys": "catalog:",
     "@shikijs/themes": "4.4.3",
     "@singapore-editor/core": "catalog:",
     "@singapore-editor/diff": "catalog:",

@@ -22,10 +22,10 @@ async function graphFixture(workspace, mode = 'release', optional = false) {
     'scripts',
   ]) {
     await put(consumer, {
-      dependencies: { '@singapore-editor/highlighting': '1.0.0', '@fregat/hotkeys': '1.0.0' },
+      dependencies: { '@singapore-editor/highlighting': '1.0.0', '@shaulavo/hotkeys': '1.0.0' },
     })
   }
-  await addPackage(put, root, 'node_modules/@fregat/hotkeys', '@fregat/hotkeys')
+  await addPackage(put, root, 'node_modules/@shaulavo/hotkeys', '@shaulavo/hotkeys')
   await addPackage(
     put,
     root,
@@ -42,12 +42,12 @@ async function graphFixture(workspace, mode = 'release', optional = false) {
       ? 'packages/singapore/packages/editor'
       : 'node_modules/@singapore-editor/core'
   await addPackage(put, root, core, '@singapore-editor/core', {
-    dependencies: { '@fregat/hotkeys': '1.0.0' },
+    dependencies: { '@shaulavo/hotkeys': '1.0.0' },
   })
   if (mode === 'fallback')
     await symlink(join(root, core), join(root, 'node_modules/@singapore-editor/core'))
   if (mode === 'split')
-    await addPackage(put, root, `${core}/node_modules/@fregat/hotkeys`, '@fregat/hotkeys')
+    await addPackage(put, root, `${core}/node_modules/@shaulavo/hotkeys`, '@shaulavo/hotkeys')
 }
 
 test('generated checks enforce the producer-free installed consumer graph', async () => {
@@ -135,8 +135,8 @@ test('rejects a scripts-only second hotkeys runtime', async () => {
     await addPackage(
       workspace.put,
       workspace.root,
-      'scripts/node_modules/@fregat/hotkeys',
-      '@fregat/hotkeys',
+      'scripts/node_modules/@shaulavo/hotkeys',
+      '@shaulavo/hotkeys',
     )
     expect(() => verifyConsumerGraph(workspace.root)).toThrow(/one installed hotkeys runtime/)
   })

@@ -1,4 +1,4 @@
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'

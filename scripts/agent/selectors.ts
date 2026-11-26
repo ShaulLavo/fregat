@@ -1,5 +1,5 @@
 import type { Locator, Page } from 'playwright'
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 import type {
   Editor,
   EditorTextBuffer,

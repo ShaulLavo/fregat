@@ -5,7 +5,7 @@
  * registry of dotted keys now, and each of these is one key's `schema`.
  */
 import * as v from 'valibot'
-import { parseContextPredicate } from '@fregat/hotkeys'
+import { parseContextPredicate } from '@shaulavo/hotkeys'
 import { providerInstanceIdSchema } from './chat-ids'
 import { trimmedNonEmptyStringSchema } from './chat-model'
 import { providerDriverKindSchema } from './orchestration-runtime'

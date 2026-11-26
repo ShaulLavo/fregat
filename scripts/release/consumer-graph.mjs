@@ -16,7 +16,7 @@ const consumers = [
 const producers = ['packages/singapore', 'packages/ghostty-webgpu', 'packages/hotkeys']
 const isStandalone = (name) =>
   name.startsWith('@singapore-editor/') ||
-  name.startsWith('@fregat/') ||
+  name.startsWith('@shaulavo/') ||
   name.startsWith('ghostty-webgpu')
 const readManifest = (root) => JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 
@@ -58,7 +58,7 @@ function inspectPackage(root, state) {
     )
   }
   const manifest = readManifest(root)
-  if (manifest.name === '@fregat/hotkeys') state.hotkeys.add(root)
+  if (manifest.name === '@shaulavo/hotkeys') state.hotkeys.add(root)
   const dependencies = { ...manifest.dependencies, ...manifest.peerDependencies }
   for (const name of Object.keys(dependencies).filter(isStandalone)) {
     const optional =

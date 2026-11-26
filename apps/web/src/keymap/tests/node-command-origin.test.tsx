@@ -1,4 +1,4 @@
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 import { expect, test } from '../../../test/fixtures'
 import { binding } from '../../../test/factories/key-binding'
 import { renderHookWithProviders } from '../../../test/render'

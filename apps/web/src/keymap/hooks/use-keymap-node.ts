@@ -1,5 +1,5 @@
 import { useEffectEvent, useLayoutEffect, useState } from 'react'
-import type { CommandHandler, FocusNode, FocusNodeContext } from '@fregat/hotkeys'
+import type { CommandHandler, FocusNode, FocusNodeContext } from '@shaulavo/hotkeys'
 import { useCommand } from '@/keymap/hooks/use-command'
 import type { FocusArea } from '@/lib/focus/state/service'
 

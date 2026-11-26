@@ -3,7 +3,7 @@ import {
   parseContextPredicate,
   type ContextPredicate,
   type KeyContext,
-} from '@fregat/hotkeys'
+} from '@shaulavo/hotkeys'
 
 type ContextSeed = { identifiers: readonly string[]; values: Readonly<Record<string, string>> }
 type ContextPath = readonly ContextSeed[]

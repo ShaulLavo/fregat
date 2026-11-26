@@ -5,7 +5,7 @@ import {
   type DragMoveEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 import { createPortal } from 'react-dom'
 import { restrictToWindowEdges } from '@dnd-kit/modifiers'
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'

@@ -22,7 +22,7 @@ import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { cn } from '@workspace/ui/lib/utils'
 import type { Terminal, TerminalScrollbar } from 'ghostty-webgpu'
 import { attachTerminalHotkeys } from 'ghostty-webgpu/hotkeys'
-import { detectPlatform } from '@fregat/hotkeys'
+import { detectPlatform } from '@shaulavo/hotkeys'
 import {
   useEffect,
   useEffectEvent,

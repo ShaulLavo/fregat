@@ -4,7 +4,7 @@ import {
   predicateDepth,
   type ContextPredicate,
   type KeyContext,
-} from '@fregat/hotkeys'
+} from '@shaulavo/hotkeys'
 import { isBindableChord, normalizedChord } from '@workspace/client-core/commands/chord'
 import { expect, test } from '../../../test/fixtures'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'

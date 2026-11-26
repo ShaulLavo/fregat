@@ -5,7 +5,7 @@ import {
   type CommandHandler,
   type FocusNode,
   type FocusNodeContext,
-} from '@fregat/hotkeys'
+} from '@shaulavo/hotkeys'
 
 type NodeRegistration = {
   readonly parent: () => FocusNode<KeyboardEvent>

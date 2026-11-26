@@ -7,7 +7,7 @@ receipts remain in Git history.
 
 ## The model
 
-- **One library, no keymaps inside.** `@fregat/hotkeys` is our fork of TanStack Hotkeys: its API
+- **One library, no keymaps inside.** `@shaulavo/hotkeys` is our fork of TanStack Hotkeys: its API
   shape and pure key functions, with our trie, editor-grade chords and Zed's context resolution.
   It lives in [ShaulLavo/hotkeys](https://github.com/ShaulLavo/hotkeys). Fregat consumes a pinned
   release archive. The core is DOM-free; adapters turn browser and terminal input into its key events.

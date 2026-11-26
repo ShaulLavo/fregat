@@ -14,7 +14,7 @@ import {
   createKeyInput,
   parseHotkey,
   parseKeyContext,
-} from '@fregat/hotkeys'
+} from '@shaulavo/hotkeys'
 
 export type TerminalBinding = {
   readonly command: CommandId | null

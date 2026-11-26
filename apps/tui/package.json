@@ -13,9 +13,9 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@fregat/hotkeys": "catalog:",
     "@opentui/core": "catalog:",
     "@opentui/react": "catalog:",
+    "@shaulavo/hotkeys": "catalog:",
     "@singapore-editor/core": "catalog:",
     "@singapore-editor/diff": "catalog:",
     "@singapore-editor/lsp": "catalog:",

@@ -6,7 +6,7 @@ import {
   type CompiledBinding,
   type FocusNode,
   type KeymapEntry,
-} from '@fregat/hotkeys'
+} from '@shaulavo/hotkeys'
 import type { CommandBus } from '@/commands/state/bus'
 import type { FocusRegistry } from '@/commands/state/focus'
 import type { TerminalBinding } from '@/commands/utils/bindings'

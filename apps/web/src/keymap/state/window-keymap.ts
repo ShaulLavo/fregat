@@ -6,7 +6,7 @@ import {
   type CompiledBinding,
   type FocusNode,
   type PendingChordLabel,
-} from '@fregat/hotkeys'
+} from '@shaulavo/hotkeys'
 import type { PlatformCommandBus } from '@/keymap/providers/command-context'
 import type { CommandInvocation } from '@/keymap/state/command-bus'
 import { createKeymapNodeRegistry } from '@/keymap/state/node-registry'

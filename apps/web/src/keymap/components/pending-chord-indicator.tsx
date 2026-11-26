@@ -1,4 +1,4 @@
-import type { PendingChordLabel } from '@fregat/hotkeys'
+import type { PendingChordLabel } from '@shaulavo/hotkeys'
 import { Kbd } from '@workspace/ui/components/kbd'
 import { formatChord } from '@/keymap/utils/format-keys'
 

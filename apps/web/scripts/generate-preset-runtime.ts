@@ -72,7 +72,7 @@ export async function presetRuntimeSource(): Promise<string> {
   })
   const runtimePatches = patches.map(({ index, fields }) => [index, fields.command, fields.context])
   const source =
-    `import type { Binding } from '@fregat/hotkeys'\n\n` +
+    `import type { Binding } from '@shaulavo/hotkeys'\n\n` +
     `export type RuntimeRow = readonly [index: number, platform: string, keys: string, command: string | null, context: string, upstreamCommand: string, args?: Binding['args']]\n\n` +
     `export const presetRuntimeRows: readonly RuntimeRow[] = [\n${rows.map((row) => `  ${JSON.stringify(row)},`).join('\n')}\n]\n\n` +
     `export const oursRuntimePatches: readonly (readonly [index: number, command: string, context: string])[] = ${JSON.stringify(runtimePatches)}\n`

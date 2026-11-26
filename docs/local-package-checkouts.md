@@ -21,16 +21,16 @@ Develop Fregat alongside Singapore, ghostty-webgpu, or hotkeys in separate Git c
 
 1. Save the consumer manifests and lockfiles before editing them. Temporary dependency edits use `link:` followed by the absolute **package directory**. Bun installs a symlink to that directory. A `file:` directory dependency installs a snapshot in Bun's dependency store, so it is useful for built-package checks but does not select source watching.
 
-   | Package                            | Directory                                                                    |
-   | ---------------------------------- | ---------------------------------------------------------------------------- |
-   | `@fregat/hotkeys`                  | `$HOTKEYS/packages/hotkeys`                                                  |
-   | `@fregat/react-hotkeys`, when used | `$HOTKEYS/packages/react-hotkeys`                                            |
-   | `@singapore-editor/*`              | The directory under `$SINGAPORE/packages` whose `package.json` has that name |
-   | `ghostty-webgpu`                   | `$GHOSTTY`                                                                   |
+   | Package                              | Directory                                                                    |
+   | ------------------------------------ | ---------------------------------------------------------------------------- |
+   | `@shaulavo/hotkeys`                  | `$HOTKEYS/packages/hotkeys`                                                  |
+   | `@shaulavo/hotkeys/react`, when used | `$HOTKEYS/packages/react-hotkeys`                                            |
+   | `@singapore-editor/*`                | The directory under `$SINGAPORE/packages` whose `package.json` has that name |
+   | `ghostty-webgpu`                     | `$GHOSTTY`                                                                   |
 
    Singapore directory names can differ from package names. For example, `@singapore-editor/core` lives in `packages/editor`. Read the selected manifest before linking.
 
-2. Change every selected direct dependency in Fregat to its local `link:` path. Inspect `apps/web`, `apps/tui`, `apps/server`, `packages/client-core`, `packages/contracts`, and `packages/markdown`. Keep `catalog:` callers when changing their root catalog entry. For example, the temporary root catalog value for hotkeys is `"@fregat/hotkeys": "link:/absolute/path/to/hotkeys/packages/hotkeys"`. Leave unrelated workspace dependencies in place.
+2. Change every selected direct dependency in Fregat to its local `link:` path. Inspect `apps/web`, `apps/tui`, `apps/server`, `packages/client-core`, `packages/contracts`, and `packages/markdown`. Keep `catalog:` callers when changing their root catalog entry. For example, the temporary root catalog value for hotkeys is `"@shaulavo/hotkeys": "link:/absolute/path/to/hotkeys/packages/hotkeys"`. Leave unrelated workspace dependencies in place.
 
 3. Link all consumed Singapore packages to the same checkout when working on Singapore. Their internal `workspace:` dependencies need the producer's independent install. Fregat keeps standalone repositories separate from its workspace globs. Explicit `link:` dependencies select the external checkout and its source aliases.
 
@@ -49,13 +49,13 @@ import { realpathSync } from "node:fs"
 import { createRequire } from "node:module"
 import { resolve } from "node:path"
 const web = createRequire(resolve("apps/web/package.json"))
-const core = realpathSync(web.resolve("@fregat/hotkeys"))
-console.log("@fregat/hotkeys", core)
+const core = realpathSync(web.resolve("@shaulavo/hotkeys"))
+console.log("@shaulavo/hotkeys", core)
 for (const name of ["@singapore-editor/core", "ghostty-webgpu"]) {
   const entry = realpathSync(web.resolve(name))
   const producer = createRequire(entry)
   console.log(name, entry)
-  assert.equal(realpathSync(producer.resolve("@fregat/hotkeys")), core, name)
+  assert.equal(realpathSync(producer.resolve("@shaulavo/hotkeys")), core, name)
 }
 '
 ```

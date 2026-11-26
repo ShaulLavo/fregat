@@ -1,7 +1,7 @@
 import { useEffectEvent, useLayoutEffect, useState } from 'react'
 import { createStore } from 'zustand/vanilla'
 import { useStore } from 'zustand'
-import type { PendingChordLabel } from '@fregat/hotkeys'
+import type { PendingChordLabel } from '@shaulavo/hotkeys'
 import type { PlatformCommandBus } from '@/keymap/providers/command-context'
 import { createWindowKeymap, type WindowKeymap } from '@/keymap/state/window-keymap'
 import type { PlatformKeyBinding } from '@/keymap/types'

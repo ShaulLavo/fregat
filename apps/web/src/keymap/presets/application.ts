@@ -1,4 +1,4 @@
-import type { Binding } from '@fregat/hotkeys'
+import type { Binding } from '@shaulavo/hotkeys'
 
 export const applicationBindings: readonly (Binding & { readonly firesWhileTyping: boolean })[] = [
   {

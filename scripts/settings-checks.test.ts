@@ -95,9 +95,9 @@ test('production contracts bundles resolve the installed hotkeys export', async 
 
     const metadata = JSON.parse(await readFile(path.join(root, 'consumer.json'), 'utf8'))
     const inputs = Object.keys(metadata.inputs).map((input) => input.replaceAll('\\', '/'))
-    const hotkeysInputs = inputs.filter((input) => input.includes('@fregat/hotkeys/'))
+    const hotkeysInputs = inputs.filter((input) => input.includes('@shaulavo/hotkeys/'))
     expect(hotkeysInputs).toHaveLength(1)
-    expect(hotkeysInputs[0]).toMatch(/@fregat\/hotkeys\/dist\/index\.js$/)
+    expect(hotkeysInputs[0]).toMatch(/@shaulavo\/hotkeys\/dist\/index\.js$/)
     expect(inputs.filter((input) => input.includes('packages/hotkeys/'))).toEqual([])
   } finally {
     await rm(root, { recursive: true, force: true })
