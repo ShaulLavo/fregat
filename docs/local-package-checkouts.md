@@ -21,12 +21,11 @@ Develop Fregat alongside Singapore, ghostty-webgpu, or hotkeys in separate Git c
 
 1. Save the consumer manifests and lockfiles before editing them. Temporary dependency edits use `link:` followed by the absolute **package directory**. Bun installs a symlink to that directory. A `file:` directory dependency installs a snapshot in Bun's dependency store, so it is useful for built-package checks but does not select source watching.
 
-   | Package                              | Directory                                                                    |
-   | ------------------------------------ | ---------------------------------------------------------------------------- |
-   | `@shaulavo/hotkeys`                  | `$HOTKEYS/packages/hotkeys`                                                  |
-   | `@shaulavo/hotkeys/react`, when used | `$HOTKEYS/packages/react-hotkeys`                                            |
-   | `@singapore-editor/*`                | The directory under `$SINGAPORE/packages` whose `package.json` has that name |
-   | `ghostty-webgpu`                     | `$GHOSTTY`                                                                   |
+   | Package                             | Directory                                                                    |
+   | ----------------------------------- | ---------------------------------------------------------------------------- |
+   | `@shaulavo/hotkeys` (and `./react`) | `$HOTKEYS/packages/hotkeys`                                                  |
+   | `@singapore-editor/*`               | The directory under `$SINGAPORE/packages` whose `package.json` has that name |
+   | `ghostty-webgpu`                    | `$GHOSTTY`                                                                   |
 
    Singapore directory names can differ from package names. For example, `@singapore-editor/core` lives in `packages/editor`. Read the selected manifest before linking.
 
