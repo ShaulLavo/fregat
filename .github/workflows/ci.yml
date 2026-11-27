@@ -57,7 +57,6 @@ jobs:
       code: ${{ steps.plan.outputs.code }}
       shared: ${{ steps.plan.outputs.shared }}
       tooling: ${{ steps.plan.outputs.tooling }}
-      tree: ${{ steps.plan.outputs.tree }}
       sites: ${{ steps.plan.outputs.sites }}
       exhaustive: ${{ steps.plan.outputs.exhaustive }}
       packages: ${{ steps.plan.outputs.packages }}
@@ -468,7 +467,7 @@ jobs:
   browser:
     name: Browser tests
     needs: [changes, workspace-builds]
-    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.tree == 'true' || needs.changes.outputs.tooling == 'true' }}
+    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.tooling == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -535,7 +534,7 @@ jobs:
         run: bun run --cwd apps/web test:syntax-settings-browser
 
       - name: Browser test (tree)
-        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.tree == 'true' }}
+        if: ${{ !cancelled() && steps.builds.outputs.ready == 'true' && needs.changes.outputs.web == 'true' }}
         timeout-minutes: 5
         run: bun run --cwd apps/web test:tree-browser
 

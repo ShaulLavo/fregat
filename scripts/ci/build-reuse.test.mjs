@@ -31,7 +31,6 @@ const full = {
   code: 'true',
   shared: 'true',
   tooling: 'true',
-  tree: 'true',
   web: 'true',
   server: 'true',
   tui: 'true',
@@ -225,7 +224,6 @@ test('full enabled CI has one owner for each Fregat setup build task', () => {
 
 test.each([
   ['web', { web: 'true' }, 1],
-  ['tree Browser prerequisites', { tree: 'true' }, 1],
   ['tooling', { tooling: 'true' }, 1],
   ['server', { server: 'true' }, 0],
   ['TUI', { tui: 'true' }, 0],

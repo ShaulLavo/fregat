@@ -44,7 +44,7 @@ export function planBuilds(graph, changes) {
   let names = []
   if (enabled('shared') || enabled('tooling'))
     names = names.concat(targets(graph, enabled('tooling') ? 'all' : changes.packages))
-  if (enabled('web') || enabled('tree') || enabled('tooling')) names = names.concat(['web'])
+  if (enabled('web') || enabled('tooling')) names = names.concat(['web'])
   if (enabled('server')) names = names.concat(['server'])
   if (enabled('tui')) names = names.concat(['tui'])
   if (enabled('site')) names = names.concat(targets(graph, `sites:${changes.sites}`))
