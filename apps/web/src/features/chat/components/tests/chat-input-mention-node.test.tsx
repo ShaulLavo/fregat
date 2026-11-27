@@ -9,6 +9,7 @@ import {
 } from '@/features/chat/state/chat-input-draft-store'
 import {
   readChatInputText,
+  replaceChatInputEditorRange,
   type ChatInputEditorHandle,
 } from '@/features/chat/utils/input-editor-actions'
 import { stubEditorViewport } from '../../../../../test/env/editor-viewport'
@@ -81,6 +82,39 @@ test('typing an active bare mention query keeps it editable so Backspace deletes
     composer.editor.editRange(4, 4, ' ', { anchor: 5 })
   })
   await waitFor(() => expect(composer.chip('src')?.textContent).toBe('src'))
+})
+
+test('a menu-committed bare mention stays atomic after ArrowLeft and deletes in one Backspace', async () => {
+  const composer = renderComposer('check ')
+
+  act(() => {
+    composer.editor.focus()
+    composer.editor.setSelection(6)
+    composer.editor.editRange(6, 6, '@AGENTS', { anchor: 13 })
+  })
+  expect(composer.anyChip()).toBeNull()
+
+  act(() => {
+    replaceChatInputEditorRange(composer.editor, {
+      expectedText: '@AGENTS',
+      rangeEnd: 13,
+      rangeStart: 6,
+      replacement: '@AGENTS.md ',
+    })
+  })
+  await waitFor(() => expect(composer.chip('AGENTS.md')?.textContent).toBe('AGENTS.md'))
+  expect(composer.text).toBe('check @AGENTS.md ')
+  expect(composer.editor.getSelectionOffsets()).toEqual({ anchor: 17, focus: 17 })
+
+  act(() => {
+    fireEvent.keyDown(composer.editor.getInputElement(), { key: 'ArrowLeft' })
+  })
+  expect(composer.editor.getSelectionOffsets()).toEqual({ anchor: 16, focus: 16 })
+  expect(composer.chip('AGENTS.md')?.textContent).toBe('AGENTS.md')
+
+  composer.pressBackspace()
+  expect(composer.text).toBe('check  ')
+  expect(composer.anyChip()).toBeNull()
 })
 
 function renderComposer(initialText: string) {

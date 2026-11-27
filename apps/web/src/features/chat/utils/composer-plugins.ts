@@ -87,6 +87,33 @@ function mentionSpecForToken(token: ComposerMentionToken): InlineReplacementSpec
   }
 }
 
+function isCompletedChip(
+  token: ComposerMentionToken,
+  previousChips: readonly ComposerMentionToken[],
+) {
+  return previousChips.some(
+    (chip) => chip.start === token.start && chip.end === token.end && chip.source === token.source,
+  )
+}
+
+function selectMentionChips({
+  activeStart,
+  previousChips,
+  textUnchanged,
+  tokens,
+}: {
+  readonly activeStart: number | null
+  readonly previousChips: readonly ComposerMentionToken[]
+  readonly textUnchanged: boolean
+  readonly tokens: readonly ComposerMentionToken[]
+}) {
+  return tokens.filter((token) => {
+    if (isCompletedChip(token, previousChips)) return true
+    if (textUnchanged) return false
+    return token.start !== activeStart
+  })
+}
+
 /**
  * Renders every completed `@path` / `@"path with spaces"` mention as an atomic inline chip
  * (`reveal: 'never'`, `atomic: true`) while leaving an active bare `@query` at the caret editable.
@@ -95,15 +122,29 @@ export function createChatInputMentionPlugin(getActiveCursor?: () => number | nu
   return {
     name: 'fregat.chat-input-mentions',
     activate(context) {
+      let previousText = ''
+      let previousChips: readonly ComposerMentionToken[] = []
       return context.registerInlineReplacementProvider(
         ({ textSnapshot }) => {
           const text = textSnapshot.readRange(0, textSnapshot.length)
           const tokens = collectComposerMentions(text)
-          if (tokens.length === 0) return []
+          if (tokens.length === 0) {
+            previousText = text
+            previousChips = []
+            return []
+          }
           const cursor = getActiveCursor?.() ?? null
           const activeStart =
             cursor === null ? null : (activeComposerMention(text, cursor)?.start ?? null)
-          return tokens.filter((token) => token.start !== activeStart).map(mentionSpecForToken)
+          const chips = selectMentionChips({
+            activeStart,
+            previousChips,
+            textUnchanged: text === previousText,
+            tokens,
+          })
+          previousText = text
+          previousChips = chips
+          return chips.map(mentionSpecForToken)
         },
         { trigger: 'edit' },
       )
