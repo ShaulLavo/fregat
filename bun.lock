@@ -494,7 +494,7 @@
     "@shaulavo/workbench-tree": "0.0.1",
     "@shaulavo/workbench-ui": "0.0.1",
     "@singapore-editor/collaboration": "0.0.10",
-    "@singapore-editor/core": "0.2.13",
+    "@singapore-editor/core": "0.2.14",
     "@singapore-editor/diff": "0.2.13",
     "@singapore-editor/file-animation": "0.2.14",
     "@singapore-editor/find": "0.2.13",
@@ -1259,7 +1259,7 @@
 
     "@singapore-editor/collaboration": ["@singapore-editor/collaboration@0.0.10", "", { "dependencies": { "@noble/hashes": "2.4.0", "@singapore-editor/collab": "0.0.6", "@singapore-editor/core": "0.2.13", "@singapore-editor/plugin-ui": "0.2.13", "@singapore-editor/textbuffer": "0.2.9" } }, "sha512-aBRRaosZG6mJLm640Sc4//YU5/iIgc8dOrtwfyW8I95pCk6KHv+Sy90VGKmnm5CR6e3Iu//gYFED5INFDCRNZg=="],
 
-    "@singapore-editor/core": ["@singapore-editor/core@0.2.13", "", { "dependencies": { "@shaulavo/hotkeys": "^0.0.4", "@shikijs/engine-oniguruma": "4.4.3", "@singapore-editor/textbuffer": "0.2.9", "diff": "^9.0.0", "evlog": "^2.29.0", "shiki": "^4.4.3" } }, "sha512-+OR2pa6pFueeOh6MOOXT6p1ZKX9cC4lkpGEPXoJ+IN4J5FjvPGlFVucYSF2+s55XbdzR9TdZL3MSgv+mZfN13g=="],
+    "@singapore-editor/core": ["@singapore-editor/core@0.2.14", "", { "dependencies": { "@shaulavo/hotkeys": "^0.0.4", "@shikijs/engine-oniguruma": "4.4.3", "@singapore-editor/textbuffer": "0.2.9", "diff": "^9.0.0", "evlog": "^2.29.0", "shiki": "^4.4.3" } }, "sha512-Ky71clId7SrJLYRSKMuvdEiB+07xYAczUKXn0fzRkvAkOUycq9VczcwJBK732UHQ6MKuNq5OIEwDENCKyxRtBA=="],
 
     "@singapore-editor/diff": ["@singapore-editor/diff@0.2.13", "", { "dependencies": { "@singapore-editor/core": "0.2.13", "diff": "^9.0.0" } }, "sha512-AJNkIKlJG6rCtcdgrV/sLgZDv82C824e91LBzmsR6KM0B+1jPhVe3jXH7BupBHRK4xcVU80wB23R+I+ZkGsR2Q=="],
 

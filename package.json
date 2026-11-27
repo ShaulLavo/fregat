@@ -40,7 +40,7 @@
       "@shaulavo/workbench-tree": "0.0.1",
       "@shaulavo/workbench-ui": "0.0.1",
       "@singapore-editor/collaboration": "0.0.10",
-      "@singapore-editor/core": "0.2.13",
+      "@singapore-editor/core": "0.2.14",
       "@singapore-editor/diff": "0.2.13",
       "@singapore-editor/file-animation": "0.2.14",
       "@singapore-editor/find": "0.2.13",
