@@ -117,7 +117,10 @@ test.for(['shiki', 'tree-sitter'] as const)(
       for (const observation of observations.filter((entry) => entry.status === 'ready'))
         expect(observation.snapshotRevision).toBe(observation.sourceRevision)
       const ready = observations.filter(
-        (observation) => observation.status === 'ready' && observation.sourceRevision === revision,
+        (observation) =>
+          observation.status === 'ready' &&
+          observation.sample.installed.initialHighlightStatus === 'painted' &&
+          observation.sourceRevision === revision,
       )
       expect(ready.length).toBeGreaterThan(0)
       for (const observation of ready) {

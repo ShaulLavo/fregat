@@ -453,7 +453,6 @@ function ReadyTreePane({
         externalCommands={EXTERNAL_TREE_COMMANDS}
         filterPlaceholder='Filter files'
         handleRef={treeHandleRef}
-        iconPreset='rich'
         initialScrollTop={restored?.record.scrollTop}
         label='Folder tree'
         loadingPaths={loadingPaths}

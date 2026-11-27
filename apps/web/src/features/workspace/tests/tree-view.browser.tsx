@@ -36,7 +36,6 @@ test('FileTreeView renders Fregat paths with filter, keyboard navigation, and in
           className='h-full'
           filterPlaceholder='Filter files'
           handleRef={handleRef}
-          iconPreset='rich'
           label='Folder tree'
           model={model}
           onCreate={(parent, kind, name) => {
