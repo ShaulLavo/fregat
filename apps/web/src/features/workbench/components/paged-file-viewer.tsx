@@ -37,12 +37,12 @@ export function PagedFileViewer({ path }: { path: string }) {
   const next = shown?.next
   const first = shown?.fragments[0]
   const last = shown?.fragments.at(-1)
-  const location =
-    first?.line !== undefined && last?.line !== undefined
-      ? ` · Lines ${first.line + 1}–${last.line + 1}`
-      : first
-        ? ` · Byte ${first.start.byteOffset}`
-        : ''
+  let location = ''
+  if (first?.line !== undefined && last?.line !== undefined) {
+    location = ` · Lines ${first.line + 1}–${last.line + 1}`
+  } else if (first) {
+    location = ` · Byte ${first.start.byteOffset}`
+  }
 
   function reopen() {
     setDraftByte('0')

@@ -76,12 +76,18 @@ async function probe(mode: string, server = true) {
       unit = `rmSync(${JSON.stringify(path.join(root, 'current'))}); symlinkSync(${JSON.stringify(peer)}, ${JSON.stringify(path.join(root, 'current'))})`
     if (mode === 'rollback')
       unit = `await main(['--rollback', '--skip-live-check'], { signalServer: async () => 'signalled', restartInto: async () => null })`
+    let notifyBody = "return 'staged'"
+    if (mode === 'published-promote') {
+      notifyBody = `rmSync(${JSON.stringify(path.join(root, 'current'))}); symlinkSync(${JSON.stringify(path.join(root, 'pending'))}, ${JSON.stringify(path.join(root, 'current'))}); const target = realpathSync(${JSON.stringify(path.join(root, 'pending'))}); rmSync(${JSON.stringify(path.join(root, 'current'))}); symlinkSync(target, ${JSON.stringify(path.join(root, 'current'))}); rmSync(${JSON.stringify(path.join(root, 'pending'))}); throw new TypeError('post promotion failure')`
+    } else if (mode === 'published-notify') {
+      notifyBody = "throw new TypeError('notification failed')"
+    }
     const args = ['--from', source, '--skip-live-check'].concat(server ? ['--server'] : [])
     const script = `import { rmSync, symlinkSync, realpathSync } from 'node:fs';
 import { main } from ${JSON.stringify(installer)};
 await main(${JSON.stringify(args)}, {
   preflight: async () => {}, installUnit: async () => { ${unit} },
-  notifyServer: async () => { ${mode === 'published-promote' ? `rmSync(${JSON.stringify(path.join(root, 'current'))}); symlinkSync(${JSON.stringify(path.join(root, 'pending'))}, ${JSON.stringify(path.join(root, 'current'))}); const target = realpathSync(${JSON.stringify(path.join(root, 'pending'))}); rmSync(${JSON.stringify(path.join(root, 'current'))}); symlinkSync(target, ${JSON.stringify(path.join(root, 'current'))}); rmSync(${JSON.stringify(path.join(root, 'pending'))}); throw new TypeError('post promotion failure')` : mode === 'published-notify' ? "throw new TypeError('notification failed')" : "return 'staged'"} },
+  notifyServer: async () => { ${notifyBody} },
   requestRestart: async () => {}, waitForServerRelease: async () => {},
   signalServer: async () => { ${mode === 'published-signal' ? "throw new TypeError('signal failed')" : "return 'signalled'"} }, restartInto: async () => null,
 }).catch((error) => { console.error(error); process.exit(1) });`
@@ -133,9 +139,10 @@ await main(${JSON.stringify(args)}, {
     }
     expect(code).toBe(1)
     expect(current).toBe(mode === 'competing-live' || mode === 'rollback' ? peer : previous)
-    expect(pending).toBe(
-      mode === 'competing-pending' ? peer : mode === 'rollback' ? null : server ? oldPending : null,
-    )
+    let expectedPending = server ? oldPending : null
+    if (mode === 'competing-pending') expectedPending = peer
+    else if (mode === 'rollback') expectedPending = null
+    expect(pending).toBe(expectedPending)
     if (mode === 'cleanup-error') {
       const candidate = names.find((name) => name !== 'previous' && name !== 'old-pending')
       expect(candidate).toBeDefined()

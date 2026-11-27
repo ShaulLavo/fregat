@@ -2321,6 +2321,18 @@ export function filePreviewFrameFacts(frame: FilePreviewFrame | null) {
   const paint = captured ? JSON.parse(captured.paint) : null
   const box = frame.element.closest('[data-file-preview]')?.getBoundingClientRect()
   const nativeBox = input?.closest('.editor-virtualized')?.getBoundingClientRect()
+  let prefix: string | null = null
+  let maxBytes: number | null = null
+  let complete: boolean | null = null
+  if (current.kind === 'live') {
+    prefix = current.text.slice(0, 128)
+    maxBytes = current.maxBytes
+    complete = current.complete
+  } else if (current.kind === 'disk') {
+    prefix = current.input.head.content.slice(0, 128)
+    maxBytes = current.input.maxBytes
+    complete = !current.input.head.truncated
+  }
   return {
     name: frame.name,
     kind: current.kind,
@@ -2336,12 +2348,7 @@ export function filePreviewFrameFacts(frame: FilePreviewFrame | null) {
     projectionHasNativeInput:
       frame.element.closest('[data-file-preview]')?.querySelector('[aria-label="Editor input"]') !==
       null,
-    prefix:
-      current.kind === 'live'
-        ? current.text.slice(0, 128)
-        : current.kind === 'disk'
-          ? current.input.head.content.slice(0, 128)
-          : null,
+    prefix,
     capturedPrefix:
       frame.read.kind === 'live'
         ? frame.read.text.slice(0, 128)
@@ -2358,19 +2365,9 @@ export function filePreviewFrameFacts(frame: FilePreviewFrame | null) {
       current.kind === 'live' && frame.read.kind === 'live'
         ? current.buffer === frame.read.buffer
         : null,
-    maxBytes:
-      current.kind === 'live'
-        ? current.maxBytes
-        : current.kind === 'disk'
-          ? current.input.maxBytes
-          : null,
+    maxBytes,
     utf8Bytes: current.kind === 'live' ? current.utf8Bytes : null,
-    complete:
-      current.kind === 'live'
-        ? current.complete
-        : current.kind === 'disk'
-          ? !current.input.head.truncated
-          : null,
+    complete,
     snapshotLength:
       frame.read.kind === 'live' ? frame.read.snapshot.length : frame.read.input.reader.length,
     dirty: frame.read.kind === 'live' ? frame.read.buffer.isDirty() : null,

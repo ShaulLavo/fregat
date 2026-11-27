@@ -162,7 +162,9 @@ async function holdStateHome() {
 }
 
 function publicAddress(host: string, listenPort: number) {
-  const name = host === '::1' ? '[::1]' : host === 'localhost' ? '127.0.0.1' : host
+  let name = host
+  if (host === '::1') name = '[::1]'
+  else if (host === 'localhost') name = '127.0.0.1'
   return `http://${name}:${listenPort}`
 }
 

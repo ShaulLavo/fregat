@@ -282,12 +282,10 @@ test.each(['inputSha256', 'inputUtf16Units', 'live'] as const)(
         phase === 'completed'
           ? row.completed[0]
           : row.streams[0].observations[phase === 'prefix' ? 0 : 2]
-      const value =
-        field === 'live'
-          ? !pair.baseline.live
-          : field === 'inputSha256'
-            ? hash('altered')
-            : pair.baseline.inputUtf16Units + 1
+      let value: boolean | string | number
+      if (field === 'live') value = !pair.baseline.live
+      else if (field === 'inputSha256') value = hash('altered')
+      else value = pair.baseline.inputUtf16Units + 1
       pair.baseline[field] = value
       pair.candidate[field] = value
       const receipt = parseBrowserReceipt(changed)

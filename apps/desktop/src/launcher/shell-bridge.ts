@@ -36,13 +36,9 @@ export function shellBridge(
   platform: NodeJS.Platform = process.platform,
   vibrancy = false,
 ): string {
+  const defaultBackdrop = platform === 'darwin' ? 'app' : 'compositor'
   const bridge: PlatformBridge = {
-    backdrop:
-      engine === 'wkwebview' && vibrancy
-        ? 'transparent'
-        : platform === 'darwin'
-          ? 'app'
-          : 'compositor',
+    backdrop: engine === 'wkwebview' && vibrancy ? 'transparent' : defaultBackdrop,
     platform: platform === 'darwin' ? 'darwin' : 'linux',
     colorScheme: null,
     titlebar: engine === 'wkwebview' ? 'overlay' : 'native',

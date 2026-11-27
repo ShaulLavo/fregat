@@ -24,14 +24,15 @@ for (const kind of ['moving', 'historical', 'captured-review'] as const) {
       oldPath: '/repo/src/old.ts',
       status: 'renamed',
     }
-    const target = v.parse(
-      gitSnapshotTargetSchema,
-      kind === 'moving'
-        ? { ...common, kind, changeSource: 'staged' }
-        : kind === 'historical'
-          ? { ...common, kind, revision, origin: { id: commit, parents } }
-          : { ...common, kind, revision },
-    )
+    let rawTarget: unknown
+    if (kind === 'moving') {
+      rawTarget = { ...common, kind, changeSource: 'staged' }
+    } else if (kind === 'historical') {
+      rawTarget = { ...common, kind, revision, origin: { id: commit, parents } }
+    } else {
+      rawTarget = { ...common, kind, revision }
+    }
+    const target = v.parse(gitSnapshotTargetSchema, rawTarget)
     const reference = editorReferenceForSnapshotTarget(target)
     expect(reference).not.toBeNull()
     if (!reference) return

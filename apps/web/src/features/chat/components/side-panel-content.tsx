@@ -103,6 +103,32 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
     promoteDraftSession(sessionId)
   }
 
+  let content = <LoadingState label='Opening draft'>{null}</LoadingState>
+  if (shown.activeSessionId) {
+    content = (
+      <ChatView
+        switching={switching}
+        activeSessionId={shown.activeSessionId}
+        transport={shown.transport}
+        rootPath={shown.rootPath}
+        onSessionCreated={handleSessionCreated}
+      />
+    )
+  } else if (draftId) {
+    content = (
+      <ChatDraftView
+        disabled={disabled}
+        draftId={draftId}
+        transport={transport}
+        project={projectState.project}
+        key={`${transport.environmentId}:${draftId}`}
+        worktree={draftBase ?? null}
+        rootPath={restoredDraft?.identity?.rootPath ?? draftBase?.path ?? rootPath}
+        onSessionCreated={handleSessionCreated}
+      />
+    )
+  }
+
   return (
     <div className='flex h-full min-h-0 flex-col'>
       <ChatPanelHeader
@@ -115,28 +141,7 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
         onSelectSession={setActiveSessionId}
         session={activeRailItem}
       />
-      {shown.activeSessionId ? (
-        <ChatView
-          switching={switching}
-          activeSessionId={shown.activeSessionId}
-          transport={shown.transport}
-          rootPath={shown.rootPath}
-          onSessionCreated={handleSessionCreated}
-        />
-      ) : draftId ? (
-        <ChatDraftView
-          disabled={disabled}
-          draftId={draftId}
-          transport={transport}
-          project={projectState.project}
-          key={`${transport.environmentId}:${draftId}`}
-          worktree={draftBase ?? null}
-          rootPath={restoredDraft?.identity?.rootPath ?? draftBase?.path ?? rootPath}
-          onSessionCreated={handleSessionCreated}
-        />
-      ) : (
-        <LoadingState label='Opening draft'>{null}</LoadingState>
-      )}
+      {content}
       <ChatPanelStatus
         createError={null}
         projectError={projectState.error}

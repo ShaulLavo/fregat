@@ -168,7 +168,10 @@ function setup(stage: HTMLElement): void {
   function render(): void {
     for (const button of buttons) {
       button.hidden = reduce.matches
-      button.textContent = step >= last ? 'Replay' : held ? 'Play' : 'Pause'
+      let label = 'Pause'
+      if (step >= last) label = 'Replay'
+      else if (held) label = 'Play'
+      button.textContent = label
     }
   }
 

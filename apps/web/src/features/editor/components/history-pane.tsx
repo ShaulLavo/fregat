@@ -205,11 +205,11 @@ export function HistoryPane({
                   {affectedFilesLabel(barrierGroup)}
                 </span>
               </div>
-            ) : focused ? (
-              <HistoryStateRow node={focused} now={now} />
-            ) : (
+            ) : null}
+            {!barrierActive && focused ? <HistoryStateRow node={focused} now={now} /> : null}
+            {!barrierActive && !focused ? (
               <span className='text-muted-foreground text-xs'>No version selected</span>
-            )}
+            ) : null}
             <div className='flex shrink-0 items-center gap-(--density-control-gap)'>
               {comparisonPending ? <Spinner size='xs' label='Comparing versions' /> : null}
               <Button

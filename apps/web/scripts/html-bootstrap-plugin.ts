@@ -85,7 +85,8 @@ export function developmentDocumentOrigin(headers: IncomingHttpHeaders, secure: 
   const forwardedProto = headers['x-forwarded-proto']
   const forwarded = forwardedHost !== undefined || forwardedProto !== undefined
   const host = forwarded ? forwardedHost : headers.host
-  const protocol = forwarded ? forwardedProto : secure ? 'https' : 'http'
+  const fallbackProtocol = secure ? 'https' : 'http'
+  const protocol = forwarded ? forwardedProto : fallbackProtocol
   const origin =
     typeof host === 'string' && typeof protocol === 'string'
       ? URL.parse(`${protocol}://${host}`)
