@@ -4,6 +4,7 @@ import { setTimeout } from 'node:timers/promises'
 import { defineErrorCatalog } from 'evlog'
 import type { HostResources } from '@workspace/contracts'
 import { createStructuredError } from '../observability/structured-errors'
+import { isWasiRuntime } from '../system/runtime'
 
 const errors = defineErrorCatalog('machines', {
   RESOURCES_UNAVAILABLE: {
@@ -39,14 +40,16 @@ export async function readHostResources(readCpus: typeof cpus = cpus): Promise<H
 }
 
 async function readAvailableMemory() {
-  if (process.platform !== 'linux') return freemem()
+  if (process.platform !== 'linux' || isWasiRuntime()) return freemem()
   const meminfo = await readFile('/proc/meminfo', 'utf8').catch((cause: unknown) => {
+    if (cause instanceof Error && 'code' in cause && cause.code === 'ENOENT') return null
     throw createStructuredError({
       ...errors.RESOURCES_UNAVAILABLE(),
       cause,
       internal: { platform: process.platform, operation: 'read_available_memory' },
     })
   })
+  if (meminfo === null) return freemem()
   const available = /^MemAvailable:\s+(\d+)\s+kB$/m.exec(meminfo)?.[1]
   if (available) return Number(available) * 1024
   throw createStructuredError({

@@ -1,7 +1,16 @@
 import { dlopen, ptr } from 'bun:ffi'
+import { existsSync, renameSync } from 'node:fs'
+import { isWasiRuntime } from '../../system/runtime'
 
 // Directory publication must be one no-replace rename, including against an empty destination.
-export function renameExclusive(source: string, destination: string) {
+export function renameExclusive(
+  source: string,
+  destination: string,
+  options: { readonly useNativeFfi?: boolean } = {},
+) {
+  const useNativeFfi = options.useNativeFfi ?? !isWasiRuntime()
+  if (!useNativeFfi) return renameWithoutReplaceFallback(source, destination)
+
   const from = Buffer.from(`${source}\0`)
   const to = Buffer.from(`${destination}\0`)
   if (process.platform === 'darwin') {
@@ -21,5 +30,15 @@ export function renameExclusive(source: string, destination: string) {
     return library.symbols.renameat2(-100, ptr(from), -100, ptr(to), 1) === 0
   } finally {
     library.close()
+  }
+}
+
+function renameWithoutReplaceFallback(source: string, destination: string) {
+  if (existsSync(destination)) return false
+  try {
+    renameSync(source, destination)
+    return true
+  } catch {
+    return false
   }
 }

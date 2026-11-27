@@ -135,6 +135,7 @@ export class InstalledFontProvider {
 }
 
 async function listWithFontconfig() {
+  if (!Bun.which('fc-list')) return ''
   const process = Bun.spawn(['fc-list', '--format', FC_FORMAT], { stderr: 'ignore' })
   const output = await new Response(process.stdout).text()
   await process.exited

@@ -9,7 +9,9 @@ import {
   type AssetId,
   type WallpaperColors,
 } from '@workspace/contracts'
+import { hasNativeImageCodec } from './decode'
 import type { WallpaperLibrary } from './library'
+import { wallpaperErrors } from './structured-errors'
 
 /** Enough pixels to find a wallpaper's colors; more only costs time. */
 const SAMPLE_WIDTH = 64
@@ -29,6 +31,9 @@ export async function wallpaperColors(
   const cache = path.join(library.directory, `${id}.colors.json`)
   const cached = await readColors(cache)
   if (cached) return cached
+  if (!hasNativeImageCodec()) {
+    throw wallpaperErrors.INVALID({ internal: { reason: 'codec-unavailable', asset: id } })
+  }
   const display = await library.rendition(id, 'display')
   const image = new Bun.Image(display)
   const { width, height } = await image.metadata()

@@ -12,6 +12,10 @@ export function acquireStateHomeLock(stateHome: string) {
 }
 
 function holderPid(file: string) {
-  const pid = Number.parseInt(readFileSync(file, 'utf8'), 10)
-  return Number.isInteger(pid) ? pid : null
+  try {
+    const pid = Number.parseInt(readFileSync(file, 'utf8'), 10)
+    return Number.isInteger(pid) ? pid : null
+  } catch {
+    return null
+  }
 }

@@ -1,9 +1,10 @@
 import { constants } from 'node:fs'
-import { open } from 'node:fs/promises'
+import { open, realpath } from 'node:fs/promises'
 import path from 'node:path'
 
 import { FsError, mapNodeError } from '../fs/errors'
 import { createWorkspacePaths, isOutsideRoot } from '../fs/path'
+import { isWasiRuntime } from '../system/runtime'
 import type { McpGrant } from './grants'
 import { openedPath } from './opened-path'
 
@@ -11,6 +12,7 @@ import { openedPath } from './opened-path'
 export async function openGrantFile(grant: McpGrant, input: string) {
   const paths = createWorkspacePaths(grant.cwd)
   const target = paths.resolve(checkoutRelative(grant.cwd, input))
+  if (isWasiRuntime()) return openWasiGrantFile(paths.workspaceRootReal, target)
   const root = await open(
     paths.workspaceRootReal,
     constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
@@ -40,6 +42,21 @@ export async function openGrantFile(grant: McpGrant, input: string) {
     throw mapNodeError(error)
   } finally {
     await root.close()
+  }
+}
+
+async function openWasiGrantFile(
+  workspaceRootReal: string,
+  target: { readonly absolutePath: string },
+) {
+  try {
+    const actual = await realpath(target.absolutePath)
+    if (isOutsideRoot(path.relative(workspaceRootReal, actual)))
+      throw new FsError('PATH_OUTSIDE_WORKSPACE')
+    return await open(actual, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+  } catch (error) {
+    if (error instanceof FsError) throw error
+    throw mapNodeError(error)
   }
 }
 

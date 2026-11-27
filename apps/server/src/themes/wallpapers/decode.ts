@@ -1,9 +1,14 @@
 import path from 'node:path'
 import { deserialize } from 'node:v8'
 import * as v from 'valibot'
+import { parseWallpaperHeader } from './image-header'
 import { wallpaperErrors } from './structured-errors'
 
 export const MAX_WALLPAPER_BYTES = 20 * 1024 * 1024
+
+export function hasNativeImageCodec() {
+  return typeof Bun !== 'undefined' && typeof (Bun as { Image?: unknown }).Image === 'function'
+}
 
 const headerSchema = v.object({
   width: v.number(),
@@ -21,6 +26,11 @@ const decodedSchema = v.object({
 export type WallpaperRendition = 'thumbnail' | 'display'
 
 export async function readWallpaperHeader(bytes: Uint8Array) {
+  if (bytes.byteLength > MAX_WALLPAPER_BYTES)
+    throw wallpaperErrors.TOO_LARGE({
+      internal: { bytes: bytes.byteLength, limit: MAX_WALLPAPER_BYTES },
+    })
+  if (!hasNativeImageCodec()) return parseWallpaperHeader(bytes)
   return v.parse(headerSchema, await runImageWorker(bytes, 'header'))
 }
 

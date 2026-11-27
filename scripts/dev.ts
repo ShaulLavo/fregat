@@ -1,5 +1,7 @@
-import { installSignalHandlers } from './process-signals'
+import { existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
+import { installSignalHandlers } from './process-signals'
 import { observabilityEnvFromFile } from '../packages/observability/src/env-file'
 import { requireFreeDevPorts } from './port-holders'
 import { allowedOriginsForWebPort, devPorts, runtimeUrl } from './runtime-network'
@@ -7,17 +9,62 @@ import { defaultDevStateHome, seedDevStateHome } from './state-home'
 import { scriptFailureText } from './structured-errors'
 
 const root = path.resolve(import.meta.dirname, '..')
-const env = observabilityEnvFromFile(path.join(root, '.env'), Bun.env)
 const turbo = path.join(root, 'node_modules/.bin/turbo')
 // Mesh proxies only IPv4 loopback, and an upstream bound on `::1` alone would never read as ready.
 const UPSTREAM_HOST = '127.0.0.1'
 const UPSTREAM_FLAG = '--upstream'
+const DIRECT_FLAG = '--direct'
+const STOP_GRACE_MS = 5_000
 
-try {
-  await runDev()
-} catch (error) {
-  console.error(scriptFailureText(error))
-  process.exit(1)
+export type DirectDevProcess = {
+  readonly taskId: 'server#dev' | 'web#dev'
+  readonly cwd: string
+  readonly cmd: readonly string[]
+}
+
+export function shouldUseDirectDev(options: {
+  readonly argv: readonly string[]
+  readonly arch?: string
+  readonly turboPath?: string
+  readonly exists?: (file: string) => boolean
+}) {
+  if (options.argv.includes(DIRECT_FLAG)) return true
+  if ((options.arch ?? process.arch) === 'wasm32') return true
+  const check = options.exists ?? existsSync
+  return !check(options.turboPath ?? turbo)
+}
+
+export function resolveViteEntry(workspaceRoot = root) {
+  const webRequire = createRequire(path.join(workspaceRoot, 'apps/web/package.json'))
+  return path.join(path.dirname(webRequire.resolve('vite/package.json')), 'bin/vite.js')
+}
+
+export function directDevProcesses(
+  workspaceRoot = root,
+  execPath = process.execPath,
+  viteEntry = resolveViteEntry(workspaceRoot),
+): readonly DirectDevProcess[] {
+  return [
+    {
+      taskId: 'server#dev',
+      cwd: path.join(workspaceRoot, 'apps/server'),
+      cmd: [execPath, 'src/index.ts'],
+    },
+    {
+      taskId: 'web#dev',
+      cwd: path.join(workspaceRoot, 'apps/web'),
+      cmd: [execPath, viteEntry],
+    },
+  ]
+}
+
+if (import.meta.main) {
+  try {
+    await runDev()
+  } catch (error) {
+    console.error(scriptFailureText(error))
+    process.exit(1)
+  }
 }
 
 /**
@@ -25,8 +72,11 @@ try {
  * binds the upstream ports and mesh owns the public ones (`scripts/dev-serve.ts`).
  */
 async function runDev() {
-  const upstream = Bun.argv.includes(UPSTREAM_FLAG)
-  const args = Bun.argv.slice(2).filter((arg) => arg !== UPSTREAM_FLAG)
+  const env = observabilityEnvFromFile(path.join(root, '.env'), Bun.env)
+  const rawArgs = Bun.argv.slice(2)
+  const upstream = rawArgs.includes(UPSTREAM_FLAG)
+  const direct = shouldUseDirectDev({ argv: rawArgs })
+  const args = rawArgs.filter((arg) => arg !== UPSTREAM_FLAG && arg !== DIRECT_FLAG)
   const ports = devPorts(env)
   const webHost = upstream ? UPSTREAM_HOST : (env.WEB_HOST ?? UPSTREAM_HOST)
   const webPort = upstream ? ports.webUpstream : ports.web
@@ -34,10 +84,14 @@ async function runDev() {
   const dryRun = isDryRun(args)
   if (!dryRun) await requireFreeDevPorts(webHost, [webPort, apiPort], `:${ports.web}`)
 
-  configureRuntime({ webHost, webPort, apiPort, publicWebPort: ports.web, upstream })
-  configureStateHome(dryRun)
+  configureRuntime(env, { webHost, webPort, apiPort, publicWebPort: ports.web, upstream })
+  configureStateHome(env, dryRun)
 
   console.log(`[dev] Client: ${runtimeUrl(webHost, ports.web)}`)
+  if (direct) {
+    process.exit(await runDirectDev(env, args, dryRun))
+  }
+
   const child = Bun.spawn({
     cmd: [turbo, 'dev', '--filter=web', '--filter=server', '--filter=desktop'].concat(args),
     cwd: root,
@@ -50,6 +104,61 @@ async function runDev() {
   process.exit(await child.exited)
 }
 
+async function runDirectDev(
+  env: Record<string, string | undefined>,
+  args: readonly string[],
+  dryRun: boolean,
+) {
+  const processes = directDevProcesses(root)
+  if (dryRun) {
+    if (isDryJson(args)) {
+      console.log(JSON.stringify({ tasks: processes.map(({ taskId }) => ({ taskId })) }, null, 2))
+      return 0
+    }
+    for (const entry of processes) console.log(`[dev] ${entry.taskId}: ${entry.cmd.join(' ')}`)
+    return 0
+  }
+
+  // A production terminal carries this; a dev process must never act on production's `pending`.
+  delete env.PLATFORM_PRODUCTION_ROOT
+
+  const children = processes.map((entry) =>
+    Bun.spawn({
+      cmd: Array.from(entry.cmd),
+      cwd: entry.cwd,
+      env,
+      stderr: 'inherit',
+      stdout: 'inherit',
+    }),
+  )
+
+  let signalReceived = false
+  const stopAll = (signal: NodeJS.Signals) => {
+    for (const child of children) {
+      if (child.exitCode === null && child.signalCode === null) child.kill(signal)
+    }
+  }
+  const onSignal = (signal: NodeJS.Signals) => {
+    signalReceived = true
+    stopAll(signal)
+  }
+  process.once('SIGINT', onSignal)
+  process.once('SIGTERM', onSignal)
+
+  const firstCode = await Promise.race(children.map((child) => child.exited))
+  if (!signalReceived) stopAll('SIGTERM')
+  await Promise.all(children.map((child) => waitOrKill(child)))
+  return signalReceived ? 0 : firstCode
+}
+
+async function waitOrKill(child: ReturnType<typeof Bun.spawn>) {
+  if (child.exitCode !== null || child.signalCode !== null) return
+  const exited = await Promise.race([child.exited.then(() => true), Bun.sleep(STOP_GRACE_MS)])
+  if (exited) return
+  child.kill('SIGKILL')
+  await child.exited
+}
+
 type Runtime = {
   webHost: string
   webPort: number
@@ -58,7 +167,7 @@ type Runtime = {
   upstream: boolean
 }
 
-function configureRuntime(runtime: Runtime) {
+function configureRuntime(env: Record<string, string | undefined>, runtime: Runtime) {
   env.WEB_HOST = runtime.webHost
   env.WEB_PORT = String(runtime.webPort)
   env.PORT = String(runtime.apiPort)
@@ -77,7 +186,7 @@ function configureRuntime(runtime: Runtime) {
 }
 
 /** Dev never opens production's `~/.platform`; see `scripts/state-home.ts`. */
-function configureStateHome(dryRun: boolean) {
+function configureStateHome(env: Record<string, string | undefined>, dryRun: boolean) {
   env.PLATFORM_HOME ??= defaultDevStateHome()
   if (!dryRun && seedDevStateHome(env.PLATFORM_HOME))
     console.log(`[dev] Seeded ${env.PLATFORM_HOME}`)
@@ -87,4 +196,8 @@ function configureStateHome(dryRun: boolean) {
 /** Turbo's `--dry`/`--dry-run` only prints the task graph, so nothing is seeded (CI has no `/work`). */
 function isDryRun(args: readonly string[]) {
   return args.some((arg) => /^--dry(-run)?(=|$)/.test(arg))
+}
+
+function isDryJson(args: readonly string[]) {
+  return args.some((arg) => /^--dry(-run)?=json$/.test(arg))
 }

@@ -20,7 +20,7 @@ import {
   type WorktreeId,
 } from '@workspace/contracts'
 import { realpathSync } from 'node:fs'
-import type { Pty, SpawnPtyOptions } from '@workspace/pty'
+import { hasNativePty, type Pty, type SpawnPtyOptions } from '@workspace/pty'
 import {
   parseTerminalClientMessage,
   type TerminalClientMessage,
@@ -48,6 +48,7 @@ import {
   type ShellCommandReader,
 } from './foreground'
 import { hostPtyFactory, TerminalHostClient } from './host-client'
+import { pipeShellPtyFactory } from './pipe-pty'
 import { terminalHostErrors, type HostSessionInfo } from '../terminal-host/protocol'
 import { isTestProcess, platformHomePath } from '../home'
 
@@ -1340,14 +1341,17 @@ export class TerminalSession {
 const socketSessions = new WeakMap<object, TerminalSession>()
 
 // Shells live in the state root's terminal host; tests inject a factory or a client instead.
+// When native PTYs are unavailable (such as under WASI), shells spawn directly over stdio pipes.
 function terminalPtyFactory(
   injected: TerminalPtyFactory | undefined,
   hostClient: TerminalHostClient | undefined,
+  nativePty = hasNativePty(),
 ) {
   if (injected) return { host: null, factory: injected }
   if (hostClient) return { host: hostClient, factory: hostPtyFactory(hostClient) }
   // No host at all here: listing or spawning would launch one on the developer's real state home.
   if (isTestProcess() && !process.env.PLATFORM_HOME) return { host: null, factory: refuseTestHost }
+  if (!nativePty) return { host: null, factory: pipeShellPtyFactory() }
   const host = new TerminalHostClient({ stateRoot: platformHomePath() })
   return { host, factory: hostPtyFactory(host) }
 }

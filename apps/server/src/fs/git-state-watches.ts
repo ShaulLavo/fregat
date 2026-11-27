@@ -128,19 +128,24 @@ function isGitStateChange(base: string, filename: string) {
 }
 
 async function resolveGitDirectories(absoluteRoot: string): Promise<GitDirectories | null> {
-  const child = Bun.spawn(
-    [
-      'git',
-      '-C',
-      absoluteRoot,
-      'rev-parse',
-      '--path-format=absolute',
-      '--show-toplevel',
-      '--git-dir',
-      '--git-common-dir',
-    ],
-    { stdout: 'pipe', stderr: 'ignore', timeout: revParseTimeoutMs },
-  )
+  let child: Bun.Subprocess<'ignore', 'pipe', 'ignore'>
+  try {
+    child = Bun.spawn(
+      [
+        'git',
+        '-C',
+        absoluteRoot,
+        'rev-parse',
+        '--path-format=absolute',
+        '--show-toplevel',
+        '--git-dir',
+        '--git-common-dir',
+      ],
+      { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore', timeout: revParseTimeoutMs },
+    )
+  } catch {
+    return null
+  }
   const [output, exitCode] = await Promise.all([new Response(child.stdout).text(), child.exited])
   if (exitCode !== 0) return null
   const [worktree, gitDir, commonDir] = output.trim().split('\n')

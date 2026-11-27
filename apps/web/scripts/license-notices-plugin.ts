@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import type { Plugin } from 'vite'
 import { packageNotices } from '../../../scripts/licenses/notices.ts'
@@ -13,13 +14,13 @@ export function licenseNoticesPlugin(): Plugin {
       const modules = Object.values(bundle).flatMap((output) =>
         output.type === 'chunk' ? Object.keys(output.modules) : [],
       )
-      const fontRoot = path.resolve(
-        import.meta.dirname,
-        '../../../packages/ui/node_modules/@fontsource-variable',
+      const uiRequire = createRequire(
+        path.resolve(import.meta.dirname, '../../../packages/ui/package.json'),
       )
+      const webRequire = createRequire(path.resolve(import.meta.dirname, '../package.json'))
       modules.push(
-        path.join(fontRoot, 'inter/package.json'),
-        path.join(fontRoot, 'jetbrains-mono/package.json'),
+        uiRequire.resolve('@fontsource-variable/inter/package.json'),
+        uiRequire.resolve('@fontsource-variable/jetbrains-mono/package.json'),
       )
       this.emitFile({
         type: 'asset',
@@ -27,9 +28,8 @@ export function licenseNoticesPlugin(): Plugin {
         source: packageNotices(modules),
       })
 
-      const grammars = path.resolve(
-        import.meta.dirname,
-        '../node_modules/@singapore-editor/tree-sitter-languages',
+      const grammars = path.dirname(
+        webRequire.resolve('@singapore-editor/tree-sitter-languages/package.json'),
       )
       const grammarFiles = ['NOTICE'].concat(
         fs

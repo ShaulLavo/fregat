@@ -39,7 +39,17 @@ const devServerPort = portFromEnv(process.env, 'WEB_PORT', 5173)
  * workspace; a real path there is otherwise outside every `fs.allow` root and Vite 403s it.
  */
 export function bunInstallCacheRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return env.BUN_INSTALL_CACHE_DIR ?? path.join(os.homedir(), '.bun', 'install', 'cache')
+  if (env.BUN_INSTALL_CACHE_DIR) return env.BUN_INSTALL_CACHE_DIR
+  return path.join(safeHomeDirectory(env), '.bun', 'install', 'cache')
+}
+
+function safeHomeDirectory(env: NodeJS.ProcessEnv): string {
+  if (env.HOME) return env.HOME
+  try {
+    return os.homedir()
+  } catch {
+    return workspaceRoot
+  }
 }
 
 export function bunDependencyRoots(root: string = workspaceRoot): string[] {

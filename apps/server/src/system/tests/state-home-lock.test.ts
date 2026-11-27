@@ -1,7 +1,8 @@
-import { mkdtemp, rm, stat } from 'node:fs/promises'
+import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { tryFileLock } from '../file-lock'
 import { acquireStateHomeLock } from '../state-home-lock'
 
 const homes: string[] = []
@@ -90,5 +91,22 @@ describe('state home lock', () => {
     const lock = acquireStateHomeLock(home)
     expect((await stat(path.join(home, 'server.lock'))).mode & 0o077).toBe(0)
     lock.release()
+  })
+
+  it('supports the non-FFI lock fallback with same-process exclusion and stale-PID recovery', async () => {
+    const home = await stateHome()
+    const lockFile = path.join(home, 'server.lock')
+
+    const lock = tryFileLock(lockFile, { useNativeFfi: false })
+    expect(lock).not.toBeNull()
+    expect((await stat(lockFile)).mode & 0o077).toBe(0)
+    expect(tryFileLock(lockFile, { useNativeFfi: false })).toBeNull()
+    lock?.release()
+
+    // Stale lock left by a dead PID is reclaimed cleanly.
+    await writeFile(lockFile, '99999999\n', { mode: 0o600 })
+    const reclaimed = tryFileLock(lockFile, { useNativeFfi: false })
+    expect(reclaimed).not.toBeNull()
+    reclaimed?.release()
   })
 })

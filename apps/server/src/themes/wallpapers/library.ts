@@ -19,6 +19,7 @@ import {
   decodeWallpaper,
   deriveRendition,
   deriveStoredWallpaper,
+  hasNativeImageCodec,
   MAX_WALLPAPER_BYTES,
   readWallpaperHeader,
   type WallpaperRendition,
@@ -365,6 +366,7 @@ export class WallpaperLibrary {
     const name = kind === 'thumbnail' ? asset.thumbnail : displayName(id)
     const target = path.join(directory, name)
     if (await Bun.file(target).exists()) return target
+    if (!hasNativeImageCodec()) return path.join(directory, `${id}.${asset.extension}`)
     if (directory !== this.directory)
       throw wallpaperErrors.NOT_FOUND({ internal: { at: 'rendition', asset: id, kind } })
     const key = `${id}:${kind}`

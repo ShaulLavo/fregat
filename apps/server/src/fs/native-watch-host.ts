@@ -49,7 +49,16 @@ export class NativeWatchHost {
     const id = this.nextId++
     const attached = Promise.withResolvers<NativeWatchAttach>()
     this.watches.set(id, { attached, callbacks })
-    this.send({ type: 'watch', id, path: absolutePath, recursive })
+    try {
+      this.send({ type: 'watch', id, path: absolutePath, recursive })
+    } catch (cause) {
+      this.watches.delete(id)
+      const message = cause instanceof Error ? cause.message : String(cause)
+      attached.resolve({
+        status: 'failed',
+        error: { code: WATCH_WORKER_FAILED, message: `native watch worker failed: ${message}` },
+      })
+    }
     return attached.promise
   }
 
@@ -60,7 +69,7 @@ export class NativeWatchHost {
   }
 
   private closeWatch(id: number) {
-    if (!this.watches.delete(id)) return
+    if (!this.watches.delete(id) || !this.worker) return
     this.send({ type: 'close', id })
   }
 

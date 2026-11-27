@@ -85,16 +85,16 @@ function media(library: WallpaperLibrary, input: string, kind: MediaKind) {
     { area: 'wallpaper', operation: `library.${kind}`, sourceKind: 'library', assetId: id },
     async () => {
       const asset = await library.read(id)
-      const file = Bun.file(
+      const target =
         kind === 'asset'
           ? path.join(await library.assetDirectory(id), `${id}.${asset.extension}`)
-          : await library.rendition(id, kind),
-      )
+          : await library.rendition(id, kind)
+      const file = Bun.file(target)
       if (!(await file.exists()))
         throw wallpaperErrors.NOT_FOUND({ internal: { at: 'serve', asset: id, kind } })
       return new Response(file, {
         headers: {
-          'content-type': kind === 'asset' ? asset.contentType : 'image/webp',
+          'content-type': target.endsWith('.webp') ? 'image/webp' : asset.contentType,
           'cache-control': 'public, max-age=31536000, immutable',
         },
       })
