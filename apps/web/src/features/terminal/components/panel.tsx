@@ -296,7 +296,7 @@ export function TerminalPanel({
     sendInputRef.current = (data) => {
       if (!inputReadyRef.current || !attachmentRef.current) return false
       const sent = adapterState.adapter.tryWrite(attachmentRef.current, data)
-      if (!sent) handleReadyChange(false)
+      if (!sent) setConnectedIdentity(null)
       return sent
     }
   }

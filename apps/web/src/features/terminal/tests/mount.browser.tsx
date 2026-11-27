@@ -224,7 +224,9 @@ test.each([false, true])(
       if (earlyRestore) window.dispatchEvent(new Event('pageshow'))
       await settled
       if (!earlyRestore) {
-        await Promise.resolve()
+        // Let the scheduled macrotask retry timer fire while the page is still hidden.
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        expect(client.getQueryState(queryKey)?.fetchStatus).toBe('idle')
         expect(onAttached).not.toHaveBeenCalled()
         expect(ready).toBe(false)
         window.dispatchEvent(new Event('pageshow'))
