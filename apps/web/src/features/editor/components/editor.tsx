@@ -457,6 +457,7 @@ export function Editor({
   useCommitMessageEditorFocus({
     controller,
     document: liveDocument,
+    tabId,
   })
 
   useEffect(() => {

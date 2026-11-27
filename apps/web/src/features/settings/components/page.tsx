@@ -8,6 +8,7 @@ import type { TabId, WorkspaceRoot } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
 import { useSettingsSearch, selectSettingsSearch } from '@/features/settings/state/search-store'
 import { Button } from '@workspace/ui/components/button'
+import { tabShouldAutoFocus } from '@/lib/focus/state/tab-activation-focus'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react'
@@ -173,7 +174,7 @@ export function SettingsPage({
                     autoCapitalize='off'
                     autoComplete='off'
                     autoCorrect='off'
-                    autoFocus={active && !phone}
+                    autoFocus={active && !phone && tabShouldAutoFocus(tabId)}
                     ref={searchRef}
                     onChange={(event) => setQuery(event.currentTarget.value)}
                     placeholder='Search settings'

@@ -4,6 +4,7 @@ import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-st
 import { documentSourcePath } from '@/lib/documents/utils/capabilities'
 import { activeEditorTab } from '@/lib/documents/utils/groups'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
+import { recordTabActivationFocus } from '@/lib/focus/state/tab-activation-focus'
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 import type { NavigationResult } from '@/state/navigation-coordinator'
 
@@ -46,12 +47,15 @@ export function useEditorGroupActions() {
   }
 
   return {
-    placeTab: (...args: Parameters<typeof commands.placeTab>) =>
-      focusAfter(commands.placeTab(...args)),
+    placeTab: (...args: Parameters<typeof commands.placeTab>) => {
+      recordTabActivationFocus(args[0].tabId, undefined)
+      return focusAfter(commands.placeTab(...args))
+    },
     selectTab: (
       target: Parameters<typeof commands.selectTab>[0],
       focus?: ActivationFocusDecision,
     ) => {
+      recordTabActivationFocus(target.tabId, focus)
       const operation = commands.selectTab(target)
       if (focus?.shouldFocusEditor === false) return operation
       return focusAfter(operation)
