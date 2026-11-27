@@ -1,24 +1,14 @@
-import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
-import type { FilesystemPath } from '@/lib/documents/utils/types'
-import { clientForQueryClient } from '@/lib/environments/state/query-clients'
-import type { FileTreeRenameEvent } from '@workspace/tree'
-import type { TreeViewModel } from '@/features/workspace/state/tree-model'
+import type { FileTreeModel } from '@shaulavo/workbench-tree'
+import type { FileTreeViewHandle } from '@shaulavo/workbench-tree/react'
 import { hashKey, useIsMutating, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 
-import { useWorkspaceMutationAllowed } from '@/features/editor/hooks/use-workspace-mutation-allowed'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
-import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
-import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
+import { useWorkspaceMutationAllowed } from '@/features/editor/hooks/use-workspace-mutation-allowed'
 import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
+import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import type { FileOperationLeg } from '@/features/editor/state/workspace-edit-service'
-import {
-  containerContentsLoaded,
-  duplicateTreePath,
-  newEntryTreePath,
-  workspacePathForTreePath,
-} from '@/features/workspace/utils/entry-paths'
-import { expandTreeDirectory } from '@/features/workspace/utils/tree-pane-state'
+import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import {
   fileOperationDocuments,
   runFileOperation,
@@ -26,17 +16,26 @@ import {
 } from '@/features/workspace/state/file-operations'
 import { runTreeIntent } from '@/features/workspace/state/tree-intents'
 import {
+  containerContentsLoaded,
+  duplicateTreePath,
+  workspacePathForTreePath,
+} from '@/features/workspace/utils/entry-paths'
+import {
   createLabel,
   deleteLabel,
   duplicateLabel,
   moveLabel,
 } from '@/features/workspace/utils/file-operation-labels'
 import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
+import { expandTreeDirectory } from '@/features/workspace/utils/tree-pane-state'
 import { clientErrorMessage, toClientError } from '@/lib/client-error-taxonomy'
-import { isDirectoryEntry } from '@/lib/file-system-types'
-import { fileSystemKeys } from '@/lib/query-keys'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
+import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
+import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { deletePath } from '@/lib/file-server'
+import { isDirectoryEntry } from '@/lib/file-system-types'
 import { canonicalTreePath, toTreePath } from '@/lib/path-formatters'
+import { fileSystemKeys } from '@/lib/query-keys'
 import type { TreeModel, TreePathMove } from '@/lib/tree-model'
 
 export type DeleteTarget = {
@@ -72,11 +71,13 @@ type DeferredCreate = { containerPath: string; isFolder: boolean }
 export function useFsActions({
   modelRef,
   rootPath,
+  treeHandleRef,
   treeRef,
 }: {
   modelRef: RefObject<TreeModel>
   rootPath: FilesystemPath
-  treeRef: RefObject<TreeViewModel | null>
+  treeHandleRef?: RefObject<FileTreeViewHandle | null>
+  treeRef: RefObject<FileTreeModel | null>
 }) {
   const queryClient = useQueryClient()
   const unavailable = useUnavailableEnvironment()
@@ -103,9 +104,6 @@ export function useFsActions({
   const [deletePermanently, setDeletePermanently] = useState(false)
   const deleting =
     useIsMutating({ mutationKey: workspaceMutationKeys.tree('delete', rootPath) }) > 0
-  // Set while an inline edit is creating rather than renaming, so the commit
-  // handler knows to write a new entry instead of moving an existing one.
-  const pendingCreatePathRef = useRef<string | null>(null)
   // Set while a create is waiting on its target directory to finish loading.
   const deferredCreateRef = useRef<DeferredCreate | null>(null)
 
@@ -128,16 +126,17 @@ export function useFsActions({
     if (!mutationsEnabled) return
     const tree = treeRef.current
     if (!tree) return
-    if (containerContentsLoaded(modelRef.current.loadedDirectoryPaths, containerPath)) {
-      startInlineCreate(tree, containerPath, isFolder)
+    const normalizedContainer = canonicalTreePath(containerPath)
+    if (containerContentsLoaded(modelRef.current.loadedDirectoryPaths, normalizedContainer)) {
+      startInlineCreate(tree, normalizedContainer, isFolder)
       return
     }
 
     // Right-clicking a collapsed directory is the common way in, and its
     // children are still on the wire. Expand to kick the load off and let
     // `resumeDeferredCreate` start the edit once they have landed.
-    deferredCreateRef.current = { containerPath, isFolder }
-    expandTreeDirectory(tree, containerPath)
+    deferredCreateRef.current = { containerPath: normalizedContainer, isFolder }
+    expandTreeDirectory(tree, normalizedContainer)
   }
 
   /** Called by the pane after each model sync, once per settled tree. */
@@ -153,15 +152,14 @@ export function useFsActions({
     startInlineCreate(tree, request.containerPath, request.isFolder)
   }
 
-  function startInlineCreate(tree: TreeViewModel, containerPath: string, isFolder: boolean) {
-    const placeholderPath = newEntryTreePath({
-      containerPath,
-      existingPaths: modelRef.current.entriesByTreePath,
-      isFolder,
-    })
-    tree.add(placeholderPath)
-    pendingCreatePathRef.current = canonicalTreePath(placeholderPath)
-    tree.startRenaming(placeholderPath, { removeIfCanceled: true })
+  function startInlineCreate(tree: FileTreeModel, containerPath: string, isFolder: boolean) {
+    const kind = isFolder ? 'directory' : 'file'
+    if (treeHandleRef?.current) {
+      treeHandleRef.current.startCreate(containerPath, kind)
+      return
+    }
+    if (containerPath) tree.setExpanded(containerPath, true)
+    tree.setDraft({ kind, mode: 'create', parent: containerPath })
   }
 
   function createOnDisk(treePath: string, isFolder: boolean) {
@@ -190,6 +188,22 @@ export function useFsActions({
     })
   }
 
+  function commitCreate(parent: string, kind: 'file' | 'directory', name: string) {
+    if (!mutationsEnabled) return
+    const normalizedParent = canonicalTreePath(parent)
+    const treePath = normalizedParent ? `${normalizedParent}/${name}` : name
+    createOnDisk(treePath, kind === 'directory')
+  }
+
+  function commitRename(fromPath: string, toPath: string) {
+    if (!mutationsEnabled) return
+    // An inline rename happens where the user is looking; only a drag needs the toast.
+    moveEntries(
+      [{ fromTreePath: canonicalTreePath(fromPath), toTreePath: canonicalTreePath(toPath) }],
+      false,
+    )
+  }
+
   function duplicateEntry(treePath: string, isDirectory: boolean) {
     const runtime = fileOperations()
     if (!mutationsEnabled || !runtime) return
@@ -212,20 +226,6 @@ export function useFsActions({
       ],
       patch: { kind: 'duplicate', rootPath, from, to, isFolder: isDirectory },
     })
-  }
-
-  /** Wired into `useFileTree`'s `renaming.onRename`; paths carry no trailing slash. */
-  function completeRename(event: FileTreeRenameEvent) {
-    if (!mutationsEnabled) return
-    const pendingCreatePath = pendingCreatePathRef.current
-    pendingCreatePathRef.current = null
-    if (pendingCreatePath === event.sourcePath) {
-      createOnDisk(event.destinationPath, event.isFolder)
-      return
-    }
-
-    // An inline rename happens where the user is looking; only a drag needs the toast.
-    moveEntries([{ fromTreePath: event.sourcePath, toTreePath: event.destinationPath }], false)
   }
 
   function closeDeleteDialog() {
@@ -295,7 +295,12 @@ export function useFsActions({
     mutationsEnabled,
     renameEntry: (rowPath) => {
       if (!mutationsEnabled) return
-      treeRef.current?.startRenaming(rowPath)
+      const canonical = canonicalTreePath(rowPath)
+      if (treeHandleRef?.current) {
+        treeHandleRef.current.startRename(canonical)
+        return
+      }
+      treeRef.current?.setDraft({ mode: 'rename', path: canonical })
     },
     requestDelete: (target) => {
       if (!mutationsEnabled) return
@@ -307,7 +312,8 @@ export function useFsActions({
 
   return {
     actions,
-    completeRename,
+    commitCreate,
+    commitRename,
     resumeDeferredCreate,
     deleteDialog: {
       deleting,

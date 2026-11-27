@@ -1,35 +1,28 @@
-import { filesystemPath } from '@/lib/documents/utils/identity'
+import { FileTreeModel } from '@shaulavo/workbench-tree'
 import { describe } from 'vitest'
-import { expect, test as it } from '../../../../test/fixtures'
-import type {
-  FileTreeDirectoryHandle,
-  FileTreeFileHandle,
-  FileTreeItemHandle,
-  FileTreeMutationEvent,
-  FileTreeRowDecorationContext,
-} from '@workspace/tree'
-import { TreeViewModel } from '@/features/workspace/state/tree-model'
 
+import { preparedTreeInputForPaths } from '@/features/workspace/state/prepared-tree-input-cache'
+import { fileTreeGitState } from '@/features/workspace/utils/git-state-for-tree'
+import { treeDecorationKey, treeRowDecoration } from '@/features/workspace/utils/tree-decoration'
 import {
   loadExpandedDirectories,
   syncTreePaneState,
   visibleTreeItemCount,
 } from '@/features/workspace/utils/tree-pane-state'
 import { selectedFileEntryForTreeSelection } from '@/features/workspace/utils/tree-selection'
-import { preparedTreeInputForPaths } from '@/features/workspace/state/prepared-tree-input-cache'
-import { treeMutationLogContext } from '@/features/workspace/utils/tree-mutation-log'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { TreeEntry, TreeResult } from '@/lib/file-system-types'
 import { cloneTreeModel, mergeDirectoryLoad, treeModel } from '@/lib/tree-model'
-import { treeDecorationKey, treeRowDecoration } from '@/features/workspace/utils/tree-decoration'
+
+import { expect, test as it } from '../../../../test/fixtures'
 
 describe('syncTreePaneState', () => {
   it('continues expanding newly loaded ancestors for the selected file', () => {
     const root = 'repo'
     const selectedFilePath = 'repo/src/components/Button.tsx'
     const initialModel = treeModel(tree(root, [directory('repo/src')]), root)
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: initialModel.paths,
     })
     const loadPasses: string[][] = []
@@ -62,20 +55,19 @@ describe('syncTreePaneState', () => {
       tree: fileTree,
     })
 
-    expect(loadPasses).toEqual([['src/'], ['src/', 'src/components/']])
+    expect(loadPasses).toEqual([['src'], ['src', 'src/components']])
   })
 
   it('loads expanded symlink directory targets', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [symlinkDirectory('repo/vendor')]), root)
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: model.paths,
     })
     const loadedPaths: string[] = []
 
-    getDirectory(fileTree, 'vendor/').expand()
+    fileTree.setExpanded('vendor', true)
 
     syncTreePaneState({
       loadExpandedDirectoriesForCurrentModel: (currentTree) => {
@@ -94,14 +86,12 @@ describe('syncTreePaneState', () => {
   it('does not rewrite tree selection when the selected file is already selected', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [file('repo/src/a.ts'), file('repo/src/b.ts')]), root)
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: model.paths,
     })
 
-    getFile(fileTree, 'src/a.ts').select()
-    getFile(fileTree, 'src/b.ts').select()
+    fileTree.setSelectedPaths(['src/a.ts', 'src/b.ts'])
 
     syncTreePaneState({
       loadExpandedDirectoriesForCurrentModel: () => {},
@@ -118,13 +108,12 @@ describe('syncTreePaneState', () => {
   it('does not reselect the active editor file during tree-only syncs', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src'), file('repo/src/a.ts')]), root)
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: model.paths,
     })
 
-    getDirectory(fileTree, 'src/').select()
+    fileTree.setSelectedPaths(['src'])
 
     syncTreePaneState({
       loadExpandedDirectoriesForCurrentModel: () => {},
@@ -136,15 +125,14 @@ describe('syncTreePaneState', () => {
       tree: fileTree,
     })
 
-    expect(fileTree.getSelectedPaths()).toEqual(['src/'])
+    expect(fileTree.getSelectedPaths()).toEqual(['src'])
   })
 
-  it('skips stale removals that are already absent from the tree model', () => {
+  it('skips stale removals and additions cleanly', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/packages/editor-find')]), root)
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: model.paths,
     })
 
@@ -160,33 +148,6 @@ describe('syncTreePaneState', () => {
     }).not.toThrow()
   })
 
-  it('skips stale additions that already exist in the tree model', () => {
-    const root = 'repo'
-    const model = treeModel(
-      tree(root, [
-        directory('repo/packages/editor-find'),
-        directory('repo/packages/editor-find/.turbo'),
-      ]),
-      root,
-    )
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
-      paths: model.paths,
-    })
-
-    expect(() => {
-      syncTreePaneState({
-        loadExpandedDirectoriesForCurrentModel: () => {},
-        model,
-        previousPaths: model.paths.filter((path) => path !== 'packages/editor-find/.turbo/'),
-        rootPath: root,
-        selectedFilePath: null,
-        tree: fileTree,
-      })
-    }).not.toThrow()
-  })
-
   it('keeps focus inside a nested lazy directory after flattened children load', () => {
     const root = 'repo'
     const initialModel = mergeDirectoryLoad(
@@ -195,15 +156,14 @@ describe('syncTreePaneState', () => {
       tree('repo/src', [directory('repo/src/components'), file('repo/src/index.ts')]),
       'src',
     )
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: initialModel.paths,
     })
 
-    getDirectory(fileTree, 'src/').expand()
-    fileTree.focusPath('src/components/')
-    getDirectory(fileTree, 'src/components/').expand()
+    fileTree.setExpanded('src', true)
+    fileTree.setFocusedPath('src/components')
+    fileTree.setExpanded('src/components', true)
 
     const loadedModel = mergeDirectoryLoad(
       initialModel,
@@ -223,8 +183,8 @@ describe('syncTreePaneState', () => {
       }),
     )
 
-    expect(focusChanges).toContain('src/components/ui/')
-    expect(fileTree.getFocusedPath()).toBe('src/components/ui/')
+    expect(focusChanges).toContain('src/components/ui')
+    expect(fileTree.getSnapshot().focusedPath).toBe('src/components/ui')
   })
 
   it('keeps focus inside a root lazy directory after flattened children load', () => {
@@ -233,14 +193,13 @@ describe('syncTreePaneState', () => {
       tree(root, [directory('repo/docs'), directory('repo/src')]),
       root,
     )
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: initialModel.paths,
     })
 
-    fileTree.focusPath('src/')
-    getDirectory(fileTree, 'src/').expand()
+    fileTree.setFocusedPath('src')
+    fileTree.setExpanded('src', true)
 
     const loadedModel = mergeDirectoryLoad(
       initialModel,
@@ -259,20 +218,19 @@ describe('syncTreePaneState', () => {
       }),
     )
 
-    expect(focusChanges).toContain('src/components/')
-    expect(fileTree.getFocusedPath()).toBe('src/components/')
+    expect(focusChanges).toContain('src/components')
+    expect(fileTree.getSnapshot().focusedPath).toBe('src/components')
   })
 
   it('keeps a lazy directory expanded after its single child directory flattens into the visible row', () => {
     const root = 'repo'
     const initialModel = treeModel(tree(root, [directory('repo/src')]), root)
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: initialModel.paths,
     })
 
-    getDirectory(fileTree, 'src/').expand()
+    fileTree.setExpanded('src', true)
 
     const loadedModel = mergeDirectoryLoad(
       initialModel,
@@ -290,7 +248,7 @@ describe('syncTreePaneState', () => {
       tree: fileTree,
     })
 
-    expect(getDirectory(fileTree, 'src/components/').isExpanded()).toBe(true)
+    expect(fileTree.getSnapshot().expanded.has('src/components')).toBe(true)
   })
 
   it('does not re-expand a collapsed flattened directory during later child syncs', () => {
@@ -302,13 +260,12 @@ describe('syncTreePaneState', () => {
       tree('repo/src', [directory('repo/src/components')]),
       'src',
     )
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: initialModel.paths,
     })
 
-    getDirectory(fileTree, 'src/').expand()
+    fileTree.setExpanded('src', true)
     syncTreePaneState({
       loadExpandedDirectoriesForCurrentModel: () => {},
       model: loadedModel,
@@ -317,7 +274,7 @@ describe('syncTreePaneState', () => {
       selectedFilePath: null,
       tree: fileTree,
     })
-    getDirectory(fileTree, 'src/components/').collapse()
+    fileTree.setExpanded('src/components', false)
 
     const nestedModel = mergeDirectoryLoad(
       loadedModel,
@@ -335,10 +292,10 @@ describe('syncTreePaneState', () => {
       tree: fileTree,
     })
 
-    expect(getDirectory(fileTree, 'src/components/ui/').isExpanded()).toBe(false)
+    expect(fileTree.getSnapshot().expanded.has('src/components/ui')).toBe(false)
   })
 
-  it('reconciles multi-path changes through one ordered batch without losing tree state', () => {
+  it('reconciles multi-path changes without losing expansion or selection state', () => {
     const root = 'repo'
     const initialModel = treeModel(
       tree(root, [
@@ -360,48 +317,32 @@ describe('syncTreePaneState', () => {
       ]),
       root,
     )
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: initialModel.paths,
     })
-    const events: FileTreeMutationEvent[] = []
-    const unsubscribe = fileTree.onMutation('*', (event) => events.push(event))
 
-    try {
-      getDirectory(fileTree, 'src/').expand()
-      getFile(fileTree, 'keep.ts').select()
-      events.length = 0
+    fileTree.setExpanded('src', true)
+    fileTree.setSelectedPaths(['keep.ts'])
 
-      syncTreePaneState({
-        loadExpandedDirectoriesForCurrentModel: () => {},
-        model: nextModel,
-        previousPaths: initialModel.paths,
-        rootPath: root,
-        selectedFilePath: null,
-        syncSelection: false,
-        tree: fileTree,
-      })
+    syncTreePaneState({
+      loadExpandedDirectoriesForCurrentModel: () => {},
+      model: nextModel,
+      prepareInputForPaths: preparedTreeInputForPaths,
+      previousPaths: initialModel.paths,
+      rootPath: root,
+      selectedFilePath: null,
+      syncSelection: false,
+      tree: fileTree,
+    })
 
-      expect(events).toHaveLength(1)
-      expect(events[0]).toMatchObject({
-        events: [
-          { operation: 'remove', path: 'old/', recursive: true },
-          { operation: 'add', path: 'new-root.ts' },
-          { operation: 'add', path: 'src/new.ts' },
-        ],
-        operation: 'batch',
-      })
-      expect(fileTree.getItem('old/')).toBeNull()
-      expect(fileTree.getItem('src/new.ts')).not.toBeNull()
-      expect(fileTree.getSelectedPaths()).toEqual(['keep.ts'])
-      expect(getDirectory(fileTree, 'src/').isExpanded()).toBe(true)
-    } finally {
-      unsubscribe()
-    }
+    expect(fileTree.index.getKind('old')).toBeUndefined()
+    expect(fileTree.index.getKind('src/new.ts')).toBe('file')
+    expect(fileTree.getSelectedPaths()).toEqual(['keep.ts'])
+    expect(fileTree.getSnapshot().expanded.has('src')).toBe(true)
   })
 
-  it('uses prepared input for the large-drift reset fallback', () => {
+  it('uses prepared input for large-drift replacements', () => {
     const root = 'repo'
     const initialModel = treeModel(tree(root, []), root)
     const nextModel = treeModel(
@@ -411,72 +352,34 @@ describe('syncTreePaneState', () => {
       ),
       root,
     )
-    const fileTree = new TreeViewModel({ paths: initialModel.paths })
-    const events: FileTreeMutationEvent[] = []
-    const unsubscribe = fileTree.onMutation('*', (event) => events.push(event))
+    const fileTree = new FileTreeModel({ paths: initialModel.paths })
 
-    try {
-      syncTreePaneState({
-        loadExpandedDirectoriesForCurrentModel: () => {},
-        model: nextModel,
-        prepareInputForPaths: preparedTreeInputForPaths,
-        previousPaths: initialModel.paths,
-        rootPath: root,
-        selectedFilePath: null,
-        tree: fileTree,
-      })
+    syncTreePaneState({
+      loadExpandedDirectoriesForCurrentModel: () => {},
+      model: nextModel,
+      prepareInputForPaths: preparedTreeInputForPaths,
+      previousPaths: initialModel.paths,
+      rootPath: root,
+      selectedFilePath: null,
+      tree: fileTree,
+    })
 
-      expect(events).toEqual([
-        expect.objectContaining({ operation: 'reset', usedPreparedInput: true }),
-      ])
-      expect(fileTree.getItem('file-512.ts')).not.toBeNull()
-    } finally {
-      unsubscribe()
-    }
+    expect(fileTree.index.getKind('file-512.ts')).toBe('file')
   })
 })
 
-describe('treeMutationLogContext', () => {
-  it('maps every mutation shape into one bounded wide event', () => {
-    const invalidation = {
-      canonicalChanged: true,
-      projectionChanged: true,
-      visibleCountDelta: 1,
-    }
-    const add = { ...invalidation, operation: 'add', path: 'a.ts' } as const
-    const remove = {
-      ...invalidation,
-      operation: 'remove',
-      path: 'old/',
-      recursive: true,
-    } as const
-    const move = { ...invalidation, from: 'a.ts', operation: 'move', to: 'b.ts' } as const
-    const reset = {
-      ...invalidation,
-      operation: 'reset',
-      pathCountAfter: 2,
-      pathCountBefore: 1,
-      usedPreparedInput: true,
-    } as const
-    const batch = { ...invalidation, events: [remove, add, move], operation: 'batch' } as const
+describe('fileTreeGitState', () => {
+  it('rolls up changed ancestor directories and tracks ignored directories separately', () => {
+    const state = fileTreeGitState([
+      { path: 'src/components/Button.tsx', status: 'modified' },
+      { path: 'dist/', status: 'ignored' },
+    ])
 
-    expect(treeMutationLogContext(add)).toMatchObject({ operation: 'add', paths: ['a.ts'] })
-    expect(treeMutationLogContext(remove)).toMatchObject({ operation: 'remove', paths: ['old/'] })
-    expect(treeMutationLogContext(move)).toMatchObject({
-      operation: 'move',
-      paths: ['a.ts', 'b.ts'],
-    })
-    expect(treeMutationLogContext(reset)).toMatchObject({
-      operation: 'reset',
-      pathCountAfter: 2,
-      pathCountBefore: 1,
-      usedPreparedInput: true,
-    })
-    expect(treeMutationLogContext(batch)).toMatchObject({
-      batchChildCount: 3,
-      operation: 'batch',
-      paths: ['old/', 'a.ts', 'a.ts', 'b.ts'],
-    })
+    expect(state.statusByPath.get('src/components/Button.tsx')).toBe('modified')
+    expect(state.directoriesWithChanges.has('src')).toBe(true)
+    expect(state.directoriesWithChanges.has('src/components')).toBe(true)
+    expect(state.ignoredDirectories.has('dist')).toBe(true)
+    expect(state.directoriesWithChanges.has('dist')).toBe(false)
   })
 })
 
@@ -485,14 +388,13 @@ describe('loadExpandedDirectories', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src')]), root)
     model.errorByDirectoryPath.set('src', { message: 'Could not load' })
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: model.paths,
     })
     const loadedPaths: string[] = []
 
-    getDirectory(fileTree, 'src/').expand()
+    fileTree.setExpanded('src', true)
     loadExpandedDirectories(fileTree, model, (_entry, path) => loadedPaths.push(path))
 
     expect(loadedPaths).toEqual([])
@@ -502,14 +404,13 @@ describe('loadExpandedDirectories', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src')]), root)
     model.errorByDirectoryPath.set('src', { message: 'Could not load' })
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: model.paths,
     })
     const loadedPaths: string[] = []
 
-    getDirectory(fileTree, 'src/').expand()
+    fileTree.setExpanded('src', true)
     loadExpandedDirectories(
       fileTree,
       model,
@@ -528,14 +429,13 @@ describe('loadExpandedDirectories', () => {
       tree('repo/src', [file('repo/src/a.ts')]),
       'src',
     )
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: model.paths,
     })
     const loads: Array<{ path: string; refresh?: boolean }> = []
 
-    getDirectory(fileTree, 'src/').expand()
+    fileTree.setExpanded('src', true)
     loadExpandedDirectories(fileTree, model, () => {}, new Set(['src']), true)
     loadExpandedDirectories(
       fileTree,
@@ -553,14 +453,13 @@ describe('loadExpandedDirectories', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src')]), root)
     model.errorByDirectoryPath.set('src', { message: 'Could not load' })
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: model.paths,
     })
     const loadedPaths: string[] = []
 
-    getDirectory(fileTree, 'src/').expand()
+    fileTree.setExpanded('src', true)
     loadExpandedDirectories(fileTree, model, (_entry, path) => loadedPaths.push(path), new Set())
 
     expect(loadedPaths).toEqual(['src/'])
@@ -582,19 +481,18 @@ describe('visibleTreeItemCount', () => {
       tree('repo/src/components', [file('repo/src/components/Button.tsx')]),
       'src/components',
     )
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: model.paths,
     })
 
-    expect(visibleTreeItemCount(fileTree, model)).toBe(1)
+    expect(visibleTreeItemCount(fileTree)).toBe(1)
 
-    getDirectory(fileTree, 'src/').expand()
-    expect(visibleTreeItemCount(fileTree, model)).toBe(3)
+    fileTree.setExpanded('src', true)
+    expect(visibleTreeItemCount(fileTree)).toBe(3)
 
-    getDirectory(fileTree, 'src/components/').expand()
-    expect(visibleTreeItemCount(fileTree, model)).toBe(4)
+    fileTree.setExpanded('src/components', true)
+    expect(visibleTreeItemCount(fileTree)).toBe(4)
   })
 
   it('counts a flattened directory chain as one visible row', () => {
@@ -611,16 +509,15 @@ describe('visibleTreeItemCount', () => {
       tree('repo/docs/guide', [file('repo/docs/guide/intro.md')]),
       'docs/guide',
     )
-    const fileTree = new TreeViewModel({
-      flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+    const fileTree = new FileTreeModel({
+      compactFolders: true,
       paths: model.paths,
     })
 
-    expect(visibleTreeItemCount(fileTree, model)).toBe(1)
+    expect(visibleTreeItemCount(fileTree)).toBe(1)
 
-    getDirectory(fileTree, 'docs/guide/').expand()
-    expect(visibleTreeItemCount(fileTree, model)).toBe(2)
+    fileTree.setExpanded('docs/guide', true)
+    expect(visibleTreeItemCount(fileTree)).toBe(2)
   })
 })
 
@@ -644,10 +541,61 @@ describe('selectedFileEntryForTreeSelection', () => {
   })
 })
 
-function focusChangesDuring(tree: TreeViewModel, action: () => void) {
+describe('treeRowDecoration', () => {
+  function noFix() {}
+
+  it('says no access for a folder the server may not read, and names it', () => {
+    const model = treeModel(tree('repo', [directory('repo/locked')]), 'repo')
+    model.errorByDirectoryPath.set('locked', { message: 'Permission denied', denied: true })
+
+    const handed: unknown[] = []
+    const decoration = treeRowDecoration(model, 'locked', (error) => handed.push(error))
+
+    expect(decoration).toMatchObject({
+      text: 'no access',
+      title: "The server's user cannot read /repo/locked",
+      action: { label: 'Fix with AI' },
+    })
+    decoration?.action?.onActivate()
+    expect(handed).toEqual([
+      {
+        code: 'PERMISSION_DENIED',
+        message: "The server's user cannot read /repo/locked",
+        title: 'The file tree has no access to a folder',
+      },
+    ])
+  })
+
+  it('keeps error and loading for other folders', () => {
+    const model = treeModel(
+      tree('repo', [directory('repo/broken'), directory('repo/slow')]),
+      'repo',
+    )
+    model.errorByDirectoryPath.set('broken', { message: 'Could not load' })
+    model.loadingDirectoryPaths.add('slow')
+
+    expect(treeRowDecoration(model, 'broken', noFix)).toMatchObject({
+      text: 'error',
+      title: 'Could not load',
+      action: { label: 'Fix with AI' },
+    })
+    expect(treeRowDecoration(model, 'slow', noFix)).toEqual({ text: 'loading' })
+  })
+
+  it('keys the repaint on what rows show, never on a clone', () => {
+    const model = treeModel(tree('repo', [directory('repo/locked')]), 'repo')
+    const before = treeDecorationKey(model)
+
+    expect(treeDecorationKey(cloneTreeModel(model))).toBe(before)
+    model.errorByDirectoryPath.set('locked', { message: 'Permission denied', denied: true })
+    expect(treeDecorationKey(model)).not.toBe(before)
+  })
+})
+
+function focusChangesDuring(tree: FileTreeModel, action: () => void) {
   const paths: (string | null)[] = []
   const unsubscribe = tree.subscribe(() => {
-    paths.push(tree.getFocusedPath())
+    paths.push(tree.getSnapshot().focusedPath ?? null)
   })
 
   try {
@@ -659,39 +607,9 @@ function focusChangesDuring(tree: TreeViewModel, action: () => void) {
   return paths
 }
 
-function expandedDirectories(tree: TreeViewModel) {
-  return ['src/', 'src/components/', 'vendor/'].filter((path) => {
-    const item = tree.getItem(path)
-    if (!isDirectoryHandle(item)) return false
-
-    return item.isExpanded()
-  })
-}
-
-function getDirectory(tree: TreeViewModel, path: string): FileTreeDirectoryHandle {
-  const item = tree.getItem(path)
-  if (!isDirectoryHandle(item)) {
-    throw new Error(`Expected ${path} to be a directory`)
-  }
-
-  return item
-}
-
-function getFile(tree: TreeViewModel, path: string): FileTreeFileHandle {
-  const item = tree.getItem(path)
-  if (!isFileHandle(item)) {
-    throw new Error(`Expected ${path} to be a file`)
-  }
-
-  return item
-}
-
-function isDirectoryHandle(item: FileTreeItemHandle | null): item is FileTreeDirectoryHandle {
-  return item?.isDirectory() === true
-}
-
-function isFileHandle(item: FileTreeItemHandle | null): item is FileTreeFileHandle {
-  return item?.isDirectory() === false
+function expandedDirectories(tree: FileTreeModel) {
+  const expanded = tree.getSnapshot().expanded
+  return ['src', 'src/components', 'vendor'].filter((path) => expanded.has(path))
 }
 
 function tree(path: string, entries: TreeEntry[]): TreeResult {
@@ -734,57 +652,3 @@ function file(path: string): TreeEntry {
     version: `test:1:${path}`,
   }
 }
-
-describe('treeRowDecoration', () => {
-  function rowAt(path: string) {
-    return { item: { path } } as FileTreeRowDecorationContext
-  }
-  function noFix() {}
-
-  it('says no access for a folder the server may not read, and names it', () => {
-    const model = treeModel(tree('repo', [directory('repo/locked')]), 'repo')
-    model.errorByDirectoryPath.set('locked', { message: 'Permission denied', denied: true })
-
-    const handed: unknown[] = []
-    const decoration = treeRowDecoration(model, rowAt('locked/'), (error) => handed.push(error))
-
-    expect(decoration).toMatchObject({
-      text: 'no access',
-      title: "The server's user cannot read /repo/locked",
-      action: { label: 'Fix with AI' },
-    })
-    if (decoration && 'action' in decoration) decoration.action?.onActivate()
-    expect(handed).toEqual([
-      {
-        code: 'PERMISSION_DENIED',
-        message: "The server's user cannot read /repo/locked",
-        title: 'The file tree has no access to a folder',
-      },
-    ])
-  })
-
-  it('keeps error and loading for other folders', () => {
-    const model = treeModel(
-      tree('repo', [directory('repo/broken'), directory('repo/slow')]),
-      'repo',
-    )
-    model.errorByDirectoryPath.set('broken', { message: 'Could not load' })
-    model.loadingDirectoryPaths.add('slow')
-
-    expect(treeRowDecoration(model, rowAt('broken/'), noFix)).toMatchObject({
-      text: 'error',
-      title: 'Could not load',
-      action: { label: 'Fix with AI' },
-    })
-    expect(treeRowDecoration(model, rowAt('slow/'), noFix)).toEqual({ text: 'loading' })
-  })
-
-  it('keys the repaint on what rows show, never on a clone', () => {
-    const model = treeModel(tree('repo', [directory('repo/locked')]), 'repo')
-    const before = treeDecorationKey(model)
-
-    expect(treeDecorationKey(cloneTreeModel(model))).toBe(before)
-    model.errorByDirectoryPath.set('locked', { message: 'Permission denied', denied: true })
-    expect(treeDecorationKey(model)).not.toBe(before)
-  })
-})

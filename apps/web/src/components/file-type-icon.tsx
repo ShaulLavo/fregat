@@ -1,7 +1,5 @@
-import { fileIconRule, fileIconSymbolHref, type ResolvedFileIcon } from '@/lib/file-icons'
-import { VSCODE_ICON_GLYPHS } from '@/lib/vscode-icon-glyphs'
-import { cn } from '@workspace/ui/lib/utils'
-import { useId } from 'react'
+import { fileIconRule, type ResolvedFileIcon } from '@/lib/file-icons'
+import { FileTypeIcon as WorkbenchFileTypeIcon } from '@shaulavo/workbench-icons/react'
 
 /**
  * A file's glyph in its hue. `sprite` draws it through the document's `FileIconSprite`, one
@@ -16,31 +14,12 @@ export function FileTypeIcon({
   className?: string
   sprite?: boolean
 }) {
-  const id = useId()
-  const rule = fileIconRule(icon)
-  const glyph = VSCODE_ICON_GLYPHS[rule.glyph]
-  if (sprite)
-    return (
-      <svg
-        aria-hidden='true'
-        className={cn(rule.className, className)}
-        data-file-icon={rule.glyph}
-        focusable='false'
-        viewBox={glyph.viewBox}
-      >
-        <use href={fileIconSymbolHref(rule.glyph)} />
-      </svg>
-    )
-
   return (
-    <svg
-      aria-hidden='true'
-      className={cn(rule.className, className)}
-      data-file-icon={rule.glyph}
-      focusable='false'
-      viewBox={glyph.viewBox}
-      // Bundled paths only. Scope gradient IDs so repeated icons cannot reference a hidden copy.
-      dangerouslySetInnerHTML={{ __html: glyph.paths.replaceAll('app-vscode-icon-', `${id}-`) }}
+    <WorkbenchFileTypeIcon
+      className={className}
+      icon={{ name: icon.name, rule: fileIconRule(icon) }}
+      preset='rich'
+      sprite={sprite}
     />
   )
 }

@@ -174,7 +174,6 @@ export function selectAffected(graph, files, full = false) {
     web: selected.has('web'),
     server: selected.has('server'),
     tui: selected.has('tui'),
-    tree: selected.has('@workspace/tree'),
     desktop: selected.has('desktop'),
     desktop_native: desktopNative,
     site: sites.length > 0,

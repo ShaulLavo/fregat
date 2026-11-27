@@ -1,10 +1,14 @@
-import type { FileTreeContextMenuItem } from '@workspace/tree'
-
 import type { TreeFsActions } from '@/features/workspace/hooks/use-fs-actions'
-import { useRowMenu } from '@/features/workspace/hooks/use-row-menu'
-import type { TreeRowMenuHandle } from '@/features/workspace/utils/tree-row-menu-open'
+import { useRowMenu, type TreeContextMenuItem } from '@/features/workspace/hooks/use-row-menu'
 import { MenuSurface } from '@/keymap/menus/components/surface'
+import type { MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
 import type { TreeModel } from '@/lib/tree-model'
+
+export type TreeRowMenuHandle = {
+  readonly anchor: MenuAnchor
+  readonly onOpenChange: (open: boolean) => void
+  readonly returnFocusTo: () => HTMLElement | null
+}
 
 /**
  * Mounted by the tree only while its menu is open, so the git mutation hooks
@@ -18,7 +22,7 @@ export function TreeRowMenu({
   rootPath,
 }: {
   readonly actions: TreeFsActions
-  readonly item: FileTreeContextMenuItem
+  readonly item: TreeContextMenuItem
   readonly menu: TreeRowMenuHandle
   readonly model: TreeModel
   readonly rootPath: string

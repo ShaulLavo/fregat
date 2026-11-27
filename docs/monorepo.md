@@ -22,7 +22,6 @@ All are private workspace packages (`@workspace/*`). None is published.
 | `packages/contracts`     | Shared types, runtime schemas and the settings registry (`src/settings/keys.ts`).               |
 | `packages/client-core`   | Client logic that the web app and the terminal client share: transport, environments, commands. |
 | `packages/ui`            | React components, styles and shared UI patterns.                                                |
-| `packages/tree`          | The file tree. A product-owned fork of Pierre's tree and path-store packages.                   |
 | `packages/markdown`      | Streaming Markdown rendering: sessions, block splitting and healing of partial text.            |
 | `packages/observability` | Structured logging configuration built on evlog.                                                |
 | `packages/pty`           | Runs a program in a pseudo-terminal from Bun.                                                   |
@@ -33,11 +32,12 @@ All are private workspace packages (`@workspace/*`). None is published.
 
 Singapore, ghostty-webgpu, and hotkeys live in their own repositories. Fregat consumes their pinned release archives. Make changes in those repositories. For coordinated local development, use [local package checkouts](local-package-checkouts.md).
 
-| Repository                                                              | What it is                                       |
-| ----------------------------------------------------------------------- | ------------------------------------------------ |
-| [ShaulLavo/singapore](https://github.com/ShaulLavo/singapore)           | Singapore, a code editor for the browser.        |
-| [ShaulLavo/ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu) | Ghostty's terminal, in the browser.              |
-| [ShaulLavo/hotkeys](https://github.com/ShaulLavo/hotkeys)               | Keyboard shortcuts for editors and complex apps. |
+| Repository                                                              | What it is                                                      |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [ShaulLavo/singapore](https://github.com/ShaulLavo/singapore)           | Singapore, a code editor for the browser.                       |
+| [ShaulLavo/ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu) | Ghostty's terminal, in the browser.                             |
+| [ShaulLavo/hotkeys](https://github.com/ShaulLavo/hotkeys)               | Keyboard shortcuts for editors and complex apps.                |
+| [ShaulLavo/workbench](https://github.com/ShaulLavo/workbench)           | Shared MIT React 19 workbench primitives, icons, and file tree. |
 
 Each repository has its own `AGENTS.md` and docs.
 

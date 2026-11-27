@@ -116,7 +116,7 @@ export function FileTree({
     else if (event.name === 'return' || event.name === 'right') void open()
     else if (event.name === 'left') {
       const item = controller.getFocusedItem()
-      if (item && 'isExpanded' in item && item.isExpanded()) item.collapse()
+      if (item?.isDirectory() && item.isExpanded?.()) item.collapse?.()
       else controller.focusParentItem()
     } else return
     event.preventDefault()

@@ -1,14 +1,12 @@
-import { activeEditorTab as selectedGroupTab } from '@/lib/documents/utils/groups'
-import { getClient } from '@/lib/client'
-import { testDocumentKey, testTabContent } from '../../../../test/factories/document-targets'
-import { filesystemPath } from '@/lib/documents/utils/identity'
-import { act, renderHook, waitFor } from '@testing-library/react'
-import { matchMutation } from '@tanstack/react-query'
-import { TreeViewModel } from '@/features/workspace/state/tree-model'
 import { open } from 'node:fs/promises'
 import path from 'node:path'
-import type { ReactNode } from 'react'
+
+import { FileTreeModel } from '@shaulavo/workbench-tree'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
+import { matchMutation } from '@tanstack/react-query'
+import { act, renderHook, waitFor } from '@testing-library/react'
+import { fileOperationWriteId } from '@workspace/contracts'
+import type { ReactNode } from 'react'
 
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
@@ -20,28 +18,31 @@ import {
   type FileOperationRuntime,
 } from '@/features/workspace/state/file-operations'
 import {
+  projectedTreeModel,
+  resetTreeIntents,
+  treeIntents,
+} from '@/features/workspace/state/tree-intents'
+import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
+import { getClient } from '@/lib/client'
+import { activeEditorTab as selectedGroupTab } from '@/lib/documents/utils/groups'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import {
   createFileContent,
   ensureFolderPath,
   fetchFile,
   fetchTree,
   statPath,
 } from '@/lib/file-server'
-import type { TreeEntry } from '@/lib/file-system-types'
-import { treeModel } from '@/lib/tree-model'
-import { fileOperationWriteId } from '@workspace/contracts'
-import {
-  projectedTreeModel,
-  resetTreeIntents,
-  treeIntents,
-} from '@/features/workspace/state/tree-intents'
-
-import { expect, test } from '../../../../test/fixtures'
-import { AppProviders, createTestQueryClient } from '../../../../test/providers'
 import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
+import type { TreeEntry } from '@/lib/file-system-types'
 import { fileSystemKeys } from '@/lib/query-keys'
-import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
+import { treeModel } from '@/lib/tree-model'
+
+import { testDocumentKey, testTabContent } from '../../../../test/factories/document-targets'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
+import { expect, test } from '../../../../test/fixtures'
+import { AppProviders, createTestQueryClient } from '../../../../test/providers'
 
 for (const { isFolder, dirty } of [
   { isFolder: false, dirty: false },
@@ -76,11 +77,10 @@ for (const { isFolder, dirty } of [
     const text = view.buffer.materializeFullText()
 
     await runJournaled(harness, 1, () =>
-      harness.result.current.completeRename({
-        sourcePath: isFolder ? 'src' : 'src/a.ts',
-        destinationPath: isFolder ? 'renamed' : 'src/b.ts',
-        isFolder,
-      }),
+      harness.result.current.commitRename(
+        isFolder ? 'src' : 'src/a.ts',
+        isFolder ? 'renamed' : 'src/b.ts',
+      ),
     )
 
     expect(workspaceStore.getState().selectedTabContent).toEqual(testTabContent(to))
@@ -141,18 +141,10 @@ test('journals create, rename, duplicate and delete as one undoable operation ea
 
   await runJournaled(harness, 1, () => {
     harness.result.current.actions.createEntry('', false)
-    harness.result.current.completeRename({
-      destinationPath: 'created.ts',
-      isFolder: false,
-      sourcePath: 'untitled',
-    })
+    harness.result.current.commitCreate('', 'file', 'created.ts')
   })
   await runJournaled(harness, 2, () => {
-    harness.result.current.completeRename({
-      destinationPath: 'renamed.ts',
-      isFolder: false,
-      sourcePath: 'rename.ts',
-    })
+    harness.result.current.commitRename('rename.ts', 'renamed.ts')
   })
   await runJournaled(harness, 3, () =>
     harness.result.current.actions.duplicateEntry('copy.ts', false),
@@ -256,11 +248,7 @@ test('withdraws the projected rename when the journal refuses an occupied destin
   const rootPath = filesystemPath('repo')
 
   act(() => {
-    harness.result.current.completeRename({
-      destinationPath: 'new.ts',
-      isFolder: false,
-      sourcePath: 'old.ts',
-    })
+    harness.result.current.commitRename('old.ts', 'new.ts')
   })
 
   await waitFor(() => expect(harness.queryClient.isMutating()).toBe(0))
@@ -310,13 +298,7 @@ test('an undo survives a history refresh cancelling its read', async ({ client }
   await ensureFolderPath(filesystemPath('repo'), getClient())
   await createFileContent(filesystemPath('repo/old.ts'), 'old\n', getClient())
   const harness = await renderFsActions('repo')
-  await runJournaled(harness, 1, () =>
-    harness.result.current.completeRename({
-      destinationPath: 'new.ts',
-      isFolder: false,
-      sourcePath: 'old.ts',
-    }),
-  )
+  await runJournaled(harness, 1, () => harness.result.current.commitRename('old.ts', 'new.ts'))
   const historyKey = fileSystemKeys.fileOperationHistory('repo')
   // As after a reload: nothing cached, so a cancelled read has no older answer to fall back on.
   harness.queryClient.removeQueries({ queryKey: historyKey })
@@ -345,13 +327,7 @@ test('a window claims the events of its own transitions and no others', async ({
   await ensureFolderPath(filesystemPath('repo'), getClient())
   await createFileContent(filesystemPath('repo/old.ts'), 'old\n', getClient())
   const harness = await renderFsActions('repo')
-  await runJournaled(harness, 1, () =>
-    harness.result.current.completeRename({
-      destinationPath: 'new.ts',
-      isFolder: false,
-      sourcePath: 'old.ts',
-    }),
-  )
+  await runJournaled(harness, 1, () => harness.result.current.commitRename('old.ts', 'new.ts'))
   const [moved] = (await harness.history()).undo
   await act(async () => {
     expect(await reverseLatestFileOperation(harness.fileOperations(), 'undo')).toBe(true)
@@ -417,7 +393,7 @@ test('saved rows cannot start mutations until the tree is confirmed', async ({ c
   act(() => harness.queryClient.removeQueries({ queryKey: fileSystemKeys.tree('repo') }))
   await waitFor(() => expect(harness.result.current.actions.mutationsEnabled).toBe(false))
   act(() => harness.result.current.actions.createEntry('', false))
-  expect(harness.tree.getItem('untitled')).toBeNull()
+  expect(harness.tree.getSnapshot().draft).toBeUndefined()
   act(() => harness.queryClient.setQueryData(fileSystemKeys.tree('repo'), harness.model))
   await waitFor(() => expect(harness.result.current.actions.mutationsEnabled).toBe(true))
   harness.cleanUp()
@@ -432,11 +408,11 @@ test('confirmation arrival enables saved rows without fetching or a parent reren
   expect(harness.queryClient.getQueryData(fileSystemKeys.tree('repo'))).toBeUndefined()
   expect(harness.queryClient.isFetching({ queryKey: fileSystemKeys.tree('repo') })).toBe(0)
   act(() => harness.result.current.actions.createEntry('', false))
-  expect(harness.tree.getItem('untitled')).toBeNull()
+  expect(harness.tree.getSnapshot().draft).toBeUndefined()
   act(() => harness.queryClient.setQueryData(fileSystemKeys.tree('repo'), harness.model))
   await waitFor(() => expect(harness.result.current.actions.mutationsEnabled).toBe(true))
   act(() => harness.result.current.actions.createEntry('', false))
-  expect(harness.tree.getItem('untitled')).not.toBeNull()
+  expect(harness.tree.getSnapshot().draft).toEqual({ kind: 'file', mode: 'create', parent: '' })
   harness.cleanUp()
 })
 
@@ -447,7 +423,7 @@ async function renderFsActions(rootPath: string, confirmed = true) {
     await fetchTree(filesystemPath(rootPath), signal(), getClient()),
     rootPath,
   )
-  const tree = new TreeViewModel({ paths: model.paths, renaming: true })
+  const tree = new FileTreeModel({ compactFolders: true, paths: model.paths })
   const queryClient = createTestQueryClient()
   if (confirmed) queryClient.setQueryData(fileSystemKeys.tree(rootPath), model)
 

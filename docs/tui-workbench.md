@@ -18,7 +18,7 @@ logs, workspace-edit, LSP, and terminal routes. [Agent sessions](tui-agent.md) b
 
 Shared code lives in `packages/client-core`: whole-file diff conversion, workspace search,
 typed SSE parsing, and workspace-edit commit handling. Web callers use the same implementations.
-The TUI imports the tree model through `@workspace/tree/model` without importing DOM components.
+The TUI imports the tree model through `@shaulavo/workbench-tree` without importing DOM components.
 All service sockets are host-injected, including the in-process test sockets.
 
 Focus registration survives temporary availability changes. Native widgets that appear after

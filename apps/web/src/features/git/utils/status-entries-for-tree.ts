@@ -1,13 +1,18 @@
+import type { GitStatusCode } from '@shaulavo/workbench-core'
 import type { GitFileStatus, GitTreeStatus } from '@workspace/contracts'
-import type { GitStatusEntry } from '@workspace/tree'
 
 import { toTreePath } from '@/lib/path-formatters'
+
+export type TreeGitStatusEntry = {
+  readonly path: string
+  readonly status: Exclude<GitStatusCode, 'conflict'>
+}
 
 export function statusEntriesForTree(
   files: readonly GitFileStatus[],
   rootPath: string,
-): GitStatusEntry[] {
-  const entries: GitStatusEntry[] = []
+): TreeGitStatusEntry[] {
+  const entries: TreeGitStatusEntry[] = []
 
   for (const file of files) {
     const treePath = treePathForStatus(file.path, rootPath)
@@ -27,7 +32,7 @@ function treePathForStatus(path: string, rootPath: string) {
   return toTreePath(path, rootPath)
 }
 
-function fileTreeStatus(status: GitTreeStatus | 'conflicted'): GitStatusEntry['status'] | null {
+function fileTreeStatus(status: GitTreeStatus | 'conflicted'): TreeGitStatusEntry['status'] | null {
   if (status === 'conflicted') return 'modified'
 
   return status

@@ -1,3 +1,4 @@
+@import '@shaulavo/workbench-tokens/tokens.css';
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import './shadcn-tailwind.css';
@@ -6,8 +7,10 @@
 /* The bundled Graphite palette, generated from data; the app's <style> for the
    selected palette outranks it because that one is unlayered. */
 @import './palette.generated.css';
-/* File icon hues per mode, generated with the icon rules. */
-@import './file-icons.generated.css';
+@import '@shaulavo/workbench-tokens/tailwind-bridge.css';
+@import '@shaulavo/workbench-tokens/themes/fregat.css';
+@import '@shaulavo/workbench-icons/icons.css';
+@import '@shaulavo/workbench-tree/tree.css';
 
 @custom-variant dark (&:is(.dark *));
 /* Inside the phone shell (data-shell on the root, set before the first paint). */

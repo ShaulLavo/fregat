@@ -162,8 +162,8 @@ export default defineConfig(({ command, isPreview }) => {
         })),
         sourceAliases(packages),
       ),
-      // Linked checkouts share the app's React, hotkey manager and evlog globals.
-      dedupe: ['react', 'react-dom', 'evlog', '@shaulavo/hotkeys'],
+      // Linked checkouts share the app's React, hotkey manager, Base UI and evlog globals.
+      dedupe: ['react', 'react-dom', 'evlog', '@shaulavo/hotkeys', '@base-ui/react'],
     },
     server: {
       fs: {

@@ -1,32 +1,34 @@
+import type { FileTreeModel } from '@shaulavo/workbench-tree'
 import { useEffect, useEffectEvent, useLayoutEffect, useRef } from 'react'
 
-import { fileTreeFileOpenIntent } from '@/features/workspace/utils/file-tree-prefetch'
 import { useFileTreeActions } from '@/features/workspace/hooks/use-file-tree-actions'
+import type { TreeRowElement, TreeRowElements } from '@/features/workspace/state/tree-row-elements'
+import { fileTreeFileOpenIntent } from '@/features/workspace/utils/file-tree-prefetch'
 import {
   createIntentPrefetchRegistry,
   type IntentPrefetchRegistry,
   type IntentPrefetchTarget,
 } from '@/features/workspace/utils/intent-prefetch-registry'
 import { createIdleScheduler } from '@/features/workspace/utils/intent-prefetch-scheduler'
-import { FILE_SNAPSHOT_STALE_MS } from '@/lib/file-snapshot-query-cache'
 import { useFileIntent } from '@/lib/file-open-intent/hooks/use-file-intent'
 import type { FileOpenIntentTrigger } from '@/lib/file-open-intent/state/service'
+import { FILE_SNAPSHOT_STALE_MS } from '@/lib/file-snapshot-query-cache'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { INTENT_PREFETCH_HIT_SLOP_PX } from '@/lib/intent-prefetch-options'
 import { canonicalTreePath } from '@/lib/path-formatters'
 import { entryForTreePath, type TreeModel } from '@/lib/tree-model'
-import type { TreeViewModel } from '@/features/workspace/state/tree-model'
-import type { TreeRowElement } from '@/features/workspace/state/tree-row-elements'
 
 type FileTreeIntentPrefetchOptions = {
   model: TreeModel
   rootPath: string
-  tree: TreeViewModel
+  rowElements: TreeRowElements
+  tree: FileTreeModel
 }
 
 export function useFileTreeIntentPrefetch({
   model,
   rootPath,
+  rowElements,
   tree,
 }: FileTreeIntentPrefetchOptions) {
   const prepareFile = useFileIntent('file-tree')
@@ -58,10 +60,10 @@ export function useFileTreeIntentPrefetch({
 
   // Tree focus owns an interest independently of each rendered row.
   useEffect(() => {
-    let focused = tree.getFocusedPath()
+    let focused = tree.getSnapshot().focusedPath
     let release = focused ? prefetchTreePath(canonicalTreePath(focused), 'focus') : undefined
     const unsubscribe = tree.subscribe(() => {
-      const next = tree.getFocusedPath()
+      const next = tree.getSnapshot().focusedPath
       if (next === focused) return
       const previous = release
       focused = next
@@ -75,7 +77,7 @@ export function useFileTreeIntentPrefetch({
   }, [tree, model, rootPath, prepareFile])
 
   const syncRegistrations = useEffectEvent((registry: IntentPrefetchRegistry<string>) => {
-    registry.sync(tree.getRowElements().map(fileTreeRowTarget), prefetchTreePath)
+    registry.sync(rowElements.rows().map(fileTreeRowTarget), prefetchTreePath)
   })
 
   useEffect(() => {
@@ -86,7 +88,7 @@ export function useFileTreeIntentPrefetch({
       reactivateAfter: FILE_SNAPSHOT_STALE_MS,
     })
     const schedule = createIdleScheduler(() => syncRegistrations(registry))
-    const unsubscribe = tree.subscribeRowElements(schedule.request)
+    const unsubscribe = rowElements.subscribe(schedule.request)
 
     schedule.request()
 
@@ -95,7 +97,7 @@ export function useFileTreeIntentPrefetch({
       schedule.cancel()
       registry.clear()
     }
-  }, [rootPath, tree, model, prepareFile])
+  }, [rootPath, rowElements, model, prepareFile])
 }
 
 function fileTreeRowTarget({ element, path }: TreeRowElement): IntentPrefetchTarget<string> {

@@ -1,5 +1,4 @@
-import { prepareFileTreeInput } from '@workspace/tree'
-import { TreeViewModel } from '@/features/workspace/state/tree-model'
+import { FileTreeModel, prepareFileTreeInput } from '@shaulavo/workbench-tree'
 
 const PATH_COUNTS = [10_000, 50_000] as const
 const WARMUP_ROUNDS = 3
@@ -64,9 +63,9 @@ function measureRound(paths: readonly string[]): TimingSample {
   const rawRemount = measureConstruction({ paths })
 
   const preparedColdStartedAt = performance.now()
-  const preparedInput = prepareFileTreeInput(paths, { flattenEmptyDirectories: true })
-  new TreeViewModel({
-    flattenEmptyDirectories: true,
+  const preparedInput = prepareFileTreeInput(paths)
+  new FileTreeModel({
+    compactFolders: true,
     preparedInput,
   })
   const preparedColdMs = performance.now() - preparedColdStartedAt
@@ -81,9 +80,9 @@ function measureRound(paths: readonly string[]): TimingSample {
   }
 }
 
-function measureConstruction(options: ConstructorParameters<typeof TreeViewModel>[0]): number {
+function measureConstruction(options: ConstructorParameters<typeof FileTreeModel>[0]): number {
   const startedAt = performance.now()
-  new TreeViewModel({ flattenEmptyDirectories: true, ...options })
+  new FileTreeModel({ compactFolders: true, ...options })
   return performance.now() - startedAt
 }
 
