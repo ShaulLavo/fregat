@@ -1,3 +1,4 @@
+import type { ActivationFocusDecision } from '@shaulavo/workbench-core'
 import { testTabContent } from '../../../../../test/factories/document-targets'
 import { tabId } from '@/lib/documents/utils/identity'
 import { groupId } from '@/lib/documents/utils/group-types'
@@ -69,7 +70,32 @@ test('selects the clicked tab id', () => {
 
   fireEvent.click(editorTabElement(container, 'tab-b')!)
 
-  expect(selectTab).toHaveBeenCalledWith('tab-b')
+  expect(selectTab).toHaveBeenCalledWith(
+    'tab-b',
+    expect.objectContaining({ shouldFocusEditor: true }),
+  )
+})
+
+test('does not request editor focus and dismisses active text input on touch tab tap', () => {
+  const selectTab = vi.fn()
+
+  const { container } = renderWithProviders(
+    <>
+      <textarea aria-label='Active input' />
+      <TestEditorTabs tabs={editorTabs()} onSelectTab={selectTab} />
+    </>,
+  )
+
+  const input = screen.getByLabelText('Active input')
+  input.focus()
+  expect(document.activeElement).toBe(input)
+
+  const tab = editorTabElement(container, 'tab-b')!
+  fireEvent.pointerDown(tab, { pointerType: 'touch' })
+  fireEvent.click(tab, { detail: 1 })
+
+  expect(selectTab).toHaveBeenCalledWith('tab-b', { shouldFocusEditor: false, origin: 'touch' })
+  expect(document.activeElement).not.toBe(input)
 })
 
 test('requests bulk close ids from the tab context menu', () => {
@@ -104,7 +130,7 @@ function TestEditorTabs({
   readonly tabs: readonly EditorTabModel[]
   readonly onCloseTab?: RequestCloseTab
   readonly onCloseTabs?: RequestCloseTabs
-  readonly onSelectTab?: (tabId: string) => void
+  readonly onSelectTab?: (tabId: string, focus?: ActivationFocusDecision) => void
 }) {
   return (
     <EditorStateProvider>

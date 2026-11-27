@@ -9,7 +9,7 @@ import {
   copyDiagnosticPeekClientRect,
   diagnosticPeekPlacement,
   type DiagnosticPeekPlacement,
-} from '@/features/editor/utils/diagnostic-peek-placement'
+} from '@shaulavo/workbench-editor/lsp'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { DiagnosticPeekFixButton } from '@/features/editor/components/diagnostic-peek-fix-button'
 import { DiagnosticFixContext } from '@/lib/diagnostic-ai/providers/context'

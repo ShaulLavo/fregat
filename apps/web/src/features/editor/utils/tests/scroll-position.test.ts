@@ -1,7 +1,7 @@
 import type { EditorViewSnapshot } from '@singapore-editor/core/extensions'
 import { describe, expect, it } from 'vitest'
 
-import { capOverscrollTop } from '@/features/editor/utils/scroll-position'
+import { capOverscrollTop } from '@shaulavo/workbench-editor'
 
 // Only the geometry the cap reads; the rest of the snapshot never enters the math.
 function snapshotWith(geometry: { totalHeight: number; clientHeight: number }): EditorViewSnapshot {

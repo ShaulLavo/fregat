@@ -4,7 +4,7 @@ import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 
 import type { DocumentKey } from '@/lib/documents/utils/types'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
-import { capOverscrollTop } from '@/features/editor/utils/scroll-position'
+import { capOverscrollTop } from '@shaulavo/workbench-editor'
 import { editorPerformanceFeatureDisabled } from '@/features/editor/state/performance-trace'
 
 type UseScrollPersistencePluginOptions = {

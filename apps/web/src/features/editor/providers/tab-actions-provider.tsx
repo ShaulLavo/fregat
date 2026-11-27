@@ -23,9 +23,9 @@ export function EditorTabActionsProvider({
   const value: EditorTabActions = {
     requestCloseTab,
     requestCloseTabs,
-    selectTab: (tabId) => {
+    selectTab: (tabId, focus) => {
       const group = groupForTab(workspace.getState().workbenchPanels.editorGroups, tabId)
-      if (group) void commands.selectTab({ groupId: group.id, tabId })
+      if (group) void commands.selectTab({ groupId: group.id, tabId }, focus)
     },
   }
 

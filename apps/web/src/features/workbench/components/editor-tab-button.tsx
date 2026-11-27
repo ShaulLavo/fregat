@@ -1,3 +1,8 @@
+import {
+  dismissSoftKeyboardOnTouchActivation,
+  ensurePointerModalityTracking,
+  resolveActivationFocus,
+} from '@shaulavo/workbench-core'
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import { documentKey } from '@/lib/documents/utils/identity'
 import { skipToken, useQuery } from '@tanstack/react-query'
@@ -8,7 +13,7 @@ import { assignRef } from '@workspace/ui/lib/assign-ref'
 import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
-import { type CSSProperties, type Ref } from 'react'
+import { useEffect, type CSSProperties, type MouseEvent, type Ref } from 'react'
 
 import { useEditorTabIntentPrefetch } from '@/features/workspace/hooks/use-tab-intent-prefetch'
 import type { EditorTabCloseTarget } from '@/features/workspace/utils/tab-close-targets'
@@ -80,8 +85,16 @@ export function EditorTabButton({
     assignRef(dragNodeRef, node)
   }
 
-  function handleSelectTab() {
-    selectTab(tab.id)
+  useEffect(() => {
+    ensurePointerModalityTracking()
+  }, [])
+
+  function handleSelectTab(event: MouseEvent<HTMLButtonElement>) {
+    const decision = resolveActivationFocus(event.nativeEvent, 'auto')
+    if (!decision.shouldFocusEditor) {
+      dismissSoftKeyboardOnTouchActivation(decision, event.currentTarget)
+    }
+    selectTab(tab.id, decision)
   }
 
   function closeTab() {
