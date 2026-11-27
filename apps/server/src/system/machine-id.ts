@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { linkSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { machineIdSchema, type MachineId } from '@workspace/contracts'
+import { errorStringField, machineIdSchema, type MachineId } from '@workspace/contracts'
 import * as v from 'valibot'
 import { platformHomePath } from '../home'
 import { isWasiRuntime } from './runtime'
@@ -25,7 +25,7 @@ type MachineIdProvider = {
   arch?: string
   fallbackFile?: () => string
   readFile: (file: string) => string
-  writeFileExclusive?: (file: string, value: string) => void
+  persistFallback?: (file: string, value: string) => string
   run: (command: string[]) => { stdout: Uint8Array; exitCode: number | null }
 }
 
@@ -34,10 +34,7 @@ const machineIdProvider: MachineIdProvider = {
   arch: process.arch,
   fallbackFile: () => platformHomePath('machine-id'),
   readFile: (file) => readFileSync(file, 'utf8'),
-  writeFileExclusive: (file, value) => {
-    mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 })
-    writeFileSync(file, value, { flag: 'wx', mode: 0o600 })
-  },
+  persistFallback: persistMachineIdAtomically,
   run: (command) => Bun.spawnSync(command),
 }
 
@@ -57,16 +54,35 @@ function persistedWasiMachineId(provider: MachineIdProvider) {
   if (existing) return existing
 
   const generated = randomBytes(16).toString('hex')
-  const writeExclusive = provider.writeFileExclusive ?? machineIdProvider.writeFileExclusive!
+  const persist = provider.persistFallback ?? persistMachineIdAtomically
   try {
-    writeExclusive(file, `${generated}\n`)
-    return generated
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'EEXIST') {
-      const concurrent = readOptionalFile(provider, file)
-      if (concurrent) return concurrent
+    const stored = persist(file, generated).trim()
+    if (stored) return stored
+  } catch {
+    const concurrent = readOptionalFile(provider, file)
+    if (concurrent) return concurrent
+  }
+  throw machineIdError('wasm32')
+}
+
+function persistMachineIdAtomically(file: string, generated: string) {
+  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 })
+  const staging = `${file}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
+  writeFileSync(staging, `${generated}\n`, { flag: 'wx', mode: 0o600 })
+  try {
+    try {
+      linkSync(staging, file)
+      return generated
+    } catch (error) {
+      if (errorStringField(error, 'code') !== 'EEXIST') throw error
     }
+    const existing = readFileSync(file, 'utf8').trim()
+    if (existing) return existing
+    // An interrupted prior write left an empty stub; atomically replace it with a complete file.
+    renameSync(staging, file)
     return generated
+  } finally {
+    rmSync(staging, { force: true })
   }
 }
 

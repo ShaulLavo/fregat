@@ -1,17 +1,20 @@
+import path from 'node:path'
 import { spawnPipePty, type Pty } from '@workspace/pty'
 import type { TerminalPtyFactory, TerminalPtyOptions } from './service'
 
 const encoder = new TextEncoder()
+const INTERACTIVE_SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ash'])
 
 /**
  * Interactive shell fallback over stdio pipes when native PTYs are unavailable.
- * Translates terminal CR input to LF for line-oriented shells and LF output to CRLF.
+ * Launches bare shells with `-i`, translates CR input to LF, forwards Ctrl+C as SIGINT
+ * to the child process group, and normalizes LF output to CRLF.
  */
 export function pipeShellPtyFactory(): TerminalPtyFactory {
   return (options: TerminalPtyOptions): Pty => {
     let previousByte = 0
     const pty = spawnPipePty({
-      command: options.command,
+      command: interactiveShellCommand(options.command),
       cwd: options.cwd,
       env: options.env,
       cols: options.cols,
@@ -30,7 +33,7 @@ export function pipeShellPtyFactory(): TerminalPtyFactory {
         return pty.exited
       },
       write(data: string | Uint8Array) {
-        pty.write(normalizeInputLineEndings(data))
+        deliverInteractiveInput(pty, data)
       },
       resize(cols: number, rows: number) {
         pty.resize(cols, rows)
@@ -42,6 +45,43 @@ export function pipeShellPtyFactory(): TerminalPtyFactory {
         return pty[Symbol.asyncDispose]()
       },
     }
+  }
+}
+
+export function interactiveShellCommand(
+  command: readonly [string, ...string[]],
+): readonly [string, ...string[]] {
+  if (command.length !== 1) return command
+  const base = path.basename(command[0])
+  if (!INTERACTIVE_SHELLS.has(base)) return command
+  return [command[0], '-i']
+}
+
+function deliverInteractiveInput(pty: Pty, data: string | Uint8Array) {
+  const bytes = typeof data === 'string' ? encoder.encode(data) : data
+  const normalized = normalizeInputLineEndings(bytes)
+  let start = 0
+  for (let index = 0; index < normalized.byteLength; index += 1) {
+    if (normalized[index] !== 0x03) continue
+    if (index > start) pty.write(normalized.subarray(start, index))
+    interruptProcessGroup(pty.pid)
+    start = index + 1
+  }
+  if (start < normalized.byteLength) pty.write(normalized.subarray(start))
+}
+
+function interruptProcessGroup(pid: number) {
+  if (pid <= 0) return
+  try {
+    process.kill(-pid, 'SIGINT')
+    return
+  } catch {
+    // Fall back to signaling the shell process directly when process groups are unavailable.
+  }
+  try {
+    process.kill(pid, 'SIGINT')
+  } catch {
+    // Ignore if the child already exited.
   }
 }
 

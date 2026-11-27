@@ -1,10 +1,13 @@
-import { dlopen, FFIType, ptr, read, type Pointer } from 'bun:ffi'
+import type { Pointer } from 'bun:ffi'
 import { chmodSync, mkdtempSync, rmSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import net from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { isLoopbackAddress } from './locality'
 import { systemErrors } from './structured-errors'
+
+const loadFfi = () => createRequire(import.meta.url)('bun:ffi') as typeof import('bun:ffi')
 
 /** systemd hands activated sockets from fd 3 (`SD_LISTEN_FDS_START`). */
 const SYSTEMD_FIRST_FD = 3
@@ -38,6 +41,7 @@ function launchdSocket(name: string) {
     throw systemErrors.ACTIVATION_INVALID({
       internal: { manager: 'launchd', platform: process.platform },
     })
+  const { dlopen, FFIType, ptr, read } = loadFfi()
   const { symbols } = dlopen('/usr/lib/libSystem.B.dylib', {
     launch_activate_socket: {
       args: [FFIType.cstring, FFIType.ptr, FFIType.ptr],

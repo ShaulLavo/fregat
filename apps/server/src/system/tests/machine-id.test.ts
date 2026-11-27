@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { machineIdFrom, readOsMachineId } from '../machine-id'
 
@@ -52,28 +55,49 @@ describe('OS machine id lookup', () => {
       expect(commands).toEqual([])
     },
   )
-  it('persists and reuses a fallback machine id on wasm32 when OS files are absent', () => {
-    const store = new Map<string, string>()
-    const provider = {
-      platform: 'linux' as const,
-      arch: 'wasm32',
-      fallbackFile: () => '/virtual/state/machine-id',
-      readFile: (file: string) => {
-        const value = store.get(file)
-        if (value === undefined) throw Object.assign(new Error('missing'), { code: 'ENOENT' })
-        return value
-      },
-      writeFileExclusive: (file: string, value: string) => {
-        if (store.has(file)) throw Object.assign(new Error('exists'), { code: 'EEXIST' })
-        store.set(file, value)
-      },
-      run: () => ({ stdout: new Uint8Array(), exitCode: 1 }),
+  it('persists, reuses, and heals an empty fallback machine id file on wasm32', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'platform-machine-id-'))
+    const fallback = path.join(directory, 'machine-id')
+    try {
+      const provider = {
+        platform: 'linux' as const,
+        arch: 'wasm32',
+        fallbackFile: () => fallback,
+        readFile: (file: string) => {
+          if (file !== fallback) throw Object.assign(new Error('missing'), { code: 'ENOENT' })
+          return readFileSync(file, 'utf8')
+        },
+        run: () => ({ stdout: new Uint8Array(), exitCode: 1 }),
+      }
+
+      // An interrupted write leaving an empty file is atomically replaced and persisted.
+      writeFileSync(fallback, '')
+      const first = readOsMachineId(provider)
+      const second = readOsMachineId(provider)
+      expect(first).toMatch(/^[0-9a-f]{32}$/)
+      expect(second).toBe(first)
+      expect(readFileSync(fallback, 'utf8').trim()).toBe(first)
+      expect(machineIdFrom(first)).toMatch(/^[0-9a-f]{32}$/)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
     }
-    const first = readOsMachineId(provider)
-    const second = readOsMachineId(provider)
-    expect(first).toMatch(/^[0-9a-f]{32}$/)
-    expect(second).toBe(first)
-    expect(machineIdFrom(first)).toMatch(/^[0-9a-f]{32}$/)
+  })
+
+  it('fails on wasm32 when the fallback machine id cannot be persisted', () => {
+    expect(() =>
+      readOsMachineId({
+        platform: 'linux',
+        arch: 'wasm32',
+        fallbackFile: () => '/virtual/state/machine-id',
+        readFile: () => {
+          throw Object.assign(new Error('missing'), { code: 'ENOENT' })
+        },
+        persistFallback: () => {
+          throw Object.assign(new Error('read-only'), { code: 'EROFS' })
+        },
+        run: () => ({ stdout: new Uint8Array(), exitCode: 1 }),
+      }),
+    ).toThrow(expect.objectContaining({ code: 'system.MACHINE_ID_UNAVAILABLE' }))
   })
 
   it('still fails on native linux when OS machine-id files are absent', () => {

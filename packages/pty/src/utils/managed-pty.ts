@@ -88,10 +88,14 @@ export abstract class ManagedPty implements Pty {
   #signal(signal: NodeJS.Signals) {
     if (this.#result || !this.#child) return
     try {
-      this.#child.kill(signal)
+      this.deliverSignal(this.#child, signal)
     } catch (cause) {
       this.#failure ??= operationError('signal', cause)
     }
+  }
+
+  protected deliverSignal(child: ManagedSubprocess, signal: NodeJS.Signals) {
+    child.kill(signal)
   }
 
   #forceClose() {

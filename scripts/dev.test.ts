@@ -1,8 +1,13 @@
 import path from 'node:path'
 import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { expect, test } from 'vitest'
-import { directDevProcesses, resolveViteEntry, shouldUseDirectDev } from './dev'
+import { expect, test, vi } from 'vitest'
+import {
+  directDevProcesses,
+  resolveViteEntry,
+  shouldUseDirectDev,
+  superviseDirectProcesses,
+} from './dev'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -56,4 +61,56 @@ test('direct dev launches server and vite without turbo or desktop', () => {
       cmd: ['/usr/bin/bun', viteEntry],
     },
   ])
+})
+
+test('superviseDirectProcesses escalates stubborn SIGTERM-trapping children on parent signal', async () => {
+  const trapScript = 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'
+  const supervisor = superviseDirectProcesses(
+    [
+      { taskId: 'server#dev', cwd: root, cmd: [process.execPath, '-e', trapScript] },
+      { taskId: 'web#dev', cwd: root, cmd: [process.execPath, '-e', trapScript] },
+    ],
+    process.env,
+    150,
+  )
+  await Bun.sleep(100)
+  process.emit('SIGTERM', 'SIGTERM')
+  await expect(supervisor).resolves.toBe(0)
+})
+
+test('superviseDirectProcesses stops already-started children if a later spawn fails', async () => {
+  const realSpawn = Bun.spawn.bind(Bun)
+  const spawned: ReturnType<typeof Bun.spawn>[] = []
+  const spy = vi.spyOn(Bun, 'spawn').mockImplementation((...args: Parameters<typeof Bun.spawn>) => {
+    const child = realSpawn(...args)
+    spawned.push(child)
+    return child
+  })
+  try {
+    await expect(
+      superviseDirectProcesses(
+        [
+          {
+            taskId: 'server#dev',
+            cwd: root,
+            cmd: [process.execPath, '-e', 'setInterval(() => {}, 1000)'],
+          },
+          {
+            taskId: 'web#dev',
+            cwd: root,
+            cmd: ['/definitely/missing/direct-dev-binary'],
+          },
+        ],
+        process.env,
+        150,
+      ),
+    ).rejects.toThrow()
+    expect(spawned).toHaveLength(1)
+    const [first] = spawned
+    if (!first) throw new TypeError('Expected first child process')
+    expect(first.exitCode ?? first.signalCode).not.toBeNull()
+    expect(() => process.kill(first.pid, 0)).toThrow()
+  } finally {
+    spy.mockRestore()
+  }
 })

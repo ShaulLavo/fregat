@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -25,7 +25,29 @@ async function scratch() {
 }
 
 describe('WASI and host-independent server degradations', () => {
-  it('renameExclusive fallback publishes to an unused path and refuses overwrite', async () => {
+  it('avoids top-level runtime imports of bun:ffi across apps/server/src', async () => {
+    const serverSrc = path.resolve(import.meta.dirname, '../..')
+    const offenders: string[] = []
+    async function walk(directory: string) {
+      for (const entry of await readdir(directory, { withFileTypes: true })) {
+        const full = path.join(directory, entry.name)
+        if (entry.isDirectory()) {
+          if (entry.name === 'tests') continue
+          await walk(full)
+          continue
+        }
+        if (!entry.name.endsWith('.ts')) continue
+        const source = await readFile(full, 'utf8')
+        if (/^\s*import\s+(?!type\b)[^;\n]*['"]bun:ffi['"]/m.test(source)) {
+          offenders.push(path.relative(serverSrc, full))
+        }
+      }
+    }
+    await walk(serverSrc)
+    expect(offenders).toEqual([])
+  })
+
+  it('renameExclusive fallback publishes to an unused path and refuses replacing existing or empty directories', async () => {
     const root = await scratch()
     const source = path.join(root, 'staging')
     const destination = path.join(root, 'published')
@@ -37,6 +59,11 @@ describe('WASI and host-independent server degradations', () => {
     const second = path.join(root, 'staging-2')
     await mkdir(second)
     expect(renameExclusive(second, destination, { useNativeFfi: false })).toBe(false)
+
+    // Pre-existing empty directory must also never be replaced.
+    const emptyDestination = path.join(root, 'empty-existing')
+    await mkdir(emptyDestination)
+    expect(renameExclusive(second, emptyDestination, { useNativeFfi: false })).toBe(false)
   })
 
   it('InstalledFontProvider degrades to empty list when fontconfig is unavailable', async () => {

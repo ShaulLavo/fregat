@@ -75,6 +75,8 @@ export type TerminalServiceOptions = {
   resolveAdoptedLease?: (key: string) => Promise<TerminalExecutionLease | null>
   /** Test-only seam: a real host client already pointed at a throwaway state root. */
   hostClient?: TerminalHostClient
+  /** Test seam: override native PTY detection to exercise the local pipe-shell fallback. */
+  nativePty?: boolean
 }
 
 type TerminalConnection = {
@@ -114,6 +116,7 @@ export class TerminalService {
   private readonly persistentSessions = new Map<string, TerminalSession>()
   private readonly ptyFactory: TerminalPtyFactory
   private readonly host: TerminalHostClient | null
+  private readonly ownsLocalShells: boolean
   private recovery: Promise<void> | null = null
   private recoverySnapshot: Promise<readonly HostSessionInfo[] | null> | null = null
   private disposed = false
@@ -131,6 +134,7 @@ export class TerminalService {
     resolveAdoptedLease,
     ptyFactory,
     hostClient,
+    nativePty,
   }: TerminalServiceOptions) {
     this.database = database
     this.env = env
@@ -142,9 +146,10 @@ export class TerminalService {
     this.lifecycle = lifecycle
     this.resolveAgentSession = resolveAgentSession
     this.resolveAdoptedLease = resolveAdoptedLease
-    const pty = terminalPtyFactory(ptyFactory, hostClient)
+    const pty = terminalPtyFactory(ptyFactory, hostClient, nativePty)
     this.host = pty.host
     this.ptyFactory = pty.factory
+    this.ownsLocalShells = pty.ownsLocalShells
   }
 
   probeHost() {
@@ -486,11 +491,20 @@ export class TerminalService {
     }
   }
 
-  /** Detaches every session so its shell keeps running in the host; a user close still kills it. */
+  /**
+   * Detaches host-retained sessions so their shells outlive a server restart.
+   * Directly owned local pipe shells have no retaining host and are terminated cleanly.
+   */
   async dispose() {
     this.disposed = true
     await Promise.allSettled([this.recovery].concat(Array.from(this.starts.values())))
-    for (const session of this.persistentSessions.values()) session.detachFromHost()
+    const sessions = Array.from(this.persistentSessions.values())
+    if (this.ownsLocalShells) {
+      await Promise.allSettled(sessions.map((session) => session.dispose({ kill: true })))
+      this.persistentSessions.clear()
+      return
+    }
+    for (const session of sessions) session.detachFromHost()
     this.persistentSessions.clear()
     this.host?.close()
   }
@@ -1347,13 +1361,15 @@ function terminalPtyFactory(
   hostClient: TerminalHostClient | undefined,
   nativePty = hasNativePty(),
 ) {
-  if (injected) return { host: null, factory: injected }
-  if (hostClient) return { host: hostClient, factory: hostPtyFactory(hostClient) }
+  if (injected) return { host: null, factory: injected, ownsLocalShells: false }
+  if (hostClient)
+    return { host: hostClient, factory: hostPtyFactory(hostClient), ownsLocalShells: false }
+  if (!nativePty) return { host: null, factory: pipeShellPtyFactory(), ownsLocalShells: true }
   // No host at all here: listing or spawning would launch one on the developer's real state home.
-  if (isTestProcess() && !process.env.PLATFORM_HOME) return { host: null, factory: refuseTestHost }
-  if (!nativePty) return { host: null, factory: pipeShellPtyFactory() }
+  if (isTestProcess() && !process.env.PLATFORM_HOME)
+    return { host: null, factory: refuseTestHost, ownsLocalShells: false }
   const host = new TerminalHostClient({ stateRoot: platformHomePath() })
-  return { host, factory: hostPtyFactory(host) }
+  return { host, factory: hostPtyFactory(host), ownsLocalShells: false }
 }
 
 const refuseTestHost: TerminalPtyFactory = () => {

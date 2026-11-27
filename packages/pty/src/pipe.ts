@@ -23,6 +23,7 @@ class PipePty extends ManagedPty {
       child = Bun.spawn(Array.from(options.command), {
         cwd: options.cwd,
         env: { ...env, TERM: env.TERM ?? 'xterm-256color' },
+        detached: process.platform !== 'win32',
         stdin: 'pipe',
         stdout: 'pipe',
         stderr: 'pipe',
@@ -55,6 +56,21 @@ class PipePty extends ManagedPty {
 
   protected override onKillStart() {
     this.closeTransport()
+  }
+
+  protected override deliverSignal(
+    child: { readonly pid: number; kill(signal?: NodeJS.Signals): void },
+    signal: NodeJS.Signals,
+  ) {
+    if (process.platform !== 'win32' && child.pid > 0) {
+      try {
+        process.kill(-child.pid, signal)
+        return
+      } catch {
+        // Fall back to signaling the direct child when process-group signaling is unavailable.
+      }
+    }
+    child.kill(signal)
   }
 
   protected closeTransport() {

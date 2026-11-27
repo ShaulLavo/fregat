@@ -122,38 +122,71 @@ async function runDirectDev(
   // A production terminal carries this; a dev process must never act on production's `pending`.
   delete env.PLATFORM_PRODUCTION_ROOT
 
-  const children = processes.map((entry) =>
-    Bun.spawn({
-      cmd: Array.from(entry.cmd),
-      cwd: entry.cwd,
-      env,
-      stderr: 'inherit',
-      stdout: 'inherit',
-    }),
-  )
+  return superviseDirectProcesses(processes, env)
+}
 
-  let signalReceived = false
-  const stopAll = (signal: NodeJS.Signals) => {
-    for (const child of children) {
-      if (child.exitCode === null && child.signalCode === null) child.kill(signal)
+export async function superviseDirectProcesses(
+  processes: readonly DirectDevProcess[],
+  env: Record<string, string | undefined>,
+  stopGraceMs = STOP_GRACE_MS,
+) {
+  const children: ReturnType<typeof Bun.spawn>[] = []
+  try {
+    for (const entry of processes) {
+      children.push(
+        Bun.spawn({
+          cmd: Array.from(entry.cmd),
+          cwd: entry.cwd,
+          env,
+          stderr: 'inherit',
+          stdout: 'inherit',
+        }),
+      )
     }
+  } catch (error) {
+    stopChildren(children, 'SIGTERM')
+    await Promise.all(children.map((child) => waitOrKill(child, stopGraceMs)))
+    throw error
   }
+
+  const signaled = Promise.withResolvers<NodeJS.Signals>()
   const onSignal = (signal: NodeJS.Signals) => {
-    signalReceived = true
-    stopAll(signal)
+    signaled.resolve(signal)
   }
   process.once('SIGINT', onSignal)
   process.once('SIGTERM', onSignal)
 
-  const firstCode = await Promise.race(children.map((child) => child.exited))
-  if (!signalReceived) stopAll('SIGTERM')
-  await Promise.all(children.map((child) => waitOrKill(child)))
-  return signalReceived ? 0 : firstCode
+  type SupervisorOutcome =
+    | { readonly kind: 'signal'; readonly signal: NodeJS.Signals }
+    | { readonly kind: 'exit'; readonly code: number }
+
+  try {
+    const signalRace: Promise<SupervisorOutcome>[] = [
+      signaled.promise.then((signal) => ({ kind: 'signal' as const, signal })),
+    ]
+    const outcome = await Promise.race(
+      signalRace.concat(
+        children.map((child) => child.exited.then((code) => ({ kind: 'exit' as const, code }))),
+      ),
+    )
+    stopChildren(children, outcome.kind === 'signal' ? outcome.signal : 'SIGTERM')
+    await Promise.all(children.map((child) => waitOrKill(child, stopGraceMs)))
+    return outcome.kind === 'signal' ? 0 : outcome.code
+  } finally {
+    process.off('SIGINT', onSignal)
+    process.off('SIGTERM', onSignal)
+  }
 }
 
-async function waitOrKill(child: ReturnType<typeof Bun.spawn>) {
+function stopChildren(children: readonly ReturnType<typeof Bun.spawn>[], signal: NodeJS.Signals) {
+  for (const child of children) {
+    if (child.exitCode === null && child.signalCode === null) child.kill(signal)
+  }
+}
+
+async function waitOrKill(child: ReturnType<typeof Bun.spawn>, stopGraceMs: number) {
   if (child.exitCode !== null || child.signalCode !== null) return
-  const exited = await Promise.race([child.exited.then(() => true), Bun.sleep(STOP_GRACE_MS)])
+  const exited = await Promise.race([child.exited.then(() => true), Bun.sleep(stopGraceMs)])
   if (exited) return
   child.kill('SIGKILL')
   await child.exited

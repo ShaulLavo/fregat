@@ -93,7 +93,7 @@ describe('state home lock', () => {
     lock.release()
   })
 
-  it('supports the non-FFI lock fallback with same-process exclusion and stale-PID recovery', async () => {
+  it('supports the non-FFI lock fallback with same-process exclusion, fresh-empty safety, and stale-PID recovery', async () => {
     const home = await stateHome()
     const lockFile = path.join(home, 'server.lock')
 
@@ -103,10 +103,29 @@ describe('state home lock', () => {
     expect(tryFileLock(lockFile, { useNativeFfi: false })).toBeNull()
     lock?.release()
 
+    // A freshly created empty file must not be treated as stale and unlinked.
+    await writeFile(lockFile, '', { mode: 0o600 })
+    expect(tryFileLock(lockFile, { useNativeFfi: false })).toBeNull()
+    await rm(lockFile)
+
     // Stale lock left by a dead PID is reclaimed cleanly.
     await writeFile(lockFile, '99999999\n', { mode: 0o600 })
     const reclaimed = tryFileLock(lockFile, { useNativeFfi: false })
     expect(reclaimed).not.toBeNull()
     reclaimed?.release()
+  })
+
+  it('grants the non-FFI lock to at most one concurrent process', async () => {
+    const home = await stateHome()
+    const lockFile = path.join(home, 'server.lock')
+    const modulePath = path.join(import.meta.dirname, '..', 'file-lock.ts')
+    const script = `const { tryFileLock } = await import(${JSON.stringify(modulePath)}); const lock = tryFileLock(${JSON.stringify(lockFile)}, { useNativeFfi: false }); if (!lock) process.exit(2); console.log('won'); await Bun.sleep(400); lock.release();`
+    const racers = Array.from({ length: 4 }, () =>
+      Bun.spawn({ cmd: [process.execPath, '-e', script], stdout: 'pipe', stderr: 'pipe' }),
+    )
+    holders.push(...racers)
+    const codes = await Promise.all(racers.map((child) => child.exited))
+    expect(codes.filter((code) => code === 0)).toHaveLength(1)
+    expect(codes.filter((code) => code === 2)).toHaveLength(3)
   })
 })
