@@ -8,7 +8,10 @@ import type { TabId, WorkspaceRoot } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
 import { useSettingsSearch, selectSettingsSearch } from '@/features/settings/state/search-store'
 import { Button } from '@workspace/ui/components/button'
-import { tabShouldAutoFocus } from '@/lib/focus/state/tab-activation-focus'
+import {
+  recordTabActivationFocus,
+  tabShouldAutoFocus,
+} from '@/lib/focus/state/tab-activation-focus'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react'
@@ -111,6 +114,11 @@ export function SettingsPage({
     startTransition(() => setRowBudget((budget) => budget + ROWS_PER_PASS))
   }, [ready, complete, rowBudget])
   const scrollRef = useReloadView(owner, ready && complete)
+  // Consume the triggering tab activation decision once Settings mounts active and ready so
+  // later in-tab view toggles (JSON -> Form) use their own interaction.
+  useEffect(() => {
+    if (tabId && active && ready) recordTabActivationFocus(tabId, undefined)
+  }, [active, ready, tabId])
   const { ref: focusTargetRef } = useFocusTarget<HTMLDivElement>(
     {
       area: 'settings',

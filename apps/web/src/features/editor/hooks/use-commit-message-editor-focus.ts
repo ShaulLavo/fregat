@@ -1,6 +1,9 @@
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import type { TabId } from '@/lib/documents/utils/types'
-import { tabShouldAutoFocus } from '@/lib/focus/state/tab-activation-focus'
+import {
+  recordTabActivationFocus,
+  tabShouldAutoFocus,
+} from '@/lib/focus/state/tab-activation-focus'
 import type { ReactEditorController } from '@singapore-editor/react'
 import { useEffect, useRef } from 'react'
 
@@ -32,7 +35,9 @@ export function useCommitMessageEditorFocus({
     preparedPathRef.current = path
     const offset = document.buffer.getTextSnapshot().lineStart(1)
     editor.setSelection(offset, offset)
-    if (tabShouldAutoFocus(tabId)) editor.focus()
+    const shouldFocus = tabShouldAutoFocus(tabId)
+    if (tabId) recordTabActivationFocus(tabId, undefined)
+    if (shouldFocus) editor.focus()
   }, [controller, document, tabId])
 }
 
