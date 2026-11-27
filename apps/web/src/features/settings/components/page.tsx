@@ -11,6 +11,7 @@ import { Button } from '@workspace/ui/components/button'
 import {
   recordTabActivationFocus,
   tabShouldAutoFocus,
+  useTabActivationSequence,
 } from '@/lib/focus/state/tab-activation-focus'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { Spinner } from '@workspace/ui/components/spinner'
@@ -114,11 +115,14 @@ export function SettingsPage({
     startTransition(() => setRowBudget((budget) => budget + ROWS_PER_PASS))
   }, [ready, complete, rowBudget])
   const scrollRef = useReloadView(owner, ready && complete)
-  // Consume the triggering tab activation decision once Settings mounts active and ready so
-  // later in-tab view toggles (JSON -> Form) use their own interaction.
+  const activationSeq = useTabActivationSequence(tabId)
+  // Consume the triggering tab activation decision once Settings is active and ready (including
+  // repeat taps on an already-mounted tab) so later in-tab view toggles use their own interaction.
   useEffect(() => {
-    if (tabId && active && ready) recordTabActivationFocus(tabId, undefined)
-  }, [active, ready, tabId])
+    if (tabId && active && ready && activationSeq !== undefined) {
+      recordTabActivationFocus(tabId, undefined)
+    }
+  }, [active, activationSeq, ready, tabId])
   const { ref: focusTargetRef } = useFocusTarget<HTMLDivElement>(
     {
       area: 'settings',

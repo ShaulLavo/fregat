@@ -11,7 +11,7 @@ import {
   filesystemPath,
   tabId,
 } from '@/lib/documents/utils/identity'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { type SettingId } from '@workspace/contracts'
 import userEvent from '@testing-library/user-event'
 import { createEditorTextBuffer, createEditorViewSession } from '@singapore-editor/core/document'
@@ -537,6 +537,12 @@ test('touch activation suppresses initial Settings search autofocus without bloc
     await waitFor(() =>
       expect(screen.queryByRole('textbox', { name: 'Search settings' })).toBeNull(),
     )
+
+    // Repeat touch tap on the already-selected Settings tab while JSON is visible must also be
+    // consumed so the subsequent mouse switch back to Form still focuses Search settings.
+    act(() => {
+      recordTabActivationFocus(settingsTab, { shouldFocusEditor: false, origin: 'touch' })
+    })
 
     await userEvent.click(screen.getByRole('tab', { name: 'Settings' }))
     const searchAfterToggle = await screen.findByRole('textbox', { name: 'Search settings' })
