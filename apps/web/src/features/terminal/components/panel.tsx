@@ -264,6 +264,23 @@ export function TerminalPanel({
     void focus.request(registeredFocusTarget(terminalFocusTargetToken)).completion
   }, [focus, focusIdentity, terminalFocusTargetToken])
 
+  const handleReadyChange = (ready: boolean) => {
+    if (!ready) flushCapture()
+    inputReadyRef.current = ready
+    setConnectedIdentity(ready ? terminalMountIdentity : null)
+    if (ready) {
+      setPaintedIdentity(terminalMountIdentity)
+      setInputGeneration((generation) => generation + 1)
+      flushCapture()
+      return
+    }
+    setDisconnectedPaint({
+      key: displayKey,
+      paint: savedTerminal(queryClient, display),
+    })
+    setMenuTarget(null)
+  }
+
   const handleTerminalReady = (terminal: Terminal) => {
     terminalRef.current = terminal
     setLiveTerminal(terminal)
@@ -278,8 +295,9 @@ export function TerminalPanel({
     })
     sendInputRef.current = (data) => {
       if (!inputReadyRef.current || !attachmentRef.current) return false
-      attachmentRef.current.write(data)
-      return true
+      const sent = adapterState.adapter.tryWrite(attachmentRef.current, data)
+      if (!sent) handleReadyChange(false)
+      return sent
     }
   }
 
@@ -296,23 +314,6 @@ export function TerminalPanel({
 
   const handleTerminalAttached = (_terminal: Terminal, attachment: TerminalAttachment) => {
     attachmentRef.current = attachment
-  }
-
-  const handleReadyChange = (ready: boolean) => {
-    if (!ready) flushCapture()
-    inputReadyRef.current = ready
-    setConnectedIdentity(ready ? terminalMountIdentity : null)
-    if (ready) {
-      setPaintedIdentity(terminalMountIdentity)
-      setInputGeneration((generation) => generation + 1)
-      flushCapture()
-      return
-    }
-    setDisconnectedPaint({
-      key: displayKey,
-      paint: savedTerminal(queryClient, display),
-    })
-    setMenuTarget(null)
   }
 
   const handleFramePainted = () => {

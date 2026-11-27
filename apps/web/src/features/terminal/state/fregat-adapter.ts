@@ -38,59 +38,93 @@ const EMPTY_ID: Subscribable<string | undefined> = {
   subscribe: () => () => {},
 }
 
+interface CancelledQueryRetry<T> {
+  settled: boolean
+  pageActive: boolean
+  retryPending: boolean
+  retryTimer: ReturnType<typeof setTimeout> | undefined
+  stopPageSubscription: () => void
+  readonly signal: AbortSignal
+  readonly run: () => Promise<T>
+  readonly resolve: (value: T) => void
+  readonly reject: (reason: unknown) => void
+  readonly onAbort: () => void
+}
+
+function finishCancelledQueryRetry<T>(retry: CancelledQueryRetry<T>, outcome: () => void): void {
+  if (retry.settled) return
+  retry.settled = true
+  clearTimeout(retry.retryTimer)
+  retry.stopPageSubscription()
+  retry.signal.removeEventListener('abort', retry.onAbort)
+  outcome()
+}
+
+function scheduleCancelledQueryRetry<T>(retry: CancelledQueryRetry<T>): void {
+  if (retry.settled || !retry.retryPending || !retry.pageActive || retry.signal.aborted) return
+  runCancelledQueryAttempt(retry)
+}
+
+function handleCancelledQueryError<T>(retry: CancelledQueryRetry<T>, error: unknown): void {
+  if (retry.settled || retry.signal.aborted || !isCancelledError(error)) {
+    finishCancelledQueryRetry(retry, () => retry.reject(error))
+    return
+  }
+  retry.retryPending = true
+  // A native departure can run this rejection before the mount's departure handler.
+  retry.retryTimer = setTimeout(() => scheduleCancelledQueryRetry(retry), 0)
+}
+
+function runCancelledQueryAttempt<T>(retry: CancelledQueryRetry<T>): void {
+  retry.retryPending = false
+  clearTimeout(retry.retryTimer)
+  void retry.run().then(
+    (value) => finishCancelledQueryRetry(retry, () => retry.resolve(value)),
+    (error: unknown) => handleCancelledQueryError(retry, error),
+  )
+}
+
+function subscribeToPageActivity<T>(retry: CancelledQueryRetry<T>): () => void {
+  return startPageSubscription(() => {
+    retry.pageActive = true
+    scheduleCancelledQueryRetry(retry)
+    return () => {
+      retry.pageActive = false
+    }
+  })
+}
+
+function attachCancelledQueryRetry<T>(
+  signal: AbortSignal,
+  run: () => Promise<T>,
+  resolve: (value: T) => void,
+  reject: (reason: unknown) => void,
+): void {
+  const retry: CancelledQueryRetry<T> = {
+    settled: false,
+    pageActive: true,
+    retryPending: false,
+    retryTimer: undefined,
+    stopPageSubscription: () => {},
+    signal,
+    run,
+    resolve,
+    reject,
+    onAbort: () => finishCancelledQueryRetry(retry, () => reject(signal.reason)),
+  }
+  retry.stopPageSubscription = subscribeToPageActivity(retry)
+  if (signal.aborted) return retry.onAbort()
+  signal.addEventListener('abort', retry.onAbort, { once: true })
+  runCancelledQueryAttempt(retry)
+}
+
 /**
  * Retries a TanStack Query call when `pagehide` / `beforeunload` cancelled it, resuming once
  * `pageshow` restores the page (or immediately on the next macrotask after an early restore).
  */
 function retryOnCancelledPageQuery<T>(signal: AbortSignal, run: () => Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    let settled = false
-    let pageActive = true
-    let retryPending = false
-    let retryTimer: ReturnType<typeof setTimeout> | undefined
-
-    const finish = (cb: () => void) => {
-      if (settled) return
-      settled = true
-      clearTimeout(retryTimer)
-      stopPageSubscription()
-      signal.removeEventListener('abort', onAbort)
-      cb()
-    }
-
-    const onAbort = () => finish(() => reject(signal.reason))
-
-    const scheduleOrRun = () => {
-      if (settled || !retryPending || !pageActive || signal.aborted) return
-      attempt()
-    }
-
-    const attempt = () => {
-      retryPending = false
-      clearTimeout(retryTimer)
-      void run().then(
-        (value) => finish(() => resolve(value)),
-        (error: unknown) => {
-          if (settled || signal.aborted) return finish(() => reject(error))
-          if (!isCancelledError(error)) return finish(() => reject(error))
-          retryPending = true
-          // A native departure can run this rejection before the mount's departure handler.
-          retryTimer = setTimeout(scheduleOrRun, 0)
-        },
-      )
-    }
-
-    const stopPageSubscription = startPageSubscription(() => {
-      pageActive = true
-      if (retryPending && !settled && !signal.aborted) attempt()
-      return () => {
-        pageActive = false
-      }
-    })
-
-    if (signal.aborted) return onAbort()
-    signal.addEventListener('abort', onAbort, { once: true })
-    attempt()
+    attachCancelledQueryRetry(signal, run, resolve, reject)
   })
 }
 
@@ -227,14 +261,19 @@ export interface CreateFregatTerminalAdapterOptions {
   readonly getSavedScroll: () => TerminalSavedScroll | null
 }
 
+export interface FregatTerminalAdapter extends TerminalAdapter {
+  tryWrite(attachment: TerminalAttachment, data: string): boolean
+}
+
 export function createFregatTerminalAdapter({
   origin,
   client,
   rootPath,
   signal: explicitSignal,
   getSavedScroll,
-}: CreateFregatTerminalAdapterOptions): TerminalAdapter {
+}: CreateFregatTerminalAdapterOptions): FregatTerminalAdapter {
   const inputEncoder = new TextEncoder()
+  const writers = new WeakMap<TerminalAttachment, (data: string) => boolean>()
 
   return {
     sessions: EMPTY_SESSIONS,
@@ -246,6 +285,9 @@ export function createFregatTerminalAdapter({
     renameSession: () => {},
     toggleSplit: () => {},
     getSavedScroll: () => getSavedScroll(),
+    tryWrite(attachment, data) {
+      return writers.get(attachment)?.(data) ?? false
+    },
     async attach(sessionId, { signal: viewSignal, onEvent }) {
       const envSignal = explicitSignal ?? environmentActivitySignal(origin)
       const combined = AbortSignal.any([envSignal, viewSignal])
@@ -274,25 +316,33 @@ export function createFregatTerminalAdapter({
       })
 
       let detached = false
+      const sendInput = (data: string) => {
+        if (detached) return false
+        return sendTerminalClientMessage(socket, { data: inputEncoder.encode(data), type: 'input' })
+      }
       const attachment: TerminalAttachment = {
         write(data) {
-          sendTerminalClientMessage(socket, { data: inputEncoder.encode(data), type: 'input' })
+          sendInput(data)
         },
         writeBytes(bytes) {
+          if (detached) return
           sendTerminalClientMessage(socket, { data: bytes, type: 'input' })
         },
         resize(cols, rows) {
+          if (detached) return
           sendTerminalClientMessage(socket, { cols, rows, type: 'resize' })
         },
         detach() {
           if (detached) return
           detached = true
+          writers.delete(attachment)
           unregisterSession()
           socket.removeEventListener('message', onMessage)
           socket.removeEventListener('close', onClose)
           closeSocket(socket)
         },
       }
+      writers.set(attachment, sendInput)
       return attachment
     },
   }
