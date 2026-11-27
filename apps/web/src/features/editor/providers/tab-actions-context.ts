@@ -1,3 +1,4 @@
+import type { ActivationFocusDecision } from '@shaulavo/workbench-core'
 import type { TabId } from '@/lib/documents/utils/types'
 import { createContext } from 'react'
 
@@ -6,7 +7,7 @@ import type { RequestCloseTab, RequestCloseTabs } from '@/features/editor/hooks/
 export type EditorTabActions = {
   readonly requestCloseTab: RequestCloseTab
   readonly requestCloseTabs: RequestCloseTabs
-  readonly selectTab: (tabId: TabId) => void
+  readonly selectTab: (tabId: TabId, focus?: ActivationFocusDecision) => void
 }
 
 export const EditorTabActionsContext = createContext<EditorTabActions | null>(null)

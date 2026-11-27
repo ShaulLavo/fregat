@@ -42,10 +42,7 @@ import { useSettingValue } from '@/hooks/use-setting-value'
 import { useScrollPersistencePlugin } from '@/features/editor/hooks/use-scroll-persistence-plugin'
 import { useEditorGutterInset } from '@/hooks/use-editor-gutter-inset'
 import { useEditorTypography } from '@/features/editor/hooks/use-editor-typography'
-import {
-  capOverscrollTop,
-  scrollPositionFromSnapshot,
-} from '@/features/editor/utils/scroll-position'
+import { capOverscrollTop, scrollPositionFromSnapshot } from '@shaulavo/workbench-editor'
 import { useLanguageServerPlugin } from '@/features/editor/hooks/use-lsp-plugin'
 import { useDiagnosticPeek } from '@/features/editor/hooks/use-diagnostic-peek'
 import { useSpellcheckPlugin } from '@/features/editor/hooks/use-spellcheck-plugin'
@@ -460,6 +457,7 @@ export function Editor({
   useCommitMessageEditorFocus({
     controller,
     document: liveDocument,
+    tabId,
   })
 
   useEffect(() => {

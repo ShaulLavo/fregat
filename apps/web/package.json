@@ -52,6 +52,7 @@
     "@phosphor-icons/react": "^2.1.10",
     "@shaulavo/hotkeys": "catalog:",
     "@shaulavo/workbench-core": "catalog:",
+    "@shaulavo/workbench-editor": "catalog:",
     "@shaulavo/workbench-icons": "catalog:",
     "@shaulavo/workbench-terminal": "catalog:",
     "@shaulavo/workbench-tree": "catalog:",

@@ -8,6 +8,11 @@ import type { TabId, WorkspaceRoot } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
 import { useSettingsSearch, selectSettingsSearch } from '@/features/settings/state/search-store'
 import { Button } from '@workspace/ui/components/button'
+import {
+  recordTabActivationFocus,
+  tabShouldAutoFocus,
+  useTabActivationSequence,
+} from '@/lib/focus/state/tab-activation-focus'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react'
@@ -110,6 +115,14 @@ export function SettingsPage({
     startTransition(() => setRowBudget((budget) => budget + ROWS_PER_PASS))
   }, [ready, complete, rowBudget])
   const scrollRef = useReloadView(owner, ready && complete)
+  const activationSeq = useTabActivationSequence(tabId)
+  // Consume the triggering tab activation decision once Settings is active and ready (including
+  // repeat taps on an already-mounted tab) so later in-tab view toggles use their own interaction.
+  useEffect(() => {
+    if (tabId && active && ready && activationSeq !== undefined) {
+      recordTabActivationFocus(tabId, undefined)
+    }
+  }, [active, activationSeq, ready, tabId])
   const { ref: focusTargetRef } = useFocusTarget<HTMLDivElement>(
     {
       area: 'settings',
@@ -173,7 +186,7 @@ export function SettingsPage({
                     autoCapitalize='off'
                     autoComplete='off'
                     autoCorrect='off'
-                    autoFocus={active && !phone}
+                    autoFocus={active && !phone && tabShouldAutoFocus(tabId)}
                     ref={searchRef}
                     onChange={(event) => setQuery(event.currentTarget.value)}
                     placeholder='Search settings'

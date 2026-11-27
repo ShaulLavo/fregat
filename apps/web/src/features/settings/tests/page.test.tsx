@@ -11,7 +11,7 @@ import {
   filesystemPath,
   tabId,
 } from '@/lib/documents/utils/identity'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { type SettingId } from '@workspace/contracts'
 import userEvent from '@testing-library/user-event'
 import { createEditorTextBuffer, createEditorViewSession } from '@singapore-editor/core/document'
@@ -32,6 +32,7 @@ import { TestEditorStateProvider as EditorStateProvider } from '../../../../test
 import { selectSettingsScope } from '@/features/settings/state/scope-store'
 import { selectSettingsView } from '@/features/settings/state/view-store'
 import { FocusService } from '@/lib/focus/state/service'
+import { recordTabActivationFocus } from '@/lib/focus/state/tab-activation-focus'
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 
 // The whole settings page renders here; a shared CI runner takes about 6x a workstation.
@@ -499,4 +500,57 @@ test('Unicode settings preserve allowed characters and can clear them', async ({
     expect(snapshot.values['editor.unicodeHighlight.ambiguousCharacters']).toBe(false)
     expect(snapshot.values['editor.unicodeHighlight.invisibleCharacters']).toBe(true)
   })
+})
+
+test('touch activation suppresses initial Settings search autofocus without blocking later mouse view toggles', async ({
+  client,
+}) => {
+  expect(client).toBeDefined()
+  const settingsTab = tabId('settings-touch-tab')
+  const path = documentKey(settingsJsonDocument('user'))
+  const buffer = createEditorTextBuffer('{}')
+  const liveDocument = {
+    buffer,
+    editability: 'editable' as const,
+    key: path,
+    target: settingsJsonDocument('user'),
+    view: createEditorViewSession(buffer, 'settings-touch-focus-test'),
+  }
+  recordTabActivationFocus(settingsTab, { shouldFocusEditor: false, origin: 'touch' })
+  const rendered = renderWithProviders(
+    <EditorStateProvider>
+      <div data-workbench>
+        <SettingsPage
+          liveDocument={liveDocument}
+          rootPath={filesystemPath('/repo')}
+          tabId={settingsTab}
+        />
+      </div>
+    </EditorStateProvider>,
+  )
+
+  try {
+    const search = await screen.findByRole('textbox', { name: 'Search settings' })
+    expect(document.activeElement).not.toBe(search)
+
+    await userEvent.click(screen.getByRole('tab', { name: 'settings.json' }))
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Search settings' })).toBeNull(),
+    )
+
+    // Repeat touch tap on the already-selected Settings tab while JSON is visible must also be
+    // consumed so the subsequent mouse switch back to Form still focuses Search settings.
+    act(() => {
+      recordTabActivationFocus(settingsTab, { shouldFocusEditor: false, origin: 'touch' })
+    })
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Settings' }))
+    const searchAfterToggle = await screen.findByRole('textbox', { name: 'Search settings' })
+    await waitFor(() => expect(document.activeElement).toBe(searchAfterToggle))
+  } finally {
+    recordTabActivationFocus(settingsTab, undefined)
+    rendered.unmount()
+    selectSettingsScope('user')
+    selectSettingsView('form')
+  }
 })

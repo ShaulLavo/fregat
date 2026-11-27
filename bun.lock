@@ -152,6 +152,7 @@
         "@phosphor-icons/react": "^2.1.10",
         "@shaulavo/hotkeys": "catalog:",
         "@shaulavo/workbench-core": "catalog:",
+        "@shaulavo/workbench-editor": "catalog:",
         "@shaulavo/workbench-icons": "catalog:",
         "@shaulavo/workbench-terminal": "catalog:",
         "@shaulavo/workbench-tree": "catalog:",
@@ -451,12 +452,13 @@
     "@opentui/core": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-core-0.5.12-bubli.2.tgz",
     "@opentui/react": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-react-0.5.12-bubli.2.tgz",
     "@shaulavo/hotkeys": "catalog:",
-    "@shaulavo/workbench-core": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.13/shaulavo-workbench-core-0.1.13.tgz",
-    "@shaulavo/workbench-icons": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.13/shaulavo-workbench-icons-0.1.13.tgz",
-    "@shaulavo/workbench-terminal": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.13/shaulavo-workbench-terminal-0.1.13.tgz",
-    "@shaulavo/workbench-tokens": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.13/shaulavo-workbench-tokens-0.1.13.tgz",
-    "@shaulavo/workbench-tree": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.13/shaulavo-workbench-tree-0.1.13.tgz",
-    "@shaulavo/workbench-ui": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.13/shaulavo-workbench-ui-0.1.13.tgz",
+    "@shaulavo/workbench-core": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-core-0.1.15.tgz",
+    "@shaulavo/workbench-editor": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-editor-0.1.15.tgz",
+    "@shaulavo/workbench-icons": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-icons-0.1.15.tgz",
+    "@shaulavo/workbench-terminal": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-terminal-0.1.15.tgz",
+    "@shaulavo/workbench-tokens": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-tokens-0.1.15.tgz",
+    "@shaulavo/workbench-tree": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-tree-0.1.15.tgz",
+    "@shaulavo/workbench-ui": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-ui-0.1.15.tgz",
     "@singapore-editor/collab": "0.0.6",
     "@singapore-editor/collaboration": "catalog:",
     "@singapore-editor/core": "catalog:",
@@ -489,6 +491,7 @@
     "@opentui/react": "0.5.12",
     "@shaulavo/hotkeys": "0.0.4",
     "@shaulavo/workbench-core": "0.0.1",
+    "@shaulavo/workbench-editor": "0.0.1",
     "@shaulavo/workbench-icons": "0.0.1",
     "@shaulavo/workbench-terminal": "0.0.1",
     "@shaulavo/workbench-tokens": "0.0.1",
@@ -1271,17 +1274,19 @@
 
     "@shaulavo/hotkeys": ["@shaulavo/hotkeys@0.0.4", "", { "dependencies": { "@tanstack/store": "^0.11.1" }, "peerDependencies": { "@tanstack/react-store": "^0.11.1", "react": ">=18", "react-dom": ">=18" }, "optionalPeers": ["@tanstack/react-store", "react", "react-dom"] }, "sha512-CFFlIU0zSouq7wmNRcB87MM6VNA4yaOXvN4ZaoZ+J2UZn6Erw180gV22uYOdsPvFH1Uw/QaLDg6SxpL75bOQ9w=="],
 
-    "@shaulavo/workbench-core": ["@shaulavo/workbench-core@https://github.com/ShaulLavo/workbench/releases/download/v0.1.13/shaulavo-workbench-core-0.1.13.tgz", { "dependencies": { "@shaulavo/hotkeys": "0.0.4", "@shaulavo/workbench-tokens": "0.0.1" }, "peerDependencies": { "react": ">=19.2.0" }, "optionalPeers": ["react"] }, "sha512-47hKHrNy5EjQmIxPQoOMtwU3cQpOS+T0eJXk6V+jaKeSBfi4aFs1C0j4BPb2M5pce1YvJq/WjKLSx7rIPddlYg=="],
+    "@shaulavo/workbench-core": ["@shaulavo/workbench-core@https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-core-0.1.15.tgz", { "dependencies": { "@shaulavo/hotkeys": "0.0.4", "@shaulavo/workbench-tokens": "0.0.1" }, "peerDependencies": { "react": ">=19.2.0" }, "optionalPeers": ["react"] }, "sha512-kcWDGPZaukkjDUYGGcqbZ6z0pcA0tQxeji67eFZrLH8SDGOXyuHOAlhbHd9C9AqgWpX7KALOVVFP+QKBINU92A=="],
 
-    "@shaulavo/workbench-icons": ["@shaulavo/workbench-icons@https://github.com/ShaulLavo/workbench/releases/download/v0.1.13/shaulavo-workbench-icons-0.1.13.tgz", { "peerDependencies": { "react": ">=19.2.0" }, "optionalPeers": ["react"] }, "sha512-lKcZ9M5esd+54g7SUGg8y2c3mO261pFEZXcUVJgcxyEafqgX6o2bLIrSEw89QvvddtUoF5oDzKS8KxXYB6vWFg=="],
+    "@shaulavo/workbench-editor": ["@shaulavo/workbench-editor@https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-editor-0.1.15.tgz", { "dependencies": { "@shaulavo/workbench-core": "0.0.1", "@shaulavo/workbench-icons": "0.0.1", "@shaulavo/workbench-tokens": "0.0.1", "@shaulavo/workbench-ui": "0.0.1" }, "peerDependencies": { "@base-ui/react": ">=1.0.0", "@dnd-kit/core": ">=6.0.0", "@dnd-kit/sortable": ">=8.0.0", "@dnd-kit/utilities": ">=3.0.0", "@singapore-editor/core": ">=0.2.13", "@singapore-editor/diff": ">=0.2.13", "@singapore-editor/find": ">=0.2.13", "@singapore-editor/gutters": ">=0.2.13", "@singapore-editor/highlighting": ">=0.2.16", "@singapore-editor/lsp": ">=0.2.13", "@singapore-editor/lsp-plugin": ">=0.2.16", "@singapore-editor/markdown": ">=0.2.13", "@singapore-editor/minimap": ">=0.2.13", "@singapore-editor/plugin-ui": ">=0.2.13", "@singapore-editor/react": ">=0.2.13", "@singapore-editor/scope-lines": ">=0.2.13", "react": ">=19.2.0", "react-dom": ">=19.2.0" }, "optionalPeers": ["@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities", "@singapore-editor/diff", "@singapore-editor/lsp", "@singapore-editor/lsp-plugin", "@singapore-editor/markdown", "@singapore-editor/minimap", "@singapore-editor/scope-lines"] }, "sha512-tCrs+aoN54wjGq9yXJedx85ng4zXINNbbZZK4XsAeEmR9VsEQ2mf3WvLWPpwfbsVZwz5MJfWfVy0BsvH8xYdmA=="],
 
-    "@shaulavo/workbench-terminal": ["@shaulavo/workbench-terminal@https://github.com/ShaulLavo/workbench/releases/download/v0.1.13/shaulavo-workbench-terminal-0.1.13.tgz", { "dependencies": { "@shaulavo/hotkeys": "0.0.4", "@shaulavo/workbench-core": "0.0.1", "@shaulavo/workbench-icons": "0.0.1", "@shaulavo/workbench-tokens": "0.0.1", "@shaulavo/workbench-ui": "0.0.1" }, "peerDependencies": { "@base-ui/react": ">=1.0.0", "ghostty-webgpu": ">=0.3.34", "react": ">=19.2.0", "react-dom": ">=19.2.0" } }, "sha512-/xmSqVIgQDw6H4Q6NigHNZ86B2VXeG+Dy/H8+uOJ5Y3rN8+IahVZR+GITqdV/5CufhLKM6UD/uVsyZeRv3czNg=="],
+    "@shaulavo/workbench-icons": ["@shaulavo/workbench-icons@https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-icons-0.1.15.tgz", { "peerDependencies": { "react": ">=19.2.0" }, "optionalPeers": ["react"] }, "sha512-lKcZ9M5esd+54g7SUGg8y2c3mO261pFEZXcUVJgcxyEafqgX6o2bLIrSEw89QvvddtUoF5oDzKS8KxXYB6vWFg=="],
 
-    "@shaulavo/workbench-tokens": ["@shaulavo/workbench-tokens@https://github.com/ShaulLavo/workbench/releases/download/v0.1.13/shaulavo-workbench-tokens-0.1.13.tgz", {}, "sha512-szvyMShkda7OW10CtD1D0n1nGAJMc1GoZiKdrgqkNFecIaJDZqnR0arzEVpAFoXQEkL6CY8e/nBLfa0NG8WNHw=="],
+    "@shaulavo/workbench-terminal": ["@shaulavo/workbench-terminal@https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-terminal-0.1.15.tgz", { "dependencies": { "@shaulavo/hotkeys": "0.0.4", "@shaulavo/workbench-core": "0.0.1", "@shaulavo/workbench-icons": "0.0.1", "@shaulavo/workbench-tokens": "0.0.1", "@shaulavo/workbench-ui": "0.0.1" }, "peerDependencies": { "@base-ui/react": ">=1.0.0", "ghostty-webgpu": ">=0.3.34", "react": ">=19.2.0", "react-dom": ">=19.2.0" } }, "sha512-/xmSqVIgQDw6H4Q6NigHNZ86B2VXeG+Dy/H8+uOJ5Y3rN8+IahVZR+GITqdV/5CufhLKM6UD/uVsyZeRv3czNg=="],
 
-    "@shaulavo/workbench-tree": ["@shaulavo/workbench-tree@https://github.com/ShaulLavo/workbench/releases/download/v0.1.13/shaulavo-workbench-tree-0.1.13.tgz", { "dependencies": { "@shaulavo/workbench-core": "0.0.1", "@shaulavo/workbench-icons": "0.0.1", "@shaulavo/workbench-tokens": "0.0.1", "@shaulavo/workbench-ui": "0.0.1", "@tanstack/react-virtual": "3.14.28" }, "peerDependencies": { "@base-ui/react": ">=1.0.0", "react": ">=19.2.0", "react-dom": ">=19.2.0" } }, "sha512-nharcjWMYSpXkPMhExeKgKAAo3qdeNEAog1VrI3iQYC9gs9mfJFu/2raTmL4hPu568enQFHkwwu4K2I8520ylw=="],
+    "@shaulavo/workbench-tokens": ["@shaulavo/workbench-tokens@https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-tokens-0.1.15.tgz", {}, "sha512-szvyMShkda7OW10CtD1D0n1nGAJMc1GoZiKdrgqkNFecIaJDZqnR0arzEVpAFoXQEkL6CY8e/nBLfa0NG8WNHw=="],
 
-    "@shaulavo/workbench-ui": ["@shaulavo/workbench-ui@https://github.com/ShaulLavo/workbench/releases/download/v0.1.13/shaulavo-workbench-ui-0.1.13.tgz", { "dependencies": { "@shaulavo/workbench-core": "0.0.1", "@shaulavo/workbench-icons": "0.0.1", "@shaulavo/workbench-tokens": "0.0.1", "@tanstack/react-virtual": "3.14.28" }, "peerDependencies": { "@base-ui/react": ">=1.0.0", "react": ">=19.2.0", "react-dom": ">=19.2.0" } }, "sha512-neKrxaskeaYR98NQizLvadTHZ+8vh1OXV26bJS2dPTyHrZkfF1Sqs8yOc7RMnWyIL777ERMKr+vm/RFssjLKQQ=="],
+    "@shaulavo/workbench-tree": ["@shaulavo/workbench-tree@https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-tree-0.1.15.tgz", { "dependencies": { "@shaulavo/workbench-core": "0.0.1", "@shaulavo/workbench-icons": "0.0.1", "@shaulavo/workbench-tokens": "0.0.1", "@shaulavo/workbench-ui": "0.0.1", "@tanstack/react-virtual": "3.14.28" }, "peerDependencies": { "@base-ui/react": ">=1.0.0", "react": ">=19.2.0", "react-dom": ">=19.2.0" } }, "sha512-nharcjWMYSpXkPMhExeKgKAAo3qdeNEAog1VrI3iQYC9gs9mfJFu/2raTmL4hPu568enQFHkwwu4K2I8520ylw=="],
+
+    "@shaulavo/workbench-ui": ["@shaulavo/workbench-ui@https://github.com/ShaulLavo/workbench/releases/download/v0.1.15/shaulavo-workbench-ui-0.1.15.tgz", { "dependencies": { "@shaulavo/workbench-core": "0.0.1", "@shaulavo/workbench-icons": "0.0.1", "@shaulavo/workbench-tokens": "0.0.1", "@tanstack/react-virtual": "3.14.28" }, "peerDependencies": { "@base-ui/react": ">=1.0.0", "react": ">=19.2.0", "react-dom": ">=19.2.0" } }, "sha512-QbynmwnB0Uw0joIqw1p5P3KdILiSz2dl52GZZ8So+NPYZf0AdsmsgwIFdnw8nINMf+eZS3SZIl7bVgUwWLIuWA=="],
 
     "@shikijs/core": ["@shikijs/core@4.4.3", "", { "dependencies": { "@shikijs/primitive": "4.4.3", "@shikijs/types": "4.4.3", "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.5", "hast-util-to-html": "^9.0.5" } }, "sha512-QCR4q2ZO/ILJEuwiBMel4wdcTDb1JGwfjKTxPDF6x8ixOaluPrVqIn06C99AcRPhmYlBR56d/Fb+GN58GzExpg=="],
 

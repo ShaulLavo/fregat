@@ -3,7 +3,7 @@ import { describe } from 'vitest'
 import {
   copyDiagnosticPeekClientRect,
   diagnosticPeekPlacement,
-} from '@/features/editor/utils/diagnostic-peek-placement'
+} from '@shaulavo/workbench-editor/lsp'
 import { expect, test } from '../../../../../test/fixtures'
 
 const layerRect = rect(100, 50, 500, 400)

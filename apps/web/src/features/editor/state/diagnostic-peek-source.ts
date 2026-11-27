@@ -16,7 +16,7 @@ import type {
 import {
   copyDiagnosticPeekClientRect,
   type DiagnosticPeekClientRect,
-} from '@/features/editor/utils/diagnostic-peek-placement'
+} from '@shaulavo/workbench-editor/lsp'
 import {
   diagnosticMessageText,
   diagnosticSeverityLabel,

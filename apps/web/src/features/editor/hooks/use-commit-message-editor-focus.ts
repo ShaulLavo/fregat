@@ -1,4 +1,9 @@
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
+import type { TabId } from '@/lib/documents/utils/types'
+import {
+  recordTabActivationFocus,
+  tabShouldAutoFocus,
+} from '@/lib/focus/state/tab-activation-focus'
 import type { ReactEditorController } from '@singapore-editor/react'
 import { useEffect, useRef } from 'react'
 
@@ -7,11 +12,13 @@ import type { EditorRenderDocument } from '@/features/editor/utils/render-docume
 type UseCommitMessageEditorFocusOptions = {
   controller: ReactEditorController
   document: Pick<EditorRenderDocument, 'buffer' | 'target'> | null
+  tabId?: TabId
 }
 
 export function useCommitMessageEditorFocus({
   controller,
   document,
+  tabId,
 }: UseCommitMessageEditorFocusOptions) {
   const preparedPathRef = useRef<string | null>(null)
 
@@ -28,8 +35,10 @@ export function useCommitMessageEditorFocus({
     preparedPathRef.current = path
     const offset = document.buffer.getTextSnapshot().lineStart(1)
     editor.setSelection(offset, offset)
-    editor.focus()
-  }, [controller, document])
+    const shouldFocus = tabShouldAutoFocus(tabId)
+    if (tabId) recordTabActivationFocus(tabId, undefined)
+    if (shouldFocus) editor.focus()
+  }, [controller, document, tabId])
 }
 
 function isGitCommitMessagePath(path: string) {
