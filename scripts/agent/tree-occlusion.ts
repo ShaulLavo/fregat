@@ -3,14 +3,14 @@ import type { Page } from 'playwright'
 export async function inspectTreeOcclusion(page: Page) {
   return page.evaluate(`(() => {
     const root = document.querySelector('[data-file-tree]')
-    const overlay = root?.querySelector('[data-file-tree-sticky-overlay-content]')
-    const flow = root?.querySelector('[data-file-tree-virtualized-sticky]')
-    const scroll = root?.querySelector('[data-file-tree-virtualized-scroll]')
-    if (!root || !overlay || !flow || !scroll) return { mounted: false }
-    const overlayBounds = overlay.getBoundingClientRect()
-    const rows = Array.from(root.querySelectorAll('button[data-type="item"]'), (row) => ({
-      path: row.getAttribute('data-item-path'),
-      sticky: row.getAttribute('data-file-tree-sticky-row') === 'true',
+    const overlay = root?.querySelector('.wb-tree-sticky-overlay')
+    const flow = root?.querySelector('.wb-tree-canvas')
+    const scroll = root?.querySelector('[data-wb-tree-scroller]')
+    if (!root || !flow || !scroll) return { mounted: false }
+    const overlayBounds = overlay?.getBoundingClientRect() ?? scroll.getBoundingClientRect()
+    const rows = Array.from(root.querySelectorAll('[data-wb-tree-row]'), (row) => ({
+      path: row.getAttribute('data-path'),
+      sticky: row.hasAttribute('data-wb-sticky-ancestor'),
       clipPath: getComputedStyle(row).clipPath,
       bounds: row.getBoundingClientRect().toJSON(),
     }))
@@ -19,7 +19,7 @@ export async function inspectTreeOcclusion(page: Page) {
       scrollTop: scroll.scrollTop,
       overlay: {
         bounds: overlayBounds.toJSON(),
-        background: getComputedStyle(overlay).backgroundColor,
+        background: overlay ? getComputedStyle(overlay).backgroundColor : 'transparent',
       },
       flow: {
         bounds: flow.getBoundingClientRect().toJSON(),

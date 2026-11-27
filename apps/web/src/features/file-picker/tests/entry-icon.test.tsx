@@ -8,7 +8,7 @@ const stamps = { size: 0, mtimeMs: 0, birthtimeMs: 0, version: 'test' }
 
 function glyph(entry: FsEntry, open?: boolean) {
   const { container } = render(<EntryIcon entry={entry} open={open} />)
-  return container.querySelector('svg')?.getAttribute('data-file-icon')
+  return container.querySelector('svg')?.getAttribute('data-wb-icon')
 }
 
 test('entries wear the glyphs the file tree gives them', () => {

@@ -8,7 +8,7 @@ export const fileIcons: Scenario = {
     // A string: this package types without the DOM, and the callback runs in the page.
     icons: await page.evaluate(`((selector) =>
       Array.from(document.querySelectorAll(selector)).map((element) => ({
-        name: element.getAttribute('data-file-icon'),
+        name: element.getAttribute('data-wb-icon') ?? element.getAttribute('data-file-icon'),
         tag: element.tagName,
         mask: getComputedStyle(element).maskImage,
         color: getComputedStyle(element).color,

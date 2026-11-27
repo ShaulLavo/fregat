@@ -11,13 +11,7 @@ import { isTestFile } from './web-design-census.mjs'
 
 const REPOSITORY = path.resolve(import.meta.dirname, '../..')
 const DEFAULT_REVIEWS = path.join(REPOSITORY, 'scripts/lint/react-memo-reviewed.json')
-const DEFAULT_ROOTS = [
-  'apps/web/src',
-  'apps/tui/src',
-  'packages/markdown/src',
-  'packages/tree/src',
-  'packages/ui/src',
-]
+const DEFAULT_ROOTS = ['apps/web/src', 'apps/tui/src', 'packages/markdown/src', 'packages/ui/src']
 const MANUAL_MEMO_HOOKS = new Set(['useMemo', 'useCallback'])
 const SUMMARY_WIDTH = 96
 

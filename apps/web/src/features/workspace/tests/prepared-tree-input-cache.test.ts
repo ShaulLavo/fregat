@@ -1,4 +1,4 @@
-import { TreeViewModel } from '@/features/workspace/state/tree-model'
+import { FileTreeModel } from '@shaulavo/workbench-tree'
 
 import { preparedTreeInputForPaths } from '@/features/workspace/state/prepared-tree-input-cache'
 
@@ -12,24 +12,16 @@ test('reuses prepared input only for the exact path-array identity', () => {
   expect(preparedTreeInputForPaths([...paths])).not.toBe(sameIdentity)
 })
 
-test('uses a matching prepared path set for construction and reset', () => {
+test('uses a matching prepared path set for construction and replacement', () => {
   const initialPaths = ['src/', 'src/a.ts'] as const
   const initialPreparedInput = preparedTreeInputForPaths(initialPaths)
-  const tree = new TreeViewModel({ preparedInput: initialPreparedInput })
-  const events: unknown[] = []
-  const unsubscribe = tree.onMutation('reset', (event) => events.push(event))
+  const tree = new FileTreeModel({ preparedInput: initialPreparedInput })
 
-  try {
-    const nextPaths = ['README.md', 'src/', 'src/b.ts'] as const
-    const nextPreparedInput = preparedTreeInputForPaths(nextPaths)
-    tree.resetPaths(nextPreparedInput.paths, { preparedInput: nextPreparedInput })
+  const nextPaths = ['README.md', 'src/', 'src/b.ts'] as const
+  const nextPreparedInput = preparedTreeInputForPaths(nextPaths)
+  tree.replacePreparedInput(nextPreparedInput)
 
-    expect(tree.getItem('src/a.ts')).toBeNull()
-    expect(tree.getItem('src/b.ts')).not.toBeNull()
-    expect(events).toEqual([
-      expect.objectContaining({ operation: 'reset', usedPreparedInput: true }),
-    ])
-  } finally {
-    unsubscribe()
-  }
+  expect(tree.index.getKind('src/a.ts')).toBeUndefined()
+  expect(tree.index.getKind('src/b.ts')).toBe('file')
+  expect(tree.index.getKind('README.md')).toBe('file')
 })

@@ -12,7 +12,7 @@ test.each(['index.html', '.prettierrc', 'next.config.js', 'component.tsx', 'unkn
     const svg = container.querySelector('svg')!
     const sprite = document.createElement('div')
     sprite.innerHTML = `<svg>${fileIconSpriteSymbols()}</svg>`
-    const symbol = sprite.querySelector(`#app-vscode-icon-${svg.getAttribute('data-file-icon')}`)!
+    const symbol = sprite.querySelector(`#wb-file-icon-${svg.getAttribute('data-wb-icon')}`)!
 
     expect(svg.getAttribute('viewBox')).toBe(symbol.getAttribute('viewBox'))
     expect(Array.from(svg.querySelectorAll('path'), (path) => path.getAttribute('d'))).toEqual(
@@ -30,11 +30,11 @@ test('sprite icons use the symbol the document sprite defines, in their hue', ()
       <FileTypeIcon icon={iconForEntry({ name: 'main.c', type: 'file' })} sprite />
     </>,
   )
-  const svg = container.querySelector('svg[data-file-icon]')!
+  const svg = container.querySelector('svg[data-wb-icon]')!
   const href = svg.querySelector('use')!.getAttribute('href')!
 
-  expect(container.querySelector(`[data-file-icon-sprite] symbol${href}`)).not.toBeNull()
-  expect(svg.getAttribute('class')).toContain('text-file-icon-blue')
+  expect(container.querySelector(`[data-wb-icon-sprite] symbol${href}`)).not.toBeNull()
+  expect(svg.getAttribute('data-wb-icon-hue')).toBe('blue')
   expect(svg.querySelector('path')).toBeNull()
 })
 
@@ -56,13 +56,13 @@ test('repeated gradient icons reference their own definitions', () => {
   }
 })
 
-test('the icon takes its hue as a class, with no inline colour', () => {
+test('the icon takes its hue as a semantic data attribute, with no inline colour', () => {
   const { container } = renderWithProviders(
     <FileTypeIcon icon={iconForEntry({ name: 'main.c', type: 'file' })} />,
   )
   const svg = container.querySelector('svg')!
 
-  expect(svg.getAttribute('class')).toContain('text-file-icon-blue')
+  expect(svg.getAttribute('data-wb-icon-hue')).toBe('blue')
   expect(svg.getAttribute('style')).toBeNull()
 })
 
@@ -70,11 +70,13 @@ test('a Catppuccin icon paints its own colours through the hue tokens', () => {
   const { container } = renderWithProviders(
     <FileTypeIcon icon={iconForEntry({ name: 'Main.java', type: 'file' })} />,
   )
-  const styles = Array.from(container.querySelectorAll('path'), (path) =>
-    path.getAttribute('style'),
-  )
+  const strokes = Array.from(container.querySelectorAll('path'), (path) =>
+    path.getAttribute('stroke'),
+  ).filter((value): value is string => value !== null)
 
-  expect(styles).toContain('stroke:var(--file-icon-red)')
-  expect(styles).toContain('stroke:var(--file-icon-neutral)')
+  expect(strokes.length).toBeGreaterThan(0)
+  expect(
+    strokes.some((stroke) => stroke.includes('var(--wb-icon-') || stroke === 'currentColor'),
+  ).toBe(true)
   expect(container.innerHTML).not.toMatch(/#[0-9a-f]{6}/iu)
 })

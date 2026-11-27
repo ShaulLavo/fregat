@@ -5,7 +5,8 @@ import { LONG_FILE_NAME } from './fixture'
 
 /** Where the harness reaches the tree; a rebuilt tree keeps these roles and the label. */
 export function treeRow(page: Page, path: string): Locator {
-  return selectors.folderTree(page).locator(`[role="treeitem"][data-item-path="${path}"]`).first()
+  const normalized = path.replace(/\/+$/u, '')
+  return selectors.folderTree(page).locator(`[role="treeitem"][data-path="${normalized}"]`).first()
 }
 
 export function filterInput(page: Page): Locator {
@@ -88,7 +89,7 @@ async function pointerAway(page: Page) {
 }
 
 async function scroller(page: Page) {
-  return selectors.folderTree(page).locator('[data-file-tree-virtualized-scroll]').first()
+  return selectors.folderTree(page).locator('[data-wb-tree-scroller]').first()
 }
 
 export const PARITY_STATES: readonly ParityState[] = [

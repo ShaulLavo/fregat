@@ -36,7 +36,7 @@ test('create adds a synthetic entry and marks a new folder loaded', () => {
 
 test('delete removes the entry and everything under it', () => {
   const model = fileTreeModel([directory('/repo/src'), file('/repo/src/a.ts'), file('/repo/b.ts')])
-  const next = applyTreePatch(model, { kind: 'delete', rootPath: root, treePath: 'src' })
+  const next = applyTreePatch(model, { kind: 'delete', rootPath: root, treePaths: ['src'] })
   expect(next.paths).toEqual(['b.ts'])
   expect(next.entriesByTreePath.has('src/a.ts')).toBe(false)
 })

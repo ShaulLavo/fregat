@@ -13,7 +13,6 @@ const DEFAULT_ROOTS = [
   'apps/web/src',
   'apps/tui/src',
   'packages/markdown/src',
-  'packages/tree/src',
   'packages/ui/src',
 ].map((root) => path.join(REPOSITORY, root))
 const DEFAULT_ALLOW = path.join(REPOSITORY, 'scripts/lint/react-compiler-allow.json')

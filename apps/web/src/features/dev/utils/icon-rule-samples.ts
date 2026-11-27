@@ -3,7 +3,7 @@ import {
   FILE_ICON_FILE_NAMES,
   FILE_ICON_RULES,
   type FileIconRuleName,
-} from '@/lib/file-icon-rules.generated'
+} from '@shaulavo/workbench-icons'
 
 export type IconRuleSample = {
   readonly name: FileIconRuleName

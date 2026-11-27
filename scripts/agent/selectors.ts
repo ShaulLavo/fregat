@@ -100,11 +100,11 @@ export const workbenchAlignmentSelectors = {
     ),
   title: (page: Page) => workbenchAlignmentSelectors.header(page).locator('.font-medium').first(),
   filterField: (page: Page) =>
-    selectors.folderTree(page).locator('[data-slot="input-group"]').first(),
+    selectors.folderTree(page).locator('[data-wb-filter-field], [data-slot="input-group"]').first(),
   lanes: (page: Page) =>
     selectors
       .folderTree(page)
-      .locator('[role="treeitem"]:not([data-item-parked]) [data-slot="tree-row-lane"]'),
+      .locator('[role="treeitem"] .wb-tree-name, [role="treeitem"] [data-slot="tree-row-lane"]'),
   gutter: (page: Page) => page.locator('.editor-virtualized-gutter').first(),
   editor: (page: Page) => page.locator('.editor-virtualized').first(),
   header: (page: Page) =>
@@ -113,12 +113,11 @@ export const workbenchAlignmentSelectors = {
       .first(),
   bars: (page: Page) =>
     page.locator(
-      '[data-workbench] [data-slot="tool-pane-header"], [data-workbench] [data-slot="filter-field"], [data-workbench] [data-editor-tab-strip], [data-workbench] [data-slot="pane-bar"]',
+      '[data-workbench] [data-slot="tool-pane-header"], [data-workbench] [data-slot="filter-field"], [data-workbench] [data-wb-filter-field], [data-workbench] [data-editor-tab-strip], [data-workbench] [data-slot="pane-bar"]',
     ),
   filter: (page: Page) => page.getByRole('textbox', { name: 'Filter files', exact: true }),
-  scroll: (page: Page) => selectors.folderTree(page).locator('[data-file-tree-virtualized-scroll]'),
-  flowRows: (page: Page) =>
-    selectors.folderTree(page).locator('[role="treeitem"]:not([data-item-parked])'),
+  scroll: (page: Page) => selectors.folderTree(page).locator('[data-wb-tree-scroller]'),
+  flowRows: (page: Page) => selectors.folderTree(page).locator('[data-wb-tree-row]'),
   railTab: (page: Page, name: string) =>
     page
       .getByRole('navigation', { name: 'Sidebar tabs' })
@@ -126,13 +125,13 @@ export const workbenchAlignmentSelectors = {
 } as const
 
 export const treeScrollSelectors = {
-  scroll: '[data-file-tree-virtualized-scroll]',
-  flow: '[data-file-tree-virtualized-sticky]',
-  overlay: '[data-file-tree-sticky-overlay-content]',
-  clip: '[data-file-tree-viewport-clip]',
+  scroll: '[data-wb-tree-scroller]',
+  flow: '.wb-tree-canvas',
+  overlay: '.wb-tree-sticky-overlay',
+  clip: '.wb-tree-viewport-wrap',
 } as const
 
-export const folderTreeShadowHost = 'file-tree-container[aria-label="Folder tree"]'
+export const folderTreeShadowHost = '[data-file-tree]'
 export const rootSwitchRows = {
   Git: '[aria-label="Git changes"] [role="treeitem"][aria-level="2"]',
   Files: '[role="treeitem"]',
@@ -140,7 +139,7 @@ export const rootSwitchRows = {
 
 export const transientAlertSelector =
   '[role="alert"], [data-sonner-toast], [role="status"].text-warning'
-export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
+export const fileIconSelector = '[data-wb-icon], [data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperImageSelector = 'img[data-workbench-wallpaper-layer]'
 export const wallpaperMediaSelector = '[data-workbench-wallpaper-layer]'
 export const diffPaneSelector = '.editor-diff-pane'
@@ -524,7 +523,8 @@ export const selectors = {
   clearTerminalHistory: (page: Page) => page.getByRole('menuitem', { name: 'Clear', exact: true }),
   restartTerminalShell: (page: Page) =>
     page.getByRole('menuitem', { name: 'Restart shell', exact: true }),
-  treeRenameInput: (page: Page) => selectors.folderTree(page).locator('[data-item-rename-input]'),
+  treeRenameInput: (page: Page) =>
+    selectors.folderTree(page).locator('[data-testid="wb-tree-inline-input"]'),
   treeRenameMenuItem: (page: Page) => page.getByRole('menuitem', { name: /^Rename\b/ }),
   terminalName: (page: Page) => page.getByRole('textbox', { name: 'Terminal name', exact: true }),
   commitFilesTree: (page: Page) => page.getByRole('tree', { name: 'Commit files', exact: true }),
@@ -649,7 +649,7 @@ export const selectors = {
     page
       .getByLabel('Folder tree', { exact: true })
       .getByRole('treeitem', { name, exact: true })
-      .locator('[data-item-section="decoration"]'),
+      .locator('[data-wb-tree-decoration]'),
   pickerCurrentFolderHeading: (page: Page) =>
     page
       .getByRole('listbox', { name: 'Folders', exact: true })
@@ -1395,7 +1395,7 @@ export const selectors = {
   filesPaneLoading: (page: Page) =>
     page.getByRole('status', { name: 'Loading files', exact: true }),
   folderTreeScroll: (page: Page) =>
-    page.locator(folderTreeShadowHost).locator('[data-file-tree-virtualized-scroll]'),
+    page.locator(folderTreeShadowHost).locator('[data-wb-tree-scroller]'),
   folderTree: (page: Page) => page.getByLabel('Folder tree', { exact: true }),
   focusedTreeRow: (page: Page) =>
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),

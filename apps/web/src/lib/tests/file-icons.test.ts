@@ -67,18 +67,12 @@ test('C and C++ are blue, git is vermilion, bun is mauve', () => {
 })
 
 test('Python, Astro and webpack paint their back layer in a second hue', () => {
-  expect(fileIconRule(iconForEntry({ name: 'app.py', type: 'file' })).className).toContain(
-    '[--file-icon-back:var(--color-file-icon-yellow)]',
+  expect(fileIconRule(iconForEntry({ name: 'app.py', type: 'file' })).backHue).toBe('yellow')
+  expect(fileIconRule(iconForEntry({ name: 'page.astro', type: 'file' })).backHue).toBe('pink')
+  expect(fileIconRule(iconForEntry({ name: 'webpack.config.js', type: 'file' })).backHue).toBe(
+    'cyan',
   )
-  expect(fileIconRule(iconForEntry({ name: 'page.astro', type: 'file' })).className).toContain(
-    '[--file-icon-back:var(--color-file-icon-pink)]',
-  )
-  expect(
-    fileIconRule(iconForEntry({ name: 'webpack.config.js', type: 'file' })).className,
-  ).toContain('[--file-icon-back:var(--color-file-icon-cyan)]')
-  expect(fileIconRule(iconForEntry({ name: 'app.ts', type: 'file' })).className).not.toContain(
-    '--file-icon-back',
-  )
+  expect(fileIconRule(iconForEntry({ name: 'app.ts', type: 'file' })).backHue).toBeUndefined()
 })
 
 test.each([

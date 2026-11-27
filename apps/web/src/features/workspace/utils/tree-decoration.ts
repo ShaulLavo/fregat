@@ -1,7 +1,17 @@
-import type { FileTreeRowDecoration, FileTreeRowDecorationContext } from '@workspace/tree'
 import type { AgentErrorInput } from '@/lib/agent-error-report'
 import { canonicalTreePath } from '@/lib/path-formatters'
 import type { TreeModel } from '@/lib/tree-model'
+
+type TreeRowDecorationAction = {
+  readonly label: string
+  readonly onActivate: () => void
+}
+
+export type TreeRowDecoration = {
+  readonly action?: TreeRowDecorationAction
+  readonly text: string
+  readonly title?: string
+}
 
 /**
  * The folder's load state beside its name: `no access`, `error` or `loading`. A failure carries
@@ -9,10 +19,10 @@ import type { TreeModel } from '@/lib/tree-model'
  */
 export function treeRowDecoration(
   model: TreeModel,
-  context: FileTreeRowDecorationContext,
+  itemPath: string,
   fix: (error: AgentErrorInput) => void,
-): FileTreeRowDecoration | null {
-  const treePath = canonicalTreePath(context.item.path)
+): TreeRowDecoration | null {
+  const treePath = canonicalTreePath(itemPath)
   const error = model.errorByDirectoryPath.get(treePath)
   const path = `/${model.entriesByTreePath.get(treePath)?.path ?? treePath}`
   if (error?.denied) {
@@ -41,7 +51,10 @@ export function treeRowDecoration(
   return null
 }
 
-function fixAction(error: AgentErrorInput, fix: (error: AgentErrorInput) => void) {
+function fixAction(
+  error: AgentErrorInput,
+  fix: (error: AgentErrorInput) => void,
+): TreeRowDecorationAction {
   return { label: 'Fix with AI', onActivate: () => fix(error) }
 }
 

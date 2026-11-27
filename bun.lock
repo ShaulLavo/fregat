@@ -111,6 +111,7 @@
         "@opentui/core": "catalog:",
         "@opentui/react": "catalog:",
         "@shaulavo/hotkeys": "catalog:",
+        "@shaulavo/workbench-tree": "catalog:",
         "@singapore-editor/core": "catalog:",
         "@singapore-editor/diff": "catalog:",
         "@singapore-editor/lsp": "catalog:",
@@ -118,7 +119,6 @@
         "@workspace/client-core": "workspace:*",
         "@workspace/contracts": "workspace:*",
         "@workspace/observability": "workspace:*",
-        "@workspace/tree": "workspace:*",
         "@workspace/utils": "workspace:*",
         "evlog": "catalog:",
         "react": "^19.3.0",
@@ -151,6 +151,9 @@
         "@lexical/text": "^0.51.0",
         "@phosphor-icons/react": "^2.1.10",
         "@shaulavo/hotkeys": "catalog:",
+        "@shaulavo/workbench-core": "catalog:",
+        "@shaulavo/workbench-icons": "catalog:",
+        "@shaulavo/workbench-tree": "catalog:",
         "@singapore-editor/collaboration": "catalog:",
         "@singapore-editor/core": "catalog:",
         "@singapore-editor/diff": "catalog:",
@@ -178,7 +181,6 @@
         "@workspace/contracts": "workspace:*",
         "@workspace/markdown": "workspace:*",
         "@workspace/observability": "workspace:*",
-        "@workspace/tree": "workspace:*",
         "@workspace/ui": "workspace:*",
         "@workspace/utils": "workspace:*",
         "evlog": "catalog:",
@@ -362,23 +364,6 @@
         "typescript": "catalog:",
       },
     },
-    "packages/tree": {
-      "name": "@workspace/tree",
-      "version": "0.0.0",
-      "dependencies": {
-        "@workspace/observability": "workspace:*",
-        "@workspace/utils": "workspace:*",
-        "evlog": "catalog:",
-      },
-      "devDependencies": {
-        "@types/bun": "catalog:",
-        "oxfmt": "catalog:",
-        "oxlint": "catalog:",
-        "typescript": "catalog:",
-        "vite": "catalog:",
-        "vitest": "catalog:",
-      },
-    },
     "packages/ui": {
       "name": "@workspace/ui",
       "version": "0.0.2",
@@ -387,6 +372,9 @@
         "@fontsource-variable/inter": "^5.3.0",
         "@fontsource-variable/jetbrains-mono": "^5.3.0",
         "@phosphor-icons/react": "^2.1.10",
+        "@shaulavo/workbench-icons": "catalog:",
+        "@shaulavo/workbench-tokens": "catalog:",
+        "@shaulavo/workbench-tree": "catalog:",
         "@tanstack/react-virtual": "3.14.13",
         "@workspace/utils": "workspace:*",
         "class-variance-authority": "^0.7.1",
@@ -435,9 +423,7 @@
         "@workspace/utils": "workspace:*",
       },
       "devDependencies": {
-        "@iconify-json/catppuccin": "1.2.17",
         "@jridgewell/trace-mapping": "0.3.31",
-        "@pierre/vscode-icons": "0.0.9",
         "@types/bun": "catalog:",
         "@types/node": "^26.6.3",
         "@valibot/to-json-schema": "1.8.0",
@@ -464,6 +450,11 @@
     "@opentui/core": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-core-0.5.12-bubli.2.tgz",
     "@opentui/react": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-react-0.5.12-bubli.2.tgz",
     "@shaulavo/hotkeys": "catalog:",
+    "@shaulavo/workbench-core": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.6/shaulavo-workbench-core-0.0.1.tgz",
+    "@shaulavo/workbench-icons": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.6/shaulavo-workbench-icons-0.0.1.tgz",
+    "@shaulavo/workbench-tokens": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.6/shaulavo-workbench-tokens-0.0.1.tgz",
+    "@shaulavo/workbench-tree": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.6/shaulavo-workbench-tree-0.0.1.tgz",
+    "@shaulavo/workbench-ui": "https://github.com/ShaulLavo/workbench/releases/download/v0.1.6/shaulavo-workbench-ui-0.0.1.tgz",
     "@singapore-editor/collab": "0.0.6",
     "@singapore-editor/collaboration": "catalog:",
     "@singapore-editor/core": "catalog:",
@@ -495,6 +486,10 @@
     "@opentui/core": "0.5.12",
     "@opentui/react": "0.5.12",
     "@shaulavo/hotkeys": "0.0.4",
+    "@shaulavo/workbench-core": "0.0.1",
+    "@shaulavo/workbench-icons": "0.0.1",
+    "@shaulavo/workbench-tokens": "0.0.1",
+    "@shaulavo/workbench-tree": "0.0.1",
     "@singapore-editor/collaboration": "0.0.10",
     "@singapore-editor/core": "0.2.13",
     "@singapore-editor/diff": "0.2.13",
@@ -794,8 +789,6 @@
     "@humanwhocodes/module-importer": ["@humanwhocodes/module-importer@1.0.1", "", {}, "sha512-bxveV4V8v5Yb4ncFTT3rPSgZBOpCkjfK0y4oVVVJwIuDVBRMDXrPyXRL988i5ap9m9bnyEEjWfm5WkBmtffLfA=="],
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
-
-    "@iconify-json/catppuccin": ["@iconify-json/catppuccin@1.2.17", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-l1pFOADEUlw+j7V+yfFzBowdE4deeMuI4amqfKaN+7uTI9B0Ho24C86DitQk5zb62NkEM9poOyfuG7WS2bw6jg=="],
 
     "@iconify/types": ["@iconify/types@2.0.0", "", {}, "sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg=="],
 
@@ -1197,8 +1190,6 @@
 
     "@phosphor-icons/react": ["@phosphor-icons/react@2.1.10", "", { "peerDependencies": { "react": ">= 16.8", "react-dom": ">= 16.8" } }, "sha512-vt8Tvq8GLjheAZZYa+YG/pW7HDbov8El/MANW8pOAz4eGxrwhnbfrQZq0Cp4q8zBEu8NIhHdnr+r8thnfRSNYA=="],
 
-    "@pierre/vscode-icons": ["@pierre/vscode-icons@0.0.9", "", {}, "sha512-nhKu2wr9wBhnzIJBqj8rZGJfh23fkLT9ehTK7TrY4ywqqWIzc23V2y+mkHmXP1sGA6hHjTcLLDQt1jXaEM+iWA=="],
-
     "@polka/url": ["@polka/url@1.0.0-next.29", "", {}, "sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww=="],
 
     "@poppinss/colors": ["@poppinss/colors@4.1.6", "", { "dependencies": { "kleur": "^4.1.5" } }, "sha512-H9xkIdFswbS8n1d6vmRd8+c10t2Qe+rZITbbDHHkQixH5+2x1FDGmi/0K+WgWiqQFKPSlIYB7jlH6Kpfn6Fleg=="],
@@ -1276,6 +1267,16 @@
     "@rollup/rollup-linux-x64-gnu": ["@rollup/rollup-linux-x64-gnu@4.65.0", "", { "os": "linux", "cpu": "x64", "libc": "glibc" }, "sha512-GExdD15WPvu/x/drELjVam7vX8EsPgvTMOa/iJL/p/4m/oOqzbb7JXZg8fXR4hlXtg/sF2zyTZ3bR0AEtEMlhQ=="],
 
     "@shaulavo/hotkeys": ["@shaulavo/hotkeys@0.0.4", "", { "dependencies": { "@tanstack/store": "^0.11.1" }, "peerDependencies": { "@tanstack/react-store": "^0.11.1", "react": ">=18", "react-dom": ">=18" }, "optionalPeers": ["@tanstack/react-store", "react", "react-dom"] }, "sha512-CFFlIU0zSouq7wmNRcB87MM6VNA4yaOXvN4ZaoZ+J2UZn6Erw180gV22uYOdsPvFH1Uw/QaLDg6SxpL75bOQ9w=="],
+
+    "@shaulavo/workbench-core": ["@shaulavo/workbench-core@https://github.com/ShaulLavo/workbench/releases/download/v0.1.6/shaulavo-workbench-core-0.0.1.tgz", { "dependencies": { "@shaulavo/hotkeys": "0.0.4", "@shaulavo/workbench-tokens": "0.0.1" }, "peerDependencies": { "react": ">=19.2.0" }, "optionalPeers": ["react"] }, "sha512-ojmOrYGd31D0ZuvvxOHehyrc8Kc/vZxpqyw0nsysehe5m6yCHDxXt0jgRYyw31/cbgmmY/xxzZvkHTspN4Zd/Q=="],
+
+    "@shaulavo/workbench-icons": ["@shaulavo/workbench-icons@https://github.com/ShaulLavo/workbench/releases/download/v0.1.6/shaulavo-workbench-icons-0.0.1.tgz", { "peerDependencies": { "react": ">=19.2.0" }, "optionalPeers": ["react"] }, "sha512-lKcZ9M5esd+54g7SUGg8y2c3mO261pFEZXcUVJgcxyEafqgX6o2bLIrSEw89QvvddtUoF5oDzKS8KxXYB6vWFg=="],
+
+    "@shaulavo/workbench-tokens": ["@shaulavo/workbench-tokens@https://github.com/ShaulLavo/workbench/releases/download/v0.1.6/shaulavo-workbench-tokens-0.0.1.tgz", {}, "sha512-szvyMShkda7OW10CtD1D0n1nGAJMc1GoZiKdrgqkNFecIaJDZqnR0arzEVpAFoXQEkL6CY8e/nBLfa0NG8WNHw=="],
+
+    "@shaulavo/workbench-tree": ["@shaulavo/workbench-tree@https://github.com/ShaulLavo/workbench/releases/download/v0.1.6/shaulavo-workbench-tree-0.0.1.tgz", { "dependencies": { "@shaulavo/workbench-core": "0.0.1", "@shaulavo/workbench-icons": "0.0.1", "@shaulavo/workbench-tokens": "0.0.1", "@shaulavo/workbench-ui": "0.0.1", "@tanstack/react-virtual": "3.14.28" }, "peerDependencies": { "@base-ui/react": ">=1.0.0", "react": ">=19.2.0", "react-dom": ">=19.2.0" } }, "sha512-dbzGpHH/FY7slBVkHz1g/C2oNXXmVEWdMQGI0H3M5pwLfGOA2XMLVksrqSbX3bIiEUxKdks0fFBgIJOfni2xYg=="],
+
+    "@shaulavo/workbench-ui": ["@shaulavo/workbench-ui@https://github.com/ShaulLavo/workbench/releases/download/v0.1.6/shaulavo-workbench-ui-0.0.1.tgz", { "dependencies": { "@shaulavo/workbench-core": "0.0.1", "@shaulavo/workbench-icons": "0.0.1", "@shaulavo/workbench-tokens": "0.0.1", "@tanstack/react-virtual": "3.14.28" }, "peerDependencies": { "@base-ui/react": ">=1.0.0", "react": ">=19.2.0", "react-dom": ">=19.2.0" } }, "sha512-neKrxaskeaYR98NQizLvadTHZ+8vh1OXV26bJS2dPTyHrZkfF1Sqs8yOc7RMnWyIL777ERMKr+vm/RFssjLKQQ=="],
 
     "@shikijs/core": ["@shikijs/core@4.4.3", "", { "dependencies": { "@shikijs/primitive": "4.4.3", "@shikijs/types": "4.4.3", "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.5", "hast-util-to-html": "^9.0.5" } }, "sha512-QCR4q2ZO/ILJEuwiBMel4wdcTDb1JGwfjKTxPDF6x8ixOaluPrVqIn06C99AcRPhmYlBR56d/Fb+GN58GzExpg=="],
 
@@ -1640,8 +1641,6 @@
     "@workspace/pty": ["@workspace/pty@workspace:packages/pty"],
 
     "@workspace/push": ["@workspace/push@workspace:packages/push"],
-
-    "@workspace/tree": ["@workspace/tree@workspace:packages/tree"],
 
     "@workspace/ui": ["@workspace/ui@workspace:packages/ui"],
 
@@ -3063,6 +3062,10 @@
 
     "@mswjs/interceptors/@open-draft/deferred-promise": ["@open-draft/deferred-promise@2.2.0", "", {}, "sha512-CecwLWx3rhxVQF6V4bAgPS5t+So2sTbPgAzafKkVizyi7tlwpcFpdFqq+wqF2OwNBmqFuu6tOyouTuxgpMfzmA=="],
 
+    "@shaulavo/workbench-tree/@tanstack/react-virtual": ["@tanstack/react-virtual@3.14.28", "", { "dependencies": { "@tanstack/virtual-core": "3.19.13" }, "peerDependencies": { "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0" } }, "sha512-zoM4eddIVUsOsunOe26ur+h6YJQbvdzU10a2tKzIovThu5P4SvEyQ+cRx0mbeKfgnR0Mz7KR/NwrZ3GzVnUF/g=="],
+
+    "@shaulavo/workbench-ui/@tanstack/react-virtual": ["@tanstack/react-virtual@3.14.28", "", { "dependencies": { "@tanstack/virtual-core": "3.19.13" }, "peerDependencies": { "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0" } }, "sha512-zoM4eddIVUsOsunOe26ur+h6YJQbvdzU10a2tKzIovThu5P4SvEyQ+cRx0mbeKfgnR0Mz7KR/NwrZ3GzVnUF/g=="],
+
     "@singapore-editor/core/shiki": ["shiki@4.5.0", "", { "dependencies": { "@shikijs/core": "4.5.0", "@shikijs/engine-javascript": "4.5.0", "@shikijs/engine-oniguruma": "4.5.0", "@shikijs/langs": "4.5.0", "@shikijs/themes": "4.5.0", "@shikijs/types": "4.5.0", "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.5" } }, "sha512-OcRW72ngQvc+MSVWBRIovC/BTW589iUE/Vxav7VeM4RcY9MUjqB+IR6ILG1k9nuW6LiG/nct9uma4/MBtnZbmQ=="],
 
     "@singapore-editor/highlighting/shiki": ["shiki@4.5.0", "", { "dependencies": { "@shikijs/core": "4.5.0", "@shikijs/engine-javascript": "4.5.0", "@shikijs/engine-oniguruma": "4.5.0", "@shikijs/langs": "4.5.0", "@shikijs/themes": "4.5.0", "@shikijs/types": "4.5.0", "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.5" } }, "sha512-OcRW72ngQvc+MSVWBRIovC/BTW589iUE/Vxav7VeM4RcY9MUjqB+IR6ILG1k9nuW6LiG/nct9uma4/MBtnZbmQ=="],
@@ -3216,6 +3219,10 @@
     "@astrojs/internal-helpers/shiki/@shikijs/types": ["@shikijs/types@4.5.0", "", { "dependencies": { "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.5" } }, "sha512-drtPrtD8N0DENyD2cyt6Ajy+IWsiCLgMxODwLTpvH1UsN6a9jf90tNTPjqwHvA+0Lzu9e0txk8DjfqH1p9UJRw=="],
 
     "@modelcontextprotocol/sdk/ajv/json-schema-traverse": ["json-schema-traverse@1.0.0", "", {}, "sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug=="],
+
+    "@shaulavo/workbench-tree/@tanstack/react-virtual/@tanstack/virtual-core": ["@tanstack/virtual-core@3.19.13", "", {}, "sha512-CyCvMm7m5JuvPW6eMPZkZBZk6diySrlUQNNRpQPiEnh2vakyghx82Hw3wW2THFUsl6xJ6uM4lSUaiA2T0oYW8w=="],
+
+    "@shaulavo/workbench-ui/@tanstack/react-virtual/@tanstack/virtual-core": ["@tanstack/virtual-core@3.19.13", "", {}, "sha512-CyCvMm7m5JuvPW6eMPZkZBZk6diySrlUQNNRpQPiEnh2vakyghx82Hw3wW2THFUsl6xJ6uM4lSUaiA2T0oYW8w=="],
 
     "@singapore-editor/core/shiki/@shikijs/core": ["@shikijs/core@4.5.0", "", { "dependencies": { "@shikijs/primitive": "4.5.0", "@shikijs/types": "4.5.0", "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.5", "hast-util-to-html": "^9.0.5" } }, "sha512-6CIgwq+bt2JZ3OSjb/nBkkwEf/CfpHcbam+Mg5Pllco7HAGRQ2/EFhZrrJtbyNTgKwknfVS+llsXGygiDGwJWw=="],
 

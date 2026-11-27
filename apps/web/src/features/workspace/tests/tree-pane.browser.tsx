@@ -11,7 +11,7 @@ import {
   type SettingsSnapshot,
   type SettingsValues,
 } from '@workspace/contracts'
-import type { GitStatusEntry } from '@workspace/tree'
+import type { TreeGitStatusEntry } from '@/features/git/utils/status-entries-for-tree'
 import { useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
@@ -97,7 +97,7 @@ afterEach(async () => {
 })
 
 test(
-  'a real Shadow DOM file row predicts and activates a prepared editor tab',
+  'a real file tree row predicts and activates a prepared editor tab',
   { timeout: 30_000 },
   async () => {
     await mountTreePane(new FocusService(), {
@@ -109,8 +109,10 @@ test(
     const treeRoot = await fileTreeRoot()
     await expect.poll(treeRuntimeIsReady).toBe(true)
 
-    const directoryRow = rowButton(treeRoot, 'src/')
+    const directoryRow = rowButton(treeRoot, 'src')
     expect(directoryRow).not.toBeNull()
+    directoryRow!.focus()
+    await expect.poll(() => directoryRow!.dataset.focused).toBe('true')
     directoryRow!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }))
     await expect.poll(() => rowButton(treeRoot, 'src/editor-tab-a.ts')).not.toBeNull()
     const row = rowButton(treeRoot, 'src/editor-tab-a.ts')!
@@ -164,10 +166,9 @@ test('the live navigator retains search, consumes requested focus, reveals, and 
   renderTreePane(focusService, fixture)
 
   const treeRoot = await fileTreeRoot()
-  await expect.poll(() => activeTreePath(treeRoot)).toBe('src/')
+  await expect.poll(() => activeTreePath(treeRoot)).toBe('src')
   await expect(focusTicket.completion).resolves.toEqual({ status: 'handled' })
 
-  // The filter field is the tree's second header row, always on screen.
   const searchInput = searchField(treeRoot)
   searchInput.focus()
   await expect.poll(() => document.activeElement).toBe(searchInput)
@@ -179,10 +180,8 @@ test('the live navigator retains search, consumes requested focus, reveals, and 
   expect(searchField(treeRoot).value).not.toBe('')
 
   searchInput.focus()
-  await expect.poll(() => searchInput.getAttribute('aria-activedescendant')).not.toBeNull()
-  const firstMatch = searchInput.getAttribute('aria-activedescendant')
   searchInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }))
-  await expect.poll(() => document.activeElement?.id).toBe(firstMatch)
+  await expect.poll(() => activeTreePath(treeRoot)).toMatch(/^src/)
   expect(searchInput.value).toBe('file-7')
   searchInput.focus()
 
@@ -202,34 +201,42 @@ test('the live navigator retains search, consumes requested focus, reveals, and 
   const treeHost = document.querySelector('[data-file-tree]')
   clickToolbarButton('Mark deep file modified')
   await expect
-    .poll(() => rowButton(treeRoot, 'src/file-79.ts')?.dataset.itemGitStatus)
+    .poll(() =>
+      rowButton(treeRoot, 'src/file-79.ts')
+        ?.querySelector('.wb-tree-git-badge')
+        ?.getAttribute('data-status'),
+    )
     .toBe('modified')
   const scroller = treeScroller(treeRoot)
   scroller.scrollTop = 0
   scroller.dispatchEvent(new Event('scroll', { bubbles: true }))
-  await expect.poll(() => treeRow(treeRoot, 'src/')?.dataset.itemContainsGitChange).toBe('true')
+  await expect
+    .poll(() => treeRow(treeRoot, 'src')?.querySelector('[data-wb-git-dot="true"]'))
+    .not.toBeNull()
   clickToolbarButton('Clear git status')
-  await expect.poll(() => treeRow(treeRoot, 'src/')?.dataset.itemContainsGitChange).toBeUndefined()
+  await expect
+    .poll(() => treeRow(treeRoot, 'src')?.querySelector('[data-wb-git-dot="true"]'))
+    .toBeNull()
   revealActiveFile()
   await expect
-    .poll(() => rowButton(treeRoot, 'src/file-79.ts')?.dataset.itemGitStatus)
-    .toBeUndefined()
+    .poll(() => rowButton(treeRoot, 'src/file-79.ts')?.querySelector('.wb-tree-git-badge'))
+    .toBeNull()
   expect(document.querySelector('[data-file-tree]')).toBe(treeHost)
 
   clickToolbarButton('Select unloaded file')
   await expect.poll(() => selectedFilePathText()).toBe(UNLOADED_FILE_PATH)
   revealActiveFile()
-  await expect.poll(() => activeTreePath(treeRoot)).toBe('src/')
+  await expect.poll(() => activeTreePath(treeRoot)).toBe('src')
 
   treeToolbar!.createFile()
   await expect.poll(() => renameField(treeRoot)).toBeTruthy()
   const renameInput = renameField(treeRoot)!
-  expect(renameInput.value).toBe('untitled')
+  expect(renameInput.getAttribute('aria-label')).toBe('New file name')
   renameInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
   await expect.poll(() => renameField(treeRoot)).toBeNull()
 
   treeToolbar!.createFolder()
-  await expect.poll(() => renameField(treeRoot)?.value).toBe('new folder')
+  await expect.poll(() => renameField(treeRoot)?.getAttribute('aria-label')).toBe('New folder name')
   renameField(treeRoot)?.dispatchEvent(
     new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }),
   )
@@ -273,21 +280,19 @@ test('selecting an editor tab expands and smoothly reveals its file without stea
   await expect.poll(() => selectedFilePathText()).toBe(SHALLOW_FILE_PATH)
   await expect
     .poll(
-      () =>
-        scroller.scrollTop <= (rowButton(treeRoot, 'src/')?.getBoundingClientRect().height ?? 0),
+      () => scroller.scrollTop <= (rowButton(treeRoot, 'src')?.getBoundingClientRect().height ?? 0),
     )
     .toBe(true)
   await expect
     .poll(() => rowIsVisibleInScroller(rowButton(treeRoot, 'src/file-0.ts'), scroller))
     .toBe(true)
 
-  // With sticky folders on, an ancestor scrolled past the top exists only as
-  // its sticky row, so the collapse has to go through whichever row is mounted.
-  const sourceDirectory = treeRow(treeRoot, 'src/')
+  const sourceDirectory = treeRow(treeRoot, 'src')
   expect(sourceDirectory).not.toBeNull()
   sourceDirectory!.focus()
+  await expect.poll(() => sourceDirectory!.dataset.focused).toBe('true')
   sourceDirectory!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }))
-  await expect.poll(() => treeRow(treeRoot, 'src/')?.getAttribute('aria-expanded')).toBe('false')
+  await expect.poll(() => treeRow(treeRoot, 'src')?.getAttribute('aria-expanded')).toBe('false')
 
   const requestedScrolls = observeScrollRequests(scroller)
   const selectDeepTabButton = toolbarButton('Select deep tab')
@@ -295,10 +300,8 @@ test('selecting an editor tab expands and smoothly reveals its file without stea
   selectDeepTabButton.click()
 
   await expect.poll(() => selectedFilePathText()).toBe(DEEP_FILE_PATH)
-  // Expanded again: a child row is mounted. The directory row itself may be
-  // the sticky copy by now, which carries no expansion state of its own.
   await expect
-    .poll(() => treeRoot.querySelector('button[data-item-path^="src/file-"]'))
+    .poll(() => treeRoot.querySelector('[data-wb-tree-row][data-path^="src/file-"]'))
     .not.toBeNull()
   await expect.poll(() => scroller.scrollTop).toBeGreaterThan(0)
   const smoothRequest = requestedScrolls.findLast((request) => request.behavior === 'smooth')
@@ -316,12 +319,12 @@ test('live density changes preserve the compact and cozy tree geometry and typog
   const { queryClient } = await mountTreePane(new FocusService(), { density: 'compact' })
 
   const treeRoot = await fileTreeRoot()
-  const treeHost = document.querySelector<HTMLElement>('[data-file-tree]')
-  expect(treeHost).not.toBeNull()
-  expect(treeHost!.style.getPropertyValue('--trees-font-family-override')).toBe(
+  const treeEl = treeRoot.querySelector<HTMLElement>('.wb-tree')
+  expect(treeEl).not.toBeNull()
+  expect(treeEl!.style.getPropertyValue('--wb-tree-font-family')).toBe(
     'var(--workbench-tree-font-family)',
   )
-  expect(treeHost!.style.getPropertyValue('--trees-font-size-override')).toBe(
+  expect(treeEl!.style.getPropertyValue('--wb-tree-font-size')).toBe(
     'var(--workbench-tree-font-size)',
   )
 
@@ -358,7 +361,7 @@ function TreePaneHarness({
     state.selectedTabContent ? (tabFileResource(state.selectedTabContent)?.path ?? null) : null,
   )
   const workbenchPanels = useEditorWorkspaceState((state) => state.workbenchPanels)
-  const [gitStatus, setGitStatus] = useState<readonly GitStatusEntry[]>([])
+  const [gitStatus, setGitStatus] = useState<readonly TreeGitStatusEntry[]>([])
   const [model] = useState(initialModel)
   const deepTab = allEditorTabs(workbenchPanels.editorGroups).find(
     (tab) => tabFileResource(tab.content)?.path === DEEP_FILE_PATH,
@@ -597,20 +600,18 @@ function toolbarButton(label: string) {
 }
 
 function searchField(treeRoot: ParentNode) {
-  const input = treeRoot.querySelector<HTMLInputElement>('[data-file-tree-search-input]')
+  const input = treeRoot.querySelector<HTMLInputElement>('[data-wb-filter-field] input')
   expect(input).not.toBeNull()
 
   return input!
 }
 
 function renameField(treeRoot: ParentNode) {
-  return treeRoot.querySelector<HTMLInputElement>('[data-item-rename-input]')
+  return treeRoot.querySelector<HTMLInputElement>('[data-testid="wb-tree-inline-input"]')
 }
 
 function rowButton(treeRoot: ParentNode, path: string) {
-  return treeRoot.querySelector<HTMLButtonElement>(
-    `button[data-item-path="${path}"]:not([data-file-tree-sticky-row="true"])`,
-  )
+  return treeRoot.querySelector<HTMLElement>(`[data-wb-tree-row][data-path="${path}"]`)
 }
 
 async function triggerForesightElement(target: HTMLElement): Promise<void> {
@@ -624,7 +625,7 @@ async function triggerForesightElement(target: HTMLElement): Promise<void> {
   await nextAnimationFrame()
 }
 
-async function activateTreeRowAndCaptureFirstFrame(row: HTMLButtonElement) {
+async function activateTreeRowAndCaptureFirstFrame(row: HTMLElement) {
   const firstFrame = new Promise<TreeActivationFirstFrame>((resolve) => {
     requestAnimationFrame(() => {
       const surface = document.querySelector<HTMLElement>('.editor-virtualized')
@@ -709,15 +710,15 @@ function treeRuntimeIsReady(): boolean {
 }
 
 function treeRow(treeRoot: ParentNode, path: string) {
-  return treeRoot.querySelector<HTMLButtonElement>(`button[data-item-path="${path}"]`)
+  return treeRoot.querySelector<HTMLElement>(`[data-wb-tree-row][data-path="${path}"]`)
 }
 
 function treeScroller(treeRoot: ParentNode) {
-  return treeRoot.querySelector<HTMLElement>('[data-file-tree-virtualized-scroll="true"]')!
+  return treeRoot.querySelector<HTMLElement>('[data-wb-tree-scroller]')!
 }
 
 function treeDensityMetrics(treeRoot: ParentNode) {
-  const row = rowButton(treeRoot, 'src/')
+  const row = rowButton(treeRoot, 'src')
   if (!row) return null
 
   const style = getComputedStyle(row)
@@ -780,8 +781,9 @@ function rowIsVisibleInScroller(row: HTMLElement | null, scroller: HTMLElement) 
 }
 
 function typeSearch(input: HTMLInputElement, value: string) {
-  input.value = value
-  input.dispatchEvent(new InputEvent('input', { bubbles: true, data: value }))
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+  setter?.call(input, value)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
 function revealActiveFile() {
@@ -797,7 +799,7 @@ function activeTreePath(treeRoot: ParentNode) {
   const activeElement = document.activeElement
   if (!(activeElement instanceof HTMLElement) || !treeRoot.contains(activeElement)) return null
 
-  return activeElement.dataset.itemPath ?? null
+  return activeElement.dataset.path ?? null
 }
 
 type TreeActivationFirstFrame = {

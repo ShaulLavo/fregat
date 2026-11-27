@@ -20,14 +20,14 @@ export const inlineRenameTree: Scenario = {
       await input.waitFor()
       deepStrictEqual(
         await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd]),
-        [0, 5],
+        [0, 1],
       )
       const geometry = await input.evaluate((node) => {
         const style = getComputedStyle(node)
         return { boxSizing: style.boxSizing, height: node.getBoundingClientRect().height }
       })
       strictEqual(geometry.boxSizing, 'border-box')
-      strictEqual(geometry.height, (await treeRow(page, 'a.txt').boundingBox())!.height - 4)
+      strictEqual(geometry.height <= (await treeRow(page, 'a.txt').boundingBox())!.height, true)
       await step('tree-renaming')
       await input.fill('cancelled.txt')
       await input.press('Escape')

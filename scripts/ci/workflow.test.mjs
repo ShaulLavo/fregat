@@ -260,7 +260,7 @@ test('script test partition discovers every file once and reuses built outputs',
   ])
   const browserJob = workflow.jobs.browser
   expect(browserJob.if).toBe(
-    "${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.tree == 'true' || needs.changes.outputs.tooling == 'true' }}",
+    "${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.tooling == 'true' }}",
   )
   expect(browserJob['runs-on']).toBe('ubuntu-latest')
   expect(workflow.jobs.verdict.needs).toContain('browser')

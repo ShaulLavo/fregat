@@ -6,34 +6,28 @@ export type TreeRowElement = {
 type RowElementListener = () => void
 
 /**
- * The row buttons the view has mounted, keyed by path. Flow and sticky rows are
- * separate: a sticky folder row and its flow row can be mounted at once.
+ * Tracks mounted tree row elements keyed by canonical tree path so hover prefetch
+ * and context-menu focus restoration can reach live DOM nodes without querying the tree.
  */
 export class TreeRowElements {
-  readonly #flow = new Map<string, HTMLElement>()
-  readonly #sticky = new Map<string, HTMLElement>()
+  readonly #rows = new Map<string, HTMLElement>()
   readonly #listeners = new Set<RowElementListener>()
   #notifyQueued = false
 
-  public register(path: string, element: HTMLElement | null, sticky: boolean): void {
-    const rows = sticky ? this.#sticky : this.#flow
-    if (rows.get(path) === (element ?? undefined)) return
+  public register(path: string, element: HTMLElement | null): void {
+    if (this.#rows.get(path) === (element ?? undefined)) return
 
-    if (element == null) rows.delete(path)
-    else rows.set(path, element)
+    if (element == null) this.#rows.delete(path)
+    else this.#rows.set(path, element)
     this.#queueNotify()
   }
 
-  /** The row for `path`, its flow row before a sticky mirror. */
   public element(path: string): HTMLElement | null {
-    return this.#flow.get(path) ?? this.#sticky.get(path) ?? null
+    return this.#rows.get(path) ?? null
   }
 
   public rows(): readonly TreeRowElement[] {
-    const rows: TreeRowElement[] = []
-    for (const [path, element] of this.#flow) rows.push({ element, path })
-    for (const [path, element] of this.#sticky) rows.push({ element, path })
-    return rows
+    return Array.from(this.#rows, ([path, element]) => ({ element, path }))
   }
 
   public subscribe(listener: RowElementListener): () => void {
@@ -43,7 +37,7 @@ export class TreeRowElements {
     }
   }
 
-  // A commit re-registers every row through its ref callback; listeners hear it once.
+  // A commit re-registers every mounted row through its ref callback; notify once per microtask.
   #queueNotify(): void {
     if (this.#notifyQueued) return
 
