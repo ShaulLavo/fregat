@@ -1,17 +1,82 @@
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
-import { BOOT_MIRROR_KEY } from '@/lib/boot-keys'
-import { writeBootMirror } from '@/lib/settings-boot-mirror'
-import { vi } from 'vitest'
+import type { TerminalAttachment } from '@shaulavo/workbench-core'
+import { TerminalView } from '@shaulavo/workbench-terminal'
 import { isCancelledError } from '@tanstack/query-core'
 import { GhosttyRuntime, type Terminal } from 'ghostty-webgpu'
-import { initializeGhostty } from '@/features/terminal/state/runtime'
-import { resourceQueryClient } from '@/lib/resources/state/query-client'
-import { expect, test } from '../../../../test/fixtures'
-import { primaryQueryClient } from '@/lib/environments/state/query-clients'
-import { getClient, primaryServerOrigin } from '@/lib/client'
-import { mountTerminal } from '@/features/terminal/state/mount'
+import { flushSync } from 'react-dom'
+import { createRoot } from 'react-dom/client'
+import { vi } from 'vitest'
+
+import {
+  createFregatRuntimeLoader,
+  createFregatTerminalAdapter,
+} from '@/features/terminal/state/fregat-adapter'
 import { terminalCheckoutQueryOptions } from '@/features/terminal/state/register-checkout'
+import { initializeGhostty } from '@/features/terminal/state/runtime'
 import { terminalQueryKeys } from '@/features/terminal/utils/query-keys'
+import { getClient, primaryServerOrigin } from '@/lib/client'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
+
+import { expect, test } from '../../../../test/fixtures'
+
+function mountFregatTerminalView(options: {
+  readonly host: HTMLDivElement
+  readonly sessionId: string
+  readonly signal: AbortSignal
+  readonly screenReader?: boolean
+  readonly onAttachStart?: () => void
+  readonly onAttached?: (terminal: Terminal, attachment: TerminalAttachment) => void
+  readonly onReadyChange?: (ready: boolean) => void
+  readonly onReady: (terminal: Terminal) => void
+  readonly onFailed: (message: string) => void
+}) {
+  const baseAdapter = createFregatTerminalAdapter({
+    origin: primaryServerOrigin(),
+    client: getClient(),
+    rootPath: '.',
+    signal: options.signal,
+    getSavedScroll: () => null,
+  })
+  const adapter = options.onAttachStart
+    ? {
+        ...baseAdapter,
+        attach: (sessionId: string, attachOptions: Parameters<typeof baseAdapter.attach>[1]) => {
+          options.onAttachStart?.()
+          return baseAdapter.attach(sessionId, attachOptions)
+        },
+      }
+    : baseAdapter
+  const loadRuntime = createFregatRuntimeLoader(primaryServerOrigin(), options.signal)
+  const root = createRoot(options.host)
+  flushSync(() => {
+    root.render(
+      <TerminalView
+        adapter={adapter}
+        sessionId={options.sessionId}
+        loadRuntime={loadRuntime}
+        scrollbackLimit={100}
+        screenReader={options.screenReader ?? false}
+        disableContextMenu
+        inertWhenNotReady
+        onTerminalReady={options.onReady}
+        onAttached={options.onAttached}
+        onReadyChange={options.onReadyChange}
+        onError={() =>
+          options.onFailed(
+            'Could not open the terminal. Close this terminal tab and open a new one.',
+          )
+        }
+      />,
+    )
+  })
+  return {
+    adapter: baseAdapter,
+    unmount: () => {
+      root.unmount()
+    },
+  }
+}
 
 test.each([
   'active',
@@ -46,25 +111,16 @@ test.each([
     const onFailed = vi.fn()
     const onReady = vi.fn()
     const controller = new AbortController()
-    const unmount = mountTerminal({
-      origin: primaryServerOrigin(),
-      client: getClient(),
-      signal: controller.signal,
+    const { unmount } = mountFregatTerminalView({
       host,
-      rootPath: '.',
-      scrollback: 100,
-      lowLatency: false,
       sessionId: `wasm-startup-${phase}`,
-      onConnectedChange: vi.fn(),
-      getSavedScroll: () => null,
-      onCapture: vi.fn(),
-      onExit: vi.fn(),
-      onFailed,
-      onProcessChange: vi.fn(),
+      signal: controller.signal,
       onReady,
-      onScrollbackLengthChange: vi.fn(),
-      onTitleChange: vi.fn(),
+      onFailed,
     })
+    // Allow TerminalView's effect (waitForDocumentFonts -> loadRuntime) to attach to the in-flight query.
+    await document.fonts.ready
+    await Promise.resolve()
     try {
       if (phase === 'unmounted') unmount()
       if (phase === 'beforeunload') window.dispatchEvent(new Event('beforeunload'))
@@ -82,7 +138,7 @@ test.each([
       const error = await opening
       await new Promise((resolve) => setTimeout(resolve, 0))
       if (phase === 'active' || phase === 'prevented-departure') {
-        expect(onFailed).toHaveBeenCalledOnce()
+        await expect.poll(() => onFailed.mock.calls.length, { timeout: 5_000 }).toBe(1)
         expect(onFailed).toHaveBeenCalledWith(
           'Could not open the terminal. Close this terminal tab and open a new one.',
         )
@@ -135,44 +191,59 @@ test.each([false, true])(
     const host = document.createElement('div')
     host.className = 'h-96 w-96'
     document.body.append(host)
+    const attachStarted = Promise.withResolvers<void>()
+    let attached: TerminalAttachment | null = null
+    let ready = false
     const onReady = vi.fn()
+    const onAttached = vi.fn((_terminal: Terminal, attachment: TerminalAttachment) => {
+      attached = attachment
+    })
+    const onReadyChange = vi.fn((nextReady: boolean) => {
+      ready = nextReady
+    })
     const onFailed = vi.fn()
     const controller = new AbortController()
-    const unmount = mountTerminal({
-      origin: primaryServerOrigin(),
-      client: getClient(),
-      signal: controller.signal,
+    const { adapter, unmount } = mountFregatTerminalView({
       host,
-      rootPath: '.',
-      scrollback: 100,
-      lowLatency: false,
       sessionId: `cancelled-open-${earlyRestore}`,
-      onConnectedChange: vi.fn(),
-      getSavedScroll: () => null,
-      onCapture: vi.fn(),
-      onExit: vi.fn(),
-      onFailed,
-      onProcessChange: vi.fn(),
+      signal: controller.signal,
+      onAttachStart: () => attachStarted.resolve(),
+      onAttached,
+      onReadyChange,
       onReady,
-      onScrollbackLengthChange: vi.fn(),
-      onTitleChange: vi.fn(),
+      onFailed,
     })
     try {
+      // Wait until adapter.attach() has entered the hanging checkout query before departing.
+      await attachStarted.promise
+      await Promise.resolve()
+      expect(onAttached).not.toHaveBeenCalled()
+      expect(ready).toBe(false)
+
       window.dispatchEvent(new Event('pagehide'))
       if (earlyRestore) window.dispatchEvent(new Event('pageshow'))
       await settled
       if (!earlyRestore) {
-        await Promise.resolve()
+        // Let the scheduled macrotask retry timer fire while the page is still hidden.
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        expect(client.getQueryState(queryKey)?.fetchStatus).toBe('idle')
+        expect(onAttached).not.toHaveBeenCalled()
+        expect(ready).toBe(false)
         window.dispatchEvent(new Event('pageshow'))
       }
 
-      await expect
-        .poll(() => onReady.mock.calls.length + onFailed.mock.calls.length, { timeout: 10_000 })
-        .toBe(1)
+      await expect.poll(() => ready, { timeout: 10_000 }).toBe(true)
       expect(onFailed.mock.calls).toEqual([])
       expect(onReady).toHaveBeenCalledOnce()
+      expect(onAttached).toHaveBeenCalledOnce()
       expect(host.querySelector('canvas')).not.toBeNull()
-      expect(onFailed).not.toHaveBeenCalled()
+      expect(host.querySelector('[inert]')).toBeNull()
+      const terminal = onReady.mock.calls[0]![0] as Terminal
+      const marker = `restored-${earlyRestore ? 'early' : 'late'}`
+      expect(adapter.tryWrite(attached!, `echo ${marker}\r`)).toBe(true)
+      await expect
+        .poll(() => terminal.visibleLines().join('\n'), { timeout: 10_000 })
+        .toContain(marker)
       window.dispatchEvent(new Event('pageshow'))
       expect(onReady).toHaveBeenCalledOnce()
     } finally {
@@ -185,14 +256,104 @@ test.each([false, true])(
   },
 )
 
+function invokeEventListener(
+  target: WebSocket,
+  listener: EventListenerOrEventListenerObject,
+  event: Event,
+) {
+  if (typeof listener === 'function') listener.call(target, event)
+  else listener.handleEvent(event)
+}
+
+function createCloseHoldingWebSocket() {
+  const NativeWebSocket = globalThis.WebSocket
+  const state = { socket: null as WebSocket | null, holdClose: false }
+
+  class CapturingWebSocket extends NativeWebSocket {
+    constructor(url: string | URL, protocols?: string | string[]) {
+      super(url, protocols)
+      state.socket = this
+    }
+
+    override addEventListener(
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: boolean | AddEventListenerOptions,
+    ) {
+      if (type !== 'close') {
+        super.addEventListener(type, listener, options)
+        return
+      }
+      const wrapped: EventListener = (event) => {
+        if (state.holdClose) return
+        invokeEventListener(this, listener, event)
+      }
+      super.addEventListener(type, wrapped, options)
+    }
+  }
+
+  return { CapturingWebSocket, state }
+}
+
+test(
+  'tryWrite reports false once the terminal socket is closing even before close fires',
+  { timeout: 20_000 },
+  async () => {
+    await primaryQueryClient().query(terminalCheckoutQueryOptions('.'))
+    const { CapturingWebSocket, state: socketState } = createCloseHoldingWebSocket()
+    vi.stubGlobal('WebSocket', CapturingWebSocket)
+
+    const host = document.createElement('div')
+    host.className = 'h-96 w-96'
+    document.body.append(host)
+    let attached: TerminalAttachment | null = null
+    let ready = false
+    const onReady = vi.fn()
+    const onFailed = vi.fn()
+    const controller = new AbortController()
+    const { adapter, unmount } = mountFregatTerminalView({
+      host,
+      sessionId: 'try-write-disconnect',
+      signal: controller.signal,
+      onAttached: (_terminal, attachment) => {
+        attached = attachment
+      },
+      onReadyChange: (nextReady) => {
+        ready = nextReady
+      },
+      onReady,
+      onFailed,
+    })
+    try {
+      await expect.poll(() => ready, { timeout: 10_000 }).toBe(true)
+      expect(onFailed).not.toHaveBeenCalled()
+      expect(attached).not.toBeNull()
+      expect(socketState.socket).not.toBeNull()
+
+      const terminal = onReady.mock.calls[0]![0] as Terminal
+      expect(adapter.tryWrite(attached!, 'echo open-socket-ok\r')).toBe(true)
+      await expect
+        .poll(() => terminal.visibleLines().join('\n'), { timeout: 10_000 })
+        .toContain('open-socket-ok')
+
+      socketState.holdClose = true
+      socketState.socket!.close()
+      expect(ready).toBe(true)
+      expect(adapter.tryWrite(attached!, 'echo closed-socket-requeue\r')).toBe(false)
+    } finally {
+      vi.unstubAllGlobals()
+      controller.abort()
+      unmount()
+      host.remove()
+    }
+  },
+)
+
 test.each([undefined, false, true])(
   'the mounted terminal applies screen-reader setting %s and releases its mirror',
   { timeout: 20_000 },
   async (enabled) => {
-    const savedMirror = localStorage.getItem(BOOT_MIRROR_KEY)
     const initiallyEnabled = enabled ?? DEFAULT_SETTING_VALUES['terminal.integrated.screenReader']
-    if (enabled === undefined) localStorage.removeItem(BOOT_MIRROR_KEY)
-    else writeBootMirror({ ...DEFAULT_SETTING_VALUES, 'terminal.integrated.screenReader': enabled })
     await primaryQueryClient().query(terminalCheckoutQueryOptions('.'))
     const host = document.createElement('div')
     host.className = 'h-96 w-96'
@@ -200,24 +361,13 @@ test.each([undefined, false, true])(
     const onReady = vi.fn()
     const onFailed = vi.fn()
     const controller = new AbortController()
-    const unmount = mountTerminal({
-      origin: primaryServerOrigin(),
-      client: getClient(),
-      signal: controller.signal,
+    const { unmount } = mountFregatTerminalView({
       host,
-      rootPath: '.',
-      scrollback: 100,
-      lowLatency: false,
       sessionId: 'screen-reader-mount',
-      onConnectedChange: vi.fn(),
-      getSavedScroll: () => null,
-      onCapture: vi.fn(),
-      onExit: vi.fn(),
-      onFailed,
-      onProcessChange: vi.fn(),
+      signal: controller.signal,
+      screenReader: initiallyEnabled,
       onReady,
-      onScrollbackLengthChange: vi.fn(),
-      onTitleChange: vi.fn(),
+      onFailed,
     })
     try {
       await expect
@@ -249,8 +399,6 @@ test.each([undefined, false, true])(
       controller.abort()
       unmount()
       host.remove()
-      if (savedMirror === null) localStorage.removeItem(BOOT_MIRROR_KEY)
-      else localStorage.setItem(BOOT_MIRROR_KEY, savedMirror)
     }
   },
 )

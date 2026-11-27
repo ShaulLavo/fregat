@@ -5,15 +5,16 @@ import {
   ArrowUpIcon,
   type Icon,
 } from '@phosphor-icons/react'
+import {
+  controlKeyFor,
+  dispatchTerminalHardwareKey,
+  TERMINAL_KEYS,
+  type TerminalKey,
+} from '@shaulavo/workbench-terminal'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { useEffect, useState, type RefObject } from 'react'
 
 import { KeyButton } from '@/features/phone/components/key-button'
-import {
-  controlKeyFor,
-  TERMINAL_KEYS,
-  type TerminalKey,
-} from '@/features/phone/utils/terminal-keys'
 
 const ARROWS: readonly (readonly [TerminalKey, Icon])[] = [
   [TERMINAL_KEYS.left, ArrowLeftIcon],
@@ -43,7 +44,7 @@ export function TerminalKeys({
       if (!chord || !event.cancelable) return
       event.preventDefault()
       setControl(false)
-      press(host, chord, true)
+      dispatchTerminalHardwareKey(host, chord, true)
     }
     host.addEventListener('beforeinput', onBeforeInput, { capture: true })
     return () => host.removeEventListener('beforeinput', onBeforeInput, { capture: true })
@@ -52,7 +53,7 @@ export function TerminalKeys({
   function send(key: TerminalKey) {
     const host = terminalRef.current
     if (!host) return
-    press(host, key, control)
+    dispatchTerminalHardwareKey(host, key, control)
     setControl(false)
   }
 
@@ -68,13 +69,4 @@ export function TerminalKeys({
       </span>
     </PaneBar>
   )
-}
-
-/** Sends a key to the terminal's input, the one element that reads the keyboard. */
-function press(host: HTMLElement, key: TerminalKey, ctrlKey: boolean) {
-  const input = host.querySelector('textarea')
-  if (!input) return
-  const init = { bubbles: true, cancelable: true, code: key.code, ctrlKey, key: key.key }
-  input.dispatchEvent(new KeyboardEvent('keydown', init))
-  input.dispatchEvent(new KeyboardEvent('keyup', init))
 }
