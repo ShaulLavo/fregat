@@ -66,3 +66,56 @@ test('external draft restoration updates the mounted composer without stealing f
   )
   expect(readChatInputText(editor!)).toBe('Edited after restoration')
 })
+
+test('external draft replacement resyncs the input window and keeps undo from restoring old text', async () => {
+  const syncTarget = {
+    environmentId: TEST_ENVIRONMENT_ID,
+    draftKey: 'draft-sync-undo-test',
+    rootPath: '/repo',
+  }
+  const drafts = useChatInputDraftStore.getState()
+  drafts.setPrompt(syncTarget, 'Read this complete stashed message.')
+  let editor: ChatInputEditorHandle | null = null
+  renderWithProviders(
+    <ChatInputEditorProvider>
+      <ChatInputEditor
+        ariaLabel='Sync composer'
+        disabled={false}
+        draftKey={syncTarget.draftKey}
+        placeholder='Message'
+        rootPath={syncTarget.rootPath}
+        trigger={null}
+        onCommandMenuCommit={() => false}
+        onCommandMenuMove={() => false}
+        onEditorReady={(value) => {
+          editor = value
+        }}
+        onImageFiles={async () => true}
+        onSubmitRequest={async () => false}
+        onTriggerChange={() => {}}
+      />
+    </ChatInputEditorProvider>,
+  )
+  await waitFor(() => expect(editor).not.toBeNull())
+  await waitFor(() =>
+    expect(readChatInputText(editor!)).toBe('Read this complete stashed message.'),
+  )
+  const input = screen.getByRole('textbox', { name: 'Sync composer' }) as HTMLTextAreaElement
+  act(() => {
+    editor!.focus()
+    editor!.setSelection(35)
+    editor!.editRange(35, 35, ' Extra edit.', { anchor: 47 })
+  })
+  expect(readChatInputText(editor!)).toBe('Read this complete stashed message. Extra edit.')
+
+  act(() => drafts.setPrompt(syncTarget, 'Keep this idea.'))
+  await waitFor(() => expect(readChatInputText(editor!)).toBe('Keep this idea.'))
+  expect(input.value).toBe('Keep this idea.')
+  expect(input.selectionStart).toBeLessThanOrEqual('Keep this idea.'.length)
+  expect(input.selectionEnd).toBeLessThanOrEqual('Keep this idea.'.length)
+
+  act(() => {
+    editor!.editor.dispatchCommand('undo')
+  })
+  expect(readChatInputText(editor!)).toBe('Keep this idea.')
+})

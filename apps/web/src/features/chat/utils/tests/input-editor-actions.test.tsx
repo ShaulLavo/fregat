@@ -173,6 +173,21 @@ test('typing a bracket over a selection wraps it and keeps the wrapped text sele
   expect(selectedText(editor)).toBe('wrap this word')
 })
 
+test('replaceChatInputEditorRange returns null when the editor is readonly', () => {
+  const editor = mountChatInputEditor('Hello world')
+  editor.setEditable(false)
+
+  expect(
+    replaceChatInputEditorRange(editor, {
+      expectedText: 'world',
+      rangeEnd: 11,
+      rangeStart: 6,
+      replacement: 'friend',
+    }),
+  ).toBeNull()
+  expect(readChatInputTextSnapshot(editor).text).toBe('Hello world')
+})
+
 function mountChatInputEditor(text: string): ChatInputEditorHandle {
   useChatInputDraftStore.getState().setPrompt(
     {

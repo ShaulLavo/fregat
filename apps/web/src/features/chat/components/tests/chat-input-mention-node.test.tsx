@@ -66,6 +66,23 @@ test('pasting plain prose inserts text without creating mention chips', () => {
   expect(composer.anyChip()).toBeNull()
 })
 
+test('typing an active bare mention query keeps it editable so Backspace deletes one character', async () => {
+  const composer = renderComposer('')
+
+  act(() => {
+    composer.editor.editRange(0, 0, '@srcc', { anchor: 5 })
+  })
+  expect(composer.anyChip()).toBeNull()
+  composer.pressBackspace()
+  expect(composer.text).toBe('@src')
+  expect(composer.anyChip()).toBeNull()
+
+  act(() => {
+    composer.editor.editRange(4, 4, ' ', { anchor: 5 })
+  })
+  await waitFor(() => expect(composer.chip('src')?.textContent).toBe('src'))
+})
+
 function renderComposer(initialText: string) {
   useChatInputDraftStore.getState().setPrompt(
     {

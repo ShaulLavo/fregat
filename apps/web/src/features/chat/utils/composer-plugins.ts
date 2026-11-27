@@ -1,9 +1,11 @@
 import type { EditorPlugin } from '@singapore-editor/core/extensions'
 import type { EditorTheme, InlineReplacementSpec } from '@singapore-editor/core/rendering'
-import { collectComposerMentions } from '@workspace/contracts'
+import { activeComposerMention, collectComposerMentions } from '@workspace/contracts'
 
 import { ultrathinkMatch } from '@/features/chat/utils/effort-tier'
 import { basename } from '@/lib/path-formatters'
+
+type ComposerMentionToken = ReturnType<typeof collectComposerMentions>[number]
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
@@ -48,11 +50,48 @@ function createFileCodeSvg(): SVGSVGElement {
   return svg
 }
 
+function renderMentionChip(tokenPath: string) {
+  return (container: HTMLElement) => {
+    const chip = document.createElement('span')
+    chip.className =
+      'bg-muted text-foreground inline-flex max-w-full items-baseline gap-1 rounded-md px-1 align-baseline font-mono text-xs leading-tight select-none'
+    chip.contentEditable = 'false'
+    chip.dataset.chatInputMention = tokenPath
+    chip.spellcheck = false
+    chip.title = tokenPath
+    const label = document.createElement('span')
+    label.className = 'overflow-hidden text-ellipsis whitespace-nowrap'
+    label.title = tokenPath
+    label.textContent = basename(tokenPath)
+    chip.append(createFileCodeSvg(), label)
+    container.replaceChildren(chip)
+    return {
+      dispose() {
+        container.replaceChildren()
+      },
+    }
+  }
+}
+
+function mentionSpecForToken(token: ComposerMentionToken): InlineReplacementSpec {
+  return {
+    atomic: true,
+    endIndex: token.end,
+    id: `mention:${token.start}:${token.end}`,
+    key: `mention:${token.path}:${token.start}`,
+    kind: 'mention',
+    render: renderMentionChip(token.path),
+    reveal: 'never',
+    startIndex: token.start,
+    text: basename(token.path),
+  }
+}
+
 /**
- * Renders every canonical `@path` / `@"path with spaces"` mention as an atomic inline chip
- * (`reveal: 'never'`, `atomic: true`) evaluated on every edit.
+ * Renders every completed `@path` / `@"path with spaces"` mention as an atomic inline chip
+ * (`reveal: 'never'`, `atomic: true`) while leaving an active bare `@query` at the caret editable.
  */
-export function createChatInputMentionPlugin(): EditorPlugin {
+export function createChatInputMentionPlugin(getActiveCursor?: () => number | null): EditorPlugin {
   return {
     name: 'fregat.chat-input-mentions',
     activate(context) {
@@ -61,36 +100,10 @@ export function createChatInputMentionPlugin(): EditorPlugin {
           const text = textSnapshot.readRange(0, textSnapshot.length)
           const tokens = collectComposerMentions(text)
           if (tokens.length === 0) return []
-          return tokens.map((token): InlineReplacementSpec => ({
-            atomic: true,
-            endIndex: token.end,
-            id: `mention:${token.start}:${token.end}`,
-            key: `mention:${token.path}:${token.start}`,
-            kind: 'mention',
-            render(container) {
-              const chip = document.createElement('span')
-              chip.className =
-                'bg-muted text-foreground inline-flex max-w-full items-baseline gap-1 rounded-md px-1 align-baseline font-mono text-xs leading-tight select-none'
-              chip.contentEditable = 'false'
-              chip.dataset.chatInputMention = token.path
-              chip.spellcheck = false
-              chip.title = token.path
-              const label = document.createElement('span')
-              label.className = 'overflow-hidden text-ellipsis whitespace-nowrap'
-              label.title = token.path
-              label.textContent = basename(token.path)
-              chip.append(createFileCodeSvg(), label)
-              container.replaceChildren(chip)
-              return {
-                dispose() {
-                  container.replaceChildren()
-                },
-              }
-            },
-            reveal: 'never',
-            startIndex: token.start,
-            text: basename(token.path),
-          }))
+          const cursor = getActiveCursor?.() ?? null
+          const activeStart =
+            cursor === null ? null : (activeComposerMention(text, cursor)?.start ?? null)
+          return tokens.filter((token) => token.start !== activeStart).map(mentionSpecForToken)
         },
         { trigger: 'edit' },
       )

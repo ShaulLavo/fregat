@@ -36,6 +36,7 @@ export function ChatInputPasteFoldPlugin({
     if (!editor) return
     const inputElement = editor.getInputElement()
     const onPaste = (event: ClipboardEvent) => {
+      if (!editor.isEditable() || editor.isComposing()) return
       const text = event.clipboardData?.getData('text/plain') ?? ''
       const inline = Date.now() <= pasteInlineUntil.current
       pasteInlineUntil.current = 0

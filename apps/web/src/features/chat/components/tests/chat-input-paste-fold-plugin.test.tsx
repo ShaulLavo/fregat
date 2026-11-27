@@ -113,3 +113,52 @@ test('Mod+Shift+V keeps a large paste inline and preserves native paste', async 
   await waitFor(() => expect(readChatInputText(editor!)).toBe(text))
   expect(attached).toBe(0)
 })
+
+test('a disabled composer ignores both large text paste folding and clipboard file pastes', async () => {
+  let editor: ChatInputEditorHandle | null = null
+  let attached = 0
+  renderWithProviders(
+    <ChatInputEditorProvider>
+      <ChatInputEditor
+        ariaLabel='Disabled paste composer'
+        disabled={true}
+        draftKey='paste-disabled'
+        placeholder='Message'
+        rootPath='/repo'
+        trigger={null}
+        onCommandMenuCommit={() => false}
+        onCommandMenuMove={() => false}
+        onEditorReady={(value) => {
+          editor = value
+        }}
+        onImageFiles={async () => {
+          attached += 1
+          return true
+        }}
+        onSubmitRequest={async () => false}
+        onTriggerChange={() => {}}
+      />
+    </ChatInputEditorProvider>,
+  )
+  await waitFor(() => expect(editor).not.toBeNull())
+  const input = screen.getByRole('textbox', { name: 'Disabled paste composer' })
+
+  act(() => {
+    input.dispatchEvent(createPasteEvent('z'.repeat(40 * 1024)))
+  })
+  const imagePaste = new Event('paste', { bubbles: true, cancelable: true })
+  Object.defineProperty(imagePaste, 'clipboardData', {
+    value: {
+      files: [new File(['png'], 'shot.png', { type: 'image/png' })],
+      getData: () => '',
+      items: [],
+      types: ['Files'],
+    },
+  })
+  act(() => {
+    input.dispatchEvent(imagePaste)
+  })
+
+  expect(attached).toBe(0)
+  expect(readChatInputText(editor!)).toBe('')
+})

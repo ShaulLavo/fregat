@@ -121,6 +121,10 @@ async function dictateDraft({
         },
       })
     const replacement = result.text.slice(captured.selection.start, result.selection.start)
+    // Dictation freezes editing while `mutation.isPending` is true; unlock just for the commit edit
+    // so the transcript and its collapsed caret land as one undoable edit before pending clears.
+    const wasEditable = editor.isEditable()
+    if (!wasEditable) editor.setEditable(true)
     const applied = replaceChatInputEditorRange(editor, {
       expectedText: captured.text.slice(captured.selection.start, captured.selection.end),
       rangeStart: captured.selection.start,
@@ -128,6 +132,7 @@ async function dictateDraft({
       replacement,
       focus: true,
     })
+    if (!wasEditable) editor.setEditable(false)
     if (!applied) throw voiceErrors.STALE({ internal: { revision, phase: 'commit' } })
     useChatInputDraftStore.getState().setPrompt(draftTarget, applied.text)
     return applied.text

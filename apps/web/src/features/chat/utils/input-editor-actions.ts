@@ -29,7 +29,7 @@ export type ChatInputEditorHandle = {
     to: number,
     text: string,
     selection?: { readonly anchor: number; readonly head?: number },
-  ) => void
+  ) => boolean
 }
 
 export function createChatInputEditorHandle(
@@ -61,7 +61,9 @@ export function createChatInputEditorHandle(
 
   const setText: ChatInputEditorHandle['setText'] = (text, setOptions = {}) => {
     if (setOptions.syncOnly) {
-      editor.syncText(text)
+      // Full document reset clears stale undo states and resyncs the hidden textarea window without stealing focus.
+      editor.setText(text)
+      if (text.length > 0) editor.setSelection(text.length)
       if (setOptions.focus) editor.focus()
       return
     }
@@ -84,7 +86,9 @@ export function createChatInputEditorHandle(
     setSelection: (anchor, head) => editor.setSelection(anchor, head),
     setText,
     editRange: (from, to, text, selection) => {
+      if (editor.getState().editability !== 'editable') return false
       editor.edit({ from, to, text }, selection ? { selection } : undefined)
+      return true
     },
   }
 }
@@ -167,7 +171,8 @@ export function replaceChatInputEditorRange(
   })
   if (!result) return null
 
-  editor.editRange(result.rangeStart, result.rangeEnd, replacement, { anchor: result.cursor })
+  if (!editor.editRange(result.rangeStart, result.rangeEnd, replacement, { anchor: result.cursor }))
+    return null
   if (focus) editor.focus()
   return result
 }

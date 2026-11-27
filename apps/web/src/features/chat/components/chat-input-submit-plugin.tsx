@@ -54,28 +54,49 @@ export function ChatInputSubmitPlugin({
   useEffect(() => {
     if (!editor) return
     const inputElement = editor.getInputElement()
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Enter') {
-        handleEnterCommand({ commandMenuOpen, disabled, event, onCommandMenuCommit })
-        return
-      }
-      if (event.key === 'Tab') {
-        handleMenuCommitCommand(commandMenuOpen, event, onCommandMenuCommit)
-        return
-      }
-      if (event.key === 'ArrowDown') {
-        handleMenuMoveCommand(commandMenuOpen, event, onCommandMenuMove, 1)
-        return
-      }
-      if (event.key === 'ArrowUp') {
-        handleMenuMoveCommand(commandMenuOpen, event, onCommandMenuMove, -1)
-      }
-    }
+    const onKeyDown = (event: KeyboardEvent) =>
+      handleComposerKeyDown({
+        commandMenuOpen,
+        disabled,
+        event,
+        onCommandMenuCommit,
+        onCommandMenuMove,
+      })
     inputElement.addEventListener('keydown', onKeyDown, true)
     return () => inputElement.removeEventListener('keydown', onKeyDown, true)
   }, [commandMenuOpen, disabled, editor, onCommandMenuCommit, onCommandMenuMove])
 
   return null
+}
+
+function handleComposerKeyDown({
+  commandMenuOpen,
+  disabled,
+  event,
+  onCommandMenuCommit,
+  onCommandMenuMove,
+}: {
+  commandMenuOpen: boolean
+  disabled: boolean
+  event: KeyboardEvent
+  onCommandMenuCommit: () => boolean
+  onCommandMenuMove: (offset: number) => boolean
+}) {
+  if (event.key === 'Enter') {
+    handleEnterCommand({ commandMenuOpen, disabled, event, onCommandMenuCommit })
+    return
+  }
+  if (event.key === 'Tab') {
+    handleMenuCommitCommand(commandMenuOpen, event, onCommandMenuCommit)
+    return
+  }
+  if (event.key === 'ArrowDown') {
+    handleMenuMoveCommand(commandMenuOpen, event, onCommandMenuMove, 1)
+    return
+  }
+  if (event.key === 'ArrowUp') {
+    handleMenuMoveCommand(commandMenuOpen, event, onCommandMenuMove, -1)
+  }
 }
 
 function handleEnterCommand({

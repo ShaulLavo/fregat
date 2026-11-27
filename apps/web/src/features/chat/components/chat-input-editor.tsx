@@ -78,7 +78,6 @@ export function ChatInputEditor({
     }),
     [draftKey, initialText, namespace, rootPath],
   )
-  const plugins = useMemo(() => [createChatInputMentionPlugin()], [])
 
   const controller = useEditor({
     autoClosingPairs: [],
@@ -100,7 +99,6 @@ export function ChatInputEditor({
       const text = controller.materializeFullText()
       setEmpty(text.length === 0)
     },
-    plugins,
     scrollMode: 'virtualized',
     scrollPastEnd: false,
     surroundingPairs: COMPOSER_SURROUND_PAIRS,
@@ -156,6 +154,14 @@ export function ChatInputEditor({
     inputElement.addEventListener('compositionend', onCompositionEnd)
     inputElement.addEventListener('keydown', onLineBoundaryKey, true)
 
+    const mentionDisposable = editorInstance.addPlugin(
+      createChatInputMentionPlugin(() => {
+        const primary = editorInstance.getSelections()[0]
+        if (!primary || primary.anchorOffset !== primary.headOffset) return null
+        return primary.anchorOffset
+      }),
+    )
+
     const handle = createChatInputEditorHandle(editorInstance, {
       getRootElement: () => hostElementRef.current,
       isComposing: () => composingRef.current,
@@ -164,6 +170,7 @@ export function ChatInputEditor({
     registerEditor(handle)
 
     return () => {
+      mentionDisposable.dispose()
       inputElement.removeEventListener('compositionstart', onCompositionStart)
       inputElement.removeEventListener('compositionend', onCompositionEnd)
       inputElement.removeEventListener('keydown', onLineBoundaryKey, true)
@@ -174,6 +181,7 @@ export function ChatInputEditor({
   }, [editorInstance, placeholder, registerEditor])
 
   const handlePasteCapture = (event: ClipboardEvent<HTMLElement>) => {
+    if (disabled) return
     const files = filesFromClipboard(event.clipboardData)
     if (files.length === 0) return
 
