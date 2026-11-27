@@ -115,6 +115,17 @@ test('a menu-committed bare mention stays atomic after ArrowLeft and deletes in 
   composer.pressBackspace()
   expect(composer.text).toBe('check  ')
   expect(composer.anyChip()).toBeNull()
+
+  act(() => {
+    fireEvent.keyDown(composer.editor.getInputElement(), { ctrlKey: true, key: 'z' })
+  })
+  await waitFor(() => expect(composer.chip('AGENTS.md')?.textContent).toBe('AGENTS.md'))
+  expect(composer.text).toBe('check @AGENTS.md ')
+  expect(composer.lastTrigger()).toBeNull()
+
+  composer.pressBackspace()
+  expect(composer.text).toBe('check  ')
+  expect(composer.anyChip()).toBeNull()
 })
 
 function renderComposer(initialText: string) {
@@ -126,7 +137,10 @@ function renderComposer(initialText: string) {
     },
     initialText,
   )
-  const state = { editor: null as ChatInputEditorHandle | null }
+  const state = {
+    editor: null as ChatInputEditorHandle | null,
+    lastTrigger: null as unknown,
+  }
 
   const rendered = renderWithProviders(
     <ChatInputEditorProvider>
@@ -144,7 +158,9 @@ function renderComposer(initialText: string) {
         }}
         onImageFiles={async () => true}
         onSubmitRequest={async () => false}
-        onTriggerChange={() => {}}
+        onTriggerChange={(next) => {
+          state.lastTrigger = next
+        }}
       />
     </ChatInputEditorProvider>,
   )
@@ -159,6 +175,9 @@ function renderComposer(initialText: string) {
     },
     chip(path: string) {
       return rendered.container.querySelector(`[data-chat-input-mention="${path}"]`)
+    },
+    lastTrigger() {
+      return state.lastTrigger
     },
     paste(text: string) {
       const event = new Event('paste', { bubbles: true, cancelable: true })

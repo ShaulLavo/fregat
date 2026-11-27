@@ -18,6 +18,7 @@ import {
   COMPOSER_EDITOR_THEME,
   COMPOSER_SURROUND_PAIRS,
   createChatInputMentionPlugin,
+  createComposerMentionTracker,
 } from '@/features/chat/utils/composer-plugins'
 import { filesFromClipboard } from '@/features/chat/utils/input-attachments'
 import {
@@ -154,16 +155,24 @@ export function ChatInputEditor({
     inputElement.addEventListener('compositionend', onCompositionEnd)
     inputElement.addEventListener('keydown', onLineBoundaryKey, true)
 
+    const mentionTracker = createComposerMentionTracker()
+    const readActiveCursor = () => {
+      const primary = editorInstance.getSelections()[0]
+      if (!primary || primary.anchorOffset !== primary.headOffset) return null
+      return primary.anchorOffset
+    }
     const mentionDisposable = editorInstance.addPlugin(
-      createChatInputMentionPlugin(() => {
-        const primary = editorInstance.getSelections()[0]
-        if (!primary || primary.anchorOffset !== primary.headOffset) return null
-        return primary.anchorOffset
-      }),
+      createChatInputMentionPlugin(readActiveCursor, mentionTracker),
     )
 
     const handle = createChatInputEditorHandle(editorInstance, {
       getRootElement: () => hostElementRef.current,
+      hasCompletedMentionAt: (start) =>
+        mentionTracker.hasCompletedMentionAt(
+          editorInstance.materializeFullText(),
+          readActiveCursor(),
+          start,
+        ),
       isComposing: () => composingRef.current,
     })
     handleRef.current = handle

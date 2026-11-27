@@ -31,7 +31,12 @@ export function ChatInputDraftPlugin({
   const handleTransaction = useEffectEvent((currentEditor: ChatInputEditorHandle) => {
     const { cursor, text } = readChatInputTextSnapshot(currentEditor)
     setPrompt({ environmentId, draftKey, rootPath }, text)
-    onTriggerChange(detectChatInputTrigger(text, cursor))
+    const trigger = detectChatInputTrigger(text, cursor)
+    const nextTrigger =
+      trigger?.kind === 'mention' && currentEditor.hasCompletedMentionAt(trigger.rangeStart)
+        ? null
+        : trigger
+    onTriggerChange(nextTrigger)
   })
 
   useEffect(() => {

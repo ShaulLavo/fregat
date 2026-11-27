@@ -87,64 +87,120 @@ function mentionSpecForToken(token: ComposerMentionToken): InlineReplacementSpec
   }
 }
 
-function isCompletedChip(
-  token: ComposerMentionToken,
+const MAX_DELETED_CHIPS = 32
+
+function sameChip(a: ComposerMentionToken, b: ComposerMentionToken) {
+  return a.start === b.start && a.end === b.end && a.source === b.source
+}
+
+function isCompletedChip(token: ComposerMentionToken, chips: readonly ComposerMentionToken[]) {
+  return chips.some((chip) => sameChip(chip, token))
+}
+
+function recordDeletedChips(
   previousChips: readonly ComposerMentionToken[],
+  nextChips: readonly ComposerMentionToken[],
+  deletedChips: readonly ComposerMentionToken[],
 ) {
-  return previousChips.some(
-    (chip) => chip.start === token.start && chip.end === token.end && chip.source === token.source,
-  )
+  const removed = previousChips.filter((chip) => !isCompletedChip(chip, nextChips))
+  if (removed.length === 0) return deletedChips
+  const kept = deletedChips.filter((chip) => !isCompletedChip(chip, removed))
+  const combined = kept.concat(removed)
+  return combined.length > MAX_DELETED_CHIPS
+    ? combined.slice(combined.length - MAX_DELETED_CHIPS)
+    : combined
+}
+
+function wasRestoredWhole(
+  token: ComposerMentionToken,
+  previousText: string,
+  deletedChips: readonly ComposerMentionToken[],
+) {
+  if (!isCompletedChip(token, deletedChips)) return false
+  // Typing onto an active `@query` already starts with `@`; undo restores the full token at once.
+  return previousText.slice(token.start, token.start + 1) !== '@'
 }
 
 function selectMentionChips({
   activeStart,
+  deletedChips,
   previousChips,
+  previousText,
   textUnchanged,
   tokens,
 }: {
   readonly activeStart: number | null
+  readonly deletedChips: readonly ComposerMentionToken[]
   readonly previousChips: readonly ComposerMentionToken[]
+  readonly previousText: string
   readonly textUnchanged: boolean
   readonly tokens: readonly ComposerMentionToken[]
 }) {
   return tokens.filter((token) => {
     if (isCompletedChip(token, previousChips)) return true
     if (textUnchanged) return false
+    if (wasRestoredWhole(token, previousText, deletedChips)) return true
     return token.start !== activeStart
   })
+}
+
+/**
+ * Tracks completed `@path` / `@"path with spaces"` mention chips across caret moves and undo/redo
+ * so both the inline replacement provider and trigger detection agree synchronously.
+ */
+export function createComposerMentionTracker() {
+  let previousText = ''
+  let previousCursor: number | null = null
+  let previousChips: readonly ComposerMentionToken[] = []
+  let deletedChips: readonly ComposerMentionToken[] = []
+
+  const sync = (text: string, cursor: number | null) => {
+    if (text === previousText && cursor === previousCursor) return previousChips
+    const tokens = collectComposerMentions(text)
+    const activeStart =
+      cursor === null ? null : (activeComposerMention(text, cursor)?.start ?? null)
+    const chips =
+      tokens.length === 0
+        ? []
+        : selectMentionChips({
+            activeStart,
+            deletedChips,
+            previousChips,
+            previousText,
+            textUnchanged: text === previousText,
+            tokens,
+          })
+    deletedChips = recordDeletedChips(previousChips, chips, deletedChips)
+    previousText = text
+    previousCursor = cursor
+    previousChips = chips
+    return chips
+  }
+
+  return {
+    sync,
+    hasCompletedMentionAt(text: string, cursor: number | null, start: number) {
+      return sync(text, cursor).some((chip) => chip.start === start)
+    },
+  }
 }
 
 /**
  * Renders every completed `@path` / `@"path with spaces"` mention as an atomic inline chip
  * (`reveal: 'never'`, `atomic: true`) while leaving an active bare `@query` at the caret editable.
  */
-export function createChatInputMentionPlugin(getActiveCursor?: () => number | null): EditorPlugin {
+export function createChatInputMentionPlugin(
+  getActiveCursor?: () => number | null,
+  tracker = createComposerMentionTracker(),
+): EditorPlugin {
   return {
     name: 'fregat.chat-input-mentions',
     activate(context) {
-      let previousText = ''
-      let previousChips: readonly ComposerMentionToken[] = []
       return context.registerInlineReplacementProvider(
         ({ textSnapshot }) => {
           const text = textSnapshot.readRange(0, textSnapshot.length)
-          const tokens = collectComposerMentions(text)
-          if (tokens.length === 0) {
-            previousText = text
-            previousChips = []
-            return []
-          }
           const cursor = getActiveCursor?.() ?? null
-          const activeStart =
-            cursor === null ? null : (activeComposerMention(text, cursor)?.start ?? null)
-          const chips = selectMentionChips({
-            activeStart,
-            previousChips,
-            textUnchanged: text === previousText,
-            tokens,
-          })
-          previousText = text
-          previousChips = chips
-          return chips.map(mentionSpecForToken)
+          return tracker.sync(text, cursor).map(mentionSpecForToken)
         },
         { trigger: 'edit' },
       )

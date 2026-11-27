@@ -13,6 +13,7 @@ export type ChatInputEditorHandle = {
   readonly focus: () => void
   readonly getInputElement: () => HTMLElement
   readonly getRootElement: () => HTMLElement | null
+  readonly hasCompletedMentionAt: (start: number) => boolean
   readonly isComposing: () => boolean
   readonly isEditable: () => boolean
   readonly getText: () => string
@@ -36,6 +37,7 @@ export function createChatInputEditorHandle(
   editor: Editor,
   options: {
     readonly getRootElement?: () => HTMLElement | null
+    readonly hasCompletedMentionAt?: (start: number) => boolean
     readonly isComposing?: () => boolean
   } = {},
 ): ChatInputEditorHandle {
@@ -77,6 +79,7 @@ export function createChatInputEditorHandle(
     focus: () => editor.focus(),
     getInputElement: () => editor.getInputElement(),
     getRootElement: () => options.getRootElement?.() ?? editor.getInputElement().parentElement,
+    hasCompletedMentionAt: (start) => options.hasCompletedMentionAt?.(start) ?? false,
     isComposing: () => options.isComposing?.() ?? false,
     isEditable: () => editor.getState().editability === 'editable',
     getText,
