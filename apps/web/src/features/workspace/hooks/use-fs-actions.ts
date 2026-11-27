@@ -264,6 +264,7 @@ export function useFsActions({
 
   /** Only after the dialog has said so: the journal cannot hold this delete. */
   async function deleteForever(targets: readonly DeleteTarget[]) {
+    let completedCount = 0
     const outcome = await runTreeIntent({
       patch: {
         kind: 'delete',
@@ -276,6 +277,7 @@ export function useFsActions({
           const client = clientForQueryClient(queryClient)
           for (const target of targets) {
             await deletePath(target.path, target.isDirectory, client)
+            completedCount += 1
           }
         }
         if (!workspaceEdits) return remove()
@@ -288,6 +290,9 @@ export function useFsActions({
     if (outcome.ok || outcome.reason !== 'transport') {
       closeDeleteDialog()
       return
+    }
+    if (completedCount > 0) {
+      setDeleteTargets(targets.slice(completedCount))
     }
     setDeleteError(clientErrorMessage(outcome.error))
   }

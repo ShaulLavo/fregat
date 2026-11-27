@@ -489,7 +489,15 @@ function ReadyTreePane({
           )
         }}
         onRequestDelete={(paths) => {
-          const targets = topLevelPaths(paths.map(canonicalTreePath))
+          const visiblePaths = new Set(
+            tree
+              .getSnapshot()
+              .rows.filter((row) => row.type === 'entry')
+              .map((row) => canonicalTreePath(row.path)),
+          )
+          const targets = topLevelPaths(
+            paths.map(canonicalTreePath).filter((canonical) => visiblePaths.has(canonical)),
+          )
             .map((canonical) => {
               const entry = modelRef.current.entriesByTreePath.get(canonical)
               if (!entry) return null
