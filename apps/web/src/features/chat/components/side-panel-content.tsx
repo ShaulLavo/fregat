@@ -8,7 +8,7 @@ import type { SessionId, WorktreeId } from '@workspace/contracts'
 import { selectChatSessionById, selectCurrentWorktree } from '@workspace/client-core/chat/selectors'
 import { useSessionRailItem } from '@/hooks/use-session-rail-item'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { useActiveChatSessionId } from '../hooks/use-active-chat-session-id'
 import { useChatShellSubscription } from '../hooks/use-chat-shell-subscription'
@@ -103,7 +103,7 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
     promoteDraftSession(sessionId)
   }
 
-  let content = <LoadingState label='Opening draft'>{null}</LoadingState>
+  let content: ReactNode
   if (shown.activeSessionId) {
     content = (
       <ChatView
@@ -127,6 +127,8 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
         onSessionCreated={handleSessionCreated}
       />
     )
+  } else {
+    content = <LoadingState label='Opening draft'>{null}</LoadingState>
   }
 
   return (
