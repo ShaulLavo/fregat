@@ -27,5 +27,5 @@ export function fileIconRule(icon: ResolvedFileIcon): FileIconRule {
 
 /** Every glyph as a `<symbol>`, for the one sprite the document mounts. */
 export function fileIconSpriteSymbols() {
-  return buildFileIconSpriteMarkup('rich')
+  return buildFileIconSpriteMarkup()
 }

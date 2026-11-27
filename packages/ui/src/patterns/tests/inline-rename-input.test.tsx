@@ -99,7 +99,10 @@ it('retains the draft when its owner rerenders with an updated initial value', (
   const onValueChange = vi.fn()
   const { input, render, onCommit, onCancel } = editor({ onValueChange })
   act(() => {
-    input.value = 'draft.md'
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      input,
+      'draft.md',
+    )
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
   render(

@@ -92,7 +92,6 @@
     "pdfjs-dist": "6.3.289",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-error-boundary": "^6.1.6",
     "server": "workspace:*",
     "shiki": "4.4.3",
     "sonner": "^2.0.8",

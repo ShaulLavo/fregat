@@ -1,3 +1,5 @@
+import { resolveListboxKeyAction } from '@shaulavo/workbench-ui'
+
 export type ListboxRole = 'listbox' | 'tree' | 'tablist'
 
 export type ListboxKeyAction =
@@ -26,35 +28,24 @@ export function listboxKeyAction(input: ListboxKeyInput): ListboxKeyAction {
     if (grid && activeIndex < 0) return { kind: 'move', index: 0 }
     if (grid) return grid
   }
-  const index = Math.max(0, activeIndex)
-  const page = Math.max(1, pageSize)
 
-  switch (key) {
-    case 'ArrowDown':
-      return { kind: 'move', index: Math.min(count - 1, activeIndex + 1) }
-    case 'ArrowUp':
-      return { kind: 'move', index: Math.max(0, index - 1) }
-    case 'Home':
-      return { kind: 'move', index: 0 }
-    case 'End':
-      return { kind: 'move', index: count - 1 }
-    case 'PageDown':
-      return { kind: 'move', index: Math.min(count - 1, index + page) }
-    case 'PageUp':
-      return { kind: 'move', index: Math.max(0, index - page) }
-    case 'Enter':
-      return { kind: 'commit' }
-    case ' ':
-      return { kind: 'select' }
-    case 'ArrowLeft':
-      if (role !== 'tree') return { kind: 'none' }
-      return { kind: canCollapse && !isCollapsed ? 'collapse' : 'parent' }
-    case 'ArrowRight':
-      if (role !== 'tree' || !canCollapse) return { kind: 'none' }
-      return { kind: isCollapsed ? 'expand' : 'child' }
-    default:
-      return { kind: 'none' }
+  if (key === ' ') return { kind: 'select' }
+  if (key === 'ArrowLeft') {
+    if (role !== 'tree') return { kind: 'none' }
+    return { kind: canCollapse && !isCollapsed ? 'collapse' : 'parent' }
   }
+  if (key === 'ArrowRight') {
+    if (role !== 'tree' || !canCollapse) return { kind: 'none' }
+    return { kind: isCollapsed ? 'expand' : 'child' }
+  }
+
+  return resolveListboxKeyAction({
+    activeIndex,
+    count,
+    key,
+    loop: false,
+    pageSize: Math.max(1, pageSize),
+  })
 }
 
 export type ListboxItem<Id extends string = string> = {

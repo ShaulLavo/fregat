@@ -5,8 +5,8 @@ import { HighlightedCode } from '@workspace/markdown/components/highlighted-code
 import type { MarkdownCodeBlockProps } from '@workspace/markdown/providers/render-context'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
+import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { use, useState, type ErrorInfo } from 'react'
-import { ErrorBoundary } from 'react-error-boundary'
 
 import { log } from '@/lib/client-logging'
 import { iconForEntry } from '@/lib/file-icons'
@@ -83,12 +83,13 @@ export function AssistantMarkdownCodeBlock({
         </span>
       </div>
       {/* A grammar or theme that trips the highlighter falls back to plain text. */}
-      <ErrorBoundary
+      <RenderErrorBoundary
         fallback={
           <pre className={BODY_CLASS_NAME} data-markdown='code-block-body'>
             <code className='font-mono'>{text}</code>
           </pre>
         }
+        label='Code block'
         onError={(error, errorInfo) => logMarkdownRenderFailure(error, errorInfo, language)}
       >
         <HighlightedCode
@@ -98,7 +99,7 @@ export function AssistantMarkdownCodeBlock({
           incomplete={incomplete}
           language={language}
         />
-      </ErrorBoundary>
+      </RenderErrorBoundary>
     </div>
   )
 }

@@ -1,5 +1,8 @@
-import type { ReactNode } from 'react'
-import { ErrorBoundary } from 'react-error-boundary'
+import {
+  RenderErrorBoundary as WorkbenchRenderErrorBoundary,
+  type RenderErrorFallbackProps,
+} from '@shaulavo/workbench-ui'
+import type { ErrorInfo, ReactNode } from 'react'
 
 import { RenderErrorState } from '@workspace/ui/patterns/render-error-state'
 
@@ -7,7 +10,9 @@ export type RenderErrorBoundaryProps = {
   label: string
   align?: 'center' | 'start'
   /** Identity of what is shown. A change clears a failure, so navigating away recovers. */
-  resetKeys?: unknown[]
+  resetKeys?: readonly unknown[]
+  onError?: (error: Error, info: ErrorInfo) => void
+  fallback?: ReactNode | ((props: RenderErrorFallbackProps) => ReactNode)
   children: ReactNode
 }
 
@@ -19,16 +24,27 @@ export function RenderErrorBoundary({
   label,
   align,
   resetKeys,
+  onError,
+  fallback,
   children,
 }: RenderErrorBoundaryProps) {
+  const renderFallback = (props: RenderErrorFallbackProps) => {
+    if (typeof fallback === 'function') return fallback(props)
+    if (fallback !== undefined) return fallback
+    return (
+      <RenderErrorState align={align} error={props.error} label={label} onRetry={props.reset} />
+    )
+  }
+
   return (
-    <ErrorBoundary
-      fallbackRender={({ error, resetErrorBoundary }) => (
-        <RenderErrorState align={align} error={error} label={label} onRetry={resetErrorBoundary} />
-      )}
+    <WorkbenchRenderErrorBoundary
+      align={align}
+      fallback={renderFallback}
+      label={label}
       resetKeys={resetKeys}
+      onError={onError}
     >
       {children}
-    </ErrorBoundary>
+    </WorkbenchRenderErrorBoundary>
   )
 }

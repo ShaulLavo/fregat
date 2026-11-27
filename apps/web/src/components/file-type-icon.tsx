@@ -18,7 +18,6 @@ export function FileTypeIcon({
     <WorkbenchFileTypeIcon
       className={className}
       icon={{ name: icon.name, rule: fileIconRule(icon) }}
-      preset='rich'
       sprite={sprite}
     />
   )
