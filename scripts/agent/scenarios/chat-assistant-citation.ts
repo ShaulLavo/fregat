@@ -53,7 +53,7 @@ export const chatAssistantCitation = isolatedNativeScenario({
 
     // The quote is part of the message: stashing takes it along, restoring brings it back.
     await selectors.chatMessage(page).fill('And the expiry?')
-    await selectors.chatMessage(page).click()
+    await selectors.chatComposerSurface(page).click()
     await page.keyboard.press('Control+s')
     await selectors.chatStash(page, 1).waitFor()
     await review.waitFor({ state: 'detached' })

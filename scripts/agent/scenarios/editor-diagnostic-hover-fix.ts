@@ -50,7 +50,7 @@ export const editorDiagnosticHoverFix: Scenario = {
       await step('diagnostic-action')
       await action.focus()
       await page.keyboard.press('Enter')
-      const composer = selectors.chatMessage(page)
+      const composer = selectors.chatComposerSurface(page)
       await composer.waitFor({ timeout: 15000 })
       await page.waitForFunction(
         (element) => (element?.textContent ?? '').includes('Fix this error'),

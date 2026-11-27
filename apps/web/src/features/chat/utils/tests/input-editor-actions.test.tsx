@@ -1,25 +1,31 @@
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { ContentEditable } from '@lexical/react/LexicalContentEditable'
-import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
-import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
-import { $getSelection, KEY_DOWN_COMMAND, type LexicalEditor } from 'lexical'
-import { useEffect } from 'react'
-import { vi } from 'vitest'
+import { act, fireEvent, waitFor } from '@testing-library/react'
+import { beforeEach, vi } from 'vitest'
 
-import { ChatInputLineBoundaryPlugin } from '@/features/chat/components/chat-input-line-boundary-plugin'
-import { CHAT_INPUT_EDITOR_NODES } from '@/features/chat/components/chat-input-mention-node'
+import { ChatInputEditor } from '@/features/chat/components/chat-input-editor'
+import { ChatInputEditorProvider } from '@/features/chat/providers/composer-editor-provider'
 import {
-  $readChatInputTextSnapshot,
-  $setChatInputText,
+  resetChatInputDraftStore,
+  useChatInputDraftStore,
+} from '@/features/chat/state/chat-input-draft-store'
+import { stubEditorViewport } from '../../../../../test/env/editor-viewport'
+import { TEST_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
+import {
   insertChatInputMention,
   insertChatInputText,
   moveChatInputCaretToLineBoundary,
+  readChatInputSelection,
+  readChatInputTextSnapshot,
   replaceChatInputEditorRange,
   surroundChatInputSelection,
+  type ChatInputEditorHandle,
 } from '@/features/chat/utils/input-editor-actions'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
+
+beforeEach(() => {
+  resetChatInputDraftStore()
+  stubEditorViewport({ height: 120, width: 400 })
+})
 
 test('a mention committed mid-sentence leaves the caret right after the inserted text', () => {
   const editor = mountChatInputEditor('read @ap now')
@@ -32,7 +38,7 @@ test('a mention committed mid-sentence leaves the caret right after the inserted
   })
 
   expect(applied?.text).toBe('read @src/app.ts now')
-  expect(snapshot(editor)).toEqual({ cursor: 17, text: 'read @src/app.ts now' })
+  expect(readChatInputTextSnapshot(editor)).toEqual({ cursor: 17, text: 'read @src/app.ts now' })
 })
 
 test('the replacement eats the space the prompt already had, so no double space lands', () => {
@@ -44,7 +50,7 @@ test('the replacement eats the space the prompt already had, so no double space 
     replacement: '@src/app.ts ',
   })
 
-  expect(snapshot(editor).text).toBe('read @src/app.ts now')
+  expect(readChatInputTextSnapshot(editor).text).toBe('read @src/app.ts now')
 })
 
 test('a second commit against the now-stale range is refused', () => {
@@ -55,7 +61,7 @@ test('a second commit against the now-stale range is refused', () => {
   const second = replaceChatInputEditorRange(editor, range)
 
   expect(second).toBeNull()
-  expect(snapshot(editor).text).toBe('read @src/app.ts now')
+  expect(readChatInputTextSnapshot(editor).text).toBe('read @src/app.ts now')
 })
 
 test('a committed mention with a space in its path stays one token, caret behind it', () => {
@@ -69,7 +75,10 @@ test('a committed mention with a space in its path stays one token, caret behind
   })
 
   expect(applied?.text).toBe('read @"src/my file.ts" ')
-  expect(snapshot(editor)).toEqual({ cursor: 23, text: 'read @"src/my file.ts" ' })
+  expect(readChatInputTextSnapshot(editor)).toEqual({
+    cursor: 23,
+    text: 'read @"src/my file.ts" ',
+  })
 })
 
 test('inserting a mention writes it through the grammar and leaves the caret after it', () => {
@@ -77,38 +86,43 @@ test('inserting a mention writes it through the grammar and leaves the caret aft
 
   expect(insertChatInputMention(editor, 'src/my file.ts')).toBe(true)
 
-  expect(snapshot(editor)).toEqual({ cursor: 23, text: 'read @"src/my file.ts" ' })
-})
-
-test('a focusing insert focuses only once the DOM holds the inserted text', async () => {
-  const editor = mountChatInputEditor('read ')
-  const root = editor.getRootElement()
-  const seenAtFocus: { text: string; decorators: number }[] = []
-  const focus = editor.focus.bind(editor)
-  vi.spyOn(editor, 'focus').mockImplementation((...args) => {
-    seenAtFocus.push({
-      text: root?.textContent ?? '',
-      decorators: root?.querySelectorAll('[data-lexical-decorator]').length ?? 0,
-    })
-    focus(...args)
+  expect(readChatInputTextSnapshot(editor)).toEqual({
+    cursor: 23,
+    text: 'read @"src/my file.ts" ',
   })
-
-  insertChatInputMention(editor, 'src/app.ts', { focus: true })
-
-  // Lexical's DOM holds the chip's node at focus; React fills in its label afterwards.
-  await vi.waitFor(() => expect(seenAtFocus).toEqual([{ text: 'read  ', decorators: 1 }]))
-  await vi.waitFor(() => expect(root?.textContent).toBe('read app.ts '))
-  await vi.waitFor(() => expect(document.activeElement).toBe(root))
 })
 
-test('an insert without focus leaves focus where it was', async () => {
+test('a focusing insert focuses only once the editor holds the inserted mention', async () => {
   const editor = mountChatInputEditor('read ')
-  const focus = vi.spyOn(editor, 'focus')
+  await waitFor(() =>
+    expect(editor.getRootElement()?.querySelector('.editor-virtualized-row')).not.toBeNull(),
+  )
+  const seenAtFocus: { text: string; chips: number }[] = []
+  const originalFocus = editor.focus
+  const root = editor.getRootElement()
+  const focusSpy = vi.fn(() => {
+    seenAtFocus.push({
+      chips: root?.querySelectorAll('[data-chat-input-mention]').length ?? 0,
+      text: editor.getText(),
+    })
+    originalFocus()
+  })
+  const trackedEditor: ChatInputEditorHandle = { ...editor, focus: focusSpy }
 
-  insertChatInputText(editor, 'more')
-  editor.read(() => undefined)
+  insertChatInputMention(trackedEditor, 'src/app.ts', { focus: true })
 
-  expect(focus).not.toHaveBeenCalled()
+  expect(seenAtFocus).toEqual([{ chips: 1, text: 'read @src/app.ts ' }])
+  expect(document.activeElement).toBe(editor.getInputElement())
+})
+
+test('an insert without focus leaves focus where it was', () => {
+  const editor = mountChatInputEditor('read ')
+  const focusSpy = vi.fn()
+  const trackedEditor: ChatInputEditorHandle = { ...editor, focus: focusSpy }
+
+  insertChatInputText(trackedEditor, 'more')
+
+  expect(focusSpy).not.toHaveBeenCalled()
 })
 
 test('inserted prompt text keeps offsets right for the prose that follows a mention', () => {
@@ -116,17 +130,20 @@ test('inserted prompt text keeps offsets right for the prose that follows a ment
 
   insertChatInputText(editor, 'see @"a b.ts" and @c.ts then')
 
-  expect(snapshot(editor)).toEqual({ cursor: 28, text: 'see @"a b.ts" and @c.ts then' })
+  expect(readChatInputTextSnapshot(editor)).toEqual({
+    cursor: 28,
+    text: 'see @"a b.ts" and @c.ts then',
+  })
 })
 
 test('Home and End move the caret to the bounds of the current line', () => {
   const editor = mountChatInputEditor('first line\nsecond line')
 
   pressKey(editor, 'Home')
-  expect(snapshot(editor).cursor).toBe(11)
+  expect(readChatInputTextSnapshot(editor).cursor).toBe(11)
 
   pressKey(editor, 'End')
-  expect(snapshot(editor).cursor).toBe(22)
+  expect(readChatInputTextSnapshot(editor).cursor).toBe(22)
 })
 
 test('shift extends the selection to the line boundary instead of moving the caret', () => {
@@ -152,69 +169,70 @@ test('typing a bracket over a selection wraps it and keeps the wrapped text sele
   moveChatInputCaretToLineBoundary(editor, 'end', true)
 
   expect(surroundChatInputSelection(editor, '(', ')')).toBe(true)
-  expect(snapshot(editor).text).toBe('(wrap this word)')
+  expect(readChatInputTextSnapshot(editor).text).toBe('(wrap this word)')
   expect(selectedText(editor)).toBe('wrap this word')
 })
 
-function mountChatInputEditor(text: string) {
-  const state = { editor: null as LexicalEditor | null }
+test('replaceChatInputEditorRange returns null when the editor is readonly', () => {
+  const editor = mountChatInputEditor('Hello world')
+  editor.setEditable(false)
+
+  expect(
+    replaceChatInputEditorRange(editor, {
+      expectedText: 'world',
+      rangeEnd: 11,
+      rangeStart: 6,
+      replacement: 'friend',
+    }),
+  ).toBeNull()
+  expect(readChatInputTextSnapshot(editor).text).toBe('Hello world')
+})
+
+function mountChatInputEditor(text: string): ChatInputEditorHandle {
+  useChatInputDraftStore.getState().setPrompt(
+    {
+      environmentId: TEST_ENVIRONMENT_ID,
+      draftKey: 'chat-input-editor-actions-test',
+      rootPath: '/repo',
+    },
+    text,
+  )
+  const state = { editor: null as ChatInputEditorHandle | null }
 
   renderWithProviders(
-    <LexicalComposer
-      initialConfig={{
-        editorState: () => {
-          $setChatInputText(text)
-        },
-        namespace: 'chat-input-editor-actions-test',
-        nodes: CHAT_INPUT_EDITOR_NODES,
-        onError: (error) => {
-          throw error
-        },
-      }}
-    >
-      <PlainTextPlugin
-        contentEditable={<ContentEditable />}
-        ErrorBoundary={LexicalErrorBoundary}
-        placeholder={null}
-      />
-      <ChatInputLineBoundaryPlugin />
-      <CaptureEditor
-        onReady={(editor) => {
+    <ChatInputEditorProvider>
+      <ChatInputEditor
+        disabled={false}
+        draftKey='chat-input-editor-actions-test'
+        initialText={text}
+        placeholder='Message'
+        rootPath='/repo'
+        trigger={null}
+        onCommandMenuCommit={() => false}
+        onCommandMenuMove={() => false}
+        onEditorReady={(editor) => {
           state.editor = editor
         }}
+        onImageFiles={async () => true}
+        onSubmitRequest={async () => false}
+        onTriggerChange={() => {}}
       />
-    </LexicalComposer>,
+    </ChatInputEditorProvider>,
   )
 
-  const editor = state.editor
-  if (!editor) throw new Error('chat input editor never mounted')
-
+  expect(state.editor).not.toBeNull()
+  const editor = state.editor!
+  editor.setSelection(text.length)
   return editor
 }
 
-function CaptureEditor({ onReady }: { readonly onReady: (editor: LexicalEditor) => void }) {
-  const [editor] = useLexicalComposerContext()
-
-  useEffect(() => {
-    onReady(editor)
-  }, [editor, onReady])
-
-  return null
+function pressKey(editor: ChatInputEditorHandle, key: string, init: KeyboardEventInit = {}) {
+  act(() => {
+    fireEvent.keyDown(editor.getInputElement(), { key, ...init })
+  })
 }
 
-function pressKey(editor: LexicalEditor, key: string, init: KeyboardEventInit = {}) {
-  editor.dispatchCommand(
-    KEY_DOWN_COMMAND,
-    new KeyboardEvent('keydown', { cancelable: true, key, ...init }),
-  )
-}
-
-// `editor.read` flushes the pending update first; `getEditorState()` would still
-// be showing the state from before the action under test.
-function snapshot(editor: LexicalEditor) {
-  return editor.read(() => $readChatInputTextSnapshot())
-}
-
-function selectedText(editor: LexicalEditor) {
-  return editor.read(() => $getSelection()?.getTextContent() ?? '')
+function selectedText(editor: ChatInputEditorHandle) {
+  const { text, selection } = readChatInputSelection(editor)
+  return text.slice(selection.start, selection.end)
 }

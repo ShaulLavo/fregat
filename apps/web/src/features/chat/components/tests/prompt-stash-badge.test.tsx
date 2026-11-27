@@ -1,28 +1,27 @@
 import { detectPlatform } from '@shaulavo/hotkeys'
-import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
-import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { ContentEditable } from '@lexical/react/LexicalContentEditable'
-import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
-import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
-import { screen, waitFor, act } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { LexicalEditor } from 'lexical'
-import { useEffect } from 'react'
 
+import { ChatInputEditor } from '@/features/chat/components/chat-input-editor'
 import { PromptStashBadge } from '@/features/chat/components/prompt-stash-badge'
-import { $setChatInputText, readChatInputText } from '@/features/chat/utils/input-editor-actions'
+import { ChatInputEditorProvider } from '@/features/chat/providers/composer-editor-provider'
 import {
   resetChatInputDraftStore,
   useChatInputDraftStore,
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
 import {
-  resetPromptStashStore,
-  promptStashStoreFor,
   initializePromptStashStore,
+  promptStashStoreFor,
+  resetPromptStashStore,
 } from '@/features/chat/state/prompt-stash-store'
+import {
+  readChatInputText,
+  setChatInputText,
+  type ChatInputEditorHandle,
+} from '@/features/chat/utils/input-editor-actions'
+import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
+import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
 
@@ -52,7 +51,7 @@ test('Mod+S parks the composer prompt and empties the composer', async () => {
 test('stash yields when focus has left the composer', async () => {
   const composer = renderComposer()
   composer.type('keep typing here')
-  act(() => screen.getByTestId('composer').blur())
+  act(() => screen.getByRole('textbox', { name: 'Message' }).blur())
   const modifier = detectPlatform() === 'mac' ? 'Meta' : 'Control'
   await userEvent.keyboard(`{${modifier}>}s{/${modifier}}`)
   expect(stashedPrompts()).toEqual([])
@@ -139,28 +138,27 @@ function renderComposer() {
   initializePromptStashStore(testScopedStorage)
   resetPromptStashStore()
   resetChatInputDraftStore()
-  const state = { editor: null as LexicalEditor | null }
+  const state = { editor: null as ChatInputEditorHandle | null }
 
   const element = (target: ChatInputDraftTarget) => (
-    <LexicalComposer
-      initialConfig={{
-        namespace: 'prompt-stash-badge-test',
-        onError: (error) => {
-          throw error
-        },
-      }}
-    >
-      <CaptureEditor
-        onReady={(editor) => {
+    <ChatInputEditorProvider>
+      <ChatInputEditor
+        disabled={false}
+        draftKey={target.draftKey ?? ''}
+        placeholder='Message'
+        rootPath={target.rootPath}
+        trigger={null}
+        onCommandMenuCommit={() => false}
+        onCommandMenuMove={() => false}
+        onEditorReady={(editor) => {
           state.editor = editor
         }}
-      />
-      <PlainTextPlugin
-        ErrorBoundary={LexicalErrorBoundary}
-        contentEditable={<ContentEditable data-testid='composer' />}
+        onImageFiles={async () => true}
+        onSubmitRequest={async () => false}
+        onTriggerChange={() => {}}
       />
       <PromptStashBadge disabled={false} draftTarget={target} />
-    </LexicalComposer>
+    </ChatInputEditorProvider>
   )
   const rendered = renderWithProviders(element(draftTarget))
 
@@ -168,7 +166,7 @@ function renderComposer() {
     queryClient: rendered.queryClient,
     navigate: (target: ChatInputDraftTarget) => rendered.rerender(element(target)),
     async pressStashShortcut() {
-      screen.getByTestId('composer').focus()
+      screen.getByRole('textbox', { name: 'Message' }).focus()
       const modifier = detectPlatform() === 'mac' ? 'Meta' : 'Control'
       await userEvent.keyboard(`{${modifier}>}s{/${modifier}}`)
     },
@@ -176,22 +174,9 @@ function renderComposer() {
       const editor = state.editor
       return editor ? readChatInputText(editor) : ''
     },
-    /** Stands in for the draft plugin: the editor and the draft move together. */
     type(text: string) {
-      state.editor?.update(() => {
-        $setChatInputText(text)
-      })
+      if (state.editor) setChatInputText(state.editor, text)
       useChatInputDraftStore.getState().setPrompt(draftTarget, text)
     },
   }
-}
-
-function CaptureEditor({ onReady }: { readonly onReady: (editor: LexicalEditor) => void }) {
-  const [editor] = useLexicalComposerContext()
-
-  useEffect(() => {
-    onReady(editor)
-  }, [editor, onReady])
-
-  return null
 }

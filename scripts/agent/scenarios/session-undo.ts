@@ -127,12 +127,12 @@ export const sessionUndo: Scenario = {
       await selectors.chatMessage(page).fill(draft)
       await act(charlie, 'Mark as settled')
       await selectors.sessionInShelf(page, charlie, 'Settled').waitFor()
-      await selectors.chatMessage(page).click()
-      strictEqual((await selectors.chatMessage(page).textContent())?.trim(), draft)
+      await selectors.chatComposerSurface(page).click()
+      strictEqual((await selectors.chatComposerSurface(page).textContent())?.trim(), draft)
       await page.keyboard.press('ControlOrMeta+z')
       await page.waitForTimeout(500)
       ok(
-        (await selectors.chatMessage(page).textContent())?.trim() !== draft,
+        (await selectors.chatComposerSurface(page).textContent())?.trim() !== draft,
         'Mod+Z in the composer undoes its own text',
       )
       strictEqual((await session(charlieId))?.settledOverride, 'settled')

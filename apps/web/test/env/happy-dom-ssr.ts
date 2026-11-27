@@ -42,8 +42,7 @@ function makeSelectionChangeAsynchronous(document: Document) {
   const dispatchEvent = document.dispatchEvent.bind(document)
   let selectionChangeQueued = false
 
-  // Browsers queue selectionchange; Happy DOM dispatches it synchronously.
-  // The synchronous re-entry catches Lexical while its selection is read-only.
+  // Browsers queue selectionchange; Happy DOM dispatches it synchronously, which can re-enter editor selection updates.
   document.dispatchEvent = (event) => {
     if (event.type !== 'selectionchange') return dispatchEvent(event)
     if (selectionChangeQueued) return true

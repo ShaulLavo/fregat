@@ -96,7 +96,7 @@ async function verifyRetry(
     strictEqual(started.length, 2)
     await selectors.modelPickerTrigger(page).getByText('gpt-5.5-mini').waitFor()
     strictEqual(await selectors.modelPickerTrigger(page).getByText('+1').count(), 0)
-    strictEqual((await selectors.chatMessage(page).textContent())?.trim(), PROMPT)
+    strictEqual((await selectors.chatComposerSurface(page).textContent())?.trim(), PROMPT)
     await step(`${retry}-unconfirmed-model-stays-on-the-draft`)
 
     const draftUrl = page.url()

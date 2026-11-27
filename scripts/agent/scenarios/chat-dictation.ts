@@ -16,6 +16,7 @@ export const chatDictation = isolatedNativeScenario({
     })
     await page.reload()
     const composer = selectors.chatMessage(page)
+    const surface = selectors.chatComposerSurface(page)
     await composer.waitFor()
     await page.evaluate(() => {
       if (window.speechRecognitionFixture) window.speechRecognitionFixture.delayedAudio = true
@@ -45,10 +46,10 @@ export const chatDictation = isolatedNativeScenario({
     await page.keyboard.press('ControlOrMeta+Shift+ArrowLeft')
     await selectors.dictationStart(page).click()
     await page.waitForFunction(
-      (input) => input?.getAttribute('contenteditable') === 'false',
+      (input) => input?.hasAttribute('readonly') === true,
       await composer.elementHandle(),
     )
-    strictEqual(await composer.getAttribute('contenteditable'), 'false')
+    strictEqual(await composer.isEditable(), false)
     strictEqual(await selectors.chatSend(page).isDisabled(), true)
     await page.evaluate(() => window.speechRecognitionFixture?.current?.result('friend', false))
     await selectors.dictationStatus(page).getByText('friend', { exact: true }).waitFor()
@@ -94,12 +95,12 @@ export const chatDictation = isolatedNativeScenario({
     await page.evaluate(() => window.speechRecognitionFixture?.current?.result('friend'))
     await selectors.dictationFinish(page).click()
     await selectors.dictationStart(page).waitFor()
-    strictEqual(await composer.innerText(), 'Hello friend')
+    strictEqual((await surface.innerText()).trim(), 'Hello friend')
     await page.waitForFunction(
-      (input) => input?.getAttribute('contenteditable') === 'true',
+      (input) => input?.hasAttribute('readonly') === false,
       await composer.elementHandle(),
     )
-    strictEqual(await composer.getAttribute('contenteditable'), 'true')
+    strictEqual(await composer.isEditable(), true)
     strictEqual(
       await selectors.chatMessages(page).getByText('Hello friend', { exact: true }).count(),
       0,
@@ -110,7 +111,7 @@ export const chatDictation = isolatedNativeScenario({
     await page.evaluate(() => window.speechRecognitionFixture?.current?.result('discard this'))
     await selectors.dictationCancel(page).click()
     await selectors.dictationStart(page).waitFor()
-    strictEqual(await composer.innerText(), 'Hello friend')
+    strictEqual((await surface.innerText()).trim(), 'Hello friend')
     strictEqual(await page.evaluate(() => window.speechRecognitionFixture?.current?.aborted), true)
     await step('cancel-preserves-draft')
 
@@ -119,7 +120,7 @@ export const chatDictation = isolatedNativeScenario({
     })
     await selectors.dictationStart(page).click()
     await page.getByText('Speech recognition stopped.', { exact: true }).waitFor()
-    strictEqual(await composer.innerText(), 'Hello friend')
+    strictEqual((await surface.innerText()).trim(), 'Hello friend')
     await step('microphone-error')
     await page.evaluate(() => {
       if (window.speechRecognitionFixture) window.speechRecognitionFixture.failure = null
@@ -130,12 +131,12 @@ export const chatDictation = isolatedNativeScenario({
       orchestration,
       { key: 'chat.dictationLimitSeconds', value: 10 },
       async () => {
-        await composer.click()
+        await surface.click()
         await page.keyboard.press('End')
         await selectors.dictationStart(page).click()
         await page.evaluate(() => window.speechRecognitionFixture?.current?.result('again'))
         await selectors.dictationStart(page).waitFor({ timeout: 15_000 })
-        strictEqual(await composer.innerText(), 'Hello friend again')
+        strictEqual((await surface.innerText()).trim(), 'Hello friend again')
         await step('time-limit-finishes')
       },
     )

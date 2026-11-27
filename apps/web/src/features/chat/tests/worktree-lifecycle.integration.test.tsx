@@ -10,6 +10,7 @@ import { useChatProjectionStore } from '@/features/chat/state/chat-projection-st
 import { WorktreeManager } from '@/features/chat-mode/components/worktree-manager'
 import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-manager-store'
 import { newWorktreeTarget } from '@/features/chat/utils/worktree-target'
+import { stubEditorViewport } from '../../../../test/env/editor-viewport'
 import { createWorktreeLifecycleHarness } from '../../../../test/factories/worktree-lifecycle'
 import { renderRailHarness } from '../../../../test/factories/rail-harness'
 import { expect, test } from '../../../../test/fixtures'
@@ -36,6 +37,7 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
     model: 'mock-model',
     providerInstanceId: server.providerAdapter.adapterKey,
   })
+  stubEditorViewport({ height: 120, width: 400 })
   let created: SessionId | null = null
   const draft = renderChatDraft({
     draftId: draftTarget.draftKey,
@@ -48,8 +50,10 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
       created = id
     },
   })
-  expect(screen.getByRole('textbox', { name: 'Message' })).toHaveTextContent(
-    'Keep this in the current checkout',
+  await waitFor(() =>
+    expect(screen.getByTestId('chat-input-editor')).toHaveTextContent(
+      'Keep this in the current checkout',
+    ),
   )
   await waitFor(() => expect(screen.getByRole('button', { name: 'Send message' })).toBeEnabled())
   await userEvent.click(screen.getByRole('button', { name: 'Send message' }))
@@ -90,8 +94,8 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
   expect(screen.getByRole('button', { name: 'Start from branch' })).toHaveTextContent(
     'From release',
   )
-  expect(screen.getByRole('textbox', { name: 'Message' })).toHaveTextContent(
-    'Create a separate checkout',
+  await waitFor(() =>
+    expect(screen.getByTestId('chat-input-editor')).toHaveTextContent('Create a separate checkout'),
   )
   await waitFor(() => expect(screen.getByRole('button', { name: 'Send message' })).toBeEnabled())
   await userEvent.click(screen.getByRole('button', { name: 'Send message' }))

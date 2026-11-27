@@ -117,13 +117,13 @@ async function maxBurst(page: Page, step: Step, evidence: Evidence) {
   await page.getByRole('menuitemradio', { name: 'Max', exact: true }).click()
   const burst = selectors.effortBurst(page, 'max')
   await burst.waitFor({ state: 'attached' })
-  // Mid-sweep, so the screenshot shows the band crossing.
-  await page.waitForTimeout(300)
-  await step('burst-max')
   evidence.maxBurst = {
     sweeps: await burst.locator('.effort-sweep').count(),
     rainbowOnTrigger: await selectors.effortRainbow(selectors.modelOptions(page)).count(),
   }
+  // Mid-sweep, so the screenshot shows the band crossing.
+  await page.waitForTimeout(300)
+  await step('burst-max')
   await burst.waitFor({ state: 'detached' })
   equal(evidence.maxBurst.sweeps, 1, 'Max plays the smaller, single-band burst')
   equal(evidence.maxBurst.rainbowOnTrigger, 0, 'Max leaves the trigger plain')
@@ -183,7 +183,7 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
   await page.getByRole('menuitemradio', { name: 'Ultrathink', exact: true }).click()
   const storedBurst = await burstPlays()
   await step('menu-ultrathink-stored')
-  const storedPrompt = await selectors.chatMessage(page).innerText()
+  const storedPrompt = await selectors.chatComposerSurface(page).innerText()
   const storedLabel = await selectors.effortRainbow(trigger).textContent()
   await burst.waitFor({ state: 'detached', timeout: 5_000 })
   await trigger.click()
@@ -194,7 +194,7 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
   await selectors.chatMessage(page).fill('Please ultrathink about the parser.')
   const wordBurst = await burstPlays()
   const burstStart = Date.now()
-  const word = selectors.effortRainbow(selectors.chatMessage(page))
+  const word = selectors.effortRainbow(selectors.chatComposerSurface(page))
   await word.waitFor()
   await step('composer-ultrathink')
   await burst.waitFor({ state: 'detached', timeout: 5_000 })
@@ -252,6 +252,7 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
 /** A caret next to, inside, or typing beside the word must leave it painted. */
 async function caretKeepsRainbow(page: Page, word: Locator, step: Step) {
   const composer = selectors.chatMessage(page)
+  const surface = selectors.chatComposerSurface(page)
   const probes: { label: string; painted: string | null; html: string }[] = []
   const probe = async (label: string) => {
     await page.waitForTimeout(200)
@@ -259,11 +260,11 @@ async function caretKeepsRainbow(page: Page, word: Locator, step: Step) {
     probes.push({
       label,
       painted: await selectors
-        .effortRainbow(composer)
+        .effortRainbow(surface)
         .first()
         .textContent({ timeout: 500 })
         .catch(() => null),
-      html: await composer.innerHTML(),
+      html: await surface.innerHTML(),
     })
   }
   const box = await word.boundingBox()
@@ -278,7 +279,7 @@ async function caretKeepsRainbow(page: Page, word: Locator, step: Step) {
   await page.mouse.click(box.x + 1, box.y + box.height / 2)
   await probe('caret before the word')
   await composer.fill('')
-  await composer.click()
+  await surface.click()
   await page.keyboard.type('Please ultrathink', { delay: 40 })
   await probe('typed the word')
   await page.keyboard.type(' about it', { delay: 40 })

@@ -70,19 +70,27 @@ export const chatComposerInsert: Scenario = {
 }
 
 async function expectFocusedWith(page: Page, text: string, what: string) {
-  const composer = selectors.chatMessage(page)
+  const input = selectors.chatMessage(page)
+  const surface = selectors.chatComposerSurface(page)
   await page
     .waitForFunction(
-      ({ element, text }) =>
-        element !== null &&
-        element === document.activeElement &&
-        (element.textContent ?? '').includes(text),
-      { element: await composer.elementHandle(), text },
+      ({ inputElement, surfaceElement, text }) =>
+        inputElement !== null &&
+        surfaceElement !== null &&
+        inputElement === document.activeElement &&
+        (surfaceElement.textContent ?? '').includes(text),
+      {
+        inputElement: await input.elementHandle(),
+        surfaceElement: await surface.elementHandle(),
+        text,
+      },
       { timeout: 5_000 },
     )
     .catch(async () => {
-      const state = await composer.evaluate((element) => ({
-        focused: element === document.activeElement,
+      const state = await surface.evaluate((element) => ({
+        focused:
+          element.closest('[data-testid="chat-input-editor"]')?.contains(document.activeElement) ??
+          false,
         active: document.activeElement?.outerHTML.slice(0, 120),
         text: element.textContent,
       }))
@@ -121,7 +129,7 @@ async function dropTreePath(page: Page, rootRelativePath: string) {
 }
 
 async function clearComposer(page: Page) {
-  await selectors.chatMessage(page).click()
+  await selectors.chatComposerSurface(page).click()
   await page.keyboard.press('ControlOrMeta+a')
   await page.keyboard.press('Delete')
 }

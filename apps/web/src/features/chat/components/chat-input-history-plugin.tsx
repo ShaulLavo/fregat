@@ -1,30 +1,24 @@
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import {
-  $getSelection,
-  $isRangeSelection,
-  COMMAND_PRIORITY_NORMAL,
-  KEY_ARROW_DOWN_COMMAND,
-  KEY_ARROW_UP_COMMAND,
-} from 'lexical'
-import { useEffect, useRef } from 'react'
-import { sessionIdSchema } from '@workspace/contracts'
-import * as v from 'valibot'
-import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
-import {
-  useChatProjectionStore,
-  selectChatProjectionSlice,
-} from '@/features/chat/state/chat-projection-store'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
+import { sessionIdSchema } from '@workspace/contracts'
+import { useEffect, useRef } from 'react'
+import * as v from 'valibot'
+
+import { useChatInputEditor } from '@/features/chat/providers/composer-editor-context'
 import { useChatInputDraftStore } from '@/features/chat/state/chat-input-draft-store'
 import {
-  $readChatInputTextSnapshot,
-  $setChatInputText,
+  selectChatProjectionSlice,
+  useChatProjectionStore,
+} from '@/features/chat/state/chat-projection-store'
+import {
+  readChatInputTextSnapshot,
+  setChatInputText,
 } from '@/features/chat/utils/input-editor-actions'
 import {
   promptHistoryEntries,
   stepPromptHistory,
   type PromptHistoryEntry,
 } from '@/features/chat/utils/prompt-history'
+import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
 
 export function ChatInputHistoryPlugin({
   draftKey,
@@ -35,64 +29,59 @@ export function ChatInputHistoryPlugin({
   rootPath: string
   disabled: boolean
 }) {
-  const [editor] = useLexicalComposerContext()
+  const editor = useChatInputEditor()
   const environmentId = useEnvironmentId()
   const position = useRef<PromptHistoryEntry | null>(null)
 
   useEffect(() => {
     position.current = null
-    const navigate = (direction: 'backward' | 'forward', event: KeyboardEvent) => {
+    if (!editor) return
+    const inputElement = editor.getInputElement()
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
       if (
         disabled ||
         event.altKey ||
         event.ctrlKey ||
         event.metaKey ||
         event.shiftKey ||
-        event.isComposing
+        event.isComposing ||
+        editor.isComposing()
       )
-        return false
+        return
+      const direction = event.key === 'ArrowUp' ? 'backward' : 'forward'
       const target = { environmentId, rootPath, draftKey }
       const draft = useChatInputDraftStore.getState().getDraft(target)
-      if (draft.attachments.length || draft.terminalContexts.length) return false
-      const selection = $getSelection()
-      if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false
-      const { text, cursor } = $readChatInputTextSnapshot()
-      if (direction === 'backward' && text.slice(0, cursor).includes('\n')) return false
-      if (direction === 'forward' && text.slice(cursor).includes('\n')) return false
+      if (draft.attachments.length || draft.terminalContexts.length) return
+      const selection = editor.getSelectionOffsets()
+      if (selection.anchor !== selection.focus) return
+      const { text, cursor } = readChatInputTextSnapshot(editor)
+      if (direction === 'backward' && text.slice(0, cursor).includes('\n')) return
+      if (direction === 'forward' && text.slice(cursor).includes('\n')) return
       const parsed = v.safeParse(sessionIdSchema, draftKey)
-      if (!parsed.success) return false
+      if (!parsed.success) return
       const session = selectChatSessionById(
         selectChatProjectionSlice(useChatProjectionStore.getState(), environmentId),
         parsed.output,
       )
-      if (!session || session.pendingApprovalCount || session.pendingUserInputCount) return false
+      if (!session || session.pendingApprovalCount || session.pendingUserInputCount) return
       const next = stepPromptHistory({
         direction,
         current: text,
         entries: promptHistoryEntries(session.messages),
         position: position.current,
       })
-      if (next === undefined) return false
+      if (next === undefined) return
       position.current = next
-      $setChatInputText(next?.prompt ?? '')
+      setChatInputText(editor, next?.prompt ?? '')
       useChatInputDraftStore.getState().setPrompt(target, next?.prompt ?? '')
       event.preventDefault()
-      return true
+      event.stopPropagation()
     }
-    const up = editor.registerCommand(
-      KEY_ARROW_UP_COMMAND,
-      (event) => navigate('backward', event),
-      COMMAND_PRIORITY_NORMAL,
-    )
-    const down = editor.registerCommand(
-      KEY_ARROW_DOWN_COMMAND,
-      (event) => navigate('forward', event),
-      COMMAND_PRIORITY_NORMAL,
-    )
-    return () => {
-      up()
-      down()
-    }
+
+    inputElement.addEventListener('keydown', onKeyDown, true)
+    return () => inputElement.removeEventListener('keydown', onKeyDown, true)
   }, [disabled, draftKey, editor, environmentId, rootPath])
 
   return null

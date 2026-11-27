@@ -16,7 +16,7 @@ export const chatDraftSentLeftover = isolatedNativeScenario({
     const text = 'Is the timer right?'
 
     await selectors.chatMessage(page).fill(text)
-    await selectors.chatMessage(page).click()
+    await selectors.chatComposerSurface(page).click()
     await page.keyboard.press('Control+s')
     await selectors.chatStash(page, 1).waitFor()
     await step('stashed-from-session')

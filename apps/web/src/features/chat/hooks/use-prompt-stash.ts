@@ -1,11 +1,10 @@
 import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
-import { SKIP_DOM_SELECTION_TAG } from 'lexical'
 import { useStore } from 'zustand'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { use, useLayoutEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { errorMessage } from '@/lib/error-message'
-import { $setChatInputText } from '../utils/input-editor-actions'
+import { useChatInputEditor } from '@/features/chat/providers/composer-editor-context'
+import { setChatInputText } from '../utils/input-editor-actions'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import { promptStashStoreFor, type PromptStashEntry } from '../state/prompt-stash-store'
 import { transferStash } from '../state/stash-transfer'
@@ -14,7 +13,7 @@ import { toastError } from '@/lib/toast-error'
 import { ComposerRootsContext } from '@/lib/composer-attach/providers/roots-context'
 
 export function usePromptStash(draftTarget: ChatInputDraftTarget) {
-  const [editor] = useLexicalComposerContext()
+  const editor = useChatInputEditor()
   const activeTarget = useRef<ChatInputDraftTarget | null>(draftTarget)
   useLayoutEffect(() => {
     activeTarget.current = draftTarget
@@ -47,8 +46,10 @@ export function usePromptStash(draftTarget: ChatInputDraftTarget) {
         return
       }
       if (useChatInputDraftStore.getState().getDraft(draftTarget).prompt !== content.prompt) return
-      editor.update(() => $setChatInputText(content.prompt), { tag: SKIP_DOM_SELECTION_TAG })
-      if (action.kind === 'restore') editor.focus()
+      if (editor) {
+        setChatInputText(editor, content.prompt, { syncOnly: true })
+        if (action.kind === 'restore') editor.focus()
+      }
       setMenuOpen(false)
     },
     onError: (error) => toastError(errorMessage(error, 'Could not transfer the message stash.')),
@@ -57,10 +58,10 @@ export function usePromptStash(draftTarget: ChatInputDraftTarget) {
   useKeymapNode({
     area: 'chat',
     context: 'Composer',
-    element: () => editor.getRootElement(),
+    element: () => editor?.getInputElement() ?? null,
     commands: {
       'chat.stashPrompt': () => {
-        if (!activeTarget.current || !editor.isEditable()) return false
+        if (!activeTarget.current || !editor || !editor.isEditable()) return false
         mutate({ target: draftTarget, action: { kind: 'stash' } })
         return true
       },

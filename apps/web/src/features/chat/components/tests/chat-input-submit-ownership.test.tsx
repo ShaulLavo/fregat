@@ -12,6 +12,7 @@ import { initializePromptStashStore } from '../../state/prompt-stash-store'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { providerListQueryOptions } from '@/lib/provider-query'
 import type { ChatInputSubmitResult } from '../../utils/composed-message'
+import { stubEditorViewport } from '../../../../../test/env/editor-viewport'
 import { expect, test } from '../../../../../test/fixtures'
 import { createTestQueryClient } from '../../../../../test/providers'
 import { renderWithProviders } from '../../../../../test/render'
@@ -24,6 +25,7 @@ import {
 } from '../../../../../test/factories/chat'
 
 beforeEach(() => {
+  stubEditorViewport({ height: 120, width: 400 })
   resetChatInputDraftStore()
   initializePromptStashStore(environmentScopedStorage(TEST_ENVIRONMENT_ID))
 })
@@ -35,16 +37,18 @@ test('a delayed successful send cannot clear the editor navigated to while it wa
     queryClient: fixture.queryClient,
   })
   await waitFor(() =>
-    expect(view.getByRole('textbox', { name: 'Message' }).textContent).toBe('Submitted prompt'),
+    expect(view.getByTestId('chat-input-editor').textContent).toBe('Submitted prompt'),
   )
   fireEvent.click(view.getByRole('button', { name: 'Send message' }))
   await waitFor(() => expect(fixture.submit).toHaveBeenCalledOnce())
   view.rerender(fixture.element(fixture.otherTarget.draftKey))
   await waitFor(() =>
-    expect(view.getByRole('textbox', { name: 'Message' }).textContent).toBe('Other session draft'),
+    expect(view.getByTestId('chat-input-editor').textContent).toBe('Other session draft'),
   )
   await act(async () => fixture.resolve('sent'))
-  expect(view.getByRole('textbox', { name: 'Message' }).textContent).toBe('Other session draft')
+  await waitFor(() =>
+    expect(view.getByTestId('chat-input-editor').textContent).toBe('Other session draft'),
+  )
   expect(useChatInputDraftStore.getState().getDraft(fixture.otherTarget).prompt).toBe(
     'Other session draft',
   )
@@ -57,14 +61,16 @@ test('a later edit to the submitted draft survives a successful receipt', async 
     queryClient: fixture.queryClient,
   })
   await waitFor(() =>
-    expect(view.getByRole('textbox', { name: 'Message' }).textContent).toBe('Submitted prompt'),
+    expect(view.getByTestId('chat-input-editor').textContent).toBe('Submitted prompt'),
   )
   fireEvent.click(view.getByRole('button', { name: 'Send message' }))
   await waitFor(() => expect(fixture.submit).toHaveBeenCalledOnce())
   act(() => useChatInputDraftStore.getState().setPrompt(fixture.target, 'Newer content'))
   await act(async () => fixture.resolve('sent'))
   expect(useChatInputDraftStore.getState().getDraft(fixture.target).prompt).toBe('Newer content')
-  expect(view.getByRole('textbox', { name: 'Message' }).textContent).toBe('Newer content')
+  await waitFor(() =>
+    expect(view.getByTestId('chat-input-editor').textContent).toBe('Newer content'),
+  )
 })
 
 function pendingComposer() {

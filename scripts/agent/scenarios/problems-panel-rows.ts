@@ -95,7 +95,7 @@ export const problemsPanelRows: Scenario = {
       await tree.focus()
       strictEqual(await selectors.listTabStops(tree).count(), 0, 'Fix with AI adds no Tab stop')
       await page.keyboard.press('Control+.')
-      const composer = selectors.chatMessage(page)
+      const composer = selectors.chatComposerSurface(page)
       await composer.waitFor({ timeout: 15_000 })
       await page.waitForFunction(
         (element) => (element?.textContent ?? '').includes('Fix this error'),

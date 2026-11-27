@@ -1,17 +1,10 @@
-import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import {
-  COMMAND_PRIORITY_HIGH,
-  KEY_ARROW_DOWN_COMMAND,
-  KEY_ARROW_UP_COMMAND,
-  KEY_ENTER_COMMAND,
-  KEY_TAB_COMMAND,
-} from 'lexical'
 import { useEffect } from 'react'
 
-import { useSettingValue } from '@/hooks/use-setting-value'
+import { useChatInputEditor } from '@/features/chat/providers/composer-editor-context'
 import { composerEnterIntent } from '@/features/chat/utils/enter-intent'
-import { $readChatInputTextSnapshot } from '@/features/chat/utils/input-editor-actions'
+import { readChatInputText } from '@/features/chat/utils/input-editor-actions'
+import { useSettingValue } from '@/hooks/use-setting-value'
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
 
 /**
  * Enter submits per `chat.sendShortcut`. The alternate send is each composer's to define:
@@ -30,21 +23,22 @@ export function ChatInputSubmitPlugin({
   onCommandMenuMove: (offset: number) => boolean
   onSubmitRequest: (alternate?: boolean) => Promise<boolean>
 }) {
-  const [editor] = useLexicalComposerContext()
+  const editor = useChatInputEditor()
   const sendShortcut = useSettingValue('chat.sendShortcut')
 
   useKeymapNode({
     area: 'chat',
     context: 'Composer',
-    element: () => editor.getRootElement(),
+    element: () => editor?.getInputElement() ?? null,
     commands: {
       'chat.sendMessage': ({ source }) => {
-        if (disabled || commandMenuOpen || editor.isComposing() || !editor.isEditable())
+        if (!editor || disabled || commandMenuOpen || editor.isComposing() || !editor.isEditable())
           return false
+        if (source && isImeCompositionEnter(source)) return false
         const intent = source
           ? composerEnterIntent({
               modifierKey: source.metaKey || source.ctrlKey,
-              prompt: editor.getEditorState().read(() => $readChatInputTextSnapshot().text),
+              prompt: readChatInputText(editor),
               sendShortcut,
               shiftKey: source.shiftKey,
               touch: touchKeyboard(),
@@ -58,42 +52,51 @@ export function ChatInputSubmitPlugin({
   })
 
   useEffect(() => {
-    const unregisterEnter = editor.registerCommand(
-      KEY_ENTER_COMMAND,
-      (event) =>
-        handleEnterCommand({
-          commandMenuOpen,
-          disabled,
-          event,
-          onCommandMenuCommit,
-        }),
-      COMMAND_PRIORITY_HIGH,
-    )
-    const unregisterTab = editor.registerCommand(
-      KEY_TAB_COMMAND,
-      (event) => handleMenuCommitCommand(commandMenuOpen, event, onCommandMenuCommit),
-      COMMAND_PRIORITY_HIGH,
-    )
-    const unregisterArrowDown = editor.registerCommand(
-      KEY_ARROW_DOWN_COMMAND,
-      (event) => handleMenuMoveCommand(commandMenuOpen, event, onCommandMenuMove, 1),
-      COMMAND_PRIORITY_HIGH,
-    )
-    const unregisterArrowUp = editor.registerCommand(
-      KEY_ARROW_UP_COMMAND,
-      (event) => handleMenuMoveCommand(commandMenuOpen, event, onCommandMenuMove, -1),
-      COMMAND_PRIORITY_HIGH,
-    )
-
-    return () => {
-      unregisterEnter()
-      unregisterTab()
-      unregisterArrowDown()
-      unregisterArrowUp()
-    }
+    if (!editor) return
+    const inputElement = editor.getInputElement()
+    const onKeyDown = (event: KeyboardEvent) =>
+      handleComposerKeyDown({
+        commandMenuOpen,
+        disabled,
+        event,
+        onCommandMenuCommit,
+        onCommandMenuMove,
+      })
+    inputElement.addEventListener('keydown', onKeyDown, true)
+    return () => inputElement.removeEventListener('keydown', onKeyDown, true)
   }, [commandMenuOpen, disabled, editor, onCommandMenuCommit, onCommandMenuMove])
 
   return null
+}
+
+function handleComposerKeyDown({
+  commandMenuOpen,
+  disabled,
+  event,
+  onCommandMenuCommit,
+  onCommandMenuMove,
+}: {
+  commandMenuOpen: boolean
+  disabled: boolean
+  event: KeyboardEvent
+  onCommandMenuCommit: () => boolean
+  onCommandMenuMove: (offset: number) => boolean
+}) {
+  if (event.key === 'Enter') {
+    handleEnterCommand({ commandMenuOpen, disabled, event, onCommandMenuCommit })
+    return
+  }
+  if (event.key === 'Tab') {
+    handleMenuCommitCommand(commandMenuOpen, event, onCommandMenuCommit)
+    return
+  }
+  if (event.key === 'ArrowDown') {
+    handleMenuMoveCommand(commandMenuOpen, event, onCommandMenuMove, 1)
+    return
+  }
+  if (event.key === 'ArrowUp') {
+    handleMenuMoveCommand(commandMenuOpen, event, onCommandMenuMove, -1)
+  }
 }
 
 function handleEnterCommand({
@@ -104,16 +107,16 @@ function handleEnterCommand({
 }: {
   commandMenuOpen: boolean
   disabled: boolean
-  event: KeyboardEvent | null
+  event: KeyboardEvent
   onCommandMenuCommit: () => boolean
 }) {
   if (disabled) return false
-  if (event && isImeCompositionEnter(event)) {
+  if (isImeCompositionEnter(event)) {
     // IME Enter commits text and still needs its native default.
     event.stopPropagation()
     return true
   }
-  if (!event?.shiftKey && handleMenuCommitCommand(commandMenuOpen, event, onCommandMenuCommit))
+  if (!event.shiftKey && handleMenuCommitCommand(commandMenuOpen, event, onCommandMenuCommit))
     return true
   return false
 }
@@ -129,28 +132,28 @@ function isImeCompositionEnter(event: KeyboardEvent) {
 
 function handleMenuCommitCommand(
   commandMenuOpen: boolean,
-  event: KeyboardEvent | null,
+  event: KeyboardEvent,
   onCommandMenuCommit: () => boolean,
 ) {
   if (!commandMenuOpen) return false
   if (!onCommandMenuCommit()) return false
 
-  event?.preventDefault()
-  event?.stopPropagation()
+  event.preventDefault()
+  event.stopPropagation()
   return true
 }
 
 function handleMenuMoveCommand(
   commandMenuOpen: boolean,
-  event: KeyboardEvent | null,
+  event: KeyboardEvent,
   onCommandMenuMove: (offset: number) => boolean,
   offset: number,
 ) {
   if (!commandMenuOpen) return false
   if (!onCommandMenuMove(offset)) return false
 
-  event?.preventDefault()
-  event?.stopPropagation()
+  event.preventDefault()
+  event.stopPropagation()
   return true
 }
 
