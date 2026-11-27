@@ -8,6 +8,7 @@ import { createEditorBufferSession } from '@singapore-editor/core/document'
 import {
   Editor,
   createEditorPreparedDocument,
+  createPaintSnapshotPlugin,
   type EditorDocumentAnalysis,
   type EditorInitialPaintEvent,
   type EditorPreparedDocument,
@@ -761,6 +762,7 @@ export async function retentionCountHost(fixture: RetentionFixture, signal: Abor
     const editor = new Editor(container, {
       onInitialPaint: (event) => paints.push(event),
       plugins: [
+        createPaintSnapshotPlugin(),
         {
           activate(context) {
             return [

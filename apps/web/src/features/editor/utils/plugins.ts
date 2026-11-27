@@ -6,6 +6,7 @@ import {
   createDocumentLinkPlugin,
   createMergeConflictPlugin,
   createOccurrenceHighlightPlugin,
+  createPaintSnapshotPlugin,
   type EditorScrollPosition,
 } from '@singapore-editor/core/editor'
 import { createEditorFindPlugin } from '@singapore-editor/find'
@@ -72,7 +73,7 @@ export function createCriticalEditorCorePlugins(
       : []
   ).concat(
     options.analysisAllowed && languageId === 'markdown' ? [createMarkdownAuthoringPlugin()] : [],
-    [createLineGutterPlugin(), createTouchSelectionPlugin()],
+    [createLineGutterPlugin(), createTouchSelectionPlugin(), createPaintSnapshotPlugin()],
     options.analysisAllowed
       ? [
           createFoldGutterPlugin({
