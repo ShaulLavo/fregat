@@ -1,59 +1,60 @@
-import { mountTerminal, type TerminalInputSender } from '@/features/terminal/state/mount'
-import {
-  applyTerminalAppearance,
-  applyTerminalCursorOptions,
-  applyTerminalTheme,
-  terminalCursorOptions,
-} from '@/features/terminal/utils/appearance'
-import { SavedViewport } from '@/features/terminal/components/saved-viewport'
-import {
-  captureTerminal,
-  discardTerminal,
-  savedTerminal,
-  terminalReloadGeneration,
-} from '@/features/terminal/state/reload'
-import { useTerminalActions } from '@/features/terminal/hooks/use-terminal-actions'
-import { ToolPane } from '@workspace/ui/patterns/tool-pane'
-import { Spinner } from '@workspace/ui/components/spinner'
-import { terminalSessionKey } from '@/features/terminal/state/session-registry'
+import { TerminalView } from '@shaulavo/workbench-terminal'
+import type { TerminalAttachment } from '@shaulavo/workbench-core'
 import { useQueryClient } from '@tanstack/react-query'
-import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
-import { environmentActivitySignal } from '@/lib/environments/state/activity'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
-import type { Terminal, TerminalScrollbar } from 'ghostty-webgpu'
-import { attachTerminalHotkeys } from 'ghostty-webgpu/hotkeys'
-import { detectPlatform } from '@shaulavo/hotkeys'
+import { playFeedback } from '@workspace/ui/patterns/feedback-layer'
+import { ToolPane } from '@workspace/ui/patterns/tool-pane'
+import { elapsedMs, nowMs } from '@workspace/utils/timing'
+import type { Terminal } from 'ghostty-webgpu'
 import {
   useEffect,
   useEffectEvent,
   useRef,
   useState,
   type ComponentPropsWithoutRef,
-  type FocusEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react'
 
-import { usePalette } from '@/lib/appearance/hooks/use-palette'
+import { FixWithAgentButton } from '@/components/fix-with-agent-button'
+import { ConnectionNotice } from '@/features/terminal/components/connection-notice'
+import { TerminalMenu } from '@/features/terminal/components/menu'
+import { OutputTiming } from '@/features/terminal/components/output-timing'
+import { SavedViewport } from '@/features/terminal/components/saved-viewport'
+import { useTerminalCommandInbox } from '@/features/terminal/hooks/use-command-inbox'
+import { useTerminalLinks } from '@/features/terminal/hooks/use-links'
+import { useTerminalOutputTiming } from '@/features/terminal/hooks/use-output-timing'
+import { useTerminalActions } from '@/features/terminal/hooks/use-terminal-actions'
+import {
+  buildFregatThemeInput,
+  createFregatHotkeyAdapter,
+  createFregatRuntimeLoader,
+  createFregatSavedScrollStore,
+  createFregatTerminalAdapter,
+  createFregatThemeStore,
+} from '@/features/terminal/state/fregat-adapter'
+import {
+  captureTerminal,
+  discardTerminal,
+  savedTerminal,
+  terminalReloadGeneration,
+} from '@/features/terminal/state/reload'
+import { terminalSessionKey } from '@/features/terminal/state/session-registry'
+import { readTerminalMenuTarget, type TerminalMenuTarget } from '@/features/terminal/utils/commands'
+import { useSettingValue } from '@/hooks/use-setting-value'
+import { useCommand } from '@/keymap/hooks/use-command'
 import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
+import { usePalette } from '@/lib/appearance/hooks/use-palette'
+import { reportError, toClientError } from '@/lib/client-error-taxonomy'
+import { log } from '@/lib/client-logging'
+import { useServerRestarting } from '@/lib/environments/hooks/use-server-restarting'
+import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
+import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { registeredFocusTarget } from '@/lib/focus/state/service'
-
-import { TerminalMenu } from '@/features/terminal/components/menu'
-import { useTerminalCommandInbox } from '@/features/terminal/hooks/use-command-inbox'
-import { useCommand } from '@/keymap/hooks/use-command'
-import { reportError, toClientError } from '@/lib/client-error-taxonomy'
-import { useTerminalLinks } from '@/features/terminal/hooks/use-links'
-import { readTerminalMenuTarget, type TerminalMenuTarget } from '@/features/terminal/utils/commands'
-import { isFocusOutsideElement } from '@/features/terminal/utils/focus-target'
-import { useSettingValue } from '@/hooks/use-setting-value'
 import { fontStack } from '@/lib/fonts/utils/stack'
-import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
-import { ConnectionNotice } from '@/features/terminal/components/connection-notice'
-import { OutputTiming } from '@/features/terminal/components/output-timing'
-import { useTerminalOutputTiming } from '@/features/terminal/hooks/use-output-timing'
-import { useServerRestarting } from '@/lib/environments/hooks/use-server-restarting'
-import { FixWithAgentButton } from '@/components/fix-with-agent-button'
+import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 
 export function TerminalPanel({
   active = true,
@@ -72,19 +73,20 @@ export function TerminalPanel({
   const origin = originForQueryClient(queryClient)
   const focus = useFocusService()
   const { keymap } = useCommand()
-  const hostRef = useRef<HTMLDivElement | null>(null)
   const restoreFocusAfterRemountRef = useRef<string | null>(null)
   const scrollbackLengthRef = useRef(0)
-  const sendInputRef = useRef<TerminalInputSender | null>(null)
+  const sendInputRef = useRef<((data: string) => boolean) | null>(null)
+  const attachmentRef = useRef<TerminalAttachment | null>(null)
+  const inputReadyRef = useRef(false)
   const terminalRef = useRef<Terminal | null>(null)
+  const mountStartedAtRef = useRef(nowMs())
+  const captureTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   // State as well as the ref: the timing readout subscribes to whichever terminal is mounted.
   const [liveTerminal, setLiveTerminal] = useState<Terminal | null>(null)
   const { resolved: palette } = usePalette()
   const terminalColors = palette.terminal
   const paletteHash = palette.contentHash
-  // Read as primitives, not an object: an object literal is a new value every
-  // render, which would make the effect below run on every render and, worse,
-  // tempt someone into making it a dependency of the mount effect.
+  const colorScheme = palette.mode === 'light' ? 'light' : 'dark'
   const cursorBlink = useSettingValue('terminal.integrated.cursorBlinking')
   const fontSize = useSettingValue('terminal.integrated.fontSize')
   const fontFamily = fontStack(useSettingValue('editor.fontFamily'), 'code')
@@ -111,9 +113,7 @@ export function TerminalPanel({
   const candidate = disconnectedPaint?.key === displayKey ? disconnectedPaint.paint : initialPaint
   const savedPaint =
     rejectedPaint?.key === displayKey && rejectedPaint.paint === candidate ? null : candidate
-  const savedScrollRef = useRef<{ paint: string; scrollbar: Readonly<TerminalScrollbar> } | null>(
-    null,
-  )
+  const [savedScrollStore] = useState(createFregatSavedScrollStore)
   const focusIdentity = terminalSessionKey(rootPath, sessionId)
   const terminalMountIdentity = `${origin}\u0000${focusIdentity}\u0000${scrollback}`
   const hasLivePaint = paintedIdentity === terminalMountIdentity
@@ -138,53 +138,174 @@ export function TerminalPanel({
       id: { kind: 'terminal', rootPath, sessionId },
       onIntent: (intent) => {
         if (intent !== 'focus' || !active || !socketConnected) return false
-
         const terminal = terminalRef.current
         if (!terminal) return false
-
         terminal.focus()
         return true
       },
     },
     active && socketConnected,
   )
-  const captureTerminalRemountFocus = useEffectEvent(() => {
+
+  const themeKey = `${paletteHash}\u0000${colorScheme}\u0000${fontFamily}\u0000${fontSize}\u0000${cursorBlink}`
+  const [themeStore] = useState(() =>
+    createFregatThemeStore(
+      buildFregatThemeInput({
+        colors: terminalColors,
+        colorScheme,
+        fontFamily,
+        fontSize,
+        cursorBlink,
+      }),
+      themeKey,
+    ),
+  )
+  useEffect(() => {
+    themeStore.update(
+      buildFregatThemeInput({
+        colors: terminalColors,
+        colorScheme,
+        fontFamily,
+        fontSize,
+        cursorBlink,
+      }),
+      themeKey,
+    )
+  }, [themeStore, terminalColors, colorScheme, fontFamily, fontSize, cursorBlink, themeKey])
+
+  useEffect(() => {
+    savedScrollStore.setPaint(savedPaint)
+  }, [savedScrollStore, savedPaint])
+  const reloadGenerationRef = useRef(terminalReloadGeneration(queryClient))
+  const flushCapture = () => {
+    clearTimeout(captureTimerRef.current)
+    captureTimerRef.current = undefined
+    const terminal = terminalRef.current
+    if (!terminal || !inputReadyRef.current || !active) return
+    captureTerminal(queryClient, display, terminal.captureViewport(), reloadGenerationRef.current)
+  }
+  const flushCaptureOnLifecycle = useEffectEvent(() => flushCapture())
+  const captureRemountFocus = useEffectEvent(() => {
     restoreFocusAfterRemountRef.current = terminalFocused ? focusIdentity : null
   })
-  // ghostty resolves long after the effect that asked for it, so the handover
-  // runs as an effect event and sees the current render rather than the one
-  // that started the mount.
-  const handleTerminalReady = useEffectEvent(
-    (terminal: Terminal, sendInput: TerminalInputSender, identity: string) => {
-      if (identity !== terminalMountIdentity) return
-      terminalRef.current = terminal
-      setLiveTerminal(terminal)
-      sendInputRef.current = sendInput
-      attachTerminalHotkeys(terminal, {
-        mode: 'hosted',
+
+  const adapterKey = `${origin}\u0000${rootPath}`
+  const [adapterState, setAdapterState] = useState(() => ({
+    key: adapterKey,
+    adapter: createFregatTerminalAdapter({
+      origin,
+      client: clientForQueryClient(queryClient),
+      rootPath,
+      getSavedScroll: () => savedScrollStore.read(),
+    }),
+    loadRuntime: createFregatRuntimeLoader(origin),
+  }))
+  if (adapterState.key !== adapterKey) {
+    setAdapterState({
+      key: adapterKey,
+      adapter: createFregatTerminalAdapter({
+        origin,
+        client: clientForQueryClient(queryClient),
+        rootPath,
+        getSavedScroll: () => savedScrollStore.read(),
+      }),
+      loadRuntime: createFregatRuntimeLoader(origin),
+    })
+  }
+
+  const hotkeyScopeParent = keymap.parentFor('terminal')
+  const [hotkeyState, setHotkeyState] = useState(() => ({
+    dispatcher: keymap.hotkeys,
+    parent: hotkeyScopeParent,
+    adapter: createFregatHotkeyAdapter({
+      dispatcher: keymap.hotkeys,
+      parent: hotkeyScopeParent,
+    }),
+  }))
+  if (hotkeyState.dispatcher !== keymap.hotkeys || hotkeyState.parent !== hotkeyScopeParent) {
+    setHotkeyState({
+      dispatcher: keymap.hotkeys,
+      parent: hotkeyScopeParent,
+      adapter: createFregatHotkeyAdapter({
         dispatcher: keymap.hotkeys,
-        parent: keymap.parentFor('terminal'),
-        platform: detectPlatform(),
-        onError: (cause, operation) => reportError({ ...toClientError(cause), operation }),
-      })
-      // At handover rather than at construction: ghostty resolves long after the
-      // mount effect started, and this is an effect event, so it sees the
-      // current settings rather than the ones the mount began with.
-      applyTerminalAppearance(terminal, { cursorBlink, fontFamily, fontSize })
-      applyTerminalCursorOptions(terminal, terminalCursorOptions(terminalFocused, cursorBlink))
-      applyTerminalTheme(terminal, terminalColors)
-      terminal.setAccessibilityEnabled(screenReader)
-      registerTerminalLinks(terminal)
-    },
-  )
-  // State, not just the ref: a script queued before the socket opened has to
-  // wake the effect that runs it, and writing a ref never re-renders.
-  const handleTerminalConnectedChange = useEffectEvent((connected: boolean, identity: string) => {
-    if (identity !== terminalMountIdentity) return
-    setConnectedIdentity(connected ? identity : null)
-    if (connected) {
-      setPaintedIdentity(identity)
+        parent: hotkeyScopeParent,
+      }),
+    })
+  }
+
+  useEffect(() => {
+    mountStartedAtRef.current = nowMs()
+    reloadGenerationRef.current = terminalReloadGeneration(queryClient)
+    const removeFlush = addLifecycleFlush(() => flushCaptureOnLifecycle())
+    return () => {
+      removeFlush()
+      captureRemountFocus()
+      clearTimeout(captureTimerRef.current)
+      captureTimerRef.current = undefined
+      setConnectedIdentity((current) => (current === terminalMountIdentity ? null : current))
+      setPaintedIdentity((current) => (current === terminalMountIdentity ? null : current))
+      sendInputRef.current = null
+      attachmentRef.current = null
+      inputReadyRef.current = false
+      scrollbackLengthRef.current = 0
+      terminalRef.current = null
+      setLiveTerminal(null)
+      setMenuTarget(null)
+    }
+  }, [machineUnavailable, queryClient, terminalMountIdentity, lowLatency])
+
+  useEffect(() => {
+    if (!terminalFocusTargetToken) return
+    const restoreIdentity = restoreFocusAfterRemountRef.current
+    restoreFocusAfterRemountRef.current = null
+    if (restoreIdentity !== focusIdentity) return
+    const snapshot = focus.getSnapshot()
+    if (snapshot.currentOwner || snapshot.requested) return
+    void focus.request(registeredFocusTarget(terminalFocusTargetToken)).completion
+  }, [focus, focusIdentity, terminalFocusTargetToken])
+
+  const handleTerminalReady = (terminal: Terminal) => {
+    terminalRef.current = terminal
+    setLiveTerminal(terminal)
+    registerTerminalLinks(terminal)
+    log.info({
+      action: 'terminal.mount',
+      area: 'terminal',
+      durationMs: elapsedMs(mountStartedAtRef.current),
+      rendererBackend: terminal.diagnostics.rendererBackend ?? null,
+      desynchronized: terminal.diagnostics.desynchronized,
+      sessionId,
+    })
+    sendInputRef.current = (data) => {
+      if (!inputReadyRef.current || !attachmentRef.current) return false
+      attachmentRef.current.write(data)
+      return true
+    }
+  }
+
+  const handleBeforeDispose = () => {
+    flushCapture()
+    clearTimeout(captureTimerRef.current)
+    captureTimerRef.current = undefined
+    terminalRef.current = null
+    attachmentRef.current = null
+    sendInputRef.current = null
+    inputReadyRef.current = false
+    setLiveTerminal(null)
+  }
+
+  const handleTerminalAttached = (_terminal: Terminal, attachment: TerminalAttachment) => {
+    attachmentRef.current = attachment
+  }
+
+  const handleReadyChange = (ready: boolean) => {
+    if (!ready) flushCapture()
+    inputReadyRef.current = ready
+    setConnectedIdentity(ready ? terminalMountIdentity : null)
+    if (ready) {
+      setPaintedIdentity(terminalMountIdentity)
       setInputGeneration((generation) => generation + 1)
+      flushCapture()
       return
     }
     setDisconnectedPaint({
@@ -192,53 +313,19 @@ export function TerminalPanel({
       paint: savedTerminal(queryClient, display),
     })
     setMenuTarget(null)
-  })
-  const handleTerminalCapture = useEffectEvent(
-    (
-      terminal: Terminal,
-      identity: string,
-      generation: ReturnType<typeof terminalReloadGeneration>,
-    ) => {
-      if (!active || identity !== terminalMountIdentity) return
-      captureTerminal(queryClient, display, terminal.captureViewport(), generation)
-    },
-  )
-  const readSavedScroll = useEffectEvent(() => {
-    const saved = savedScrollRef.current
-    return savedPaint && saved?.paint === savedPaint ? saved.scrollbar : null
-  })
-  const handleTerminalScrollbackLengthChange = useEffectEvent((length: number) => {
-    scrollbackLengthRef.current = length
-  })
-  const handleTerminalExit = useEffectEvent((exitCode: number | null) => {
-    onExit?.(exitCode)
-  })
-  const handleTerminalProcessChange = useEffectEvent((process: string | null) => {
-    onProcessChange?.(process)
-  })
-  const handleTerminalTitleChange = useEffectEvent((title: string) => {
-    onTitleChange?.(title)
-  })
-  const handleTerminalFocus = () => {
-    if (!socketConnected) return
-    applyTerminalCursorOptions(terminalRef.current, terminalCursorOptions(true, cursorBlink))
   }
-  const handleTerminalBlur = (event: FocusEvent<HTMLElement>) => {
-    if (!isFocusOutsideElement(event.currentTarget, event.relatedTarget)) return
 
-    applyTerminalCursorOptions(terminalRef.current, terminalCursorOptions(false, cursorBlink))
+  const handleFramePainted = () => {
+    if (!inputReadyRef.current || captureTimerRef.current !== undefined) return
+    captureTimerRef.current = setTimeout(() => flushCapture(), 250)
   }
-  // ghostty registers its own `contextmenu` listener on the canvas and never
-  // calls preventDefault — it parks a hidden textarea under the cursor so the
-  // native menu can copy and paste. That listener runs in the target phase, so
-  // only a capture-phase handler above the canvas can take the event first.
-  const handleTerminalContextMenu = (event: ReactMouseEvent<HTMLElement>) => {
-    const terminal = terminalRef.current
+
+  const handleTerminalContextMenu = (
+    event: ReactMouseEvent<HTMLDivElement>,
+    terminal: Terminal | null,
+  ) => {
     if (!terminal || !socketConnected) return
-
     event.stopPropagation()
-    // Snapshotted here because ghostty drops the selection from a document
-    // `click` handler the moment a portalled menu item is pressed.
     setMenuTarget(
       readTerminalMenuTarget(terminal, sessionId, scrollbackLengthRef.current > 0, {
         clearHistory: () => terminalActions.mutate('clear'),
@@ -247,102 +334,12 @@ export function TerminalPanel({
     )
     contextMenu.openAtEvent(event, event.currentTarget)
   }
+
   const handleTerminalMenuOpenChange = (open: boolean) => {
     contextMenu.onOpenChange(open)
     if (open) return
-
     setMenuTarget(null)
   }
-
-  useEffect(() => {
-    applyTerminalAppearance(terminalRef.current, { cursorBlink, fontFamily, fontSize })
-  }, [cursorBlink, fontFamily, fontSize])
-
-  useEffect(() => {
-    terminalRef.current?.setAccessibilityEnabled(screenReader)
-  }, [screenReader])
-
-  // Keyed on the content hash, not the mode: a dark-to-dark palette change repaints the ANSI
-  // table without a remount, and the same colors arriving as a fresh object repaint nothing.
-  const appliedPaletteRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (appliedPaletteRef.current === paletteHash) return
-
-    appliedPaletteRef.current = paletteHash
-    applyTerminalTheme(terminalRef.current, terminalColors)
-  }, [paletteHash, terminalColors])
-
-  useEffect(() => {
-    if (machineUnavailable) return
-    const host = hostRef.current
-    if (!host) return
-
-    const generation = terminalReloadGeneration(queryClient)
-    const unmountTerminal = mountTerminal({
-      origin,
-      client: clientForQueryClient(queryClient),
-      signal: environmentActivitySignal(origin),
-      host,
-      rootPath,
-      scrollback,
-      lowLatency,
-      sessionId,
-      onConnectedChange: (connected) =>
-        handleTerminalConnectedChange(connected, terminalMountIdentity),
-      getSavedScroll: readSavedScroll,
-      onCapture: (terminal) => handleTerminalCapture(terminal, terminalMountIdentity, generation),
-      onExit: handleTerminalExit,
-      onProcessChange: handleTerminalProcessChange,
-      onTitleChange: handleTerminalTitleChange,
-      onFailed: (message) => setTerminalFailure({ identity: terminalMountIdentity, message }),
-      onReady: (terminal, sendInput) =>
-        handleTerminalReady(terminal, sendInput, terminalMountIdentity),
-      onScrollbackLengthChange: handleTerminalScrollbackLengthChange,
-    })
-
-    return () => {
-      captureTerminalRemountFocus()
-      setConnectedIdentity((current) => (current === terminalMountIdentity ? null : current))
-      setPaintedIdentity((current) => (current === terminalMountIdentity ? null : current))
-      sendInputRef.current = null
-      scrollbackLengthRef.current = 0
-      terminalRef.current = null
-      setLiveTerminal(null)
-      // The open menu holds the terminal it was opened against. Dropping it
-      // here keeps a settings-driven remount from leaving items pointed at a disposed one.
-      setMenuTarget(null)
-      unmountTerminal()
-    }
-  }, [
-    machineUnavailable,
-    origin,
-    queryClient,
-    rootPath,
-    scrollback,
-    lowLatency,
-    sessionId,
-    terminalMountIdentity,
-  ])
-
-  useEffect(() => {
-    if (!terminalFocusTargetToken) return
-
-    const restoreIdentity = restoreFocusAfterRemountRef.current
-    restoreFocusAfterRemountRef.current = null
-    if (restoreIdentity !== focusIdentity) return
-
-    const snapshot = focus.getSnapshot()
-    if (snapshot.currentOwner || snapshot.requested) return
-
-    void focus.request(registeredFocusTarget(terminalFocusTargetToken)).completion
-  }, [focus, focusIdentity, terminalFocusTargetToken])
-
-  useEffect(() => {
-    applyTerminalCursorOptions(
-      terminalRef.current,
-      terminalCursorOptions(terminalFocused, cursorBlink),
-    )
-  }, [cursorBlink, terminalFocused])
 
   return (
     <ToolPane
@@ -352,20 +349,59 @@ export function TerminalPanel({
       aria-label='Terminal'
       {...sectionProps}
       className={cn('relative flex min-h-0 min-w-0 flex-col overflow-hidden', className)}
-      onBlurCapture={handleTerminalBlur}
-      onContextMenuCapture={handleTerminalContextMenu}
-      onFocusCapture={handleTerminalFocus}
       ref={terminalFocusTargetRef}
     >
       <div
-        className={cn(
-          'min-h-0 min-w-0 flex-1 overflow-hidden px-(--density-control-padding-x) py-(--density-section-gap) font-mono',
-          savedPaint && !hasLivePaint && 'invisible',
-        )}
-        inert={!socketConnected}
+        className='relative flex min-h-0 min-w-0 flex-1 flex-col'
         data-terminal-input-generation={inputGeneration}
-        ref={hostRef}
-      />
+      >
+        {!machineUnavailable ? (
+          <TerminalView
+            adapter={adapterState.adapter}
+            sessionId={sessionId}
+            active={active}
+            loadRuntime={adapterState.loadRuntime}
+            themeOverride={themeStore.subscribable}
+            backgroundOpacity={0}
+            cursorBlink={cursorBlink}
+            scrollbackLimit={scrollback}
+            lowLatency={lowLatency}
+            screenReader={screenReader}
+            hotkeys={hotkeyState.adapter}
+            onHotkeyError={(cause, operation) =>
+              reportError({ ...toClientError(cause), operation })
+            }
+            disableContextMenu
+            inertWhenNotReady
+            className='flex min-h-0 min-w-0 flex-1 flex-col'
+            canvasHostClassName={cn(
+              'min-h-0 min-w-0 flex-1 overflow-hidden px-(--density-control-padding-x) py-(--density-section-gap) font-mono',
+              savedPaint && !hasLivePaint && 'invisible',
+            )}
+            onTerminalReady={handleTerminalReady}
+            onBeforeDispose={handleBeforeDispose}
+            onAttached={handleTerminalAttached}
+            onReadyChange={handleReadyChange}
+            onFramePainted={handleFramePainted}
+            onScrollbackLengthChange={(length) => {
+              scrollbackLengthRef.current = length
+            }}
+            onBell={() => playFeedback('bell', 'terminalBell')}
+            onExit={onExit}
+            onProcessChange={onProcessChange}
+            onTitleChange={onTitleChange}
+            onContextMenuCapture={handleTerminalContextMenu}
+            renderError={() => null}
+            onError={(_message, cause) => {
+              setTerminalFailure({
+                identity: terminalMountIdentity,
+                message: 'Could not open the terminal. Close this terminal tab and open a new one.',
+              })
+              reportError(toClientError(cause))
+            }}
+          />
+        ) : null}
+      </div>
       {savedPaint && !hasLivePaint && active ? (
         <SavedViewport
           key={`${terminalMountIdentity}:${paletteHash}:${fontSize}:${fontFamily}`}
@@ -373,10 +409,10 @@ export function TerminalPanel({
           fontFamily={fontFamily}
           fontSize={fontSize}
           onAdmitted={(scrollbar) => {
-            savedScrollRef.current = { paint: savedPaint, scrollbar }
+            savedScrollStore.setAdmitted(savedPaint, scrollbar)
           }}
           onRejected={() => {
-            savedScrollRef.current = null
+            savedScrollStore.clear()
             discardTerminal(queryClient, display, savedPaint)
             setRejectedPaint({ key: displayKey, paint: savedPaint })
           }}

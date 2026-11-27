@@ -53,6 +53,7 @@
     "@shaulavo/hotkeys": "catalog:",
     "@shaulavo/workbench-core": "catalog:",
     "@shaulavo/workbench-icons": "catalog:",
+    "@shaulavo/workbench-terminal": "catalog:",
     "@shaulavo/workbench-tree": "catalog:",
     "@singapore-editor/collaboration": "catalog:",
     "@singapore-editor/core": "catalog:",

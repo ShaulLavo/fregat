@@ -1,17 +1,63 @@
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
-import { BOOT_MIRROR_KEY } from '@/lib/boot-keys'
-import { writeBootMirror } from '@/lib/settings-boot-mirror'
-import { vi } from 'vitest'
+import { TerminalView } from '@shaulavo/workbench-terminal'
 import { isCancelledError } from '@tanstack/query-core'
 import { GhosttyRuntime, type Terminal } from 'ghostty-webgpu'
-import { initializeGhostty } from '@/features/terminal/state/runtime'
-import { resourceQueryClient } from '@/lib/resources/state/query-client'
-import { expect, test } from '../../../../test/fixtures'
-import { primaryQueryClient } from '@/lib/environments/state/query-clients'
-import { getClient, primaryServerOrigin } from '@/lib/client'
-import { mountTerminal } from '@/features/terminal/state/mount'
+import { flushSync } from 'react-dom'
+import { createRoot } from 'react-dom/client'
+import { vi } from 'vitest'
+
+import {
+  createFregatRuntimeLoader,
+  createFregatTerminalAdapter,
+} from '@/features/terminal/state/fregat-adapter'
 import { terminalCheckoutQueryOptions } from '@/features/terminal/state/register-checkout'
+import { initializeGhostty } from '@/features/terminal/state/runtime'
 import { terminalQueryKeys } from '@/features/terminal/utils/query-keys'
+import { getClient, primaryServerOrigin } from '@/lib/client'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
+
+import { expect, test } from '../../../../test/fixtures'
+
+function mountFregatTerminalView(options: {
+  readonly host: HTMLDivElement
+  readonly sessionId: string
+  readonly signal: AbortSignal
+  readonly screenReader?: boolean
+  readonly onReady: (terminal: Terminal) => void
+  readonly onFailed: (message: string) => void
+}) {
+  const adapter = createFregatTerminalAdapter({
+    origin: primaryServerOrigin(),
+    client: getClient(),
+    rootPath: '.',
+    signal: options.signal,
+    getSavedScroll: () => null,
+  })
+  const loadRuntime = createFregatRuntimeLoader(primaryServerOrigin(), options.signal)
+  const root = createRoot(options.host)
+  flushSync(() => {
+    root.render(
+      <TerminalView
+        adapter={adapter}
+        sessionId={options.sessionId}
+        loadRuntime={loadRuntime}
+        scrollbackLimit={100}
+        screenReader={options.screenReader ?? false}
+        disableContextMenu
+        onTerminalReady={options.onReady}
+        onError={() =>
+          options.onFailed(
+            'Could not open the terminal. Close this terminal tab and open a new one.',
+          )
+        }
+      />,
+    )
+  })
+  return () => {
+    root.unmount()
+  }
+}
 
 test.each([
   'active',
@@ -46,25 +92,16 @@ test.each([
     const onFailed = vi.fn()
     const onReady = vi.fn()
     const controller = new AbortController()
-    const unmount = mountTerminal({
-      origin: primaryServerOrigin(),
-      client: getClient(),
-      signal: controller.signal,
+    const unmount = mountFregatTerminalView({
       host,
-      rootPath: '.',
-      scrollback: 100,
-      lowLatency: false,
       sessionId: `wasm-startup-${phase}`,
-      onConnectedChange: vi.fn(),
-      getSavedScroll: () => null,
-      onCapture: vi.fn(),
-      onExit: vi.fn(),
-      onFailed,
-      onProcessChange: vi.fn(),
+      signal: controller.signal,
       onReady,
-      onScrollbackLengthChange: vi.fn(),
-      onTitleChange: vi.fn(),
+      onFailed,
     })
+    // Allow TerminalView's effect (waitForDocumentFonts -> loadRuntime) to attach to the in-flight query.
+    await document.fonts.ready
+    await Promise.resolve()
     try {
       if (phase === 'unmounted') unmount()
       if (phase === 'beforeunload') window.dispatchEvent(new Event('beforeunload'))
@@ -82,7 +119,7 @@ test.each([
       const error = await opening
       await new Promise((resolve) => setTimeout(resolve, 0))
       if (phase === 'active' || phase === 'prevented-departure') {
-        expect(onFailed).toHaveBeenCalledOnce()
+        await expect.poll(() => onFailed.mock.calls.length, { timeout: 5_000 }).toBe(1)
         expect(onFailed).toHaveBeenCalledWith(
           'Could not open the terminal. Close this terminal tab and open a new one.',
         )
@@ -138,24 +175,12 @@ test.each([false, true])(
     const onReady = vi.fn()
     const onFailed = vi.fn()
     const controller = new AbortController()
-    const unmount = mountTerminal({
-      origin: primaryServerOrigin(),
-      client: getClient(),
-      signal: controller.signal,
+    const unmount = mountFregatTerminalView({
       host,
-      rootPath: '.',
-      scrollback: 100,
-      lowLatency: false,
       sessionId: `cancelled-open-${earlyRestore}`,
-      onConnectedChange: vi.fn(),
-      getSavedScroll: () => null,
-      onCapture: vi.fn(),
-      onExit: vi.fn(),
-      onFailed,
-      onProcessChange: vi.fn(),
+      signal: controller.signal,
       onReady,
-      onScrollbackLengthChange: vi.fn(),
-      onTitleChange: vi.fn(),
+      onFailed,
     })
     try {
       window.dispatchEvent(new Event('pagehide'))
@@ -189,10 +214,7 @@ test.each([undefined, false, true])(
   'the mounted terminal applies screen-reader setting %s and releases its mirror',
   { timeout: 20_000 },
   async (enabled) => {
-    const savedMirror = localStorage.getItem(BOOT_MIRROR_KEY)
     const initiallyEnabled = enabled ?? DEFAULT_SETTING_VALUES['terminal.integrated.screenReader']
-    if (enabled === undefined) localStorage.removeItem(BOOT_MIRROR_KEY)
-    else writeBootMirror({ ...DEFAULT_SETTING_VALUES, 'terminal.integrated.screenReader': enabled })
     await primaryQueryClient().query(terminalCheckoutQueryOptions('.'))
     const host = document.createElement('div')
     host.className = 'h-96 w-96'
@@ -200,24 +222,13 @@ test.each([undefined, false, true])(
     const onReady = vi.fn()
     const onFailed = vi.fn()
     const controller = new AbortController()
-    const unmount = mountTerminal({
-      origin: primaryServerOrigin(),
-      client: getClient(),
-      signal: controller.signal,
+    const unmount = mountFregatTerminalView({
       host,
-      rootPath: '.',
-      scrollback: 100,
-      lowLatency: false,
       sessionId: 'screen-reader-mount',
-      onConnectedChange: vi.fn(),
-      getSavedScroll: () => null,
-      onCapture: vi.fn(),
-      onExit: vi.fn(),
-      onFailed,
-      onProcessChange: vi.fn(),
+      signal: controller.signal,
+      screenReader: initiallyEnabled,
       onReady,
-      onScrollbackLengthChange: vi.fn(),
-      onTitleChange: vi.fn(),
+      onFailed,
     })
     try {
       await expect
@@ -249,8 +260,6 @@ test.each([undefined, false, true])(
       controller.abort()
       unmount()
       host.remove()
-      if (savedMirror === null) localStorage.removeItem(BOOT_MIRROR_KEY)
-      else localStorage.setItem(BOOT_MIRROR_KEY, savedMirror)
     }
   },
 )
