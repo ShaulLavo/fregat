@@ -47,23 +47,20 @@ describe('WASI and host-independent server degradations', () => {
     expect(offenders).toEqual([])
   })
 
-  it('renameExclusive fallback publishes to an unused path and refuses replacing existing or empty directories', async () => {
+  it('renameExclusive fails closed without loading bun:ffi when native no-replace rename is unavailable', async () => {
     const root = await scratch()
     const source = path.join(root, 'staging')
     const destination = path.join(root, 'published')
     await mkdir(source)
     await writeFile(path.join(source, 'marker.txt'), 'ok')
 
-    expect(renameExclusive(source, destination, { useNativeFfi: false })).toBe(true)
+    expect(renameExclusive(source, destination, { useNativeFfi: false })).toBe(false)
+    expect(await readFile(path.join(source, 'marker.txt'), 'utf8')).toBe('ok')
 
-    const second = path.join(root, 'staging-2')
-    await mkdir(second)
-    expect(renameExclusive(second, destination, { useNativeFfi: false })).toBe(false)
-
-    // Pre-existing empty directory must also never be replaced.
     const emptyDestination = path.join(root, 'empty-existing')
     await mkdir(emptyDestination)
-    expect(renameExclusive(second, emptyDestination, { useNativeFfi: false })).toBe(false)
+    expect(renameExclusive(source, emptyDestination, { useNativeFfi: false })).toBe(false)
+    expect(await readdir(emptyDestination)).toEqual([])
   })
 
   it('InstalledFontProvider degrades to empty list when fontconfig is unavailable', async () => {

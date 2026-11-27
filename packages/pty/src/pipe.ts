@@ -73,19 +73,25 @@ class PipePty extends ManagedPty implements PipePtyHandle {
     this.closeTransport()
   }
 
+  protected override get canSignalAfterLeaderExit() {
+    return this.#useProcessGroup
+  }
+
   protected override deliverSignal(
     child: { readonly pid: number; kill(signal?: NodeJS.Signals): void },
     signal: NodeJS.Signals,
+    leaderExited: boolean,
   ) {
     if (this.#useProcessGroup && child.pid > 0) {
       try {
         process.kill(-child.pid, signal)
         return
       } catch {
-        // Fall back to signaling the direct child when process-group signaling is unavailable.
+        // After the leader exits, never signal its raw PID (which may be recycled); ESRCH means the group exited.
+        if (leaderExited) return
       }
     }
-    child.kill(signal)
+    if (!leaderExited) child.kill(signal)
   }
 
   protected closeTransport() {

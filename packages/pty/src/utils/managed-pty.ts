@@ -85,25 +85,35 @@ export abstract class ManagedPty implements Pty {
     this.#finish()
   }
 
+  protected get canSignalAfterLeaderExit() {
+    return false
+  }
+
   protected sendSignal(signal: NodeJS.Signals) {
-    if (this.#result || this.#completed || !this.#child) return
+    if (this.#completed || !this.#child) return
+    if (this.#result && !this.canSignalAfterLeaderExit) return
     try {
-      this.deliverSignal(this.#child, signal)
+      this.deliverSignal(this.#child, signal, this.#result !== null)
     } catch {
-      // Ignore if the child exited concurrently.
+      // Ignore if the child or its process group exited concurrently.
     }
   }
 
   #signal(signal: NodeJS.Signals) {
-    if (this.#result || !this.#child) return
+    if (this.#completed || !this.#child) return
+    if (this.#result && !this.canSignalAfterLeaderExit) return
     try {
-      this.deliverSignal(this.#child, signal)
+      this.deliverSignal(this.#child, signal, this.#result !== null)
     } catch (cause) {
       this.#failure ??= operationError('signal', cause)
     }
   }
 
-  protected deliverSignal(child: ManagedSubprocess, signal: NodeJS.Signals) {
+  protected deliverSignal(
+    child: ManagedSubprocess,
+    signal: NodeJS.Signals,
+    _leaderExited: boolean,
+  ) {
     child.kill(signal)
   }
 

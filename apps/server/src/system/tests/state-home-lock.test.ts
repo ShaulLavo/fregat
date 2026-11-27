@@ -129,18 +129,62 @@ describe('state home lock', () => {
     expect(codes.filter((code) => code === 2)).toHaveLength(3)
   })
 
-  it('fails closed when process.kill throws ENOSYS (WASI) instead of treating live locks as stale', async () => {
+  it('keeps a live lease held under ENOSYS and reclaims expired locks after a holder crashes', async () => {
     const home = await stateHome()
     const lockFile = path.join(home, 'server.lock')
-    await writeFile(lockFile, '99999999:deadbeef\n', { mode: 0o600 })
 
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
       throw Object.assign(new Error('ENOSYS: function not implemented, kill'), { code: 'ENOSYS' })
     })
     try {
-      expect(tryFileLock(lockFile, { useNativeFfi: false })).toBeNull()
+      // Fresh unexpired lease held by another process (even with matching PID, as on WASI pid=1) refuses contenders.
+      const future = String(Date.now() + 30_000).padStart(16, '0')
+      await writeFile(lockFile, `${process.pid}:aabbccdd00112233:${future}\n`, { mode: 0o600 })
+      expect(tryFileLock(lockFile, { useNativeFfi: false, leaseTtlMs: 200 })).toBeNull()
+
+      // Expired lease left behind by a crashed WASI holder is reclaimed cleanly.
+      const expired = String(Date.now() - 1_000).padStart(16, '0')
+      await writeFile(lockFile, `${process.pid}:deadbeef00112233:${expired}\n`, { mode: 0o600 })
+      const reclaimed = tryFileLock(lockFile, { useNativeFfi: false, leaseTtlMs: 200 })
+      expect(reclaimed).not.toBeNull()
+      reclaimed?.release()
     } finally {
       killSpy.mockRestore()
+    }
+
+    // Live holder heartbeat keeps the lease fresh past leaseTtlMs; killing it lets the next owner recover.
+    const modulePath = path.join(import.meta.dirname, '..', 'file-lock.ts')
+    const holderScript = `
+      const { tryFileLock } = await import(${JSON.stringify(modulePath)});
+      const lock = tryFileLock(${JSON.stringify(lockFile)}, { useNativeFfi: false, leaseTtlMs: 250 });
+      if (!lock) process.exit(2);
+      console.log('held');
+      await Bun.sleep(60000);
+    `
+    const holder = Bun.spawn({
+      cmd: [process.execPath, '-e', holderScript],
+      stdout: 'pipe',
+      stderr: 'inherit',
+    })
+    holders.push(holder)
+    const reader = holder.stdout.getReader()
+    const { value } = await reader.read()
+    expect(new TextDecoder().decode(value)).toContain('held')
+
+    await Bun.sleep(400)
+    const spyDuringLive = vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw Object.assign(new Error('ENOSYS: function not implemented, kill'), { code: 'ENOSYS' })
+    })
+    try {
+      expect(tryFileLock(lockFile, { useNativeFfi: false, leaseTtlMs: 250 })).toBeNull()
+      holder.kill('SIGKILL')
+      await holder.exited
+      await Bun.sleep(350)
+      const afterCrash = tryFileLock(lockFile, { useNativeFfi: false, leaseTtlMs: 250 })
+      expect(afterCrash).not.toBeNull()
+      afterCrash?.release()
+    } finally {
+      spyDuringLive.mockRestore()
     }
   })
 

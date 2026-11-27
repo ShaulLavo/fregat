@@ -164,13 +164,20 @@ export async function superviseDirectProcesses(
     const signalRace: Promise<SupervisorOutcome>[] = [
       signaled.promise.then((signal) => ({ kind: 'signal' as const, signal })),
     ]
-    const outcome = await Promise.race(
-      signalRace.concat(
-        children.map((child) => child.exited.then((code) => ({ kind: 'exit' as const, code }))),
-      ),
-    )
+    let outcome: SupervisorOutcome
+    try {
+      outcome = await Promise.race(
+        signalRace.concat(
+          children.map((child) => child.exited.then((code) => ({ kind: 'exit' as const, code }))),
+        ),
+      )
+    } catch (error) {
+      stopChildren(children, 'SIGTERM')
+      await Promise.allSettled(children.map((child) => waitOrKill(child, stopGraceMs)))
+      throw error
+    }
     stopChildren(children, outcome.kind === 'signal' ? outcome.signal : 'SIGTERM')
-    await Promise.all(children.map((child) => waitOrKill(child, stopGraceMs)))
+    await Promise.allSettled(children.map((child) => waitOrKill(child, stopGraceMs)))
     return outcome.kind === 'signal' ? 0 : outcome.code
   } finally {
     process.off('SIGINT', onSignal)
@@ -186,10 +193,14 @@ function stopChildren(children: readonly ReturnType<typeof Bun.spawn>[], signal:
 
 async function waitOrKill(child: ReturnType<typeof Bun.spawn>, stopGraceMs: number) {
   if (child.exitCode !== null || child.signalCode !== null) return
-  const exited = await Promise.race([child.exited.then(() => true), Bun.sleep(stopGraceMs)])
+  const settled = child.exited.then(
+    () => true,
+    () => true,
+  )
+  const exited = await Promise.race([settled, Bun.sleep(stopGraceMs)])
   if (exited) return
   signalChild(child, 'SIGKILL')
-  await child.exited
+  await settled
 }
 
 function signalChild(child: ReturnType<typeof Bun.spawn>, signal: NodeJS.Signals) {

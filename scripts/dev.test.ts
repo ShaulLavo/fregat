@@ -114,3 +114,53 @@ test('superviseDirectProcesses stops already-started children if a later spawn f
     spy.mockRestore()
   }
 })
+
+test('superviseDirectProcesses stops sibling children if a child exited promise rejects asynchronously', async () => {
+  const realSpawn = Bun.spawn.bind(Bun)
+  const spawned: ReturnType<typeof Bun.spawn>[] = []
+  let callIndex = 0
+  const spy = vi.spyOn(Bun, 'spawn').mockImplementation((...args: Parameters<typeof Bun.spawn>) => {
+    callIndex += 1
+    if (callIndex === 1) {
+      const child = realSpawn(...args)
+      spawned.push(child)
+      return child
+    }
+    const failing = Promise.withResolvers<number>()
+    setTimeout(() => failing.reject(new Error('simulated async startup failure')), 25)
+    return {
+      pid: 0,
+      exitCode: null,
+      signalCode: null,
+      exited: failing.promise,
+      kill() {},
+    } as unknown as ReturnType<typeof Bun.spawn>
+  })
+  try {
+    await expect(
+      superviseDirectProcesses(
+        [
+          {
+            taskId: 'server#dev',
+            cwd: root,
+            cmd: [process.execPath, '-e', 'setInterval(() => {}, 1000)'],
+          },
+          {
+            taskId: 'web#dev',
+            cwd: root,
+            cmd: [process.execPath, '-e', 'setInterval(() => {}, 1000)'],
+          },
+        ],
+        process.env,
+        150,
+      ),
+    ).rejects.toThrow('simulated async startup failure')
+    expect(spawned).toHaveLength(1)
+    const [sibling] = spawned
+    if (!sibling) throw new TypeError('Expected sibling child process')
+    expect(sibling.exitCode ?? sibling.signalCode).not.toBeNull()
+    expect(() => process.kill(sibling.pid, 0)).toThrow()
+  } finally {
+    spy.mockRestore()
+  }
+})

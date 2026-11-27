@@ -42,6 +42,32 @@ test('terminates a running piped child cleanly on dispose', async () => {
   expect(exit.signal !== null || exit.exitCode !== 0).toBe(true)
 })
 
+test('terminates background descendants holding pipes open even after the shell leader exits', async () => {
+  const chunks: Uint8Array[] = []
+  const text = () => chunks.map((chunk) => decoder.decode(chunk)).join('')
+  const pty = spawnPipePty({
+    command: ['/bin/sh', '-c', 'sleep 30 & echo "BG=$!"; exit 0'],
+    onData: (bytes) => chunks.push(bytes.slice()),
+  })
+
+  await expect.poll(text).toMatch(/BG=\d+/)
+  const bgPid = Number(/BG=(\d+)/.exec(text())?.[1])
+  expect(bgPid).toBeGreaterThan(0)
+  // Give the shell leader time to exit while the background sleep still holds stdout open.
+  await Bun.sleep(100)
+  await pty[Symbol.asyncDispose]()
+  await expect
+    .poll(() => {
+      try {
+        process.kill(bgPid, 0)
+        return true
+      } catch {
+        return false
+      }
+    })
+    .toBe(false)
+})
+
 test('validates dimensions and rejects missing executables cleanly', () => {
   expect(() =>
     spawnPipePty({ command: ['/definitely/missing/pipe-pty-binary'], onData: () => {} }),
