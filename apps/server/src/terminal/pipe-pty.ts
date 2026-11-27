@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { spawnPipePty, type Pty } from '@workspace/pty'
+import { spawnPipePty, type PipePtyHandle, type Pty } from '@workspace/pty'
 import type { TerminalPtyFactory, TerminalPtyOptions } from './service'
 
 const encoder = new TextEncoder()
@@ -57,32 +57,17 @@ export function interactiveShellCommand(
   return [command[0], '-i']
 }
 
-function deliverInteractiveInput(pty: Pty, data: string | Uint8Array) {
+function deliverInteractiveInput(pty: PipePtyHandle, data: string | Uint8Array) {
   const bytes = typeof data === 'string' ? encoder.encode(data) : data
   const normalized = normalizeInputLineEndings(bytes)
   let start = 0
   for (let index = 0; index < normalized.byteLength; index += 1) {
     if (normalized[index] !== 0x03) continue
     if (index > start) pty.write(normalized.subarray(start, index))
-    interruptProcessGroup(pty.pid)
+    pty.signal('SIGINT')
     start = index + 1
   }
   if (start < normalized.byteLength) pty.write(normalized.subarray(start))
-}
-
-function interruptProcessGroup(pid: number) {
-  if (pid <= 0) return
-  try {
-    process.kill(-pid, 'SIGINT')
-    return
-  } catch {
-    // Fall back to signaling the shell process directly when process groups are unavailable.
-  }
-  try {
-    process.kill(pid, 'SIGINT')
-  } catch {
-    // Ignore if the child already exited.
-  }
 }
 
 export function normalizeInputLineEndings(data: string | Uint8Array): Uint8Array {

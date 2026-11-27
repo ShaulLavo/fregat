@@ -1,7 +1,7 @@
 import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tryFileLock } from '../file-lock'
 import { acquireStateHomeLock } from '../state-home-lock'
 
@@ -120,6 +120,38 @@ describe('state home lock', () => {
     const lockFile = path.join(home, 'server.lock')
     const modulePath = path.join(import.meta.dirname, '..', 'file-lock.ts')
     const script = `const { tryFileLock } = await import(${JSON.stringify(modulePath)}); const lock = tryFileLock(${JSON.stringify(lockFile)}, { useNativeFfi: false }); if (!lock) process.exit(2); console.log('won'); await Bun.sleep(400); lock.release();`
+    const racers = Array.from({ length: 4 }, () =>
+      Bun.spawn({ cmd: [process.execPath, '-e', script], stdout: 'pipe', stderr: 'pipe' }),
+    )
+    holders.push(...racers)
+    const codes = await Promise.all(racers.map((child) => child.exited))
+    expect(codes.filter((code) => code === 0)).toHaveLength(1)
+    expect(codes.filter((code) => code === 2)).toHaveLength(3)
+  })
+
+  it('fails closed when process.kill throws ENOSYS (WASI) instead of treating live locks as stale', async () => {
+    const home = await stateHome()
+    const lockFile = path.join(home, 'server.lock')
+    await writeFile(lockFile, '99999999:deadbeef\n', { mode: 0o600 })
+
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw Object.assign(new Error('ENOSYS: function not implemented, kill'), { code: 'ENOSYS' })
+    })
+    try {
+      expect(tryFileLock(lockFile, { useNativeFfi: false })).toBeNull()
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+
+  it('grants at most one concurrent lock when reclaiming a stale lock with a stale witness', async () => {
+    const home = await stateHome()
+    const lockFile = path.join(home, 'server.lock')
+    await writeFile(lockFile, '99999999:dead0001\n', { mode: 0o600 })
+    await writeFile(`${lockFile}.reclaim.dead0001`, '99999998:dead0002\n', { mode: 0o600 })
+
+    const modulePath = path.join(import.meta.dirname, '..', 'file-lock.ts')
+    const script = `const { tryFileLock } = await import(${JSON.stringify(modulePath)}); const lock = tryFileLock(${JSON.stringify(lockFile)}, { useNativeFfi: false }); if (!lock) process.exit(2); await Bun.sleep(400); lock.release();`
     const racers = Array.from({ length: 4 }, () =>
       Bun.spawn({ cmd: [process.execPath, '-e', script], stdout: 'pipe', stderr: 'pipe' }),
     )

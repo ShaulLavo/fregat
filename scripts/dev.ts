@@ -180,7 +180,7 @@ export async function superviseDirectProcesses(
 
 function stopChildren(children: readonly ReturnType<typeof Bun.spawn>[], signal: NodeJS.Signals) {
   for (const child of children) {
-    if (child.exitCode === null && child.signalCode === null) child.kill(signal)
+    if (child.exitCode === null && child.signalCode === null) signalChild(child, signal)
   }
 }
 
@@ -188,8 +188,16 @@ async function waitOrKill(child: ReturnType<typeof Bun.spawn>, stopGraceMs: numb
   if (child.exitCode !== null || child.signalCode !== null) return
   const exited = await Promise.race([child.exited.then(() => true), Bun.sleep(stopGraceMs)])
   if (exited) return
-  child.kill('SIGKILL')
+  signalChild(child, 'SIGKILL')
   await child.exited
+}
+
+function signalChild(child: ReturnType<typeof Bun.spawn>, signal: NodeJS.Signals) {
+  try {
+    child.kill(signal)
+  } catch {
+    // Child may exit between status check and signal delivery.
+  }
 }
 
 type Runtime = {

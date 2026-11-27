@@ -19,6 +19,7 @@ import { isWasiRuntime } from './runtime'
 const LOCK_EX = 2
 const LOCK_NB = 4
 const STALE_EMPTY_AGE_MS = 5_000
+const MAX_RECLAIM_DEPTH = 3
 
 let libc: { flock: (fd: number, operation: number) => number } | undefined
 const fallbackLocks = new Set<string>()
@@ -73,16 +74,18 @@ function tryExclusiveLockFile(file: string): FileLock | null {
   const key = path.resolve(file)
   if (fallbackLocks.has(key)) return null
 
-  const staging = `${file}.${process.pid}.${randomBytes(8).toString('hex')}.tmp`
-  writeFileSync(staging, `${process.pid}\n`, { flag: 'wx', mode: 0o600 })
+  const token = randomBytes(8).toString('hex')
+  const content = `${process.pid}:${token}\n`
+  const staging = `${file}.${process.pid}.${token}.tmp`
+  writeFileSync(staging, content, { flag: 'wx', mode: 0o600 })
   try {
-    const ownedIno = publishAtomicLock(staging, file)
+    const ownedIno = publishAtomicLock(staging, file, content)
     if (ownedIno === null) return null
     fallbackLocks.add(key)
     return {
       release: () => {
         if (!fallbackLocks.delete(key)) return
-        unlinkOwnedLock(file, ownedIno)
+        unlinkMatchingLock(file, ownedIno, content)
       },
     }
   } finally {
@@ -90,10 +93,10 @@ function tryExclusiveLockFile(file: string): FileLock | null {
   }
 }
 
-function publishAtomicLock(staging: string, file: string): number | null {
-  if (tryLink(staging, file)) return readInode(file)
-  if (!reclaimStaleLock(file)) return null
-  if (tryLink(staging, file)) return readInode(file)
+function publishAtomicLock(staging: string, file: string, content: string): number | null {
+  if (tryLink(staging, file)) return readOwnedInode(file, content)
+  if (!reclaimStaleLock(file, 0)) return null
+  if (tryLink(staging, file)) return readOwnedInode(file, content)
   return null
 }
 
@@ -108,36 +111,43 @@ function tryLink(staging: string, target: string): boolean {
 }
 
 /**
- * Serializes stale-lock cleanup with a sibling reclaim link and re-verifies the observed inode
- * before unlinking, so two contenders never unlink a live replacement lock.
+ * Serializes stale-lock cleanup with a per-incarnation witness file and re-verifies the observed
+ * inode and content before unlinking, so contenders never unlink a live replacement lock.
  */
-function reclaimStaleLock(file: string): boolean {
-  const snapshot = readLockSnapshot(file)
+function reclaimStaleLock(target: string, depth: number): boolean {
+  if (depth >= MAX_RECLAIM_DEPTH) return false
+  const snapshot = readLockSnapshot(target)
   if (!snapshot || !isSnapshotStale(snapshot)) return false
 
-  const reclaimFile = `${file}.reclaim`
-  const reclaimStaging = `${reclaimFile}.${process.pid}.${randomBytes(8).toString('hex')}.tmp`
-  writeFileSync(reclaimStaging, `${process.pid}\n`, { flag: 'wx', mode: 0o600 })
-  let acquired = false
+  const witness = `${target}.reclaim.${snapshotWitnessId(snapshot)}`
+  const token = randomBytes(8).toString('hex')
+  const content = `${process.pid}:${token}\n`
+  const staging = `${witness}.${process.pid}.${token}.tmp`
+  writeFileSync(staging, content, { flag: 'wx', mode: 0o600 })
+  let witnessIno: number | null = null
   try {
-    acquired = tryAcquireReclaimMutex(reclaimStaging, reclaimFile)
-    if (!acquired) return false
-    const current = readLockSnapshot(file)
-    if (!current || current.ino !== snapshot.ino || !isSnapshotStale(current)) return false
-    rmSync(file, { force: true })
+    witnessIno = acquireWitness(staging, witness, content, depth)
+    if (witnessIno === null) return false
+    const current = readLockSnapshot(target)
+    if (!current || !sameSnapshot(current, snapshot) || !isSnapshotStale(current)) return false
+    rmSync(target, { force: true })
     return true
   } finally {
-    rmSync(reclaimStaging, { force: true })
-    if (acquired) rmSync(reclaimFile, { force: true })
+    rmSync(staging, { force: true })
+    if (witnessIno !== null) unlinkMatchingLock(witness, witnessIno, content)
   }
 }
 
-function tryAcquireReclaimMutex(staging: string, reclaimFile: string): boolean {
-  if (tryLink(staging, reclaimFile)) return true
-  const existing = readLockSnapshot(reclaimFile)
-  if (!existing || !isSnapshotStale(existing)) return false
-  rmSync(reclaimFile, { force: true })
-  return tryLink(staging, reclaimFile)
+function acquireWitness(
+  staging: string,
+  witness: string,
+  content: string,
+  depth: number,
+): number | null {
+  if (tryLink(staging, witness)) return readOwnedInode(witness, content)
+  if (!reclaimStaleLock(witness, depth + 1)) return null
+  if (tryLink(staging, witness)) return readOwnedInode(witness, content)
+  return null
 }
 
 type LockSnapshot = {
@@ -158,6 +168,15 @@ function readLockSnapshot(file: string): LockSnapshot | null {
   }
 }
 
+function snapshotWitnessId(snapshot: LockSnapshot): string {
+  const token = /^\d+:([a-f0-9]+)\s*$/.exec(snapshot.content)?.[1]
+  return token ?? `ino-${snapshot.ino}`
+}
+
+function sameSnapshot(left: LockSnapshot, right: LockSnapshot): boolean {
+  return left.ino === right.ino && left.content === right.content
+}
+
 function isSnapshotStale(snapshot: LockSnapshot): boolean {
   const pid = Number.parseInt(snapshot.content, 10)
   if (!Number.isInteger(pid) || pid <= 0) {
@@ -168,19 +187,19 @@ function isSnapshotStale(snapshot: LockSnapshot): boolean {
     process.kill(pid, 0)
     return false
   } catch (error) {
-    return errorStringField(error, 'code') !== 'EPERM'
+    // Only ESRCH proves the PID is dead; EPERM or ENOSYS (WASI) must fail closed.
+    return errorStringField(error, 'code') === 'ESRCH'
   }
 }
 
-function readInode(file: string): number | null {
-  try {
-    return lstatSync(file).ino
-  } catch {
-    return null
-  }
+function readOwnedInode(file: string, content: string): number | null {
+  const snapshot = readLockSnapshot(file)
+  if (!snapshot || snapshot.content !== content) return null
+  return snapshot.ino
 }
 
-function unlinkOwnedLock(file: string, ownedIno: number) {
-  if (readInode(file) !== ownedIno) return
+function unlinkMatchingLock(file: string, ownedIno: number, ownedContent: string) {
+  const current = readLockSnapshot(file)
+  if (!current || current.ino !== ownedIno || current.content !== ownedContent) return
   rmSync(file, { force: true })
 }

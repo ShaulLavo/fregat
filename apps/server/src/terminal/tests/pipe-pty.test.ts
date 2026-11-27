@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAuthConfig } from '../../auth'
 import { createWorkspacePaths } from '../../fs/path'
 import { createOrchestrationFixture } from '../../../test/factories/orchestration'
@@ -73,6 +73,37 @@ describe('pipe shell PTY fallback', () => {
       pty.write('exit 0\r')
       expect(await pty.exited).toEqual({ exitCode: 0, signal: null })
     } finally {
+      await pty[Symbol.asyncDispose]()
+    }
+  })
+
+  it('delivers Ctrl+C via child.kill when process.kill is unavailable (ENOSYS)', async () => {
+    const factory = pipeShellPtyFactory()
+    const chunks: Uint8Array[] = []
+    const text = () => chunks.map((chunk) => decoder.decode(chunk)).join('')
+    const pty = await factory({
+      key: 'test-pipe-sigint-enosys',
+      command: [
+        process.execPath,
+        '-e',
+        'process.on("SIGINT", () => console.log("CAUGHT-SIGINT")); console.log("READY"); setInterval(() => {}, 1000)',
+      ],
+      cwd: process.cwd(),
+      env: process.env,
+      cols: 80,
+      rows: 24,
+      onData: (bytes) => chunks.push(bytes.slice()),
+    })
+
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw Object.assign(new Error('ENOSYS: function not implemented, kill'), { code: 'ENOSYS' })
+    })
+    try {
+      await expect.poll(text).toContain('READY\r\n')
+      pty.write('\x03')
+      await expect.poll(text).toContain('CAUGHT-SIGINT\r\n')
+    } finally {
+      killSpy.mockRestore()
       await pty[Symbol.asyncDispose]()
     }
   })

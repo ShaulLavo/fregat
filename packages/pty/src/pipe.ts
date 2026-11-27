@@ -3,27 +3,38 @@ import { validateDimensions, validateOptions } from './utils/options'
 import { operationError } from './utils/structured-errors'
 import type { Pty, SpawnPtyOptions } from './utils/types'
 
+export interface PipePtyHandle extends Pty {
+  signal(signal: NodeJS.Signals): void
+}
+
+function supportsProcessGroupSignals() {
+  const arch: string = process.arch
+  return process.platform !== 'win32' && arch !== 'wasm32'
+}
+
 /**
  * Spawns a child process connected through stdio pipes instead of a kernel PTY.
  * Used when `Bun.Terminal` or native PTYs are unavailable (such as under WASI).
  */
-export function spawnPipePty(options: SpawnPtyOptions): Pty {
+export function spawnPipePty(options: SpawnPtyOptions): PipePtyHandle {
   validateOptions(options)
   return new PipePty(options)
 }
 
-class PipePty extends ManagedPty {
+class PipePty extends ManagedPty implements PipePtyHandle {
   readonly #stdin: Bun.FileSink
+  readonly #useProcessGroup: boolean
 
   constructor(options: SpawnPtyOptions) {
     super()
+    this.#useProcessGroup = supportsProcessGroupSignals()
     const env = options.env ?? process.env
     let child: Bun.Subprocess<'pipe', 'pipe', 'pipe'>
     try {
       child = Bun.spawn(Array.from(options.command), {
         cwd: options.cwd,
         env: { ...env, TERM: env.TERM ?? 'xterm-256color' },
-        detached: process.platform !== 'win32',
+        detached: this.#useProcessGroup,
         stdin: 'pipe',
         stdout: 'pipe',
         stderr: 'pipe',
@@ -54,6 +65,10 @@ class PipePty extends ManagedPty {
     validateDimensions(cols, rows)
   }
 
+  signal(signal: NodeJS.Signals) {
+    this.sendSignal(signal)
+  }
+
   protected override onKillStart() {
     this.closeTransport()
   }
@@ -62,7 +77,7 @@ class PipePty extends ManagedPty {
     child: { readonly pid: number; kill(signal?: NodeJS.Signals): void },
     signal: NodeJS.Signals,
   ) {
-    if (process.platform !== 'win32' && child.pid > 0) {
+    if (this.#useProcessGroup && child.pid > 0) {
       try {
         process.kill(-child.pid, signal)
         return

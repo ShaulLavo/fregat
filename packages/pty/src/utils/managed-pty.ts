@@ -85,6 +85,15 @@ export abstract class ManagedPty implements Pty {
     this.#finish()
   }
 
+  protected sendSignal(signal: NodeJS.Signals) {
+    if (this.#result || this.#completed || !this.#child) return
+    try {
+      this.deliverSignal(this.#child, signal)
+    } catch {
+      // Ignore if the child exited concurrently.
+    }
+  }
+
   #signal(signal: NodeJS.Signals) {
     if (this.#result || !this.#child) return
     try {
