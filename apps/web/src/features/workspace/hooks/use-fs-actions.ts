@@ -273,17 +273,18 @@ export function useFsActions({
       },
       queryClient,
       perform: () => {
-        const remove = async () => {
+        const remove = async (reportAffectedPaths?: (paths: readonly FilesystemPath[]) => void) => {
           const client = clientForQueryClient(queryClient)
           for (const target of targets) {
             await deletePath(target.path, target.isDirectory, client)
+            reportAffectedPaths?.([target.path])
             completedCount += 1
           }
         }
         if (!workspaceEdits) return remove()
         return workspaceEdits.runWorkspaceMutation(
           targets.map((target) => target.path),
-          remove,
+          (reportAffectedPaths) => remove(reportAffectedPaths),
         )
       },
     })
