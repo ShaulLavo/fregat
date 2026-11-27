@@ -387,8 +387,9 @@ function familyResult(
     .filter((sample) => sample.outputMatches === false)
     .map((sample) => `${sample.fixture}/${sample.field}: output coverage failed`)
   const allFailures = failures.concat(incorrect)
-  const status =
-    allFailures.length > 0 ? 'FAILED' : measured.length > 0 ? 'BASELINE_ONLY' : 'NOT_MEASURED'
+  let status: 'FAILED' | 'BASELINE_ONLY' | 'NOT_MEASURED' = 'NOT_MEASURED'
+  if (allFailures.length > 0) status = 'FAILED'
+  else if (measured.length > 0) status = 'BASELINE_ONLY'
   return {
     family,
     status,

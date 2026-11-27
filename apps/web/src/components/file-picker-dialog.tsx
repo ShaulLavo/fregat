@@ -33,7 +33,15 @@ import {
 } from '@workspace/ui/components/resizable'
 import { openingPopupTrigger } from '@workspace/ui/patterns/popup-trigger'
 import { deriveWriteTarget, policyControlledIds } from '@workspace/contracts'
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
@@ -671,72 +679,81 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
     </div>
   )
 
+  let browsingContent: ReactNode
+  if (view === 'columns') {
+    browsingContent = (
+      <ColumnsView
+        columnWidths={session.columnWidths}
+        currentPath={session.currentPath}
+        isBusy={listInteractionPending}
+        showHidden={showHidden}
+        trail={trail}
+        onCommit={commitEntry}
+        onDirectoryIntent={guessDirectory}
+        onGoParent={goParent}
+        onOpen={handleEntryDoubleClick}
+        onTrailChange={changeTrail}
+      />
+    )
+  } else if (view === 'icons') {
+    browsingContent = (
+      <IconsView
+        entries={entries}
+        isBusy={listInteractionPending}
+        listRef={listRef}
+        loadState={loadState}
+        onRetry={refresh}
+        selectedPath={selectedEntry?.path ?? null}
+        onCommitEntry={commitEntry}
+        onEntryDoubleClick={handleEntryDoubleClick}
+        onGoParent={goParent}
+      />
+    )
+  } else {
+    browsingContent = (
+      <div
+        className={cn(
+          'grid h-full min-h-0',
+          compact ? 'grid-rows-[minmax(0,1fr)]' : 'grid-rows-[auto_minmax(0,1fr)]',
+        )}
+      >
+        {/* On a phone the sort lives in the bar's menu; a one-column header would only say Name. */}
+        {compact ? null : (
+          <ListHeader
+            isLoading={loadState.status === 'loading' || listInteractionPending}
+            isSearching={isSearching}
+            onSort={handleSort}
+            sort={effectiveSort}
+          />
+        )}
+        <FileList
+          choice={files ? { chosen: chosenPaths, toggle: toggleFile } : null}
+          copy={copy}
+          entries={listEntries}
+          isBusy={listInteractionPending}
+          isSearching={isSearching}
+          listRef={listRef}
+          loadState={lead.state}
+          onDirectoryIntent={guessDirectory}
+          onEntryDoubleClick={handleEntryDoubleClick}
+          onCommitEntry={commitEntry}
+          onGoParent={goParent}
+          onRetry={refresh}
+          recents={
+            leadingRecents.length > 0
+              ? { entries: leadingRecents, folder: folderLabel(session.currentPath) }
+              : null
+          }
+          touch={compact}
+          selectedPath={selectedEntry?.path ?? null}
+        />
+      </div>
+    )
+  }
+
   const browsing = (
     <div className='bg-background h-full min-h-0' ref={middleRef}>
-      {view === 'columns' ? (
-        <ColumnsView
-          columnWidths={session.columnWidths}
-          currentPath={session.currentPath}
-          isBusy={listInteractionPending}
-          showHidden={showHidden}
-          trail={trail}
-          onCommit={commitEntry}
-          onDirectoryIntent={guessDirectory}
-          onGoParent={goParent}
-          onOpen={handleEntryDoubleClick}
-          onTrailChange={changeTrail}
-        />
-      ) : view === 'icons' ? (
-        <IconsView
-          entries={entries}
-          isBusy={listInteractionPending}
-          listRef={listRef}
-          loadState={loadState}
-          onRetry={refresh}
-          selectedPath={selectedEntry?.path ?? null}
-          onCommitEntry={commitEntry}
-          onEntryDoubleClick={handleEntryDoubleClick}
-          onGoParent={goParent}
-        />
-      ) : (
-        <div
-          className={cn(
-            'grid h-full min-h-0',
-            compact ? 'grid-rows-[minmax(0,1fr)]' : 'grid-rows-[auto_minmax(0,1fr)]',
-          )}
-        >
-          {/* On a phone the sort lives in the bar's menu; a one-column header would only say Name. */}
-          {compact ? null : (
-            <ListHeader
-              isLoading={loadState.status === 'loading' || listInteractionPending}
-              isSearching={isSearching}
-              onSort={handleSort}
-              sort={effectiveSort}
-            />
-          )}
-          <FileList
-            choice={files ? { chosen: chosenPaths, toggle: toggleFile } : null}
-            copy={copy}
-            entries={listEntries}
-            isBusy={listInteractionPending}
-            isSearching={isSearching}
-            listRef={listRef}
-            loadState={lead.state}
-            onDirectoryIntent={guessDirectory}
-            onEntryDoubleClick={handleEntryDoubleClick}
-            onCommitEntry={commitEntry}
-            onGoParent={goParent}
-            onRetry={refresh}
-            recents={
-              leadingRecents.length > 0
-                ? { entries: leadingRecents, folder: folderLabel(session.currentPath) }
-                : null
-            }
-            touch={compact}
-            selectedPath={selectedEntry?.path ?? null}
-          />
-        </div>
-      )}
+      {browsingContent}
     </div>
   )
 

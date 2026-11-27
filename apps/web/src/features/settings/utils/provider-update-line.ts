@@ -15,7 +15,8 @@ export function updateLine(advisory: ProviderUpdateAdvisory): UpdateLine {
   const { canUpdate, command, installedVersion, latestVersion, method, status } = advisory
   const title = `Installed ${installedVersion ?? 'unknown'} · latest ${latestVersion ?? 'unknown'}`
   if (status !== 'behind') {
-    const note = status === 'current' ? 'Up to date' : installedVersion ? null : 'Version unknown'
+    const fallbackNote = installedVersion ? null : 'Version unknown'
+    const note = status === 'current' ? 'Up to date' : fallbackNote
     return { action: null, command: null, note, title, versions: installedVersion }
   }
 

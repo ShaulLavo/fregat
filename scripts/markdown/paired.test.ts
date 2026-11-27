@@ -421,16 +421,19 @@ test('artifact streaming native writes complete pairs in actual order and scalar
     expect(summary.workloads[0]).toMatchObject({ observedPairs: 2, mismatchedPairs: 0 })
     expect(summary.workloads[0]).not.toHaveProperty('pairs')
     expect(summary.workloads[0].comparisons).toEqual(
-      (['updateP95', 'settlementP95', 'mountP95', 'streamCpu'] as const).map((metric) =>
-        pairedConfidence({
+      (['updateP95', 'settlementP95', 'mountP95', 'streamCpu'] as const).map((metric) => {
+        let value = 2
+        if (metric === 'streamCpu') value = 3
+        else if (metric === 'settlementP95') value = 0
+        return pairedConfidence({
           workload: workload.id,
           metric,
-          baseline: metric === 'streamCpu' ? [3, 3] : metric === 'settlementP95' ? [0, 0] : [2, 2],
-          candidate: metric === 'streamCpu' ? [3, 3] : metric === 'settlementP95' ? [0, 0] : [2, 2],
+          baseline: [value, value],
+          candidate: [value, value],
           seed: 176,
           resamples: 256,
-        }),
-      ),
+        })
+      }),
     )
   } finally {
     await rm(output, { recursive: true, force: true })

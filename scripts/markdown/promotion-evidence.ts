@@ -222,14 +222,17 @@ function observation(input: {
 }): Observation {
   const failed = input.failed ?? 0
   const skipped = input.skipped ?? Math.max(0, input.selected - input.complete)
-  const status: ReceiptStatus =
-    failed > 0
-      ? 'failed'
-      : input.forceInconclusive
-        ? 'inconclusive'
-        : input.selected > 0 && input.complete >= input.selected && skipped === 0
-          ? 'complete'
-          : 'inconclusive'
+  let status: ReceiptStatus = 'inconclusive'
+  if (failed > 0) {
+    status = 'failed'
+  } else if (
+    !input.forceInconclusive &&
+    input.selected > 0 &&
+    input.complete >= input.selected &&
+    skipped === 0
+  ) {
+    status = 'complete'
+  }
   return {
     selected: input.selected,
     attempted: input.attempted,
@@ -886,18 +889,13 @@ function parseStreamAssertion(row: RecordValue, engine: RawEngine): StreamAssert
   const name = assertionName(row)
   if (!title || !name) return []
   const nativeSuffix = engine === 'remark' ? NATIVE_REMARK_STREAM_SUFFIX : NATIVE_TREE_STREAM_SUFFIX
-  const kind = title.endsWith(BROWSER_STREAM_SUFFIX)
-    ? 'browser'
-    : title.endsWith(nativeSuffix)
-      ? 'native'
-      : null
+  let kind: StreamAssertionKind | null = null
+  if (title.endsWith(BROWSER_STREAM_SUFFIX)) kind = 'browser'
+  else if (title.endsWith(nativeSuffix)) kind = 'native'
   if (!kind) return []
-  const suite =
-    kind === 'browser'
-      ? 'real chat prefix projection '
-      : engine === 'tree-sitter'
-        ? 'Tree-sitter actual product semantics '
-        : ''
+  let suite = ''
+  if (kind === 'browser') suite = 'real chat prefix projection '
+  else if (engine === 'tree-sitter') suite = 'Tree-sitter actual product semantics '
   if (name !== suite + title) return []
   const suffix = kind === 'browser' ? BROWSER_STREAM_SUFFIX : nativeSuffix
   const id = title.slice(0, -suffix.length)
@@ -1253,13 +1251,15 @@ function artifactPaths(
   report: string | null,
 ): readonly string[] {
   const configured = manifest.artifacts?.[gate] ?? []
-  const raw =
-    gate === 'interactions' || gate === 'safety' || gate === 'resources'
-      ? (manifest.rawQualificationReports ?? []).map((entry) => entry.path)
-      : gate === 'frame-probes'
-        ? (manifest.frameLogs ?? [])
-        : []
-  const source = report ? [report] : raw.length > 0 ? [] : [`missing/${gate}.report.json`]
+  let raw: readonly string[] = []
+  if (gate === 'interactions' || gate === 'safety' || gate === 'resources') {
+    raw = (manifest.rawQualificationReports ?? []).map((entry) => entry.path)
+  } else if (gate === 'frame-probes') {
+    raw = manifest.frameLogs ?? []
+  }
+  let source: readonly string[] = []
+  if (report) source = [report]
+  else if (raw.length === 0) source = [`missing/${gate}.report.json`]
   return source.concat(configured, raw)
 }
 

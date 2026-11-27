@@ -289,22 +289,23 @@ export function SettingsPage({
             <SettingsScrollerContext value={scrollRef}>
               <fieldset className='min-w-0' inert={pending}>
                 {project ? <ProjectSection project={project} /> : null}
-                {project ? null : shown.length === 0 ? (
+                {!project && shown.length === 0 ? (
                   <StatusMessage>
                     {emptySettingsMessage(shownQuery, selectedCategory)}
                   </StatusMessage>
-                ) : (
-                  mountedCategories(shown, rowBudget).map(({ category, ids, limit }) => (
-                    <CategorySection
-                      category={category}
-                      ids={ids}
-                      key={category}
-                      limit={limit}
-                      showPush={showPush}
-                      snapshot={projection}
-                    />
-                  ))
-                )}
+                ) : null}
+                {!project && shown.length > 0
+                  ? mountedCategories(shown, rowBudget).map(({ category, ids, limit }) => (
+                      <CategorySection
+                        category={category}
+                        ids={ids}
+                        key={category}
+                        limit={limit}
+                        showPush={showPush}
+                        snapshot={projection}
+                      />
+                    ))
+                  : null}
               </fieldset>
             </SettingsScrollerContext>
           </div>

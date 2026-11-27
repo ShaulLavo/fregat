@@ -556,7 +556,9 @@ async function downloadLuaLs() {
   if (!release?.tag_name) return null
 
   const platform = process.platform === 'win32' ? 'win32' : process.platform
-  const arch = process.arch === 'ia32' ? 'ia32' : process.arch === 'arm64' ? 'arm64' : 'x64'
+  let arch = 'x64'
+  if (process.arch === 'ia32') arch = 'ia32'
+  else if (process.arch === 'arm64') arch = 'arm64'
   const ext = process.platform === 'win32' ? 'zip' : 'tar.gz'
   const name = `lua-language-server-${release.tag_name}-${platform}-${arch}.${ext}`
   const asset = release.assets?.find((item) => item.name === name)

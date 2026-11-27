@@ -42,7 +42,9 @@ export function useDiffIntent<T, K extends QueryKey>(
   }, [predicted, pointerInside])
   const start = useEffectEvent(() => {
     if (!options) return undefined
-    const trigger = active ? 'active-row' : focused ? 'focus' : 'trajectory'
+    let trigger: 'active-row' | 'focus' | 'trajectory' = 'trajectory'
+    if (active) trigger = 'active-row'
+    else if (focused) trigger = 'focus'
     return startDiffIntent(client, options, trigger, enabled)
   })
   useEffect(() => {

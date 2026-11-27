@@ -461,6 +461,23 @@ export async function publishColdProfile() {
   const record = store().record
   if (!record) return
   try {
+    const readers = readerSnapshot()
+    let readerObservationReason: string | null = 'unavailable'
+    if (store().readers) {
+      readerObservationReason = readers ? null : 'observer-refused'
+    }
+    let wireReason: string | null = null
+    if (!record.wire) {
+      wireReason = 'unavailable'
+    } else if (!record.wire.eofObserved) {
+      wireReason = 'eof-unobserved'
+    } else if (
+      record.wire.discardedBytes ||
+      record.wire.afterEofBytes ||
+      record.wire.observerFailures
+    ) {
+      wireReason = 'loss-observed'
+    }
     const payload = {
       version: 1,
       clocks: {
@@ -471,12 +488,8 @@ export async function publishColdProfile() {
       ...record,
       output: undefined,
       readerWindowOpen: undefined,
-      readers: readerSnapshot(),
-      readerObservationReason: !store().readers
-        ? 'unavailable'
-        : readerSnapshot()
-          ? null
-          : 'observer-refused',
+      readers,
+      readerObservationReason,
       readerAdmission:
         'first-case beginColdProfile through cancelled or cleanup-mark entry; helper-lifetime suite; callbacks admitted at invocation',
       readerCpuLimit:
@@ -486,13 +499,7 @@ export async function publishColdProfile() {
           record.wire.afterEofBytes === 0 &&
           record.wire.observerFailures === 0
         : null,
-      wireReason: !record.wire
-        ? 'unavailable'
-        : !record.wire.eofObserved
-          ? 'eof-unobserved'
-          : record.wire.discardedBytes || record.wire.afterEofBytes || record.wire.observerFailures
-            ? 'loss-observed'
-            : null,
+      wireReason,
       missingServerReason: record.server ? null : 'unavailable',
       missingBrowserReason: record.browser.length ? null : 'unavailable',
       queueDepth: null,

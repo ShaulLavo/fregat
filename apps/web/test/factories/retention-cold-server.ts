@@ -53,6 +53,8 @@ export function retentionColdServer(enabled: boolean): Plugin[] {
   const snapshot = (server: ViteDevServer, phase: 'startup' | 'baseline' | 'reload' | 'end') => {
     const optimizer = server.environments.client?.depsOptimizer,
       metadata = optimizer?.metadata
+    let reason: string | null = 'unsupported'
+    if (optimizer) reason = processingCompleteAt ? null : 'pending'
     phases.push({
       phase,
       cpu: coldCpu(),
@@ -67,7 +69,7 @@ export function retentionColdServer(enabled: boolean): Plugin[] {
         modules: server.environments.client?.moduleGraph.idToModuleMap.size ?? null,
         scanCompleteAt,
         processingCompleteAt,
-        reason: optimizer ? (processingCompleteAt ? null : 'pending') : 'unsupported',
+        reason,
       },
     })
     if (optimizer?.scanProcessing)

@@ -54,11 +54,12 @@ export function HistoryGraphStrip({
     ]),
   )
   const barrierDom = `${idPrefix}history-barrier`
-  const focusedDom = barrierFocused
-    ? barrierDom
-    : focusedId === null
-      ? undefined
-      : nodeDomId(idPrefix, focusedId)
+  let focusedDom: string | undefined
+  if (barrierFocused) {
+    focusedDom = barrierDom
+  } else if (focusedId !== null) {
+    focusedDom = nodeDomId(idPrefix, focusedId)
+  }
 
   return (
     <svg

@@ -137,6 +137,12 @@ function summarizeGroup(samples: readonly BenchmarkSample[]): BenchmarkSummary {
       internal: { sampleCount: samples.length },
     })
   const values = samples.map((sample) => sample.sample)
+  let outputMatches: boolean | null = true
+  if (samples.some((sample) => sample.outputMatches === false)) {
+    outputMatches = false
+  } else if (samples.some((sample) => sample.outputMatches === null)) {
+    outputMatches = null
+  }
   return {
     engine: first.engine,
     family: first.family,
@@ -150,11 +156,7 @@ function summarizeGroup(samples: readonly BenchmarkSample[]): BenchmarkSummary {
     p95: percentile(values, 0.95),
     minimum: values.reduce((minimum, value) => Math.min(minimum, value), Number.POSITIVE_INFINITY),
     maximum: values.reduce((maximum, value) => Math.max(maximum, value), Number.NEGATIVE_INFINITY),
-    outputMatches: samples.some((sample) => sample.outputMatches === false)
-      ? false
-      : samples.some((sample) => sample.outputMatches === null)
-        ? null
-        : true,
+    outputMatches,
   }
 }
 

@@ -1401,15 +1401,13 @@ test.for(['fallback', 'unavailable', 'missing-directory'] as const)(
       expect(JSON.parse(await readFile(join(output, 'final-raw.json'), 'utf8'))).toMatchObject({
         frames: [{ at: 2 }],
       })
+      let expectedCodes = ['ENOENT', 'ENOENT']
+      if (mode === 'fallback') expectedCodes = ['EISDIR']
+      else if (mode === 'unavailable') expectedCodes = ['EISDIR', 'EISDIR']
       expect(receipts).toEqual([
         {
           status: mode === 'fallback' ? 'fallback-written' : 'unavailable',
-          codes:
-            mode === 'fallback'
-              ? ['EISDIR']
-              : mode === 'unavailable'
-                ? ['EISDIR', 'EISDIR']
-                : ['ENOENT', 'ENOENT'],
+          codes: expectedCodes,
         },
       ])
       if (mode !== 'fallback') return
