@@ -49,7 +49,7 @@ export const chatQueueStopUpload = isolatedNativeScenario({
         async () => (await nativeLog(root)).some((entry) => entry.event === 'interrupt-requested'),
         'The interrupt is pending',
       )
-      const restored = (await selectors.chatMessage(page).textContent()) ?? ''
+      const restored = (await selectors.chatComposerSurface(page).textContent()) ?? ''
       strictEqual(restored.split('QUEUE_BEFORE_STOP').length - 1, 1, 'Restored exactly once')
       await step('stop-restores-once-while-uploading')
 
@@ -59,10 +59,10 @@ export const chatQueueStopUpload = isolatedNativeScenario({
         .getByRole('status')
         .getByText('Preparing attachments…')
         .waitFor({ state: 'detached' })
-      strictEqual(await selectors.chatMessage(page).textContent(), restored)
+      strictEqual(await selectors.chatComposerSurface(page).textContent(), restored)
       await control(root, 'reject-interrupt')
       await Bun.sleep(200)
-      strictEqual(await selectors.chatMessage(page).textContent(), restored)
+      strictEqual(await selectors.chatComposerSurface(page).textContent(), restored)
       strictEqual((await nativeLog(root)).filter((entry) => entry.event === 'turn/steer').length, 0)
       ok((await selectors.chatSendQueued(page).count()) === 0, 'Nothing is queued again')
       await step('upload-lands-on-the-restored-draft')

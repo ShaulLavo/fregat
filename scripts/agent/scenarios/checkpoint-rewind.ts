@@ -48,7 +48,7 @@ export const checkpointRewind: Scenario = {
           selectors.rewindDialog(page).waitFor({ state: 'hidden', timeout: 60_000 }),
         )
         strictEqual(
-          (await selectors.chatMessage(page).innerText()).trim(),
+          (await selectors.chatComposerSurface(page).innerText()).trim(),
           `${prompt}\n\nKeep this newer draft.`,
         )
         strictEqual(await selectors.chatRewind(page).count(), 0)

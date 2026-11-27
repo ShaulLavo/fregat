@@ -20,5 +20,8 @@ function isTextEntryElement(
   if (target instanceof HTMLTextAreaElement) return true
   if (target instanceof HTMLSelectElement) return true
 
+  if (target instanceof HTMLElement && 'editContext' in target && target.editContext != null)
+    return true
+
   return target instanceof HTMLElement && target.isContentEditable
 }

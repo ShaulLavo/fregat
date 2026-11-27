@@ -10,17 +10,18 @@ export const chatComposerEditing = isolatedNativeScenario({
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, orchestration }) {
     const composer = selectors.chatMessage(page)
+    const surface = selectors.chatComposerSurface(page)
     const messages = selectors.chatMessages(page)
     await withUserSetting(
       page,
       orchestration,
       { key: 'chat.sendShortcut', value: 'mod-enter' },
       async () => {
-        await composer.click()
+        await surface.click()
         await page.keyboard.type('first line')
         await page.keyboard.press('Enter')
         await page.keyboard.type('second line')
-        strictEqual((await composer.innerText()).trim(), 'first line\nsecond line')
+        strictEqual((await surface.innerText()).trim(), 'first line\nsecond line')
         await step('enter-adds-a-line')
         await page.keyboard.press('Control+Enter')
         await messages.getByText('second line', { exact: false }).waitFor({ timeout: 30_000 })
@@ -31,15 +32,15 @@ export const chatComposerEditing = isolatedNativeScenario({
     // A real clipboard paste: synthesized paste events never insert text.
     const large = 'large pasted log line\n'.repeat(2_000)
     await page.evaluate((text) => navigator.clipboard.writeText(text), large)
-    await composer.click()
+    await surface.click()
     await composer.fill('')
     await page.keyboard.press('Control+V')
     await selectors.chatStagedFile(page, 'pasted-text.txt').waitFor({ timeout: 10_000 })
-    strictEqual((await composer.innerText()).trim(), '', 'A folded paste leaves the prompt empty')
+    strictEqual((await surface.innerText()).trim(), '', 'A folded paste leaves the prompt empty')
     await step('large-paste-folded')
 
     await page.keyboard.press('Control+Shift+V')
-    await composer.getByText('large pasted log line', { exact: false }).first().waitFor()
+    await surface.getByText('large pasted log line', { exact: false }).first().waitFor()
     await step('ctrl-shift-v-pastes-inline')
     await composer.fill('')
 
@@ -55,14 +56,14 @@ export const chatComposerEditing = isolatedNativeScenario({
         true,
         'Touch emulation reports a finger pointer',
       )
-      await composer.click()
+      await surface.click()
       await page.keyboard.press('Control+A')
       await page.keyboard.press('Backspace')
       await page.keyboard.type('touch one')
       await page.keyboard.press('Enter')
       await page.keyboard.type('touch two')
       await page.waitForTimeout(300)
-      strictEqual((await composer.innerText()).trim(), 'touch one\ntouch two')
+      strictEqual((await surface.innerText()).trim(), 'touch one\ntouch two')
       strictEqual(await messages.getByText('touch two', { exact: false }).count(), 0)
       await step('touch-return-adds-a-line')
       await selectors.chatSend(page).click()

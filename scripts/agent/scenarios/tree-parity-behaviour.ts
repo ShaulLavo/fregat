@@ -230,7 +230,7 @@ async function treeSnapshot(page: Page) {
  */
 async function composerRowDrop(page: Page) {
   await selectors.workspaceMode(page, 'Chat').click()
-  const composer = selectors.chatMessage(page)
+  const composer = selectors.chatComposerSurface(page)
   await composer.waitFor({ timeout: 15_000 })
   const files = page
     .getByRole('tab', { name: 'Files', exact: true })
@@ -250,9 +250,9 @@ async function composerRowDrop(page: Page) {
   await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 12 })
   await page.mouse.up()
   await page.waitForTimeout(500)
-  const landed = await composer.evaluate((element) => ({
+  const landed = await page.locator('[data-testid="chat-input-editor"]').evaluate((element) => ({
     text: element.textContent ?? '',
-    mentions: element.querySelectorAll('[data-mention], [data-lexical-decorator]').length,
+    mentions: element.querySelectorAll('[data-chat-input-mention], [data-mention]').length,
   }))
   strictEqual(landed.mentions, 0, `No mention chip lands today: ${JSON.stringify(landed)}`)
 }

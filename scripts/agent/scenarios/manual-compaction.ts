@@ -31,7 +31,7 @@ function manualCompactionScenario(provider: { name: string; kind: FixtureProvide
           .first()
           .waitFor({ timeout: 15_000 })
         strictEqual(
-          (await selectors.chatMessage(page).innerText()).trim(),
+          (await selectors.chatComposerSurface(page).innerText()).trim(),
           DRAFT,
           'The draft stays unsent',
         )

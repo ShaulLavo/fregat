@@ -68,8 +68,8 @@ test.for([
               }
               if (selector === '[data-testid="chat-input-editor"]') {
                 return {
-                  __lexicalEditor: {
-                    _config: { namespace: `platform-chat-input:${owner}:${root}:${sessionId}` },
+                  dataset: {
+                    composerNamespace: `platform-chat-input:${owner}:${root}:${sessionId}`,
                   },
                 }
               }

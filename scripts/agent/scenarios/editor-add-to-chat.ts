@@ -10,7 +10,7 @@ import { focusEditor, openFileFromTree, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
 async function composerText(page: Page, expected: string, what: string) {
-  const composer = selectors.chatMessage(page)
+  const composer = selectors.chatComposerSurface(page)
   await composer.waitFor({ timeout: 15_000 })
   await page
     .waitForFunction(
@@ -48,7 +48,7 @@ export const editorAddToChat: Scenario = {
       await composerText(page, 'const three = 3', 'The selected text')
       await step('selection-in-composer')
 
-      await selectors.chatMessage(page).click()
+      await selectors.chatComposerSurface(page).click()
       await page.keyboard.press('Control+A')
       await page.keyboard.press('Delete')
       await focusEditor(page)
@@ -57,7 +57,7 @@ export const editorAddToChat: Scenario = {
       await composerText(page, 'a.ts', 'The file mention')
       await step('file-mention-in-composer')
 
-      await selectors.chatMessage(page).click()
+      await selectors.chatComposerSurface(page).click()
       await page.keyboard.press('Control+A')
       await page.keyboard.press('Delete')
       await writeUserSetting(page, 'chat.activeFileContext', true)

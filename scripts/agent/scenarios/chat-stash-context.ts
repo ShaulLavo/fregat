@@ -35,7 +35,7 @@ export const chatStashContext = isolatedNativeScenario({
     await selectors.chatStagedFile(page, 'notes.txt').waitFor()
     await selectors.chatStagedFile(page, 'stash.png').waitFor()
     strictEqual(
-      await selectors.chatMessage(page).textContent(),
+      await selectors.chatComposerSurface(page).textContent(),
       'Read this complete stashed message.',
     )
     await step('complete-stash-restored-after-reload')
@@ -49,7 +49,7 @@ export const chatStashContext = isolatedNativeScenario({
       .waitFor({ timeout: 30_000 })
     await selectors.chatStash(page, 1).click()
     await selectors.chatStashEntry(page, 'Keep this separate idea.').click()
-    strictEqual(await selectors.chatMessage(page).textContent(), 'Keep this separate idea.')
+    strictEqual(await selectors.chatComposerSurface(page).textContent(), 'Keep this separate idea.')
     await selectors.chatStagedFile(page, 'notes.txt').waitFor({ state: 'hidden' })
     await step('separate-message-preserved')
     await selectors.chatMessage(page).fill('')
@@ -63,7 +63,7 @@ function attachFile(page: Page, file: { name: string; mimeType: string; buffer: 
 /** Ctrl+S from the composer, then wait for the stash to hold it and the staged row to go. */
 async function stashDraft(page: Page, fileName: string) {
   await selectors.chatSend(page).click({ trial: true })
-  await selectors.chatMessage(page).click()
+  await selectors.chatComposerSurface(page).click()
   await page.keyboard.press('Control+s')
   await selectors.chatStash(page, 1).waitFor()
   await selectors.chatStagedFile(page, fileName).waitFor({ state: 'hidden' })

@@ -1,5 +1,5 @@
 import { strictEqual } from 'node:assert/strict'
-import { selectors } from '../selectors'
+import { chatComposerSelector, selectors } from '../selectors'
 import {
   draftFixture,
   openIsolatedDraft,
@@ -37,8 +37,8 @@ export const chatBackgroundStart = isolatedNativeScenario({
       await composer.fill(prompt)
       await composer.press('Control+Enter')
       await page.waitForFunction(
-        (text) => !document.querySelector('[aria-label="Message"]')?.textContent?.includes(text),
-        prompt,
+        ({ selector, text }) => !document.querySelector(selector)?.textContent?.includes(text),
+        { selector: chatComposerSelector, text: prompt },
       )
     }
     strictEqual(draftIdIn(page.url()), draftId, 'Background starts keep the user on the draft')

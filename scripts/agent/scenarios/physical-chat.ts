@@ -137,7 +137,7 @@ export const physicalChat = isolatedNativeScenario({
         'Saved drafts acknowledge pointer recovery',
       )
       await page.waitForURL(draftAddress)
-      strictEqual(await selectors.chatMessage(page).textContent(), draftTitle)
+      strictEqual(await selectors.chatComposerSurface(page).textContent(), draftTitle)
       await expectPointerTick(
         page,
         () => draft.click(),

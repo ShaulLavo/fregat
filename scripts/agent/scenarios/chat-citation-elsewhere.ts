@@ -39,7 +39,7 @@ export const chatCitationElsewhere = isolatedNativeScenario({
     await step('folded-note-quoted')
 
     await selectors.chatMessage(page).fill('Is the timer right?')
-    await selectors.chatMessage(page).click()
+    await selectors.chatComposerSurface(page).click()
     await page.keyboard.press('Control+s')
     await selectors.chatStash(page, 1).waitFor()
     await review.waitFor({ state: 'detached' })

@@ -1,20 +1,23 @@
 import { useIsMutating, useMutation } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useStore } from 'zustand'
-import type { LexicalEditor } from 'lexical'
 
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import { BrowserVoiceInput, browserSpeechRecognition } from '../utils/browser-voice-input'
-import { readChatInputSelection, replaceChatInputEditorRange } from '../utils/input-editor-actions'
+import {
+  readChatInputSelection,
+  replaceChatInputEditorRange,
+  type ChatInputEditorHandle,
+} from '../utils/input-editor-actions'
 import { chatMutationKeys } from '../utils/mutation-keys'
 import { resolveTranscriptCommit } from '../utils/voice-draft'
 import { voiceErrors } from '../utils/voice-errors'
 
 export function useVoiceInput(
   draftTarget: ChatInputDraftTarget,
-  editorRef: RefObject<LexicalEditor | null>,
+  editorRef: RefObject<ChatInputEditorHandle | null>,
 ) {
   const [capture] = useState(() => new BrowserVoiceInput())
   const phase = useStore(capture.store, (state) => state.phase)
@@ -81,7 +84,7 @@ async function dictateDraft({
   limitSeconds,
 }: {
   readonly capture: BrowserVoiceInput
-  readonly editorRef: RefObject<LexicalEditor | null>
+  readonly editorRef: RefObject<ChatInputEditorHandle | null>
   readonly currentOwner: RefObject<string>
   readonly ownerKey: string
   readonly draftTarget: ChatInputDraftTarget

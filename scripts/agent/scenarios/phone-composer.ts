@@ -234,7 +234,9 @@ async function expectComposerRhythm(page: Page, width: number) {
           }
         })
     const model = actions.querySelector('[aria-label="Provider and model"] span.truncate')
-    const field = document.querySelector('[aria-label="Message"]')?.getBoundingClientRect()
+    const field = document
+      .querySelector('[data-testid="chat-input-editor"]')
+      ?.getBoundingClientRect()
     return {
       run: measure(groups[0]),
       corner: measure(groups[1]),

@@ -42,7 +42,7 @@ async function drive(
   await waitForSessionWorkspace(page, first, fixture, environmentId)
   const firstPrompt = 'Reply with exactly MONITOR_DRAFT_FIRST.'
   await typePrompt(page, firstPrompt)
-  equal((await selectors.chatMessage(page).innerText()).trim(), firstPrompt)
+  equal((await selectors.chatComposerSurface(page).innerText()).trim(), firstPrompt)
   await step('known-good-first-draft-visible')
   await selectors.chatSend(page).click()
   await waitForCompletedTurn(page, orchestration, first)
@@ -71,8 +71,8 @@ async function drive(
   await selectors.sessionSearch(page).fill(firstTitle)
   await selectors.sessionByTitle(page, firstTitle).click()
   await waitForSessionWorkspace(page, first, fixture, environmentId)
-  await selectors.chatMessage(page).filter({ hasText: unsent }).waitFor()
-  equal((await selectors.chatMessage(page).innerText()).trim(), unsent)
+  await selectors.chatComposerSurface(page).filter({ hasText: unsent }).waitFor()
+  equal((await selectors.chatComposerSurface(page).innerText()).trim(), unsent)
   await step('original-monitor-draft-preserved')
   await selectors.sessionSearch(page).fill('')
   equal(await selectors.sessionByTitle(page, firstTitle).count(), 1)
@@ -98,6 +98,6 @@ async function drive(
 }
 
 async function emptyComposer(page: Page) {
-  await selectors.chatMessage(page).filter({ hasText: /^\s*$/ }).waitFor()
-  equal((await selectors.chatMessage(page).innerText()).trim(), '')
+  await selectors.chatComposerSurface(page).filter({ hasText: /^\s*$/ }).waitFor()
+  equal((await selectors.chatComposerSurface(page).innerText()).trim(), '')
 }

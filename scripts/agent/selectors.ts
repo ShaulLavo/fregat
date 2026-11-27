@@ -1235,10 +1235,13 @@ export const selectors = {
   dictationPreview: (page: Page) => page.locator('[data-dictation-preview]'),
   dictationCaret: (page: Page) => page.locator('[data-dictation-caret]'),
   chatMessage: (page: Page) => page.getByRole('textbox', { name: 'Message', exact: true }),
+  chatComposerSurface: (page: Page) =>
+    page.locator(`${chatComposerSelector} ${editorViewportSelector}`),
   waitForChatText: (page: Page, text: string) =>
     page.waitForFunction(
-      (value) => document.querySelector('[aria-label="Message"]')?.textContent?.includes(value),
-      text,
+      ({ selector, value }) =>
+        document.querySelector(selector)?.textContent?.includes(value) ?? false,
+      { selector: chatComposerSelector, value: text },
     ),
   chatWelcome: (page: Page) =>
     page.getByText('Ask about your workspace', { exact: true }).locator('../..'),
@@ -1325,7 +1328,7 @@ export const selectors = {
     nestedIcon: page
       .locator('[data-timeline-row-type="turn-fold"] [data-timeline-row-id] button svg')
       .first(),
-    composer: selectors.chatMessage(page),
+    composer: selectors.chatComposerSurface(page),
     workIcon: selectors.completedWorkGroup(page).locator('svg').first(),
     rowTitle: selectors.sessionRows(page).first().locator('span.truncate').first(),
     rowContext: selectors.sessionRows(page).first().locator('[data-worktree-id]').first(),
@@ -1677,13 +1680,10 @@ export async function waitForSessionWorkspace(
   await page.waitForFunction(
     ({ composerSelector, switcherSelector, expectedNamespace, rootPath }) => {
       const title = document.querySelector(switcherSelector)?.getAttribute('title')
-      const composer = document.querySelector(composerSelector) as
-        | (HTMLElement & { __lexicalEditor?: { _config: { namespace: string } } })
-        | null
-      // Lexical's rendered owner can lag the session URL during a workspace switch.
-      const namespace = composer?.__lexicalEditor?._config.namespace
+      const composer = document.querySelector<HTMLElement>(composerSelector)
+      const namespace = composer?.dataset.composerNamespace
       const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`) === true
-      // The phone header has no project switcher; Lexical names the exact workspace there.
+      // The phone header has no project switcher; the composer names the exact workspace there.
       const phone = document.documentElement.dataset.shell === 'phone'
       return (phone || workspaceReady) && namespace === expectedNamespace
     },

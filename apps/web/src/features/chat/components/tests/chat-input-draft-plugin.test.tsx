@@ -1,16 +1,16 @@
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
-import { ContentEditable } from '@lexical/react/LexicalContentEditable'
-import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
-import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 import { act, screen, waitFor } from '@testing-library/react'
-import type { LexicalEditor } from 'lexical'
-import { ChatInputDraftPlugin } from '@/features/chat/components/chat-input-draft-plugin'
-import { CHAT_INPUT_EDITOR_NODES } from '@/features/chat/components/chat-input-mention-node'
-import { $setChatInputText, readChatInputText } from '@/features/chat/utils/input-editor-actions'
+
+import { ChatInputEditor } from '@/features/chat/components/chat-input-editor'
+import { ChatInputEditorProvider } from '@/features/chat/providers/composer-editor-provider'
 import { useChatInputDraftStore } from '@/features/chat/state/chat-input-draft-store'
+import {
+  readChatInputText,
+  setChatInputText,
+  type ChatInputEditorHandle,
+} from '@/features/chat/utils/input-editor-actions'
 import { TEST_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
+import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
-import { test, expect } from '../../../../../test/fixtures'
 
 const target = {
   environmentId: TEST_ENVIRONMENT_ID,
@@ -21,35 +21,30 @@ const target = {
 test('external draft restoration updates the mounted composer without stealing focus or losing later edits', async () => {
   const drafts = useChatInputDraftStore.getState()
   drafts.setPrompt(target, 'Newer draft')
-  let editor: LexicalEditor | null = null
+  let editor: ChatInputEditorHandle | null = null
   renderWithProviders(
-    <LexicalComposer
-      initialConfig={{
-        namespace: 'draft-sync-test',
-        nodes: CHAT_INPUT_EDITOR_NODES,
-        onError: (error) => {
-          throw error
-        },
-      }}
-    >
-      <PlainTextPlugin
-        contentEditable={<ContentEditable aria-label='Test composer' />}
-        ErrorBoundary={LexicalErrorBoundary}
-      />
-      <ChatInputDraftPlugin
+    <ChatInputEditorProvider>
+      <ChatInputEditor
+        ariaLabel='Test composer'
         disabled={false}
         draftKey={target.draftKey}
+        placeholder='Message'
         rootPath={target.rootPath}
+        trigger={null}
+        onCommandMenuCommit={() => false}
+        onCommandMenuMove={() => false}
         onEditorReady={(value) => {
           editor = value
         }}
+        onImageFiles={async () => true}
+        onSubmitRequest={async () => false}
         onTriggerChange={() => {}}
       />
       <button type='button'>Keep focus</button>
-    </LexicalComposer>,
+    </ChatInputEditorProvider>,
   )
-  const composer = screen.getByRole('textbox', { name: 'Test composer' })
-  await waitFor(() => expect(composer.textContent).toBe('Newer draft'))
+  await waitFor(() => expect(editor).not.toBeNull())
+  await waitFor(() => expect(readChatInputText(editor!)).toBe('Newer draft'))
   const button = screen.getByRole('button', { name: 'Keep focus' })
   button.focus()
   act(() =>
@@ -61,7 +56,7 @@ test('external draft restoration updates the mounted composer without stealing f
   )
   await waitFor(() => expect(readChatInputText(editor!)).toBe('Original prompt\n\nNewer draft'))
   expect(button).toHaveFocus()
-  act(() => editor!.update(() => $setChatInputText('Edited after restoration')))
+  act(() => setChatInputText(editor!, 'Edited after restoration'))
   await waitFor(() => expect(drafts.getDraft(target).prompt).toBe('Edited after restoration'))
   act(() =>
     drafts.restoreContent(
@@ -69,5 +64,5 @@ test('external draft restoration updates the mounted composer without stealing f
       { prompt: 'Other session', attachments: [], terminalContexts: [] },
     ),
   )
-  expect(composer.textContent).toBe('Edited after restoration')
+  expect(readChatInputText(editor!)).toBe('Edited after restoration')
 })

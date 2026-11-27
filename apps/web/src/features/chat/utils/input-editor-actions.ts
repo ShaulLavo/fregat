@@ -1,22 +1,5 @@
-import { serializeComposerMention, splitComposerPrompt } from '@workspace/contracts'
-import type { LexicalEditor, NodeKey } from 'lexical'
-import {
-  $createLineBreakNode,
-  $createParagraphNode,
-  $createRangeSelection,
-  $createTextNode,
-  $getRoot,
-  $getSelection,
-  $isDecoratorNode,
-  $isElementNode,
-  $isLineBreakNode,
-  $isRangeSelection,
-  $isTextNode,
-  $setSelection,
-  type LexicalNode,
-} from 'lexical'
-
-import { $createChatInputMentionNode } from '@/features/chat/components/chat-input-mention-node'
+import type { Editor } from '@singapore-editor/core/editor'
+import { serializeComposerMention } from '@workspace/contracts'
 
 import {
   chatInputLineBoundaryOffset,
@@ -25,91 +8,142 @@ import {
   type ChatInputRangeReplacement,
 } from '@/features/chat/utils/input-logic'
 
-type ChatInputPoint = {
-  key: NodeKey
-  offset: number
-  type: 'element' | 'text'
+export type ChatInputEditorHandle = {
+  readonly editor: Editor
+  readonly focus: () => void
+  readonly getInputElement: () => HTMLElement
+  readonly getRootElement: () => HTMLElement | null
+  readonly isComposing: () => boolean
+  readonly isEditable: () => boolean
+  readonly getText: () => string
+  readonly getSelectionOffsets: () => { readonly anchor: number; readonly focus: number }
+  readonly getSnapshot: () => { readonly cursor: number; readonly text: string }
+  readonly setEditable: (editable: boolean) => void
+  readonly setSelection: (anchor: number, head?: number) => void
+  readonly setText: (
+    text: string,
+    options?: { readonly focus?: boolean; readonly syncOnly?: boolean },
+  ) => void
+  readonly editRange: (
+    from: number,
+    to: number,
+    text: string,
+    selection?: { readonly anchor: number; readonly head?: number },
+  ) => void
 }
 
-export function $setChatInputText(text: string) {
-  const root = $getRoot()
-  root.clear()
+export function createChatInputEditorHandle(
+  editor: Editor,
+  options: {
+    readonly getRootElement?: () => HTMLElement | null
+    readonly isComposing?: () => boolean
+  } = {},
+): ChatInputEditorHandle {
+  const getText = () => editor.materializeFullText()
 
-  const paragraph = $createParagraphNode()
-  for (const node of $chatInputPromptNodes(text)) {
-    paragraph.append(node)
+  const getSelectionOffsets = () => {
+    const primary = editor.getSelections()[0]
+    if (!primary) {
+      const end = getText().length
+      return { anchor: end, focus: end }
+    }
+    return { anchor: primary.anchorOffset, focus: primary.headOffset }
   }
-  root.append(paragraph)
-  paragraph.selectEnd()
+
+  const getSnapshot = () => {
+    const text = getText()
+    const primary = editor.getSelections()[0]
+    if (!primary || primary.anchorOffset !== primary.headOffset) {
+      return { cursor: text.length, text }
+    }
+    return { cursor: primary.anchorOffset, text }
+  }
+
+  const setText: ChatInputEditorHandle['setText'] = (text, setOptions = {}) => {
+    if (setOptions.syncOnly) {
+      editor.syncText(text)
+      if (setOptions.focus) editor.focus()
+      return
+    }
+    const currentLength = getText().length
+    editor.edit({ from: 0, to: currentLength, text }, { selection: { anchor: text.length } })
+    if (setOptions.focus) editor.focus()
+  }
+
+  return {
+    editor,
+    focus: () => editor.focus(),
+    getInputElement: () => editor.getInputElement(),
+    getRootElement: () => options.getRootElement?.() ?? editor.getInputElement().parentElement,
+    isComposing: () => options.isComposing?.() ?? false,
+    isEditable: () => editor.getState().editability === 'editable',
+    getText,
+    getSelectionOffsets,
+    getSnapshot,
+    setEditable: (editable) => editor.setEditability(editable ? 'editable' : 'readonly'),
+    setSelection: (anchor, head) => editor.setSelection(anchor, head),
+    setText,
+    editRange: (from, to, text, selection) => {
+      editor.edit({ from, to, text }, selection ? { selection } : undefined)
+    },
+  }
 }
 
-/**
- * Inserts prompt text at the caret, mentions included: the text goes through
- * the grammar, so a serialized mention arrives as a chip instead of as the
- * characters it was written with. This is what a paste of a copied prompt runs
- * through.
- */
+export function setChatInputText(
+  editor: ChatInputEditorHandle,
+  text: string,
+  options?: { readonly syncOnly?: boolean },
+) {
+  editor.setText(text, options)
+}
+
+/** Inserts prompt text at the current selection; mentions render automatically as chips. */
 export function insertChatInputText(
-  editor: LexicalEditor,
+  editor: ChatInputEditorHandle,
   text: string,
   { focus = false }: { focus?: boolean } = {},
 ) {
-  let inserted = false
-
-  editor.update(
-    () => {
-      // A composer that was never focused has no caret; the end of the prompt is
-      // where handed-over text belongs, and without this it was dropped silently.
-      if (!$isRangeSelection($getSelection())) $getRoot().selectEnd()
-      inserted = $insertChatInputPrompt(text)
-    },
-    {
-      // After the commit: focusing an editor whose DOM still lacks the insert
-      // syncs that stale DOM back over it.
-      onUpdate: () => {
-        if (focus && inserted) editor.focus()
-      },
-    },
-  )
-
-  return inserted
+  if (text.length === 0) return false
+  const { anchor, focus: head } = editor.getSelectionOffsets()
+  const start = Math.min(anchor, head)
+  const end = Math.max(anchor, head)
+  editor.editRange(start, end, text, { anchor: start + text.length })
+  if (focus) editor.focus()
+  return true
 }
 
 /** Replaces the whole prompt, caret at the end, and focuses the composer. */
-export function setChatInputEditorText(editor: LexicalEditor, text: string) {
-  editor.update(() => $setChatInputText(text), { onUpdate: () => editor.focus() })
+export function setChatInputEditorText(editor: ChatInputEditorHandle, text: string) {
+  editor.setText(text, { focus: true })
 }
 
 /** Inserts one mention, plus the blank that separates it from what follows. */
 export function insertChatInputMention(
-  editor: LexicalEditor,
+  editor: ChatInputEditorHandle,
   path: string,
   options?: { focus?: boolean },
 ) {
   return insertChatInputText(editor, `${serializeComposerMention(path)} `, options)
 }
 
-export function clearChatInputEditor(editor: LexicalEditor) {
-  editor.update(() => {
-    $setChatInputText('')
-  })
+export function clearChatInputEditor(editor: ChatInputEditorHandle) {
+  editor.setText('', { syncOnly: true })
 }
 
-/** Reads through `editor.read`, which flushes updates a keystroke may still owe. */
-export function readChatInputText(editor: LexicalEditor) {
-  return editor.read(() => $readChatInputTextSnapshot().text)
+export function readChatInputText(editor: ChatInputEditorHandle) {
+  return editor.getText()
+}
+
+export function readChatInputTextSnapshot(editor: ChatInputEditorHandle) {
+  return editor.getSnapshot()
 }
 
 /**
- * Splices a menu commit into the prompt through the selection rather than by
- * rewriting the document. Two things ride on that: the caret lands right after
- * the inserted text instead of at the end of the prompt, and the edit stays a
- * single undo step instead of collapsing the whole history.
- *
- * Returns `null` when the range is stale — see `chatInputRangeReplacement`.
+ * Splices a menu commit into the prompt as a single undoable edit with the caret
+ * landing right after the replacement. Returns `null` when the range is stale.
  */
 export function replaceChatInputEditorRange(
-  editor: LexicalEditor,
+  editor: ChatInputEditorHandle,
   {
     expectedText,
     rangeEnd,
@@ -124,327 +158,72 @@ export function replaceChatInputEditorRange(
     replacement: string
   },
 ): ChatInputRangeReplacement | null {
-  // Declared explicitly: the only assignment happens inside `editor.update`, so
-  // control-flow analysis would otherwise infer the return as plain `null`.
-  let applied: ChatInputRangeReplacement | null = null
+  const result = chatInputRangeReplacement({
+    expectedText,
+    rangeEnd,
+    rangeStart,
+    replacement,
+    text: editor.getText(),
+  })
+  if (!result) return null
 
-  editor.update(
-    () => {
-      const result = chatInputRangeReplacement({
-        expectedText,
-        rangeEnd,
-        rangeStart,
-        replacement,
-        text: $getRoot().getTextContent(),
-      })
-      if (!result) return
-      if (!$selectChatInputRange(result.rangeStart, result.rangeEnd)) return
-      if (!$replaceChatInputSelection(replacement)) return
-
-      applied = result
-    },
-    {
-      onUpdate: () => {
-        if (focus && applied) editor.focus()
-      },
-    },
-  )
-
-  return applied
+  editor.editRange(result.rangeStart, result.rangeEnd, replacement, { anchor: result.cursor })
+  if (focus) editor.focus()
+  return result
 }
 
 /** Wraps the selection in `open`/`close` and keeps the wrapped text selected. */
-export function surroundChatInputSelection(editor: LexicalEditor, open: string, close: string) {
-  let handled = false
+export function surroundChatInputSelection(
+  editor: ChatInputEditorHandle,
+  open: string,
+  close: string,
+) {
+  const { anchor, focus: head } = editor.getSelectionOffsets()
+  if (anchor === head) return false
 
-  editor.update(() => {
-    const selection = $getSelection()
-    if (!$isRangeSelection(selection) || selection.isCollapsed()) return
+  const start = Math.min(anchor, head)
+  const end = Math.max(anchor, head)
+  const selected = editor.getText().slice(start, end)
+  if (!selected) return false
 
-    const offsets = $chatInputSelectionOffsets()
-    if (!offsets) return
-
-    const start = Math.min(offsets.anchor, offsets.focus)
-    const selected = offsets.text.slice(start, Math.max(offsets.anchor, offsets.focus))
-    if (!selected) return
-
-    const innerStart = start + open.length
-    selection.insertText(`${open}${selected}${close}`)
-    $selectChatInputRange(innerStart, innerStart + selected.length)
-    handled = true
+  const innerStart = start + open.length
+  editor.editRange(start, end, `${open}${selected}${close}`, {
+    anchor: innerStart,
+    head: innerStart + selected.length,
   })
-
-  return handled
+  return true
 }
 
 /** Home/End. Returns false when the caret is already on the boundary. */
 export function moveChatInputCaretToLineBoundary(
-  editor: LexicalEditor,
+  editor: ChatInputEditorHandle,
   edge: ChatInputLineEdge,
   extend: boolean,
 ) {
-  let moved = false
+  const text = editor.getText()
+  const { anchor, focus: head } = editor.getSelectionOffsets()
+  const nextFocus = chatInputLineBoundaryOffset(text, head, edge)
+  const nextAnchor = extend ? anchor : nextFocus
+  if (nextAnchor === anchor && nextFocus === head) return false
 
-  editor.update(() => {
-    const offsets = $chatInputSelectionOffsets()
-    if (!offsets) return
-
-    const focus = chatInputLineBoundaryOffset(offsets.text, offsets.focus, edge)
-    const anchor = extend ? offsets.anchor : focus
-    if (anchor === offsets.anchor && focus === offsets.focus) return
-
-    moved = $selectChatInputRange(anchor, focus)
-  })
-
-  return moved
-}
-
-export function readChatInputSelection(editor: LexicalEditor) {
-  return editor.read(() => {
-    const text = $getRoot().getTextContent()
-    const offsets = $chatInputSelectionOffsets()
-    return {
-      text,
-      selection: {
-        start: offsets ? Math.min(offsets.anchor, offsets.focus) : text.length,
-        end: offsets ? Math.max(offsets.anchor, offsets.focus) : text.length,
-      },
-    }
-  })
-}
-
-export function $readChatInputTextSnapshot() {
-  const text = $getRoot().getTextContent()
-  const selection = $getSelection()
-  if (!$isRangeSelection(selection)) return { cursor: text.length, text }
-  if (!selection.isCollapsed()) return { cursor: text.length, text }
-
-  return {
-    cursor: textOffsetForLexicalPoint(selection.anchor, text.length),
-    text,
-  }
-}
-
-/**
- * Prose is spliced with `insertText` so the edit stays one undo step. Only a
- * replacement that carries a mention has to be built out of nodes, and it is
- * cleared first so the range it replaces is gone before the chip lands.
- */
-function $replaceChatInputSelection(replacement: string) {
-  const carriesMention = splitComposerPrompt(replacement).some(
-    (segment) => segment.type === 'mention',
-  )
-  const selection = $getSelection()
-  if (!$isRangeSelection(selection)) return false
-  if (!carriesMention) {
-    selection.insertText(replacement)
-
-    return true
-  }
-
-  selection.insertText('')
-
-  return $insertChatInputPrompt(replacement)
-}
-
-function $insertChatInputPrompt(text: string) {
-  const selection = $getSelection()
-  if (!$isRangeSelection(selection)) return false
-
-  const nodes = $chatInputPromptNodes(text)
-  if (nodes.length === 0) return false
-
-  selection.insertNodes(nodes)
-
+  editor.setSelection(nextAnchor, nextFocus)
   return true
 }
 
-function $chatInputPromptNodes(text: string) {
-  const nodes: LexicalNode[] = []
-
-  for (const segment of splitComposerPrompt(text)) {
-    if (segment.type === 'mention') {
-      nodes.push($createChatInputMentionNode(segment.path))
-      continue
-    }
-
-    $appendChatInputTextNodes(nodes, segment.text)
-  }
-
-  return nodes
-}
-
-function $appendChatInputTextNodes(nodes: LexicalNode[], text: string) {
-  const lines = text.split('\n')
-  for (const [index, line] of lines.entries()) {
-    if (line.length > 0) nodes.push($createTextNode(line))
-    if (index < lines.length - 1) nodes.push($createLineBreakNode())
-  }
-}
-
-function $chatInputSelectionOffsets() {
-  const text = $getRoot().getTextContent()
-  const selection = $getSelection()
-  if (!$isRangeSelection(selection)) return null
-
+export function readChatInputSelection(editor: ChatInputEditorHandle) {
+  const text = editor.getText()
+  const { anchor, focus: head } = editor.getSelectionOffsets()
   return {
-    anchor: textOffsetForLexicalPoint(selection.anchor, text.length),
-    focus: textOffsetForLexicalPoint(selection.focus, text.length),
     text,
+    selection: {
+      start: Math.min(anchor, head),
+      end: Math.max(anchor, head),
+    },
   }
-}
-
-function $selectChatInputRange(anchorOffset: number, focusOffset: number) {
-  const anchor = $chatInputPointAtOffset(anchorOffset)
-  const focus = $chatInputPointAtOffset(focusOffset)
-  if (!anchor || !focus) return false
-
-  const selection = $createRangeSelection()
-  selection.anchor.set(anchor.key, anchor.offset, anchor.type)
-  selection.focus.set(focus.key, focus.offset, focus.type)
-  $setSelection(selection)
-
-  return true
-}
-
-function $chatInputPointAtOffset(offset: number): ChatInputPoint | null {
-  let start = 0
-
-  for (const leaf of $chatInputLeaves()) {
-    const size = lexicalNodeTextSize(leaf)
-    if (offset > start + size) {
-      start += size
-      continue
-    }
-
-    return chatInputPointInLeaf(leaf, offset - start)
-  }
-
-  return $chatInputTailPoint()
-}
-
-/**
- * A line break carries no text offsets of its own, so an offset that lands on
- * one becomes an element point in the parent, before or after the break.
- */
-function chatInputPointInLeaf(leaf: LexicalNode, localOffset: number): ChatInputPoint | null {
-  if ($isTextNode(leaf)) return { key: leaf.getKey(), offset: localOffset, type: 'text' }
-
-  const parent = leaf.getParent()
-  if (!parent) return null
-
-  const index = leaf.getIndexWithinParent()
-
-  return {
-    key: parent.getKey(),
-    offset: localOffset > 0 ? index + 1 : index,
-    type: 'element',
-  }
-}
-
-/** Where an offset past the last leaf goes — including the empty-prompt case. */
-function $chatInputTailPoint(): ChatInputPoint | null {
-  const last = $getRoot().getLastChild()
-  if (!$isElementNode(last)) return null
-
-  return { key: last.getKey(), offset: last.getChildrenSize(), type: 'element' }
-}
-
-function $chatInputLeaves() {
-  const leaves: LexicalNode[] = []
-  collectChatInputLeaves($getRoot().getChildren(), leaves)
-
-  return leaves
-}
-
-function collectChatInputLeaves(nodes: readonly LexicalNode[], leaves: LexicalNode[]) {
-  for (const node of nodes) {
-    if ($isElementNode(node)) {
-      collectChatInputLeaves(node.getChildren(), leaves)
-      continue
-    }
-
-    leaves.push(node)
-  }
-}
-
-function textOffsetForLexicalPoint(
-  point: { getNode: () => LexicalNode; offset: number },
-  fallback: number,
-) {
-  const anchorNode = point.getNode()
-  const root = $getRoot()
-  const result = textOffsetInNode(root, anchorNode, point.offset, 0)
-
-  return result.found ? result.offset : fallback
-}
-
-function textOffsetInNode(
-  node: LexicalNode,
-  anchorNode: LexicalNode,
-  anchorOffset: number,
-  offset: number,
-): { found: boolean; offset: number } {
-  if (node.getKey() === anchorNode.getKey()) {
-    return {
-      found: true,
-      offset: offset + anchorOffsetInNode(node, anchorOffset),
-    }
-  }
-  if (!$isElementNode(node)) return { found: false, offset: offset + lexicalNodeTextSize(node) }
-
-  return textOffsetInChildren(node.getChildren(), anchorNode, anchorOffset, offset)
-}
-
-function textOffsetInChildren(
-  children: LexicalNode[],
-  anchorNode: LexicalNode,
-  anchorOffset: number,
-  offset: number,
-) {
-  let nextOffset = offset
-
-  for (const child of children) {
-    const result = textOffsetInNode(child, anchorNode, anchorOffset, nextOffset)
-    if (result.found) return result
-
-    nextOffset = result.offset
-  }
-
-  return { found: false, offset: nextOffset }
-}
-
-function anchorOffsetInNode(node: LexicalNode, anchorOffset: number) {
-  if ($isElementNode(node)) return elementTextSizeBeforeOffset(node.getChildren(), anchorOffset)
-
-  return anchorOffset
-}
-
-function elementTextSizeBeforeOffset(children: LexicalNode[], anchorOffset: number) {
-  let size = 0
-  const end = Math.max(0, Math.min(children.length, anchorOffset))
-
-  for (let index = 0; index < end; index += 1) {
-    const child = children[index]
-    if (child) size += lexicalNodeTextSize(child)
-  }
-
-  return size
-}
-
-function lexicalNodeTextSize(node: LexicalNode): number {
-  if ($isTextNode(node)) return node.getTextContentSize()
-  if ($isLineBreakNode(node)) return 1
-  // A chip occupies the width of the text it serializes to, or every offset
-  // past it in the prompt would be short by that much.
-  if ($isDecoratorNode(node)) return node.getTextContent().length
-  if (!$isElementNode(node)) return 0
-
-  return node.getChildren().reduce((size, child) => size + lexicalNodeTextSize(child), 0)
 }
 
 export async function foldChatInputPaste(
-  editor: LexicalEditor,
+  editor: ChatInputEditorHandle,
   text: string,
   name: string,
   admit: (files: readonly File[]) => Promise<boolean>,

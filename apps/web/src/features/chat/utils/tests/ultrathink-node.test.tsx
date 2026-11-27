@@ -1,59 +1,57 @@
-import { $getRoot, createEditor, type LexicalEditor } from 'lexical'
+import { Editor } from '@singapore-editor/core/editor'
+import { waitFor } from '@testing-library/react'
 
-import { CHAT_INPUT_EDITOR_NODES } from '@/features/chat/components/chat-input-mention-node'
-import {
-  $readChatInputTextSnapshot,
-  $setChatInputText,
-} from '@/features/chat/utils/input-editor-actions'
-import { registerUltrathinkEntity } from '@/features/chat/utils/ultrathink-node'
+import { createChatInputUltrathinkPlugin } from '@/features/chat/utils/composer-plugins'
+import { stubEditorViewport } from '../../../../../test/env/editor-viewport'
 import { expect, test } from '../../../../../test/fixtures'
 
 test('the word becomes one rainbow span and the prompt text is unchanged', async () => {
-  const { editor, root } = mountEditor()
-  registerUltrathinkEntity(editor, true)
-  await write(editor, 'Please ultrathink about ultrathinking.')
+  stubEditorViewport({ height: 120, width: 400 })
+  const { editor, host } = mountEditor()
+  try {
+    const disposable = editor.addPlugin(createChatInputUltrathinkPlugin())
+    editor.setText('Please ultrathink about ultrathinking.')
 
-  const painted = Array.from(root.querySelectorAll('.rainbow-text'), (span) => span.textContent)
-  expect(painted).toEqual(['ultrathink'])
-  expect(editor.read(() => $readChatInputTextSnapshot().text)).toBe(
-    'Please ultrathink about ultrathinking.',
-  )
+    await waitFor(() =>
+      expect(
+        Array.from(host.querySelectorAll('.rainbow-text'), (span) => span.textContent),
+      ).toEqual(['ultrathink']),
+    )
+    expect(editor.materializeFullText()).toBe('Please ultrathink about ultrathinking.')
+    disposable.dispose()
+  } finally {
+    editor.dispose()
+    host.remove()
+  }
 })
 
 test('a model without the word reverts painted text to plain', async () => {
-  const { editor, root } = mountEditor()
-  const unregister = registerUltrathinkEntity(editor, true)
-  await write(editor, 'ultrathink it')
-  expect(root.querySelector('.rainbow-text')).not.toBeNull()
+  stubEditorViewport({ height: 120, width: 400 })
+  const { editor, host } = mountEditor()
+  try {
+    const disposable = editor.addPlugin(createChatInputUltrathinkPlugin())
+    editor.setText('ultrathink it')
+    await waitFor(() => expect(host.querySelector('.rainbow-text')).not.toBeNull())
 
-  unregister()
-  registerUltrathinkEntity(editor, false)
-  await settle(editor)
-  expect(root.querySelector('.rainbow-text')).toBeNull()
-  expect(editor.read(() => $getRoot().getTextContent())).toBe('ultrathink it')
+    disposable.dispose()
+    expect(host.querySelector('.rainbow-text')).toBeNull()
+    expect(editor.materializeFullText()).toBe('ultrathink it')
+  } finally {
+    editor.dispose()
+    host.remove()
+  }
 })
 
 function mountEditor() {
-  const editor = createEditor({
-    namespace: 'ultrathink-node-test',
-    nodes: CHAT_INPUT_EDITOR_NODES,
-    onError: (error) => {
-      throw error
-    },
+  const host = document.createElement('div')
+  host.style.width = '400px'
+  host.style.height = '120px'
+  document.body.append(host)
+  const editor = new Editor(host, {
+    scrollMode: 'virtualized',
+    scrollPastEnd: false,
+    wordWrap: true,
+    wordWrapBreak: 'word',
   })
-  const root = document.createElement('div')
-  root.contentEditable = 'true'
-  editor.setRootElement(root)
-
-  return { editor, root }
-}
-
-async function write(editor: LexicalEditor, text: string) {
-  editor.update(() => $setChatInputText(text))
-  await settle(editor)
-}
-
-/** Updates and their transforms commit in a microtask. */
-function settle(editor: LexicalEditor) {
-  return new Promise<void>((resolve) => editor.update(() => {}, { onUpdate: resolve }))
+  return { editor, host }
 }

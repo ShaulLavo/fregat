@@ -20,11 +20,6 @@
     "reason": "An inline chip set in a run of markdown prose that renders at several sizes. It must track the text around it, which a fixed step cannot do; 0.9em also offsets the larger x-height of the mono face."
   },
   {
-    "file": "apps/web/src/features/chat/components/chat-input-mention-chip.tsx",
-    "class": "text-[0.9em]",
-    "reason": "An inline chip set in a run of composer text. It must track the text around it, which a fixed step cannot do; 0.9em also offsets the larger x-height of the mono face."
-  },
-  {
     "file": "apps/web/src/features/chat/components/terminal-context-chip.tsx",
     "class": "text-[0.9em]",
     "reason": "An inline chip set in a run of prose. It must track the text around it, which a fixed step cannot do; 0.9em also offsets the larger x-height of the mono face."

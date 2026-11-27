@@ -23,7 +23,7 @@ export const fileAttachments = isolatedNativeScenario({
     await step('general-file-upload-ready')
     await page.reload()
     await selectors.chatStagedFile(page, 'notes.txt').waitFor()
-    strictEqual(await selectors.chatMessage(page).textContent(), prompt)
+    strictEqual(await selectors.chatComposerSurface(page).textContent(), prompt)
     await step('general-file-draft-recovered')
 
     // A ready upload whose server copy has expired comes back as a failed chip that says so,

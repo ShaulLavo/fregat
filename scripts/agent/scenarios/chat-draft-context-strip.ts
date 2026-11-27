@@ -20,7 +20,7 @@ const DRAFT_TEXT = 'carry this draft across worktrees'
 const LINKED_BRANCH = 'feature/strip'
 
 async function draftText(page: Page) {
-  return (await selectors.chatMessage(page).innerText()).trim()
+  return (await selectors.chatComposerSurface(page).innerText()).trim()
 }
 
 /** The workspace trigger carries the base worktree's path as its title. */

@@ -76,9 +76,7 @@ it('native fixture opens its workspace before reloading its provider snapshot', 
       let unloading = false
       window.addEventListener('beforeunload', () => {
         unloading = true
-        const composer = document.querySelector('[data-testid="chat-input-editor"]') as
-          | (HTMLElement & { __lexicalEditor?: { _config: { namespace: string } } })
-          | null
+        const composer = document.querySelector<HTMLElement>('[data-testid="chat-input-editor"]')
         void (
           window as unknown as { recordFixtureNavigation: (value: unknown) => Promise<void> }
         ).recordFixtureNavigation({
@@ -86,7 +84,7 @@ it('native fixture opens its workspace before reloading its provider snapshot', 
           workspaceTitle: document
             .querySelector('[aria-label="Switch project"]')
             ?.getAttribute('title'),
-          composerNamespace: composer?.__lexicalEditor?._config.namespace ?? null,
+          composerNamespace: composer?.dataset.composerNamespace ?? null,
         })
       })
       // Bun declares fetch.preconnect; browser fetch has no preconnect method.

@@ -103,7 +103,7 @@ async function chats(
     )
     const displayed = order.map((title) => ids[Number(title.at(-1)) - 1]!)
     // Item keys apply in a pane; in chat mode that is the chat, not the rail's search.
-    await selectors.chatMessage(page).click()
+    await selectors.chatComposerSurface(page).click()
 
     await pressForChat(page, keys.select(1), displayed[0]!)
     await pressForChat(page, keys.select(2), displayed[1]!)

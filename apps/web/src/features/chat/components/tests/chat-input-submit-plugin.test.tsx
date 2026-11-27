@@ -1,11 +1,8 @@
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
-import { ContentEditable } from '@lexical/react/LexicalContentEditable'
-import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
-import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
-import { act, fireEvent, screen } from '@testing-library/react'
 import { detectPlatform } from '@shaulavo/hotkeys'
+import { act, fireEvent, screen } from '@testing-library/react'
 
-import { ChatInputSubmitPlugin } from '@/features/chat/components/chat-input-submit-plugin'
+import { ChatInputEditor } from '@/features/chat/components/chat-input-editor'
+import { ChatInputEditorProvider } from '@/features/chat/providers/composer-editor-provider'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
 
@@ -62,33 +59,33 @@ function renderComposer(
 ) {
   const state = { submits: 0, intents: [] as boolean[], completions: 0 }
   renderWithProviders(
-    <LexicalComposer
-      initialConfig={{
-        namespace: 'chat-input-submit-plugin-test',
-        onError: (error) => {
-          throw error
-        },
-      }}
-    >
-      <PlainTextPlugin
-        contentEditable={<ContentEditable aria-label='Submit composer' />}
-        ErrorBoundary={LexicalErrorBoundary}
-      />
-      <ChatInputSubmitPlugin
-        commandMenuOpen={options.menuOpen ?? false}
+    <ChatInputEditorProvider>
+      <ChatInputEditor
+        ariaLabel='Submit composer'
         disabled={options.disabled ?? false}
+        draftKey='chat-input-submit-plugin-test'
+        placeholder='Message'
+        rootPath='/repo'
+        trigger={
+          options.menuOpen
+            ? { kind: 'mention', query: '', rangeEnd: 1, rangeStart: 0, text: '@' }
+            : null
+        }
         onCommandMenuCommit={() => {
           state.completions += 1
           return true
         }}
         onCommandMenuMove={() => false}
+        onEditorReady={() => {}}
+        onImageFiles={async () => true}
         onSubmitRequest={async (alternate = false) => {
           state.intents.push(alternate)
           state.submits += 1
           return true
         }}
+        onTriggerChange={() => {}}
       />
-    </LexicalComposer>,
+    </ChatInputEditorProvider>,
   )
   const root = screen.getByRole('textbox', { name: 'Submit composer' })
   act(() => root.focus())

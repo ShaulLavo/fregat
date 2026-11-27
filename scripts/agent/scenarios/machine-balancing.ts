@@ -149,7 +149,7 @@ export const machineBalancing: Scenario = {
       await selectors.draftBaseBranch(page).waitFor()
       strictEqual((await selectors.draftBaseBranch(page).innerText()).trim(), 'From release')
       strictEqual(
-        (await selectors.chatMessage(page).innerText()).trim(),
+        (await selectors.chatComposerSurface(page).innerText()).trim(),
         'Keep this draft on its selected machine',
       )
       strictEqual(page.url(), selectedAddress)

@@ -9,7 +9,6 @@ import { withActiveFileMention } from '@/features/chat/utils/active-file-mention
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { resolveComposerInteractionMode } from '@workspace/client-core/chat/composer-interaction'
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
-import { LexicalComposer, type InitialConfigType } from '@lexical/react/LexicalComposer'
 import { useQuery } from '@tanstack/react-query'
 import {
   MAX_CHAT_ATTACHMENTS,
@@ -18,16 +17,15 @@ import {
   type ProviderInstanceId,
   type RuntimeMode,
 } from '@workspace/contracts'
-import { $setSelection, type LexicalEditor } from 'lexical'
 import { use, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { cn } from '@workspace/ui/lib/utils'
 
 import {
-  $setChatInputText,
   clearChatInputEditor,
   insertChatInputMention,
   readChatInputText,
   replaceChatInputEditorRange,
+  type ChatInputEditorHandle,
 } from '@/features/chat/utils/input-editor-actions'
 import { composerDropCarriesFiles, composerDropMentionPath } from '../utils/composer-drop'
 import {
@@ -65,8 +63,8 @@ import { ChatInputCommandMenu } from './chat-input-command-menu'
 import { ChatInputEditor } from './chat-input-editor'
 import { ChatInputUltrathinkPlugin } from './chat-input-ultrathink-plugin'
 import { EffortBurst } from './effort-burst'
+import { ChatInputEditorProvider } from '@/features/chat/providers/composer-editor-provider'
 import { ChatInputTerminalContextList } from './chat-input-terminal-context-list'
-import { CHAT_INPUT_EDITOR_NODES } from './chat-input-mention-node'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import type { ComposerPendingAction } from '@/features/chat/utils/composer-state'
 
@@ -150,7 +148,7 @@ export function ChatInput({
   const clearStoredDraftContent = useChatInputDraftStore((store) => store.clearDraftContent)
   const removeTerminalContext = useChatInputDraftStore((store) => store.removeTerminalContext)
   const setInteractionMode = useChatInputDraftStore((store) => store.setInteractionMode)
-  const editorRef = useRef<LexicalEditor | null>(null)
+  const editorRef = useRef<ChatInputEditorHandle | null>(null)
   // State as well as the ref: the inbox only splices text once a caret exists,
   // and a ref cannot wake the effect that is waiting for one.
   const voice = useVoiceInput(draftTarget, editorRef)
@@ -225,18 +223,7 @@ export function ChatInput({
   // a spinner over rows that are already usable.
   const commandMenuLoading =
     trigger?.kind === 'mention' ? projectEntries.isSearching : commandCatalog.isFetching
-  const initialConfig: InitialConfigType = {
-    editorState: () => {
-      // Restoring a draft must not take focus from the session list.
-      $setChatInputText(initialDraft)
-      $setSelection(null)
-    },
-    namespace: `platform-chat-input:${inputKey}`,
-    nodes: CHAT_INPUT_EDITOR_NODES,
-    onError: (error) => {
-      throw error
-    },
-  }
+  const composerNamespace = `platform-chat-input:${inputKey}`
 
   // Captures made outside chat wait in the inbox until a composer exists to
   // hold them — the terminal is often right-clicked while the sidebar is on
@@ -250,11 +237,11 @@ export function ChatInput({
     setActiveCommandItemId(commandMenuItems[0]?.id ?? null)
   }, [activeCommandItemId, commandMenuItems])
 
-  const handleEditorReady = (editor: LexicalEditor | null) => {
+  const handleEditorReady = (editor: ChatInputEditorHandle | null) => {
     editorRef.current = editor
     setEditorReady(editor !== null)
   }
-  function clearDraft(editor: LexicalEditor | null, keepDraft: boolean) {
+  function clearDraft(editor: ChatInputEditorHandle | null, keepDraft: boolean) {
     if (editor && editorRef.current === editor) clearChatInputEditor(editor)
 
     // A correction or a background start consumes content; the picks apply to the next turn.
@@ -419,6 +406,8 @@ export function ChatInput({
     const mentionPath = composerDropMentionPath(event.dataTransfer, rootPath)
     if (mentionPath) {
       event.preventDefault()
+      event.stopPropagation()
+      event.nativeEvent.stopPropagation()
       insertMention(mentionPath)
       return
     }
@@ -427,6 +416,8 @@ export function ChatInput({
     if (files.length === 0) return
 
     event.preventDefault()
+    event.stopPropagation()
+    event.nativeEvent.stopPropagation()
     handleImageFiles(files)
   }
 
@@ -462,10 +453,10 @@ export function ChatInput({
               onSelect={handleCommandItemSelect}
             />
           ) : null}
-          <LexicalComposer initialConfig={initialConfig} key={inputKey}>
+          <ChatInputEditorProvider key={inputKey}>
             {/* The whole composer is the drop target, not just the text area:
                 dropping on the attachment strip or the action row used to do
-                nothing at all. */}
+                nothing at all. Capture runs before the editor's own drop handler. */}
             <div
               className={cn(
                 'focus-ring-within border-transparent bg-input/30 relative isolate overflow-hidden rounded-lg border',
@@ -476,12 +467,14 @@ export function ChatInput({
               ref={focusTargetRef}
               onDragLeave={handleComposerDragLeave}
               onDragOver={handleComposerDragOver}
-              onDrop={handleComposerDrop}
+              onDropCapture={handleComposerDrop}
             >
               <EffortBurst key={draftKey} draftTarget={draftTarget} />
               <ChatInputEditor
                 disabled={composerDisabled}
                 draftKey={draftKey}
+                initialText={initialDraft}
+                namespace={composerNamespace}
                 placeholder='Use @ to mention, / for commands.'
                 rootPath={rootPath}
                 trigger={trigger}
@@ -551,7 +544,7 @@ export function ChatInput({
                 </div>
               ) : null}
             </div>
-          </LexicalComposer>
+          </ChatInputEditorProvider>
           {footer}
         </form>
       </ChatModelPickerProvider>

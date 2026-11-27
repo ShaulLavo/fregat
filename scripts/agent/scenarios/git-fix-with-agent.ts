@@ -34,7 +34,7 @@ export const gitFixWithAgent: Scenario = {
       // Something already in the open chat: the hand-off must not land beside it.
       await selectors.sidebarTab(page, 'Chat').click()
       await selectors.chatMessage(page).waitFor({ timeout: 20_000 })
-      await selectors.chatMessage(page).click()
+      await selectors.chatComposerSurface(page).click()
       await page.keyboard.type(EXISTING_DRAFT)
       await openGitPanel(page)
       await selectors.commitMessage(page).fill('rejected by the hook')
@@ -43,7 +43,7 @@ export const gitFixWithAgent: Scenario = {
       await step('failure-notice')
 
       await selectors.gitFixWithAgent(page).click()
-      const composer = selectors.chatMessage(page)
+      const composer = selectors.chatComposerSurface(page)
       await composer.waitFor({ timeout: 15_000 })
       await page.waitForFunction(
         (element) => element?.textContent?.includes('lint failed on src/app.ts'),

@@ -1,7 +1,7 @@
 import { initializePromptStashStore } from '@/features/chat/state/prompt-stash-store'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
+import { ChatInputEditorProvider } from '@/features/chat/providers/composer-editor-provider'
 import { sessionIdSchema, type ClientOrchestrationCommand } from '@workspace/contracts'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -152,14 +152,7 @@ function renderActions({ existingSession = false } = {}) {
           }}
           persistModelSelection={() => {}}
         >
-          <LexicalComposer
-            initialConfig={{
-              namespace: 'chat-input-actions-test',
-              onError: (error) => {
-                throw error
-              },
-            }}
-          >
+          <ChatInputEditorProvider>
             <ChatInputActions
               busy={false}
               disabled={false}
@@ -173,7 +166,7 @@ function renderActions({ existingSession = false } = {}) {
               onStop={() => {}}
               onSubmit={async () => true}
             />
-          </LexicalComposer>
+          </ChatInputEditorProvider>
         </ChatModelPickerProvider>
       </ChatComposerModesProvider>
     </ChatProviderSignInProvider>,

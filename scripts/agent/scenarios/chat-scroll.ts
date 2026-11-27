@@ -251,7 +251,7 @@ export const chatScrollFollowing = isolatedNativeScenario({
       await answerOverflows(page)
       await step('answer-overflows')
       // A draft growing in the composer shortens the transcript's viewport mid-stream.
-      const composer = selectors.chatMessage(page)
+      const composer = selectors.chatComposerSurface(page)
       await composer.click()
       for (let line = 0; line < 6; line += 1) {
         await page.keyboard.type(`Draft line ${line + 1}`)

@@ -1,5 +1,4 @@
 import { TEST_ENVIRONMENT_ID } from '../../../../test/factories/chat'
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import type { ProviderInstanceId } from '@workspace/contracts'
 import '@workspace/ui/globals.css'
 import { Button } from '@workspace/ui/components/button'
@@ -22,7 +21,7 @@ import { afterEach, expect, test } from 'vitest'
 import { ChatInputAttachmentList } from '@/features/chat/components/chat-input-attachment-list'
 import { ChatInputCommandMenu } from '@/features/chat/components/chat-input-command-menu'
 import { ChatInputEditor } from '@/features/chat/components/chat-input-editor'
-import { CHAT_INPUT_EDITOR_NODES } from '@/features/chat/components/chat-input-mention-node'
+import { ChatInputEditorProvider } from '@/features/chat/providers/composer-editor-provider'
 import { ChatInputSubmitButton } from '@/features/chat/components/chat-input-submit-button'
 import { ChatPanelStatus } from '@/features/chat/components/chat-panel-status'
 import { ChatPanelHeader } from '@/features/chat/components/chat-panel-header'
@@ -299,15 +298,7 @@ test('custom composer, picker, search, and references chrome follows density', a
     <AppProviders queryClient={createTestQueryClient()}>
       <EditorStateProvider>
         <TooltipProvider delay={0}>
-          <LexicalComposer
-            initialConfig={{
-              namespace: 'density-contract',
-              nodes: CHAT_INPUT_EDITOR_NODES,
-              onError: (error) => {
-                throw error
-              },
-            }}
-          >
+          <ChatInputEditorProvider>
             <ChatInputEditor
               disabled={false}
               draftKey='density-contract'
@@ -321,7 +312,7 @@ test('custom composer, picker, search, and references chrome follows density', a
               onSubmitRequest={() => Promise.resolve(false)}
               onTriggerChange={() => undefined}
             />
-          </LexicalComposer>
+          </ChatInputEditorProvider>
           <ChatInputAttachmentList
             attachments={[attachment]}
             disabled={false}

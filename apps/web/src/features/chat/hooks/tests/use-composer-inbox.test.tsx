@@ -1,10 +1,10 @@
 import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import { renderHook } from '@testing-library/react'
-import type { LexicalEditor } from 'lexical'
 import { beforeEach } from 'vitest'
 import type { RefObject } from 'react'
 
 import { useComposerInbox } from '@/features/chat/hooks/use-composer-inbox'
+import type { ChatInputEditorHandle } from '@/features/chat/utils/input-editor-actions'
 import {
   resetChatInputDraftStore,
   useChatInputDraftStore,
@@ -35,7 +35,7 @@ beforeEach(() => {
 })
 
 /** No editor yet is the real first-render state, not a contrived one. */
-function noEditor(): RefObject<LexicalEditor | null> {
+function noEditor(): RefObject<ChatInputEditorHandle | null> {
   return { current: null }
 }
 

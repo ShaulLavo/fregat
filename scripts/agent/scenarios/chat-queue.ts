@@ -207,7 +207,7 @@ export const chatQueue = isolatedNativeScenario({
       await enqueue(page, 'QUEUE_RESTORE')
       await selectors.chatRestoreQueued(page).click()
       await expectQueued(page, 0)
-      strictEqual(await selectors.chatMessage(page).textContent(), 'QUEUE_RESTORE')
+      strictEqual(await selectors.chatComposerSurface(page).textContent(), 'QUEUE_RESTORE')
       await step('send-now-and-restore')
       await selectors.chatMessage(page).fill('')
 
@@ -232,7 +232,7 @@ export const chatQueue = isolatedNativeScenario({
       await selectors.chatStagedFile(page, 'queued.txt').waitFor()
       await selectors.chatTerminalContext(page).waitFor()
       strictEqual(await selectors.chatTerminalContext(page).getAttribute('title'), terminalText)
-      const restored = await selectors.chatMessage(page).textContent()
+      const restored = await selectors.chatComposerSurface(page).textContent()
       ok(restored?.includes('EXISTING_DRAFT') && restored.includes('QUEUE_RECOVER'))
       await until(
         async () => (await nativeLog(root)).some((entry) => entry.event === 'interrupt-requested'),
@@ -245,7 +245,7 @@ export const chatQueue = isolatedNativeScenario({
         'The native interrupt must reject',
       )
       await Bun.sleep(200)
-      strictEqual(await selectors.chatMessage(page).textContent(), restored)
+      strictEqual(await selectors.chatComposerSurface(page).textContent(), restored)
       strictEqual(await selectors.chatTerminalContext(page).getAttribute('title'), terminalText)
       await selectors.chatStagedFile(page, 'queued.txt').waitFor()
       strictEqual((await inputEntries(root)).length, 4, 'Stop must not dispatch recovered content')

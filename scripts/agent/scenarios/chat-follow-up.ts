@@ -33,7 +33,7 @@ export const chatFollowUp: Scenario = {
       await selectors.chatQueue(page).click()
       await selectors.chatQueuedEntry(page, FOLLOW_UP).waitFor()
       strictEqual(
-        (await selectors.chatMessage(page).innerText()).trim(),
+        (await selectors.chatComposerSurface(page).innerText()).trim(),
         '',
         'The running turn rejected its follow-up',
       )
