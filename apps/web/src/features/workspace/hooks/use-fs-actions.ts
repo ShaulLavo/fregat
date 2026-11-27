@@ -56,6 +56,7 @@ export type TreeFsActions = {
   readonly moveEntries: (moves: readonly TreePathMove[]) => void
   readonly renameEntry: (rowPath: string) => void
   readonly requestDelete: (target: DeleteTarget) => void
+  readonly requestDeleteMany: (targets: readonly DeleteTarget[]) => void
 }
 
 type DeferredCreate = { containerPath: string; isFolder: boolean }
@@ -98,7 +99,7 @@ export function useFsActions({
   const documentStore = useEditorDocumentStoreApi()
   const workspaceStore = useEditorWorkspaceStoreApi()
   const { renameLiveEditorDocument } = useEditorCommands()
-  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [deleteTargets, setDeleteTargets] = useState<readonly DeleteTarget[]>([])
   const [deleteError, setDeleteError] = useState<string | null>(null)
   // Set once the journal has refused to keep this delete for undo.
   const [deletePermanently, setDeletePermanently] = useState(false)
@@ -231,17 +232,23 @@ export function useFsActions({
   function closeDeleteDialog() {
     setDeleteError(null)
     setDeletePermanently(false)
-    setDeleteTarget(null)
+    setDeleteTargets([])
   }
 
-  async function deleteJournaled(target: DeleteTarget, runtime: FileOperationRuntime) {
+  async function deleteJournaled(targets: readonly DeleteTarget[], runtime: FileOperationRuntime) {
     const outcome = await runFileOperation(runtime, {
       announce: true,
-      label: deleteLabel(target.path),
-      legs: [
-        { kind: 'delete', path: target.path, type: target.isDirectory ? 'directory' : 'file' },
-      ],
-      patch: { kind: 'delete', rootPath, treePath: toTreePath(target.path, rootPath) },
+      label: deleteLabel(targets.map((target) => target.path)),
+      legs: targets.map((target) => ({
+        kind: 'delete' as const,
+        path: target.path,
+        type: target.isDirectory ? ('directory' as const) : ('file' as const),
+      })),
+      patch: {
+        kind: 'delete',
+        rootPath,
+        treePaths: targets.map((target) => toTreePath(target.path, rootPath)),
+      },
       rendersError: isQuotaError,
     })
     if (outcome.ok || outcome.reason !== 'transport') {
@@ -256,15 +263,26 @@ export function useFsActions({
   }
 
   /** Only after the dialog has said so: the journal cannot hold this delete. */
-  async function deleteForever(target: DeleteTarget) {
+  async function deleteForever(targets: readonly DeleteTarget[]) {
     const outcome = await runTreeIntent({
-      patch: { kind: 'delete', rootPath, treePath: toTreePath(target.path, rootPath) },
+      patch: {
+        kind: 'delete',
+        rootPath,
+        treePaths: targets.map((target) => toTreePath(target.path, rootPath)),
+      },
       queryClient,
       perform: () => {
-        const remove = () =>
-          deletePath(target.path, target.isDirectory, clientForQueryClient(queryClient))
+        const remove = async () => {
+          const client = clientForQueryClient(queryClient)
+          for (const target of targets) {
+            await deletePath(target.path, target.isDirectory, client)
+          }
+        }
         if (!workspaceEdits) return remove()
-        return workspaceEdits.runWorkspaceMutation([target.path], remove)
+        return workspaceEdits.runWorkspaceMutation(
+          targets.map((target) => target.path),
+          remove,
+        )
       },
     })
     if (outcome.ok || outcome.reason !== 'transport') {
@@ -275,15 +293,15 @@ export function useFsActions({
   }
 
   function confirmDelete() {
-    const target = deleteTarget
+    const targets = deleteTargets
     const runtime = fileOperations()
-    if (!target || !mutationsEnabled || !runtime) return
+    if (targets.length === 0 || !mutationsEnabled || !runtime) return
 
     if (deletePermanently) {
-      void deleteForever(target)
+      void deleteForever(targets)
       return
     }
-    void deleteJournaled(target, runtime)
+    void deleteJournaled(targets, runtime)
   }
 
   const actions: TreeFsActions = {
@@ -306,7 +324,13 @@ export function useFsActions({
       if (!mutationsEnabled) return
       setDeleteError(null)
       setDeletePermanently(false)
-      setDeleteTarget(target)
+      setDeleteTargets([target])
+    },
+    requestDeleteMany: (targets) => {
+      if (!mutationsEnabled || targets.length === 0) return
+      setDeleteError(null)
+      setDeletePermanently(false)
+      setDeleteTargets(targets)
     },
   }
 
@@ -322,7 +346,7 @@ export function useFsActions({
       onCancel: closeDeleteDialog,
       onConfirm: confirmDelete,
       permanent: deletePermanently,
-      target: deleteTarget,
+      targets: deleteTargets,
     },
   }
 }

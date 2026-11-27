@@ -37,6 +37,36 @@
   gap: 0.375rem;
 }
 
+[data-file-tree] .wb-tree:hover .wb-tree-guide:nth-child(6n + 1),
+[data-file-tree] .wb-tree-guide[data-active-guide='true']:nth-child(6n + 1) {
+  background: var(--tree-guide-1);
+}
+
+[data-file-tree] .wb-tree:hover .wb-tree-guide:nth-child(6n + 2),
+[data-file-tree] .wb-tree-guide[data-active-guide='true']:nth-child(6n + 2) {
+  background: var(--tree-guide-2);
+}
+
+[data-file-tree] .wb-tree:hover .wb-tree-guide:nth-child(6n + 3),
+[data-file-tree] .wb-tree-guide[data-active-guide='true']:nth-child(6n + 3) {
+  background: var(--tree-guide-3);
+}
+
+[data-file-tree] .wb-tree:hover .wb-tree-guide:nth-child(6n + 4),
+[data-file-tree] .wb-tree-guide[data-active-guide='true']:nth-child(6n + 4) {
+  background: var(--tree-guide-4);
+}
+
+[data-file-tree] .wb-tree:hover .wb-tree-guide:nth-child(6n + 5),
+[data-file-tree] .wb-tree-guide[data-active-guide='true']:nth-child(6n + 5) {
+  background: var(--tree-guide-5);
+}
+
+[data-file-tree] .wb-tree:hover .wb-tree-guide:nth-child(6n + 6),
+[data-file-tree] .wb-tree-guide[data-active-guide='true']:nth-child(6n + 6) {
+  background: var(--tree-guide-6);
+}
+
 @keyframes file-tree-loading-shimmer {
   from {
     background-position:

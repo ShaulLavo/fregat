@@ -17,7 +17,7 @@ export function DeleteEntryDialog({
   onCancel,
   onConfirm,
   permanent,
-  target,
+  targets,
 }: {
   readonly deleting: boolean
   readonly error: string | null
@@ -25,14 +25,19 @@ export function DeleteEntryDialog({
   readonly onCancel: () => void
   readonly onConfirm: () => void
   readonly permanent: boolean
-  readonly target: DeleteTarget | null
+  readonly targets: readonly DeleteTarget[]
 }) {
+  const single = targets.length === 1 ? (targets[0] ?? null) : null
+  const title = single
+    ? `Delete ${single.isDirectory ? 'folder' : 'file'}`
+    : `Delete ${targets.length} items`
+
   return (
-    <Dialog onOpenChange={(open) => open || onCancel()} open={target !== null}>
+    <Dialog onOpenChange={(open) => open || onCancel()} open={targets.length > 0}>
       <ActionDialogContent
-        title={<>Delete {target?.isDirectory ? 'folder' : 'file'}</>}
-        description={deleteDescription(target, permanent)}
-        path={target?.path}
+        title={title}
+        description={deleteDescription(targets, permanent)}
+        path={single?.path}
         error={error}
         pending={deleting}
         onCancel={onCancel}
@@ -55,7 +60,15 @@ export function DeleteEntryDialog({
   )
 }
 
-function deleteDescription(target: DeleteTarget | null, permanent: boolean) {
+function deleteDescription(targets: readonly DeleteTarget[], permanent: boolean) {
+  if (targets.length === 0) return ''
+  if (targets.length > 1) {
+    if (permanent) {
+      return `${targets.length} selected items are too large to keep for undo. Delete them permanently? This cannot be undone.`
+    }
+    return `Delete ${targets.length} selected items? Ctrl+Z in the file tree brings them back.`
+  }
+  const target = targets[0]
   if (!target) return ''
   const subject = target.isDirectory ? `${target.name} and everything inside it` : target.name
   if (permanent) {

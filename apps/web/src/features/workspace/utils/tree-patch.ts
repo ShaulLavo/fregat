@@ -33,7 +33,11 @@ export type TreePatch =
       readonly to: string
       readonly isFolder: boolean
     }
-  | { readonly kind: 'delete'; readonly rootPath: FilesystemPath; readonly treePath: string }
+  | {
+      readonly kind: 'delete'
+      readonly rootPath: FilesystemPath
+      readonly treePaths: readonly string[]
+    }
 
 /** The model the server will hand back once the change has landed. */
 export function applyTreePatch(model: TreeModel, patch: TreePatch): TreeModel {
@@ -45,7 +49,7 @@ export function applyTreePatch(model: TreeModel, patch: TreePatch): TreeModel {
     case 'duplicate':
       return withCopiedEntries(model, patch)
     case 'delete':
-      return withoutEntry(model, patch.treePath)
+      return withoutEntries(model, patch.treePaths)
   }
 }
 
@@ -58,8 +62,9 @@ export function treePatchResources(patch: TreePatch): string[] {
 export function treePatchPaths(patch: TreePatch): string[] {
   switch (patch.kind) {
     case 'create':
-    case 'delete':
       return [patch.treePath]
+    case 'delete':
+      return Array.from(patch.treePaths)
     case 'move':
       return patch.moves.flatMap((move) => [move.fromTreePath, move.toTreePath])
     case 'duplicate':
@@ -84,7 +89,7 @@ export function treePatchConfirmed(model: TreeModel, patch: TreePatch): boolean 
     case 'duplicate':
       return destinationSettled(model, patch.to)
     case 'delete':
-      return !hasEntry(model, patch.treePath)
+      return patch.treePaths.every((treePath) => !hasEntry(model, treePath))
   }
 }
 
@@ -137,20 +142,24 @@ function withCopiedEntries(
   return next
 }
 
-function withoutEntry(model: TreeModel, treePath: string): TreeModel {
-  const canonicalPath = canonicalTreePath(treePath)
-  if (!model.entriesByTreePath.has(canonicalPath)) return model
+function withoutEntries(model: TreeModel, treePaths: readonly string[]): TreeModel {
+  const canonicalPaths = treePaths
+    .map(canonicalTreePath)
+    .filter((path) => model.entriesByTreePath.has(path))
+  if (canonicalPaths.length === 0) return model
 
   const next = cloneModel(model)
   for (const path of model.entriesByTreePath.keys()) {
-    if (!isSelfOrChild(path, canonicalPath)) continue
+    if (!canonicalPaths.some((dir) => isSelfOrChild(path, dir))) continue
 
     next.entriesByTreePath.delete(path)
     next.loadedDirectoryPaths.delete(path)
     next.loadingDirectoryPaths.delete(path)
     next.errorByDirectoryPath.delete(path)
   }
-  next.paths = next.paths.filter((path) => !isSelfOrChild(canonicalTreePath(path), canonicalPath))
+  next.paths = next.paths.filter(
+    (path) => !canonicalPaths.some((dir) => isSelfOrChild(canonicalTreePath(path), dir)),
+  )
   return next
 }
 

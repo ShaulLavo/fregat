@@ -25,6 +25,13 @@ test('tree lazily expands directories and resolves paths against its project roo
     expect(tree.controller.getVisibleRows(0, 10).map((row) => row.path)).toContain('.hidden')
     tree.controller.setSearch('main')
     expect(tree.controller.getVisibleRows(0, 10).map((row) => row.path)).toContain('src/main.ts')
+    expect(tree.controller.getFocusedPath()).toBe('src/')
+    tree.controller.setSearch('nonexistent')
+    expect(tree.controller.getVisibleRows(0, 10)).toEqual([])
+    expect(tree.controller.getFocusedPath()).toBeNull()
+    expect(tree.controller.getFocusedItem()).toBeNull()
+    tree.controller.setSearch('main.ts')
+    expect(tree.controller.getFocusedPath()).toBe('src/')
   } finally {
     tree.dispose()
     session.dispose()

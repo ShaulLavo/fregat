@@ -1,8 +1,12 @@
 import '@/features/workspace/components/tree-pane.css'
 
 import { WarningCircleIcon } from '@phosphor-icons/react'
-import { ancestorsOf, FileTreeModel } from '@shaulavo/workbench-tree'
-import { FileTreeView, type FileTreeViewHandle } from '@shaulavo/workbench-tree/react'
+import { ancestorsOf, FileTreeModel, topLevelPaths } from '@shaulavo/workbench-tree'
+import {
+  FileTreeView,
+  type FileTreeKeyboardCommand,
+  type FileTreeViewHandle,
+} from '@shaulavo/workbench-tree/react'
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
@@ -52,6 +56,7 @@ import {
   visibleTreeItemCount,
 } from '@/features/workspace/utils/tree-pane-state'
 import { useWatchCoverage } from '@/hooks/use-watch-coverage'
+import { useKeymapNode } from '@/keymap/hooks/use-keymap-node'
 import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
@@ -69,6 +74,11 @@ import { treePathForSelectedPath, type TreeModel, type TreePathMove } from '@/li
 
 const EMPTY_GIT_STATUS: readonly TreeGitStatusEntry[] = []
 const EMPTY_LOADING_PATHS: ReadonlySet<string> = new Set()
+const EXTERNAL_TREE_COMMANDS: ReadonlySet<FileTreeKeyboardCommand> = new Set([
+  'rename',
+  'selectAll',
+  'toggleMark',
+])
 
 export const TreePane = memo(
   ({
@@ -383,6 +393,41 @@ function ReadyTreePane({
     return hostRef.current
   }
 
+  function isTreeCommandBlocked() {
+    if (contextMenu.anchor !== null) return true
+    if (tree.getSnapshot().draft !== undefined) return true
+    const active = document.activeElement
+    return active instanceof HTMLElement && active.closest('input, textarea') !== null
+  }
+
+  useKeymapNode({
+    area: 'file-tree',
+    context: 'TreeSelection',
+    element: () => hostRef.current,
+    commands: {
+      'fileTree.selectAll': () => {
+        if (isTreeCommandBlocked()) return false
+        if (!tree.getSnapshot().focusedPath) return false
+        tree.selectAll()
+        return true
+      },
+      'fileTree.toggleMark': () => {
+        if (isTreeCommandBlocked()) return false
+        const focused = tree.getSnapshot().focusedPath
+        if (!focused) return false
+        tree.select(focused, 'toggle', 'keyboard')
+        return true
+      },
+      'fileTree.rename': () => {
+        if (!actionsRef.current.mutationsEnabled || isTreeCommandBlocked()) return false
+        const focused = tree.getSnapshot().focusedPath
+        if (!focused) return false
+        actionsRef.current.renameEntry(focused)
+        return true
+      },
+    },
+  })
+
   const loadingPaths = loadingTreePath ? new Set([loadingTreePath]) : EMPTY_LOADING_PATHS
 
   return (
@@ -405,6 +450,7 @@ function ReadyTreePane({
           canDropTreePaths(modelRef.current, sources, destinationDir)
         }
         className='h-full'
+        externalCommands={EXTERNAL_TREE_COMMANDS}
         filterPlaceholder='Filter files'
         handleRef={treeHandleRef}
         iconPreset='rich'
@@ -443,16 +489,19 @@ function ReadyTreePane({
           )
         }}
         onRequestDelete={(paths) => {
-          const first = paths[0]
-          if (!first) return
-          const canonical = canonicalTreePath(first)
-          const entry = modelRef.current.entriesByTreePath.get(canonical)
-          if (!entry) return
-          fsActions.actions.requestDelete({
-            isDirectory: isDirectoryEntry(entry),
-            name: entryName(canonical),
-            path: entry.path,
-          })
+          const targets = topLevelPaths(paths.map(canonicalTreePath))
+            .map((canonical) => {
+              const entry = modelRef.current.entriesByTreePath.get(canonical)
+              if (!entry) return null
+              return {
+                isDirectory: isDirectoryEntry(entry),
+                name: entryName(canonical),
+                path: entry.path,
+              }
+            })
+            .filter((target) => target !== null)
+          if (targets.length === 0) return
+          fsActions.actions.requestDeleteMany(targets)
         }}
         onRowElementChange={(path, element) => rowElements.register(path, element)}
         onScrollTopChange={(top) => {
@@ -655,6 +704,11 @@ const treeStyle = {
   '--wb-row-selected-bg': 'var(--row-selected)',
   '--wb-tree-font-family': 'var(--workbench-tree-font-family)',
   '--wb-tree-font-size': 'var(--workbench-tree-font-size)',
+  '--wb-tree-guide': 'var(--tree-guide)',
+  '--wb-tree-guide-active': 'var(--tree-guide-1)',
+  '--wb-tree-guide-active-opacity': 'var(--tree-guide-active-opacity)',
+  '--wb-tree-guide-hover-opacity': 'var(--tree-guide-hover-opacity)',
+  '--wb-tree-guide-opacity': 'var(--tree-guide-opacity)',
   '--wb-tree-indent': 'var(--workbench-tree-level-gap)',
   height: '100%',
 } as CSSProperties

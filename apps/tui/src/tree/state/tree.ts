@@ -29,6 +29,20 @@ function entryRows(model: FileTreeModel): readonly TreeEntryRow[] {
   return model.getSnapshot().rows.filter((row): row is TreeEntryRow => row.type === 'entry')
 }
 
+function reconcileTuiFocus(model: FileTreeModel) {
+  const rows = entryRows(model)
+  const focused = model.getSnapshot().focusedPath
+  if (focused && rows.some((row) => row.path === focused)) return
+  const first = rows[0]
+  model.setFocusedPath(first ? first.path : undefined, 'keyboard')
+}
+
+function visibleFocusedRow(model: FileTreeModel): TreeEntryRow | null {
+  const focused = model.getSnapshot().focusedPath
+  if (!focused) return null
+  return entryRows(model).find((row) => row.path === focused) ?? null
+}
+
 function createTuiTreeController(model: FileTreeModel) {
   function navigate(key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'Home' | 'End') {
     const snap = model.getSnapshot()
@@ -58,22 +72,18 @@ function createTuiTreeController(model: FileTreeModel) {
       return index >= 0 ? index : 0
     },
     getFocusedPath(): string | null {
-      const focused = model.getSnapshot().focusedPath
-      if (!focused) return null
-      const kind = model.index.getKind(focused)
-      if (!kind) return null
-      return toTuiPath(focused, kind)
+      const row = visibleFocusedRow(model)
+      if (!row) return null
+      return toTuiPath(row.path, row.kind)
     },
     getFocusedItem() {
-      const focused = model.getSnapshot().focusedPath
-      if (!focused) return null
-      const kind = model.index.getKind(focused)
-      if (!kind) return null
-      if (kind !== 'directory') return { isDirectory: () => false as const }
+      const row = visibleFocusedRow(model)
+      if (!row) return null
+      if (row.kind !== 'directory') return { isDirectory: () => false as const }
       return {
         isDirectory: () => true as const,
-        isExpanded: () => model.getSnapshot().expanded.has(focused),
-        collapse: () => model.setExpanded(focused, false),
+        isExpanded: () => row.expanded,
+        collapse: () => model.setExpanded(row.path, false),
       }
     },
     focusPath(path: string) {
@@ -88,6 +98,7 @@ function createTuiTreeController(model: FileTreeModel) {
     focusParentItem: () => navigate('ArrowLeft'),
     setSearch(value: string | null) {
       model.setFilter(value ?? '')
+      reconcileTuiFocus(model)
     },
     getSearchValue() {
       return model.getSnapshot().filter

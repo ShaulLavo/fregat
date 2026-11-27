@@ -156,7 +156,7 @@ test('journals create, rename, duplicate and delete as one undoable operation ea
       path: filesystemPath('repo/delete.ts'),
     })
   })
-  await waitFor(() => expect(harness.result.current.deleteDialog.target).not.toBeNull())
+  await waitFor(() => expect(harness.result.current.deleteDialog.targets).toHaveLength(1))
   await runJournaled(harness, 4, () => harness.result.current.deleteDialog.onConfirm())
 
   const history = await harness.history()
@@ -284,7 +284,7 @@ test('a delete too large to undo asks again before deleting permanently', async 
   act(() => harness.result.current.deleteDialog.onConfirm())
   await waitFor(() => expect(harness.result.current.deleteDialog.permanent).toBe(true))
   await expect(readContent('repo/big/small.ts')).resolves.toBe('small\n')
-  expect(harness.result.current.deleteDialog.target).not.toBeNull()
+  expect(harness.result.current.deleteDialog.targets).toHaveLength(1)
 
   act(() => harness.result.current.deleteDialog.onConfirm())
   await waitFor(async () => expect(await treePaths('repo')).not.toContain('repo/big'))

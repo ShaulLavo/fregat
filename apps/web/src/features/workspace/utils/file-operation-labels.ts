@@ -24,6 +24,9 @@ export function duplicateLabel(from: FilesystemPath): string {
   return `Duplicate ${basename(from)}`
 }
 
-export function deleteLabel(path: FilesystemPath): string {
-  return `Delete ${basename(path)}`
+export function deleteLabel(paths: readonly FilesystemPath[]): string {
+  const first = paths[0]
+  if (!first) return 'Delete'
+  if (paths.length > 1) return `Delete ${paths.length} items`
+  return `Delete ${basename(first)}`
 }
