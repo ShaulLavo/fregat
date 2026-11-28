@@ -1,6 +1,6 @@
-import { type EditorSyntaxLanguageId } from '@singapore-editor/core/syntax'
+import type { EditorSyntaxLanguageId } from '@singapore-editor/core/syntax'
 import { createEditorLoggingPlugin, type EditorLogEvent } from '@singapore-editor/core/logging'
-import { type EditorPlugin } from '@singapore-editor/core/extensions'
+import type { EditorPlugin } from '@singapore-editor/core/extensions'
 import {
   createBracketMatchPlugin,
   createDocumentLinkPlugin,

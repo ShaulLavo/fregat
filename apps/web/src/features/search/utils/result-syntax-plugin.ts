@@ -1,4 +1,4 @@
-import { type TextReadSnapshot } from '@singapore-editor/core/document'
+import type { TextReadSnapshot } from '@singapore-editor/core/document'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxLanguageId,
@@ -8,7 +8,7 @@ import {
   type EditorToken,
   type EditorTokenInput,
 } from '@singapore-editor/core/syntax'
-import { type EditorPlugin } from '@singapore-editor/core/extensions'
+import type { EditorPlugin } from '@singapore-editor/core/extensions'
 import {
   createEditorStructuralOperation,
   type EditorStructuralOperationContext,

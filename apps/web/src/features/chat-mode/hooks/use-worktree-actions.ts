@@ -1,4 +1,4 @@
-import { type ClientOrchestrationCommand, type ScopedWorktreeRef } from '@workspace/contracts'
+import type { ClientOrchestrationCommand, ScopedWorktreeRef } from '@workspace/contracts'
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import { dispatchCommandForEnvironment } from '@/features/chat/state/active-transports'

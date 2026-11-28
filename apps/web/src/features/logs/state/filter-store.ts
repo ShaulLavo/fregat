@@ -7,7 +7,7 @@ import { createStore } from 'zustand/vanilla'
 
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { defaultLogsFilterState, logsFilterDefaults } from '@/features/logs/utils/filter-params'
-import { type LogsFilterState } from '@workspace/client-core/logs/filters'
+import type { LogsFilterState } from '@workspace/client-core/logs/filters'
 
 /**
  * `null` means "nobody has touched the filters". Storing a snapshot of the defaults instead would

@@ -13,11 +13,8 @@ import {
   createEditorTextBuffer,
   pieceTableDocumentText,
 } from '@singapore-editor/core/document'
-import { type EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
-import {
-  type EditorDocumentAnalysis,
-  type EditorPreparedDocument,
-} from '@singapore-editor/core/editor'
+import type { EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
+import type { EditorDocumentAnalysis, EditorPreparedDocument } from '@singapore-editor/core/editor'
 import type { FileResult } from '@/lib/file-system-types'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'

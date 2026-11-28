@@ -1,5 +1,5 @@
 import type { ChatSelection } from '@/lib/chat-selection'
-import { type EnvironmentId, type ProjectId, type SessionId } from '@workspace/contracts'
+import type { EnvironmentId, ProjectId, SessionId } from '@workspace/contracts'
 import {
   chatReferenceForToken,
   tokenForChatReference,
