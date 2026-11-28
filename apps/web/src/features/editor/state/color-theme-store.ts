@@ -15,7 +15,7 @@ import {
   type BuiltinEditorThemeDefinition,
 } from '@/lib/code-theme/utils/catalog'
 import { shikiThemeContentHash } from '@/lib/code-theme/utils/content-hash'
-import { themeRegistrationQueryOptions } from '@/lib/code-theme/state/registration-query'
+import { themeRegistrationQueryOptions } from '@/lib/code-theme/utils/registration-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { codeThemeQueryKeys } from '@/lib/code-theme/utils/query-keys'
 import { editorQueryKeys } from '@/features/editor/utils/query-keys'

@@ -1,6 +1,6 @@
 import { act } from 'react'
 
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { writeSettings } from '@workspace/client-core/settings/write'
 import { createInProcessClient } from '../../../test/client'
 import { createTestSettingsSession } from '../../../test/factories/session'

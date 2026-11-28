@@ -2,7 +2,7 @@ import { act } from 'react'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { runPaletteCommand } from '../../../test/actions'
 import { createTestSettingsSession } from '../../../test/factories/session'
 import { test, expect } from '../../../test/fixtures'

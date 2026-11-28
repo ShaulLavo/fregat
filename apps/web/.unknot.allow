@@ -1,28 +1,9 @@
 # Structure debt that existed when this project adopted unknot.
 # Remove each entry as its finding is fixed.
 # rules: field-leak forward-ref import-cycle import-cycle-edge long-file module-cycle module-cycle-edge prop-drilling shallow-module tangle wide-directory wide-injection
-import-cycle src/keymap/menus/components/item-row.tsx <-> src/keymap/menus/components/section.tsx
-import-cycle-edge src/keymap/menus/components/item-row.tsx -> src/keymap/menus/components/section.tsx
-import-cycle-edge src/keymap/menus/components/section.tsx -> src/keymap/menus/components/item-row.tsx
-import-cycle-edge src/lib/client-error-taxonomy.ts -> src/lib/clipboard.ts
-import-cycle-edge src/lib/client-error-taxonomy.ts -> src/lib/toast-error.ts
-import-cycle-edge src/lib/clipboard.ts -> src/lib/environments/state/query-clients.ts
-import-cycle-edge src/lib/environments/state/query-clients.ts -> src/lib/file-snapshot-query-cache.ts
-import-cycle-edge src/lib/file-server.ts -> src/lib/structured-errors.ts
-import-cycle-edge src/lib/file-snapshot-query-cache.ts -> src/lib/environments/state/query-clients.ts
-import-cycle-edge src/lib/file-snapshot-query-cache.ts -> src/lib/file-server.ts
-import-cycle-edge src/lib/fix-with-agent.ts -> src/lib/clipboard.ts
-import-cycle-edge src/lib/fix-with-agent.ts -> src/state/navigation-binding.ts
-import-cycle-edge src/lib/structured-errors.ts -> src/lib/client-error-taxonomy.ts
-import-cycle-edge src/lib/toast-error.ts -> src/lib/fix-with-agent.ts
-import-cycle-edge src/state/navigation-binding.ts -> src/lib/structured-errors.ts
 long-file src/features/editor/state/workspace-document-service.ts
 long-file src/features/editor/state/workspace-edit-service.ts
-long-file src/lib/file-open-intent/state/service.ts
 module-cycle src/components <-> src/components/pdf-viewer <-> src/features/address/state <-> src/features/address/utils <-> src/features/chat-mode/components <-> src/features/chat-mode/hooks <-> src/features/chat-mode/providers <-> src/features/chat-mode/state <-> src/features/chat-mode/transport <-> src/features/chat-mode/utils <-> src/features/chat/components <-> src/features/chat/hooks <-> src/features/chat/providers <-> src/features/chat/state <-> src/features/chat/transport <-> src/features/chat/utils <-> src/features/command-palette/utils <-> src/features/editor/components <-> src/features/editor/hooks <-> src/features/editor/providers <-> src/features/editor/state <-> src/features/editor/utils <-> src/features/environments/components <-> src/features/environments/hooks <-> src/features/file-picker/components <-> src/features/file-picker/hooks <-> src/features/file-picker/state <-> src/features/file-picker/utils <-> src/features/git/components <-> src/features/git/hooks <-> src/features/git/providers <-> src/features/git/state <-> src/features/git/utils <-> src/features/logs/components <-> src/features/logs/hooks <-> src/features/logs/state <-> src/features/logs/utils <-> src/features/onboarding/components <-> src/features/onboarding/hooks <-> src/features/onboarding/utils <-> src/features/search/components <-> src/features/search/hooks <-> src/features/search/state <-> src/features/search/utils <-> src/features/server-update/components <-> src/features/server-update/hooks <-> src/features/server-update/state <-> src/features/server-update/utils <-> src/features/settings/components <-> src/features/settings/hooks <-> src/features/settings/providers <-> src/features/settings/state <-> src/features/settings/utils <-> src/features/terminal/components <-> src/features/terminal/hooks <-> src/features/terminal/state <-> src/features/terminal/utils <-> src/features/workbench/components <-> src/features/workbench/hooks <-> src/features/workbench/providers <-> src/features/workbench/state <-> src/features/workbench/utils <-> src/features/workspace/components <-> src/features/workspace/hooks <-> src/features/workspace/state <-> src/features/workspace/utils <-> src/hooks <-> src/keymap <-> src/keymap/hooks <-> src/keymap/menus/components <-> src/keymap/menus/hooks <-> src/keymap/menus/utils <-> src/keymap/providers <-> src/keymap/state <-> src/keymap/utils <-> src/lib <-> src/lib/file-open-intent/hooks <-> src/lib/intent-prefetch/hooks <-> src/lib/markdown-mode/hooks <-> src/providers <-> src/state
-module-cycle src/lib/code-theme/state <-> src/lib/highlighting/state
-module-cycle src/lib/environments/state <-> src/lib/environments/utils
-module-cycle src/lib/keep-alive/components <-> src/lib/keep-alive/hooks <-> src/lib/keep-alive/providers
 module-cycle-edge src/components -> src/features/chat-mode/components
 module-cycle-edge src/components -> src/features/chat-mode/hooks
 module-cycle-edge src/components -> src/features/chat-mode/state
@@ -530,15 +511,8 @@ module-cycle-edge src/keymap/state -> src/keymap/utils
 module-cycle-edge src/keymap/state -> src/lib
 module-cycle-edge src/keymap/utils -> src/lib
 module-cycle-edge src/lib -> src/state
-module-cycle-edge src/lib/code-theme/state -> src/lib/highlighting/state
-module-cycle-edge src/lib/environments/state -> src/lib/environments/utils
-module-cycle-edge src/lib/environments/utils -> src/lib/environments/state
 module-cycle-edge src/lib/file-open-intent/hooks -> src/hooks
-module-cycle-edge src/lib/highlighting/state -> src/lib/code-theme/state
 module-cycle-edge src/lib/intent-prefetch/hooks -> src/hooks
-module-cycle-edge src/lib/keep-alive/components -> src/lib/keep-alive/hooks
-module-cycle-edge src/lib/keep-alive/hooks -> src/lib/keep-alive/providers
-module-cycle-edge src/lib/keep-alive/providers -> src/lib/keep-alive/components
 module-cycle-edge src/lib/markdown-mode/hooks -> src/hooks
 module-cycle-edge src/providers -> src/components
 module-cycle-edge src/providers -> src/features/chat-mode/utils
@@ -572,14 +546,6 @@ module-cycle-edge src/state -> src/features/workspace/state
 module-cycle-edge src/state -> src/features/workspace/utils
 module-cycle-edge src/state -> src/keymap/state
 module-cycle-edge src/state -> src/lib
-prop-drilling src/features/file-picker/components/places-sheet.tsx#PlacesSheet.currentPath
-prop-drilling src/features/file-picker/components/places-sidebar.tsx#PlacesSidebar.currentPath
-prop-drilling src/features/search/components/result-editor-surface.tsx#SearchResultEditorSurface.canReplace
-prop-drilling src/features/search/components/result-editor-surface.tsx#SearchResultEditorSurface.replaceVisible
-prop-drilling src/features/search/components/results-view.tsx#SearchResultsView.query
-prop-drilling src/features/workbench/components/layout.tsx#WorkbenchLayout.conflicts
-prop-drilling src/features/workbench/components/layout.tsx#WorkbenchLayout.gitFiles
-prop-drilling src/features/workbench/components/layout.tsx#WorkbenchLayout.rootPath
 wide-directory src/components
 wide-directory src/features/chat-mode/components
 wide-directory src/features/chat/components

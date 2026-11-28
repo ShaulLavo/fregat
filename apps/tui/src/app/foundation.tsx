@@ -3,7 +3,7 @@ import { agentHome } from '@/agent/utils/target'
 import { rememberedAgent } from '@/agent/utils/location'
 import type { Location } from '@/navigation/state/history'
 import { CommandProvider } from '@/commands/providers/command-provider'
-import { Workspace } from '@/components/workspace'
+import { Workspace } from '@/app/workspace'
 import { connectionFailure } from '@/connection/utils/failure'
 import type { SessionState, SettingsSession } from '@/connection/state/session'
 import { recentCommands } from '@/storage/recent-commands-policy'
@@ -14,6 +14,7 @@ import { useState } from 'react'
 import { createHistory } from '@/navigation/state/history'
 import { rememberedWorkbench } from '@/workbench/utils/location'
 import { Toast } from '@/components/toast'
+import { TextEditor } from '@/editor/components/editor'
 import { EditorProvider } from '@/editor/providers/editor-provider'
 import { Status } from '@/components/status'
 import { SyncNotice } from '@/settings/components/sync-notice'
@@ -60,7 +61,11 @@ export function Foundation({
       }}
     >
       <SyncNotice owner={state.owner} theme={theme} />
-      <EditorProvider theme={theme}>
+      <EditorProvider
+        renderEditor={(request, onComplete) => (
+          <TextEditor request={request} theme={theme} onComplete={onComplete} />
+        )}
+      >
         <Workspace session={session} state={state} theme={theme} history={history} />
       </EditorProvider>
       {failure && (

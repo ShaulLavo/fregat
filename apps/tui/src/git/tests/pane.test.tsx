@@ -1,5 +1,5 @@
 import { act } from 'react'
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { test, expect } from '../../../test/fixtures'
 import { renderTui } from '../../../test/render'
 import { createTestSettingsSession } from '../../../test/factories/session'

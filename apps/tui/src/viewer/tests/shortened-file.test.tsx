@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises'
 import { act } from 'react'
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { rememberWorkbench } from '@/workbench/utils/location'
 import { test, expect } from '../../../test/fixtures'
 import { renderTui } from '../../../test/render'

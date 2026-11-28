@@ -2,7 +2,9 @@ import { ClockCounterClockwiseIcon } from '@phosphor-icons/react'
 
 import type { EntriesLoadState } from '@/features/file-picker/utils/model'
 
-import { RecentShortcutList } from '@/features/file-picker/components/recent-shortcut-list'
+import { RecentShortcut } from '@/features/file-picker/components/recent-shortcut'
+import { RecentSidebarNote } from '@/features/file-picker/components/recent-sidebar-note'
+import { RecentsLoading } from '@/features/file-picker/components/recents-loading'
 
 export function RecentSidebarSection({
   currentPath,
@@ -17,7 +19,27 @@ export function RecentSidebarSection({
         <ClockCounterClockwiseIcon className='size-(--icon-size-sm)' />
         Recent
       </div>
-      <RecentShortcutList currentPath={currentPath} state={state} />
+      {recentShortcuts(currentPath, state)}
+    </div>
+  )
+}
+
+function recentShortcuts(currentPath: string, state: EntriesLoadState) {
+  if (state.status === 'loading') {
+    return <RecentsLoading />
+  }
+  if (state.status === 'error') return <RecentSidebarNote>Could not load</RecentSidebarNote>
+  if (state.status === 'ready' && state.data.length === 0) {
+    return <RecentSidebarNote>No recent items</RecentSidebarNote>
+  }
+
+  const entries = state.status === 'ready' ? state.data : []
+
+  return (
+    <div className='space-y-0.5'>
+      {entries.map((entry) => (
+        <RecentShortcut currentPath={currentPath} entry={entry} key={entry.path} />
+      ))}
     </div>
   )
 }

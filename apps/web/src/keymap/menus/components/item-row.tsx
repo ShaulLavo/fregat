@@ -6,40 +6,19 @@ import {
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
   ContextMenuShortcut,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
 } from '@workspace/ui/components/context-menu'
-
-import { MenuSection } from './section'
 
 export function MenuItemRow({
   item,
   onInvoke,
 }: {
-  readonly item: ResolvedMenuItem
+  readonly item: Exclude<ResolvedMenuItem, { kind: 'submenu' }>
   readonly onInvoke: (
     item: ResolvedMenuItem,
     value?: string,
     invocation?: ResolvedMenuInvocation,
   ) => void
 }) {
-  if (item.kind === 'submenu') {
-    return (
-      <ContextMenuSub>
-        <ContextMenuSubTrigger disabled={item.disabled}>
-          {item.icon ? <item.icon /> : null}
-          <span>{item.label}</span>
-        </ContextMenuSubTrigger>
-        <ContextMenuSubContent>
-          {item.sections.map((entry, index) => (
-            <MenuSection index={index} key={entry.id} onInvoke={onInvoke} section={entry} />
-          ))}
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-    )
-  }
-
   if (item.kind === 'checkbox') {
     return (
       <ContextMenuCheckboxItem

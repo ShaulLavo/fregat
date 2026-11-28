@@ -9,7 +9,8 @@ import {
 } from '@workspace/client-core/optimistic/run'
 
 import type { FilesystemPath } from '@/lib/documents/utils/types'
-import { reportError, toClientError } from '@/lib/client-error-taxonomy'
+import { toClientError } from '@/lib/client-error-taxonomy'
+import { reportError } from '@/lib/client-error-feedback'
 import { log } from '@/lib/client-logging'
 import { watchIntentHolds } from '@/lib/optimistic/hold-diagnostics'
 import { fileSystemKeys } from '@/lib/query-keys'

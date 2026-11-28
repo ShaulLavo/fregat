@@ -1,7 +1,7 @@
 import { effectiveTerminalBindings } from '@/commands/utils/bindings'
 import { recordedSettingOperation } from '@/settings/utils/recording'
 import { act } from 'react'
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { createTestSettingsSession } from '../../../test/factories/session'
 import { test, expect } from '../../../test/fixtures'
 import { renderTui } from '../../../test/render'

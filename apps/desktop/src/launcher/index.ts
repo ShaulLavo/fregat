@@ -48,32 +48,35 @@ process.once('SIGTERM', stop)
 try {
   await start()
 } catch (error) {
-  if (!controller.signal.aborted) {
-    reportStartFailure(error, {
-      log: (facts) => recordDesktopError('desktop.start_failed', facts),
-      stderr: (line) => console.error(line),
-      exit: (code) => {
-        process.exitCode = code
-      },
-    })
-    await flushDesktopObservability()
-    try {
-      await showStartFailure(error, {
-        binary,
-        signal: controller.signal,
-        budget: helperBudget,
-        logDir: observability.config.logDir,
-      })
-    } catch (messageError) {
-      if (!controller.signal.aborted)
-        recordDesktopError('desktop.start_message_failed', launcherFailureFacts(messageError))
-    }
-  }
+  await handleStartFailure(error)
 } finally {
   await window?.close()
   await flushDesktopObservability()
   process.removeListener('SIGINT', stop)
   process.removeListener('SIGTERM', stop)
+}
+
+async function handleStartFailure(error: unknown) {
+  if (controller.signal.aborted) return
+  reportStartFailure(error, {
+    log: (facts) => recordDesktopError('desktop.start_failed', facts),
+    stderr: (line) => console.error(line),
+    exit: (code) => {
+      process.exitCode = code
+    },
+  })
+  await flushDesktopObservability()
+  try {
+    await showStartFailure(error, {
+      binary,
+      signal: controller.signal,
+      budget: helperBudget,
+      logDir: observability.config.logDir,
+    })
+  } catch (messageError) {
+    if (!controller.signal.aborted)
+      recordDesktopError('desktop.start_message_failed', launcherFailureFacts(messageError))
+  }
 }
 
 async function start() {
@@ -149,38 +152,14 @@ async function start() {
   for (const candidate of candidates) {
     controller.signal.throwIfAborted()
     if (candidate.kind === 'webview') {
-      try {
-        window = await openNative()
-      } catch (error) {
-        if (controller.signal.aborted) throw error
-        recordDesktopInfo('desktop.browser.rejected', {
-          engine: process.platform === 'darwin' ? 'wkwebview' : 'webkitgtk',
-          ...launcherFailureFacts(error),
-        })
-        continue
-      }
+      const native = await tryNativeWindow(openNative)
+      if (!native) continue
+      window = native
       await window.exited
       return
     }
     if (candidate.kind === 'tab') {
-      recordDesktopInfo('desktop.window.degraded', {
-        engine: 'tab',
-        reason: 'controlled-browser-unavailable',
-      })
-      const child = Bun.spawn({
-        cmd: [process.platform === 'darwin' ? '/usr/bin/open' : 'xdg-open', web],
-        stdio: ['ignore', 'ignore', 'ignore'],
-      })
-      const stopOpener = () => child.kill('SIGTERM')
-      controller.signal.addEventListener('abort', stopOpener, { once: true })
-      try {
-        if ((await child.exited) !== 0)
-          throw launcherErrors.LAUNCH_FAILED({
-            internal: { reason: 'tab-opener-exit', exitCode: child.exitCode },
-          })
-      } finally {
-        controller.signal.removeEventListener('abort', stopOpener)
-      }
+      await openBrowserTab(web)
       return
     }
     try {
@@ -220,6 +199,39 @@ async function start() {
       })
       throw error
     }
+  }
+}
+
+async function tryNativeWindow(openNative: () => ReturnType<typeof launchWebview>) {
+  try {
+    return await openNative()
+  } catch (error) {
+    if (controller.signal.aborted) throw error
+    recordDesktopInfo('desktop.browser.rejected', {
+      engine: process.platform === 'darwin' ? 'wkwebview' : 'webkitgtk',
+      ...launcherFailureFacts(error),
+    })
+  }
+}
+
+async function openBrowserTab(web: string) {
+  recordDesktopInfo('desktop.window.degraded', {
+    engine: 'tab',
+    reason: 'controlled-browser-unavailable',
+  })
+  const child = Bun.spawn({
+    cmd: [process.platform === 'darwin' ? '/usr/bin/open' : 'xdg-open', web],
+    stdio: ['ignore', 'ignore', 'ignore'],
+  })
+  const stopOpener = () => child.kill('SIGTERM')
+  controller.signal.addEventListener('abort', stopOpener, { once: true })
+  try {
+    if ((await child.exited) !== 0)
+      throw launcherErrors.LAUNCH_FAILED({
+        internal: { reason: 'tab-opener-exit', exitCode: child.exitCode },
+      })
+  } finally {
+    controller.signal.removeEventListener('abort', stopOpener)
   }
 }
 

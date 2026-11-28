@@ -28,14 +28,18 @@ if (operation === 'build') {
     )
 } else {
   assert(['checks', 'tests'].includes(operation), 'Unknown CI package operation')
+  const testShards = new Set(['web', 'server', 'tui', 'scripts'])
   for (const name of names) {
-    const pkg = graph.packages.get(name)
-    if (operation === 'tests' && ['web', 'server', 'tui', 'scripts'].includes(name)) continue
-    const tasks = operation === 'checks' ? ['format:check', 'lint', 'typecheck'] : ['test']
-    for (const task of tasks) {
-      if (!pkg.scripts[task]) continue
-      if (name === 'scripts' && task === 'typecheck') continue
-      await run(['bun', 'run', '--cwd', pkg.directory, task])
-    }
+    if (operation === 'tests' && testShards.has(name)) continue
+    await runPackageTasks(graph.packages.get(name), name)
+  }
+}
+
+async function runPackageTasks(pkg, name) {
+  const tasks = operation === 'checks' ? ['format:check', 'lint', 'typecheck'] : ['test']
+  for (const task of tasks) {
+    if (!pkg.scripts[task]) continue
+    if (name === 'scripts' && task === 'typecheck') continue
+    await run(['bun', 'run', '--cwd', pkg.directory, task])
   }
 }

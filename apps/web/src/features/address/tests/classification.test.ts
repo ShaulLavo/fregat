@@ -46,7 +46,7 @@ function persistedKeysInSource() {
       if (!STORAGE_CONTEXT_PATTERN.test(line)) continue
 
       for (const [, key] of line.matchAll(STORAGE_KEY_PATTERN)) {
-        if (!keys.has(key)) keys.set(key, file)
+        keys.set(key, keys.get(key) ?? file)
       }
     }
   }

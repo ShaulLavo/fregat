@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises'
 import { act } from 'react'
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { rememberedWorkbench } from '@/workbench/utils/location'
 import { createTestSettingsSession } from '../../../test/factories/session'
 import { createWorkbenchFrame } from '../../../test/factories/workbench-frame'

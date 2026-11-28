@@ -2,7 +2,7 @@ import { act } from 'react'
 import { writeFile } from 'node:fs/promises'
 import { InputRenderable } from '@opentui/core'
 
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { settingsAddress } from '@/navigation/utils/address'
 import { createTestSettingsSession } from '../../../test/factories/session'
 import { test, expect } from '../../../test/fixtures'

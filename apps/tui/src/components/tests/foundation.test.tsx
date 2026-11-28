@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises'
 import { act } from 'react'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
 
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { recentCommands } from '@/storage/recent-commands-policy'
 import { createControlledInProcessTransport } from '../../../test/client'
 import { createTestSettingsSession } from '../../../test/factories/session'

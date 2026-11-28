@@ -450,15 +450,7 @@ async function parseSamples(path: string, fixtures: ReadonlySet<string> | null) 
     index++
     if (!raw) continue
     try {
-      const sample: unknown = JSON.parse(raw)
-      if (typeof sample !== 'object' || sample === null)
-        throw new TypeError('Sample must be an object')
-      if ('arm' in sample || 'fixture' in sample) {
-        if (!('fixture' in sample) || typeof sample.fixture !== 'string')
-          throw new TypeError('Sample fixture identity is required')
-        if (fixtures && !fixtures.has(sample.fixture))
-          throw new TypeError('Sample fixture identity is absent from the manifest')
-      }
+      const sample = parseSample(raw, fixtures)
       sampleCount++
       if (!('kind' in sample)) continue
       if (sample.kind === RETENTION_COUNT_PROTOCOL.successfulCycleMarker) endpoints.push(sample)
@@ -469,6 +461,17 @@ async function parseSamples(path: string, fixtures: ReadonlySet<string> | null) 
     }
   }
   return { sampleCount, endpoints, failures, cases, invalid }
+}
+
+function parseSample(raw: string, fixtures: ReadonlySet<string> | null) {
+  const sample: unknown = JSON.parse(raw)
+  if (typeof sample !== 'object' || sample === null) throw new TypeError('Sample must be an object')
+  if (!('arm' in sample) && !('fixture' in sample)) return sample
+  if (!('fixture' in sample) || typeof sample.fixture !== 'string')
+    throw new TypeError('Sample fixture identity is required')
+  if (fixtures && !fixtures.has(sample.fixture))
+    throw new TypeError('Sample fixture identity is absent from the manifest')
+  return sample
 }
 
 function signalOwned(signal: NodeJS.Signals) {
