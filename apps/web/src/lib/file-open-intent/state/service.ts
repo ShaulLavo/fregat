@@ -3,13 +3,13 @@ import { isRecord } from '@workspace/utils/objects'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { DocumentKey, FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import type { QueryClient } from '@tanstack/react-query'
-import { type EditorTextBuffer, type PieceTableSnapshot } from '@singapore-editor/core/document'
-import { type EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
-import {
-  type EditorPreparedDocument,
-  type EditorDocumentAnalysis,
-  type EditorPreparedTagValue,
-  type EditorScrollPosition,
+import type { EditorTextBuffer, PieceTableSnapshot } from '@singapore-editor/core/document'
+import type { EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
+import type {
+  EditorPreparedDocument,
+  EditorDocumentAnalysis,
+  EditorPreparedTagValue,
+  EditorScrollPosition,
 } from '@singapore-editor/core/editor'
 
 import type { FileSnapshot } from '@/lib/file-snapshot'

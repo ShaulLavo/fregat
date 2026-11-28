@@ -65,6 +65,7 @@
     },
     "scripts": {
       "entry": [
+        "lint/structure.ts",
         "ci/affected.mjs",
         "ci/packages.mjs",
         "check-editor-backlog.mjs",

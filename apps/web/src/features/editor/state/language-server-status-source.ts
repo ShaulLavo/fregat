@@ -2,9 +2,9 @@ import {
   combineDiagnosticsFreshness,
   summarizeDiagnostics,
 } from '@singapore-editor/lsp-plugin/diagnostics'
-import {
-  type LanguageServerDiagnosticSummary,
-  type LanguageServerStatus,
+import type {
+  LanguageServerDiagnosticSummary,
+  LanguageServerStatus,
 } from '@singapore-editor/lsp-plugin/websocket'
 
 export type EditorLanguageServerStatusSnapshot = {
