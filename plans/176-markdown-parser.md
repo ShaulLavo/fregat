@@ -23,8 +23,8 @@ streaming, browser, visual, and paired performance comparisons against remark.
   [current implementation and release gate](#current-implementation-and-release-gate) supersede
   their packaging, completion and performance claims. The [behaviour research](../.internal/markdown-parser/editor-behaviour.md)
   separates observed editor practices from the proposed integration contract.
-- Replaces [Plan 108](108-markdown-modes.md) D5. Plan 108 Phase 2 and the chat parser decision
-  wait on this plan. [Plan 111](111-editor-decorations.md)'s decoration API does not.
+- Replaces [Plan 108](108-markdown-modes.md) D5. Plan 108 Phase 2 waits on this plan.
+  [Plan 111](111-editor-decorations.md)'s decoration API does not.
 - Planned at: Platform `d42184dc`, Editor `74e76be`, 2026-09-26. Researched at Platform
   `c130dd35a`, Editor `74e76be`. Origin: the investigation into markdown files painting as raw
   source before their live-preview decorations land.
@@ -413,8 +413,6 @@ from the completed Phase 0 rewrite).
    found from changed ranges plus the edit, bounded input reads, one idle reparse after a full parse, and the cap refilled after deletes. Worker bench at
    1 MB: keystroke median 37 → 10 ms, first keystroke 82 → 20 ms. This phase keeps the rest.
 
-Chat: no phase while question 2 stands at (a).
-
 ## Recorded owner decisions
 
 1. **The parser behind live preview.** (a) `@lezer/markdown` on the main thread; tree-sitter
@@ -444,7 +442,6 @@ Chat: no phase while question 2 stands at (a).
   parser must support both; Plan 176 alone does not ship their full UX or Plan 108 Phase 3 features.
 - Plans 170/177 own general warm-up and prefetch infrastructure; Phase 1 integrates this parser
   with those paths and verifies its cold behaviour.
-- No change to chat rendering before the decision.
 
 ## October 2026 issue follow-ups
 
