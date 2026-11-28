@@ -16,10 +16,9 @@ import type { FileSnapshot } from '@/lib/file-snapshot'
 import {
   ensureFileSnapshotQuery,
   FILE_SNAPSHOT_STALE_MS,
-  fileSnapshotPathFromQueryKey,
   fileSnapshotQueryOptions,
-  fileSnapshotReads,
 } from '@/lib/file-snapshot-query-cache'
+import { fileSnapshotPathFromQueryKey, fileSnapshotReads } from '@/lib/file-snapshot-cache-policy'
 import {
   hasPrefetchRoom,
   prefetchSurfaceEnabled,

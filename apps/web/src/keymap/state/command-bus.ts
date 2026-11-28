@@ -1,8 +1,8 @@
-import type { ClientError } from '@/lib/client-error-taxonomy'
 import {
-  reportError as defaultReportError,
   toClientError as defaultToClientError,
+  type ClientError,
 } from '@/lib/client-error-taxonomy'
+import { reportError as defaultReportError } from '@/lib/client-error-feedback'
 import { createCommandEvent } from '@/keymap/state/command-event'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import type {

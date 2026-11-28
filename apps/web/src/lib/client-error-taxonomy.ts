@@ -1,14 +1,9 @@
-import { isCancelledError } from '@tanstack/react-query'
 import { isConnectivityError } from '@workspace/client-core/transport/connectivity-error'
 import { rpcErrorPayload } from '@workspace/client-core/transport/rpc-error'
 import { isObject } from '@workspace/utils/objects'
 import type { ConnectionError, ErrorCategory } from '@workspace/contracts'
-import { agentErrorReport } from './agent-error-report'
-import { copyTextToClipboard } from './clipboard'
 import { errorMessage } from './error-message'
 import { clientErrorMetadata } from './client-error-context'
-import { reportClientError } from './client-error-reporting'
-import { toastError } from '@/lib/toast-error'
 
 export type { ErrorCategory }
 
@@ -149,64 +144,6 @@ export function toConnectionError(input: unknown, fallback: string): ConnectionE
   return { code: error.code, message: error.message, why: error.why, fix: error.fix }
 }
 
-/** Hands the failure to an agent: the catalog's answer plus how to find the log. */
-function copyAgentReport(error: ClientError) {
-  void copyTextToClipboard(agentErrorReport(error), 'error report for an agent')
-}
-
-export function reportError(error: ClientError): void {
-  if (isCancelledError(error.cause) || isAbortError(error.cause)) return
-
-  if (!clientErrorMetadata(error.cause)) {
-    reportClientError({
-      area: 'client-error-taxonomy',
-      category: error.category,
-      cause: error.cause,
-      context: error.context,
-      message: error.message,
-      operation: error.operation ?? 'report',
-    })
-  }
-
-  if (!shouldToastCategory(error.category)) return
-
-  toastError(
-    titleByCategory[error.category],
-    {
-      cancel: { label: 'Copy', onClick: () => copyAgentReport(error) },
-      description: clientErrorDescription(error),
-    },
-    error,
-  )
-}
-
-const toastableCategories: ReadonlySet<ErrorCategory> = new Set<ErrorCategory>([
-  'not_found',
-  'permission_denied',
-  'too_large',
-  'invalid_path',
-  'io_error',
-  'lossy_write',
-])
-
-function shouldToastCategory(category: ErrorCategory): boolean {
-  return toastableCategories.has(category)
-}
-
-const titleByCategory: Record<ErrorCategory, string> = {
-  not_found: 'File not found',
-  permission_denied: 'Access denied',
-  not_a_file: 'Not a file',
-  not_a_directory: 'Not a folder',
-  too_large: 'File too large',
-  binary_file: 'Binary file',
-  lossy_write: 'Save refused',
-  invalid_path: 'Invalid path',
-  io_error: 'Filesystem error',
-  connectivity: 'Connection failed',
-  unknown: 'Unexpected error',
-}
-
 function categorizedClientError(
   category: ErrorCategory,
   cause: unknown,
@@ -223,7 +160,7 @@ function categorizedClientError(
   }
 }
 
-function isAbortError(input: unknown): boolean {
+export function isAbortError(input: unknown): boolean {
   if (input instanceof DOMException) return input.name === 'AbortError'
   if (input instanceof Error && input.name === 'AbortError') return true
   return false
