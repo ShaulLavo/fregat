@@ -8,6 +8,17 @@ const gate = join(import.meta.dirname, 'structure.ts')
 test('requires exact cycle edges under the selected apps', () => {
   const root = mkdtempSync(join(tmpdir(), 'fregat-structure-'))
   try {
+    writeFixture(
+      root,
+      'apps/web/tsconfig.json',
+      JSON.stringify({
+        compilerOptions: {
+          module: 'ESNext',
+          moduleResolution: 'Bundler',
+          verbatimModuleSyntax: true,
+        },
+      }),
+    )
     writeFixture(root, 'apps/web/src/alpha/entry.ts', 'export const alpha = 1')
     writeFixture(root, 'apps/web/src/beta/entry.ts', 'export const beta = 2')
     writeFixture(root, 'apps/web/src/alpha/use-beta.ts', "export { beta } from '../beta/entry'")
@@ -26,6 +37,26 @@ test('requires exact cycle edges under the selected apps', () => {
     expect(diagnostics).toContain('apps/web/src/alpha/cycle.ts [import-cycle-edge]')
     expect(diagnostics).toContain('src/alpha/cycle.ts imports src/beta/cycle.ts')
     expect(diagnostics).toContain('src/beta/cycle.ts imports src/alpha/cycle.ts')
+
+    writeFixture(
+      root,
+      'apps/web/src/beta/cycle.ts',
+      "import { alpha } from '../alpha/cycle'; export type Beta = number; export function beta() { return alpha(1) }",
+    )
+    writeFixture(
+      root,
+      'apps/web/src/alpha/cycle.ts',
+      "import type { Beta } from '../beta/cycle'; export function alpha(value: Beta) { return value }",
+    )
+    expect(check(root).exitCode).toBe(0)
+    writeFixture(
+      root,
+      'apps/web/src/alpha/cycle.ts',
+      "import { type Beta } from '../beta/cycle'; export function alpha(value: Beta) { return value }",
+    )
+    const inlineType = check(root)
+    expect(inlineType.exitCode).toBe(1)
+    expect(inlineType.stderr.toString()).toContain('src/alpha/cycle.ts imports src/beta/cycle.ts')
 
     rmSync(join(root, 'apps/web/src/alpha/cycle.ts'))
     rmSync(join(root, 'apps/web/src/beta/cycle.ts'))
