@@ -79,23 +79,26 @@ export async function readOpenCodeEvents(
     while (true) {
       const next = await reader.read()
       if (next.done) return
-      pending += decoder.decode(next.value, { stream: true })
-      let boundary = pending.search(/\r?\n\r?\n/)
-      while (boundary >= 0) {
-        const frame = pending.slice(0, boundary)
-        const separator = pending.slice(boundary).match(/^\r?\n\r?\n/)![0]
-        pending = pending.slice(boundary + separator.length)
-        const data = frame
-          .split(/\r?\n/)
-          .filter((line) => line.startsWith('data:'))
-          .map((line) => line.slice(5).trimStart())
-          .join('\n')
-        if (data) onEvent(JSON.parse(data))
-        boundary = pending.search(/\r?\n\r?\n/)
-      }
+      pending = dispatchEventFrames(pending + decoder.decode(next.value, { stream: true }), onEvent)
     }
   } finally {
     await reader.cancel().catch(() => undefined)
     reader.releaseLock()
   }
+}
+
+function dispatchEventFrames(pending: string, onEvent: (event: unknown) => void) {
+  let boundary = /\r?\n\r?\n/.exec(pending)
+  while (boundary) {
+    const data = pending
+      .slice(0, boundary.index)
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart())
+      .join('\n')
+    if (data) onEvent(JSON.parse(data))
+    pending = pending.slice(boundary.index + boundary[0].length)
+    boundary = /\r?\n\r?\n/.exec(pending)
+  }
+  return pending
 }

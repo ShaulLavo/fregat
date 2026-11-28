@@ -22,16 +22,7 @@ type Miss = { readonly column: number; readonly caretPrefix: string }
  */
 export async function clickColumns(page: Page) {
   const points = await page.evaluate((layers) => {
-    for (const row of document.querySelectorAll<HTMLElement>(
-      '.editor-virtualized-row:not([hidden])',
-    )) {
-      const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT)
-      const nodes: Text[] = []
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        if (!node.parentElement?.closest(layers)) nodes.push(node as Text)
-      }
-      const text = nodes.map((node) => node.data).join('')
-      if (text.trim().length < 24 || text.includes('\t')) continue
+    function columnPoints(nodes: readonly Text[], row: HTMLElement) {
       const range = document.createRange()
       const rowRect = row.getBoundingClientRect()
       const columns: { column: number; x: number; y: number }[] = []
@@ -47,7 +38,20 @@ export async function clickColumns(page: Page) {
         }
         base += node.data.length
       }
-      return { text, columns }
+      return columns
+    }
+
+    for (const row of document.querySelectorAll<HTMLElement>(
+      '.editor-virtualized-row:not([hidden])',
+    )) {
+      const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT)
+      const nodes: Text[] = []
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.parentElement?.closest(layers)) nodes.push(node as Text)
+      }
+      const text = nodes.map((node) => node.data).join('')
+      if (text.trim().length < 24 || text.includes('\t')) continue
+      return { text, columns: columnPoints(nodes, row) }
     }
     return null
   }, EDITOR_ROW_LAYERS)

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve, join, extname } from 'node:path'
 import { parseArgs } from 'node:util'
-import { chromium, firefox, webkit } from 'playwright'
+import { chromium, firefox, webkit, type Page } from 'playwright'
 
 const { values } = parseArgs({
   options: {
@@ -158,59 +158,7 @@ try {
     // Let the browser record the scroll event before navigating away.
     await page.waitForTimeout(300)
     for (const height of [844, 664]) {
-      await page.setViewportSize({ width: 390, height })
-      const expected = await page.evaluate(() => scrollY)
-      assert.ok(Math.abs(expected - position) <= 1, 'Resizing preserves the saved position')
-      await page.reload({ waitUntil: 'domcontentloaded' })
-      await page.waitForFunction(() => {
-        const state = (
-          window as typeof window & {
-            reloadEvidence: { samples: { ms: number }[] }
-          }
-        ).reloadEvidence
-        return (state.samples.at(-1)?.ms ?? 0) >= 5500
-      })
-      const state = await page.evaluate(
-        () =>
-          (
-            window as typeof window & {
-              reloadEvidence: {
-                samples: { ms: number; y: number; bounds: number[] }[]
-                shifts: { ms: number; value: number; replicaOnly: boolean }[]
-                wallpapers: boolean[]
-              }
-            }
-          ).reloadEvidence,
-      )
-      assert.ok(
-        state.wallpapers.length > 0 && state.wallpapers.every(Boolean),
-        'Initial wallpapers include image dimensions and an inline preview',
-      )
-      const firstSecond = state.samples.filter((sample) => sample.ms <= 1000)
-      const first = firstSecond[0]!
-      const layoutDrift = Math.max(
-        ...firstSecond.flatMap((sample) =>
-          sample.bounds.map((bound, index) => Math.abs(bound - first.bounds[index]!)),
-        ),
-      )
-      // The first visible frame must already be restored; a top-frame flash is a failure.
-      const restored = state.samples
-      const scrollDrift = Math.max(...restored.map((sample) => Math.abs(sample.y - expected)))
-      // Playback intentionally moves illustration contents; page layout must stay steady.
-      const pageShift = state.shifts
-        .filter((shift) => shift.ms >= 0 && shift.ms <= 1000 && !shift.replicaOnly)
-        .reduce((total, shift) => total + shift.value, 0)
-      const label = `${values.engine}-${position}-${height}`
-      console.log(
-        `${label}: first-second layout ${layoutDrift.toFixed(2)}px, reload scroll ${scrollDrift.toFixed(2)}px, page CLS ${pageShift.toFixed(6)}`,
-      )
-      if (evidence)
-        await writeFile(
-          join(evidence, `${label}.json`),
-          JSON.stringify({ expected, layoutDrift, scrollDrift, pageShift, ...state }, null, 2),
-        )
-      assert.ok(Number.isFinite(layoutDrift) && Number.isFinite(scrollDrift))
-      if (layoutDrift !== 0 || scrollDrift !== 0 || pageShift > 0) failures.push(label)
+      await verifyReloadAtHeight(page, position, height)
     }
   }
   // A saved reload position must not affect a fresh visit or a fragment destination.
@@ -336,3 +284,59 @@ try {
   await browser.close()
 }
 assert.deepEqual(failures, [], 'Reload preserves scroll position and first-second layout')
+
+async function verifyReloadAtHeight(page: Page, position: number, height: number) {
+  await page.setViewportSize({ width: 390, height })
+  const expected = await page.evaluate(() => scrollY)
+  assert.ok(Math.abs(expected - position) <= 1, 'Resizing preserves the saved position')
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(() => {
+    const state = (
+      window as typeof window & {
+        reloadEvidence: { samples: { ms: number }[] }
+      }
+    ).reloadEvidence
+    return (state.samples.at(-1)?.ms ?? 0) >= 5500
+  })
+  const state = await page.evaluate(
+    () =>
+      (
+        window as typeof window & {
+          reloadEvidence: {
+            samples: { ms: number; y: number; bounds: number[] }[]
+            shifts: { ms: number; value: number; replicaOnly: boolean }[]
+            wallpapers: boolean[]
+          }
+        }
+      ).reloadEvidence,
+  )
+  assert.ok(
+    state.wallpapers.length > 0 && state.wallpapers.every(Boolean),
+    'Initial wallpapers include image dimensions and an inline preview',
+  )
+  const firstSecond = state.samples.filter((sample) => sample.ms <= 1000)
+  const first = firstSecond[0]!
+  const layoutDrift = Math.max(
+    ...firstSecond.flatMap((sample) =>
+      sample.bounds.map((bound, index) => Math.abs(bound - first.bounds[index]!)),
+    ),
+  )
+  // The first visible frame must already be restored; a top-frame flash is a failure.
+  const restored = state.samples
+  const scrollDrift = Math.max(...restored.map((sample) => Math.abs(sample.y - expected)))
+  // Playback intentionally moves illustration contents; page layout must stay steady.
+  const pageShift = state.shifts
+    .filter((shift) => shift.ms >= 0 && shift.ms <= 1000 && !shift.replicaOnly)
+    .reduce((total, shift) => total + shift.value, 0)
+  const label = `${values.engine}-${position}-${height}`
+  console.log(
+    `${label}: first-second layout ${layoutDrift.toFixed(2)}px, reload scroll ${scrollDrift.toFixed(2)}px, page CLS ${pageShift.toFixed(6)}`,
+  )
+  if (evidence)
+    await writeFile(
+      join(evidence, `${label}.json`),
+      JSON.stringify({ expected, layoutDrift, scrollDrift, pageShift, ...state }, null, 2),
+    )
+  assert.ok(Number.isFinite(layoutDrift) && Number.isFinite(scrollDrift))
+  if (layoutDrift !== 0 || scrollDrift !== 0 || pageShift > 0) failures.push(label)
+}
