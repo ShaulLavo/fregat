@@ -77,36 +77,6 @@
           }
         ]
       }
-    },
-    {
-      // Legacy max-depth baseline: shrink this list when touching a listed file; never add new files.
-      "files": [
-        "apps/desktop/src/launcher/chromium.ts",
-        "apps/desktop/src/launcher/index.ts",
-        "apps/desktop/src/launcher/tests/fixtures/browser.mjs",
-        "apps/desktop/src/launcher/tests/fixtures/review-race-browser.mjs",
-        "apps/server/src/lsp/tests/registry.test.ts",
-        "apps/server/src/provider/adapters/utils/opencode-http.ts",
-        "apps/site/scripts/verify-scroll.ts",
-        "apps/web/scripts/chat-snapshot-benchmark.ts",
-        "apps/web/scripts/verify-web-design-loading.mjs",
-        "apps/web/scripts/workspace-reload-proof.mjs",
-        "apps/web/src/features/address/tests/classification.test.ts",
-        "apps/web/src/features/environments/components/picker-dialog.tsx",
-        "apps/web/test/factories/retention-cold-reader.test.ts",
-        "scripts/agent/scenarios/chat-alignment.ts",
-        "scripts/agent/scenarios/editor-proportional-font.ts",
-        "scripts/agent/scenarios/editor-retention-count-policy-driver.ts",
-        "scripts/agent/scenarios/native-host.ts",
-        "scripts/agent/scenarios/phone-surfaces.ts",
-        "scripts/agent/scenarios/surface-audit.ts",
-        "scripts/ci/packages.mjs",
-        "scripts/deploy/live-terminal.mjs",
-        "scripts/parity/background.ts"
-      ],
-      "rules": {
-        "max-depth": "off"
-      }
     }
   ]
 }

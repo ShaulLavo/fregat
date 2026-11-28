@@ -115,6 +115,16 @@ let heldFrames = 0
 const streamQueue = []
 page.on('pageerror', (error) => errors.push(error.message))
 await mkdir(values.output, { recursive: true })
+async function expandTreeForScroll(page) {
+  for (const name of ['apps', 'web', 'src', 'features']) {
+    const row = selectors.folderTree(page).getByRole('treeitem', { name, exact: true }).first()
+    if ((await row.getAttribute('aria-expanded')) === 'true') continue
+    await row.focus()
+    await row.press('ArrowRight')
+    await page.waitForTimeout(300)
+  }
+}
+
 try {
   const url = new URL(values.url)
   const apiUrl = new URL(url)
@@ -175,15 +185,7 @@ try {
   if (scenarioConfig[values.scenario])
     scenarioCleanup = (await setupScenario(page, values.scenario)).cleanup
   await page.waitForTimeout(1500)
-  if (values.scroll && values.scenario === 'tree') {
-    for (const name of ['apps', 'web', 'src', 'features']) {
-      const row = selectors.folderTree(page).getByRole('treeitem', { name, exact: true }).first()
-      if ((await row.getAttribute('aria-expanded')) === 'true') continue
-      await row.focus()
-      await row.press('ArrowRight')
-      await page.waitForTimeout(300)
-    }
-  }
+  if (values.scroll && values.scenario === 'tree') await expandTreeForScroll(page)
   if (values.scroll) {
     const scroll =
       values.scenario === 'tree'
