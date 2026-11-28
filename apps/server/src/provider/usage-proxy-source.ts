@@ -15,10 +15,7 @@ import {
   mergeUsageWindows,
 } from './utils/usage-windows'
 import { CODEX_USAGE_MAX_FAILURES, type ProxyUsageRefresh } from './usage-proxy-budget'
-import {
-  recordChatPipelineInfo,
-  recordChatPipelineWarning,
-} from '../orchestration/orchestration-logging'
+import { recordChatPipelineInfo, recordChatPipelineWarning } from '../observability/chat-pipeline'
 
 const CODEX_DRIVER_KIND = v.parse(providerDriverKindSchema, 'codex')
 

@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from 'node:fs'
 import path from 'node:path'
 import type { ProviderInstanceId } from '@workspace/contracts'
-import { recordChatPipelineInfo } from '../orchestration/orchestration-logging'
+import { recordChatPipelineInfo } from '../observability/chat-pipeline'
 
 /** Coalesces the burst of events a CLI emits while rewriting its credentials file. */
 const CREDENTIAL_CHANGE_DEBOUNCE_MS = 150

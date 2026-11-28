@@ -18,7 +18,7 @@ import {
   orchestrationEventSummary,
   recordChatPipelineInfo,
   recordChatPipelineWarning,
-} from './orchestration-logging'
+} from '../observability/chat-pipeline'
 import { BoundedTtlCache } from './provider-runtime-buffers'
 import {
   settledTurnStateForSessionStatus,
@@ -26,7 +26,7 @@ import {
   type OrchestrationReadModel,
 } from './read-model'
 
-import { SerialWorker } from './serial-worker'
+import { SerialWorker } from '../utils/serial-worker'
 import type { OrchestrationDomainEventReactor } from './streams'
 
 type CheckpointTask = {
@@ -69,6 +69,7 @@ export class CheckpointReactor implements OrchestrationDomainEventReactor {
   // A replayed batch — the engine republishes events it committed before a
   // failed dispatch threw — must not photograph the worktree a second time.
   private readonly handledEventIds: BoundedTtlCache<string, true>
+  private readonly git: GitService
   private readonly store: GitCheckpointStore
   /**
    * Captures run one at a time per process: two `git add --all` passes over the
@@ -95,6 +96,7 @@ export class CheckpointReactor implements OrchestrationDomainEventReactor {
       now,
       ttlMs: HANDLED_EVENT_ID_TTL_MS,
     })
+    this.git = git
     this.store = new GitCheckpointStore(git)
     this.worker = new SerialWorker((task) => this.runTask(task))
   }
@@ -194,7 +196,7 @@ export class CheckpointReactor implements OrchestrationDomainEventReactor {
 
     const checkpointTurnCount = maxCheckpointTurnCount(context.session)
     const checkpointRef = checkpointRefForSessionTurn(task.sessionId, checkpointTurnCount)
-    if (await this.store.has({ path: context.workspacePath, ref: checkpointRef })) {
+    if (await this.git.hasRef({ path: context.workspacePath, ref: checkpointRef })) {
       return { captured: false, checkpointRef, checkpointTurnCount, skipReason: 'baseline-exists' }
     }
 

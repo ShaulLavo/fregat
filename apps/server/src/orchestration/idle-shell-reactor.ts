@@ -1,8 +1,8 @@
 import type { OrchestrationEvent, WorktreeId } from '@workspace/contracts'
 import type { TerminalService } from '../terminal/service'
 import type { OrchestrationReadModel } from './read-model'
-import { recordChatPipelineInfo, recordChatPipelineWarning } from './orchestration-logging'
-import { SerialWorker } from './serial-worker'
+import { recordChatPipelineInfo, recordChatPipelineWarning } from '../observability/chat-pipeline'
+import { SerialWorker } from '../utils/serial-worker'
 import type { OrchestrationDomainEventReactor } from './streams'
 
 type Options = {

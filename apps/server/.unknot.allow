@@ -2,14 +2,10 @@
 # Remove each entry as its finding is fixed.
 # rules: field-leak forward-ref import-cycle import-cycle-edge long-file module-cycle prop-drilling shallow-module tangle wide-directory wide-injection
 long-file src/fs/workspace-edit.ts
-long-file src/git/service.ts
 long-file src/lsp/proxy-session.ts
 long-file src/orchestration/engine.ts
-long-file src/orchestration/projection-pipeline.ts
 long-file src/provider/adapters/claude.ts
 long-file src/provider/adapters/codex.ts
-module-cycle src/orchestration <-> src/provider <-> src/provider/adapters/utils <-> src/terminal <-> src/terminal-host
-shallow-module src/git/checkpoint-store.ts
 wide-directory src/fs
 wide-directory src/orchestration
 wide-directory src/provider/adapters/utils

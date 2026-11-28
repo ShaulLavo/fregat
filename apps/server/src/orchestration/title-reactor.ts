@@ -13,7 +13,7 @@ import type { ProviderService } from '../provider/provider-service'
 import type { OrchestrationReadModel, OrchestrationProjectedSession } from './read-model'
 import { formatSessionTitleContext, type SessionTitleMessage } from './title-context'
 import { generateSessionTitle } from './title-generation'
-import { recordChatPipelineWarning } from './orchestration-logging'
+import { recordChatPipelineWarning } from '../observability/chat-pipeline'
 
 type Dependencies = {
   attachmentsDir: string

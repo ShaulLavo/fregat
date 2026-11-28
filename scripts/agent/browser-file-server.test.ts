@@ -14,7 +14,7 @@ import {
 } from '../../apps/server/src/terminal-host/identity'
 import { launchHost } from '../../apps/server/src/terminal-host/launch'
 import { hostPaths } from '../../apps/server/src/terminal-host/protocol'
-import { createTestTerminalHost } from '../../apps/server/src/terminal-host/testing'
+import { createTestTerminalHost } from '../../apps/server/src/terminal-host/tests/fixture'
 import { closeTestApps, createTestApp } from '../../apps/server/test/server'
 import { testSettingsOptions } from '../../apps/server/src/settings/testing'
 import { fixtureReadiness } from './fixture-readiness'

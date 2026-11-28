@@ -43,8 +43,8 @@ import {
   providerRuntimeEventSummary,
   recordChatPipelineInfo,
   recordChatPipelineWarning,
-} from './orchestration-logging'
-import { SerialWorker } from './serial-worker'
+} from '../observability/chat-pipeline'
+import { SerialWorker } from '../utils/serial-worker'
 
 type ProviderIntentEvent = Extract<
   OrchestrationEvent,

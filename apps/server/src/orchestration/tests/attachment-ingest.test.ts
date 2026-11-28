@@ -10,7 +10,7 @@ import * as v from 'valibot'
 import * as schema from '../../db/schema'
 import { initializePlatformDatabase } from '../../db/initialize'
 import { OrchestrationEngine } from '../engine'
-import { orchestrationCommandSummary } from '../orchestration-logging'
+import { orchestrationCommandSummary } from '../../observability/chat-pipeline'
 import { orchestrationCommandSchema, type OrchestrationCommand } from '@workspace/contracts'
 
 const now = '2026-06-20T00:00:00.000Z'

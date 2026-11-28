@@ -34,7 +34,7 @@ import {
   orchestrationCommandSummary,
   recordChatPipelineInfo,
   recordChatPipelineWarning,
-} from './orchestration-logging'
+} from '../observability/chat-pipeline'
 import { orchestrationReplaySummary } from '@workspace/contracts'
 import type { ClientPresence } from './client-presence'
 import type { OrchestrationEngine } from './engine'

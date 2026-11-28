@@ -17,7 +17,7 @@ import {
 } from '@workspace/contracts'
 
 import { createOrchestrationFixture } from '../../../test/factories/orchestration'
-import { createTestTerminalHost } from '../../terminal-host/testing'
+import { createTestTerminalHost } from '../../terminal-host/tests/fixture'
 import { createFakeTerminalHost } from '../../../test/factories/fake-terminal-host'
 import {
   createFakePtyFactory,

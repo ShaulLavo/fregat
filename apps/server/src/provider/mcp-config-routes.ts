@@ -17,7 +17,7 @@ import {
 import * as v from 'valibot'
 
 import type { WorkspacePaths } from '../fs/path'
-import { recordChatPipelineInfo } from '../orchestration/orchestration-logging'
+import { recordChatPipelineInfo } from '../observability/chat-pipeline'
 import { providerErrors } from '../observability/structured-errors'
 import type { McpSignInAttempts } from './mcp-sign-in'
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'

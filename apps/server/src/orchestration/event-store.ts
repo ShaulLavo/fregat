@@ -10,7 +10,10 @@ import {
 
 import { getDefaultPlatformDatabase, type PlatformDatabase } from '../db/client'
 import { orchestrationEvents, type OrchestrationEventRow } from '../db/schema'
-import { orchestrationEventBatchSummary, recordChatPipelineInfo } from './orchestration-logging'
+import {
+  orchestrationEventBatchSummary,
+  recordChatPipelineInfo,
+} from '../observability/chat-pipeline'
 import { orchestrationReplaySummary } from '@workspace/contracts'
 import { orchestrationErrors } from '../observability/structured-errors'
 

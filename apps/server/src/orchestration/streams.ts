@@ -16,7 +16,10 @@ import {
 import type { OrchestrationSnapshotQuery } from './snapshot-query'
 import * as v from 'valibot'
 import type { PlatformDatabase } from '../db/client'
-import { orchestrationEventBatchSummary, recordChatPipelineInfo } from './orchestration-logging'
+import {
+  orchestrationEventBatchSummary,
+  recordChatPipelineInfo,
+} from '../observability/chat-pipeline'
 import { appendBounded } from './read-model'
 import { createShellRowReader, type OrchestrationShellRowReader } from './shell-row-reader'
 

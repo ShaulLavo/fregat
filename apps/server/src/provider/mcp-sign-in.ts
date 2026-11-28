@@ -1,7 +1,7 @@
 import type { ProviderMcpSignIn, ProviderMcpSignInAttempt } from '@workspace/contracts'
 import { errorMessage } from '@workspace/contracts'
 
-import { recordChatPipelineInfo } from '../orchestration/orchestration-logging'
+import { recordChatPipelineInfo } from '../observability/chat-pipeline'
 import { mcpConfigErrors } from './structured-errors'
 
 /** How long a started sign-in waits for its page to finish before it is dropped. */

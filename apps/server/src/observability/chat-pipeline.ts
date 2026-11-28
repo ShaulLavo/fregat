@@ -6,8 +6,8 @@ import {
   type OrchestrationCommand,
   type OrchestrationEvent,
 } from '@workspace/contracts'
-import { recordProcessInfo, recordProcessWarning, type OperationContext } from '../observability'
-import { sanitizeErrorCause } from '../observability/logging'
+import { recordProcessInfo, recordProcessWarning, type OperationContext } from '.'
+import { sanitizeErrorCause } from './logging'
 
 import type {
   ProviderRuntimeEvent,

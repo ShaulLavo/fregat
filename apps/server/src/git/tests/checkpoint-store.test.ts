@@ -16,7 +16,7 @@ afterEach(async () => {
 describe('git checkpoint capture', () => {
   it('round-trips the worktree through capture, edit, and restore', async () => {
     const root = await fixtureRepo()
-    const store = checkpointStore(root)
+    const { store, git } = checkpointStore(root)
     await writeFile(path.join(root, 'tracked.txt'), 'captured\n')
     await writeFile(path.join(root, 'fresh.txt'), 'new file\n')
 
@@ -26,7 +26,7 @@ describe('git checkpoint capture', () => {
     await writeFile(path.join(root, 'later.txt'), 'written after the checkpoint\n')
     await rm(path.join(root, 'sub/nested.txt'))
 
-    expect(await store.restore({ path: '', ref: REF })).toBe(true)
+    expect(await git.restoreRef({ path: '', ref: REF })).toBe(true)
     expect(await readFile(path.join(root, 'tracked.txt'), 'utf8')).toBe('captured\n')
     expect(await readFile(path.join(root, 'fresh.txt'), 'utf8')).toBe('new file\n')
     expect(await readFile(path.join(root, 'sub/nested.txt'), 'utf8')).toBe('nested\n')
@@ -35,7 +35,7 @@ describe('git checkpoint capture', () => {
 
   it('leaves the user index exactly as it was', async () => {
     const root = await fixtureRepo()
-    const store = checkpointStore(root)
+    const { store } = checkpointStore(root)
     await writeFile(path.join(root, 'tracked.txt'), 'staged content\n')
     await runGit(root, ['add', 'tracked.txt'])
     await writeFile(path.join(root, 'tracked.txt'), 'worktree content\n')
@@ -53,7 +53,7 @@ describe('git checkpoint capture', () => {
 
   it('captures the worktree, not the index', async () => {
     const root = await fixtureRepo()
-    const store = checkpointStore(root)
+    const { store } = checkpointStore(root)
     await writeFile(path.join(root, 'tracked.txt'), 'staged content\n')
     await runGit(root, ['add', 'tracked.txt'])
     await writeFile(path.join(root, 'tracked.txt'), 'worktree content\n')
@@ -66,7 +66,7 @@ describe('git checkpoint capture', () => {
 
   it('deletes its temporary index file', async () => {
     const root = await fixtureRepo()
-    const store = checkpointStore(root)
+    const { store } = checkpointStore(root)
 
     await store.capture({ path: '', ref: REF })
 
@@ -76,7 +76,7 @@ describe('git checkpoint capture', () => {
 
   it('includes untracked files and excludes ignored ones', async () => {
     const root = await fixtureRepo()
-    const store = checkpointStore(root)
+    const { store } = checkpointStore(root)
     await writeFile(path.join(root, '.gitignore'), 'ignored.txt\nbuild/\n')
     await writeFile(path.join(root, 'ignored.txt'), 'secret\n')
     await writeFile(path.join(root, 'untracked.txt'), 'keep me\n')
@@ -92,12 +92,12 @@ describe('git checkpoint capture', () => {
 
   it('captures a repository with no commits yet', async () => {
     const root = await emptyRepo()
-    const store = checkpointStore(root)
+    const { store, git } = checkpointStore(root)
     await writeFile(path.join(root, 'turn-zero.txt'), 'baseline\n')
 
     const commit = await store.capture({ path: '', ref: REF })
 
-    expect(await store.has({ path: '', ref: REF })).toBe(true)
+    expect(await git.hasRef({ path: '', ref: REF })).toBe(true)
     const captured = await runGit(root, ['show', `${commit}:turn-zero.txt`])
     expect(captured.stdout).toBe('baseline\n')
     const parents = await runGit(root, ['rev-list', '--parents', '-n', '1', commit])
@@ -106,37 +106,37 @@ describe('git checkpoint capture', () => {
 
   it('restores a repository with no commits yet', async () => {
     const root = await emptyRepo()
-    const store = checkpointStore(root)
+    const { store, git } = checkpointStore(root)
     await writeFile(path.join(root, 'turn-zero.txt'), 'baseline\n')
     await store.capture({ path: '', ref: REF })
     await writeFile(path.join(root, 'turn-zero.txt'), 'drifted\n')
 
-    expect(await store.restore({ path: '', ref: REF })).toBe(true)
+    expect(await git.restoreRef({ path: '', ref: REF })).toBe(true)
     expect(await readFile(path.join(root, 'turn-zero.txt'), 'utf8')).toBe('baseline\n')
   })
 
   it('deletes checkpoint refs', async () => {
     const root = await fixtureRepo()
-    const store = checkpointStore(root)
+    const { store, git } = checkpointStore(root)
     await store.capture({ path: '', ref: REF })
 
-    await store.deleteRefs({ path: '', refs: [REF, 'refs/platform/checkpoints/missing'] })
+    await git.deleteRefs({ path: '', refs: [REF, 'refs/platform/checkpoints/missing'] })
 
-    expect(await store.has({ path: '', ref: REF })).toBe(false)
+    expect(await git.hasRef({ path: '', ref: REF })).toBe(false)
   })
 })
 
 describe('git checkpoint restore', () => {
   it('leaves the index clean so the revert reads as unstaged work', async () => {
     const root = await fixtureRepo()
-    const store = checkpointStore(root)
+    const { store, git } = checkpointStore(root)
     await store.capture({ path: '', ref: REF })
     await writeFile(path.join(root, 'tracked.txt'), 'agent edit\n')
     await runGit(root, ['add', 'tracked.txt'])
     await runGit(root, ['commit', '-m', 'agent turn'])
     await writeFile(path.join(root, 'tracked.txt'), 'more agent edits\n')
 
-    expect(await store.restore({ path: '', ref: REF })).toBe(true)
+    expect(await git.restoreRef({ path: '', ref: REF })).toBe(true)
 
     const staged = await runGit(root, ['diff', '--cached', '--name-only'])
     expect(staged.stdout.trim()).toBe('')
@@ -150,14 +150,14 @@ describe('git checkpoint restore', () => {
 describe('git checkpoint diff', () => {
   it('diffs two captured refs that hasRef accepts', async () => {
     const root = await fixtureRepo()
-    const store = checkpointStore(root)
+    const { store, git } = checkpointStore(root)
     await store.capture({ path: '', ref: REF })
     await writeFile(path.join(root, 'tracked.txt'), 'two\n')
     await writeFile(path.join(root, 'added.txt'), 'added\n')
     await store.capture({ path: '', ref: LATER_REF })
 
-    expect(await store.has({ path: '', ref: REF })).toBe(true)
-    expect(await store.has({ path: '', ref: LATER_REF })).toBe(true)
+    expect(await git.hasRef({ path: '', ref: REF })).toBe(true)
+    expect(await git.hasRef({ path: '', ref: LATER_REF })).toBe(true)
     const diffs = await store.diff({
       fromRef: REF,
       ignoreWhitespace: false,
@@ -170,7 +170,7 @@ describe('git checkpoint diff', () => {
 
   it('hides whitespace-only changes when asked to', async () => {
     const root = await fixtureRepo()
-    const store = checkpointStore(root)
+    const { store } = checkpointStore(root)
     await store.capture({ path: '', ref: REF })
     await writeFile(path.join(root, 'tracked.txt'), 'one   \n')
     await store.capture({ path: '', ref: LATER_REF })
@@ -194,7 +194,7 @@ describe('git checkpoint diff', () => {
 
   it('falls back to HEAD when the base ref was never captured', async () => {
     const root = await fixtureRepo()
-    const store = checkpointStore(root)
+    const { store } = checkpointStore(root)
     await writeFile(path.join(root, 'tracked.txt'), 'two\n')
     await store.capture({ path: '', ref: LATER_REF })
 
@@ -211,7 +211,7 @@ describe('git checkpoint diff', () => {
 
   it('fails with a structured error when the base ref is unavailable', async () => {
     const root = await fixtureRepo()
-    const store = checkpointStore(root)
+    const { store } = checkpointStore(root)
     await store.capture({ path: '', ref: LATER_REF })
 
     await expect(
@@ -224,7 +224,8 @@ const REF = 'refs/platform/checkpoints/turn/0'
 const LATER_REF = 'refs/platform/checkpoints/turn/1'
 
 function checkpointStore(root: string) {
-  return new GitCheckpointStore(new GitService(createWorkspacePaths(root)))
+  const git = new GitService(createWorkspacePaths(root))
+  return { store: new GitCheckpointStore(git), git }
 }
 
 async function porcelain(root: string) {

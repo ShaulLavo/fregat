@@ -55,7 +55,7 @@ import {
   providerTurnSummary,
   recordChatPipelineInfo,
   recordChatPipelineWarning,
-} from '../../orchestration/orchestration-logging'
+} from '../../observability/chat-pipeline'
 import type { AgentDiagnosticsSource } from '../../lsp/agent-diagnostics'
 import { claudeDiagnosticsHooks } from './utils/claude-diagnostics-hooks'
 import { RuntimeAdapter } from './state/runtime-adapter'

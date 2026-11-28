@@ -10,7 +10,7 @@ import {
   resetObservabilityForTests,
 } from '../../observability/runtime'
 import { createStructuredError } from '../../observability/structured-errors'
-import { recordChatPipelineWarning } from '../orchestration-logging'
+import { recordChatPipelineWarning } from '../../observability/chat-pipeline'
 
 const roots: string[] = []
 

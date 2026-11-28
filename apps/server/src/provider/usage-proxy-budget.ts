@@ -3,7 +3,7 @@ import * as v from 'valibot'
 import { nodeErrorCode, type ProviderAccountUsage } from '@workspace/contracts'
 import { writeFileAtomicSync } from '../fs/atomic-write'
 import { tryFileLock, type FileLock } from '../system/file-lock'
-import { recordChatPipelineWarning } from '../orchestration/orchestration-logging'
+import { recordChatPipelineWarning } from '../observability/chat-pipeline'
 
 const HOUR_MS = 3_600_000
 export const CODEX_USAGE_MAX_FAILURES = 3

@@ -8,7 +8,7 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { writeFileAtomicSync } from '../fs/atomic-write'
-import { recordChatPipelineWarning } from '../orchestration/orchestration-logging'
+import { recordChatPipelineWarning } from '../observability/chat-pipeline'
 import { platformHomePath } from '../home'
 
 const DEFAULT_PROVIDER_STATUS_TTL_MS = 60_000

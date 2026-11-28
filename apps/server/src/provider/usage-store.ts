@@ -18,10 +18,7 @@ import {
 import { writeFileAtomicSync } from '../fs/atomic-write'
 import { isEvlogError } from '../observability/structured-errors'
 import { sessionIdentityErrors } from './structured-errors'
-import {
-  recordChatPipelineInfo,
-  recordChatPipelineWarning,
-} from '../orchestration/orchestration-logging'
+import { recordChatPipelineInfo, recordChatPipelineWarning } from '../observability/chat-pipeline'
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'
 import type { ProviderAdapter, ProviderRuntimeEvent } from './types'
 import { readClaudeUsageCache, readClaudeUsageIdentity } from './usage-claude-cache'
