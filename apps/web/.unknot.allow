@@ -1,7 +1,21 @@
 # Structure debt that existed when this project adopted unknot.
 # Remove each entry as its finding is fixed.
-# rules: field-leak forward-ref import-cycle long-file module-cycle prop-drilling shallow-module tangle wide-directory wide-injection
+# rules: field-leak forward-ref import-cycle import-cycle-edge long-file module-cycle prop-drilling shallow-module tangle wide-directory wide-injection
 import-cycle src/keymap/menus/components/item-row.tsx <-> src/keymap/menus/components/section.tsx
+import-cycle-edge src/keymap/menus/components/item-row.tsx -> src/keymap/menus/components/section.tsx
+import-cycle-edge src/keymap/menus/components/section.tsx -> src/keymap/menus/components/item-row.tsx
+import-cycle-edge src/lib/client-error-taxonomy.ts -> src/lib/clipboard.ts
+import-cycle-edge src/lib/client-error-taxonomy.ts -> src/lib/toast-error.ts
+import-cycle-edge src/lib/clipboard.ts -> src/lib/environments/state/query-clients.ts
+import-cycle-edge src/lib/environments/state/query-clients.ts -> src/lib/file-snapshot-query-cache.ts
+import-cycle-edge src/lib/file-server.ts -> src/lib/structured-errors.ts
+import-cycle-edge src/lib/file-snapshot-query-cache.ts -> src/lib/environments/state/query-clients.ts
+import-cycle-edge src/lib/file-snapshot-query-cache.ts -> src/lib/file-server.ts
+import-cycle-edge src/lib/fix-with-agent.ts -> src/lib/clipboard.ts
+import-cycle-edge src/lib/fix-with-agent.ts -> src/state/navigation-binding.ts
+import-cycle-edge src/lib/structured-errors.ts -> src/lib/client-error-taxonomy.ts
+import-cycle-edge src/lib/toast-error.ts -> src/lib/fix-with-agent.ts
+import-cycle-edge src/state/navigation-binding.ts -> src/lib/structured-errors.ts
 long-file src/features/editor/state/workspace-document-service.ts
 long-file src/features/editor/state/workspace-edit-service.ts
 long-file src/lib/file-open-intent/state/service.ts

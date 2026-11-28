@@ -1,0 +1,35 @@
+diff --git a/dist/rules/graph.js b/dist/rules/graph.js
+index 3184b3071feda5c82c1d4800b8d16de1bc83254b..1f6b89fa6b7ab3cf0bcec7270587b67350001969 100644
+--- a/dist/rules/graph.js
++++ b/dist/rules/graph.js
+@@ -201,7 +201,30 @@ function importCycles(model) {
+     }
+     return out;
+ }
++function importCycleEdges(model) {
++    const components = stronglyConnected(Array.from(model.files).sort(), model.imports);
++    return components.flatMap((component) => {
++        const members = new Set(component);
++        return component.flatMap((from) => Array.from(model.imports.get(from) ?? [])
++            .filter((to) => members.has(to))
++            .map((to) => ({
++                rule: 'import-cycle-edge',
++                key: `${from} -> ${to}`,
++                title: 'Runtime import participates in a file cycle',
++                at: from,
++                notes: [`${from} imports ${to}`],
++                body: [],
++            })));
++    });
++}
+ export const graphRules = [
++    {
++        id: 'import-cycle-edge',
++        scope: 'TypeScript',
++        summary: 'A runtime import participates in a file cycle. Keys record edges even when a folder cycle also exists.',
++        fix: 'Remove the import edge, split the shared dependency into its own module, or pass it at the call site.',
++        run: importCycleEdges,
++    },
+     {
+         id: 'module-cycle',
+         scope: 'TypeScript',
