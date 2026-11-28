@@ -2,7 +2,7 @@ import { captureFilesystemLocal, type FilesystemLocalCapture } from '@/lib/snaps
 import { retainFilesystemConflict } from '@/features/workspace/state/event-conflict-adapter'
 import { supportsTextFile } from '@/features/editor/state/workspace-document-service'
 import { parentFilesystemPath } from '@/lib/path-formatters'
-import { type TextSnapshot } from '@singapore-editor/core/document'
+import type { TextSnapshot } from '@singapore-editor/core/document'
 import { parseMergeConflicts } from '@singapore-editor/core/editor'
 import { decodedAsText } from '@workspace/contracts'
 import { Debouncer } from '@tanstack/react-pacer/debouncer'

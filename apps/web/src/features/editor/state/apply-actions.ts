@@ -25,7 +25,7 @@ import type {
 } from '@/lib/documents/utils/types'
 import type { GroupId } from '@/lib/documents/utils/group-types'
 import { groupForTab, selectEditorGroupTab } from '@/lib/documents/utils/groups'
-import { type EditorDocumentStoreApi } from '@/features/editor/state/document-state'
+import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import {
   editorHistoryForClosedContent,
   editorHistoryForSelection,
@@ -33,7 +33,7 @@ import {
   recentlyClosedTabsForClose,
   recentlyClosedTabsForReopen,
 } from '@/features/editor/utils/tab-history'
-import { type EditorUiStoreApi } from '@/features/editor/state/ui-state'
+import type { EditorUiStoreApi } from '@/features/editor/state/ui-state'
 import {
   retentionForProjects,
   type RetainedWorkspaceSlice,
@@ -52,7 +52,7 @@ import {
   activeEditorTabForWorkbenchPanels,
   type WorkbenchPanels,
 } from '@/features/workbench/utils/panels'
-import { type SearchBufferStoreApi } from '@/features/search/state/buffer-state'
+import type { SearchBufferStoreApi } from '@/features/search/state/buffer-state'
 import { log } from '@/lib/client-logging'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import {

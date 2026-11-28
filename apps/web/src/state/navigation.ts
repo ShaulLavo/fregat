@@ -107,7 +107,7 @@ import type { SearchBufferOptionPatch } from '@/features/search/state/buffer-sta
 import { searchParamsFor } from '@/features/address/utils/search-params'
 import { logsParamsFor } from '@/features/address/utils/logs-params'
 import { defaultLogsFilterState } from '@/features/logs/utils/filter-params'
-import { type LogsFilterState } from '@workspace/client-core/logs/filters'
+import type { LogsFilterState } from '@workspace/client-core/logs/filters'
 import { settingsCategorySlug } from '@/features/address/utils/settings-category'
 import { shareableAddress } from '@/features/address/state/storage'
 import { buildAddressLocation } from '@/features/address/utils/route-options'
