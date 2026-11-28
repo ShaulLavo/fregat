@@ -19,7 +19,7 @@ import {
   type EditorApplyActions,
 } from '@/features/editor/state/apply-actions'
 import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
-import { type EditorOpenBenchmarkControl } from '@/features/editor/state/performance-trace'
+import type { EditorOpenBenchmarkControl } from '@/features/editor/state/performance-trace'
 import type { EditorUiStoreApi } from '@/features/editor/state/ui-state'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import {

@@ -5,7 +5,7 @@ import {
 } from '@singapore-editor/lsp'
 import { summarizeDiagnostics } from '@singapore-editor/lsp-plugin/diagnostics'
 import { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
-import { type LanguageServerSetPluginOptions } from '@singapore-editor/lsp-plugin/websocket'
+import type { LanguageServerSetPluginOptions } from '@singapore-editor/lsp-plugin/websocket'
 import { LSP_SERVER_EXITED, type LspServerExitedParams } from '@workspace/contracts'
 import { toast } from 'sonner'
 import { afterEach, beforeEach, describe, expectTypeOf, vi } from 'vitest'

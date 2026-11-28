@@ -18,7 +18,7 @@ import { TestEditorStateProvider as EditorStateProvider } from '../../../../test
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { useEditorUiStoreApi, type EditorUiStoreApi } from '@/features/editor/state/ui-state'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
-import { type EditorCommands } from '@/features/editor/state/commands'
+import type { EditorCommands } from '@/features/editor/state/commands'
 import {
   useEditorDocumentStoreApi,
   type EditorDocumentStoreApi,

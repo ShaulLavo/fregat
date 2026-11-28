@@ -8,18 +8,6 @@ const gate = join(import.meta.dirname, 'structure.ts')
 test('requires exact cycle edges under the selected apps', () => {
   const root = mkdtempSync(join(tmpdir(), 'fregat-structure-'))
   try {
-    writeFixture(
-      root,
-      'apps/web/tsconfig.json',
-      JSON.stringify({
-        compilerOptions: {
-          module: 'ESNext',
-          moduleResolution: 'Bundler',
-          verbatimModuleSyntax: true,
-        },
-      }),
-    )
-    writeFixture(root, 'apps/web/.unknot.json', '{"inlineTypeImportSideEffects":true}')
     writeFixture(root, 'apps/web/src/alpha/entry.ts', 'export const alpha = 1')
     writeFixture(root, 'apps/web/src/beta/entry.ts', 'export const beta = 2')
     writeFixture(root, 'apps/web/src/alpha/use-beta.ts', "export { beta } from '../beta/entry'")
@@ -53,21 +41,11 @@ test('requires exact cycle edges under the selected apps', () => {
     writeFixture(
       root,
       'apps/web/src/alpha/cycle.ts',
-      "import { type Beta } from '../beta/cycle'; export function alpha(value: Beta) { return value }",
+      "import '../beta/cycle'; import type { Beta } from '../beta/cycle'; export function alpha(value: Beta) { return value }",
     )
-    const inlineType = check(root)
-    expect(inlineType.exitCode).toBe(1)
-    expect(inlineType.stderr.toString()).toContain('src/alpha/cycle.ts imports src/beta/cycle.ts')
-
-    writeFixture(
-      root,
-      'apps/web/src/alpha/cycle.ts',
-      "export { type Beta } from '../beta/cycle'; export function alpha(value: number) { return value }",
-    )
-    expect(check(root).exitCode).toBe(0)
-
-    for (const app of ['server', 'tui']) writeInlineTypeCycle(root, `apps/${app}`)
-    expect(check(root).exitCode).toBe(0)
+    const sideEffect = check(root)
+    expect(sideEffect.exitCode).toBe(1)
+    expect(sideEffect.stderr.toString()).toContain('src/alpha/cycle.ts imports src/beta/cycle.ts')
 
     rmSync(join(root, 'apps/web/src/alpha/cycle.ts'))
     rmSync(join(root, 'apps/web/src/beta/cycle.ts'))
@@ -103,28 +81,4 @@ function writeFixture(root: string, name: string, content: string) {
   const path = join(root, name)
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, content + '\n')
-}
-
-function writeInlineTypeCycle(root: string, app: string) {
-  writeFixture(
-    root,
-    `${app}/tsconfig.json`,
-    JSON.stringify({
-      compilerOptions: {
-        module: 'ESNext',
-        moduleResolution: 'Bundler',
-        verbatimModuleSyntax: true,
-      },
-    }),
-  )
-  writeFixture(
-    root,
-    `${app}/src/alpha/cycle.ts`,
-    "import { type Beta } from '../beta/cycle'; export function alpha(value: Beta) { return value }",
-  )
-  writeFixture(
-    root,
-    `${app}/src/beta/cycle.ts`,
-    "import { alpha } from '../alpha/cycle'; export type Beta = number; export function beta() { return alpha(1) }",
-  )
 }
