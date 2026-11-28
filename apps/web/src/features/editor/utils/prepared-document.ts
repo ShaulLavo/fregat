@@ -1,9 +1,6 @@
-import { type EditorTextBuffer } from '@singapore-editor/core/document'
-import {
-  type EditorSyntaxProvider,
-  type EditorSyntaxLanguageId,
-} from '@singapore-editor/core/syntax'
-import { type EditorHighlighterProvider } from '@singapore-editor/core/extensions'
+import type { EditorTextBuffer } from '@singapore-editor/core/document'
+import type { EditorSyntaxProvider, EditorSyntaxLanguageId } from '@singapore-editor/core/syntax'
+import type { EditorHighlighterProvider } from '@singapore-editor/core/extensions'
 import {
   createEditorPreparedDocument,
   type EditorDocumentAnalysis,

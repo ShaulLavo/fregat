@@ -2,12 +2,12 @@ import { Spinner } from '@workspace/ui/components/spinner'
 import { useBalanceDraft } from '@/features/chat/hooks/use-balance-draft'
 import { ComposerRootsContext } from '@/lib/composer-attach/providers/roots-context'
 import { advanceBackgroundDraft } from '@/features/chat/state/advance-background-draft'
-import {
-  type ModelSelection,
-  type OrchestrationProjectShell,
-  type SessionId,
-  type OrchestrationWorktreeShell,
-  type SessionWorktreeTarget,
+import type {
+  ModelSelection,
+  OrchestrationProjectShell,
+  SessionId,
+  OrchestrationWorktreeShell,
+  SessionWorktreeTarget,
 } from '@workspace/contracts'
 import { useQuery } from '@tanstack/react-query'
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'

@@ -31,7 +31,7 @@ import { createNavigation } from '@/state/navigation'
 import { canPlaceEditorTab } from '@/features/workbench/state/group-geometry'
 import { NavigationProvider } from '@/providers/navigation-provider'
 import { LoggingErrorBoundary } from '@/components/logging-error-boundary.tsx'
-import {} from '@/features/settings/providers/appearance-provider.tsx'
+import type {} from '@/features/settings/providers/appearance-provider.tsx'
 import { applyAppearance } from '@/features/settings/utils/apply-appearance.ts'
 import {
   applyPaletteStylesheet,
