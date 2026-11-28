@@ -26,6 +26,7 @@
     "playwright": "catalog:",
     "sharp": "^0.35.4",
     "typescript": "catalog:",
+    "unknot": "0.1.2",
     "valibot": "^1.5.0",
     "vitest": "catalog:",
     "wrangler": "4.149.0"

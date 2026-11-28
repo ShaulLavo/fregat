@@ -1,5 +1,5 @@
 # Structure debt that existed when this project adopted unknot.
-# Fixing an entry never fails the run; anything not listed here does.
+# Remove each entry as its finding is fixed.
 # rules: field-leak forward-ref import-cycle long-file module-cycle prop-drilling shallow-module tangle wide-directory wide-injection
 long-file src/fs/workspace-edit.ts
 long-file src/git/service.ts
