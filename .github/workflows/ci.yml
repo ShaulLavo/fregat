@@ -249,6 +249,11 @@ jobs:
         if: ${{ needs.changes.outputs.desktop_native == 'true' }}
         run: bun run --cwd apps/desktop build:native
 
+      # Scan the three app roots so the reference clones stay outside the scan.
+      - name: Architecture lint
+        if: ${{ needs.changes.outputs.tooling == 'true' || needs.changes.outputs.web == 'true' || needs.changes.outputs.server == 'true' || needs.changes.outputs.tui == 'true' }}
+        run: bun run lint:structure
+
       - name: Package checks
         env:
           CI_PACKAGES: ${{ needs.changes.outputs.packages }}

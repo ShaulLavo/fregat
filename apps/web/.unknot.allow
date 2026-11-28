@@ -1,0 +1,34 @@
+# Structure debt that existed when this project adopted unknot.
+# Fixing an entry never fails the run; anything not listed here does.
+# rules: field-leak forward-ref import-cycle long-file module-cycle prop-drilling shallow-module tangle wide-directory wide-injection
+import-cycle src/keymap/menus/components/item-row.tsx <-> src/keymap/menus/components/section.tsx
+long-file src/features/editor/state/workspace-document-service.ts
+long-file src/features/editor/state/workspace-edit-service.ts
+long-file src/lib/file-open-intent/state/service.ts
+module-cycle src/components <-> src/components/pdf-viewer <-> src/features/address/state <-> src/features/address/utils <-> src/features/chat-mode/components <-> src/features/chat-mode/hooks <-> src/features/chat-mode/providers <-> src/features/chat-mode/state <-> src/features/chat-mode/transport <-> src/features/chat-mode/utils <-> src/features/chat/components <-> src/features/chat/hooks <-> src/features/chat/providers <-> src/features/chat/state <-> src/features/chat/transport <-> src/features/chat/utils <-> src/features/command-palette/utils <-> src/features/editor/components <-> src/features/editor/hooks <-> src/features/editor/providers <-> src/features/editor/state <-> src/features/editor/utils <-> src/features/environments/components <-> src/features/environments/hooks <-> src/features/file-picker/components <-> src/features/file-picker/hooks <-> src/features/file-picker/state <-> src/features/file-picker/utils <-> src/features/git/components <-> src/features/git/hooks <-> src/features/git/providers <-> src/features/git/state <-> src/features/git/utils <-> src/features/logs/components <-> src/features/logs/hooks <-> src/features/logs/state <-> src/features/logs/utils <-> src/features/onboarding/components <-> src/features/onboarding/hooks <-> src/features/onboarding/utils <-> src/features/search/components <-> src/features/search/hooks <-> src/features/search/state <-> src/features/search/utils <-> src/features/server-update/components <-> src/features/server-update/hooks <-> src/features/server-update/state <-> src/features/server-update/utils <-> src/features/settings/components <-> src/features/settings/hooks <-> src/features/settings/providers <-> src/features/settings/state <-> src/features/settings/utils <-> src/features/terminal/components <-> src/features/terminal/hooks <-> src/features/terminal/state <-> src/features/terminal/utils <-> src/features/workbench/components <-> src/features/workbench/hooks <-> src/features/workbench/providers <-> src/features/workbench/state <-> src/features/workbench/utils <-> src/features/workspace/components <-> src/features/workspace/hooks <-> src/features/workspace/state <-> src/features/workspace/utils <-> src/hooks <-> src/keymap <-> src/keymap/hooks <-> src/keymap/menus/components <-> src/keymap/menus/hooks <-> src/keymap/menus/utils <-> src/keymap/providers <-> src/keymap/state <-> src/keymap/utils <-> src/lib <-> src/lib/file-open-intent/hooks <-> src/lib/intent-prefetch/hooks <-> src/lib/markdown-mode/hooks <-> src/providers <-> src/state
+module-cycle src/lib/code-theme/state <-> src/lib/highlighting/state
+module-cycle src/lib/environments/state <-> src/lib/environments/utils
+module-cycle src/lib/keep-alive/components <-> src/lib/keep-alive/hooks <-> src/lib/keep-alive/providers
+prop-drilling src/features/file-picker/components/places-sheet.tsx#PlacesSheet.currentPath
+prop-drilling src/features/file-picker/components/places-sidebar.tsx#PlacesSidebar.currentPath
+prop-drilling src/features/search/components/result-editor-surface.tsx#SearchResultEditorSurface.canReplace
+prop-drilling src/features/search/components/result-editor-surface.tsx#SearchResultEditorSurface.replaceVisible
+prop-drilling src/features/search/components/results-view.tsx#SearchResultsView.query
+prop-drilling src/features/workbench/components/layout.tsx#WorkbenchLayout.conflicts
+prop-drilling src/features/workbench/components/layout.tsx#WorkbenchLayout.gitFiles
+prop-drilling src/features/workbench/components/layout.tsx#WorkbenchLayout.rootPath
+wide-directory src/components
+wide-directory src/features/chat-mode/components
+wide-directory src/features/chat/components
+wide-directory src/features/chat/hooks
+wide-directory src/features/chat/state
+wide-directory src/features/chat/utils
+wide-directory src/features/editor/state
+wide-directory src/features/editor/utils
+wide-directory src/features/git/components
+wide-directory src/features/git/hooks
+wide-directory src/features/settings/components
+wide-directory src/features/settings/hooks
+wide-directory src/features/settings/utils
+wide-directory src/features/workbench/components
+wide-directory src/lib

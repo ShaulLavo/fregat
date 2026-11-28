@@ -1,0 +1,5 @@
+# Structure debt that existed when this project adopted unknot.
+# Fixing an entry never fails the run; anything not listed here does.
+# rules: field-leak forward-ref import-cycle long-file module-cycle prop-drilling shallow-module tangle wide-directory wide-injection
+module-cycle src/agent-models/components <-> src/agent-rail/components <-> src/agent-stage/components <-> src/agent/components <-> src/commands/components <-> src/components <-> src/editor/components <-> src/editor/providers <-> src/files/components <-> src/git/components <-> src/logs/components <-> src/navigation/components <-> src/search/components <-> src/settings/components <-> src/terminal/components <-> src/tree/components <-> src/viewer/components <-> src/workbench/components <-> src/worktrees/components
+prop-drilling src/components/foundation.tsx#Foundation.theme
