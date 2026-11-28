@@ -133,7 +133,7 @@ test('cancelled and cleanup close first admission idempotently even after the ph
       beginColdProfile(true, { syntax: 'plain', font: 'normal', saved: 'absent' }, output)
       markColdProfile('start')
       observe('coldWire', input, () => 17)
-      if (capped) for (let i = 1; i < 9; i++) markColdProfile('setup')
+      if (capped) fillPhaseSnapshots()
       markColdProfile('cancelled')
       observe('coldWire', input, () => 0)
       markColdProfile('cleanup')
@@ -154,6 +154,10 @@ test('cancelled and cleanup close first admission idempotently even after the ph
     await rm(output, { recursive: true, force: true })
   }
 })
+
+function fillPhaseSnapshots() {
+  for (let i = 1; i < 9; i++) markColdProfile('setup')
+}
 
 test('repeated and late registrations retain the admitted counter owner and old closures stay reported', async () => {
   globalThis.__retentionColdCost = undefined

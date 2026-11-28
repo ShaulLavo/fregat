@@ -1,42 +1,24 @@
-import { Fragment } from 'react'
-import type { GitFileStatus } from '@workspace/contracts'
+import { Fragment, type ReactNode } from 'react'
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@workspace/ui/components/resizable'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
-import { EditorGroup } from '@/features/workbench/components/editor-group'
-import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
 import { minimumGroupSize } from '@/lib/documents/utils/group-layout'
-import type { GroupId, GroupNode } from '@/lib/documents/utils/group-types'
-import type { FilesystemPath } from '@/lib/documents/utils/types'
+import type { EditorGroup, GroupId, GroupNode } from '@/lib/documents/utils/group-types'
 
 export function EditorGroupsLayout({
   activeGroupId,
-  conflicts,
-  gitFiles,
   node,
-  rootPath,
+  renderGroup,
 }: {
   readonly activeGroupId: GroupId
-  readonly conflicts: EditorTabConflictMap
-  readonly gitFiles: readonly GitFileStatus[]
   readonly node: GroupNode
-  readonly rootPath: FilesystemPath
+  readonly renderGroup: (group: EditorGroup, active: boolean) => ReactNode
 }) {
   const commands = useEditorCommands()
-  if (node.kind === 'group') {
-    return (
-      <EditorGroup
-        active={node.id === activeGroupId}
-        conflicts={conflicts}
-        gitFiles={gitFiles}
-        group={node}
-        rootPath={rootPath}
-      />
-    )
-  }
+  if (node.kind === 'group') return renderGroup(node, node.id === activeGroupId)
 
   const childIds = node.children.map(({ node: child }) => child.id)
   const layout = Object.fromEntries(node.children.map(({ node: child, size }) => [child.id, size]))
@@ -68,10 +50,8 @@ export function EditorGroupsLayout({
             >
               <EditorGroupsLayout
                 activeGroupId={activeGroupId}
-                conflicts={conflicts}
-                gitFiles={gitFiles}
                 node={child}
-                rootPath={rootPath}
+                renderGroup={renderGroup}
               />
             </ResizablePanel>
           </Fragment>

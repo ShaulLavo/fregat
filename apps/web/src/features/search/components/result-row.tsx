@@ -1,4 +1,5 @@
-import { memo } from 'react'
+import { SearchResultQueryContext } from '@/features/search/providers/result-view-context'
+import { memo, use } from 'react'
 import type { ListRowProps } from '@workspace/ui/patterns/list-row'
 import type { WorkspaceSearchQuery } from '@workspace/contracts'
 import { SearchFileGroupHeader } from '@/features/search/components/file-group'
@@ -17,7 +18,6 @@ export const SearchResultRow = memo(
     compact,
     measurePreviewCell,
     previewMaxLength,
-    query,
     replaceQuery,
     replaceText,
     replaceVisible,
@@ -29,11 +29,11 @@ export const SearchResultRow = memo(
     compact?: boolean
     measurePreviewCell?: MeasurePreviewCell
     previewMaxLength?: number
-    query: string
     replaceQuery: WorkspaceSearchQuery | null
     replaceText: string
     replaceVisible?: boolean
   }) => {
+    const query = use(SearchResultQueryContext)
     const { openMatch, replaceGroup, replaceMatch, selectResult, toggleGroup } =
       useSearchResultActions()
 

@@ -1,6 +1,7 @@
+import { SearchResultReplacementContext } from '@/features/search/providers/result-view-context'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ArrowSquareOutIcon } from '@phosphor-icons/react'
-import { memo, useEffect, useRef, type MouseEvent, type RefObject } from 'react'
+import { memo, use, useEffect, useRef, type MouseEvent, type RefObject } from 'react'
 
 import {
   searchResultLineActionClassName,
@@ -12,23 +13,15 @@ import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
 type SearchResultFileLineActionRowProps = {
-  canReplace?: boolean
   line: SearchResultFileDocumentLine
   lineActionRowsRef: RefObject<Map<SearchResultId, HTMLDivElement>>
-  replaceVisible: boolean
   onOpenLine: (line: SearchResultFileDocumentLine) => void
   onReplaceLine: (line: SearchResultFileDocumentLine) => void
 }
 
 export const SearchResultFileLineActionRow = memo(
-  ({
-    canReplace,
-    line,
-    lineActionRowsRef,
-    replaceVisible,
-    onOpenLine,
-    onReplaceLine,
-  }: SearchResultFileLineActionRowProps) => {
+  ({ line, lineActionRowsRef, onOpenLine, onReplaceLine }: SearchResultFileLineActionRowProps) => {
+    const { canReplace, replaceVisible } = use(SearchResultReplacementContext)
     const rowRef = useRef<HTMLDivElement | null>(null)
     const openLabel = searchResultLineOpenLabel(line)
 

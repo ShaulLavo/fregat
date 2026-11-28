@@ -3,12 +3,12 @@ import { vi } from 'vitest'
 
 import { expect, test } from '../../../test/fixtures'
 import {
-  reportError,
   thrownErrorMessage,
   toClientError,
   toConnectionError,
   clientErrorDescription,
 } from '@/lib/client-error-taxonomy'
+import { reportError } from '@/lib/client-error-feedback'
 import { createEnvironmentProtocolMismatchError } from '@workspace/client-core/environments/utils/structured-errors'
 import { log, observeClientOperation } from '@/lib/client-logging'
 import { sanitizeRecord } from '@workspace/observability/sanitize'

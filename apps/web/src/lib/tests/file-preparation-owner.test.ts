@@ -4,11 +4,8 @@ import { join } from 'node:path'
 import { QueryClient } from '@tanstack/react-query'
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
-import {
-  ensureFileSnapshotQuery,
-  fileSnapshotPathFromQueryKey,
-  fileSnapshotQueryOptions,
-} from '@/lib/file-snapshot-query-cache'
+import { ensureFileSnapshotQuery, fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
+import { fileSnapshotPathFromQueryKey } from '@/lib/file-snapshot-cache-policy'
 import { createPlatformFileOpenPreparer } from '@/features/editor/utils/prepared-document'
 import { expect, test } from '../../../test/fixtures'
 import { createGatedMutationClient } from '../../../test/factories/gated-mutation-client'

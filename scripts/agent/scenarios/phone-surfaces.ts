@@ -416,19 +416,22 @@ async function expectNothingPastTheEdge(page: Page) {
       return false
     }
     const found = new Set<string>()
+    function findBeyondEdge(scroller: Element, edge: number) {
+      for (const element of scroller.querySelectorAll('*')) {
+        const box = element.getBoundingClientRect()
+        if (box.width === 0 || box.right <= edge + 1) continue
+        if (clippedBelow(element, scroller)) continue
+        found.add(
+          `${element.tagName.toLowerCase()}[${element.getAttribute('aria-label') ?? element.getAttribute('data-slot') ?? ''}] in ${element.closest('[data-setting-id], [id]')?.getAttribute('data-setting-id') ?? element.closest('[id]')?.id} right=${Math.round(box.right)} edge=${Math.round(edge)}`,
+        )
+      }
+    }
     for (const scroller of scrollers) {
       const edge = scroller.getBoundingClientRect().right
       for (let top = 0; top <= scroller.scrollHeight; top += scroller.clientHeight / 2) {
         scroller.scrollTop = top
         await new Promise((resolve) => requestAnimationFrame(() => resolve(null)))
-        for (const element of scroller.querySelectorAll('*')) {
-          const box = element.getBoundingClientRect()
-          if (box.width === 0 || box.right <= edge + 1) continue
-          if (clippedBelow(element, scroller)) continue
-          found.add(
-            `${element.tagName.toLowerCase()}[${element.getAttribute('aria-label') ?? element.getAttribute('data-slot') ?? ''}] in ${element.closest('[data-setting-id], [id]')?.getAttribute('data-setting-id') ?? element.closest('[id]')?.id} right=${Math.round(box.right)} edge=${Math.round(edge)}`,
-          )
-        }
+        findBeyondEdge(scroller, edge)
       }
       scroller.scrollTop = 0
     }

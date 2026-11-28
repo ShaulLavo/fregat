@@ -6,9 +6,9 @@ import { expect, test as it } from '../../../test/fixtures'
 import {
   FILE_SNAPSHOT_QUERY_GC_TIME_MS,
   ensureFileSnapshotQuery,
-  pruneFileSnapshotQueryCache,
   setFileSnapshotQueryData,
 } from '@/lib/file-snapshot-query-cache'
+import { pruneFileSnapshotQueryCache } from '@/lib/file-snapshot-cache-policy'
 import type { FileResult } from '@/lib/file-system-types'
 import { fileSystemKeys } from '@/lib/query-keys'
 

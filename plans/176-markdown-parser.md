@@ -2,13 +2,13 @@
 
 Owner direction, 2026-09-28: [Markdown experiences](../.internal/markdown-experiences.md)
 extends the target to visual and source-revealing authoring, rich composition and
-streaming chat on our parser. Keeping remark for chat and split rendering was
-the scope of the completed integration below. Migrating those consumers remains
-required future work, with streaming and rendering acceptance checks.
+streaming chat on our parser.
 
-The approved [chat qualification follow-up](chat-markdown-qualification.md) is scheduled later
-and does not block PR #1326. It lists later semantic, streaming, browser, visual and paired
-performance comparisons against remark under the owner's 2026-10-24 merge and delivery decision.
+[fregat#1326](https://github.com/ShaulLavo/fregat/pull/1326) merged on 2026-10-24 and switched
+streaming chat in `apps/web/src/features/chat/state/markdown-session.ts` to
+`createTreeSitterMarkdownSession` on `tree-sitter-md`. Split file preview still uses remark.
+The approved [chat qualification follow-up](chat-markdown-qualification.md) covers semantic,
+streaming, browser, visual, and paired performance comparisons against remark.
 
 ## Status and authorization
 
@@ -16,15 +16,15 @@ performance comparisons against remark under the owner's 2026-10-24 merge and de
   Owner adopted `tree-sitter-md` on 2026-09-26. The C resolver rewrite and the subsequent
   `tree-sitter-x` extension migration have landed upstream. Phase 0 below is the remaining
   release gate; do not repeat those migrations. The parser serves the source-backed live preview
-  and future rendered blocks inside the Editor. Chat and the existing split renderer keep remark.
+  and future rendered blocks inside the Editor.
 - Released parser: `tree-sitter-md@0.1.0`, source `5dd917a`. Editor integration and Platform
   CI pin: `7edf180cea1e03a477db4c4626d39c9e985cdb3b`.
 - The original research and Rust measurements below are historical. The
   [current implementation and release gate](#current-implementation-and-release-gate) supersede
   their packaging, completion and performance claims. The [behaviour research](../.internal/markdown-parser/editor-behaviour.md)
   separates observed editor practices from the proposed integration contract.
-- Replaces [Plan 108](108-markdown-modes.md) D5. Plan 108 Phase 2 and the chat parser decision
-  wait on this plan. [Plan 111](111-editor-decorations.md)'s decoration API does not.
+- Replaces [Plan 108](108-markdown-modes.md) D5. Plan 108 Phase 2 waits on this plan.
+  [Plan 111](111-editor-decorations.md)'s decoration API does not.
 - Planned at: Platform `d42184dc`, Editor `74e76be`, 2026-09-26. Researched at Platform
   `c130dd35a`, Editor `74e76be`. Origin: the investigation into markdown files painting as raw
   source before their live-preview decorations land.
@@ -76,7 +76,7 @@ before they inform a change here.
   color/preview at 118 ms; prepared tree opens paint together. Evidence:
   `/work/tmp/fregat-evidence/20260928T152625Z-trace-prefetch-first-paint`.
 - Markdown and MDX use the shared parser for colors, including code fences, under every theme.
-  The source-backed preview is enabled for Markdown. Chat and split rendering retain remark.
+  The source-backed preview is enabled for Markdown.
 
 The following release inventory records the state before implementation; the evidence above
 supersedes its remaining-work and benchmark claims.
@@ -113,8 +113,8 @@ per retained buffer and view-specific selections and range demands.
 ## Outcome
 
 One parser supplies structure for source-backed live preview and future fully rendered blocks
-inside the Editor, along with colours, folds and fence boundaries. The existing split view and
-chat keep remark. The historical research below explains the parser choice.
+inside the Editor, along with colours, folds and fence boundaries. The historical research
+below explains the parser choice.
 
 Owner direction, 2026-09-26: lean towards tree-sitter as the only markdown parser, editor and chat,
 if it can be made correct and fast enough. `@lezer/markdown` is a benchmark candidate and a fork of
@@ -340,8 +340,6 @@ The C rewrite has since landed; current release gates and expanded stress findin
   the current release gates above before claiming the integrated implementation meets the original
   timings.
 - **Split view** keeps remark (Plan 108 D4); its scroll sync reads remark positions.
-- **Chat keeps remark** until the editor settles (owner, question 2). tree-sitter-md reaches chat
-  only with footnotes, `$$` math and CJK flanking added and measured against remark.
 - **lezer** stays the fallback: if the owner rejects the bytes or the own-repository cost, Plan
   176's lezer recommendation and phases as of research/176b `1f74ff059` apply unchanged.
 
@@ -415,8 +413,6 @@ from the completed Phase 0 rewrite).
    found from changed ranges plus the edit, bounded input reads, one idle reparse after a full parse, and the cap refilled after deletes. Worker bench at
    1 MB: keystroke median 37 → 10 ms, first keystroke 82 → 20 ms. This phase keeps the rest.
 
-Chat: no phase while question 2 stands at (a).
-
 ## Recorded owner decisions
 
 1. **The parser behind live preview.** (a) `@lezer/markdown` on the main thread; tree-sitter
@@ -446,7 +442,6 @@ Chat: no phase while question 2 stands at (a).
   parser must support both; Plan 176 alone does not ship their full UX or Plan 108 Phase 3 features.
 - Plans 170/177 own general warm-up and prefetch infrastructure; Phase 1 integrates this parser
   with those paths and verifies its cold behaviour.
-- No change to chat rendering before the decision.
 
 ## October 2026 issue follow-ups
 

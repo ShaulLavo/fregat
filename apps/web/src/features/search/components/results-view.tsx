@@ -28,6 +28,7 @@ import type {
 } from '@/features/search/state/buffer-state'
 import { SearchIdleState } from '@/features/search/components/idle-state'
 import { SearchPendingOrEmpty } from '@/features/search/components/pending-or-empty'
+import { SearchResultQueryContext } from '@/features/search/providers/result-view-context'
 import { SearchResultRow } from '@/features/search/components/result-row'
 
 export function SearchResultsView({
@@ -170,7 +171,7 @@ export function SearchResultsView({
       : null
 
   return (
-    <>
+    <SearchResultQueryContext value={query}>
       <VirtualList
         {...list.containerProps}
         {...contextMenu.containerProps}
@@ -198,7 +199,6 @@ export function SearchResultsView({
             compact={compact}
             measurePreviewCell={preview.measureCell}
             previewMaxLength={preview.maxLength}
-            query={query}
             replaceQuery={resultsSearchQuery}
             replaceText={replaceText}
             replaceVisible={replaceVisible}
@@ -214,6 +214,6 @@ export function SearchResultsView({
           onOpenChange={contextMenu.onOpenChange}
         />
       ) : null}
-    </>
+    </SearchResultQueryContext>
   )
 }

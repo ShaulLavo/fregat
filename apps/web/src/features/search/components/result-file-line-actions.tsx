@@ -9,20 +9,16 @@ import type {
 } from '@/features/search/utils/result-view-model'
 
 type SearchResultFileLineActionsProps = {
-  canReplace?: boolean
   document: SearchResultFileDocument
   lineActionRowsRef: RefObject<Map<SearchResultId, HTMLDivElement>>
-  replaceVisible: boolean
   onOpenLine: (line: SearchResultFileDocumentLine) => void
   onReplaceLine: (line: SearchResultFileDocumentLine) => void
 }
 
 export const SearchResultFileLineActions = memo(
   ({
-    canReplace,
     document,
     lineActionRowsRef,
-    replaceVisible,
     onOpenLine,
     onReplaceLine,
   }: SearchResultFileLineActionsProps) => {
@@ -35,11 +31,9 @@ export const SearchResultFileLineActions = memo(
       >
         {lines.map((line) => (
           <SearchResultFileLineActionRow
-            canReplace={canReplace}
             key={line.id}
             line={line}
             lineActionRowsRef={lineActionRowsRef}
-            replaceVisible={replaceVisible}
             onOpenLine={onOpenLine}
             onReplaceLine={onReplaceLine}
           />

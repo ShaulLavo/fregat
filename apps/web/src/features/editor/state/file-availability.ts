@@ -4,7 +4,7 @@ import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-
 import { allEditorTabs } from '@/lib/documents/utils/groups'
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import { toClientError } from '@/lib/client-error-taxonomy'
-import { fileSnapshotPathFromQueryKey } from '@/lib/file-snapshot-query-cache'
+import { fileSnapshotPathFromQueryKey } from '@/lib/file-snapshot-cache-policy'
 import type { FileResult } from '@/lib/file-system-types'
 
 export function watchFileAvailability({
