@@ -105,67 +105,7 @@ for await (const chunk of Bun.file(3).stream()) {
     buffered = buffered.slice(end + 1)
     appendFileSync(process.argv[3] + '.requests', JSON.stringify(message) + '\n')
     if (message.method.startsWith('PWA.')) {
-      if (
-        message.method === 'PWA.getOsAppState' &&
-        ((mode === 'race-paused' && !installed) || (mode === 'race-shortcut' && installed))
-      ) {
-        await Bun.write(process.argv[3] + '.paused', 'ready')
-        while (!existsSync(process.argv[3] + '.release')) await Bun.sleep(5)
-      }
-      if (mode === 'exit-install' && message.method === 'PWA.getOsAppState') process.exit(3)
-      if (mode === 'slow-install' && message.method === 'PWA.getOsAppState') busy(6000)
-      if (mode === 'silent-install' && message.method === 'PWA.getOsAppState') {
-        end = buffered.indexOf('\0')
-        continue
-      }
-      if (mode === 'reject-install' && message.method === 'PWA.getOsAppState') {
-        writeSync(4, JSON.stringify({ id: message.id, error: { code: -1 } }) + '\0')
-        end = buffered.indexOf('\0')
-        continue
-      }
-      let result = {}
-      let error
-      if (mode === 'pwa-unavailable')
-        error = { code: -32000, message: 'Webapps are not available in current profile.' }
-      else if (mode === 'pwa-invalid-params')
-        error = { code: -32602, message: 'Invalid manifest id containing private URL' }
-      else if (mode === 'pwa-install-failed' && message.method === 'PWA.install')
-        error = { code: -32600, message: 'Failed to install private URL' }
-      else if (mode === 'pwa-verify-failed' && installed && message.method === 'PWA.getOsAppState')
-        error = { code: -32600, message: 'Failed to launch private URL' }
-      else if (mode === 'pwa-unsupported') error = { code: -32601, message: 'Method not found' }
-      else if (mode === 'pwa-install-unsupported' && message.method === 'PWA.install')
-        error = { code: -32601, message: 'Method not found' }
-      else if (message.method === 'PWA.getOsAppState') {
-        if (!installed || mode === 'pwa-install-unsupported')
-          error = {
-            code: -32602,
-            message: 'Unknown web-app manifest id ' + message.params.manifestId,
-          }
-        else result = { badgeCount: 0, fileHandlers: [] }
-      } else if (message.method === 'PWA.install') {
-        installed = true
-        if (race) {
-          await Bun.write(process.argv[3] + '.installed', 'yes')
-          const { installedIdentity } = await import('../../installed-app.ts')
-          mkdirSync(
-            path.join(
-              profile,
-              'Platform',
-              'Web Applications',
-              'Manifest Resources',
-              installedIdentity(message.params.manifestId).appId,
-            ),
-            { recursive: true },
-          )
-        }
-      } else if (message.method === 'PWA.launch') {
-        result = { targetId: 'installed-app' }
-      }
-      writeSync(
-        4,
-        JSON.stringify({ id: message.id, result: error ? undefined : result, error }) + '\0',
-      )
+      await respondToPwa(message)
       end = buffered.indexOf('\0')
       continue
     }
@@ -196,3 +136,60 @@ appendFileSync(
 )
 
 if (race) cleanupLock()
+
+async function respondToPwa(message) {
+  if (
+    message.method === 'PWA.getOsAppState' &&
+    ((mode === 'race-paused' && !installed) || (mode === 'race-shortcut' && installed))
+  ) {
+    await Bun.write(process.argv[3] + '.paused', 'ready')
+    while (!existsSync(process.argv[3] + '.release')) await Bun.sleep(5)
+  }
+  if (mode === 'exit-install' && message.method === 'PWA.getOsAppState') process.exit(3)
+  if (mode === 'slow-install' && message.method === 'PWA.getOsAppState') busy(6000)
+  if (mode === 'silent-install' && message.method === 'PWA.getOsAppState') return
+  if (mode === 'reject-install' && message.method === 'PWA.getOsAppState') {
+    writeSync(4, JSON.stringify({ id: message.id, error: { code: -1 } }) + '\0')
+    return
+  }
+  let result = {}
+  let error
+  if (mode === 'pwa-unavailable')
+    error = { code: -32000, message: 'Webapps are not available in current profile.' }
+  else if (mode === 'pwa-invalid-params')
+    error = { code: -32602, message: 'Invalid manifest id containing private URL' }
+  else if (mode === 'pwa-install-failed' && message.method === 'PWA.install')
+    error = { code: -32600, message: 'Failed to install private URL' }
+  else if (mode === 'pwa-verify-failed' && installed && message.method === 'PWA.getOsAppState')
+    error = { code: -32600, message: 'Failed to launch private URL' }
+  else if (mode === 'pwa-unsupported') error = { code: -32601, message: 'Method not found' }
+  else if (mode === 'pwa-install-unsupported' && message.method === 'PWA.install')
+    error = { code: -32601, message: 'Method not found' }
+  else if (message.method === 'PWA.getOsAppState') {
+    if (!installed || mode === 'pwa-install-unsupported')
+      error = {
+        code: -32602,
+        message: 'Unknown web-app manifest id ' + message.params.manifestId,
+      }
+    else result = { badgeCount: 0, fileHandlers: [] }
+  } else if (message.method === 'PWA.install') {
+    installed = true
+    if (race) {
+      await Bun.write(process.argv[3] + '.installed', 'yes')
+      const { installedIdentity } = await import('../../installed-app.ts')
+      mkdirSync(
+        path.join(
+          profile,
+          'Platform',
+          'Web Applications',
+          'Manifest Resources',
+          installedIdentity(message.params.manifestId).appId,
+        ),
+        { recursive: true },
+      )
+    }
+  } else if (message.method === 'PWA.launch') {
+    result = { targetId: 'installed-app' }
+  }
+  writeSync(4, JSON.stringify({ id: message.id, result: error ? undefined : result, error }) + '\0')
+}

@@ -3,7 +3,6 @@
 # rules: field-leak forward-ref import-cycle import-cycle-edge long-file module-cycle module-cycle-edge prop-drilling shallow-module tangle wide-directory wide-injection
 long-file src/fs/workspace-edit.ts
 long-file src/git/service.ts
-long-file src/lsp/proxy-session.ts
 long-file src/orchestration/engine.ts
 long-file src/orchestration/projection-pipeline.ts
 long-file src/provider/adapters/claude.ts

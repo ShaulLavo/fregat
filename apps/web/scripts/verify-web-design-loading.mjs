@@ -301,23 +301,7 @@ export async function verifyDesignLoading(options) {
       await lane.pending().waitFor({ state: 'hidden', timeout: 20_000 })
       if (terminal) await terminal.ready()
       await settleAnimations(page)
-      for (let index = 0; index < lane.headers.length; index++) {
-        const header = lane.headers[index]
-        const measurement = result.headers[index]
-        await header.loaded().waitFor({ state: 'visible' })
-        measurement.loaded = await geometry(header.loaded(), Boolean(lane.viewport))
-        measurement.sameNode = await header
-          .loaded()
-          .evaluate((element, previous) => element === previous, pendingHandles[index])
-        measurement.differences = geometryDifferences(
-          measurement.loading,
-          measurement.loaded,
-          header.bar,
-          density,
-        )
-        if (header.retained && !measurement.sameNode)
-          measurement.differences.push('retained header DOM node was replaced')
-      }
+      await measureResolvedHeaders(lane, result.headers, pendingHandles, density)
       await page.screenshot({ path: join(directory, `${lane.name}-loaded.png`) })
       if (capture) result.loadedCapture = await capture(`loading-${lane.name}-resolved`)
       result.status = result.headers.some((header) => header.differences.length)
@@ -579,5 +563,25 @@ async function holdSocket(page, rule) {
       active = false
       for (const forward of queued) forward()
     },
+  }
+}
+
+async function measureResolvedHeaders(lane, headers, pendingHandles, density) {
+  for (let index = 0; index < lane.headers.length; index++) {
+    const header = lane.headers[index]
+    const measurement = headers[index]
+    await header.loaded().waitFor({ state: 'visible' })
+    measurement.loaded = await geometry(header.loaded(), Boolean(lane.viewport))
+    measurement.sameNode = await header
+      .loaded()
+      .evaluate((element, previous) => element === previous, pendingHandles[index])
+    measurement.differences = geometryDifferences(
+      measurement.loading,
+      measurement.loaded,
+      header.bar,
+      density,
+    )
+    if (header.retained && !measurement.sameNode)
+      measurement.differences.push('retained header DOM node was replaced')
   }
 }
