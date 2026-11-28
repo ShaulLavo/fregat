@@ -12,7 +12,7 @@ import { SymbolKindIcon } from '@/features/workbench/components/symbol-kind-icon
 import { breadcrumbPathItems, symbolRowKey } from '@/features/workbench/utils/breadcrumbs'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
-import { type DocumentSymbol } from '@/lib/document-symbols'
+import type { DocumentSymbol } from '@/lib/document-symbols'
 import { fileUriForPath } from '@workspace/contracts'
 import { iconForEntry } from '@/lib/file-icons'
 

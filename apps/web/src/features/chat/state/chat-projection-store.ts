@@ -2,14 +2,14 @@ import {
   createInitialChatProjectionSlice,
   type ChatProjectionSlice,
 } from '@workspace/client-core/chat/types'
-import {
-  type EnvironmentId,
-  type OrchestrationEvent,
-  type OrchestrationShellSnapshot,
-  type OrchestrationShellStreamItem,
-  type OrchestrationSessionDetailPage,
-  type OrchestrationSessionDetailSnapshot,
-  type OrchestrationSessionStreamItem,
+import type {
+  EnvironmentId,
+  OrchestrationEvent,
+  OrchestrationShellSnapshot,
+  OrchestrationShellStreamItem,
+  OrchestrationSessionDetailPage,
+  OrchestrationSessionDetailSnapshot,
+  OrchestrationSessionStreamItem,
 } from '@workspace/contracts'
 import { Throttler } from '@tanstack/react-pacer/throttler'
 import { clientLogEnabled } from '@/lib/client-logging'

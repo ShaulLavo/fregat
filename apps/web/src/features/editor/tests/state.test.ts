@@ -17,7 +17,7 @@ import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import { QueryClient } from '@tanstack/react-query'
 import { createEditorBufferSession, type EditorTextBuffer } from '@singapore-editor/core/document'
-import { type EditorPreparedDocument } from '@singapore-editor/core/editor'
+import type { EditorPreparedDocument } from '@singapore-editor/core/editor'
 import { describe, vi } from 'vitest'
 import { expect, test } from '../../../../test/fixtures'
 import {

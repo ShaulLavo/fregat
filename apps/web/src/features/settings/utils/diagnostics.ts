@@ -1,6 +1,6 @@
 import { settingsDiagnosticLabel } from '@workspace/client-core/settings/diagnostic-label'
 import { offsetToLspPosition } from '@singapore-editor/lsp/positions'
-import { type lsp } from '@singapore-editor/lsp'
+import type { lsp } from '@singapore-editor/lsp'
 import type {
   SettingsDiagnostic,
   SettingsLayerFile,
