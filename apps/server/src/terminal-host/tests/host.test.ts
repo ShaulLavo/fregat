@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, it, onTestFinished } from 'vitest'
 
-import { createTestTerminalHost } from '../testing'
+import { createTestTerminalHost } from './fixture'
 import { ensureSocketDirectory, ensureToken, hostPaths, RING_BYTES } from '../protocol'
 
 const hosts: Awaited<ReturnType<typeof createTestTerminalHost>>[] = []

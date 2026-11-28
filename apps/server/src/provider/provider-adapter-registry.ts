@@ -21,10 +21,7 @@ import {
   type ProviderSnapshot,
 } from '@workspace/contracts'
 import * as v from 'valibot'
-import {
-  recordChatPipelineInfo,
-  recordChatPipelineWarning,
-} from '../orchestration/orchestration-logging'
+import { recordChatPipelineInfo, recordChatPipelineWarning } from '../observability/chat-pipeline'
 import { AsyncQueue } from '../async-queue'
 import { ProviderCredentialWatch } from './credential-watch'
 import type { AnyProviderDriver, ProviderDriverServices, ProviderInstanceConfig } from './driver'

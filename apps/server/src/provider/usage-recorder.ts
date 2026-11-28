@@ -5,10 +5,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import * as v from 'valibot'
 import type { PlatformDatabase } from '../db/client'
 import { providerUsageBaselines, providerUsageTurns } from '../db/schema'
-import {
-  recordChatPipelineInfo,
-  recordChatPipelineWarning,
-} from '../orchestration/orchestration-logging'
+import { recordChatPipelineInfo, recordChatPipelineWarning } from '../observability/chat-pipeline'
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'
 import type { ProviderPriceCatalog } from './price-catalog'
 import {

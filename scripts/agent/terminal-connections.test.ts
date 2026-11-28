@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { createTestTerminalHost } from '../../apps/server/src/terminal-host/testing'
+import { createTestTerminalHost } from '../../apps/server/src/terminal-host/tests/fixture'
 import { reattachedTerminal } from './terminal-connections'
 
 test('replayed bytes from an old viewer cannot authorize input before a fresh attachment is ready', async () => {

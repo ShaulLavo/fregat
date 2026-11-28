@@ -12,17 +12,6 @@ export type CheckpointCaptureInput = {
   ref: string
 }
 
-export type CheckpointRefInput = {
-  path: string
-  ref: string
-}
-
-export type CheckpointRestoreInput = {
-  fallbackToHead?: boolean
-  path: string
-  ref: string
-}
-
 export type CheckpointDiffInput = {
   /** Treat a missing `fromRef` as HEAD instead of failing (turn-zero fallback). */
   fallbackFromToHead?: boolean
@@ -30,11 +19,6 @@ export type CheckpointDiffInput = {
   ignoreWhitespace: boolean
   path: string
   toRef: string
-}
-
-export type CheckpointDeleteInput = {
-  path: string
-  refs: readonly string[]
 }
 
 /**
@@ -79,18 +63,6 @@ export class GitCheckpointStore {
     } finally {
       await rm(indexFile, { force: true })
     }
-  }
-
-  has(input: CheckpointRefInput): Promise<boolean> {
-    return this.git.hasRef(input)
-  }
-
-  restore(input: CheckpointRestoreInput): Promise<boolean> {
-    return this.git.restoreRef(input)
-  }
-
-  deleteRefs(input: CheckpointDeleteInput): Promise<void> {
-    return this.git.deleteRefs(input)
   }
 
   async diff(input: CheckpointDiffInput): Promise<GitFileDiff[]> {

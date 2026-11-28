@@ -50,7 +50,7 @@ export { spawnTypeScript } from './lsp/typescript/runtime'
 export { spawnRustAnalyzer } from './lsp/installers'
 export type { LspProxyClientSession } from './lsp/proxy-session'
 export type { TerminalPtyFactory } from './terminal/service'
-export { createTestTerminalHost } from './terminal-host/testing'
+export { createTestTerminalHost } from './terminal-host/tests/fixture'
 
 export { LogReaderService } from './observability/log-reader'
 export { releaseSource } from './machines/update'

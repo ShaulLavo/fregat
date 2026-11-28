@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'vitest'
-import { createTestTerminalHost } from '../testing'
+import { createTestTerminalHost } from './fixture'
 import { TerminalHostClient } from '../../terminal/host-client'
 import { testSettingsOptions } from '../../settings/testing'
 import { closeTestApps, createTestApp } from '../../../test/server'

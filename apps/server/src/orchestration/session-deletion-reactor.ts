@@ -16,8 +16,8 @@ import type { OrchestrationReadModel } from './read-model'
 import type { TerminalService } from '../terminal/service'
 
 import { internalCommandKey } from './utils/repository-ids'
-import { recordChatPipelineInfo, recordChatPipelineWarning } from './orchestration-logging'
-import { SerialWorker } from './serial-worker'
+import { recordChatPipelineInfo, recordChatPipelineWarning } from '../observability/chat-pipeline'
+import { SerialWorker } from '../utils/serial-worker'
 import type { OrchestrationDomainEventReactor } from './streams'
 import { sessionDomainErrors } from './structured-errors'
 

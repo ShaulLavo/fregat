@@ -105,7 +105,7 @@ import {
   recordChatPipelineInfo,
   recordChatPipelineWarning,
   type CommandAttachmentIngest,
-} from './orchestration-logging'
+} from '../observability/chat-pipeline'
 import type { OrchestrationReadModel, OrchestrationProjectedSession } from './read-model'
 import { ReactorScheduler } from './reactor-scheduler'
 import { OrchestrationSnapshotQuery } from './snapshot-query'

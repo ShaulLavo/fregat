@@ -87,7 +87,7 @@ import {
   providerTurnSummary,
   recordChatPipelineInfo,
   recordChatPipelineWarning,
-} from '../../orchestration/orchestration-logging'
+} from '../../observability/chat-pipeline'
 import {
   CODEX_CLIENT_REQUEST_METHODS,
   CodexAccountRateLimitsUpdatedNotificationSchema,

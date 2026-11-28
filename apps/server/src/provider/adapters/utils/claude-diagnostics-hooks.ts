@@ -5,7 +5,7 @@ import { isRecord } from '@workspace/utils/objects'
 import { elapsedMs } from '@workspace/utils/timing'
 
 import type { AgentDiagnosticsSource } from '../../../lsp/agent-diagnostics'
-import { recordChatPipelineInfo } from '../../../orchestration/orchestration-logging'
+import { recordChatPipelineInfo } from '../../../observability/chat-pipeline'
 import { diagnosticsFeedback, newErrors } from '../../utils/agent-diagnostics-feedback'
 
 const EDIT_TOOLS = 'Edit|Write|MultiEdit|NotebookEdit'

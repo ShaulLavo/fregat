@@ -22,7 +22,7 @@ import {
   orchestrationCommandSummary,
   recordChatPipelineInfo,
   recordChatPipelineWarning,
-} from './orchestration-logging'
+} from '../observability/chat-pipeline'
 
 type ReceiptCommand =
   | OrchestrationCommand

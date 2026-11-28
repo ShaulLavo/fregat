@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SerialWorker } from '../serial-worker'
+import { SerialWorker } from '../../utils/serial-worker'
 
 describe('SerialWorker', () => {
   it('runs tasks one at a time in enqueue order', async () => {

@@ -5,10 +5,7 @@ import {
   type SessionId,
 } from '@workspace/contracts'
 
-import {
-  recordChatPipelineInfo,
-  recordChatPipelineWarning,
-} from '../orchestration/orchestration-logging'
+import { recordChatPipelineInfo, recordChatPipelineWarning } from '../observability/chat-pipeline'
 import type {
   ProviderRuntimeBindingWithMetadata,
   ProviderSessionDirectory,

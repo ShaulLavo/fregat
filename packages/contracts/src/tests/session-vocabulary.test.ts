@@ -12,6 +12,7 @@ const ownedRoots = [
   'apps/web/src/features/chat-mode',
   'apps/web/src/features/address',
 ]
+const ownedFiles = ['apps/server/src/observability/chat-pipeline.ts']
 const noun = ['th', 'read'].join('')
 const capitalNoun = ['Th', 'read'].join('')
 const idName = `${capitalNoun}Id`
@@ -36,7 +37,7 @@ test.each([
 
 test('retains only exact upstream protocol vocabulary across the session domain', () => {
   const actual: Record<string, Record<string, number>> = {}
-  for (const file of ownedRoots.flatMap(sourceFiles).sort()) {
+  for (const file of ownedRoots.flatMap(sourceFiles).concat(ownedFiles).sort()) {
     const symbols = symbolsInSource(readFileSync(path.join(repositoryRoot, file), 'utf8'))
     if (Object.keys(symbols).length === 0) continue
     actual[file] = symbols

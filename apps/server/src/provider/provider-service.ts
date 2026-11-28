@@ -49,7 +49,7 @@ import {
 } from './provider-session-directory'
 import { ProviderSessionReaper } from './provider-session-reaper'
 import { runtimeEventId } from './adapters/utils/runtime-ids'
-import { SerialWorker } from '../orchestration/serial-worker'
+import { SerialWorker } from '../utils/serial-worker'
 import {
   providerBindingSummary,
   providerRuntimeEventSummary,
@@ -57,7 +57,7 @@ import {
   providerTurnSummary,
   recordChatPipelineInfo,
   recordChatPipelineWarning,
-} from '../orchestration/orchestration-logging'
+} from '../observability/chat-pipeline'
 import type {
   ProviderApprovalResponseInput,
   ProviderRuntimeEvent,

@@ -35,8 +35,8 @@ import {
   PROVIDER_RUNTIME_BUFFER_TTL_MS,
   ProviderRuntimeBuffers,
 } from './provider-runtime-buffers'
-import { recordChatPipelineInfo } from './orchestration-logging'
-import { SerialWorker } from './serial-worker'
+import { recordChatPipelineInfo } from '../observability/chat-pipeline'
+import { SerialWorker } from '../utils/serial-worker'
 
 export type ProviderRuntimeDispatch = (
   command: InternalOrchestrationCommand | OrchestrationCommand,
