@@ -14,22 +14,13 @@ import { searchResultVirtualRowId } from '@/features/search/utils/result-view-mo
 
 type SearchResultFileEditorPoolSlotProps = {
   activeResultId: SearchResultId | null
-  canReplace?: boolean
   editorTheme: EditorTheme
   slot: SearchResultFileEditorSlot
-  replaceVisible: boolean
   treeId: string
 }
 
 export const SearchResultFileEditorPoolSlot = memo(
-  ({
-    activeResultId,
-    canReplace,
-    editorTheme,
-    slot,
-    replaceVisible,
-    treeId,
-  }: SearchResultFileEditorPoolSlotProps) => {
+  ({ activeResultId, editorTheme, slot, treeId }: SearchResultFileEditorPoolSlotProps) => {
     const { item, lineWindow, visible } = slot
     const row = item.row
     const file = row.file
@@ -67,12 +58,10 @@ export const SearchResultFileEditorPoolSlot = memo(
       >
         <SearchResultFileEditor
           activeResultId={active ? activeResultId : null}
-          canReplace={canReplace}
           editorTheme={editorTheme}
           file={file}
           lineWindow={lineWindow}
           parked={!visible}
-          replaceVisible={replaceVisible}
         />
       </div>
     )

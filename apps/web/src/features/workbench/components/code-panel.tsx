@@ -4,6 +4,7 @@ import { minimumGroupSize } from '@/lib/documents/utils/group-layout'
 import { EMPTY_GIT_FILES } from '@/features/workspace/utils/tab-model'
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
 import type { WorkbenchPanels } from '@/features/workbench/utils/panels'
+import { EditorGroup } from '@/features/workbench/components/editor-group'
 import { EditorGroupsLayout } from '@/features/workbench/components/editor-groups-layout'
 import { EditorGroupsDragProvider } from '@/features/workbench/providers/editor-groups-drag-provider'
 
@@ -29,10 +30,16 @@ export function CodePanel({
         >
           <EditorGroupsLayout
             activeGroupId={panels.editorGroups.activeGroupId}
-            conflicts={conflicts}
-            gitFiles={gitFiles}
             node={panels.editorGroups.root}
-            rootPath={rootPath}
+            renderGroup={(group, active) => (
+              <EditorGroup
+                active={active}
+                conflicts={conflicts}
+                gitFiles={gitFiles}
+                group={group}
+                rootPath={rootPath}
+              />
+            )}
           />
         </div>
       </div>
