@@ -5,7 +5,7 @@ import { settingParentId, type SettingId } from '@workspace/contracts'
 
 import { isSettingAvailable, settingEnvironment } from '@/features/settings/utils/availability'
 import { MCP_CATEGORY, matchesMcpSearch } from '@/features/settings/utils/mcp'
-import { matchesPushSearch } from '@/features/settings/utils/push-device'
+import { matchesPushSearch } from '@/features/settings/utils/devices/push-device'
 import { matchingShortcutRows, type ShortcutRow } from '@/features/settings/utils/shortcut-rows'
 import { matchesUsageSearch } from '@/features/settings/utils/usage'
 

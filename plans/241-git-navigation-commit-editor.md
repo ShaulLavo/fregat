@@ -37,12 +37,12 @@ Switch changes/history, navigate trees/graph controls, filter recent branches, e
 
 ## Existing implementation
 
-[HistoryList](../apps/web/src/features/git/components/history-list.tsx) already virtualizes
-commits with listbox navigation. [HistoryGraph](../apps/web/src/features/git/components/history-graph.tsx)
+[HistoryList](../apps/web/src/features/git/components/commits/history-list.tsx) already virtualizes
+commits with listbox navigation. [HistoryGraph](../apps/web/src/features/git/components/commits/history-graph.tsx)
 and [history layout](../apps/web/src/features/git/utils/history-layout.ts) draw commit lanes.
 Graph lanes exist; interactive graph controls remain to be added.
 [CommitControls](../apps/web/src/features/git/components/commit-controls.tsx) uses a single-line
-input; [useCommitAction](../apps/web/src/features/git/hooks/use-commit-action.ts) owns submission.
+input; [useCommitAction](../apps/web/src/features/git/hooks/commit/use-commit-action.ts) owns submission.
 [GitService](../apps/server/src/git/service.ts) has streamed commit progress. The
 [file-backed commit editor](../apps/web/src/features/git/components/message-file-commit.tsx) is
 an adjacent workflow. Editor document sessions exist in

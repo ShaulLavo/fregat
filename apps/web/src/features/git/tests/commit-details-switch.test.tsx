@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import type { HistoricalDiffOpen } from '@/lib/documents/utils/comparisons'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
-import { CommitDetails } from '@/features/git/components/commit-details'
+import { CommitDetails } from '@/features/git/components/commits/commit-details'
 import { commitDetailsQueryOptions } from '@/lib/git-commit-details-query'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { historyRepository } from '../../../../test/factories/git-history'

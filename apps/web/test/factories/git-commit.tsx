@@ -5,7 +5,7 @@ import { onTestFinished } from 'vitest'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
 
-import { useCommitAction } from '@/features/git/hooks/use-commit-action'
+import { useCommitAction } from '@/features/git/hooks/commit/use-commit-action'
 import { GitStoreProvider } from '@/features/git/providers/store-provider'
 import { activeServerOrigin, getClient, setActiveServerOrigin, setClient } from '@/lib/client'
 import { originForQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'

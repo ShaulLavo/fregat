@@ -28,7 +28,7 @@ import {
   useEditorWorkspaceState,
 } from '@/features/editor/state/workspace-state'
 import { useWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
-import { useOpenFileAtRef } from '@/features/git/hooks/use-open-file-at-ref'
+import { useOpenFileAtRef } from '@/features/git/hooks/commits/use-open-file-at-ref'
 import { SettingsDialog } from '@/features/settings/components/dialog'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { readSettingBootValue } from '@/lib/settings-boot-mirror'

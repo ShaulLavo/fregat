@@ -9,7 +9,7 @@ import {
 } from '../../../../test/factories/usage'
 import { renderWithProviders } from '../../../../test/render'
 import { expect, test } from '../../../../test/fixtures'
-import { UsageSection } from '@/features/settings/components/usage-section'
+import { UsageSection } from '@/features/settings/components/usage/usage-section'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { usageHistoryQueryOptions } from '@/features/settings/utils/usage-history-query'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'

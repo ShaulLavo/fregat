@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 import { coarseClockStore } from '@/state/coarse-clock'
-import { TranscriptCoverage } from '@/features/settings/components/transcript-coverage'
+import { TranscriptCoverage } from '@/features/settings/components/usage/transcript-coverage'
 import { UsageLimitsMeter } from '@/features/chat/components/usage-limits-meter'
 import { accountUsageFixture } from '../../../../test/factories/account-usage'
 import { expect, test } from '../../../../test/fixtures'

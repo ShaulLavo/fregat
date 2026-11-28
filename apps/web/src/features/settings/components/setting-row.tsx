@@ -15,10 +15,10 @@ import {
   type ColorMode,
 } from '@workspace/contracts'
 
-import { KeybindingSection } from '@/features/settings/components/keybinding-section'
-import { ModelSection } from '@/features/settings/components/model-section'
+import { KeybindingSection } from '@/features/settings/components/shortcuts/keybinding-section'
+import { ModelSection } from '@/features/settings/components/providers/model-section'
 import { MachinesSection } from '@/features/settings/components/machines-section'
-import { ProviderSection } from '@/features/settings/components/provider-section'
+import { ProviderSection } from '@/features/settings/components/providers/provider-section'
 import { RowActions } from '@/features/settings/components/row-actions'
 import { SettingDetails } from '@/features/settings/components/setting-details'
 import { BooleanWidget } from '@/features/settings/components/widgets/boolean-widget'

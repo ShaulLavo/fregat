@@ -2,7 +2,7 @@ import { act, waitFor } from '@testing-library/react'
 import type { GitStatusResult } from '@workspace/contracts'
 import { createClientError } from '@workspace/client-core/errors'
 
-import { useReconcileCommitProgress } from '@/features/git/hooks/use-reconcile-commit-progress'
+import { useReconcileCommitProgress } from '@/features/git/hooks/commit/use-reconcile-commit-progress'
 import {
   commitProgressStoreFor,
   selectCommitProgress,

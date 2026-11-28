@@ -33,8 +33,8 @@ Create, edit, record, search and inspect bindings, contexts and conflicts in Set
 ## Existing Fregat and Editor work
 
 Settings already has
-[shortcuts-toolbar.tsx](../apps/web/src/features/settings/components/shortcuts-toolbar.tsx),
-[shortcut-recorder.tsx](../apps/web/src/features/settings/components/shortcut-recorder.tsx),
+[shortcuts-toolbar.tsx](../apps/web/src/features/settings/components/shortcuts/shortcuts-toolbar.tsx),
+[shortcut-recorder.tsx](../apps/web/src/features/settings/components/shortcuts/shortcut-recorder.tsx),
 [shortcut-recording.ts](../apps/web/src/features/settings/utils/shortcut-recording.ts),
 and [shortcut-report.ts](../apps/web/src/features/settings/utils/shortcut-report.ts).
 Recording currently follows VS Code-style two-stroke rules and uses raw key handlers.

@@ -1,6 +1,6 @@
 import { useDebouncedValue } from '@tanstack/react-pacer/debouncer'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
-import { useHistory } from '@/features/git/hooks/use-history'
+import { useHistory } from '@/features/git/hooks/commits/use-history'
 import { useStatus } from '@/features/git/hooks/use-status'
 import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
 

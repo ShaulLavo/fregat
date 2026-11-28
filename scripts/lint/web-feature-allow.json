@@ -1382,13 +1382,13 @@
   {
     "from": "dev",
     "to": "settings",
-    "module": "features/settings/components/shortcut-recorder.tsx",
+    "module": "features/settings/components/shortcuts/shortcut-recorder.tsx",
     "reason": "owner: the /dev gallery shows the settings shortcut rows and recorder over fixture overrides, so a phone check needs no settings state."
   },
   {
     "from": "dev",
     "to": "settings",
-    "module": "features/settings/components/shortcut-row.tsx",
+    "module": "features/settings/components/shortcuts/shortcut-row.tsx",
     "reason": "owner: the /dev gallery shows the settings shortcut rows and recorder over fixture overrides, so a phone check needs no settings state."
   },
   {

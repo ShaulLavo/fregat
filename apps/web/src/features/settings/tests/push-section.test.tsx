@@ -6,15 +6,15 @@ import { http, HttpResponse } from 'msw'
 import { toast } from 'sonner'
 import { Toaster } from '@workspace/ui/components/sonner'
 
-import { PushSection } from '@/features/settings/components/push-section'
+import { PushSection } from '@/features/settings/components/devices/push-section'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { SettingsPage } from '@/features/settings/components/page'
 import {
   pushThisDeviceQueryOptions,
   subscribeThisDevice,
-} from '@/features/settings/utils/push-browser'
-import { pushDevicesQueryOptions } from '@/features/settings/utils/push-api'
-import { pushErrors } from '@/features/settings/utils/push-errors'
+} from '@/features/settings/utils/devices/push-browser'
+import { pushDevicesQueryOptions } from '@/features/settings/utils/devices/push-api'
+import { pushErrors } from '@/features/settings/utils/devices/push-errors'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
 import type { Client } from '@/lib/client'
 import { expect, test } from '../../../../test/fixtures'

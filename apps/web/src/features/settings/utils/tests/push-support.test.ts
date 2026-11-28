@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deviceLabel, pushSupport, type PushEnvironment } from '../push-support'
+import { deviceLabel, pushSupport, type PushEnvironment } from '../devices/push-support'
 
 const WORKER = 'https://omarchy.example.test/platform/sw.js'
 const IPHONE =

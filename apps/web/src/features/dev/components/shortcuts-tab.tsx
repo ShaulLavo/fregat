@@ -3,8 +3,8 @@ import { useState } from 'react'
 import { Button } from '@workspace/ui/components/button'
 
 import { Section } from '@/features/dev/components/section'
-import { ShortcutRecorder } from '@/features/settings/components/shortcut-recorder'
-import { ShortcutRow } from '@/features/settings/components/shortcut-row'
+import { ShortcutRecorder } from '@/features/settings/components/shortcuts/shortcut-recorder'
+import { ShortcutRow } from '@/features/settings/components/shortcuts/shortcut-row'
 import { shortcutRows } from '@/features/settings/utils/shortcut-rows'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 

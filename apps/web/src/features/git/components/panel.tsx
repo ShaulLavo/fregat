@@ -13,7 +13,7 @@ import { Button } from '@workspace/ui/components/button'
 import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { GitBranchIcon, GitDiffIcon } from '@phosphor-icons/react'
-import { History } from '@/features/git/components/history'
+import { History } from '@/features/git/components/commits/panel'
 import { useNavigation } from '@/hooks/use-navigation'
 
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'

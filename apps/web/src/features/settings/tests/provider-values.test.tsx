@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react'
 import { REDACTED_SETTINGS_VALUE, type ProviderInstanceConfig } from '@workspace/contracts'
 
-import { ProviderValues } from '@/features/settings/components/provider-values'
+import { ProviderValues } from '@/features/settings/components/providers/provider-values'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
 

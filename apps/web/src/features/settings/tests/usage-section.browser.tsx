@@ -4,7 +4,7 @@ import { page } from 'vitest/browser'
 import '@workspace/ui/globals.css'
 import type { ProviderUsageHistory } from '@workspace/contracts'
 
-import { UsageSection } from '@/features/settings/components/usage-section'
+import { UsageSection } from '@/features/settings/components/usage/usage-section'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
 import { afterEach, expect, test } from 'vitest'
 

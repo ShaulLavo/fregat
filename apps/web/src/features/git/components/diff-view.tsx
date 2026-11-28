@@ -12,7 +12,7 @@ import { useTabPresentation } from '@/features/editor/hooks/use-tab-presentation
 import type { DiffLanguageHost } from '@/features/editor/utils/diff-language-context'
 import type { FilesystemPath, GitComparison, TabId } from '@/lib/documents/utils/types'
 import { useDiffDocumentDiffs } from '../hooks/use-diff-document-diffs'
-import { useSnapshotComparison } from '@/features/git/hooks/use-snapshot-comparison'
+import { useSnapshotComparison } from '@/features/git/hooks/commits/use-snapshot-comparison'
 import { diffFileNotice, emptyDiffNotice, unrenderableDiffNotice } from '../utils/diff-presentation'
 import { renderableDiffFile } from '@workspace/client-core/git/diff-files'
 import { DiffLineCommentAction } from './diff-line-comment-action'

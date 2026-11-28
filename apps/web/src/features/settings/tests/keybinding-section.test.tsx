@@ -5,7 +5,7 @@ import { afterEach, beforeEach } from 'vitest'
 
 import { fetchSettings, saveSettings } from '@/features/settings/utils/api'
 
-import { KeybindingSection } from '../components/keybinding-section'
+import { KeybindingSection } from '../components/shortcuts/keybinding-section'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
 
