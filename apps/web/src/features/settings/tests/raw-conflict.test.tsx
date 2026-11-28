@@ -15,7 +15,7 @@ import userEvent from '@testing-library/user-event'
 import type { SettingsSnapshot } from '@workspace/contracts'
 
 import { Toaster } from '@workspace/ui/components/sonner'
-import { type EditorDocumentStoreApi } from '@/features/editor/state/document-state'
+import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import { fetchSettings, saveSettingsText } from '@/features/settings/utils/api'
 import { mkdir } from 'node:fs/promises'

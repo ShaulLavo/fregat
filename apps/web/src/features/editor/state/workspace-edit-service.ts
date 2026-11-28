@@ -13,10 +13,10 @@ import type {
   WorkspaceTextReplaySegmentInput,
 } from '@singapore-editor/lsp-plugin/workspace-edit'
 import { prepareWorkspaceTextReplay } from '@singapore-editor/lsp-plugin/workspace-edit'
-import { type LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
-import {
-  type ApplyWorkspaceEditRequest,
-  type ApplyWorkspaceEditResult,
+import type { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
+import type {
+  ApplyWorkspaceEditRequest,
+  ApplyWorkspaceEditResult,
 } from '@singapore-editor/lsp-plugin'
 import {
   beginReverseDocumentTransactionSequence,
