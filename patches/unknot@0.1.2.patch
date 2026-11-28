@@ -1,8 +1,29 @@
 diff --git a/dist/rules/graph.js b/dist/rules/graph.js
-index 3184b3071feda5c82c1d4800b8d16de1bc83254b..1f6b89fa6b7ab3cf0bcec7270587b67350001969 100644
+index 3184b3071feda5c82c1d4800b8d16de1bc83254b..fc3a9a907fa8c5c88258964eeffcf1c9c9a96f6d 100644
 --- a/dist/rules/graph.js
 +++ b/dist/rules/graph.js
-@@ -201,7 +201,30 @@ function importCycles(model) {
+@@ -1,3 +1,4 @@
++import { createHash } from 'node:crypto';
+ import { dirOf, plural, SEPARATOR } from "./types.js";
+ const nested = (a, b) => a === b || a.startsWith(b + '/') || b.startsWith(a + '/') || a === '.' || b === '.';
+ function stronglyConnected(nodes, edges) {
+@@ -114,12 +115,14 @@ function moduleCycles(model) {
+     return stronglyConnected(nodes, edges).map((comp) => {
+         const inside = new Set(comp);
+         const links = comp.flatMap((a) => [...(edges.get(a) ?? [])].filter((b) => inside.has(b)).map((b) => ({ a, b, files: via.get(`${a}\u0000${b}`) ?? [] })));
++        const directedEdges = links.map(({ a, b }) => `${a} -> ${b}`).sort();
++        const edgeDigest = createHash('sha256').update(JSON.stringify(directedEdges)).digest('hex');
+         const order = layering(comp, links);
+         const rank = new Map(order.map((n, i) => [n, i]));
+         const back = links.filter((l) => rank.get(l.a) < rank.get(l.b)).sort((x, y) => x.files.length - y.files.length);
+         return {
+             rule: 'module-cycle',
+-            key: comp.join(SEPARATOR),
++            key: `${comp.join(SEPARATOR)} [dependencies ${edgeDigest}]`,
+             title: `${plural(comp.length, 'module', 'modules')} import each other; ${plural(back.reduce((n, l) => n + l.files.length, 0), 'import goes', 'imports go')} against the layers`,
+             at: back[0].files[0].split(' -> ')[0],
+             notes: back.flatMap((l) => l.files.map((f) => `upward import: ${f}`)).slice(0, 12),
+@@ -201,7 +204,30 @@ function importCycles(model) {
      }
      return out;
  }

@@ -8,7 +8,7 @@ long-file src/orchestration/engine.ts
 long-file src/orchestration/projection-pipeline.ts
 long-file src/provider/adapters/claude.ts
 long-file src/provider/adapters/codex.ts
-module-cycle src/orchestration <-> src/provider <-> src/provider/adapters/utils <-> src/terminal <-> src/terminal-host
+module-cycle src/orchestration <-> src/provider <-> src/provider/adapters/utils <-> src/terminal <-> src/terminal-host [dependencies 38d3f8302fd7a5c6cae8b5063647edf8709d7b2b0f5deb2d2f80392bc1506065]
 shallow-module src/git/checkpoint-store.ts
 wide-directory src/fs
 wide-directory src/orchestration

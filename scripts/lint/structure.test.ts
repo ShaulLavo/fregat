@@ -1,9 +1,11 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { expect, test } from 'vitest'
 
 const gate = join(import.meta.dirname, 'structure.ts')
+const unknot = fileURLToPath(import.meta.resolve('unknot/bin/unknot.mjs'))
 
 test('requires exact cycle edges under the selected apps', () => {
   const root = mkdtempSync(join(tmpdir(), 'fregat-structure-'))
@@ -14,7 +16,7 @@ test('requires exact cycle edges under the selected apps', () => {
     writeFixture(root, 'apps/web/src/beta/use-alpha.ts', "export { alpha } from '../alpha/entry'")
     writeFixture(root, 'apps/server/src/entry.ts', 'export const server = 1')
     writeFixture(root, 'apps/tui/src/entry.ts', 'export const tui = 1')
-    writeFixture(root, 'apps/web/.unknot.allow', 'module-cycle src/alpha <-> src/beta')
+    recordBaseline(root)
 
     writeCycle(root, 'references/fixture')
     expect(check(root).exitCode).toBe(0)
@@ -59,6 +61,39 @@ test('requires exact cycle edges under the selected apps', () => {
     rmSync(root, { force: true, recursive: true })
   }
 }, 60_000)
+
+test('detects a new folder dependency inside an existing cycle', () => {
+  const root = mkdtempSync(join(tmpdir(), 'fregat-structure-folders-'))
+  try {
+    writeFixture(root, 'apps/web/src/alpha/entry.ts', 'export const alpha = 1')
+    writeFixture(root, 'apps/web/src/beta/entry.ts', 'export const beta = 2')
+    writeFixture(root, 'apps/web/src/gamma/entry.ts', 'export const gamma = 3')
+    writeFixture(root, 'apps/web/src/alpha/use-beta.ts', "export { beta } from '../beta/entry'")
+    writeFixture(root, 'apps/web/src/beta/use-gamma.ts', "export { gamma } from '../gamma/entry'")
+    writeFixture(root, 'apps/web/src/gamma/use-alpha.ts', "export { alpha } from '../alpha/entry'")
+    writeFixture(root, 'apps/server/src/entry.ts', 'export const server = 1')
+    writeFixture(root, 'apps/tui/src/entry.ts', 'export const tui = 1')
+    recordBaseline(root)
+    expect(check(root).exitCode).toBe(0)
+
+    writeFixture(root, 'apps/web/src/beta/use-alpha.ts', "export { alpha } from '../alpha/entry'")
+    const result = check(root)
+    expect(result.exitCode).toBe(1)
+    const diagnostics = result.stderr.toString()
+    expect(diagnostics).toContain('[module-cycle]')
+    expect(diagnostics).not.toContain('[import-cycle-edge]')
+  } finally {
+    rmSync(root, { force: true, recursive: true })
+  }
+}, 60_000)
+
+function recordBaseline(cwd: string) {
+  const result = Bun.spawnSync(['node', unknot, 'apps/web', '--update-allow'], {
+    cwd,
+    timeout: 15_000,
+  })
+  expect(result.exitCode).toBe(0)
+}
 
 function check(cwd: string) {
   return Bun.spawnSync([process.execPath, gate], { cwd, timeout: 15_000 })
