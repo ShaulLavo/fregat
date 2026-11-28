@@ -1,5 +1,6 @@
+import { AgentTerminalHistory } from './session-lifecycle/terminal-history'
 import { SETUP_TIMEOUT_MS } from './setup-runner'
-import { commandUploadClaim } from './command-attachments'
+import { commandUploadClaim, ingestCommandAttachments } from './command-attachments'
 import { copyForkAttachments, discardUnclaimedForkAttachments } from '../attachments/fork'
 import { withAttachmentLanes } from '../attachments/lanes'
 import { createAttachmentOwnership, type AttachmentOwnership } from '../attachments/ownership'
@@ -7,12 +8,9 @@ import { sessionTitleMessages } from './titles/title-messages'
 import { SessionTitleReactor } from './titles/title-reactor'
 import type { ModelSelection } from '@workspace/contracts'
 import { validateAttachmentUpload } from '../attachments/uploads'
-import { createInternalError } from '../observability/structured-errors'
 import { errorMessage } from '@workspace/contracts'
 import { elapsedMs } from '@workspace/utils/timing'
-import { terminalHistoryMessages } from './utils/terminal-history'
-import { TerminalHandoffs, type TerminalHandoff } from './terminal-handoffs'
-import type { AgentTerminalResolver, AgentTerminalProcess } from '../terminal/agent-launch'
+import type { AgentTerminalResolver } from '../terminal/agent-launch'
 import { sessionIdentityErrors } from '../provider/structured-errors'
 import { realpath } from 'node:fs/promises'
 import path from 'node:path'
@@ -27,15 +25,13 @@ import { WorktreeCommandPreparation } from './worktrees/worktree-command-prepara
 import { TerminalLeaseController } from './terminal-lease-controller'
 import { remoteHost, remoteRepositoryPath } from '../git/forges/detect'
 import { GitWorktreeService } from '../git/worktrees'
-import { terminalSessionKey, type TerminalService } from '../terminal/service'
+import { type TerminalService } from '../terminal/service'
 import type { HostSessionInfo } from '../terminal-host/protocol'
 import { worktreeRuntimeErrors } from './worktrees/worktree-runtime-errors'
 import {
   type ProviderInstanceId,
   type SessionId,
   type WorktreeId,
-  type ChatAttachment,
-  type ChatAttachmentUpload,
   clientOrchestrationCommandSchema,
   orchestrationCommandSchema,
   type OrchestrationCommand,
@@ -56,11 +52,7 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import {
-  defaultAttachmentsDir,
-  writeAttachmentFromDataUrl,
-  attachmentFilePath,
-} from '../attachments/store'
+import { defaultAttachmentsDir } from '../attachments/store'
 import { initializePlatformDatabase } from '../db/initialize'
 import { orchestrationErrors } from '../observability'
 import { requireActionableSourcePlan } from './command-invariants'
@@ -159,8 +151,7 @@ export class OrchestrationEngine {
   private worktreeReactor: WorktreeLifecycleReactor | null = null
   private worktreePreparation: WorktreeCommandPreparation | null = null
   private readonly terminalLeases: TerminalLeaseController
-  private readonly terminalHandoffs: TerminalHandoffs
-  private readonly terminalHistoryRecoveries = new Map<SessionId, Promise<void>>()
+  private readonly terminalHistory: AgentTerminalHistory
   private unsubscribeGitMutations: (() => void) | null = null
   private reactorsStarted = false
   // Set once a restart is accepted and never cleared: the process exits after it.
@@ -203,13 +194,19 @@ export class OrchestrationEngine {
     this.attachmentOwnership = createAttachmentOwnership(database)
     this.registration = options.registration
     this.providerService = options.providerService ?? null
-    this.terminalHandoffs = new TerminalHandoffs(database)
     this.terminalService = options.terminalService ?? null
     this.terminalLeases = new TerminalLeaseController({
       gate: this.worktreeExecutionGate,
       dispatch: (command) => this.enqueue(command),
       getReadModel: () => this.readModel,
       queryHostSessions: () => this.hostSessions(),
+    })
+    this.terminalHistory = new AgentTerminalHistory(database, {
+      provider: () => this.providerService,
+      leases: this.terminalLeases,
+      readModel: () => this.readModel,
+      hostSessions: () => this.hostSessions(),
+      dispatch: (command) => this.enqueue(command),
     })
     this.eventStore = new OrchestrationEventStore(database)
     this.receipts = new OrchestrationCommandReceipts(database)
@@ -970,7 +967,7 @@ export class OrchestrationEngine {
 
   private async recover() {
     await this.titleReactor?.recover()
-    await this.recoverTerminalHistory()
+    await this.terminalHistory.recover()
     for (const session of this.readModel.sessions.values()) {
       if (session.deletedAt) continue
       await this.recoverRewind(session)
@@ -1312,158 +1309,7 @@ export class OrchestrationEngine {
           latestTurnState: session.latestTurn?.state ?? null,
         },
       })
-    const provider = this.providerService
-    const pending = this.terminalHandoffs.get(sessionId)
-    if (pending) await this.retryTerminalHistory(pending, provider)
-    const launch = await provider.reserveTerminalRuntime({
-      sessionId,
-      providerInstanceId: session.modelSelection.providerInstanceId,
-    })
-    return this.prepareTerminalHistory({ session, provider, launch, lease: input })
-  }
-
-  private async prepareTerminalHistory({
-    session,
-    provider,
-    launch,
-    lease,
-  }: {
-    session: OrchestrationProjectedSession
-    provider: ProviderService
-    launch: AgentTerminalProcess
-    lease: Parameters<AgentTerminalResolver>[0]
-  }) {
-    const worktree = this.readModel.worktrees.get(session.worktreeId)
-    if (!worktree) {
-      launch.release()
-      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID({
-        internal: {
-          at: 'terminal-launch',
-          sessionId: session.id,
-          worktreeId: session.worktreeId,
-          reason: 'worktree-absent',
-        },
-      })
-    }
-    const startedAt = new Date().toISOString()
-    const input = {
-      sessionId: session.id,
-      providerInstanceId: session.modelSelection.providerInstanceId,
-      cwd: worktree.canonicalPath,
-    }
-    try {
-      const before = await provider.readSessionHistory(input)
-      const handoff: TerminalHandoff = {
-        ...input,
-        worktreeId: session.worktreeId,
-        terminalLeaseId: lease.terminalLeaseId,
-        runtimeEpoch: lease.runtimeEpoch,
-        startedAt,
-        baseline: before.map((message) => message.sourceId),
-        phase: 'active',
-      }
-      this.terminalHandoffs.begin(handoff)
-      return {
-        ...launch,
-        reconcile: () => {
-          this.terminalHandoffs.exited(session.id)
-          return this.appendTerminalHistory(provider, handoff)
-        },
-        release: () => {
-          this.terminalHandoffs.complete(session.id)
-          launch.release()
-        },
-      }
-    } catch (error) {
-      launch.release()
-      throw error
-    }
-  }
-
-  private async appendTerminalHistory(provider: ProviderService, handoff: TerminalHandoff) {
-    provider.markTerminalHistoryPending(handoff.sessionId)
-    try {
-      const after = await provider.readSessionHistory(handoff)
-      const messages = terminalHistoryMessages(
-        handoff.sessionId,
-        handoff.startedAt,
-        handoff.baseline,
-        after,
-      )
-      if (!messages.length) return
-      await this.enqueue({
-        type: 'session.terminal-history.append',
-        sessionId: handoff.sessionId,
-        messages,
-        commandId: v.parse(
-          commandIdSchema,
-          internalCommandKey(
-            'session.terminal-history.append',
-            handoff.sessionId,
-            historyRevision(JSON.stringify(messages)),
-          ),
-        ),
-      })
-      recordChatPipelineInfo('chat.pipeline.terminal_history.summary', {
-        sessionId: handoff.sessionId,
-        messageCount: messages.length,
-        outcome: 'synchronized',
-      })
-    } catch (error) {
-      await this.recordTerminalHistoryFailure(handoff.sessionId, handoff.startedAt, error).catch(
-        (failure: unknown) => {
-          recordChatPipelineWarning('chat.pipeline.terminal_history.failure_record_failed', {
-            sessionId: handoff.sessionId,
-            error: failure,
-          })
-        },
-      )
-      throw error
-    }
-  }
-
-  private async recordTerminalHistoryFailure(
-    sessionId: SessionId,
-    startedAt: string,
-    error: unknown,
-  ) {
-    const message = errorStringField(error, 'message') ?? 'The provider history could not be read.'
-    const unknownOwnership =
-      errorStringField(error, 'code') === 'provider.TERMINAL_OWNERSHIP_UNKNOWN'
-    const key = internalCommandKey(
-      'terminal-history-failed',
-      sessionId,
-      startedAt,
-      historyRevision(message),
-    )
-    recordChatPipelineWarning('chat.pipeline.terminal_history.summary', {
-      sessionId,
-      outcome: 'failed',
-      error,
-    })
-    await this.enqueue({
-      type: 'session.activity.append',
-      commandId: v.parse(commandIdSchema, key),
-      sessionId,
-      createdAt: startedAt,
-      activity: {
-        id: v.parse(eventIdSchema, key),
-        sessionId,
-        createdAt: startedAt,
-        turnId: null,
-        tone: 'error',
-        kind: unknownOwnership ? 'terminal.ownership.unknown' : 'terminal.history.failed',
-        summary: unknownOwnership
-          ? 'An earlier terminal may still be running this session'
-          : 'The terminal conversation could not be copied into this chat',
-        payload: {
-          message,
-          fix:
-            errorStringField(error, 'fix') ??
-            'Reopen the session’s terminal to copy the conversation again.',
-        },
-      },
-    })
+    return this.terminalHistory.reserve(session, this.providerService, input)
   }
 
   async beginTerminalLease(worktreeId: WorktreeId, key?: string) {
@@ -1478,93 +1324,11 @@ export class OrchestrationEngine {
       (candidate) => candidate.key === key && candidate.state === 'active',
     )
     if (!lease) return null
-    const owned = this.terminalLeases.attachAdopted(lease.worktreeId, lease.terminalLeaseId)
-    const provider = this.providerService
-    const handoff = this.terminalHandoffs
-      .pending()
-      .find((entry) => entry.terminalLeaseId === lease.terminalLeaseId)
-    if (!provider || !handoff) return owned
-    return {
-      ...owned,
-      end: async () => {
-        this.terminalHandoffs.exited(handoff.sessionId)
-        await this.appendTerminalHistory(provider, handoff)
-        await owned.end()
-        this.terminalHandoffs.complete(handoff.sessionId)
-        provider.releaseTerminalOwnership(handoff.sessionId)
-      },
-    }
+    return this.terminalHistory.attachAdopted(lease)
   }
 
   private hostSessions(): Promise<readonly HostSessionInfo[] | null> {
     return this.terminalService?.listHostSessions() ?? Promise.resolve(null)
-  }
-
-  /**
-   * A pending agent-in-terminal handoff is adopted when the host still runs its shell, so the
-   * session resumes as an ordinary terminal instead of being blocked on unknown ownership.
-   */
-  private async recoverTerminalHistory() {
-    const provider = this.providerService
-    if (!provider) return
-    const pending = this.terminalHandoffs.pending()
-    const sessions = await this.hostSessions()
-    const byKey = sessions ? new Map(sessions.map((session) => [session.key, session])) : null
-    for (const handoff of pending) {
-      await this.recoverTerminalHandoff(handoff, provider, byKey)
-    }
-  }
-
-  private async recoverTerminalHandoff(
-    handoff: TerminalHandoff,
-    provider: ProviderService,
-    sessions: ReadonlyMap<string, HostSessionInfo> | null,
-  ) {
-    const key = terminalSessionKey(handoff.worktreeId, handoff.sessionId, handoff.sessionId)
-    const live = sessions?.get(key)
-    if (handoff.phase === 'active' && live && !live.exited) {
-      const lease = this.readModel.terminalLeases.get(handoff.terminalLeaseId)
-      if (lease)
-        await this.terminalLeases.adopt(
-          handoff.worktreeId,
-          lease.terminalLeaseId,
-          lease.runtimeEpoch,
-        )
-      provider.restoreTerminalOwnership(handoff.sessionId, 'terminal')
-      return
-    }
-    if (handoff.phase === 'active' && sessions !== null) {
-      this.terminalHandoffs.exited(handoff.sessionId)
-      handoff = { ...handoff, phase: 'history' }
-    }
-    provider.restoreTerminalOwnership(
-      handoff.sessionId,
-      handoff.phase === 'history' ? 'history' : 'unknown',
-    )
-    await this.retryTerminalHistory(handoff, provider).catch((error: unknown) =>
-      this.recordTerminalHistoryFailure(handoff.sessionId, handoff.startedAt, error),
-    )
-  }
-
-  private retryTerminalHistory(handoff: TerminalHandoff, provider: ProviderService) {
-    const existing = this.terminalHistoryRecoveries.get(handoff.sessionId)
-    if (existing) return existing
-    const recovery = this.finishTerminalHistoryRecovery(handoff, provider).finally(() => {
-      this.terminalHistoryRecoveries.delete(handoff.sessionId)
-    })
-    this.terminalHistoryRecoveries.set(handoff.sessionId, recovery)
-    return recovery
-  }
-
-  private async finishTerminalHistoryRecovery(handoff: TerminalHandoff, provider: ProviderService) {
-    if (handoff.phase === 'active')
-      throw sessionIdentityErrors.TERMINAL_OWNERSHIP_UNKNOWN({
-        internal: { at: 'history-recovery', sessionId: handoff.sessionId, phase: handoff.phase },
-      })
-    await this.terminalLeases.endRecovered(handoff.terminalLeaseId)
-    await this.appendTerminalHistory(provider, handoff)
-    this.terminalHandoffs.complete(handoff.sessionId)
-    provider.releaseTerminalOwnership(handoff.sessionId)
   }
 
   async refreshWorktreeMetadata(checkoutPath: string) {
@@ -1841,89 +1605,6 @@ export class OrchestrationEngine {
     })
 
     return providerCommandReactor
-  }
-}
-
-/**
- * Write-through between parse and dispatch. Attachment bytes hit the blob store
- * exactly once here; everything downstream sees metadata only.
- */
-async function ingestCommandAttachments(
-  command: OrchestrationCommand,
-  attachmentsDir: string,
-  ownership: AttachmentOwnership,
-): Promise<{ attachmentIngest?: CommandAttachmentIngest; command: OrchestrationCommand }> {
-  if (command.type === 'session.user-input.respond' && command.attachmentsByQuestionId) {
-    const kept: Record<string, ChatAttachment[]> = {}
-    for (const [questionId, attachments] of Object.entries(command.attachmentsByQuestionId)) {
-      kept[questionId] = (
-        await persistTurnAttachments(attachments, attachmentsDir, command.sessionId, ownership)
-      ).attachments
-    }
-    return { command: { ...command, attachmentsByQuestionId: kept } }
-  }
-  if (command.type !== 'session.turn.start' && command.type !== 'session.turn.steer')
-    return { command }
-  if (command.message.attachments.length === 0) return { command }
-
-  const ingested = await persistTurnAttachments(
-    command.message.attachments,
-    attachmentsDir,
-    command.sessionId,
-    ownership,
-  )
-
-  return {
-    attachmentIngest: ingested.attachmentIngest,
-    command: {
-      ...command,
-      message: { ...command.message, attachments: ingested.attachments },
-    },
-  }
-}
-
-async function persistTurnAttachments(
-  attachments: readonly ChatAttachmentUpload[],
-  attachmentsDir: string,
-  sessionId: string,
-  ownership: AttachmentOwnership,
-) {
-  const kept: ChatAttachment[] = []
-  const ids = new Set<string>()
-  let bytesPersisted = 0
-  for (const attachment of attachments) {
-    if (ids.has(attachment.id))
-      throw createInternalError('The same attachment cannot be sent twice.')
-    ids.add(attachment.id)
-    if (attachment.id.startsWith('upload-')) {
-      kept.push(await validateAttachmentUpload(attachmentsDir, attachment, sessionId, ownership))
-      continue
-    }
-    if (attachment.type === 'file') throw createInternalError('Upload this file before sending it.')
-    if (attachment.dataUrl) {
-      const written = await writeAttachmentFromDataUrl({ attachment, attachmentsDir })
-      bytesPersisted += written.bytesWritten
-      kept.push({ ...attachmentMetadata(attachment), sizeBytes: written.bytesWritten })
-      continue
-    }
-    const filePath = attachmentFilePath({ attachment, attachmentsDir })
-    if (!filePath || !(await Bun.file(filePath).exists()))
-      throw createInternalError('Attachment is unavailable. Attach it again.')
-    kept.push(attachmentMetadata(attachment))
-  }
-  return {
-    attachmentIngest: { bytesPersisted, dropReasons: [], dropped: 0, persisted: kept.length },
-    attachments: kept,
-  }
-}
-
-function attachmentMetadata(attachment: ChatAttachmentUpload): ChatAttachment {
-  return {
-    type: attachment.type,
-    id: attachment.id,
-    name: attachment.name,
-    mimeType: attachment.mimeType,
-    sizeBytes: attachment.sizeBytes,
   }
 }
 
