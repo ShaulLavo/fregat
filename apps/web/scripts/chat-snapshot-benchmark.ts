@@ -21,19 +21,28 @@ for (const count of [1_000, 4_000]) {
     ['initial', empty],
     ['refresh', populated],
   ] as const) {
-    const before = structuredClone(state)
-    const samples: number[] = []
-    for (let iteration = 0; iteration < 20; iteration += 1) {
-      const start = performance.now()
-      const result = syncChatProjectionShellSnapshot(state, refresh)
-      const elapsed = performance.now() - start
-      assert.equal(result.sessionIds.length, count)
-      assert.equal(Object.keys(result.sessionById).length, count)
-      if (iteration < 5) continue
-      samples.push(elapsed)
-    }
-    samples.sort((left, right) => left - right)
-    assert.deepEqual(state, before)
-    console.log(JSON.stringify({ sessions: count, mode, medianMs: samples[7] }))
+    const medianMs = measureSnapshot(state, refresh, count)
+    console.log(JSON.stringify({ sessions: count, mode, medianMs }))
   }
+}
+
+function measureSnapshot(
+  state: Parameters<typeof syncChatProjectionShellSnapshot>[0],
+  snapshot: Parameters<typeof syncChatProjectionShellSnapshot>[1],
+  count: number,
+) {
+  const before = structuredClone(state)
+  const samples: number[] = []
+  for (let iteration = 0; iteration < 20; iteration += 1) {
+    const start = performance.now()
+    const result = syncChatProjectionShellSnapshot(state, snapshot)
+    const elapsed = performance.now() - start
+    assert.equal(result.sessionIds.length, count)
+    assert.equal(Object.keys(result.sessionById).length, count)
+    if (iteration < 5) continue
+    samples.push(elapsed)
+  }
+  samples.sort((left, right) => left - right)
+  assert.deepEqual(state, before)
+  return samples[7]
 }
