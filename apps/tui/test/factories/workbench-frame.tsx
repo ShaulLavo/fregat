@@ -1,4 +1,4 @@
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { rememberWorkbench, type WorkbenchLocation } from '@/workbench/utils/location'
 import type { HostActions } from '@/host/providers/actions-context'
 import { createTuiError } from '@/host/utils/structured-errors'

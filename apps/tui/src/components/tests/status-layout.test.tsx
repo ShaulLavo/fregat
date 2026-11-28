@@ -1,7 +1,7 @@
 import { act } from 'react'
 import { settingRowTitle } from '@workspace/client-core/settings/humanize'
 import { matchingSettingIds } from '@workspace/client-core/settings/search'
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { createControlledInProcessTransport } from '../../../test/client'
 import { createTestSettingsSession } from '../../../test/factories/session'
 import { test, expect } from '../../../test/fixtures'

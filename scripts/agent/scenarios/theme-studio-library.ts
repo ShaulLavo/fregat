@@ -40,7 +40,16 @@ export const themeStudioLibrary: Scenario = {
     await page.keyboard.press('Escape')
     await studio.waitFor({ state: 'detached' })
 
+    const wasDark = await page.evaluate(() => document.documentElement.classList.contains('dark'))
     await selectors.titlebar(page).click({ button: 'right' })
+    await selectors.menuItem(page, 'Light / dark mode').hover()
+    await selectors.menuRadio(page, wasDark ? 'Light' : 'Dark').click()
+    await page.waitForFunction(
+      (dark) => document.documentElement.classList.contains('dark') !== dark,
+      wasDark,
+    )
+    await step('color-mode-submenu')
+
     await selectors.menuItem(page, 'Theme…').click()
     await studio.waitFor()
     await step('studio-from-titlebar')

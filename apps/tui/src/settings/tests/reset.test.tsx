@@ -1,7 +1,7 @@
 import { act } from 'react'
 import { BUNDLED_THEMES, type SettingsOperation } from '@workspace/contracts'
 
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { runPaletteCommand } from '../../../test/actions'
 import { createTestSettingsSession } from '../../../test/factories/session'
 import { test, expect } from '../../../test/fixtures'

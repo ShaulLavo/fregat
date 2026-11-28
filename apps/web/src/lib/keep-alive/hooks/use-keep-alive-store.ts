@@ -1,6 +1,6 @@
 import { use } from 'react'
 
-import { KeepAliveContext } from '@/lib/keep-alive/providers/keep-alive-context'
+import { KeepAliveContext } from '@/lib/keep-alive/state/context'
 import { requireContext } from '@/lib/require-context'
 
 export function useKeepAliveStore() {

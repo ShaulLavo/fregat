@@ -3,7 +3,7 @@ import { dirname } from 'node:path'
 import { createTestRenderer } from '@opentui/core/testing'
 import { createRoot, flushSync } from '@opentui/react'
 
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import type { SettingsSession } from '@/connection/state/session'
 
 type FrameOptions = {

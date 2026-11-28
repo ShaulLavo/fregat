@@ -1,5 +1,5 @@
 import type { HighlightTheme } from '@singapore-editor/highlighting'
-import { themeRegistrationQueryOptions } from '@/lib/code-theme/state/registration-query'
+import { themeRegistrationQueryOptions } from '@/lib/code-theme/utils/registration-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { createClientError } from '@workspace/client-core/errors'
 

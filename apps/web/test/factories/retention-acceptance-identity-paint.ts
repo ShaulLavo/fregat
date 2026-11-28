@@ -8,7 +8,7 @@ import {
 } from '@/features/editor/state/syntax-highlighting'
 import { languageIdForFilePath } from '@/lib/file-language'
 import { highlightingService } from '@/lib/highlighting/state/service'
-import { themeRegistrationQueryOptions } from '@/lib/code-theme/state/registration-query'
+import { themeRegistrationQueryOptions } from '@/lib/code-theme/utils/registration-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { readLiveSettingsProjection } from '@/features/settings/state/live-projection'

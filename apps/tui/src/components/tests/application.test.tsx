@@ -4,7 +4,7 @@ import { act } from 'react'
 
 import { settingRowTitle } from '@workspace/client-core/settings/humanize'
 
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { createControlledInProcessTransport } from '../../../test/client'
 import { createTestSettingsSession } from '../../../test/factories/session'
 import { expect, test } from '../../../test/fixtures'

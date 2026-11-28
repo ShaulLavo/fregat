@@ -1,7 +1,7 @@
 import { createCliRenderer } from '@opentui/core'
 import { createRoot } from '@opentui/react'
 
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import type { SettingsSession } from '@/connection/state/session'
 import { createTuiError } from '@/host/utils/structured-errors'
 import { foregroundJobGroup } from '@/host/job-control'

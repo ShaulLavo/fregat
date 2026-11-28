@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 
 import { KeepAliveOutlet } from '@/lib/keep-alive/components/keep-alive-outlet'
-import { KeepAliveContext } from '@/lib/keep-alive/providers/keep-alive-context'
+import { KeepAliveContext } from '@/lib/keep-alive/state/context'
 import { createKeepAliveStore } from '@/lib/keep-alive/state/store'
 
 /**

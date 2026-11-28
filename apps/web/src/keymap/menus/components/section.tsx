@@ -1,4 +1,5 @@
-import type { ResolvedMenuItem, ResolvedMenuSection } from '@/keymap/menus/utils/resolve'
+import type { ComponentProps } from 'react'
+import type { ResolvedMenuSection } from '@/keymap/menus/utils/resolve'
 import {
   ContextMenuGroup,
   ContextMenuLabel,
@@ -6,6 +7,7 @@ import {
 } from '@workspace/ui/components/context-menu'
 
 import { MenuItemRow } from './item-row'
+import { MenuSubmenu } from './submenu'
 
 /**
  * Draws the rule that precedes every section but the first. Resolution has
@@ -18,7 +20,7 @@ export function MenuSection({
   section,
 }: {
   readonly index: number
-  readonly onInvoke: (item: ResolvedMenuItem, value?: string) => void
+  readonly onInvoke: ComponentProps<typeof MenuItemRow>['onInvoke']
   readonly section: ResolvedMenuSection
 }) {
   return (
@@ -26,9 +28,17 @@ export function MenuSection({
       {index > 0 ? <ContextMenuSeparator /> : null}
       <ContextMenuGroup>
         {section.label ? <ContextMenuLabel>{section.label}</ContextMenuLabel> : null}
-        {section.items.map((item) => (
-          <MenuItemRow item={item} key={item.key} onInvoke={onInvoke} />
-        ))}
+        {section.items.map((item) =>
+          item.kind === 'submenu' ? (
+            <MenuSubmenu item={item} key={item.key}>
+              {item.sections.map((child, index) => (
+                <MenuSection index={index} key={child.id} onInvoke={onInvoke} section={child} />
+              ))}
+            </MenuSubmenu>
+          ) : (
+            <MenuItemRow item={item} key={item.key} onInvoke={onInvoke} />
+          ),
+        )}
       </ContextMenuGroup>
     </>
   )
