@@ -4,7 +4,7 @@ import { Spinner } from '@workspace/ui/components/spinner'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import type { ReactNode } from 'react'
 
-import { ModuleLoadError } from '@/components/module-load-error'
+import { ModuleLoadError } from '@/components/application/module-load-error'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 
 /**

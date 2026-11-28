@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { cn } from '@workspace/ui/lib/utils'
 
-import { ServerUpdateStatus } from '@/components/server-update-status'
+import { ServerUpdateStatus } from '@/components/machines/server-update-status'
 import { useNativeMacOverlay } from '@/components/use-native-mac-overlay'
 import { BackButton } from '@/features/phone/components/back-button'
 import { PaletteButton } from '@/features/phone/components/palette-button'

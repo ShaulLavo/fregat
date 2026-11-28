@@ -2,8 +2,8 @@ import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { queryOptions } from '@tanstack/react-query'
 
-import { DeferredOverlay } from '@/components/deferred-overlay'
-import { DeferredSessionDialogs } from '@/components/deferred-session-dialogs'
+import { DeferredOverlay } from '@/components/application/deferred-overlay'
+import { DeferredSessionDialogs } from '@/components/sessions/deferred-session-dialogs'
 import { overlayQueryKeys } from '@/components/utils/query-keys'
 import { useSessionSnoozeRequestStore } from '@/features/chat-mode/state/session-snooze-request-store'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
@@ -13,7 +13,7 @@ import { holdDeferredDialog, renderWithProviders } from '../../../test/render'
 test('an overlay opened before its code arrives shows a loading dialog, then the overlay', async () => {
   const release = holdDeferredDialog(
     overlayQueryKeys.sessionDialogs,
-    () => import('@/components/session-dialogs'),
+    () => import('@/components/sessions/session-dialogs'),
   )
   renderWithProviders(<DeferredSessionDialogs />)
   expect(screen.queryByRole('dialog')).toBeNull()

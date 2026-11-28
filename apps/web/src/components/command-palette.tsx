@@ -3,7 +3,7 @@ import { CommandDialog, CommandInput } from '@workspace/ui/components/command'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
-import { ModuleLoadError } from '@/components/module-load-error'
+import { ModuleLoadError } from '@/components/application/module-load-error'
 import { paletteContentQueryOptions } from '@/features/command-palette/utils/content-query'
 import { useCommand } from '@/keymap/hooks/use-command'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'

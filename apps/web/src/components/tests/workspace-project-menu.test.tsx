@@ -5,7 +5,7 @@ import path from 'node:path'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import { WorkspaceProjectMenu } from '@/components/workspace-project-menu'
+import { WorkspaceProjectMenu } from '@/components/workspace/workspace-project-menu'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../test/factories/editor-state-provider'
 import { expect, test } from '../../../test/fixtures'
 import { renderWithProviders } from '../../../test/render'

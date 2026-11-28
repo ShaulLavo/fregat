@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ComponentProps } from 'react'
 
-import { ModuleLoadError } from '@/components/module-load-error'
+import { ModuleLoadError } from '@/components/application/module-load-error'
 import type { TerminalPanel } from '@/features/terminal/components/panel'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'

@@ -29,7 +29,7 @@ import type { EditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 import { editorQueryKeys } from '@/features/editor/utils/query-keys'
 import { editorMutationKeys } from '@/features/editor/utils/mutation-keys'
 import { mutationOptions, queryOptions, useQuery } from '@tanstack/react-query'
-import { ModuleLoadError } from '@/components/module-load-error'
+import { ModuleLoadError } from '@/components/application/module-load-error'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { runMutation } from '@/lib/mutations/run'
 

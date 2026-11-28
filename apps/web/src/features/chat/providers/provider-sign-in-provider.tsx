@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 
-import { DeferredOverlay } from '@/components/deferred-overlay'
+import { DeferredOverlay } from '@/components/application/deferred-overlay'
 import { providerSignInDialogModuleQueryOptions } from '@/features/chat/utils/sign-in-dialog-module'
 import type { ProviderSignInTarget } from '@workspace/client-core/chat/providers/auth'
 import {

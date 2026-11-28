@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Shimmer } from '@workspace/ui/components/shimmer'
 import { cn } from '@workspace/ui/lib/utils'
 
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 import { iconForEntry } from '@/lib/file-icons'
 import { basename, parentPath } from '@/lib/path-formatters'
 

@@ -11,7 +11,7 @@ import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 import { toClientError } from '@/lib/client-error-taxonomy'
 import { assignRef } from '@workspace/ui/lib/assign-ref'
 import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
 import { useEffect, type CSSProperties, type MouseEvent, type Ref } from 'react'
 

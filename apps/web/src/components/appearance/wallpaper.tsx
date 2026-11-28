@@ -1,7 +1,7 @@
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { visibleWallpaper } from '@/lib/wallpapers/utils/selection'
-import { LibraryWallpaper } from '@/components/library-wallpaper'
-import { WebWallpaper } from '@/components/web-wallpaper'
+import { LibraryWallpaper } from '@/components/appearance/library-wallpaper'
+import { WebWallpaper } from '@/components/appearance/web-wallpaper'
 import { documentBackdrop } from '@/lib/platform/backdrop'
 import { useWallpaperPreviewStore } from '@/lib/wallpapers/state/preview-store'
 

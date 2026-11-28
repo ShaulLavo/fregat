@@ -1,7 +1,7 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { StatusFrame } from '@workspace/ui/patterns/status-frame'
 
-import { ModuleLoadError } from '@/components/module-load-error'
+import { ModuleLoadError } from '@/components/application/module-load-error'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { pairingStatusQueryOptions } from '@/lib/pairing/utils/api'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
@@ -9,7 +9,7 @@ import { resourceQueryClient } from '@/lib/resources/state/query-client'
 // Only an unpaired device ever sees the screen, so its code stays out of everyone's first load.
 const pairDeviceQueryOptions = queryOptions({
   queryKey: ['pairing', 'screen-module'],
-  queryFn: () => import('@/components/pair-device'),
+  queryFn: () => import('@/components/machines/pair-device'),
   staleTime: 'static',
   structuralSharing: false,
   gcTime: Infinity,

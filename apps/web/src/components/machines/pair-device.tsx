@@ -5,7 +5,7 @@ import { InputGroup, InputGroupInput } from '@workspace/ui/components/input-grou
 import { useState, type FormEvent } from 'react'
 
 import { InlineError } from '@/components/inline-error'
-import { PairingSteps } from '@/components/pairing-steps'
+import { PairingSteps } from '@/components/machines/pairing-steps'
 import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { usePairingLinkStore } from '@/lib/pairing/state/link-outcome'

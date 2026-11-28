@@ -1,4 +1,4 @@
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 import { memo, useState, type KeyboardEvent } from 'react'
 import type { ReactEditorController } from '@singapore-editor/react'
 

@@ -23,7 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/component
 import { LogsTimeline } from '@/features/logs/components/timeline'
 import { LogsToolbar } from '@/features/logs/components/toolbar'
 import { useLogsFilters } from '@/features/logs/state/filter-store'
-import { ToolPaneHeader } from '@/components/tool-pane-header'
+import { ToolPaneHeader } from '@/components/workspace/tool-pane-header'
 
 type LogsPanelProps = {
   active: boolean

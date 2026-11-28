@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 
-import { FileLabel } from '@/components/file-label'
+import { FileLabel } from '@/components/files/file-label'
 import { expect, test } from '../../../test/fixtures'
 
 test('the basename comes first so a right cut eats the directory', () => {

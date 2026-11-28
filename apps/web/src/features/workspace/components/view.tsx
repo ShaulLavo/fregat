@@ -3,8 +3,8 @@ import { GitStoreProvider } from '@/features/git/providers/store-provider'
 import { useDisplayedShell } from '@/features/workspace/hooks/use-displayed-shell'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import { KeepAliveProvider } from '@/lib/keep-alive/providers/keep-alive-provider'
-import { DeferredThemeStudioSlot } from '@/components/deferred-theme-studio-slot'
-import { DeferredSessionDialogs } from '@/components/deferred-session-dialogs'
+import { DeferredThemeStudioSlot } from '@/components/appearance/deferred-theme-studio-slot'
+import { DeferredSessionDialogs } from '@/components/sessions/deferred-session-dialogs'
 import { ShellBody } from '@/features/workspace/components/shell-body'
 
 type WorkspaceViewProps = {

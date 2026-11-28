@@ -4,7 +4,7 @@ import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { playClickFeedback } from '@workspace/ui/patterns/feedback-layer'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { usePaneHost } from '@/hooks/use-pane-host'
-import { PaneHeaderMenu } from '@/components/pane-header-menu'
+import { PaneHeaderMenu } from '@/components/workspace/pane-header-menu'
 import { TerminalIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 

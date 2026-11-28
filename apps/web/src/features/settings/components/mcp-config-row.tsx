@@ -4,7 +4,7 @@ import type { ProviderMcpConfigServer, ProviderSnapshot } from '@workspace/contr
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
-import { FileLabel } from '@/components/file-label'
+import { FileLabel } from '@/components/files/file-label'
 import { McpConfigSignIn } from '@/features/settings/components/mcp-config-sign-in'
 import { McpCopyMenu } from '@/features/settings/components/mcp-copy-menu'
 import { McpRemoveDialog } from '@/features/settings/components/mcp-remove-dialog'

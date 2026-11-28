@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useState } from 'react'
-import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
+import { DeferredFilePickerDialog } from '@/components/files/deferred-file-picker-dialog'
 import type { PickedFsEntry } from '@/lib/file-system-types'
-import type { UsePickEntryOptions } from '@/components/use-pick-entry'
+import type { UsePickEntryOptions } from '@/components/files/use-pick-entry'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import {
   nativePickerCapabilitiesOptions,

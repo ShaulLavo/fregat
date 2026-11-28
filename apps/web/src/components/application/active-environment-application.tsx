@@ -1,4 +1,4 @@
-import { ServerUpdateStatus } from '@/components/server-update-status'
+import { ServerUpdateStatus } from '@/components/machines/server-update-status'
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { TooltipProvider } from '@workspace/ui/components/tooltip'
@@ -12,8 +12,8 @@ import { LanguageServerMatchProvider } from '@/features/editor/providers/languag
 import { EditorStateProvider } from '@/features/editor/providers/state-provider'
 import { AppearanceProvider } from '@/features/settings/providers/appearance-provider'
 import { useApplicationRuntime } from '@/hooks/use-application-runtime'
-import { FeedbackLayer } from '@/components/feedback-layer'
-import { FileIconSprite } from '@/components/file-icon-sprite'
+import { FeedbackLayer } from '@/components/application/feedback-layer'
+import { FileIconSprite } from '@/components/files/file-icon-sprite'
 import { ErrorActionProvider } from '@/providers/error-action-provider'
 
 export function ActiveEnvironmentApplication({ children }: { readonly children: ReactNode }) {

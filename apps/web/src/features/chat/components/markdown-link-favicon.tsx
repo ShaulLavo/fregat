@@ -1,6 +1,6 @@
 import { GlobeIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 
 import { faviconUrlForHost } from '@/features/chat/utils/markdown-external-links'
 

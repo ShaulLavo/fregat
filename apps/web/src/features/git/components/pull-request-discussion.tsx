@@ -10,7 +10,7 @@ import {
 } from '@workspace/ui/components/dialog'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
-import { ModuleLoadError } from '@/components/module-load-error'
+import { ModuleLoadError } from '@/components/application/module-load-error'
 import { discussionDialogQueryOptions } from '@/features/git/utils/discussion-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 

@@ -2,7 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { onTestFinished } from 'vitest'
 
-import { MachineForm } from '@/components/machine-form'
+import { MachineForm } from '@/components/machines/machine-form'
 import { fetchSettings } from '@/features/settings/utils/api'
 import { tailnetPeer, tailnetStatusCommand } from '../../../../../server/test/factories/tailnet'
 import { createFederationHarness } from '../../../../test/factories/federation'

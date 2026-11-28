@@ -1,7 +1,7 @@
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { TreeRowLead } from '@workspace/ui/patterns/tree-row-lead'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 import { iconForEntry } from '@/lib/file-icons'
 import type { ReferenceGroup } from '@/features/editor/utils/language-server-references'
 

@@ -1,5 +1,5 @@
 import { iconForEntry } from '@/lib/file-icons'
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 import type { FsEntry } from '@/lib/file-system-types'
 import { cn } from '@workspace/ui/lib/utils'
 

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ComponentProps } from 'react'
 
-import { ModuleLoadError } from '@/components/module-load-error'
+import { ModuleLoadError } from '@/components/application/module-load-error'
 import type { LogsPanel } from '@/features/logs/components/panel'
 import { logsPanelQueryOptions } from '@/features/logs/utils/panel-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'

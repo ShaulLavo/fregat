@@ -10,7 +10,7 @@ import {
 import { Spinner } from '@workspace/ui/components/spinner'
 
 import { InlineError } from '@/components/inline-error'
-import { MachineForm } from '@/components/machine-form'
+import { MachineForm } from '@/components/machines/machine-form'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import { connectionNoticeSummary } from '@/lib/environments/utils/connection-notice'

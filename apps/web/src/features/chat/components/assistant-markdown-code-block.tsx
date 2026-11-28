@@ -1,5 +1,5 @@
 import { CopyButton } from '@/components/copy-button'
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 import { ArrowUDownLeftIcon } from '@phosphor-icons/react'
 import { HighlightedCode } from '@workspace/markdown/components/highlighted-code'
 import type { MarkdownCodeBlockProps } from '@workspace/markdown/providers/render-context'

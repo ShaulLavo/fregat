@@ -2,7 +2,7 @@ import { ListRow } from '@workspace/ui/patterns/list-row'
 import { TreeRowLead } from '@workspace/ui/patterns/tree-row-lead'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 
-import { FileLabel } from '@/components/file-label'
+import { FileLabel } from '@/components/files/file-label'
 import type { DiagnosticGroupRow as Row } from '@/features/workbench/utils/diagnostic-rows'
 
 export function DiagnosticGroupRow({

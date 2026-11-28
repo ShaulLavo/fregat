@@ -1,4 +1,4 @@
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 import { CommandItem, CommandShortcut } from '@workspace/ui/components/command'
 
 import { iconForEntry } from '@/lib/file-icons'

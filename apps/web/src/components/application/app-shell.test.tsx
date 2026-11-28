@@ -1,10 +1,10 @@
-import { expect, test } from '../../test/fixtures'
-import { createTestQueryClient } from '../../test/providers'
-import { renderWithProviders } from '../../test/render'
-import { TestEditorStateProvider } from '../../test/factories/editor-state-provider'
-import { settingsSnapshot } from '../../test/factories/settings'
+import { expect, test } from '../../../test/fixtures'
+import { createTestQueryClient } from '../../../test/providers'
+import { renderWithProviders } from '../../../test/render'
+import { TestEditorStateProvider } from '../../../test/factories/editor-state-provider'
+import { settingsSnapshot } from '../../../test/factories/settings'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
-import { AppShell } from '@/components/app-shell'
+import { AppShell } from '@/components/application/app-shell'
 
 test('app shell clears busy state when workspace restoration settles', async ({ client }) => {
   expect(client).toBeDefined()

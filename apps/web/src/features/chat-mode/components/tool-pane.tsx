@@ -16,7 +16,7 @@ import { FileNavigatorPanel } from '@/features/workbench/components/file-navigat
 import { GitPaneHeader } from '@/features/workbench/components/git-pane-header'
 import { GitToolPane } from '@/features/chat-mode/components/git-tool-pane'
 import { SessionTerminal } from '@/features/chat-mode/components/session-terminal'
-import { ToolPaneHeader } from '@/components/tool-pane-header'
+import { ToolPaneHeader } from '@/components/workspace/tool-pane-header'
 import type { WorkbenchPanels } from '@/features/workbench/utils/panels'
 import type { ChatModeToolTab } from '@/features/chat-mode/utils/panels'
 

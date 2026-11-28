@@ -9,7 +9,7 @@ import { afterEach, onTestFinished } from 'vitest'
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import { MachineForm } from '@/components/machine-form'
+import { MachineForm } from '@/components/machines/machine-form'
 import { fetchSettings } from '@/features/settings/utils/api'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { createFederationHarness } from '../../../../test/factories/federation'

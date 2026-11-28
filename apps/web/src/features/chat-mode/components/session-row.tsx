@@ -13,7 +13,7 @@ import { SessionPullRequestBadge } from '@/features/chat-mode/components/session
 
 import { formatChatRelativeTime } from '@/features/chat/utils/formatters'
 import { useCoarseNow } from '@/hooks/use-coarse-now'
-import { SessionRename } from '@/components/session-rename'
+import { SessionRename } from '@/components/sessions/session-rename'
 import { SessionRowSnippet } from '@/features/chat-mode/components/session-row-snippet'
 import { activateSessionRow } from '@/features/chat-mode/state/session-commands'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'

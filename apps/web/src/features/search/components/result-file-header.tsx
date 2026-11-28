@@ -1,6 +1,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ListRow } from '@workspace/ui/patterns/list-row'
-import { FileLabel } from '@/components/file-label'
+import { FileLabel } from '@/components/files/file-label'
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { memo } from 'react'
 

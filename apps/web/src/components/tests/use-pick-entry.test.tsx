@@ -13,7 +13,7 @@ import { serverCapabilities } from '../../../test/factories/server-capabilities'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { expect, test } from '../../../test/fixtures'
 import { holdDeferredDialog, renderWithProviders } from '../../../test/render'
-import { usePickEntry } from '../use-pick-entry'
+import { usePickEntry } from '../files/use-pick-entry'
 
 beforeAll(() => {
   // New notices must remain observable when Sonner evicts dismissed history.
@@ -71,7 +71,7 @@ test.for(['loading', 'loaded'] as const)(
       phase === 'loading'
         ? holdDeferredDialog(
             filePickerDialogQueryOptions.queryKey,
-            () => import('@/components/file-picker-dialog'),
+            () => import('@/components/files/file-picker-dialog'),
           )
         : undefined
     if (release) onTestFinished(release)

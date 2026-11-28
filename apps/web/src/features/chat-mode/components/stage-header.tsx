@@ -14,8 +14,8 @@ import {
   sessionStatusTextClass,
 } from '@/features/chat-mode/utils/attention-state'
 import { BranchActions } from '@/features/git/components/branch-actions'
-import { SessionRename } from '@/components/session-rename'
-import { SessionActionsButton } from '@/components/session-actions-button'
+import { SessionRename } from '@/components/sessions/session-rename'
+import { SessionActionsButton } from '@/components/sessions/session-actions-button'
 import { useChatModeSession } from '@/features/chat-mode/providers/session-context'
 import { useSessionRenaming } from '@/hooks/use-session-renaming'
 import { stageTitle } from '@/features/chat-mode/utils/stage-title'

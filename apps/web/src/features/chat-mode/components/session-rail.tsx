@@ -1,4 +1,4 @@
-import { ChatDraftRail } from '@/components/chat-draft-rail'
+import { ChatDraftRail } from '@/components/sessions/chat-draft-rail'
 import { SessionMenu } from '@/features/chat-mode/components/session-menu'
 import { ProjectMenu } from '@/features/chat-mode/components/project-menu'
 import { useListContextMenu } from '@/keymap/menus/hooks/use-list-context-menu'

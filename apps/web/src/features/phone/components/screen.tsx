@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
-import { ModuleLoadError } from '@/components/module-load-error'
+import { ModuleLoadError } from '@/components/application/module-load-error'
 import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
 import { useWarmOverlays } from '@/features/phone/hooks/use-warm-overlays'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'

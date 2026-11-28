@@ -10,7 +10,7 @@ import { Spinner } from '@workspace/ui/components/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { useRef, useState, type ChangeEvent } from 'react'
 
-import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
+import { DeferredFilePickerDialog } from '@/components/files/deferred-file-picker-dialog'
 import { useMachineAttachOffer } from '@/features/chat/hooks/use-machine-attach-offer'
 import { useScreenshotCapture } from '@/features/chat/hooks/use-screenshot-capture'
 

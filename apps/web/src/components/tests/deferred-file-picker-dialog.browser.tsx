@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { afterEach, expect, test } from 'vitest'
 import { commands } from 'vitest/browser'
 
-import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
+import { DeferredFilePickerDialog } from '@/components/files/deferred-file-picker-dialog'
 import { filePickerDialogQueryOptions } from '@/features/file-picker/utils/dialog-query'
 import { activeServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
@@ -22,7 +22,7 @@ test('a picker opened before its module loads hands focus on and returns it to t
   await loadDeferredDialogs()
   const release = holdDeferredDialog(
     filePickerDialogQueryOptions.queryKey,
-    () => import('@/components/file-picker-dialog'),
+    () => import('@/components/files/file-picker-dialog'),
   )
   renderWithProviders(<PickerOpener />)
   const opener = document.querySelector<HTMLButtonElement>('[data-picker-opener]')!

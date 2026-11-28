@@ -1,7 +1,7 @@
 import { ListRow, type ListRowProps } from '@workspace/ui/patterns/list-row'
 import { memo } from 'react'
 
-import { FileLabel } from '@/components/file-label'
+import { FileLabel } from '@/components/files/file-label'
 import { HighlightedPreview } from '@/features/search/components/highlight'
 import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
 import { basename, parentPath } from '@/lib/path-formatters'

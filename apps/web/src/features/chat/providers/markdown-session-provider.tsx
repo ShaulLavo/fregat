@@ -3,7 +3,7 @@ import { MarkdownSessionContext } from '@workspace/markdown/providers/session-co
 import { Spinner } from '@workspace/ui/components/spinner'
 import { use, type ReactNode } from 'react'
 
-import { ModuleLoadError } from '@/components/module-load-error'
+import { ModuleLoadError } from '@/components/application/module-load-error'
 import { chatMarkdownQueryOptions } from '@/features/chat/state/markdown-session'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 

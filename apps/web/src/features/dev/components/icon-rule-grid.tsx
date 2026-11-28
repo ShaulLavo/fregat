@@ -1,4 +1,4 @@
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 import { iconRuleSamples } from '@/features/dev/utils/icon-rule-samples'
 
 /** Every file icon rule: its glyph at row and heading size, its hue, and what it matches. */

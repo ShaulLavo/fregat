@@ -13,9 +13,9 @@ import { ChatCircleIcon, ClockCounterClockwiseIcon, PlusIcon } from '@phosphor-i
 
 import { chatSessionPreview, formatChatDateLabel } from '@/features/chat/utils/formatters'
 import { SessionControls } from '@/features/chat/components/session-controls'
-import { ToolPaneHeader } from '@/components/tool-pane-header'
-import { SessionActionsButton } from '@/components/session-actions-button'
-import { SessionRename } from '@/components/session-rename'
+import { ToolPaneHeader } from '@/components/workspace/tool-pane-header'
+import { SessionActionsButton } from '@/components/sessions/session-actions-button'
+import { SessionRename } from '@/components/sessions/session-rename'
 import { useSessionRenaming } from '@/hooks/use-session-renaming'
 import type { ChatSessionListProjection } from '@workspace/client-core/chat/selectors'
 

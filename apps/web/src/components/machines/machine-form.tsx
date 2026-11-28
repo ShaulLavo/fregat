@@ -7,7 +7,7 @@ import {
   CollapsibleTrigger,
 } from '@workspace/ui/components/collapsible'
 import { CaretRightIcon, PlugsConnectedIcon } from '@phosphor-icons/react'
-import { MachineConnectionOption } from '@/components/machine-connection-option'
+import { MachineConnectionOption } from '@/components/machines/machine-connection-option'
 import { SshHostPicker } from '@/features/environments/components/ssh-host-picker'
 import { useId } from 'react'
 

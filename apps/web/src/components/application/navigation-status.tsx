@@ -3,7 +3,7 @@ import { Alert, AlertDescription } from '@workspace/ui/components/alert'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useNavigation } from '@/hooks/use-navigation'
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
-import { WorkspaceSwitchPending } from '@/components/workspace-switch-pending'
+import { WorkspaceSwitchPending } from '@/components/workspace/workspace-switch-pending'
 import { Button } from '@workspace/ui/components/button'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 

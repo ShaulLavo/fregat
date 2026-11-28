@@ -1,5 +1,5 @@
-import { FileIconSprite } from '@/components/file-icon-sprite'
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileIconSprite } from '@/components/files/file-icon-sprite'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 import { fileIconSpriteSymbols, iconForEntry } from '@/lib/file-icons'
 import { expect, test } from '../../../test/fixtures'
 import { renderWithProviders } from '../../../test/render'

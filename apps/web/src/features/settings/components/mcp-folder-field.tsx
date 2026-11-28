@@ -2,7 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button } from '@workspace/ui/components/button'
 
-import { FilePickerDialog } from '@/components/file-picker-dialog'
+import { FilePickerDialog } from '@/components/files/file-picker-dialog'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 
 /** The folder the list is read from: home by default, a project to see its local and project servers. */

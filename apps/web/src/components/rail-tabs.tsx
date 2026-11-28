@@ -1,7 +1,7 @@
 import { RailTab } from '@/components/rail-tab'
 import type { PanelTab } from '@/components/utils/panel-tabs'
 import { railTabCommand } from '@/components/utils/rail-tab-command'
-import { WorkspaceRail } from '@/components/workspace-rail'
+import { WorkspaceRail } from '@/components/workspace/workspace-rail'
 import { usePaneHost } from '@/hooks/use-pane-host'
 import type { PaneHostView } from '@/providers/pane-host-context'
 

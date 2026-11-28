@@ -2,7 +2,7 @@ import '@workspace/ui/globals.css'
 import { cleanup, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
-import { FilePickerDialog } from '@/components/file-picker-dialog'
+import { FilePickerDialog } from '@/components/files/file-picker-dialog'
 import type { FsEntry } from '@/lib/file-system-types'
 import { renderWithProviders } from '../../../../test/render'
 

@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
-import { MachineForm } from '@/components/machine-form'
+import { MachineForm } from '@/components/machines/machine-form'
 
 export function FormDialog(props: ComponentProps<typeof MachineForm>) {
   return (

@@ -1,6 +1,6 @@
 import { cn } from '@workspace/ui/lib/utils'
 
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 import { iconForEntry } from '@/lib/file-icons'
 import type { SidebarLocation } from '@/features/file-picker/utils/sidebar-locations'
 

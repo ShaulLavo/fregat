@@ -8,7 +8,7 @@ import { resourceQueryClient } from '@/lib/resources/state/query-client'
 // The browser may already have a chunk while offline, so these load without a network check.
 export const sessionDialogsModuleQueryOptions = queryOptions({
   queryKey: overlayQueryKeys.sessionDialogs,
-  queryFn: () => import('@/components/session-dialogs'),
+  queryFn: () => import('@/components/sessions/session-dialogs'),
   staleTime: 'static',
   structuralSharing: false,
   gcTime: Infinity,
@@ -17,7 +17,7 @@ export const sessionDialogsModuleQueryOptions = queryOptions({
 
 export const themeStudioSlotModuleQueryOptions = queryOptions({
   queryKey: overlayQueryKeys.themeStudioSlot,
-  queryFn: () => import('@/components/theme-studio-slot'),
+  queryFn: () => import('@/components/appearance/theme-studio-slot'),
   staleTime: 'static',
   structuralSharing: false,
   gcTime: Infinity,

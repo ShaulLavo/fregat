@@ -6,7 +6,7 @@ import { changeRowId } from '@/features/git/utils/change-row-id'
 import { useOpenDiffDocument } from '@/features/git/hooks/use-open-diff-document'
 import { gitStatusSymbol } from '@/lib/git-status-symbols'
 import type { ChangeRow } from '@/features/git/utils/types'
-import { GitFileRow } from '@/components/git-file-row'
+import { GitFileRow } from '@/components/files/git-file-row'
 import { FileActions } from '@/features/git/components/file-actions'
 
 export function ChangeFileRow({

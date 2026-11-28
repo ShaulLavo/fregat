@@ -6,7 +6,7 @@ import { createObservedInProcessClient } from '../../../../test/client'
 import { createRequestGate } from '../../../../test/factories/request-gate'
 import { installTestClient } from '../../../../test/factories/client-binding'
 import { directoryQueryOptions } from '@/features/file-picker/utils/directory-query'
-import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
+import { DeferredFilePickerDialog } from '@/components/files/deferred-file-picker-dialog'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithLoadedDialogs } from '../../../../test/render'
 

@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 
-import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
+import { DeferredFilePickerDialog } from '@/components/files/deferred-file-picker-dialog'
 import { Phase } from '@/lib/environments/components/phase'
 import { useNavigation } from '@/hooks/use-navigation'
 import { queryClientFor } from '@/lib/environments/state/query-clients'

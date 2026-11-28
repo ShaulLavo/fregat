@@ -3,7 +3,7 @@ import { entryPickerQueryKeys } from '@/components/utils/query-keys'
 
 export const entryPickerModuleQueryOptions = queryOptions({
   queryKey: entryPickerQueryKeys.module,
-  queryFn: () => import('@/components/entry-picker'),
+  queryFn: () => import('@/components/files/entry-picker'),
   staleTime: 'static',
   structuralSharing: false,
   gcTime: Infinity,

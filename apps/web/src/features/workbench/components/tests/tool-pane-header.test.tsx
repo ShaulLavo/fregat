@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import { ToolPaneHeader } from '@/components/tool-pane-header'
+import { ToolPaneHeader } from '@/components/workspace/tool-pane-header'
 import { PaneHostContext, type PaneHost } from '@/providers/pane-host-context'
 import { chatModeToolTabLabel } from '@/features/chat-mode/utils/panels'
 import {

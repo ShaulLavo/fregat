@@ -10,8 +10,8 @@ import {
 import { Spinner } from '@workspace/ui/components/spinner'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
-import type { FilePickerDialog } from '@/components/file-picker-dialog'
-import { ModuleLoadError } from '@/components/module-load-error'
+import type { FilePickerDialog } from '@/components/files/file-picker-dialog'
+import { ModuleLoadError } from '@/components/application/module-load-error'
 import { filePickerDialogQueryOptions } from '@/features/file-picker/utils/dialog-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 

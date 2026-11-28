@@ -1,4 +1,4 @@
-import { DeferredOverlay } from '@/components/deferred-overlay'
+import { DeferredOverlay } from '@/components/application/deferred-overlay'
 import { themeStudioSlotModuleQueryOptions } from '@/components/utils/overlay-modules'
 import { useStudioStore } from '@/lib/theme-studio/state/studio-store'
 

@@ -1,7 +1,7 @@
 import { fireEvent } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, vi } from 'vitest'
-import { WebWallpaper } from '@/components/web-wallpaper'
+import { WebWallpaper } from '@/components/appearance/web-wallpaper'
 import { wallpaperStillUrl } from '@/features/workbench/state/wallpaper-query'
 import { WALLPAPER_URL } from '@/features/workbench/utils/wallpaper'
 import { primaryServerOrigin } from '@/lib/client'

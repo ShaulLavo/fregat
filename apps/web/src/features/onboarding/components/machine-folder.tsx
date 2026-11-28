@@ -1,7 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
+import { DeferredFilePickerDialog } from '@/components/files/deferred-file-picker-dialog'
 import { useConnectedMachines } from '@/hooks/use-connected-machines'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { queryClientFor } from '@/lib/environments/state/query-clients'

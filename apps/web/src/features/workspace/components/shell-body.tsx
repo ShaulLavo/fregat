@@ -1,4 +1,4 @@
-import { ModuleLoadError } from '@/components/module-load-error'
+import { ModuleLoadError } from '@/components/application/module-load-error'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import type { useDisplayedShell } from '@/features/workspace/hooks/use-displayed-shell'
 import type { ShellProps } from '@/lib/shell/utils/props'

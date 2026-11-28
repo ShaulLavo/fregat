@@ -5,7 +5,7 @@ import { CrosshairIcon, FilePlusIcon, FolderPlusIcon } from '@phosphor-icons/rea
 import { Button } from '@workspace/ui/components/button'
 import { useStore } from 'zustand'
 
-import { ToolPaneHeader } from '@/components/tool-pane-header'
+import { ToolPaneHeader } from '@/components/workspace/tool-pane-header'
 import { LiveUpdatesLimited } from '@/features/workbench/components/live-updates-limited'
 import type { NavigatorHeaderStore } from '@/features/workbench/state/navigator-header-store'
 import type { LoadState } from '@/lib/load-state'

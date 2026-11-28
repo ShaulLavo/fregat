@@ -1,6 +1,6 @@
 import { GitDiffIcon, TerminalWindowIcon } from '@phosphor-icons/react'
 
-import { SessionActionsButton } from '@/components/session-actions-button'
+import { SessionActionsButton } from '@/components/sessions/session-actions-button'
 import { useNavigation } from '@/hooks/use-navigation'
 import { SessionAttentionIndicator } from '@/features/chat-mode/components/session-attention-indicator'
 import type { StageHeaderProps } from '@/features/chat-mode/components/stage-header'

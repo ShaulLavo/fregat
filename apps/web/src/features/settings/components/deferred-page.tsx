@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ComponentProps } from 'react'
 
-import { ModuleLoadError } from '@/components/module-load-error'
+import { ModuleLoadError } from '@/components/application/module-load-error'
 import type { SettingsPage } from '@/features/settings/components/page'
 import { PageLoading } from '@/features/settings/components/page-loading'
 import { settingsPageQueryOptions } from '@/features/settings/utils/page-query'

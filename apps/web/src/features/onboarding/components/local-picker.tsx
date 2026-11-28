@@ -1,4 +1,4 @@
-import { usePickEntry } from '@/components/use-pick-entry'
+import { usePickEntry } from '@/components/files/use-pick-entry'
 import type { ConfirmedMachine } from '@/lib/environments/utils/machines'
 
 /** Inside the primary server's query client, so the picker asks that server. */

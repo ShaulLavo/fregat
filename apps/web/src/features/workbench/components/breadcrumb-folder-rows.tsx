@@ -1,4 +1,4 @@
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 import { Spinner } from '@workspace/ui/components/spinner'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 

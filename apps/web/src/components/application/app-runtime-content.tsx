@@ -1,4 +1,4 @@
-import { AppShell } from '@/components/app-shell'
+import { AppShell } from '@/components/application/app-shell'
 import { useDirtyTabCloseRequest } from '@/features/editor/hooks/use-dirty-tab-close'
 import { EditorTabActionsProvider } from '@/features/editor/providers/tab-actions-provider'
 import { useRestoreRecentWorkspaceRoot } from '@/features/workspace/hooks/use-restore-recent-root'

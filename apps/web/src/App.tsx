@@ -1,5 +1,5 @@
 import { SessionNotificationCoordinator } from '@/features/chat-mode/components/session-notification-coordinator'
-import { AppContent } from '@/components/app-content'
+import { AppContent } from '@/components/application/app-content'
 import { QueuedFollowUpDelivery } from '@/features/chat/components/queued-follow-up-delivery'
 import { ChatProviderSignInProvider } from '@/features/chat/providers/provider-sign-in-provider'
 import { WorkspaceEditRecoveryDialog } from '@/features/editor/components/workspace-edit-recovery-dialog'

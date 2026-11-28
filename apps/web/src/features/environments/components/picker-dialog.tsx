@@ -11,7 +11,7 @@ import { errorMessage } from '@/lib/error-message'
 import { clientErrorDescription } from '@/lib/client-error-taxonomy'
 import { connectionNoticeSummary } from '@/lib/environments/utils/connection-notice'
 import { InlineError } from '@/components/inline-error'
-import { ServerUpdateButton } from '@/components/server-update-button'
+import { ServerUpdateButton } from '@/components/machines/server-update-button'
 
 export function PickerDialog({
   mode,

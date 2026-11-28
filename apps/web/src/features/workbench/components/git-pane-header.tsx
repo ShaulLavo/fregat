@@ -1,7 +1,7 @@
 import { Spinner } from '@workspace/ui/components/spinner'
 import { BranchChip } from '@/features/git/components/branch-chip'
 import { RemoteActions } from '@/features/git/components/remote-actions'
-import { ToolPaneHeader } from '@/components/tool-pane-header'
+import { ToolPaneHeader } from '@/components/workspace/tool-pane-header'
 
 export function GitPaneHeader({
   rootPath,

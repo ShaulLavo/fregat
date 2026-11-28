@@ -1,4 +1,4 @@
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileTypeIcon } from '@/components/files/file-type-icon'
 import { SparkleIcon, TerminalWindowIcon } from '@phosphor-icons/react'
 
 import { iconForEntry } from '@/lib/file-icons'

@@ -1,4 +1,4 @@
-import { FileLabel } from '@/components/file-label'
+import { FileLabel } from '@/components/files/file-label'
 import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
 import { Button } from '@workspace/ui/components/button'
 import { ListRow, type ListRowProps } from '@workspace/ui/patterns/list-row'

@@ -12,7 +12,7 @@ import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { useMemo, useState } from 'react'
 
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
-import { GitFileRow } from '@/components/git-file-row'
+import { GitFileRow } from '@/components/files/git-file-row'
 import { TurnHunkRow } from '@/features/chat-mode/components/turn-hunk-row'
 import { turnTreeRows, type TurnTreeRow } from '@/features/chat-mode/utils/turn-tree'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'

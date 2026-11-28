@@ -5,8 +5,8 @@ import { test, expect } from '../../../test/fixtures'
 import { omarchyCatalogWebp, wallpaperPng } from '../../../test/factories/wallpaper'
 import { createTestQueryClient } from '../../../test/providers'
 import { renderWithProviders } from '../../../test/render'
-import { Wallpaper } from '@/components/wallpaper'
-import { LibraryWallpaper } from '@/components/library-wallpaper'
+import { Wallpaper } from '@/components/appearance/wallpaper'
+import { LibraryWallpaper } from '@/components/appearance/library-wallpaper'
 import { refreshConfirmedSettings } from '@/features/settings/state/snapshot-admission'
 
 test.afterEach(() => {

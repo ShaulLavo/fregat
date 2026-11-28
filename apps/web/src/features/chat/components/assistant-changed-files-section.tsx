@@ -30,7 +30,7 @@ import {
 } from '../state/chat-changed-files-expansion-store'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { AssistantChangedFilesTree } from './assistant-changed-files-tree'
-import { DiffStatLabel } from '@/components/diff-stat-label'
+import { DiffStatLabel } from '@/components/files/diff-stat-label'
 
 export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDiffSummary }) {
   const queryClient = useQueryClient()

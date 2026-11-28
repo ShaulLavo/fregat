@@ -1,4 +1,4 @@
-import { DeferredOverlay } from '@/components/deferred-overlay'
+import { DeferredOverlay } from '@/components/application/deferred-overlay'
 import { sessionDialogsModuleQueryOptions } from '@/components/utils/overlay-modules'
 import { useSessionDeleteRequestStore } from '@/features/chat-mode/state/session-delete-request-store'
 import { useSessionSnoozeRequestStore } from '@/features/chat-mode/state/session-snooze-request-store'

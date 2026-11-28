@@ -5,7 +5,7 @@ import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { act, screen } from '@testing-library/react'
 import { afterEach } from 'vitest'
 
-import { AppTitlebar } from '@/components/app-titlebar'
+import { AppTitlebar } from '@/components/application/app-titlebar'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../test/factories/editor-state-provider'
 import {
   createEditorWorkspaceStore,

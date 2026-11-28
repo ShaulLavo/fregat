@@ -1,7 +1,7 @@
 import { Button } from '@workspace/ui/components/button'
 import { useState } from 'react'
 
-import { MachineForm } from '@/components/machine-form'
+import { MachineForm } from '@/components/machines/machine-form'
 import { MachineRow } from '@/features/settings/components/machine-row'
 import { useSettingValue } from '@/hooks/use-setting-value'
 
