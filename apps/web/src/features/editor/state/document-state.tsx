@@ -1,6 +1,6 @@
 import { createStoreContext } from '@/lib/store-context'
 import type { FileSnapshot } from '@/lib/file-snapshot'
-import { type EditorScrollPosition } from '@singapore-editor/core/editor'
+import type { EditorScrollPosition } from '@singapore-editor/core/editor'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { createStore, type Mutate, type StoreApi } from 'zustand/vanilla'
 import type { DocumentRetention } from '@/features/editor/utils/document-retention'

@@ -8,7 +8,7 @@ import {
   type WorkspaceLocation,
   type WorktreeIdsByRootPath,
 } from '@/features/workspace/utils/location'
-import { type ScopedStorage } from '@/lib/environments/state/scoped-storage'
+import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { createDefaultGitHistoryView, gitHistoryViewSchema } from '@/lib/git-history-view'
 import type { WorkspaceRootFolder } from '@/lib/file-system-types'
 import {

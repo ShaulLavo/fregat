@@ -1,8 +1,46 @@
 diff --git a/dist/rules/graph.js b/dist/rules/graph.js
-index 3184b3071feda5c82c1d4800b8d16de1bc83254b..1f6b89fa6b7ab3cf0bcec7270587b67350001969 100644
+index 3184b3071feda5c82c1d4800b8d16de1bc83254b..05ee1c98951a818846ef3151ce72b1b0dd54645c 100644
 --- a/dist/rules/graph.js
 +++ b/dist/rules/graph.js
-@@ -201,7 +201,30 @@ function importCycles(model) {
+@@ -92,7 +92,7 @@ function layering(comp, links) {
+     }
+     return [...low, ...high];
+ }
+-function moduleCycles(model) {
++function moduleCycleGroups(model) {
+     const edges = new Map();
+     const via = new Map();
+     for (const [from, targets] of model.imports) {
+@@ -114,6 +114,11 @@ function moduleCycles(model) {
+     return stronglyConnected(nodes, edges).map((comp) => {
+         const inside = new Set(comp);
+         const links = comp.flatMap((a) => [...(edges.get(a) ?? [])].filter((b) => inside.has(b)).map((b) => ({ a, b, files: via.get(`${a}\u0000${b}`) ?? [] })));
++        return { comp, links };
++    });
++}
++function moduleCycles(model) {
++    return moduleCycleGroups(model).map(({ comp, links }) => {
+         const order = layering(comp, links);
+         const rank = new Map(order.map((n, i) => [n, i]));
+         const back = links.filter((l) => rank.get(l.a) < rank.get(l.b)).sort((x, y) => x.files.length - y.files.length);
+@@ -127,6 +132,16 @@ function moduleCycles(model) {
+         };
+     });
+ }
++function moduleCycleEdges(model) {
++    return moduleCycleGroups(model).flatMap(({ links }) => links.map(({ a, b, files }) => ({
++        rule: 'module-cycle-edge',
++        key: `${a} -> ${b}`,
++        title: `${a} -> ${b} participates in a module cycle`,
++        at: files[0].split(' -> ')[0],
++        notes: files,
++        body: [],
++    })));
++}
+ function shortestLoop(comp, edges) {
+     const inside = new Set(comp);
+     let best = null;
+@@ -201,7 +216,37 @@ function importCycles(model) {
      }
      return out;
  }
@@ -15,7 +53,7 @@ index 3184b3071feda5c82c1d4800b8d16de1bc83254b..1f6b89fa6b7ab3cf0bcec7270587b673
 +            .map((to) => ({
 +                rule: 'import-cycle-edge',
 +                key: `${from} -> ${to}`,
-+                title: 'Runtime import participates in a file cycle',
++                title: 'Static runtime import participates in a file cycle',
 +                at: from,
 +                notes: [`${from} imports ${to}`],
 +                body: [],
@@ -26,9 +64,16 @@ index 3184b3071feda5c82c1d4800b8d16de1bc83254b..1f6b89fa6b7ab3cf0bcec7270587b673
 +    {
 +        id: 'import-cycle-edge',
 +        scope: 'TypeScript',
-+        summary: 'A runtime import participates in a file cycle. Keys record edges even when a folder cycle also exists.',
++        summary: 'A statically resolved runtime import participates in a file cycle. Keys record edges even when a folder cycle also exists.',
 +        fix: 'Remove the import edge, split the shared dependency into its own module, or pass it at the call site.',
 +        run: importCycleEdges,
++    },
++    {
++        id: 'module-cycle-edge',
++        scope: 'TypeScript',
++        summary: 'A directed folder dependency participates in a module cycle.',
++        fix: 'Move what the importing folder needs below both folders, or pass it at the call site.',
++        run: moduleCycleEdges,
 +    },
      {
          id: 'module-cycle',

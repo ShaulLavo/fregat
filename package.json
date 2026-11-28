@@ -78,7 +78,7 @@
     "dev:tui": "bun scripts/tui.ts",
     "desktop:dev": "bun --env-file=.env scripts/desktop-dev.ts",
     "lint": "bun run workspace:check && bun run plans:check && bun run dupes:functions && bun run dupes && bun run lint:structure && bun run --parallel --no-exit-on-error --filter '*' lint",
-    "lint:structure": "bun scripts/lint/structure.ts",
+    "lint:structure": "oxlint -c scripts/lint/structure.oxlintrc.json apps/web/src && bun scripts/lint/structure.ts",
     "design:census": "node scripts/lint/web-design-census.mjs --check",
     "compiler:census": "node scripts/lint/react-compiler-census.mjs --check",
     "errors:census": "node scripts/lint/error-context-census.mjs --check",
