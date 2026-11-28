@@ -562,16 +562,14 @@ describe('LSP server registry', () => {
   it('pins runtime release downloads with checksums', () => {
     const manifest: Record<string, PinnedLspRuntimeManifestEntry> = pinnedLspRuntimeManifest
     for (const entry of Object.values(manifest)) {
-      for (const platform of Object.values(entry.platforms)) {
-        if (!platform) continue
-
-        for (const asset of Object.values(platform)) {
-          if (!asset) continue
-
-          expect(asset.url).toContain(`/releases/download/${entry.version}/`)
-          expect(asset.url).not.toContain('/latest')
-          expect(asset.sha256).toMatch(/^[a-f0-9]{64}$/u)
-        }
+      const assets = Object.values(entry.platforms).flatMap((platform) =>
+        Object.values(platform ?? {}),
+      )
+      for (const asset of assets) {
+        if (!asset) continue
+        expect(asset.url).toContain(`/releases/download/${entry.version}/`)
+        expect(asset.url).not.toContain('/latest')
+        expect(asset.sha256).toMatch(/^[a-f0-9]{64}$/u)
       }
     }
   })

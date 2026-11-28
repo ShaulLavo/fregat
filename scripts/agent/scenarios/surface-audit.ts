@@ -64,32 +64,37 @@ function auditSurfaces() {
     string,
     { alpha: number; count: number; layers: string[]; point: string }
   >()
+  function sampleStack(x: number, y: number) {
+    const layers: string[] = []
+    let through = 1
+    for (const element of document.elementsFromPoint(x, y)) {
+      // The wallpaper's parent is the floor under it; nothing from there down is a pane surface.
+      if (element.querySelector(':scope > [data-workbench-wallpaper]')) break
+      const style = getComputedStyle(element)
+      const alpha = alphaOf(style.backgroundColor)
+      if (alpha === 0) continue
+      const blur = style.backdropFilter === 'none' ? '' : ' +blur'
+      layers.push(`${describe(element)} ${Math.round(alpha * 100)}%${blur}`)
+      through *= 1 - alpha
+    }
+    const key = layers.join(' > ')
+    const entry = stacks.get(key)
+    if (entry) {
+      entry.count += 1
+      return
+    }
+    stacks.set(key, {
+      alpha: Math.round((1 - through) * 1000) / 10,
+      count: 1,
+      layers,
+      point: `${x},${y}`,
+    })
+  }
   for (let row = 0; row < ROWS; row += 1) {
     for (let column = 0; column < COLUMNS; column += 1) {
       const x = Math.round(((column + 0.5) / COLUMNS) * innerWidth)
       const y = Math.round(((row + 0.5) / ROWS) * innerHeight)
-      const layers: string[] = []
-      let through = 1
-      for (const element of document.elementsFromPoint(x, y)) {
-        // The wallpaper's parent is the floor under it; nothing from there down is a pane surface.
-        if (element.querySelector(':scope > [data-workbench-wallpaper]')) break
-        const style = getComputedStyle(element)
-        const alpha = alphaOf(style.backgroundColor)
-        if (alpha === 0) continue
-        const blur = style.backdropFilter === 'none' ? '' : ' +blur'
-        layers.push(`${describe(element)} ${Math.round(alpha * 100)}%${blur}`)
-        through *= 1 - alpha
-      }
-      const key = layers.join(' > ')
-      const entry = stacks.get(key)
-      if (entry) entry.count += 1
-      else
-        stacks.set(key, {
-          alpha: Math.round((1 - through) * 1000) / 10,
-          count: 1,
-          layers,
-          point: `${x},${y}`,
-        })
+      sampleStack(x, y)
     }
   }
   return Array.from(stacks.values()).sort((left, right) => right.count - left.count)

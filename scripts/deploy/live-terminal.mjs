@@ -107,16 +107,12 @@ async function changedInputPixels({
   const channelDelta = restored
     ? thresholds.restoreChannelTolerance + 1
     : thresholds.glyphChannelDelta
-  for (let cell = firstCell; cell < lastCell; cell++) {
+  function countChangedPixels(firstColumn, lastColumn) {
     let changed = 0
     let area = 0
     const columns = new Set()
     for (let y = Math.floor(top); y < Math.ceil(bottom); y++) {
-      for (
-        let x = Math.floor(left + cell * cellWidth);
-        x < Math.ceil(left + (cell + 1) * cellWidth);
-        x++
-      ) {
+      for (let x = firstColumn; x < lastColumn; x++) {
         area++
         const offset = (y * baseline.width + x) * 4
         const difference = Math.max(
@@ -129,6 +125,13 @@ async function changedInputPixels({
         columns.add(x)
       }
     }
+    return { changed, area, columns }
+  }
+  for (let cell = firstCell; cell < lastCell; cell++) {
+    const { changed, area, columns } = countChangedPixels(
+      Math.floor(left + cell * cellWidth),
+      Math.ceil(left + (cell + 1) * cellWidth),
+    )
     const fraction = changed / area
     if (restored) {
       if (fraction > thresholds.maxRestoreChangedFraction) return false

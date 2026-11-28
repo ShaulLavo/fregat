@@ -45,16 +45,14 @@ export function PickerDialog({
     setError(null)
     setFailedName(null)
     try {
-      if (connecting) {
-        const result = await connections.connectMachine(name)
-        if (result === 'cancelled') return
-        if (result === 'failed') {
-          const failure = connections.store
-            .getState()
-            .machines.find((entry) => entry.name === name)?.lastError
-          if (failure) return setFailedName(name)
-          return setError(`Cannot connect to ${name}. Retry the connection.`)
-        }
+      const result = connecting ? await connections.connectMachine(name) : undefined
+      if (result === 'cancelled') return
+      if (result === 'failed') {
+        const failure = connections.store
+          .getState()
+          .machines.find((entry) => entry.name === name)?.lastError
+        if (failure) return setFailedName(name)
+        return setError(`Cannot connect to ${name}. Retry the connection.`)
       }
       if (mode === 'disconnect') await connections.disconnectMachine(name)
       const machine = connections.store.getState().machines.find((entry) => entry.name === name)

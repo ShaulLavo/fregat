@@ -69,30 +69,39 @@ export async function launchChromium(options: ChromiumOptions): Promise<Chromium
     }
     if (owner === 'live') return await launchInstalledBrowser(remaining, profile, true)
     const receipt = installReceipt(options.url, options.manifest)
-    if (hasVerifiedInstall(profile, receipt)) {
-      try {
-        const result = await launchInstalledBrowser(remaining, profile, false)
-        options.onOpen({
-          engine: 'chromium',
-          installed: true,
-          installation: 'receipt',
-          displayMode: 'standalone',
-        })
-        return result
-      } catch (error) {
-        options.signal?.throwIfAborted()
-        if ((error as { code?: string }).code !== 'desktop.launcher.LAUNCH_FAILED') throw error
-        forgetVerifiedInstall(profile)
-        const after = await singletonState(profile, cap.remainingMs(), options.signal)
-        if (after !== 'idle' || cap.remainingMs() <= 0) throw error
-      }
-    }
+    const installed = hasVerifiedInstall(profile, receipt)
+      ? await launchVerifiedInstall(remaining, profile, cap.remainingMs)
+      : undefined
+    if (installed) return installed
     return await installAndLaunch(
       { ...remaining, startup: { ...remaining.startup, limitMs: cap.remainingMs() } },
       profile,
     )
   } finally {
     release()
+  }
+}
+
+async function launchVerifiedInstall(
+  options: InstalledOptions,
+  profile: string,
+  remainingMs: () => number,
+) {
+  try {
+    const result = await launchInstalledBrowser(options, profile, false)
+    options.onOpen({
+      engine: 'chromium',
+      installed: true,
+      installation: 'receipt',
+      displayMode: 'standalone',
+    })
+    return result
+  } catch (error) {
+    options.signal?.throwIfAborted()
+    if ((error as { code?: string }).code !== 'desktop.launcher.LAUNCH_FAILED') throw error
+    forgetVerifiedInstall(profile)
+    const after = await singletonState(profile, remainingMs(), options.signal)
+    if (after !== 'idle' || remainingMs() <= 0) throw error
   }
 }
 
@@ -275,10 +284,7 @@ async function launchInstalledBrowser(
       }
       const verdict = supervisor.check(observe(child.pid))
       if (verdict !== 'progressing') {
-        child.kill('SIGTERM')
-        await waitForBrowserExit(child, 2000)
-        if (child.exitCode === null) child.kill('SIGKILL')
-        await child.exited
+        await stopBrowserProcess(child)
         throw launcherErrors.LAUNCH_FAILED({
           internal: { reason: verdict, startupPhase: 'installed-window' },
         })

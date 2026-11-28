@@ -3,6 +3,7 @@
 Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: In progress
+- Landed: `@singapore-editor/collaboration@0.0.10`, with the core engine in its dependency `@singapore-editor/collab@0.0.6`
 - Kind: Implementation
 - Owner: Editor
 - Priority: P2
