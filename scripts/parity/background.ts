@@ -34,6 +34,31 @@ const { make } = await import(
 const upstream = make()
 const local = new BackgroundTaskRegistry()
 let comparisons = 0
+function compareLiveness() {
+  for (const id of ['session', 'other'])
+    deepStrictEqual(local.get(id), upstream.getThreadBackgroundLiveness(id))
+}
+
+function compareTaskUpdates(taskType: string | undefined, status: string | undefined) {
+  for (const kind of ['started', 'progress', 'updated', 'completed'] as const) {
+    for (const agentId of [undefined, 'parent']) {
+      const sessionId = comparisons % 3 === 0 ? 'other' : 'session'
+      const taskId = `task-${comparisons % 7}`
+      upstream.recordTaskLiveness({
+        threadId: sessionId,
+        taskId,
+        taskType,
+        status,
+        kind,
+        agentId,
+      })
+      local.record({ sessionId, taskId, taskType, status, kind, agentId })
+      compareLiveness()
+      comparisons++
+    }
+  }
+}
+
 for (const taskType of [
   undefined,
   'agent',
@@ -57,24 +82,7 @@ for (const taskType of [
     'cancelled',
     'interrupted',
   ]) {
-    for (const kind of ['started', 'progress', 'updated', 'completed'] as const) {
-      for (const agentId of [undefined, 'parent']) {
-        const sessionId = comparisons % 3 === 0 ? 'other' : 'session'
-        const taskId = `task-${comparisons % 7}`
-        upstream.recordTaskLiveness({
-          threadId: sessionId,
-          taskId,
-          taskType,
-          status,
-          kind,
-          agentId,
-        })
-        local.record({ sessionId, taskId, taskType, status, kind, agentId })
-        for (const id of ['session', 'other'])
-          deepStrictEqual(local.get(id), upstream.getThreadBackgroundLiveness(id))
-        comparisons++
-      }
-    }
+    compareTaskUpdates(taskType, status)
   }
 }
 upstream.clearThreadLiveness('session')
