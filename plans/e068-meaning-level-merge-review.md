@@ -3,6 +3,7 @@
 Source paths in this document are relative to [`editor/`](https://github.com/ShaulLavo/singapore/tree/d44f7ffa2112417fcc919e1ee4ac5e801f054432) unless qualified.
 
 - Status: Approved
+- Landed: Steps 1 to 4 in `@singapore-editor/collaboration@0.0.10`
 - Kind: Implementation
 - Owner: Editor
 - Priority: P2
@@ -883,6 +884,14 @@ Remaining Approved work:
 - [ ] Bound late damaged-root/error-range checks and wide/injected incremental fallbacks.
       `bench/cursor.test.ts` now reproduces the expensive late damaged-root lookup independently
       of syntax-query execution; repeat it with the existing full-reparse differential corpus.
+
+## Delivery
+
+Steps 1 to 4 landed in `@singapore-editor/collaboration@0.0.10`, which Fregat pins in
+`package.json`. The package exports `MergeReview` from its root entry point and
+`MergeReviewDetector` from `@singapore-editor/collaboration/merge-review`. Its
+`@singapore-editor/collab@0.0.6` dependency provides `ConfirmedWindow`, `editsAfter`, and
+`projectEffects`. Step 5 and the unchecked cursor and fallback items above stay open.
 
 ## Verification
 

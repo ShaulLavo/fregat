@@ -9,6 +9,12 @@ async function box(locator: Locator) {
   return bounds
 }
 
+function alignmentFailures(offsets: Record<string, number>, label: string) {
+  return Object.entries(offsets)
+    .filter(([, offset]) => Math.abs(offset) > 0.5)
+    .map(([name, offset]) => `${label} ${name}: ${offset}px`)
+}
+
 export const chatAlignment = isolatedNativeScenario({
   name: 'chat-alignment',
   description:
@@ -57,8 +63,7 @@ export const chatAlignment = isolatedNativeScenario({
             toolbarCentres: Math.max(...iconY) - Math.min(...iconY),
           })
         }
-        for (const [name, offset] of Object.entries(offsets))
-          if (Math.abs(offset) > 0.5) failures.push(`${width}/${density} ${name}: ${offset}px`)
+        failures.push(...alignmentFailures(offsets, `${width}/${density}`))
         measurements.push({ width, density, phone, offsets })
         await step(`${width}-${density}`)
       }
