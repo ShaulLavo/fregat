@@ -8,7 +8,7 @@ import {
   createQueryClientOwnerMissingError,
 } from '@workspace/client-core/environments/utils/structured-errors'
 import { installGitBudgetInvalidation } from '@/lib/environments/state/git-budget-invalidation'
-import { installFileSnapshotQueryCachePolicy } from '@/lib/file-snapshot-query-cache'
+import { installFileSnapshotQueryCachePolicy } from '@/lib/file-snapshot-cache-policy'
 import { retryUnlessClientError } from '@/lib/environments/utils/query-retry'
 import { startPageSubscription } from '@/lib/state/page-subscription'
 

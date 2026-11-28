@@ -1,6 +1,5 @@
 import { withinDiagnosticsBudget } from './diagnostics-budget'
 
-import { lineStartOffset } from '@workspace/utils/strings'
 import { errorMessage } from '@workspace/contracts'
 import { fileUriForNativePath } from './language'
 import { elapsedMs } from '@workspace/utils/timing'
@@ -38,27 +37,54 @@ import {
   recordProcessWarning,
 } from '../observability'
 
-type JsonRpcId = number | string | null
+import {
+  CONTENT_MODIFIED_CODE,
+  applyContentChangesStrict,
+  byteLength,
+  cancellationRequestId,
+  capabilityChanges,
+  configurationSection,
+  didChangeDocument,
+  didOpenDocument,
+  initializeContractOf,
+  isJsonRpcNotification,
+  isJsonRpcRequest,
+  isJsonRpcResponse,
+  jsonRpcError,
+  jsonRpcResult,
+  normalizeClientMessage,
+  parseJsonMessage,
+  protocolValueDifference,
+  publishedDiagnostics,
+  responseForClient,
+  rewriteTextDocumentVersion,
+  safeSum,
+  serverNotificationForClient,
+  supportsPullDiagnostics,
+  textDocumentUri,
+  withWatchedFilesCapability,
+  type DidOpenDocument,
+  type InitializeContract,
+  type JsonRpcId,
+  type JsonRpcNotification,
+  type JsonRpcRequest,
+  type JsonRpcResponse,
+} from './proxy-protocol'
+import {
+  SEMANTIC_TOKENS_DELTA,
+  SEMANTIC_TOKENS_FULL,
+  applySemanticTokenEdits,
+  isRejectedBaselineError,
+  negotiatedSemanticTokens,
+} from './proxy-semantic-tokens'
+import {
+  translateWorkspaceEditResponse,
+  workspaceEditResponseMethod,
+  type CapturedDocumentProvenance,
+  type WorkspaceEditProvenance,
+} from './proxy-workspace-edits'
 
-type JsonRpcRequest = {
-  readonly id: JsonRpcId
-  readonly jsonrpc?: string
-  readonly method: string
-  params?: unknown
-}
-
-type JsonRpcNotification = {
-  readonly jsonrpc?: string
-  readonly method: string
-  params?: unknown
-}
-
-type JsonRpcResponse = {
-  readonly id: JsonRpcId
-  readonly jsonrpc?: string
-  readonly result?: unknown
-  readonly error?: unknown
-}
+import { LspProxyConnection } from './proxy-connection'
 
 type PendingBackendRequest = {
   readonly clientId: JsonRpcId
@@ -111,7 +137,7 @@ type SemanticTokenBaseline = {
   data: number[]
 }
 
-type SharedDocument = {
+export type SharedDocument = {
   backendVersion: number
   diagnostics: string | null
   languageId: string
@@ -120,46 +146,12 @@ type SharedDocument = {
   text: string
 }
 
-type OwnerDocumentState = {
+export type OwnerDocumentState = {
   clientVersion: number
   text: string
   contentEpoch: number
   lastSyncEpoch: number
   synchronizedBackendVersion: number
-}
-
-type CapturedDocumentProvenance = {
-  readonly backendVersion: number
-  readonly owner: Readonly<OwnerDocumentState> | null
-  readonly syncEpoch: number
-  readonly text: string
-}
-
-type WorkspaceEditProvenance = {
-  readonly connection: LspProxyConnection
-  readonly documents: ReadonlyMap<string, CapturedDocumentProvenance>
-}
-
-type DidOpenDocument = {
-  readonly languageId: string
-  readonly text: string
-  readonly uri: string
-  readonly version: number
-}
-
-type DidChangeDocument = {
-  readonly contentChanges: readonly TextDocumentContentChange[]
-  readonly uri: string
-  readonly version: number
-}
-
-type TextDocumentContentChange = {
-  readonly rangeLength?: number
-  readonly range?: {
-    readonly start: { readonly line: number; readonly character: number }
-    readonly end: { readonly line: number; readonly character: number }
-  }
-  readonly text: string
 }
 
 /** A file's diagnostics as the backend has them: pulled on request, or its last publish. */
@@ -871,7 +863,7 @@ class PooledLspProxySession {
     // good baseline on every keystroke, poison the counter that decides whether a
     // server is dropped from the delta set, and re-issue a whole-file request the
     // client explicitly told us to stop working on.
-    if (message.error !== undefined && !isRejectedBaselineError(request, message.error)) {
+    if (message.error !== undefined && !isRejectedBaselineError(request.delta, message.error)) {
       this.answerSemanticTokenWaiters(request, message)
       return
     }
@@ -1910,408 +1902,6 @@ class PooledLspProxySession {
   }
 }
 
-class LspProxyConnection implements LspProxyClientSession {
-  private readonly documents = new Set<string>()
-  private readonly requestIds = new Map<JsonRpcId, JsonRpcId>()
-  private session: PooledLspProxySession
-  private readonly socket: LspProxySocket
-  private closed = false
-
-  constructor(socket: LspProxySocket, session: PooledLspProxySession) {
-    this.socket = socket
-    this.session = session
-  }
-
-  get isClosed(): boolean {
-    return this.closed
-  }
-
-  async handleClientMessage(message: string | ArrayBuffer | Uint8Array): Promise<void> {
-    if (this.closed) return
-
-    await this.session.handleClientMessage(this, message)
-  }
-
-  dispose(): void {
-    if (this.closed) return
-
-    this.closed = true
-    this.session.releaseConnection(this)
-  }
-
-  send(message: string): void {
-    if (this.closed) return
-
-    this.socket.send(message)
-  }
-
-  /** Only before `initialize` is answered: nothing is registered with the old backend yet. */
-  moveTo(session: PooledLspProxySession): void {
-    this.session.releaseConnection(this)
-    this.session = session
-    session.adopt(this)
-  }
-
-  closeSocket(): void {
-    if (this.closed) return
-
-    this.closed = true
-    this.socket.close()
-  }
-
-  closeForProtocolError(): void {
-    if (this.closed) return
-
-    this.session.releaseConnection(this)
-    this.closed = true
-    this.socket.close()
-  }
-
-  addDocument(uri: string): void {
-    this.documents.add(uri)
-  }
-
-  deleteDocument(uri: string): void {
-    this.documents.delete(uri)
-  }
-
-  documentUris(): readonly string[] {
-    return Array.from(this.documents)
-  }
-
-  trackRequest(clientId: JsonRpcId, backendId: JsonRpcId): void {
-    this.requestIds.set(clientId, backendId)
-  }
-
-  untrackRequest(clientId: JsonRpcId): void {
-    this.requestIds.delete(clientId)
-  }
-
-  backendRequestIdFor(clientId: JsonRpcId): JsonRpcId | null {
-    return this.requestIds.get(clientId) ?? null
-  }
-}
-
-/**
- * The value at a dotted `section`, or the whole tree when the item names none.
- *
- * `{}` rather than `null` for a section the registry says nothing about: LSP
- * lets a client answer either, and a server that reads a field off the result
- * without checking is common enough that the shape a bare `[{}]` already gave it
- * is the safer of the two.
- */
-/**
- * Reads a `semanticTokensProvider` out of an `initialize` result.
- *
- * `full` may be `true` or `{ delta }`, and only the object form's `delta` counts:
- * gopls returns a `resultId` on every response and then rejects `full/delta`
- * outright, so a `resultId` in a response says nothing about delta support and
- * `full.delta === true` is the only thing that does.
- */
-function negotiatedSemanticTokens(result: unknown): LspNegotiatedSemanticTokens | null {
-  if (!isRecord(result)) return null
-  if (!isRecord(result.capabilities)) return null
-
-  const provider = result.capabilities.semanticTokensProvider
-  if (!isRecord(provider)) return null
-
-  const full = provider.full
-  const legend = isRecord(provider.legend) ? provider.legend : {}
-  return {
-    delta: isRecord(full) && full.delta === true,
-    full: full === true || isRecord(full),
-    legend: {
-      tokenModifiers: stringArray(legend.tokenModifiers),
-      tokenTypes: stringArray(legend.tokenTypes),
-    },
-    range: provider.range === true || isRecord(provider.range),
-  }
-}
-
-function stringArray(value: unknown): readonly string[] {
-  if (!Array.isArray(value)) return []
-
-  return value.filter((entry): entry is string => typeof entry === 'string')
-}
-
-function configurationSection(configuration: Readonly<Record<string, unknown>>, section: unknown) {
-  if (typeof section !== 'string' || section.length === 0) return configuration
-
-  let value: unknown = configuration
-  for (const key of section.split('.')) {
-    // A section that does not resolve is answered `{}`, never the whole tree.
-    // Handing back everything would tell a server asking about *itself* what
-    // some other server was configured with, and would make an unknown section
-    // indistinguishable from a request that named none.
-    if (!isRecord(value)) return {}
-
-    value = value[key]
-  }
-
-  return value ?? {}
-}
-
-type WorkspaceEditTranslation =
-  | { readonly ok: true; readonly value: unknown }
-  | { readonly ok: false }
-
-function workspaceEditResponseMethod(method: string): boolean {
-  if (method === 'textDocument/rename') return true
-  if (method === 'textDocument/codeAction') return true
-
-  return method === 'codeAction/resolve'
-}
-
-function translateWorkspaceEditResponse(
-  method: string,
-  result: unknown,
-  provenance: WorkspaceEditProvenance,
-  documents: ReadonlyMap<string, SharedDocument>,
-): WorkspaceEditTranslation {
-  if (method === 'textDocument/rename') {
-    return translateWorkspaceEdit(result, provenance, documents)
-  }
-  if (method === 'textDocument/codeAction') {
-    return translateCodeActionList(result, provenance, documents)
-  }
-  if (method === 'codeAction/resolve') {
-    return translateCodeAction(result, provenance, documents)
-  }
-
-  return translated(result)
-}
-
-function translateCodeActionList(
-  value: unknown,
-  provenance: WorkspaceEditProvenance,
-  documents: ReadonlyMap<string, SharedDocument>,
-): WorkspaceEditTranslation {
-  if (!Array.isArray(value)) return translated(value)
-
-  const actions: unknown[] = []
-  for (const action of value) {
-    const result = translateCodeAction(action, provenance, documents)
-    if (!result.ok) return result
-    actions.push(result.value)
-  }
-  return translated(actions)
-}
-
-function translateCodeAction(
-  value: unknown,
-  provenance: WorkspaceEditProvenance,
-  documents: ReadonlyMap<string, SharedDocument>,
-): WorkspaceEditTranslation {
-  if (!isRecord(value)) return translated(value)
-  if (!Object.hasOwn(value, 'edit')) return translated(value)
-
-  const edit = translateWorkspaceEdit(value.edit, provenance, documents)
-  if (!edit.ok) return edit
-
-  return translated({ ...value, edit: edit.value })
-}
-
-function translateWorkspaceEdit(
-  value: unknown,
-  provenance: WorkspaceEditProvenance,
-  documents: ReadonlyMap<string, SharedDocument>,
-): WorkspaceEditTranslation {
-  if (!isRecord(value)) return translated(value)
-  if (value.documentChanges === undefined) return translated(value)
-  if (!Array.isArray(value.documentChanges)) return translated(value)
-
-  const documentChanges: unknown[] = []
-  for (const change of value.documentChanges) {
-    const result = translateDocumentChange(change, provenance, documents)
-    if (!result.ok) return result
-    documentChanges.push(result.value)
-  }
-
-  return translated({ ...value, documentChanges })
-}
-
-function translateDocumentChange(
-  value: unknown,
-  provenance: WorkspaceEditProvenance,
-  documents: ReadonlyMap<string, SharedDocument>,
-): WorkspaceEditTranslation {
-  if (!isRecord(value)) return translated(value)
-  if (!isRecord(value.textDocument)) return translated(value)
-
-  const document = value.textDocument
-  if (typeof document.uri !== 'string') return translationFailure()
-  if (document.version === null) return translated(value)
-  if (!isSafeDocumentVersion(document.version)) return translationFailure()
-
-  const version = translatedDocumentVersion(document.uri, document.version, provenance, documents)
-  if (version === null) return translationFailure()
-
-  return translated({
-    ...value,
-    textDocument: { ...document, version },
-  })
-}
-
-function translatedDocumentVersion(
-  uri: string,
-  backendVersion: number,
-  provenance: WorkspaceEditProvenance,
-  documents: ReadonlyMap<string, SharedDocument>,
-): number | null {
-  const captured = provenance.documents.get(uri)
-  if (!captured?.owner) return null
-  if (!documentProvenanceIsCurrent(uri, captured, provenance.connection, documents)) return null
-
-  const delta = backendVersion - captured.backendVersion
-  if (!Number.isSafeInteger(delta)) return null
-  if (delta < 0) return null
-
-  return safeSum(captured.owner.clientVersion, delta)
-}
-
-function documentProvenanceIsCurrent(
-  uri: string,
-  captured: CapturedDocumentProvenance,
-  connection: LspProxyConnection,
-  documents: ReadonlyMap<string, SharedDocument>,
-): boolean {
-  const capturedOwner = captured.owner
-  if (!capturedOwner) return false
-  if (!capturedOwnerIsSynchronized(capturedOwner, captured)) return false
-
-  const current = documents.get(uri)
-  const currentOwner = current?.owners.get(connection)
-  if (!current || !currentOwner) return false
-  if (current.backendVersion !== captured.backendVersion) return false
-  if (current.syncEpoch !== captured.syncEpoch) return false
-  if (current.text !== captured.text) return false
-
-  return ownerStatesEqual(currentOwner, capturedOwner)
-}
-
-function capturedOwnerIsSynchronized(
-  owner: Readonly<OwnerDocumentState>,
-  document: CapturedDocumentProvenance,
-): boolean {
-  if (owner.text !== document.text) return false
-  if (owner.lastSyncEpoch !== document.syncEpoch) return false
-
-  return owner.synchronizedBackendVersion === document.backendVersion
-}
-
-function ownerStatesEqual(
-  current: Readonly<OwnerDocumentState>,
-  captured: Readonly<OwnerDocumentState>,
-): boolean {
-  if (current.clientVersion !== captured.clientVersion) return false
-  if (current.text !== captured.text) return false
-  if (current.contentEpoch !== captured.contentEpoch) return false
-  if (current.lastSyncEpoch !== captured.lastSyncEpoch) return false
-
-  return current.synchronizedBackendVersion === captured.synchronizedBackendVersion
-}
-
-function translated(value: unknown): WorkspaceEditTranslation {
-  return { ok: true, value }
-}
-
-function translationFailure(): WorkspaceEditTranslation {
-  return { ok: false }
-}
-
-/** LSP's own codes for "you cancelled this" and "the text moved under it". */
-const REQUEST_CANCELLED_CODE = -32800
-const CONTENT_MODIFIED_CODE = -32801
-
-const SEMANTIC_TOKENS_FULL = 'textDocument/semanticTokens/full'
-const SEMANTIC_TOKENS_DELTA = 'textDocument/semanticTokens/full/delta'
-
-/**
- * Applies a `SemanticTokensDelta`'s edits to a baseline array.
- *
- * Returns `null` rather than a best effort for anything malformed. Every edit is
- * `{ start, deleteCount, data? }` over the flat uint32 array, and the spec gives
- * them in **descending** order of `start` so earlier edits do not move later
- * ones — but a server is not obliged to, so they are sorted here rather than
- * trusted. An edit whose range runs past the array is refused outright: applying
- * it would silently shift every 5-tuple after it, and a shifted tuple stream
- * decodes to plausible spans over the wrong text.
- */
-/**
- * Is this error the server saying it cannot honour our `previousResultId`?
- *
- * Only a delta request can get that answer, and only that answer justifies
- * throwing the baseline away. The two codes that dominate the hot path —
- * `-32800 RequestCancelled`, which is what every keystroke produces because the
- * browser cancels its in-flight request, and `-32801 ContentModified`, the
- * ordinary answer to asking about text that has moved — are explicitly *not*
- * evidence about the baseline. Treating them as such threw away a good baseline
- * on every keystroke and counted each one against the server.
- */
-function isRejectedBaselineError(request: SemanticTokenRequest, error: unknown): boolean {
-  if (!request.delta) return false
-  if (!isRecord(error)) return false
-  if (error.code === REQUEST_CANCELLED_CODE || error.code === CONTENT_MODIFIED_CODE) return false
-
-  return true
-}
-
-/**
- * Applies a `SemanticTokensDelta`'s edits to a baseline array.
- *
- * Returns `null` rather than a best effort for anything malformed. Every edit is
- * `{ start, deleteCount, data? }` over the flat uint32 array, and **every one of
- * those offsets indexes the array the server diffed against** — the previous
- * result — not the array as it is being rewritten. So the edits are validated
- * against the baseline's own length, checked for overlap, and then applied in
- * descending order of `start` so that each splice leaves every lower offset
- * exactly where the server computed it.
- *
- * Sorting rather than trusting the order given: the spec does not oblige a
- * server to emit them in any particular one, and applying two edits in the wrong
- * order silently shifts every 5-tuple after them into a stream that still decodes
- * — into plausible spans over the wrong text.
- */
-function applySemanticTokenEdits(baseline: readonly number[], edits: readonly unknown[]) {
-  const parsed: { start: number; deleteCount: number; data: number[] }[] = []
-  for (const edit of edits) {
-    if (!isRecord(edit)) return null
-    if (!Number.isInteger(edit.start) || !Number.isInteger(edit.deleteCount)) return null
-
-    const data = edit.data === undefined ? [] : edit.data
-    if (!Array.isArray(data)) return null
-    if (data.some((value) => !Number.isInteger(value) || (value as number) < 0)) return null
-
-    const start = edit.start as number
-    const deleteCount = edit.deleteCount as number
-    // Against the BASELINE, before anything has been spliced. Checking the
-    // running array instead would let a later edit pass because an earlier one
-    // had already grown it — the bound would be measuring the wrong array.
-    if (start < 0 || deleteCount < 0) return null
-    if (start + deleteCount > baseline.length) return null
-
-    parsed.push({ data: data as number[], deleteCount, start })
-  }
-
-  const ordered = parsed.sort((left, right) => right.start - left.start)
-  for (let index = 1; index < ordered.length; index += 1) {
-    const later = ordered[index - 1]
-    const earlier = ordered[index]
-    if (!later || !earlier) return null
-    // Two edits claiming the same region describe an array that cannot be built.
-    if (earlier.start + earlier.deleteCount > later.start) return null
-  }
-
-  const next = [...baseline]
-  for (const edit of ordered) next.splice(edit.start, edit.deleteCount, ...edit.data)
-
-  // A token stream is 5-tuples. Anything else means the edits did not describe
-  // the array we held, and the client must not be told otherwise.
-  if (next.length % 5 !== 0) return null
-
-  return next
-}
-
 function synchronizedOwner(document: DidOpenDocument, shared: SharedDocument): OwnerDocumentState {
   return {
     clientVersion: document.version,
@@ -2329,293 +1919,8 @@ function ownerIsSynchronized(owner: OwnerDocumentState, shared: SharedDocument):
   return owner.synchronizedBackendVersion === shared.backendVersion
 }
 
-function safeSum(left: number, right: number): number | null {
-  const result = left + right
-  if (!Number.isSafeInteger(result)) return null
-  if (result < 0) return null
-
-  return result
-}
-
-type InitializeContract = {
-  readonly value: unknown
-  /** Canonical JSON: equal params in any key order share one backend. */
-  readonly fingerprint: string
-}
-
-/** `processId` is the backend's own pid, so it differs between siblings and is left out. */
-function initializeContractOf(params: unknown): InitializeContract {
-  const { processId: _processId, ...rest } = isRecord(params) ? params : {}
-  const value = immutableProtocolValue(rest)
-  return { value, fingerprint: JSON.stringify(value, canonicalJsonKeys) }
-}
-
-function canonicalJsonKeys(_key: string, value: unknown): unknown {
-  if (!isRecord(value)) return value
-
-  return Object.fromEntries(
-    Object.entries(value).sort(([left], [right]) => (left < right ? -1 : 1)),
-  )
-}
-
-function immutableProtocolValue(value: unknown): unknown {
-  return freezeProtocolValue(structuredClone(value))
-}
-
-function freezeProtocolValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    for (const item of value) freezeProtocolValue(item)
-    return Object.freeze(value)
-  }
-  if (!isRecord(value)) return value
-
-  for (const item of Object.values(value)) freezeProtocolValue(item)
-  return Object.freeze(value)
-}
-
-/** Where two protocol values first differ, as a dotted path, or `null` when they are equal. */
-function protocolValueDifference(left: unknown, right: unknown, path: string): string | null {
-  if (Object.is(left, right)) return null
-  if (Array.isArray(left) || Array.isArray(right)) return protocolArrayDifference(left, right, path)
-  if (!isRecord(left) || !isRecord(right)) return path
-
-  return protocolRecordDifference(left, right, path)
-}
-
-function protocolArrayDifference(left: unknown, right: unknown, path: string): string | null {
-  if (!Array.isArray(left) || !Array.isArray(right)) return path
-  if (left.length !== right.length) return `${path}.length`
-
-  for (let index = 0; index < left.length; index += 1) {
-    const difference = protocolValueDifference(left[index], right[index], `${path}[${index}]`)
-    if (difference !== null) return difference
-  }
-  return null
-}
-
-function protocolRecordDifference(
-  left: Readonly<Record<string, unknown>>,
-  right: Readonly<Record<string, unknown>>,
-  path: string,
-): string | null {
-  for (const key of new Set(Object.keys(left).concat(Object.keys(right)))) {
-    if (!Object.hasOwn(left, key) || !Object.hasOwn(right, key)) return `${path}.${key}`
-    const difference = protocolValueDifference(left[key], right[key], `${path}.${key}`)
-    if (difference !== null) return difference
-  }
-  return null
-}
-
 function lspProxySessionKey(match: LspServerMatch): string {
   return `${match.server.id}\u0000${match.root}`
-}
-
-function normalizeClientMessage(message: string | ArrayBuffer | Uint8Array) {
-  if (typeof message === 'string') return message
-  if (message instanceof ArrayBuffer) return Buffer.from(message).toString('utf8')
-  if (message instanceof Uint8Array) return Buffer.from(message).toString('utf8')
-
-  return null
-}
-
-function parseJsonMessage(message: string) {
-  try {
-    return JSON.parse(message) as unknown
-  } catch {
-    return null
-  }
-}
-
-function isJsonRpcRequest(value: unknown): value is JsonRpcRequest {
-  if (!isRecord(value)) return false
-  if (typeof value.method !== 'string') return false
-  if (!('id' in value)) return false
-
-  return isJsonRpcId(value.id)
-}
-
-function isJsonRpcNotification(value: unknown): value is JsonRpcNotification {
-  if (!isRecord(value)) return false
-  if (typeof value.method !== 'string') return false
-
-  return !('id' in value)
-}
-
-function isJsonRpcResponse(value: unknown): value is JsonRpcResponse {
-  if (!isRecord(value)) return false
-  if (!('id' in value)) return false
-  if ('method' in value) return false
-  if (!('result' in value) && !('error' in value)) return false
-
-  return isJsonRpcId(value.id)
-}
-
-function isJsonRpcId(value: unknown): value is JsonRpcId {
-  return typeof value === 'number' || typeof value === 'string' || value === null
-}
-
-function didOpenDocument(params: unknown): DidOpenDocument | null {
-  if (!isRecord(params)) return null
-  if (!isRecord(params.textDocument)) return null
-
-  const document = params.textDocument
-  if (typeof document.uri !== 'string') return null
-  if (typeof document.languageId !== 'string') return null
-  if (typeof document.text !== 'string') return null
-  if (!isSafeDocumentVersion(document.version)) return null
-
-  return {
-    languageId: document.languageId,
-    text: document.text,
-    uri: document.uri,
-    version: document.version,
-  }
-}
-
-function didChangeDocument(params: unknown): DidChangeDocument | null {
-  if (!isRecord(params)) return null
-  if (!isRecord(params.textDocument)) return null
-  if (!Array.isArray(params.contentChanges)) return null
-
-  const uri = params.textDocument.uri
-  const version = params.textDocument.version
-  if (typeof uri !== 'string') return null
-  if (!isSafeDocumentVersion(version)) return null
-  if (!params.contentChanges.every(isTextDocumentContentChange)) return null
-
-  return {
-    contentChanges: params.contentChanges,
-    uri,
-    version,
-  }
-}
-
-function isTextDocumentContentChange(value: unknown): value is TextDocumentContentChange {
-  if (!isRecord(value)) return false
-  if (typeof value.text !== 'string') return false
-  if (value.range === undefined) return value.rangeLength === undefined
-  if (!isTextDocumentRange(value.range)) return false
-  if (value.rangeLength === undefined) return true
-
-  return isSafeNonNegativeInteger(value.rangeLength)
-}
-
-function isTextDocumentRange(value: unknown): value is TextDocumentContentChange['range'] {
-  if (!isRecord(value)) return false
-  if (!isTextDocumentPosition(value.start)) return false
-
-  return isTextDocumentPosition(value.end)
-}
-
-function isTextDocumentPosition(
-  value: unknown,
-): value is { readonly line: number; readonly character: number } {
-  if (!isRecord(value)) return false
-  if (!isSafeNonNegativeInteger(value.line)) return false
-
-  return isSafeNonNegativeInteger(value.character)
-}
-
-function isSafeDocumentVersion(value: unknown): value is number {
-  return isSafeNonNegativeInteger(value)
-}
-
-function isSafeNonNegativeInteger(value: unknown): value is number {
-  if (typeof value !== 'number') return false
-  if (value < 0) return false
-
-  return Number.isSafeInteger(value)
-}
-
-function textDocumentUri(params: unknown): string | null {
-  if (!isRecord(params)) return null
-  if (!isRecord(params.textDocument)) return null
-
-  return typeof params.textDocument.uri === 'string' ? params.textDocument.uri : null
-}
-
-function cancellationRequestId(params: unknown): JsonRpcId | null {
-  if (!isRecord(params)) return null
-
-  return isJsonRpcId(params.id) ? params.id : null
-}
-
-function responseForClient(response: JsonRpcResponse, id: JsonRpcId): JsonRpcResponse {
-  return { ...response, id }
-}
-
-function jsonRpcResult(id: JsonRpcId, result: unknown): string {
-  return JSON.stringify({
-    id,
-    jsonrpc: '2.0',
-    result,
-  })
-}
-
-function jsonRpcError(id: JsonRpcId, code: number, message: string): string {
-  return JSON.stringify({
-    error: { code, message },
-    id,
-    jsonrpc: '2.0',
-  })
-}
-
-function serverNotificationForClient(message: JsonRpcNotification, raw: string): string {
-  if (message.method !== 'textDocument/publishDiagnostics') return raw
-  if (!isRecord(message.params)) return raw
-
-  const { version: _version, ...params } = message.params
-  return JSON.stringify({ ...message, params })
-}
-
-function applyContentChangesStrict(
-  text: string,
-  changes: readonly TextDocumentContentChange[],
-): string | null {
-  let next = text
-  for (const change of changes) {
-    const changed = applyContentChangeStrict(next, change)
-    if (changed === null) return null
-
-    next = changed
-  }
-
-  return next
-}
-
-function applyContentChangeStrict(text: string, change: TextDocumentContentChange): string | null {
-  if (!change.range) return change.text
-
-  const start = strictOffsetForPosition(text, change.range.start)
-  const end = strictOffsetForPosition(text, change.range.end)
-  if (start === null || end === null) return null
-  if (end < start) return null
-  if (change.rangeLength !== undefined && change.rangeLength !== end - start) return null
-
-  return `${text.slice(0, start)}${change.text}${text.slice(end)}`
-}
-
-function strictOffsetForPosition(
-  text: string,
-  position: { readonly line: number; readonly character: number },
-): number | null {
-  const lineStart = lineStartOffset(text, position.line)
-  if (lineStart === null) return null
-
-  const newline = text.indexOf('\n', lineStart)
-  const rawLineEnd = newline < 0 ? text.length : newline
-  const lineEnd =
-    rawLineEnd > lineStart && text[rawLineEnd - 1] === '\r' ? rawLineEnd - 1 : rawLineEnd
-  if (position.character > lineEnd - lineStart) return null
-
-  return lineStart + position.character
-}
-
-function byteLength(value: string | ArrayBuffer | Uint8Array): number {
-  if (typeof value === 'string') return Buffer.byteLength(value, 'utf8')
-  if (value instanceof ArrayBuffer) return value.byteLength
-
-  return value.byteLength
 }
 
 function isFailedLspSession(
@@ -2628,52 +1933,4 @@ function isFailedLspSession(
   if (exitSignal) return true
 
   return exitCode !== 0
-}
-
-function rewriteTextDocumentVersion(message: JsonRpcNotification, version: number) {
-  const params = isRecord(message.params) ? message.params : {}
-  const textDocument = isRecord(params.textDocument) ? params.textDocument : {}
-  return {
-    ...message,
-    params: {
-      ...params,
-      textDocument: { ...textDocument, version },
-    },
-  }
-}
-
-function withWatchedFilesCapability(capabilities: unknown) {
-  const client = isRecord(capabilities) ? capabilities : {}
-  const workspace = isRecord(client.workspace) ? client.workspace : {}
-  return {
-    ...client,
-    workspace: {
-      ...workspace,
-      didChangeWatchedFiles: { dynamicRegistration: true, relativePatternSupport: true },
-    },
-  }
-}
-
-function capabilityChanges(params: unknown, field: 'registrations' | 'unregisterations') {
-  const changes = isRecord(params) && Array.isArray(params[field]) ? params[field] : []
-  return changes.flatMap((change: unknown) =>
-    isRecord(change) && typeof change.id === 'string' && typeof change.method === 'string'
-      ? [{ id: change.id, method: change.method, registerOptions: change.registerOptions }]
-      : [],
-  )
-}
-
-function supportsPullDiagnostics(result: unknown) {
-  return (
-    isRecord(result) &&
-    isRecord(result.capabilities) &&
-    Boolean(result.capabilities.diagnosticProvider)
-  )
-}
-
-function publishedDiagnostics(notification: string | null): readonly unknown[] | null {
-  if (!notification) return null
-  const message: unknown = JSON.parse(notification)
-  if (!isRecord(message) || !isRecord(message.params)) return null
-  return Array.isArray(message.params.diagnostics) ? message.params.diagnostics : null
 }

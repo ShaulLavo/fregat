@@ -33,7 +33,8 @@ import {
   type LiveEditorDocument,
 } from '@/features/editor/state/document-state'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
-import { reportError, toClientError } from '@/lib/client-error-taxonomy'
+import { toClientError } from '@/lib/client-error-taxonomy'
+import { reportError } from '@/lib/client-error-feedback'
 import {
   fileSnapshotQueryOptions,
   moveFileSnapshotQueryData,
