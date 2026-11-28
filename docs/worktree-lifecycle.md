@@ -37,7 +37,7 @@ Safe cleanup requires Platform ownership, zero non-deleted session references, s
 stop evidence, and no terminal or unverified external process ownership. Archived sessions still
 count. Attachment reclamation failure does not block an otherwise safe cleanup.
 
-The [execution gate](../apps/server/src/orchestration/worktree-execution-gate.ts) gives provider and
+The [execution gate](../apps/server/src/orchestration/worktrees/worktree-execution-gate.ts) gives provider and
 terminal processes shared leases. Cleanup takes an exclusive lease and checks the actual services
 again before Git removal. A terminal keeps its lease while detached and after disposal is requested.
 Only a positive process exit plus an accepted terminal-end receipt releases that lease.

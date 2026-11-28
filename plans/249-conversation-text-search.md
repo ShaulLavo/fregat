@@ -28,7 +28,7 @@ Fregat also searches unloaded/virtualized conversation text, as required by this
 
 ## Existing implementation
 
-[SessionSearchQuery](../apps/server/src/orchestration/session-search-query.ts) searches persisted
+[SessionSearchQuery](../apps/server/src/orchestration/session-lifecycle/session-search-query.ts) searches persisted
 message text and returns the newest matching snippet per session. It cannot return all occurrences
 within one conversation. [Timeline reveal](../apps/web/src/features/chat/hooks/use-timeline-reveal.ts)
 releases following, expands folded rows, and reveals stable IDs.
