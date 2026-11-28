@@ -1,6 +1,6 @@
 # Structure debt that existed when this project adopted unknot.
 # Remove each entry as its finding is fixed.
-# rules: field-leak forward-ref import-cycle import-cycle-edge long-file module-cycle prop-drilling shallow-module tangle wide-directory wide-injection
+# rules: field-leak forward-ref import-cycle import-cycle-edge long-file module-cycle module-cycle-edge prop-drilling shallow-module tangle wide-directory wide-injection
 long-file src/fs/workspace-edit.ts
 long-file src/git/service.ts
 long-file src/lsp/proxy-session.ts
@@ -8,7 +8,15 @@ long-file src/orchestration/engine.ts
 long-file src/orchestration/projection-pipeline.ts
 long-file src/provider/adapters/claude.ts
 long-file src/provider/adapters/codex.ts
-module-cycle src/orchestration <-> src/provider <-> src/provider/adapters/utils <-> src/terminal <-> src/terminal-host [dependencies 38d3f8302fd7a5c6cae8b5063647edf8709d7b2b0f5deb2d2f80392bc1506065]
+module-cycle src/orchestration <-> src/provider <-> src/provider/adapters/utils <-> src/terminal <-> src/terminal-host
+module-cycle-edge src/orchestration -> src/provider
+module-cycle-edge src/orchestration -> src/provider/adapters/utils
+module-cycle-edge src/orchestration -> src/terminal
+module-cycle-edge src/provider -> src/orchestration
+module-cycle-edge src/provider/adapters/utils -> src/orchestration
+module-cycle-edge src/terminal -> src/provider
+module-cycle-edge src/terminal -> src/terminal-host
+module-cycle-edge src/terminal-host -> src/terminal
 shallow-module src/git/checkpoint-store.ts
 wide-directory src/fs
 wide-directory src/orchestration

@@ -80,8 +80,10 @@ test('detects a new folder dependency inside an existing cycle', () => {
     const result = check(root)
     expect(result.exitCode).toBe(1)
     const diagnostics = result.stderr.toString()
-    expect(diagnostics).toContain('[module-cycle]')
+    expect(diagnostics).toContain('apps/web/src/beta/use-alpha.ts [module-cycle-edge]')
+    expect(diagnostics).toContain('src/beta -> src/alpha')
     expect(diagnostics).not.toContain('[import-cycle-edge]')
+    expect(diagnostics).not.toContain('[module-cycle]')
   } finally {
     rmSync(root, { force: true, recursive: true })
   }
