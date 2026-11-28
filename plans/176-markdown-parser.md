@@ -76,7 +76,7 @@ before they inform a change here.
   color/preview at 118 ms; prepared tree opens paint together. Evidence:
   `/work/tmp/fregat-evidence/20260928T152625Z-trace-prefetch-first-paint`.
 - Markdown and MDX use the shared parser for colors, including code fences, under every theme.
-  The source-backed preview is enabled for Markdown. Chat and split rendering retain remark.
+  The source-backed preview is enabled for Markdown.
 
 The following release inventory records the state before implementation; the evidence above
 supersedes its remaining-work and benchmark claims.
@@ -113,8 +113,8 @@ per retained buffer and view-specific selections and range demands.
 ## Outcome
 
 One parser supplies structure for source-backed live preview and future fully rendered blocks
-inside the Editor, along with colours, folds and fence boundaries. The existing split view and
-chat keep remark. The historical research below explains the parser choice.
+inside the Editor, along with colours, folds and fence boundaries. The historical research
+below explains the parser choice.
 
 Owner direction, 2026-09-26: lean towards tree-sitter as the only markdown parser, editor and chat,
 if it can be made correct and fast enough. `@lezer/markdown` is a benchmark candidate and a fork of
@@ -340,8 +340,6 @@ The C rewrite has since landed; current release gates and expanded stress findin
   the current release gates above before claiming the integrated implementation meets the original
   timings.
 - **Split view** keeps remark (Plan 108 D4); its scroll sync reads remark positions.
-- **Chat keeps remark** until the editor settles (owner, question 2). tree-sitter-md reaches chat
-  only with footnotes, `$$` math and CJK flanking added and measured against remark.
 - **lezer** stays the fallback: if the owner rejects the bytes or the own-repository cost, Plan
   176's lezer recommendation and phases as of research/176b `1f74ff059` apply unchanged.
 
