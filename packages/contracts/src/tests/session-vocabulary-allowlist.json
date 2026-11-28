@@ -1,5 +1,5 @@
 {
-  "apps/server/src/orchestration/orchestration-logging.ts": {
+  "apps/server/src/observability/chat-pipeline.ts": {
     "agentThreadId": 1,
     "threadId": 1
   },
