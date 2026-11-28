@@ -1,6 +1,6 @@
 import { mkdir, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { OpenFileWatches } from '../../../../../server/src/fs/open-file-watches'
+import { OpenFileWatches } from '../../../../../server/src/fs/watch/open-file'
 import { createWorkspacePaths } from '../../../../../server/src/fs/path'
 
 import { test, expect } from '../../../../test/fixtures'

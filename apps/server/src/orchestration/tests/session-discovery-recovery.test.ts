@@ -3,7 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 import { providerInstanceIdSchema, sessionIdSchema } from '@workspace/contracts'
-import { SessionDiscoveryReconciler } from '../session-discovery'
+import { SessionDiscoveryReconciler } from '../session-lifecycle/session-discovery'
 import { discoveryFixture } from './factories/discovery'
 import type { ProviderDiscoveredSession } from '../../provider/types'
 

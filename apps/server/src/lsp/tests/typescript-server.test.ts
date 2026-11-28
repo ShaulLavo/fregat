@@ -17,7 +17,7 @@ import {
 } from '../../../test/factories/typescript-runtime'
 import { createWorkspacePaths, isOutsideRoot } from '../../fs/path'
 import { treeWatchSource } from '../../fs/tree-watch'
-import { FileChangeHub } from '../../fs/watch'
+import { FileChangeHub } from '../../fs/watch/service'
 import { createInternalError } from '../../observability/structured-errors'
 import { fileUriForPath } from '@workspace/contracts'
 import { AgentDiagnosticsReader } from '../agent-diagnostics'

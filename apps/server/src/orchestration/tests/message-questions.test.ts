@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'vitest'
 import * as v from 'valibot'
 import { orchestrationCommandSchema, orchestrationLatestTurnSchema } from '@workspace/contracts'
 import { decideOrchestrationCommand } from '../decider'
-import { pendingMessageQuestions } from '../message-questions'
+import { pendingMessageQuestions } from '../requests/message-questions'
 import { MAX_SESSION_ACTIVITIES } from '../read-model'
 import {
   activityAppendedEvent,

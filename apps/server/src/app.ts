@@ -8,7 +8,7 @@ import { AgentReviewService } from './review/agent-review'
 import { agentReviewRoutes } from './review/routes'
 import { sessionControlRoutes } from './provider/session-control-routes'
 import { createAttachmentOwnership } from './attachments/ownership'
-import { selectTitleModel } from './orchestration/title-generation'
+import { selectTitleModel } from './orchestration/titles/title-generation'
 import { errorMessage } from '@workspace/contracts'
 import { BundleLibrary } from './themes/bundle-library'
 import { isTestProcess, platformHomePath } from './home'
@@ -72,11 +72,11 @@ import {
 } from './observability'
 import { OrchestrationEngine } from './orchestration/engine'
 import { requireWorktree } from './orchestration/read-model'
-import { OrchestrationCheckpointHunks } from './orchestration/checkpoint-hunks'
-import { OrchestrationCheckpointDiffQuery } from './orchestration/checkpoint-diff-query'
+import { OrchestrationCheckpointHunks } from './orchestration/checkpoints/checkpoint-hunks'
+import { OrchestrationCheckpointDiffQuery } from './orchestration/checkpoints/checkpoint-diff-query'
 import type { OrchestrationDatabase } from './orchestration/event-store'
 import { orchestrationRoutes } from './orchestration/routes'
-import { OrchestrationSessionSearchQuery } from './orchestration/session-search-query'
+import { OrchestrationSessionSearchQuery } from './orchestration/session-lifecycle/session-search-query'
 import {
   createOrchestrationSockets,
   orchestrationWsRoutes,

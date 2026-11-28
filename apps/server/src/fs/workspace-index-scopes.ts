@@ -2,7 +2,7 @@ import type { WorkspaceIndexScopeStatus } from '@workspace/contracts'
 import { recordProcessInfo } from '../observability'
 import type { WatchServerMessage } from './contracts'
 import { createWorkspacePaths, type WorkspacePaths } from './path'
-import type { FileChangeHub } from './watch'
+import type { FileChangeHub } from './watch/service'
 import {
   WorkspaceIndex,
   watchWorkspaceIndex,

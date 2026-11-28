@@ -7,7 +7,7 @@ import {
 
 import type { GitFileDiff, GitService } from '../git/service'
 import { observeRequestOperation, operatorErrorSummary } from '../observability'
-import type { OrchestrationCheckpointDiffQuery } from '../orchestration/checkpoint-diff-query'
+import type { OrchestrationCheckpointDiffQuery } from '../orchestration/checkpoints/checkpoint-diff-query'
 import type { ProviderService } from '../provider/provider-service'
 import type { ProviderTextGenerationInput } from '../provider/text-generation'
 import { agentReviewErrors } from './structured-errors'

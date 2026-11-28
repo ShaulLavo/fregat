@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { PendingOrchestrationEvent } from '../event-store'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../../git/service'
-import { OrchestrationCheckpointDiffQuery } from '../checkpoint-diff-query'
+import { OrchestrationCheckpointDiffQuery } from '../checkpoints/checkpoint-diff-query'
 import {
   createProjectionFixture,
   pendingEvent,

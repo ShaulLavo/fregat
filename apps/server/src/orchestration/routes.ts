@@ -13,9 +13,9 @@ import {
 } from '@workspace/contracts'
 
 import type { OrchestrationEngine } from './engine'
-import type { OrchestrationCheckpointDiffQuery } from './checkpoint-diff-query'
-import type { OrchestrationCheckpointHunks } from './checkpoint-hunks'
-import type { OrchestrationSessionSearchQuery } from './session-search-query'
+import type { OrchestrationCheckpointDiffQuery } from './checkpoints/checkpoint-diff-query'
+import type { OrchestrationCheckpointHunks } from './checkpoints/checkpoint-hunks'
+import type { OrchestrationSessionSearchQuery } from './session-lifecycle/session-search-query'
 import { observeRequestOperation } from '../observability'
 import { chatOperationContext } from '../observability/chat-pipeline'
 import { orchestrationReplaySummary } from '@workspace/contracts'

@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import * as v from 'valibot'
 import { clientOrchestrationCommandSchema } from '@workspace/contracts'
 import { OrchestrationCommandReceipts } from '../command-receipts'
-import { worktreeLifecycleErrors } from '../worktree-errors'
+import { worktreeLifecycleErrors } from '../worktrees/worktree-errors'
 import { createWorktreeDomain, MANAGED_ID } from './factories/worktree-domain'
 import { DOMAIN_IDS, DOMAIN_MODEL } from './factories/session-domain'
 

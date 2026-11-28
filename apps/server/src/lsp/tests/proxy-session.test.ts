@@ -22,7 +22,7 @@ import { createMetadataDatabase } from '../../db/client'
 import { testSettingsOptions } from '../../settings/testing'
 import { createWorkspacePaths } from '../../fs/path'
 import { treeWatchSource, type TreeWatchSource } from '../../fs/tree-watch'
-import { FileChangeHub } from '../../fs/watch'
+import { FileChangeHub } from '../../fs/watch/service'
 import { fileUriForPath } from '@workspace/contracts'
 import {
   flushObservability,

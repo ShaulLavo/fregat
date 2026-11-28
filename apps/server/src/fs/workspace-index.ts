@@ -1,5 +1,5 @@
 import { sortedDirents } from './dirents'
-import { joinRelative } from './search-shared'
+import { joinRelative } from './search/shared'
 import {
   errorMessage,
   type WorkspaceIndexReadiness,
@@ -17,7 +17,7 @@ import {
   workspaceGitIgnoreMatcher,
   type GitIgnoreMatcher,
   type GitIgnoreMatcherOptions,
-} from './search-gitignore'
+} from './search/gitignore'
 import { readEntryStats, type FsEntryStats } from './stat'
 import { recordProcessInfo } from '../observability'
 import { fileVersion } from './version'

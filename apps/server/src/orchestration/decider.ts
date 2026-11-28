@@ -1,23 +1,23 @@
 import { forkAttachment, forkMessages } from './utils/fork-messages'
 import { restoreLifecycle } from './lifecycle-restore'
-import { questionAnswerHistory } from './question-answer-history'
-import { approvalResponseEvents, endedApprovalEvents } from './approval-admission'
-import { decideSessionTitle, titleMetadata } from './title-decider'
+import { questionAnswerHistory } from './requests/question-answer-history'
+import { approvalResponseEvents, endedApprovalEvents } from './requests/approval-admission'
+import { decideSessionTitle, titleMetadata } from './titles/title-decider'
 import { createInternalError } from '../observability/structured-errors'
 import {
   pendingMessageQuestions,
   messageQuestionDismissalEvents,
   messageQuestionAnswer,
   messageQuestionResolutionEvent,
-} from './message-questions'
+} from './requests/message-questions'
 import { requireSettled } from './command-invariants'
-import { requireNoRewindConflict } from './rewind-admission'
+import { requireNoRewindConflict } from './session-lifecycle/rewind-admission'
 import {
   decideWorktreeLifecycle,
   creationTargetEvents,
   requireReadyWorktree,
-} from './worktree-decider'
-import { worktreeLifecycleErrors } from './worktree-errors'
+} from './worktrees/worktree-decider'
+import { worktreeLifecycleErrors } from './worktrees/worktree-errors'
 import {
   DEFAULT_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
@@ -31,10 +31,10 @@ import {
 import * as v from 'valibot'
 
 import { orchestrationErrors } from '../observability'
-import { activityRequestId } from './pending-requests'
+import { activityRequestId } from './requests/pending-requests'
 import { event, one } from './event-factory'
 import { settlementActivityEvents, userEngagementEvents } from './lifecycle-events'
-import { decideRegistration, decideWorktreeCommand } from './registration-decider'
+import { decideRegistration, decideWorktreeCommand } from './session-lifecycle/registration-decider'
 import {
   decideDeletionUpdate,
   decideProviderStart,

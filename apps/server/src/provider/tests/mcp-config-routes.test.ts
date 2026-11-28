@@ -14,9 +14,9 @@ import type { ProviderMcpConfigAccess } from '../types'
 import {
   approveProjectMcpServer,
   unapprovedProjectMcpServers,
-} from '../adapters/utils/claude-project-mcp'
+} from '../adapters/utils/mcp/claude-project'
 import { MockProviderAdapter } from '../adapters/mock'
-import type { ClaudeMcpCli } from '../adapters/utils/claude-mcp-config'
+import type { ClaudeMcpCli } from '../adapters/utils/mcp/claude-config'
 import { mcpConfigErrors } from '../structured-errors'
 import { ProviderAdapterRegistry } from '../provider-adapter-registry'
 import { testSettingsOptions } from '../../settings/testing'

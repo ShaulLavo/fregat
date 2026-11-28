@@ -1,7 +1,7 @@
 import { titleAttachment, titleMessages } from '../../../test/factories/title-context'
 import { expect, test } from 'vitest'
-import { formatSessionTitleContext, limitTitleMessage } from '../title-context'
-import { assistantCitationsToPlainText } from '../title-citations'
+import { formatSessionTitleContext, limitTitleMessage } from '../titles/title-context'
+import { assistantCitationsToPlainText } from '../titles/title-citations'
 
 test('reserves first intent, recent constraints and four attachment slots', () => {
   const result = formatSessionTitleContext(titleMessages(30, 3_000))

@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { OrchestrationCheckpointDiffQuery } from '../checkpoint-diff-query'
+import { OrchestrationCheckpointDiffQuery } from '../checkpoints/checkpoint-diff-query'
 import { checkpointRefForSessionTurn } from '../checkpoint-refs'
 import {
   checkpointOrchestration,

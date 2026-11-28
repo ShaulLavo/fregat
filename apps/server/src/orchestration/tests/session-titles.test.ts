@@ -9,7 +9,7 @@ import {
   sessionFrom,
 } from '../../../test/factories/orchestration'
 import { MockProviderAdapter } from '../../provider/adapters/mock'
-import { selectTitleModel } from '../title-generation'
+import { selectTitleModel } from '../titles/title-generation'
 
 test('manual rename wins over initial generation and survives restart', async () => {
   const fixture = await createOrchestrationFixture()

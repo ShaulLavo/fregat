@@ -1,4 +1,4 @@
-import { requireReadyWorktree } from './worktree-decider'
+import { requireReadyWorktree } from './worktrees/worktree-decider'
 import type { OrchestrationCommand } from '@workspace/contracts'
 import { event, one } from './event-factory'
 import { requireSession, type OrchestrationReadModel } from './read-model'

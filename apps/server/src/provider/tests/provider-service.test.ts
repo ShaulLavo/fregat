@@ -35,7 +35,7 @@ import {
 } from '@workspace/contracts'
 import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
-import { WorktreeExecutionGate } from '../../orchestration/worktree-execution-gate'
+import { WorktreeExecutionGate } from '../../orchestration/worktrees/worktree-execution-gate'
 import { MockProviderAdapter } from '../adapters/mock'
 import { MOCK_DRIVER_KIND, mockDriver } from '../drivers/mock'
 import { ProviderAdapterRegistry } from '../provider-adapter-registry'

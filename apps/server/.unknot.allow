@@ -6,6 +6,3 @@ long-file src/lsp/proxy-session.ts
 long-file src/orchestration/engine.ts
 long-file src/provider/adapters/claude.ts
 long-file src/provider/adapters/codex.ts
-wide-directory src/fs
-wide-directory src/orchestration
-wide-directory src/provider/adapters/utils

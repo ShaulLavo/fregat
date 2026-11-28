@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { WatchServerMessage } from '../contracts'
 import { createWorkspacePaths } from '../path'
-import { FileChangeHub } from '../watch'
+import { FileChangeHub } from '../watch/service'
 
 const cleanups: (() => Promise<unknown>)[] = []
 

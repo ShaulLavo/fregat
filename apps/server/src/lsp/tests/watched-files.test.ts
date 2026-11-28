@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { createWorkspacePaths } from '../../fs/path'
 import { treeWatchSource, type TreeWatchSource } from '../../fs/tree-watch'
-import { FileChangeHub } from '../../fs/watch'
+import { FileChangeHub } from '../../fs/watch/service'
 import { fileUriForPath } from '@workspace/contracts'
 import {
   boundedWatch,

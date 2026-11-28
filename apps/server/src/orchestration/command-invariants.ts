@@ -1,4 +1,4 @@
-import { pendingMessageQuestions } from './message-questions'
+import { pendingMessageQuestions } from './requests/message-questions'
 import { requireSession as requireSessionNotDeleted } from './read-model'
 import { defineErrorCatalog } from 'evlog'
 import { isValidOrderKey } from '@workspace/contracts'

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { createWorkspacePaths } from '../path'
-import { workspaceGitIgnoreMatcher } from '../search-gitignore'
+import { workspaceGitIgnoreMatcher } from '../search/gitignore'
 
 const roots: string[] = []
 

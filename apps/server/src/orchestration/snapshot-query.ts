@@ -2,10 +2,10 @@ import {
   APPROVAL_ACTIVITY_KINDS,
   applyApprovalActivity,
   type ApprovalRequests,
-} from './approval-requests'
-import { pendingMessageQuestions, retainMessageQuestions } from './message-questions'
+} from './requests/approval-requests'
+import { pendingMessageQuestions, retainMessageQuestions } from './requests/message-questions'
 import { terminalLeaseSchema } from '@workspace/contracts'
-import { worktreesAffectedByEvent, referencingSessionIds } from './worktree-projection'
+import { worktreesAffectedByEvent, referencingSessionIds } from './worktrees/worktree-projection'
 import { and, asc, desc, eq, inArray, isNull, lt, or, type SQL } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import * as v from 'valibot'

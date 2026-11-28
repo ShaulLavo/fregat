@@ -14,7 +14,7 @@ import {
   initializeObservability,
   resetObservabilityForTests,
 } from '../../observability/runtime'
-import { SessionDiscoveryReconciler } from '../session-discovery'
+import { SessionDiscoveryReconciler } from '../session-lifecycle/session-discovery'
 import { discoveryFixture } from './factories/discovery'
 
 test.each([

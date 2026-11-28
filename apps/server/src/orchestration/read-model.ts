@@ -1,4 +1,4 @@
-import type { ApprovalRequests } from './approval-requests'
+import type { ApprovalRequests } from './requests/approval-requests'
 import { planStepStatus } from '@workspace/contracts'
 import type {
   TerminalLease,

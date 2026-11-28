@@ -13,7 +13,7 @@ import type {
   findInWorkspaceStream as findInWorkspaceStreamFunction,
   FindOptions,
   SearchProviderOptions,
-} from '../src/fs/search'
+} from '../src/fs/search/query'
 import type { buildWorkspaceIndex as buildWorkspaceIndexFunction } from '../src/fs/workspace-index'
 
 type BenchmarkConfig = {
@@ -180,7 +180,7 @@ function searchModules() {
 async function loadSearchModules(): Promise<SearchModules> {
   const [pathModule, searchModule, workspaceIndexModule] = await Promise.all([
     import('../src/fs/path'),
-    import('../src/fs/search'),
+    import('../src/fs/search/query'),
     import('../src/fs/workspace-index'),
   ])
 

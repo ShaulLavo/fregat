@@ -15,7 +15,7 @@ import {
   refreshWorktreePolicy,
   referencingSessionIds,
   worktreesAffectedByEvent,
-} from './worktree-projection'
+} from './worktrees/worktree-projection'
 import { or, and, asc, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import * as v from 'valibot'
 import {
@@ -57,7 +57,7 @@ import {
   isPendingRequestActivityKind,
   PENDING_REQUEST_ACTIVITY_KINDS,
   pendingRequestCounts,
-} from './pending-requests'
+} from './requests/pending-requests'
 
 import {
   compactPatch,

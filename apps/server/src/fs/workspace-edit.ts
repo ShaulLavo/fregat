@@ -31,7 +31,7 @@ import { FsError } from './errors'
 import { fileOperationWriteId, isProvisionalWorkspaceEditState } from '@workspace/contracts'
 import { slashPathsOverlap } from '@workspace/utils/slash-paths'
 import type { WorkspacePaths } from './path'
-import type { FileChangeHub } from './watch'
+import type { FileChangeHub } from './watch/service'
 import type { WatchServerMessage } from './contracts'
 import { recordRequestContext, runDetached } from '../observability'
 import {

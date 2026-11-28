@@ -1,6 +1,9 @@
 import { expect, it } from 'vitest'
 import { worktreeA } from '../../../test/factories/git-worktree'
-import { WorktreeExecutionGate, worktreeExecutionErrors } from '../worktree-execution-gate'
+import {
+  WorktreeExecutionGate,
+  worktreeExecutionErrors,
+} from '../worktrees/worktree-execution-gate'
 
 it('gives provider holders precedence and releases only the owning token', () => {
   const gate = new WorktreeExecutionGate()

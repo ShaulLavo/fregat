@@ -2,7 +2,7 @@ import * as v from 'valibot'
 import { worktreeIdSchema, type OrchestrationCommand } from '@workspace/contracts'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { TerminalLeaseController } from '../terminal-lease-controller'
-import { WorktreeExecutionGate } from '../worktree-execution-gate'
+import { WorktreeExecutionGate } from '../worktrees/worktree-execution-gate'
 import type { OrchestrationReadModel } from '../read-model'
 import { orchestrationErrors } from '../../observability/structured-errors'
 

@@ -9,7 +9,7 @@ import {
   createCommandAvailability,
   runToolLines,
   type SearchToolWarning,
-} from '../search-tool-runner'
+} from '../search/tool-runner'
 
 describe('search tool runner', () => {
   test('runs an uncancelled child and observes its exit', async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseRgMatchLine, type RgMatchEvent } from '../search-rg-parser'
+import { parseRgMatchLine, type RgMatchEvent } from '../search/rg-parser'
 
 describe('ripgrep match parser', () => {
   it.each([

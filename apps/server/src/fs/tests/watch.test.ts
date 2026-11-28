@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { WatchServerMessage } from '../contracts'
 import { createWorkspacePaths } from '../path'
 import { NativeWatchHost } from '../native-watch-host'
-import { FileChangeHub } from '../watch'
+import { FileChangeHub } from '../watch/service'
 
 const roots: string[] = []
 const execFileAsync = promisify(execFile)

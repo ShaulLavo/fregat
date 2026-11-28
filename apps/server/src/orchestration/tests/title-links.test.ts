@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
-import { resolveSessionTitleLinks, sessionTitleLinks, titleSourceLink } from '../title-links'
-import { sessionTitlePrompt } from '../title-prompt'
+import { resolveSessionTitleLinks, sessionTitleLinks, titleSourceLink } from '../titles/title-links'
+import { sessionTitlePrompt } from '../titles/title-prompt'
 import type { runBoundedProcess } from '../../git/utils/process'
 
 const input = (message: string) => ({
