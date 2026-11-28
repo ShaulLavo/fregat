@@ -4,7 +4,7 @@ import {
   type LanguageServerLaneOptions,
 } from '@singapore-editor/lsp-plugin/websocket'
 import { LanguageServerSet } from '@singapore-editor/lsp-plugin'
-import { type LspWorkspaceDocumentAttachment } from '@singapore-editor/lsp/types'
+import type { LspWorkspaceDocumentAttachment } from '@singapore-editor/lsp/types'
 import { arrayLspLineStarts } from '@singapore-editor/lsp'
 import { createStringTextSnapshot } from '@singapore-editor/core/document'
 

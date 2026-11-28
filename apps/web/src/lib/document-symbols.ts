@@ -1,5 +1,5 @@
 import type { ServerSocket } from '@workspace/client-core/transport/socket'
-import { type LspTransportHandler } from '@singapore-editor/lsp/types'
+import type { LspTransportHandler } from '@singapore-editor/lsp/types'
 import { LspClient, composeWorkspaceEditClientCapabilities } from '@singapore-editor/lsp'
 import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import {

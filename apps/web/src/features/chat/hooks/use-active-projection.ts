@@ -1,5 +1,5 @@
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
-import { type ChatProjectionSlice } from '@workspace/client-core/chat/types'
+import type { ChatProjectionSlice } from '@workspace/client-core/chat/types'
 import {
   selectChatProjectionSlice,
   useChatProjectionStore,

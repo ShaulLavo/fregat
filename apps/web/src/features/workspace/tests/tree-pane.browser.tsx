@@ -22,7 +22,7 @@ import { holdWallClock } from '../../../../test/factories/wall-clock'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
-import { type EditorCommands } from '@/features/editor/state/commands'
+import type { EditorCommands } from '@/features/editor/state/commands'
 import {
   useEditorDocumentStoreApi,
   type EditorDocumentStoreApi,

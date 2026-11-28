@@ -36,7 +36,7 @@ import {
 } from '@/features/chat/state/chat-input-draft-store'
 import { placeChatMessage } from '@/features/chat/state/place-chat-message'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
-import { type ChatSession } from '@workspace/client-core/chat/types'
+import type { ChatSession } from '@workspace/client-core/chat/types'
 import {
   useChatProjectionStore,
   selectChatProjectionSlice,
