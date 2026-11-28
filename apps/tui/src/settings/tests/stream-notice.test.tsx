@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
 import { act } from 'react'
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { test, expect } from '../../../test/fixtures'
 import { renderTui } from '../../../test/render'
 import { submitPaletteSearch } from '../../../test/palette'

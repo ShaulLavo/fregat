@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { act } from 'react'
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { test, expect } from '../../../test/fixtures'
 import { openTestChat } from '../../../test/factories/chat'
 import { renderTui } from '../../../test/render'

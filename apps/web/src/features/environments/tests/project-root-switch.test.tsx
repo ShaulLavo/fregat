@@ -1,5 +1,5 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
+import { readEnvironmentDescriptor } from '@/lib/environments/state/descriptor'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { act, screen, waitFor } from '@testing-library/react'

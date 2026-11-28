@@ -36,7 +36,7 @@ import {
 } from '@/lib/environments/utils/mutation-keys'
 import { runMutation } from '@/lib/mutations/run'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
-import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
+import { readEnvironmentDescriptor } from '@/lib/environments/state/descriptor'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { toConnectionError } from '@/lib/client-error-taxonomy'
 import { createEnvironmentRecovery } from '@/state/environment-recovery'

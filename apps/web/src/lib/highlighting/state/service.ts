@@ -3,7 +3,7 @@ import {
   type HighlightingLanguage,
   type HighlightingService,
 } from '@singapore-editor/highlighting'
-import { themeRegistrationQueryOptions } from '@/lib/code-theme/state/registration-query'
+import { themeRegistrationQueryOptions } from '@/lib/code-theme/utils/registration-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 

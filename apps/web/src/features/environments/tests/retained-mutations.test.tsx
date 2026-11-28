@@ -1,4 +1,4 @@
-import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
+import { readEnvironmentDescriptor } from '@/lib/environments/state/descriptor'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { mkdir, writeFile } from 'node:fs/promises'

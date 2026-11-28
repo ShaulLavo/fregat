@@ -1,6 +1,6 @@
 import { act } from 'react'
 
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import type { EditTextRequest } from '@/host/providers/actions-context'
 import { createTestSettingsSession } from '../../../test/factories/session'
 import { test, expect } from '../../../test/fixtures'

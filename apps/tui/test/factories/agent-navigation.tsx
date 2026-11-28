@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { openTestChat } from './chat'
 import { createControlledInProcessTransport } from '../client'
 import { renderTui } from '../render'

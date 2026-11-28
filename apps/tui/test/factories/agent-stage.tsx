@@ -10,7 +10,7 @@ import {
   type SessionId,
   type TurnId,
 } from '@workspace/contracts'
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { openTestChat, draftChatTurn } from './chat'
 import { renderTui } from '../render'
 import type { TestServer } from '../server'

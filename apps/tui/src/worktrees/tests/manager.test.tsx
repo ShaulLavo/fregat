@@ -1,7 +1,7 @@
 import { access, readFile, writeFile } from 'node:fs/promises'
 import { act } from 'react'
 import { ScrollBoxRenderable, SelectRenderable } from '@opentui/core'
-import { Application } from '@/components/application'
+import { Application } from '@/app/application'
 import { createWorktreeActions } from '@/worktrees/state/actions'
 import { test, expect } from '../../../test/fixtures'
 import { renderTui } from '../../../test/render'

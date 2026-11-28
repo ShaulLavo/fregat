@@ -11,7 +11,7 @@ import { Spinner } from '@workspace/ui/components/spinner'
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { selectServerConnection } from '@workspace/client-core/environments/state/store'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
-import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
+import { readEnvironmentDescriptor } from '@/lib/environments/state/descriptor'
 import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import { StatusFrame } from '@workspace/ui/patterns/status-frame'
 
