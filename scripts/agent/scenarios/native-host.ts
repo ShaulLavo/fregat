@@ -81,12 +81,13 @@ export const nativeHost: Scenario = {
           },
         })
         const deadline = Date.now() + 20_000
-        while (Date.now() < deadline) {
+        let ready = false
+        while (!ready && Date.now() < deadline) {
           current.host.evaluate(
             `webkit.messageHandlers.platformShell.postMessage({nativeProof:(${nativeHostSelectors.readiness})})`,
           )
           await page.waitForTimeout(100)
-          if (facts && (facts as { ready: boolean }).ready && frames.length) break
+          ready = Boolean(facts && (facts as { ready: boolean }).ready && frames.length)
         }
         await evidence.json(`webkit-${action}-readiness.json`, { facts, frames })
         ok(

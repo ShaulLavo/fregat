@@ -108,27 +108,12 @@ async function changedInputPixels({
     ? thresholds.restoreChannelTolerance + 1
     : thresholds.glyphChannelDelta
   for (let cell = firstCell; cell < lastCell; cell++) {
-    let changed = 0
-    let area = 0
-    const columns = new Set()
-    for (let y = Math.floor(top); y < Math.ceil(bottom); y++) {
-      for (
-        let x = Math.floor(left + cell * cellWidth);
-        x < Math.ceil(left + (cell + 1) * cellWidth);
-        x++
-      ) {
-        area++
-        const offset = (y * baseline.width + x) * 4
-        const difference = Math.max(
-          Math.abs(baseline.pixels[offset] - compared.pixels[offset]),
-          Math.abs(baseline.pixels[offset + 1] - compared.pixels[offset + 1]),
-          Math.abs(baseline.pixels[offset + 2] - compared.pixels[offset + 2]),
-        )
-        if (difference < channelDelta) continue
-        changed++
-        columns.add(x)
-      }
-    }
+    const { changed, area, columns } = countChangedPixels(baseline, compared, channelDelta, {
+      top,
+      bottom,
+      firstColumn: Math.floor(left + cell * cellWidth),
+      lastColumn: Math.ceil(left + (cell + 1) * cellWidth),
+    })
     const fraction = changed / area
     if (restored) {
       if (fraction > thresholds.maxRestoreChangedFraction) return false
@@ -143,6 +128,28 @@ async function changedInputPixels({
       return false
   }
   return true
+}
+
+function countChangedPixels(baseline, compared, channelDelta, box) {
+  const { top, bottom, firstColumn, lastColumn } = box
+  let changed = 0
+  let area = 0
+  const columns = new Set()
+  for (let y = Math.floor(top); y < Math.ceil(bottom); y++) {
+    for (let x = firstColumn; x < lastColumn; x++) {
+      area++
+      const offset = (y * baseline.width + x) * 4
+      const difference = Math.max(
+        Math.abs(baseline.pixels[offset] - compared.pixels[offset]),
+        Math.abs(baseline.pixels[offset + 1] - compared.pixels[offset + 1]),
+        Math.abs(baseline.pixels[offset + 2] - compared.pixels[offset + 2]),
+      )
+      if (difference < channelDelta) continue
+      changed++
+      columns.add(x)
+    }
+  }
+  return { changed, area, columns }
 }
 
 function focusInput(element) {

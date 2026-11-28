@@ -2,13 +2,13 @@
 
 Owner direction, 2026-09-28: [Markdown experiences](../.internal/markdown-experiences.md)
 extends the target to visual and source-revealing authoring, rich composition and
-streaming chat on our parser. Keeping remark for chat and split rendering was
-the scope of the completed integration below. Migrating those consumers remains
-required future work, with streaming and rendering acceptance checks.
+streaming chat on our parser.
 
-The approved [chat qualification follow-up](chat-markdown-qualification.md) is scheduled later
-and does not block PR #1326. It lists later semantic, streaming, browser, visual and paired
-performance comparisons against remark under the owner's 2026-10-24 merge and delivery decision.
+[fregat#1326](https://github.com/ShaulLavo/fregat/pull/1326) merged on 2026-10-24 and switched
+streaming chat in `apps/web/src/features/chat/state/markdown-session.ts` to
+`createTreeSitterMarkdownSession` on `tree-sitter-md`. Split file preview still uses remark.
+The approved [chat qualification follow-up](chat-markdown-qualification.md) covers semantic,
+streaming, browser, visual, and paired performance comparisons against remark.
 
 ## Status and authorization
 
@@ -16,7 +16,7 @@ performance comparisons against remark under the owner's 2026-10-24 merge and de
   Owner adopted `tree-sitter-md` on 2026-09-26. The C resolver rewrite and the subsequent
   `tree-sitter-x` extension migration have landed upstream. Phase 0 below is the remaining
   release gate; do not repeat those migrations. The parser serves the source-backed live preview
-  and future rendered blocks inside the Editor. Chat and the existing split renderer keep remark.
+  and future rendered blocks inside the Editor.
 - Released parser: `tree-sitter-md@0.1.0`, source `5dd917a`. Editor integration and Platform
   CI pin: `7edf180cea1e03a477db4c4626d39c9e985cdb3b`.
 - The original research and Rust measurements below are historical. The

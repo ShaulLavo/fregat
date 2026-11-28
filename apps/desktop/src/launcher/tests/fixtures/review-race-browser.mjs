@@ -78,20 +78,24 @@ for await (const chunk of Bun.file(3).stream()) {
   while ((end = buffered.indexOf('\0')) !== -1) {
     const msg = JSON.parse(buffered.slice(0, end))
     buffered = buffered.slice(end + 1)
-    if (msg.method === 'PWA.getOsAppState') {
-      await Bun.write(marker + '.installing', String(process.pid))
-      while (!existsSync(marker + '.release')) await Bun.sleep(10)
-    }
-    let result = msg.method === 'Browser.getVersion' ? { product: 'Chrome/154.0.1' } : {}
-    if (msg.method === 'Target.getTargets')
-      result = {
-        targetInfos: existsSync(marker + '.targets')
-          ? readFileSync(marker + '.targets', 'utf8')
-              .trim()
-              .split('\n')
-              .map((line) => JSON.parse(line))
-          : [],
-      }
-    writeSync(4, JSON.stringify({ id: msg.id, result }) + '\0')
+    await respond(msg)
   }
+}
+
+async function respond(msg) {
+  if (msg.method === 'PWA.getOsAppState') {
+    await Bun.write(marker + '.installing', String(process.pid))
+    while (!existsSync(marker + '.release')) await Bun.sleep(10)
+  }
+  let result = msg.method === 'Browser.getVersion' ? { product: 'Chrome/154.0.1' } : {}
+  if (msg.method === 'Target.getTargets')
+    result = {
+      targetInfos: existsSync(marker + '.targets')
+        ? readFileSync(marker + '.targets', 'utf8')
+            .trim()
+            .split('\n')
+            .map((line) => JSON.parse(line))
+        : [],
+    }
+  writeSync(4, JSON.stringify({ id: msg.id, result }) + '\0')
 }
