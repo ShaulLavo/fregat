@@ -11,7 +11,8 @@ import {
   readTerminalSnapshotPathLinks,
   type TerminalSnapshotPathLink,
 } from '@/features/terminal/utils/links'
-import { reportError, toClientError } from '@/lib/client-error-taxonomy'
+import { toClientError } from '@/lib/client-error-taxonomy'
+import { reportError } from '@/lib/client-error-feedback'
 import { log } from '@/lib/client-logging'
 import { statPath } from '@/lib/file-server'
 import { isFileEntry } from '@/lib/file-system-types'
