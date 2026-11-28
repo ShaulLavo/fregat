@@ -1,5 +1,42 @@
 # Structure debt that existed when this project adopted unknot.
 # Remove each entry as its finding is fixed.
-# rules: field-leak forward-ref import-cycle import-cycle-edge long-file module-cycle prop-drilling shallow-module tangle wide-directory wide-injection
+# rules: field-leak forward-ref import-cycle import-cycle-edge long-file module-cycle module-cycle-edge prop-drilling shallow-module tangle wide-directory wide-injection
 module-cycle src/agent-models/components <-> src/agent-rail/components <-> src/agent-stage/components <-> src/agent/components <-> src/commands/components <-> src/components <-> src/editor/components <-> src/editor/providers <-> src/files/components <-> src/git/components <-> src/logs/components <-> src/navigation/components <-> src/search/components <-> src/settings/components <-> src/terminal/components <-> src/tree/components <-> src/viewer/components <-> src/workbench/components <-> src/worktrees/components
+module-cycle-edge src/agent-models/components -> src/components
+module-cycle-edge src/agent-rail/components -> src/components
+module-cycle-edge src/agent-rail/components -> src/worktrees/components
+module-cycle-edge src/agent-stage/components -> src/agent-models/components
+module-cycle-edge src/agent-stage/components -> src/components
+module-cycle-edge src/agent-stage/components -> src/terminal/components
+module-cycle-edge src/agent-stage/components -> src/worktrees/components
+module-cycle-edge src/agent/components -> src/agent-rail/components
+module-cycle-edge src/agent/components -> src/agent-stage/components
+module-cycle-edge src/agent/components -> src/components
+module-cycle-edge src/commands/components -> src/components
+module-cycle-edge src/components -> src/agent/components
+module-cycle-edge src/components -> src/commands/components
+module-cycle-edge src/components -> src/editor/providers
+module-cycle-edge src/components -> src/files/components
+module-cycle-edge src/components -> src/navigation/components
+module-cycle-edge src/components -> src/settings/components
+module-cycle-edge src/components -> src/workbench/components
+module-cycle-edge src/editor/components -> src/components
+module-cycle-edge src/editor/providers -> src/editor/components
+module-cycle-edge src/files/components -> src/components
+module-cycle-edge src/git/components -> src/components
+module-cycle-edge src/logs/components -> src/components
+module-cycle-edge src/navigation/components -> src/components
+module-cycle-edge src/search/components -> src/components
+module-cycle-edge src/settings/components -> src/components
+module-cycle-edge src/terminal/components -> src/components
+module-cycle-edge src/tree/components -> src/components
+module-cycle-edge src/viewer/components -> src/components
+module-cycle-edge src/workbench/components -> src/components
+module-cycle-edge src/workbench/components -> src/git/components
+module-cycle-edge src/workbench/components -> src/logs/components
+module-cycle-edge src/workbench/components -> src/search/components
+module-cycle-edge src/workbench/components -> src/terminal/components
+module-cycle-edge src/workbench/components -> src/tree/components
+module-cycle-edge src/workbench/components -> src/viewer/components
+module-cycle-edge src/worktrees/components -> src/components
 prop-drilling src/components/foundation.tsx#Foundation.theme

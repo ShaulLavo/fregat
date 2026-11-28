@@ -3,7 +3,7 @@ import type {
   SessionInteractionModeSetCommand,
   SessionRuntimeModeSetCommand,
 } from '@workspace/contracts'
-import { type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import {

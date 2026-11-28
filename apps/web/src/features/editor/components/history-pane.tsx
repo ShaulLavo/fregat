@@ -31,7 +31,7 @@ import {
   historyClearMutationOptions,
   historyRestoreMutationOptions,
 } from '@/features/editor/state/history-mutations'
-import { type HistoryComparisonResult } from '@/features/editor/utils/history-compare'
+import type { HistoryComparisonResult } from '@/features/editor/utils/history-compare'
 import {
   historyStateExcerpt,
   historyStateLabel,

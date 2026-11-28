@@ -12,7 +12,7 @@ import {
   tabId,
 } from '@/lib/documents/utils/identity'
 import { act, screen, waitFor, within } from '@testing-library/react'
-import { type SettingId } from '@workspace/contracts'
+import type { SettingId } from '@workspace/contracts'
 import userEvent from '@testing-library/user-event'
 import { createEditorTextBuffer, createEditorViewSession } from '@singapore-editor/core/document'
 
