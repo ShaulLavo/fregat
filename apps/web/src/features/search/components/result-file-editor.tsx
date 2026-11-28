@@ -53,26 +53,22 @@ import { fontStack } from '@/lib/fonts/utils/stack'
 
 type SearchResultFileEditorProps = {
   activeResultId: SearchResultId | null
-  canReplace?: boolean
   editorTheme: EditorTheme
   file: SearchResultFileBlock
 
   lineWindow: SearchResultFileEditorLineWindow
   /** Waiting in the pool for the next file: the editor stays built, its document is released. */
   parked: boolean
-  replaceVisible: boolean
 }
 
 export const SearchResultFileEditor = memo(
   ({
     activeResultId,
-    canReplace,
     editorTheme,
     file,
 
     lineWindow,
     parked,
-    replaceVisible,
   }: SearchResultFileEditorProps) => {
     const { openTarget, replaceMatch, selectResultWithoutReveal } = useSearchResultActions()
     // Manual memo: `fileDocument` is a useMemo dependency, and the compiler's cache is a
@@ -254,10 +250,8 @@ export const SearchResultFileEditor = memo(
           </div>
           {parked ? null : (
             <SearchResultFileLineActions
-              canReplace={canReplace}
               document={visibleDocument}
               lineActionRowsRef={lineActionRowsRef}
-              replaceVisible={replaceVisible}
               onOpenLine={handleOpenLine}
               onReplaceLine={handleReplaceLine}
             />

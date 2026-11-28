@@ -23,14 +23,6 @@ module-cycle src/components <-> src/components/pdf-viewer <-> src/features/addre
 module-cycle src/lib/code-theme/state <-> src/lib/highlighting/state
 module-cycle src/lib/environments/state <-> src/lib/environments/utils
 module-cycle src/lib/keep-alive/components <-> src/lib/keep-alive/hooks <-> src/lib/keep-alive/providers
-prop-drilling src/features/file-picker/components/places-sheet.tsx#PlacesSheet.currentPath
-prop-drilling src/features/file-picker/components/places-sidebar.tsx#PlacesSidebar.currentPath
-prop-drilling src/features/search/components/result-editor-surface.tsx#SearchResultEditorSurface.canReplace
-prop-drilling src/features/search/components/result-editor-surface.tsx#SearchResultEditorSurface.replaceVisible
-prop-drilling src/features/search/components/results-view.tsx#SearchResultsView.query
-prop-drilling src/features/workbench/components/layout.tsx#WorkbenchLayout.conflicts
-prop-drilling src/features/workbench/components/layout.tsx#WorkbenchLayout.gitFiles
-prop-drilling src/features/workbench/components/layout.tsx#WorkbenchLayout.rootPath
 wide-directory src/components
 wide-directory src/features/chat-mode/components
 wide-directory src/features/chat/components

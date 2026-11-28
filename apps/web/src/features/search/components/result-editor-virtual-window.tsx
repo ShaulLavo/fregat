@@ -17,12 +17,10 @@ import { useSearchResultFileEditorSlots } from '@/features/search/hooks/use-resu
 
 type SearchResultEditorVirtualWindowProps = {
   readonly activeResultId: SearchResultId | null
-  readonly canReplace?: boolean
   readonly editorTheme: EditorTheme
   readonly initialViewport: SearchResultVirtualListViewport
 
   readonly parentRef: RefObject<HTMLDivElement | null>
-  readonly replaceVisible: boolean
   readonly rows: readonly SearchResultVirtualRow[]
   readonly scrollToIndexRef: RefObject<SearchResultEditorScrollToIndex>
   readonly scrollToOffsetRef: RefObject<(offset: number) => void>
@@ -32,12 +30,10 @@ type SearchResultEditorVirtualWindowProps = {
 export const SearchResultEditorVirtualWindow = memo(
   ({
     activeResultId,
-    canReplace,
     editorTheme,
     initialViewport,
 
     parentRef,
-    replaceVisible,
     rows,
     scrollToIndexRef,
     scrollToOffsetRef,
@@ -78,9 +74,7 @@ export const SearchResultEditorVirtualWindow = memo(
           return (
             <SearchResultFileHeaderRow
               activeResultId={activeResultId}
-              canReplace={canReplace}
               key={renderKey}
-              replaceVisible={replaceVisible}
               row={row}
               treeId={treeId}
               virtualItem={virtualItem}
@@ -90,10 +84,8 @@ export const SearchResultEditorVirtualWindow = memo(
         {fileEditorSlots.map((slot) => (
           <SearchResultFileEditorPoolSlot
             activeResultId={activeResultId}
-            canReplace={canReplace}
             editorTheme={editorTheme}
             key={slot.key}
-            replaceVisible={replaceVisible}
             slot={slot}
             treeId={treeId}
           />

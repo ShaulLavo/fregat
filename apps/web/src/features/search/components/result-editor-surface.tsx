@@ -1,3 +1,4 @@
+import { SearchResultReplacementContext } from '@/features/search/providers/result-view-context'
 import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
 import { createSearchResultVirtualListMetrics } from '@/features/search/utils/result-virtual-list'
 import {
@@ -204,20 +205,22 @@ export const SearchResultEditorSurface = memo(
         onKeyDown={handleKeyDown}
       >
         <SearchResultActionsContext value={editorActions}>
-          <SearchFileMenuContext value={openFileMenu}>
-            <SearchResultEditorVirtualWindow
-              activeResultId={activeResultId}
-              canReplace={canReplace}
-              editorTheme={editorTheme}
-              initialViewport={initialViewport}
-              parentRef={parentRef}
-              replaceVisible={replaceVisible}
-              rows={rows}
-              scrollToIndexRef={scrollToIndexRef}
-              scrollToOffsetRef={scrollToOffsetRef}
-              treeId={treeId}
-            />
-          </SearchFileMenuContext>
+          <SearchResultReplacementContext
+            value={{ canReplace: canReplace ?? false, replaceVisible }}
+          >
+            <SearchFileMenuContext value={openFileMenu}>
+              <SearchResultEditorVirtualWindow
+                activeResultId={activeResultId}
+                editorTheme={editorTheme}
+                initialViewport={initialViewport}
+                parentRef={parentRef}
+                rows={rows}
+                scrollToIndexRef={scrollToIndexRef}
+                scrollToOffsetRef={scrollToOffsetRef}
+                treeId={treeId}
+              />
+            </SearchFileMenuContext>
+          </SearchResultReplacementContext>
           {contextMenu.anchor && menuTarget ? (
             <SearchFileMenu
               anchor={contextMenu.anchor}
