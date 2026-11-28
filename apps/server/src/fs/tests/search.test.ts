@@ -11,9 +11,9 @@ import {
   findInWorkspace,
   findInWorkspaceStream,
   type SearchStreamEvent,
-} from '../search'
+} from '../search/query'
 import { createWorkspacePaths, defaultIgnoredNames } from '../path'
-import { readLines } from '../search-line-decoder'
+import { readLines } from '../search/line-decoder'
 import { WorkspaceIndex, buildWorkspaceIndex } from '../workspace-index'
 
 // Tests must not depend on whatever the developer has in their global git

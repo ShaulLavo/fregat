@@ -132,24 +132,24 @@ import {
   splitSessionOffMcp,
   unapprovedProjectMcpServers,
   type SessionOffMcp,
-} from './utils/claude-project-mcp'
+} from './utils/mcp/claude-project'
 import {
   claudeMcpConfigAccess,
   defaultClaudeMcpCli,
   type ClaudeMcpCli,
-} from './utils/claude-mcp-config'
+} from './utils/mcp/claude-config'
 import {
   defaultClaudeMcpLoginSpawn,
   startClaudeMcpSignIn,
   type ClaudeMcpLoginSpawn,
-} from './utils/claude-mcp-sign-in'
+} from './utils/mcp/claude-sign-in'
 import {
   ClaudeMcpStatusWatch,
   claudeMcpServer,
   gatedProjectMcpServer,
   sessionOffPlaceholder,
   sessionOffServer,
-} from './utils/claude-mcp-status'
+} from './utils/mcp/claude-status'
 import { asRecord, numberField, stringField } from './utils/records'
 import { noop, runtimeEventId } from './utils/runtime-ids'
 import { reopenWithMcpOff, sessionInputFromTurn } from './utils/session-input'

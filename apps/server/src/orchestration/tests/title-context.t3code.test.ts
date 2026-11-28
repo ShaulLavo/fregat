@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { formatSessionTitleContext } from '../title-context'
+import { formatSessionTitleContext } from '../titles/title-context'
 import { titleMessages } from '../../../test/factories/title-context'
 import { pinnedT3codeSource, requireT3codeReference } from '../../testing/t3code-reference'
 

@@ -5,8 +5,8 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { createWorkspacePaths } from '../path'
-import { DiskWorkspaceSearchProvider, type SearchStreamEvent } from '../search'
-import { parseRgMatchLine } from '../search-rg-parser'
+import { DiskWorkspaceSearchProvider, type SearchStreamEvent } from '../search/query'
+import { parseRgMatchLine } from '../search/rg-parser'
 
 const roots: string[] = []
 const rgExecutable = Bun.which('rg')

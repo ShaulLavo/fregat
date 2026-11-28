@@ -1,7 +1,7 @@
 import { AsyncQueue } from '../async-queue'
 import { LiveStreamBudget, type RetainedLiveItem } from './live-stream-budget'
 import { errorMessage as reactorErrorMessage } from '@workspace/contracts'
-import { referencingSessionIds, worktreesAffectedByEvent } from './worktree-projection'
+import { referencingSessionIds, worktreesAffectedByEvent } from './worktrees/worktree-projection'
 import {
   ORCHESTRATION_RESUME_MAX_GAP,
   type OrchestrationShellStreamFrame,

@@ -20,7 +20,7 @@
   "apps/server/src/orchestration/tests/title-normalization.test.ts": {
     "thread": 1
   },
-  "apps/server/src/orchestration/title-normalization.ts": {
+  "apps/server/src/orchestration/titles/title-normalization.ts": {
     "thread": 1
   },
   "apps/server/src/provider/adapters/codex-protocol/generate.ts": {

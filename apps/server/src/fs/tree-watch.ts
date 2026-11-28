@@ -1,7 +1,7 @@
 import { operatorErrorSummary } from '../observability'
 import type { WatchServerMessage } from './contracts'
 import type { WorkspacePaths } from './path'
-import type { FileChangeHub } from './watch'
+import type { FileChangeHub } from './watch/service'
 
 export type TreeWatch = {
   /** Absolute directory. */

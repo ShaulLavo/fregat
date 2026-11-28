@@ -18,8 +18,8 @@ import {
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../../git/service'
 import { OrchestrationEngine } from '../engine'
-import { SessionDeletionReactor } from '../session-deletion-reactor'
-import { WorktreeLifecycleReactor } from '../worktree-lifecycle-reactor'
+import { SessionDeletionReactor } from '../session-lifecycle/session-deletion-reactor'
+import { WorktreeLifecycleReactor } from '../worktrees/worktree-lifecycle-reactor'
 
 const fixtures: Awaited<ReturnType<typeof worktreeLifecycleFixture>>[] = []
 const engines: OrchestrationEngine[] = []

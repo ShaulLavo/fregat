@@ -1,5 +1,5 @@
 import { FileReadSessions, defaultReadSessionLimits, type ReadSessionLimits } from './read-sessions'
-import { workspaceIndexForSearch } from './search-shared'
+import { workspaceIndexForSearch } from './search/shared'
 import { elapsedMs } from '@workspace/utils/timing'
 import { homedir } from 'node:os'
 import path from 'node:path'
@@ -12,7 +12,7 @@ import {
 } from '@workspace/contracts'
 import { platformHomePath } from '../home'
 import { createWorkspacePaths } from './path'
-import { FileChangeHub } from './watch'
+import { FileChangeHub } from './watch/service'
 import { entryFromStat } from './entry'
 import { DEFAULT_MAX_TEXT_FILE_BYTES, MAX_TEXT_FILE_BYTES_UPPER_BOUND } from './limits'
 import { statPath } from './stat'
@@ -41,7 +41,7 @@ import {
   recordRequestWarning,
   recordStreamSummary,
 } from '../observability'
-import { findInWorkspaceStream, type FindOptions, type SearchStreamEvent } from './search'
+import { findInWorkspaceStream, type FindOptions, type SearchStreamEvent } from './search/query'
 import { FsError, isFsError } from './errors'
 import type { MetadataDatabaseHandle } from '../db/client'
 import { FsMetadataStore } from './metadata'

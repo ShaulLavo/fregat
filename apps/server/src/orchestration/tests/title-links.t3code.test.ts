@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { sessionTitleLinks, titleSourceLink } from '../title-links'
+import { sessionTitleLinks, titleSourceLink } from '../titles/title-links'
 import { pinnedT3codeSource, requireT3codeReference } from '../../testing/t3code-reference'
 
 const github = 'https://github.com/org/repo/pull/42'

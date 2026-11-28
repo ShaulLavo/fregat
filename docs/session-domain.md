@@ -7,7 +7,7 @@ and [the database schema](../apps/server/src/db/schema.ts).
 
 ## Registration and paths
 
-[Registration](../apps/server/src/orchestration/registration.ts) resolves filesystem input before
+[Registration](../apps/server/src/orchestration/session-lifecycle/registration.ts) resolves filesystem input before
 committing a project or worktree. Repository identity uses a normalized origin remote, then a
 reachable root commit. A non-Git directory uses its canonical path. SHA-256 repository keys and
 separate UUIDv5 namespaces make repository IDs repeat across environments while checkout IDs
@@ -65,7 +65,7 @@ sessions through `thread/list` and `thread/read`, without resuming them. App ses
 that provider's local Codex home. Claude app chats and cloud-only conversations are outside this import.
 
 `chat.keepImportedSessionsUpdated` defaults to true. The
-[reconciler](../apps/server/src/orchestration/session-discovery.ts) checks previously imported chats
+[reconciler](../apps/server/src/orchestration/session-lifecycle/session-discovery.ts) checks previously imported chats
 on startup and every minute. It never adds new chats in the background. Unchanged source metadata
 skips transcript reads. Sending the first Platform message stops external updates, including after
 a checkpoint rollback. The composer notice explains this handoff. Continuing uses the original

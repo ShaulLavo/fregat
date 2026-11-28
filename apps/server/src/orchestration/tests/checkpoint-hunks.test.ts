@@ -10,8 +10,8 @@ import {
   turnIdSchema,
 } from '@workspace/contracts'
 
-import { OrchestrationCheckpointDiffQuery } from '../checkpoint-diff-query'
-import { OrchestrationCheckpointHunks } from '../checkpoint-hunks'
+import { OrchestrationCheckpointDiffQuery } from '../checkpoints/checkpoint-diff-query'
+import { OrchestrationCheckpointHunks } from '../checkpoints/checkpoint-hunks'
 import { checkpointRefForSessionTurn } from '../checkpoint-refs'
 import {
   checkpointOrchestration,

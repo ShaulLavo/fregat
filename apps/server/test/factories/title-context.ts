@@ -1,6 +1,6 @@
 import * as v from 'valibot'
 import { chatAttachmentSchema } from '@workspace/contracts'
-import type { SessionTitleMessage } from '../../src/orchestration/title-context'
+import type { SessionTitleMessage } from '../../src/orchestration/titles/title-context'
 
 export const titleAttachment = (id: string) =>
   v.parse(chatAttachmentSchema, {

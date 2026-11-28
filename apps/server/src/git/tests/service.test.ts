@@ -1,7 +1,7 @@
 import {
   checkpointFilesFromDiffs,
   checkpointFilesFromUnifiedDiff,
-} from '../../orchestration/checkpoint-files'
+} from '../../orchestration/checkpoints/checkpoint-files'
 import { readTextResponse } from '../../../test/file-transport'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

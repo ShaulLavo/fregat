@@ -10,7 +10,7 @@ import {
 } from 'node:fs/promises'
 import path from 'node:path'
 import { createWorkspacePaths, isSameOrDescendant } from '../path'
-import { FileChangeHub } from '../watch'
+import { FileChangeHub } from '../watch/service'
 import { WorkspaceEditController } from '../workspace-edit'
 import { WorkspaceEditJournal } from '../workspace-edit-journal'
 import { expect } from 'vitest'

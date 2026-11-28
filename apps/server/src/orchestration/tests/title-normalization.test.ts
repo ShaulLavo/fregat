@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { sanitizeSessionTitle } from '../title-normalization'
+import { sanitizeSessionTitle } from '../titles/title-normalization'
 
 test.each([
   ['  "Fix   worker crashes"\nExtra explanation', 'Fix worker crashes'],

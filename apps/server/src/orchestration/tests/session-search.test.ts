@@ -8,12 +8,12 @@ import {
 } from '@workspace/contracts'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../../git/service'
-import { OrchestrationCheckpointHunks } from '../checkpoint-hunks'
-import { OrchestrationCheckpointDiffQuery } from '../checkpoint-diff-query'
+import { OrchestrationCheckpointHunks } from '../checkpoints/checkpoint-hunks'
+import { OrchestrationCheckpointDiffQuery } from '../checkpoints/checkpoint-diff-query'
 import { OrchestrationEngine } from '../engine'
 import type { OrchestrationDatabase } from '../event-store'
 import { orchestrationRoutes } from '../routes'
-import { OrchestrationSessionSearchQuery } from '../session-search-query'
+import { OrchestrationSessionSearchQuery } from '../session-lifecycle/session-search-query'
 import {
   createProjectionFixture,
   PROJECT_ID,

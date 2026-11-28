@@ -30,7 +30,7 @@ chooses a connected machine and opens its folder picker through that machine's q
 [PickerDialog](../apps/web/src/features/environments/components/picker-dialog.tsx) trusts machine
 identity through `connections.trustMachine`. [Environment commands](../packages/client-core/src/commands/environment.ts)
 cover connection and switching. Checkout preparation has an
-[execution gate](../apps/server/src/orchestration/worktree-execution-gate.ts) and a
+[execution gate](../apps/server/src/orchestration/worktrees/worktree-execution-gate.ts) and a
 [setup runner](../apps/server/src/orchestration/setup-runner.ts), but neither establishes a
 repository trust policy. Editor currently has document sessions in
 `/work/projects/Editor/packages/editor/src/documentSession.ts`; trust decisions belong to the

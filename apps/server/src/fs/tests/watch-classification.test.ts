@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { WatchServerMessage } from '../contracts'
 import { createWorkspacePaths } from '../path'
-import { FileChangeHub, nativeEventType } from '../watch'
+import { FileChangeHub, nativeEventType } from '../watch/service'
 
 // macOS reports every mutation to `fs.watch` as a bare `rename`, so these tests
 // exercise the only thing standing between an editor save and the client being

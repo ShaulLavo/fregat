@@ -2,7 +2,7 @@ import { afterEach, expect, it } from 'vitest'
 import { createOrchestrationFixture } from '../../../test/factories/orchestration'
 import { requireWorktree } from '../read-model'
 import { TerminalLeaseController } from '../terminal-lease-controller'
-import { WorktreeExecutionGate } from '../worktree-execution-gate'
+import { WorktreeExecutionGate } from '../worktrees/worktree-execution-gate'
 
 const fixtures: Awaited<ReturnType<typeof createOrchestrationFixture>>[] = []
 afterEach(async () => {

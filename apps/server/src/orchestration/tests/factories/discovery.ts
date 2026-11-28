@@ -14,8 +14,8 @@ import { GitService } from '../../../git/service'
 import { runGit } from '../../../testing/git'
 import { OrchestrationEngine } from '../../engine'
 import { createProjectionFixture } from './projection'
-import { OrchestrationSessionSearchQuery } from '../../session-search-query'
-import { SessionDiscoveryReconciler } from '../../session-discovery'
+import { OrchestrationSessionSearchQuery } from '../../session-lifecycle/session-search-query'
+import { SessionDiscoveryReconciler } from '../../session-lifecycle/session-discovery'
 
 export function discoveryHistory(text = 'Existing conversation'): ProviderHistoryMessage[] {
   return [

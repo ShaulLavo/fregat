@@ -4,10 +4,10 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { createWorkspacePaths } from '../path'
-import { createFindContext } from '../search'
-import { searchWithFallback } from '../search-fallback'
-import { safeEntryStats } from '../search-shared'
-import type { FindMatch, FindOptions } from '../search-shared'
+import { createFindContext } from '../search/query'
+import { searchWithFallback } from '../search/fallback'
+import { safeEntryStats } from '../search/shared'
+import type { FindMatch, FindOptions } from '../search/shared'
 
 // `fd`/`rg` decide which provider `findInWorkspaceStream` picks, and CI installs
 // both — so the fallback is only reachable here by calling it directly.

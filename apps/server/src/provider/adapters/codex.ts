@@ -10,7 +10,7 @@ import {
   codexMcpDefinitions,
   codexMcpServer,
   type CodexMcpDefinition,
-} from './utils/codex-mcp-status'
+} from './utils/mcp/codex-status'
 import {
   CODEX_MCP_SCOPES,
   codexMcpConfigServers,
@@ -20,7 +20,7 @@ import {
   layerServers,
   requireCodexScope,
   userLayer,
-} from './utils/codex-mcp-config'
+} from './utils/mcp/codex-config'
 import { offeredOptions, offeredResponse, type ApprovalOffer } from './utils/approval-offers'
 import { codexCommandApprovalOffers } from './utils/codex-command-approval'
 import { parseCodexElicitation } from './utils/codex-elicitation'

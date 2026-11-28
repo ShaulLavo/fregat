@@ -28,7 +28,7 @@ The first implementation works without SharedArrayBuffer.
 - [Platform search providers](../apps/web/src/features/search/utils/providers.ts)
   already combine disk and open-buffer search, preserve dirty-buffer precedence, and stream events.
 - [Platform search batching](../apps/web/src/features/search/utils/buffer-runner.ts)
-  already batches results into its UI. [Disk search](../apps/server/src/fs/search.ts)
+  already batches results into its UI. [Disk search](../apps/server/src/fs/search/query.ts)
   is an existing server concern. Cross-file search itself is not a missing Platform feature.
 
 ## Scope

@@ -31,10 +31,10 @@ import {
   workspaceAddressParamsSchema,
 } from './contracts'
 import { errorPayload, FsError, isFsError } from './errors'
-import type { SearchStreamEvent } from './search'
+import type { SearchStreamEvent } from './search/query'
 import type { FileSystemService } from './service'
 import type { SystemService } from '../system/service'
-import { parseWatchInputs } from './watch'
+import { parseWatchInputs } from './watch/service'
 import { sseResponse, toErrorYieldingSse, toSse } from '../sse'
 
 /** The only native chooser endpoint: the service re-checks locality for every request. */

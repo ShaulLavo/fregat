@@ -25,9 +25,9 @@ import {
   TURN_ENDED_ACTIVITY_KIND,
   type ProviderTurnOrigin,
 } from '@workspace/contracts'
-import { endedApprovalActivityId } from './approval-admission'
+import { endedApprovalActivityId } from './requests/approval-admission'
 import type { ProviderRuntimeEvent } from '../provider/types'
-import { checkpointFilesFromUnifiedDiff } from './checkpoint-files'
+import { checkpointFilesFromUnifiedDiff } from './checkpoints/checkpoint-files'
 import { checkpointRefForSessionTurn } from './checkpoint-refs'
 import type { OrchestrationProjectedSession, OrchestrationReadModel } from './read-model'
 import {

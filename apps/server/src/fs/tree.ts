@@ -1,4 +1,4 @@
-import { joinRelative } from './search-shared'
+import { joinRelative } from './search/shared'
 import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import {

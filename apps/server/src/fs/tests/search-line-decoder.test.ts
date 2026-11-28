@@ -1,7 +1,7 @@
 import { Readable } from 'node:stream'
 
 import { test, expect } from 'vitest'
-import { streamLines } from '../search-line-decoder'
+import { streamLines } from '../search/line-decoder'
 
 test('decodes physical lines with split UTF-8 and CRLF bytes', async () => {
   const bytes = Buffer.from('café\r\n😀 needle\nlast')

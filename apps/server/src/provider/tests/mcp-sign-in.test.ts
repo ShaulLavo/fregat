@@ -5,7 +5,7 @@ import {
   authorizationUrlIn,
   startClaudeMcpSignIn,
   type ClaudeMcpLoginProcess,
-} from '../adapters/utils/claude-mcp-sign-in'
+} from '../adapters/utils/mcp/claude-sign-in'
 
 const AUTHORIZATION =
   'https://auth.example.test/authorize?client_id=c&redirect_uri=http%3A%2F%2Flocalhost%3A56536%2Fcallback&state=s-1'
